@@ -28,7 +28,6 @@ import type { AiStatus } from '@/modules/ai/ai';
 import { autosaveDraftAction, previewQueueAction, saveQueueComposerAction, type QueueComposerState as ComposerActionState, type QueuePreviewState } from './queue-actions';
 import { fill } from './queue-copy';
 import { holdsRemotely, leadLabel } from './remote-copy';
-import { formatDate } from '@/modules/publishing/ui/publishing-ui';
 import styles from './PostComposer.module.css';
 import { ComposerCopyProvider } from './CopyProvider';
 
@@ -146,7 +145,9 @@ function PostComposerContent({ copyCatalog = composerCatalogDefaults, profiles, 
   const [link, setLink] = useState(initial.link ?? '');
   const [selectedTargets, setSelectedTargets] = useState<string[]>(initial.targetIds ?? initialTargetIds);
   const [formatChoices, setFormatChoices] = useState<Record<string, string>>(() => parseFormats(initial.destinationFormatsJson));
+  const [publishNowFlag, setPublishNowFlag] = useState(false);
   const [scheduleDate, setScheduleDate] = useState(initial.scheduleDate ?? schedule.date);
+  useEffect(() => { if (!pending) setPublishNowFlag(false); }, [pending]);
   const [scheduleTime, setScheduleTime] = useState(initial.scheduleTime ?? schedule.time);
   const [mode, setMode] = useState<'draft' | 'schedule' | 'queue'>((initial.intent as 'draft' | 'schedule' | 'queue') ?? 'draft');
   const [scheduleMode, setScheduleMode] = useState<'application' | 'remote'>(initial.scheduleMode === 'remote' || initial.scheduleMode === 'application' ? initial.scheduleMode : remoteScheduling?.defaultMode ?? 'application');
@@ -260,13 +261,14 @@ function PostComposerContent({ copyCatalog = composerCatalogDefaults, profiles, 
       data.set('message', message); data.set('firstComment', firstComment); data.set('firstCommentDelayMinutes', firstCommentDelayMinutes);
       data.set('labelId', labelId); data.set('link', link); data.set('mediaJson', JSON.stringify(attachments.media)); data.set('destinationFormatsJson', destinationFormatsJson);
       for (const id of selected.map(target => target.id)) data.append('targetIds', id);
+      data.append('queueLocale', aiLocale);
       setAutosave({ status: 'saving' });
       const run = autosaveDraftAction(draftPostId || null, data).then(result => {
         if (result.status === 'saved') {
           lastAutosaved.current = autosaveSignature;
           draftIdRef.current = result.draftPostId;
           setDraftPostId(result.draftPostId);
-          setAutosave({ status: 'saved', at: new Intl.DateTimeFormat(aiLocale, { timeZone: schedule.timeZone, hour: '2-digit', minute: '2-digit' }).format(new Date(result.savedAt)) });
+          setAutosave({ status: 'saved', at: result.savedLabel });
         } else setAutosave(result.status === 'error' ? { status: 'error' } : { status: 'idle' });
       }, () => setAutosave({ status: 'error' })).finally(() => { if (autosaveInFlight.current === run) autosaveInFlight.current = null; });
       autosaveInFlight.current = run;
@@ -399,17 +401,16 @@ function PostComposerContent({ copyCatalog = composerCatalogDefaults, profiles, 
   const toggleTarget = (id: string) => setSelectedTargets(current => current.includes(id) ? current.filter(item => item !== id) : [...current, id]);
 
   /** Pick the intent, then submit through the form so validation, uploads and the server action are the same for every button. */
-  function submitWith(next: 'draft' | 'schedule' | 'queue', when?: { date: string; time: string }) {
-    flushSync(() => { setPane('edit'); setIntent(next); if (when) { setScheduleDate(when.date); setScheduleTime(when.time); } });
+  function submitWith(next: 'draft' | 'schedule' | 'queue', when?: { date: string; time: string }, now = false) {
+    flushSync(() => { setPane('edit'); setIntent(next); setPublishNowFlag(now); if (when) { setScheduleDate(when.date); setScheduleTime(when.time); } });
     intentRef.current = next;
     formRef.current?.requestSubmit();
   }
   /** "Publish now" is a schedule a short, configurable moment ahead; the delivery worker then sends it like any scheduled post. */
   function publishNow() {
     setPublishConfirm(false);
-    const parts = new Intl.DateTimeFormat('en-CA', { timeZone: schedule.timeZone, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(new Date(Date.now() + policy.publishNowLeadMinutes * 60_000));
-    const part = (type: string) => parts.find(item => item.type === type)?.value ?? '';
-    submitWith('schedule', { date: `${part('year')}-${part('month')}-${part('day')}`, time: `${part('hour')}:${part('minute')}` });
+    // The server computes the instant (now plus the Root lead) so a browser with different time-zone data cannot shift it.
+    submitWith('schedule', { date: scheduleDate || schedule.date, time: scheduleTime || schedule.time }, true);
   }
   function leave() {
     let sameSite = false;
@@ -427,7 +428,7 @@ function PostComposerContent({ copyCatalog = composerCatalogDefaults, profiles, 
 
   const status = localError ? <p ref={feedbackRef} className={styles.alert} role="alert" tabIndex={-1}><IconAlertTriangle size={16} aria-hidden="true" /><span>{localError}</span></p>
     : state.status === 'error' ? <p ref={feedbackRef} className={styles.alert} role="alert" data-composer-error tabIndex={-1}><IconAlertTriangle size={16} aria-hidden="true" /><span>{state.message} {copy.retained}{state.saveUnconfirmed ? <> <a href="/content" target="_blank" rel="noopener noreferrer">{cc.createOpenContent}</a>.</> : ` ${copy.retry}`}</span></p>
-    : saved ? <p ref={feedbackRef} tabIndex={-1} className={styles.ok} role="status"><IconCheck size={16} aria-hidden="true" /><span>{state.queued ? fill(state.queued.status === 'pending_approval' ? copy.addedApproval : copy.added, { time: formatDate(new Date(state.queued.scheduledAt), schedule.timeZone) }) : ui.saved} {copy.opening} {state.destination && <a href={state.destination}>{copy.viewSaved}</a>}</span></p>
+    : saved ? <p ref={feedbackRef} tabIndex={-1} className={styles.ok} role="status"><IconCheck size={16} aria-hidden="true" /><span>{state.queued ? fill(state.queued.status === 'pending_approval' ? copy.addedApproval : copy.added, { time: state.queued.scheduledLabel }) : ui.saved} {copy.opening} {state.destination && <a href={state.destination}>{copy.viewSaved}</a>}</span></p>
     : uploadMessage ? <span>{uploadMessage}</span>
     : autosave.status === 'saving' ? <span>{cc.createStatusSaving}</span>
     : autosave.status === 'error' ? <span>{cc.createStatusAutosaveFailed}</span>
@@ -438,7 +439,7 @@ function PostComposerContent({ copyCatalog = composerCatalogDefaults, profiles, 
   const queueErrored = typeof queuePreview === 'object' && queuePreview?.status === 'error' && previewSelection === selectedKey;
   const queueLabel = !selected.length ? cc.createQueueNeedChannel : queuePreview === 'loading' || queuePreview === null || previewSelection !== selectedKey ? cc.createQueueLoading
     : queueErrored ? cc.createQueueRetry
-    : typeof queuePreview === 'object' && queuePreview.status === 'ready' ? fillContent(cc.createQueueAt, { when: formatDate(new Date(queuePreview.scheduledAt), schedule.timeZone) }) : cc.createQueueFull;
+    : typeof queuePreview === 'object' && queuePreview.status === 'ready' ? fillContent(cc.createQueueAt, { when: queuePreview.scheduledLabel }) : cc.createQueueFull;
 
   return <div className={styles.sheet} role="dialog" aria-modal="true" aria-labelledby={titleId} onKeyDown={onSheetKey}>
     <header className={styles.top}>
@@ -455,6 +456,7 @@ function PostComposerContent({ copyCatalog = composerCatalogDefaults, profiles, 
     <div className={styles.main} data-pane={pane}>
     <form id={FORM_ID} ref={formRef} action={formAction} onSubmit={onSubmit} className={styles.editor} noValidate onKeyDown={event => { const target = event.target as HTMLInputElement; if (event.key === 'Enter' && target.tagName === 'INPUT' && target.type !== 'submit') event.preventDefault(); }}>
       <input type="hidden" name="intent" value={intent} />
+      {publishNowFlag && <input type="hidden" name="publishNow" value="1" />}
       <input type="hidden" name="scheduleDate" value={scheduleDate} />
       <input type="hidden" name="scheduleTime" value={scheduleTime} />
       {selected.map(target => <input key={target.id} type="hidden" name="targetIds" value={target.id} />)}
@@ -556,7 +558,7 @@ function PostComposerContent({ copyCatalog = composerCatalogDefaults, profiles, 
       </div>}
       <PostPreview post={{ ...previewPost, targets: previewTargets }} authorName={authorName || ui.yourTeam} timeZone={schedule.timeZone} variant="card" mediaOverride={<AuthoringMediaPreview controller={attachments} />} />
       {mode === 'schedule' && hasTime && <p className={styles.timeNote}><IconCalendarEvent size={15} aria-hidden="true" />{fillComposerCopy(ui.schedulePreview, { date: scheduleDate, time: scheduleTime, zone: schedule.timeZone.replaceAll('_', ' ') })}</p>}
-      {mode === 'queue' && queueReady && typeof queuePreview === 'object' && queuePreview?.status === 'ready' && <p className={styles.timeNote}><IconCalendarEvent size={15} aria-hidden="true" />{fill(copy.next, { time: formatDate(new Date(queuePreview.scheduledAt), schedule.timeZone) })} <small>{copy.estimate}</small></p>}
+      {mode === 'queue' && queueReady && typeof queuePreview === 'object' && queuePreview?.status === 'ready' && <p className={styles.timeNote}><IconCalendarEvent size={15} aria-hidden="true" />{fill(copy.next, { time: queuePreview.scheduledLabel })} <small>{copy.estimate}</small></p>}
     </aside>
     </div>
 

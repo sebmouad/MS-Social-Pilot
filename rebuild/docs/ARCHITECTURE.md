@@ -872,3 +872,23 @@ loopback `listen EPERM ::1` probes; `npx next build` passes;
 `tests/browser-matrix.test.ts` + `tests/raw-sql-void-guard.test.ts`
 41/41 pass. Nothing here is browser, PostgreSQL, provider or
 production evidence beyond the stated production SHA.
+
+## Zoned times are formatted on the server (client components)
+
+Browsers can ship different time-zone data than Node (Chromium formats
+`Africa/Casablanca` one hour behind), which shifts the displayed time and breaks
+hydration. Following `4bf400f4` (Approvals), no client component formats an instant in a
+workspace/operator zone any more; the server preformats the string and passes it as a prop
+or in the action/API response: Posts first-comment due time (`firstCommentDueLabels`),
+Queue timeline (`scheduledLabel`), queue-now receipt and composer queue preview/autosave
+(`scheduledLabel`, `savedLabel`), best-time slots (`label`), Inbox sync (`syncedLabel`),
+Recipe source (`labels` from `feeds/server/recipe-labels.ts`), chat-channel last sent,
+post notes/versions/repeat (`createdLabel`, `nextLabel`) and Root diagnostics
+(`startedLabel`, `finishedLabel`). Shared helper: `publishing/server/display-time.ts`.
+"Publish now" no longer derives a wall time in the browser; the composer sends
+`publishNow=1` and the server schedules now plus the Root lead. Documented remaining
+browser-side uses (fallbacks and validation only) are listed in
+`tests/client-zoned-time-formatting.test.ts`, which also guards against regressions. UTC-only
+formatting and number formatting are unaffected. Not covered: client formatting with the
+browser's own zone (no explicit `timeZone`, e.g. Settings key tables, Analytics
+posts table), which is intentional local time or a separate hydration concern.

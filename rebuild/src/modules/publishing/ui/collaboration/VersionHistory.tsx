@@ -9,9 +9,9 @@ import { send, useAction } from './collab-client';
 import { catalogGroup, composerCatalogDefaults, type ComposerCatalog } from '../../composer-catalog';
 import styles from './collaboration.module.css';
 
-type Version = { id: string; authorName: string | null; createdAt: string; message: string };
+type Version = { id: string; authorName: string | null; createdAt: string; createdLabel?: string; message: string };
 type Receipt = { postId: string; versionId: string; approvalReset: boolean; restored: boolean; review: RestoreReview };
-export function VersionHistory({ postId, versions, restore, canWrite, canRestoreNow, timeZone, copyCatalog = composerCatalogDefaults }: { copyCatalog?: ComposerCatalog; postId: string; versions: Version[]; restore: boolean; canWrite: boolean; canRestoreNow: boolean; timeZone: string }) {
+export function VersionHistory({ postId, versions, restore, canWrite, canRestoreNow, copyCatalog = composerCatalogDefaults }: { copyCatalog?: ComposerCatalog; postId: string; versions: Version[]; restore: boolean; canWrite: boolean; canRestoreNow: boolean; timeZone?: string }) {
   const [locale, setLocale] = useState<'en' | 'fr'>('en');
   useEffect(() => { setLocale(/^fr\b/i.test(document.documentElement.lang || navigator.language) ? 'fr' : 'en'); }, []);
   const c = catalogGroup(copyCatalog, 'version', locale);
@@ -43,7 +43,7 @@ export function VersionHistory({ postId, versions, restore, canWrite, canRestore
   return <section className={styles.section} aria-labelledby="versions-title"><h2 id="versions-title">{c.title}</h2>
     {action.banner}
     {versions.length ? <div className={styles.tableWrap}><table className={styles.table}><caption className="sr-only">{c.title}</caption><thead><tr><th scope="col">{c.saved}</th><th scope="col">{c.by}</th><th scope="col">{c.text}</th>{controls && <th scope="col">{c.actions}</th>}</tr></thead>
-      <tbody>{versions.map(v => <tr key={v.id}><th scope="row">{Number.isFinite(Date.parse(v.createdAt)) ? new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short', timeZone }).format(new Date(v.createdAt)) : c.unavailable}</th><td>{v.authorName ?? c.unavailable}</td><td><span className={styles.msg}>{v.message || c.noText}</span></td>{controls && <td><Button size="sm" disabled={action.busy} onClick={() => void preview(v)}>{action.busy ? c.checking : c.restore}</Button></td>}</tr>)}</tbody></table></div> : <p className={styles.empty}>{c.empty}</p>}
+      <tbody>{versions.map(v => <tr key={v.id}><th scope="row">{v.createdLabel || c.unavailable}</th><td>{v.authorName ?? c.unavailable}</td><td><span className={styles.msg}>{v.message || c.noText}</span></td>{controls && <td><Button size="sm" disabled={action.busy} onClick={() => void preview(v)}>{action.busy ? c.checking : c.restore}</Button></td>}</tr>)}</tbody></table></div> : <p className={styles.empty}>{c.empty}</p>}
     <Dialog open={reviewOpen && Boolean(target)} title={c.review} description={c.description} closeLabel={c.cancel} busy={action.busy} onClose={() => { setReviewOpen(false); setTarget(null); }} actions={<><Button disabled={action.busy} onClick={() => { setReviewOpen(false); setTarget(null); }}>{c.cancel}</Button><Button disabled={action.busy} onClick={() => target && void preview(target.version)}>{c.refresh}</Button><Button disabled={action.busy || !target?.review.canRestore} onClick={() => void apply()}>{target?.review.exact ? c.apply : c.closest}</Button></>}>
       {target && <>
         {target.review.issues.length > 0 && <><h3>{c.changes}</h3><ul>{target.review.issues.map((issue, i) => <li key={i}>{issue.destinationId ? `${issue.destinationName ?? issue.destinationId}: ` : ''}{issue[locale]}</li>)}</ul></>}

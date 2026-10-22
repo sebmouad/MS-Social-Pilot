@@ -1,6 +1,8 @@
 import { requestOrigin } from '@/server/request-origin';
 import { currentRootActor } from '@/server/config/access';
 import { listRootDiagnostics, runRootDiagnostics } from '@/server/root/diagnostics';
+import { runtimeConfig } from '@/server/config/store';
+import { formatRootTimestamp } from '@/lib/root-time';
 import { OperationError, operationFailure } from '@/lib/operation-error';
 
 export const runtime = 'nodejs';
@@ -27,6 +29,9 @@ export async function POST(request: Request) {
     const origin = request.headers.get('origin');
     if (!origin || new URL(origin).origin !== requestOrigin(request)) throw new OperationError('forbidden', 'Cross-origin request denied.');
     const current = await actor();
-    return reply(await runRootDiagnostics(current.id, await request.json()));
+    const receipt = await runRootDiagnostics(current.id, await request.json());
+    // Formatted here in the operator zone; the label is decoration, so a formatting failure never hides the receipt.
+    const finishedLabel = await Promise.resolve().then(async () => formatRootTimestamp(receipt.finishedAt, String(await runtimeConfig('root.operationalTimezone')))).catch(() => null);
+    return reply({ ...receipt, finishedLabel });
   } catch (error) { return failure(error); }
 }

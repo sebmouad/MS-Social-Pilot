@@ -28,3 +28,9 @@ it('MCP declares resource scope and passes the credential channel ceiling to the
   expect(await group.execute(viewer, 'get_best_times', { targetIds: ['a'] }, 100)).toEqual(result);
   expect(h.read).toHaveBeenCalledWith({ userId: 'u', workspaceId: 'w', allowedTargetIds: ['a'] }, { targetIds: ['a'] });
 });
+
+it('HTTP adds server-formatted slot labels in the workspace zone so browsers never format them', async () => {
+  h.read.mockResolvedValue({ mode: 'suggest', timeZone: 'Africa/Casablanca', suggestions: [{ nextAt: '2026-10-22T14:30:00.000Z', date: '2026-10-22', time: '15:30' }] });
+  const body = await (await GET(new Request('https://example.test/api/publishing/best-times?targetId=a'))).json();
+  expect(body.suggestions[0].label).toContain('15:30');
+});

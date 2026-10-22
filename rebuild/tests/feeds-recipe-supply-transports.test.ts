@@ -28,7 +28,8 @@ describe('supply status transports and Home integration component', () => {
     const response = await GET(new Request('https://example.test/api/feeds/wordpress?page=2'));
     expect(response.status).toBe(200);
     expect(response.headers.get('cache-control')).toBe('no-store');
-    expect(await response.json()).toEqual(result);
+    // REST adds server-formatted time labels for the screen (none without a source zone); the service result is otherwise identical.
+    expect(await response.json()).toEqual({ ...result, labels: { lastRun: null, poolAsOf: null, slots: {} } });
     expect(await executeFeedTool(actor, 'get_recipe_source', { page: 2 })).toEqual(result);
     expect(state.read.mock.calls).toEqual([[actor, { page: 2 }], [actor, { page: 2 }]]);
   });

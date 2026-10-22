@@ -50,6 +50,10 @@ async function PostCollaborationPageContent({ params, searchParams }: { params: 
     ]);
     const post = listing?.posts[0];
     const timeZone = viewer.membership.workspace.timezone;
+    // Times are formatted here so the browser never applies its own time-zone data.
+    const stampFormat = new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short', timeZone });
+    const stamp = (value: Date) => stampFormat.format(value);
+    const zoned = (value: Date) => `${stamp(value)} ${timeZone}`;
     return <>
       <PageHeader module="publishing" title={copy.postTitle} info={<InfoTip name={copy.postTitle}>{content.copy.postDetailInfo}</InfoTip>}
         breadcrumbs={<a href="/content">{content.copy.postDetailBack}</a>} />
@@ -66,11 +70,11 @@ async function PostCollaborationPageContent({ params, searchParams }: { params: 
       <PostPanel copyCatalog={copyCatalog} timeZone={viewer.membership.workspace.timezone} key={`${postId}:${notes.page}:${versions.page}`} notesCanAdd={notes.page === 1} postId={postId} canWrite={canWrite} labels={labels.labels.map(({ id, name }) => ({ id, name }))} assigned={assigned.labels.map(l => l.id)}
         fields={fields.fields.map(f => ({ id: f.id, name: f.name, kind: f.kind, options: f.options, value: f.value }))}
         fieldValueMax={fields.maxCharacters}
-        notes={notes.notes.map(n => ({ id: n.id, body: n.body, authorId: n.authorId, authorName: n.authorName, createdAt: n.createdAt.toISOString() }))}
+        notes={notes.notes.map(n => ({ id: n.id, body: n.body, authorId: n.authorId, authorName: n.authorName, createdAt: n.createdAt.toISOString(), createdLabel: zoned(n.createdAt) }))}
         mentionable={caps.mentionNotifications ? notes.mentionable : []} noteMax={notes.maxCharacters} viewerId={notes.viewerId} canModerate={notes.viewerCanModerate}
-        versions={versions.versions.map(v => ({ id: v.id, authorName: v.authorName, createdAt: v.createdAt.toISOString(), message: v.message, scheduledAt: v.scheduledAt?.toISOString() ?? null }))}
+        versions={versions.versions.map(v => ({ id: v.id, authorName: v.authorName, createdAt: v.createdAt.toISOString(), createdLabel: stamp(v.createdAt), message: v.message, scheduledAt: v.scheduledAt?.toISOString() ?? null }))}
         restore={caps.versionRestore} canRestoreNow={canWrite && versions.restorable}
-        recycle={recycle ? { enabled: recycle.enabled, everyDays: recycle.everyDays, limit: recycle.limit, count: recycle.count, nextAt: recycle.nextAt?.toISOString() ?? null, variants: recycle.variants, isRepeat: recycle.isRepeat, maxIntervalDays: recycle.limits.maxIntervalDays, maxRepeats: recycle.limits.maxRepeats, defaultIntervalDays: recycle.limits.defaultIntervalDays, maxVariants: recycle.limits.maxVariants } : null} />
+        recycle={recycle ? { enabled: recycle.enabled, everyDays: recycle.everyDays, limit: recycle.limit, count: recycle.count, nextAt: recycle.nextAt?.toISOString() ?? null, nextLabel: recycle.nextAt ? zoned(recycle.nextAt) : null, variants: recycle.variants, isRepeat: recycle.isRepeat, maxIntervalDays: recycle.limits.maxIntervalDays, maxRepeats: recycle.limits.maxRepeats, defaultIntervalDays: recycle.limits.defaultIntervalDays, maxVariants: recycle.limits.maxVariants } : null} />
     </>;
   } catch (error) {
     if (error instanceof OperationError && error.code === 'not_found') notFound();

@@ -24,6 +24,8 @@ export type RecipeView = {
   counts: Record<string, number>; available: boolean; limits: { maxNameCharacters: number; maxTemplateCharacters: number; pauseCancel?: boolean };
   reuse?: { enabled: boolean; cooldownDays: number };
   pool?: RecipePool | null;
+  /** Times formatted on the server in the source's zone; the browser never formats a zoned instant. */
+  labels?: { lastRun: string | null; poolAsOf: string | null; slots: Record<string, string> };
 };
 export type RecipePool = { asOf: string; complete: boolean; warnDays: number; low: boolean; pages: Array<{ targetId: string; targetName: string; eligible: number; daysLeft: number | null; low: boolean }> };
 type Preview = { items: Array<{ wpPostId: string; title: string; permalink: string; imageUrl: string; caption: string; firstComment: string }> };
@@ -59,8 +61,6 @@ export function RecipeSource({ initial, locale, canWrite, copy = recipeCopy }: {
   const errorText = (body: unknown) => body && typeof body === 'object' && 'error' in body && typeof (body as { error: unknown }).error === 'string' ? (body as { error: string }).error : t('unknownError');
   const phrase = review === 'save' ? `SAVE RECIPE SOURCE ${draft.name.trim()}` : review === 'pause' ? (cancelPosts ? PAUSE_CANCEL_PHRASE : PAUSE_PHRASE) : review === 'resume' ? 'RESUME RECIPE SOURCE' : review === 'retry' ? 'RETRY RECIPE SLOTS' : 'RUN RECIPE PLANNER';
   const confirmParts = copy[locale].typeToConfirm.split('{phrase}');
-  const when = (value: string | null, zone: string) => value && Number.isFinite(Date.parse(value)) ? new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short', timeZone: zone }).format(new Date(value)) : '';
-  const zone = source?.config.timezone ?? draft.config.timezone;
   const setConfig = (patch: Partial<RecipeConfig>) => setDraft(d => ({ ...d, config: { ...d.config, ...patch } }));
   const setMapping = (patch: Partial<Mapping>) => setDraft(d => ({ ...d, config: { ...d.config, mapping: { ...d.config.mapping, ...patch } } }));
 
@@ -115,7 +115,7 @@ export function RecipeSource({ initial, locale, canWrite, copy = recipeCopy }: {
   const reviewAction = review ? t(REVIEW_COPY[review].action) : '';
   const unresolved = (view.counts['failed'] ?? 0) + (view.counts['uncertain'] ?? 0);
   const openReview = (next: Review) => { setConfirmation(''); setCancelPosts(false); setReview(next); };
-  const lastRun = source?.lastRunAt ? t('lastRun', { when: when(source.lastRunAt, zone), planned: source.lastSummary?.planned ?? 0, failed: source.lastSummary?.failed ?? 0, unfilled: source.lastSummary?.unfilled ?? 0 }) : t('neverRun');
+  const lastRun = source?.lastRunAt ? t('lastRun', { when: view.labels?.lastRun ?? '', planned: source.lastSummary?.planned ?? 0, failed: source.lastSummary?.failed ?? 0, unfilled: source.lastSummary?.unfilled ?? 0 }) : t('neverRun');
   const statusKey: RecipeCopyKey = !source ? 'statusNew' : source.enabled ? 'statusActive' : 'statusPaused';
 
   return <section className={styles.root} aria-labelledby="recipe-heading">
@@ -136,7 +136,7 @@ export function RecipeSource({ initial, locale, canWrite, copy = recipeCopy }: {
       {view.pool ? <>
         <RecipeSupplyWarning pool={view.pool} locale={locale} copy={copy} />
         {view.reuse && <p className={styles.help}>{t(view.reuse.enabled ? 'poolReuseEnabled' : 'poolReuseDisabled', { days: view.reuse.cooldownDays })}</p>}
-        <p className={styles.help}>{t('poolIntro')} {!view.pool.complete && t('poolPartial')} {t('poolAsOf', { when: when(view.pool.asOf, zone) })}</p>
+        <p className={styles.help}>{t('poolIntro')} {!view.pool.complete && t('poolPartial')} {t('poolAsOf', { when: view.labels?.poolAsOf ?? '' })}</p>
         <div className={styles.tableWrap}><table className={styles.table}><caption className="sr-only">{t('poolHeading')}</caption>
           <thead><tr><th scope="col">{t('colChannel')}</th><th scope="col">{t('colEligible')}</th><th scope="col">{t('colDays')}</th></tr></thead>
           <tbody>{view.pool.pages.map(p => <tr key={p.targetId}><th scope="row">{p.targetName}</th><td>{p.eligible}</td><td>{p.daysLeft === null ? t('daysUnlimited') : p.daysLeft}{p.low && <span className={styles.meta}>{t('poolRowLow')}</span>}</td></tr>)}</tbody>
@@ -202,7 +202,7 @@ export function RecipeSource({ initial, locale, canWrite, copy = recipeCopy }: {
     <h3 className={styles.sectionTitle}>{t('plansHeading')}</h3>
     {view.plans.items.length ? <div className={styles.tableWrap}><table className={styles.table}><caption className="sr-only">{t('plansHeading')}</caption>
       <thead><tr><th scope="col">{t('colTime')}</th><th scope="col">{t('colChannel')}</th><th scope="col">{t('colRecipe')}</th><th scope="col">{t('colState')}</th></tr></thead>
-      <tbody>{view.plans.items.map(p => <tr key={p.id}><th scope="row">{when(p.slotAt, zone)}</th><td>{p.targetName}</td><td>{p.title}</td><td>{stateText(p)}{reasonText(p.reason) && <span className={styles.meta}>{reasonText(p.reason)}</span>}</td></tr>)}</tbody>
+      <tbody>{view.plans.items.map(p => <tr key={p.id}><th scope="row">{view.labels?.slots[p.id] ?? ''}</th><td>{p.targetName}</td><td>{p.title}</td><td>{stateText(p)}{reasonText(p.reason) && <span className={styles.meta}>{reasonText(p.reason)}</span>}</td></tr>)}</tbody>
     </table></div> : <p className={styles.empty}>{t('plansEmpty')}</p>}
     <nav className={styles.pagination} aria-label={t('plansHeading')}>
       {view.plans.page > 1 ? <Button size="sm" disabled={busy} onClick={() => void goPage(view.plans.page - 1)}>{t('previous')}</Button> : <span />}

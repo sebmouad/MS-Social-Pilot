@@ -82,11 +82,11 @@ describe('Inbox write receipts', () => {
   });
 
   it('uses sync totals and time only after a complete valid receipt', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => respond(200, { ok: true, targetCount: 1, failedCount: 0, conversationCount: 2, messageCount: 3, commentCount: 4, syncedAt: '2026-10-16T12:00:00.000Z' })));
+    vi.stubGlobal('fetch', vi.fn(async () => respond(200, { ok: true, targetCount: 1, failedCount: 0, conversationCount: 2, messageCount: 3, commentCount: 4, syncedAt: '2026-10-16T12:00:00.000Z', syncedLabel: 'Oct 16, 12:00 PM UTC' })));
     await render(createElement(InboxSyncBar, { lastSynced: null, timeZone: 'UTC' }));
     await act(async () => container.querySelector('button')!.click());
     expect(container.querySelector('[role=status]')?.textContent).toContain('Checked 1 channel: 2 conversations (3 messages) and 4 comments up to date.');
-    expect(container.textContent).toContain('Last synced'); expect(router.refresh).toHaveBeenCalledOnce();
+    expect(container.textContent).toContain('Last synced'); expect(container.textContent).toContain('Oct 16, 12:00 PM UTC'); expect(router.refresh).toHaveBeenCalledOnce();
   });
 
   it('keeps deletion confirmation open after a missing receipt and re-enables controls', async () => {

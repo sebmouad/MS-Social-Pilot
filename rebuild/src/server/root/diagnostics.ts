@@ -7,6 +7,7 @@ import { OperationError } from '@/lib/operation-error';
 import { diagnosticChecks } from '@/server/diagnostics/checks';
 import { diagnosticCheckSchema, diagnosticInput, diagnosticRunSchema, diagnosticScope, diagnosticConfirmation, type DiagnosticReceipt, type DiagnosticRun } from '@/lib/diagnostics';
 import { requireActiveRoot } from './operations';
+import { formatRootTimestamp } from '@/lib/root-time';
 
 async function scopeFor(actorId: string, scopeId: string) {
   await requireActiveRoot(actorId);
@@ -33,7 +34,9 @@ export async function listRootDiagnostics(actorId: string, scopeId: string, resu
   const history = rows.flatMap(row => {
     const detail = row.detail as Record<string, unknown> | null;
     if (!detail || typeof detail.runId !== 'string') return [];
-    return [{ id: detail.runId, startedAt: row.createdAt.toISOString(), result: results.find(result => result.id === detail.runId) ?? null }];
+    const result = results.find(item => item.id === detail.runId) ?? null;
+    // Labels are formatted here in the operator zone: the browser's time-zone data can differ from Node's.
+    return [{ id: detail.runId, startedAt: row.createdAt.toISOString(), startedLabel: formatRootTimestamp(row.createdAt.toISOString(), timeZone), finishedLabel: result ? formatRootTimestamp(result.finishedAt, timeZone) : null, result }];
   });
   return { scope: scopeId, label: scope.label, timeZone, enabled, minimumIntervalSeconds, incompleteRunStaleSeconds: diagnosticRecoverySeconds(incompleteRunStaleSeconds, runTimeoutMs, databaseTimeoutMs), connections, history, connectionLimit: Math.min(limit, resultCap ?? limit) };
 }

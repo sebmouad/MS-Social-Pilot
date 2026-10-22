@@ -11,7 +11,7 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 const schema = z.discriminatedUnion('action', [
-  z.object({ action: z.literal('sync'), targetId: z.string().regex(/^[A-Za-z0-9_-]{1,100}$/).optional() }).strict(),
+  z.object({ action: z.literal('sync'), targetId: z.string().regex(/^[A-Za-z0-9_-]{1,100}$/).optional(), locale: z.enum(['en', 'fr']).optional() }).strict(),
   z.object({ action: z.literal('reply'), kind: z.enum(['message', 'comment', 'review']), id: z.string().regex(/^[A-Za-z0-9_-]{1,200}$/), text: z.string().max(2000) }).strict(),
   z.object({ action: z.literal('resolve'), kind: z.enum(['message', 'comment', 'review']), id: z.string().regex(/^[A-Za-z0-9_-]{1,200}$/), resolved: z.boolean() }).strict(),
   z.object({ action: z.literal('delete'), id: z.string().regex(/^[A-Za-z0-9_-]{1,200}$/), confirmation: z.string().max(240) }).strict(),
@@ -43,7 +43,12 @@ export async function POST(request: Request) {
     if (input.action !== 'sync' && (!result || typeof result !== 'object' || (result as { ok?: unknown }).ok !== true)) {
       throw new OperationError('upstream_failure', unconfirmed);
     }
-    return reply({ ok: true, ...result });
+    // The sync time is formatted here in the workspace zone; browsers can carry different time-zone data than Node.
+    const syncedAt = input.action === 'sync' && result && typeof result === 'object' ? (result as { syncedAt?: unknown }).syncedAt : undefined;
+    const syncedLabel = typeof syncedAt === 'string' && Number.isFinite(Date.parse(syncedAt))
+      ? new Intl.DateTimeFormat(input.action === 'sync' && input.locale === 'fr' ? 'fr-FR' : 'en-US', { timeZone: viewer.membership.workspace.timezone, month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZoneName: 'short' }).format(new Date(syncedAt))
+      : undefined;
+    return reply({ ok: true, ...result, ...(syncedLabel ? { syncedLabel } : {}) });
   } catch (error) {
     const typedError = error instanceof z.ZodError || error instanceof SyntaxError
       ? new OperationError('invalid_request', 'Invalid inbox action.')

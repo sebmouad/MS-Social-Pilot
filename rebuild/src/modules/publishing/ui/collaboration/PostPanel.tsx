@@ -14,10 +14,9 @@ import { fillComposerCopy } from '../../composer-catalog';
 
 type Label = { id: string; name: string };
 type FieldValue = { id: string; name: string; kind: 'text' | 'choice'; options: string[]; value: string };
-type Note = { id: string; body: string; authorId: string | null; authorName: string | null; createdAt: string };
-type Version = { id: string; authorName: string | null; createdAt: string; message: string; scheduledAt: string | null };
-type Recycle = { enabled: boolean; everyDays: number | null; limit: number | null; count: number; nextAt: string | null; variants: string[]; isRepeat: boolean; maxIntervalDays: number; maxRepeats: number; defaultIntervalDays: number; maxVariants: number };
-const when = (v: string, timeZone: string, unknown: string) => { const d = new Date(v); return Number.isFinite(d.getTime()) ? new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short', timeZone }).format(d) + ` ${timeZone}` : unknown; };
+type Note = { id: string; body: string; authorId: string | null; authorName: string | null; createdAt: string; createdLabel?: string };
+type Version = { id: string; authorName: string | null; createdAt: string; createdLabel?: string; message: string; scheduledAt: string | null };
+type Recycle = { enabled: boolean; everyDays: number | null; limit: number | null; count: number; nextAt: string | null; nextLabel?: string | null; variants: string[]; isRepeat: boolean; maxIntervalDays: number; maxRepeats: number; defaultIntervalDays: number; maxVariants: number };
 
 export function PostPanel(p: { copyCatalog?: ComposerCatalog; postId: string; canWrite: boolean; labels: Label[]; assigned: string[]; fields: FieldValue[]; notes: Note[]; mentionable: Array<{ id: string; name: string }>; noteMax: number; viewerId: string; canModerate: boolean; versions: Version[]; restore: boolean; recycle: Recycle | null; canRestoreNow: boolean; fieldValueMax?: number; notesCanAdd?: boolean; timeZone: string }) {
   const c = useCollaborationCopy();
@@ -94,10 +93,10 @@ function NotesSection({ postId, canWrite, notes: initial, mentionable, noteMax, 
     await action.run(async () => {
       const text = body.trim();
       const ids = mentionable.filter(m => mentions.has(m.id) && text.includes(`@${m.name}`)).map(m => m.id);
-      const result = await action.send<{ id: string; createdAt: string; notified: string }>('POST', '/api/publishing/notes', { postId, body: text, mentionIds: ids, confirmation: confirmed });
+      const result = await action.send<{ id: string; createdAt: string; createdLabel?: string | null; notified: string }>('POST', '/api/publishing/notes', { postId, body: text, mentionIds: ids, confirmation: confirmed });
       const createdAt = new Date(result.createdAt);
       if (typeof result.id !== 'string' || !Number.isFinite(createdAt.getTime())) throw new Error(c.the_note_could_not_be_verified_refresh_to_check_it);
-      setNotes(n => [{ id: result.id, body: text, authorId: viewerId, authorName: c.you, createdAt: createdAt.toISOString() }, ...n]);
+      setNotes(n => [{ id: result.id, body: text, authorId: viewerId, authorName: c.you, createdAt: createdAt.toISOString(), ...(result.createdLabel ? { createdLabel: result.createdLabel } : {}) }, ...n]);
       setBody(''); setMentions(new Set());
       return result.notified === 'queued' ? c.note_saved_mention_notifications_queued : c.note_saved;
     });
@@ -118,7 +117,7 @@ function NotesSection({ postId, canWrite, notes: initial, mentionable, noteMax, 
       {mentionable.length > 0 && <fieldset className={styles.form}><legend className={styles.meta}>{c.mention_also_type_name_in_the_note}</legend><div className={styles.grid}>{mentionable.filter(m => m.id !== viewerId).map(m => <label key={m.id} className={styles.check}><input type="checkbox" checked={mentions.has(m.id)} onChange={() => setMentions(s => { const n = new Set(s); if (!n.delete(m.id)) n.add(m.id); return n; })} />{m.name}</label>)}</div></fieldset>}
       <div className={styles.actions}><Button type="submit" variant="primary" disabled={action.busy || !body.trim()}>{action.busy ? c.saving : c.add_note}</Button><span className={styles.meta}>{body.length}/{noteMax}</span></div>
     </form>}
-    {notes.length ? <ul className={styles.form}>{notes.map(n => <li key={n.id} className={styles.note}><div>{n.body}</div><div className={styles.meta}>{n.authorName ?? c.former_member} · {when(n.createdAt, timeZone, c.unknown)}</div>
+    {notes.length ? <ul className={styles.form}>{notes.map(n => <li key={n.id} className={styles.note}><div>{n.body}</div><div className={styles.meta}>{n.authorName ?? c.former_member} · {n.createdLabel || c.unknown}</div>
       {canWrite && (n.authorId === viewerId || canModerate) && <Button size="sm" variant="danger" disabled={action.busy} onClick={() => setRemoving(n)}>{c.delete}</Button>}</li>)}</ul> : <p className={styles.empty}>{c.no_notes_yet}</p>}
     <ConfirmDialog feedback={action.feedback} open={Boolean(removing)} title={c.delete_note} description={c.this_permanently_removes_the_note_for_everyone} confirmation={removing ? deleteNoteConfirmation(removing.id) : ''} actionLabel={c.delete_note} danger busy={action.busy} onCancel={() => setRemoving(null)} onConfirm={() => removing && void remove(removing)} />
   </section>;
@@ -139,7 +138,7 @@ function RecycleSection({ postId, canWrite, initial, timeZone }: { postId: strin
   async function save() {
     const ok = await action.run(async () => {
       const body = { postId, enabled, everyDays: days, limit: limit === '' ? null : Number(limit), variants: list, confirmation };
-      const r = await action.send<{ enabled: boolean; everyDays: number | null; limit: number | null; count: number; nextAt: string | null; variants: string[]; isRepeat: boolean }>('PUT', '/api/publishing/recycle', body);
+      const r = await action.send<{ enabled: boolean; everyDays: number | null; limit: number | null; count: number; nextAt: string | null; nextLabel?: string | null; variants: string[]; isRepeat: boolean }>('PUT', '/api/publishing/recycle', body);
       if (r.enabled !== enabled) throw new Error(c.the_saved_settings_could_not_be_verified_refresh_to_see_the_current);
       setState(s => ({ ...s, ...r })); return enabled ? c.repeating_is_on : c.repeating_is_off;
     });
@@ -148,7 +147,7 @@ function RecycleSection({ postId, canWrite, initial, timeZone }: { postId: strin
   return <section className={styles.section} aria-labelledby="recycle-title"><h2 id="recycle-title">{c.repeat_this_post}</h2>
     {action.banner}
     {state.isRepeat ? <p className={styles.help}>{c.this_post_is_a_repeat_of_another_post_change_repeating_on_the}</p> : <>
-      <p className={styles.help}>{state.enabled ? fillComposerCopy(c.repeatStatus, { days: state.everyDays ?? '', count: state.count, plural: state.count === 1 ? '' : 's', next: state.nextAt ? fillComposerCopy(c.nextRepeat, { time: when(state.nextAt, timeZone, c.unknown) }) : '' }) : c.repeating_is_off} { c.repeatHint }</p>
+      <p className={styles.help}>{state.enabled ? fillComposerCopy(c.repeatStatus, { days: state.everyDays ?? '', count: state.count, plural: state.count === 1 ? '' : 's', next: state.nextAt ? fillComposerCopy(c.nextRepeat, { time: state.nextLabel || c.unknown }) : '' }) : c.repeating_is_off} { c.repeatHint }</p>
       <form noValidate className={styles.form} onSubmit={event => { event.preventDefault(); setReview(true); }}>
         <label className={styles.check}><input type="checkbox" disabled={!canWrite || action.busy} checked={enabled} onChange={e => setEnabled(e.target.checked)} />{c.repeat_this_post}</label>
         <label>{c.days_between_repeats}<input type="number" min={1} max={state.maxIntervalDays} required value={days} disabled={!canWrite || action.busy} onChange={e => setDays(Math.max(1, Math.min(state.maxIntervalDays, Number(e.target.value) || 1)))} /></label>

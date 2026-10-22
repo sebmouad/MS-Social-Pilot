@@ -12,6 +12,6 @@ export default async function ChatChannelsScreen() {
   const snapshot = await listChatChannels({ userId: viewer.user.id, workspaceId: viewer.workspaceId }).catch(() => null);
   const copy = snapshot?.copy[locale] ?? CHAT_COPY[locale];
   return <PageFrame module="settings"><PageHeader module="settings" title={copy.title} description={copy.description} />
-    {snapshot ? <ChatChannels initial={snapshot.channels} policy={snapshot.policy} copy={copy} locale={locale} timeZone={viewer.membership.workspace.timezone} /> : <p role="alert">{copy.unavailable}</p>}
+    {snapshot ? <ChatChannels initial={snapshot.channels.map(row => ({ ...row, lastSentLabel: row.lastSentAt ? `${new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short', timeZone: viewer.membership.workspace.timezone }).format(new Date(row.lastSentAt))} ${viewer.membership.workspace.timezone}` : undefined }))} policy={snapshot.policy} copy={copy} locale={locale} timeZone={viewer.membership.workspace.timezone} /> : <p role="alert">{copy.unavailable}</p>}
   </PageFrame>;
 }

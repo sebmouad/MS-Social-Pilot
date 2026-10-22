@@ -111,7 +111,7 @@ describe('post row recovery', () => {
   });
 
   it('shows a future first-comment due time and makes the immediate manual send explicit', async () => {
-    const dueLater = { ...publishedWithReadyComment, firstCommentDelayMinutes: 15, targets: [{ ...publishedWithReadyComment.targets[0]!, publishedAt: new Date(Date.now() + 60 * 60_000) }] };
+    const dueLater = { ...publishedWithReadyComment, firstCommentDelayMinutes: 15, firstCommentDueLabels: { [publishedWithReadyComment.targets[0]!.id]: 'Oct 22, 2026, 5:15 PM' }, targets: [{ ...publishedWithReadyComment.targets[0]!, publishedAt: new Date(Date.now() + 60 * 60_000) }] };
     await act(async () => root.render(createElement(PostRowActions, { post: dueLater, targets, canEdit: true, canPublish: true, imageRules: rules, timeZone: 'UTC' })));
     expect(container.textContent).toContain('First comment scheduled for');
     expect(Array.from(container.querySelectorAll('button')).some(button => button.textContent === 'Send now')).toBe(true);

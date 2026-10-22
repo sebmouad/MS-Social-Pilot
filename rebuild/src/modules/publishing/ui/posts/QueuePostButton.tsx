@@ -5,11 +5,10 @@ import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/Button';
 import { Dialog } from '@/components/Dialog';
-import { formatDate } from '@/modules/publishing/ui/publishing-ui';
 
-type QueueReceipt = { postId: string; status: 'scheduled' | 'pending_approval'; scheduledAt: string };
+type QueueReceipt = { postId: string; status: 'scheduled' | 'pending_approval'; scheduledAt: string; scheduledLabel: string };
 
-export function QueuePostButton({ postId, postMessage, destinations, timeZone, eligible = true }: { postId: string; postMessage: string; destinations: string[]; timeZone: string; eligible?: boolean }) {
+export function QueuePostButton({ postId, postMessage, destinations, eligible = true }: { postId: string; postMessage: string; destinations: string[]; eligible?: boolean }) {
   const t = usePublishingActionText();
   const router = useRouter();
   const inFlight = useRef(false);
@@ -31,10 +30,10 @@ export function QueuePostButton({ postId, postMessage, destinations, timeZone, e
       });
       const result = await response.json().catch(() => null) as QueueReceipt | { error?: string } | null;
       if (!response.ok) throw new Error(result && 'error' in result && typeof result.error === 'string' ? result.error : t('thePostCouldNotBeAddedTo'));
-      if (!result || !('postId' in result) || result.postId !== postId || !['scheduled', 'pending_approval'].includes(result.status) || typeof result.scheduledAt !== 'string' || !Number.isFinite(Date.parse(result.scheduledAt))) {
+      if (!result || !('postId' in result) || result.postId !== postId || !['scheduled', 'pending_approval'].includes(result.status) || typeof result.scheduledAt !== 'string' || typeof (result as QueueReceipt).scheduledLabel !== 'string' || !Number.isFinite(Date.parse(result.scheduledAt))) {
         throw new Error(t('theQueueResponseCouldNotBeVerified'));
       }
-      const scheduledAt = formatDate(new Date(result.scheduledAt), timeZone);
+      const scheduledAt = result.scheduledLabel;
       setSuccess(result.status === 'pending_approval'
         ? t('queuedApproval', { time: scheduledAt })
         : t('queued', { time: scheduledAt }));

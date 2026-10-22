@@ -19,3 +19,5 @@ export const chatConfirmation = {
 };
 export type ChatRow = { id: string; kind: string; name: string; events: string[]; enabled: boolean; lastSentAt: Date | null; hasError: boolean };
 export type ChatView = Omit<ChatRow, 'lastSentAt'> & { lastSentAt: string | null };
+/** A view row with its last-sent time formatted on the server in the workspace zone, so browser time-zone data cannot differ. */
+export type ChatViewRow = ChatView & { lastSentLabel?: string };

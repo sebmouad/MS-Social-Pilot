@@ -23,7 +23,7 @@ async function click(element: HTMLElement) { await act(async () => element.click
 
 describe('queue existing post UI', () => {
   it('reviews the post and pending destinations, sends exact confirmation, then reports server-assigned time', async () => {
-    const fetch = vi.fn(async (_url: string, _init: RequestInit) => ({ ok: true, json: async () => ({ postId: 'post-1', status: 'scheduled', scheduledAt: '2026-10-18T12:30:00.000Z' }) }));
+    const fetch = vi.fn(async (_url: string, _init: RequestInit) => ({ ok: true, json: async () => ({ postId: 'post-1', status: 'scheduled', scheduledAt: '2026-10-18T12:30:00.000Z', scheduledLabel: 'Oct 18, 2026, 12:30 PM' }) }));
     vi.stubGlobal('fetch', fetch); await render();
     await click(button('Add to queue'));
     const dialog = container.querySelector<HTMLDialogElement>('dialog')!;
@@ -40,7 +40,7 @@ describe('queue existing post UI', () => {
   });
 
   it('keeps the review open with post content after failure and permits retry', async () => {
-    const fetch = vi.fn().mockRejectedValueOnce(new TypeError('offline')).mockResolvedValue({ ok: true, json: async () => ({ postId: 'post-1', status: 'scheduled', scheduledAt: '2026-10-18T12:30:00.000Z' }) });
+    const fetch = vi.fn().mockRejectedValueOnce(new TypeError('offline')).mockResolvedValue({ ok: true, json: async () => ({ postId: 'post-1', status: 'scheduled', scheduledAt: '2026-10-18T12:30:00.000Z', scheduledLabel: 'Oct 18, 2026, 12:30 PM' }) });
     vi.stubGlobal('fetch', fetch); await render();
     await click(button('Add to queue'));
     const dialog = container.querySelector<HTMLDialogElement>('dialog')!;
@@ -54,7 +54,7 @@ describe('queue existing post UI', () => {
   });
 
   it('treats approval-required queue placement as success without promising publication', async () => {
-    const fetch = vi.fn(async (_url: string, _init: RequestInit) => ({ ok: true, json: async () => ({ postId: 'post-1', status: 'pending_approval', scheduledAt: '2026-10-18T12:30:00.000Z' }) }));
+    const fetch = vi.fn(async (_url: string, _init: RequestInit) => ({ ok: true, json: async () => ({ postId: 'post-1', status: 'pending_approval', scheduledAt: '2026-10-18T12:30:00.000Z', scheduledLabel: 'Oct 18, 2026, 12:30 PM' }) }));
     vi.stubGlobal('fetch', fetch); await render();
     await click(button('Add to queue'));
     const dialog = container.querySelector<HTMLDialogElement>('dialog')!;
@@ -75,6 +75,6 @@ describe('queue existing post UI', () => {
     const confirm = button('Add to queue', dialog);
     await act(async () => { confirm.click(); confirm.click(); });
     expect(fetch).toHaveBeenCalledOnce();
-    await act(async () => resolve({ ok: true, json: async () => ({ postId: 'post-1', status: 'scheduled', scheduledAt: '2026-10-18T12:30:00.000Z' }) }));
+    await act(async () => resolve({ ok: true, json: async () => ({ postId: 'post-1', status: 'scheduled', scheduledAt: '2026-10-18T12:30:00.000Z', scheduledLabel: 'Oct 18, 2026, 12:30 PM' }) }));
   });
 });

@@ -15,6 +15,7 @@ import { RecipeSource, type RecipePool, type RecipeView } from './RecipeSource';
 import { RecipeStatusCard } from './RecipeStatusCard';
 import { loadRecipeStatus } from './recipe-status';
 import { readRecipeSource } from '../server/wordpress';
+import { withRecipeLabels } from '../server/recipe-labels';
 import styles from './feeds.module.css';
 
 export default async function FeedsScreen({ searchParams }: { searchParams: Promise<{ page?: string }> }) {
@@ -45,7 +46,7 @@ export default async function FeedsScreen({ searchParams }: { searchParams: Prom
       {recipeStatus ? <RecipeStatusCard status={recipeStatus} locale={locale} copy={copy} /> : null}
       <FeedManager initialFeeds={result.feeds.map(f => ({ ...f, lastPolledAt: f.lastPolledAt?.toISOString() ?? null, createdAt: f.createdAt.toISOString(), updatedAt: f.updatedAt.toISOString() }))}
         channels={channels.map(c => ({ id: c.id, name: c.name }))} page={result.page} hasMore={result.hasMore} canWrite={canWrite} limits={result.limits} locale={locale} automaticMinutes={automatic.intervalMinutes} copy={copy} />
-      {recipes && (recipes.source || canWrite) && <RecipeSource initial={recipes as unknown as RecipeView} locale={locale} canWrite={canWrite} copy={recipeCopy} />}
+      {recipes && (recipes.source || canWrite) && <RecipeSource initial={withRecipeLabels(recipes, locale) as unknown as RecipeView} locale={locale} canWrite={canWrite} copy={recipeCopy} />}
       <p className={styles.privacy}>{t('footnote')}</p>
     </>;
   } catch (error) {

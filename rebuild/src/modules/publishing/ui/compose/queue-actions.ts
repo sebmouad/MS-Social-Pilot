@@ -11,15 +11,18 @@ import { parseFirstCommentDelay } from '@/modules/publishing/first-comment-delay
 import { runtimeConfig } from '@/server/config/store';
 import { wallTimeToInstant } from '@/lib/calendar-dates';
 import type { ComposerActionState as BaseState } from '@/modules/publishing/ui/posts/actions';
+import { loadContent } from '@/modules/publishing/server/content-copy';
+import { formatDate } from '../publishing-ui';
+import { pageLocale } from '../kit/locale';
 import { loadComposerCopy } from '../../server/composer-copy';
 import { catalogGroup } from '../../composer-catalog';
 
 export type QueueComposerState = BaseState & {
   values: BaseState['values'] & { draftPostId?: string };
-  queued?: { scheduledAt: string; status: 'scheduled' | 'pending_approval' };
+  queued?: { scheduledAt: string; scheduledLabel: string; status: 'scheduled' | 'pending_approval' };
 };
 export type QueuePreviewState =
-  | { status: 'ready'; scheduledAt: string; channels: Array<{ targetId: string; nextAt: string | null }> }
+  | { status: 'ready'; scheduledAt: string; scheduledLabel: string; channels: Array<{ targetId: string; nextAt: string | null }> }
   | { status: 'full'; channels: Array<{ targetId: string; nextAt: string | null }> }
   | { status: 'error'; message: string };
 
@@ -28,7 +31,7 @@ export async function previewQueueAction(targetIds: string[]): Promise<QueuePrev
     const viewer = await requireViewer({ feature: 'publishing/queue', channelScoped: true });
     const preview = await previewQueueTimes(actor(viewer), targetIds);
     const channels = preview.channels.map(channel => ({ targetId: channel.targetId, nextAt: channel.nextAt?.toISOString() ?? null }));
-    return preview.scheduledAt ? { status: 'ready', scheduledAt: preview.scheduledAt.toISOString(), channels } : { status: 'full', channels };
+    return preview.scheduledAt ? { status: 'ready', scheduledAt: preview.scheduledAt.toISOString(), scheduledLabel: formatDate(preview.scheduledAt, viewer.membership.workspace.timezone, true, await pageLocale()), channels } : { status: 'full', channels };
   } catch {
     return { status: 'error', message: catalogGroup(await loadComposerCopy(), 'queue', 'en').unavailable };
   }
@@ -58,13 +61,17 @@ export async function saveQueueComposerAction(previous: QueueComposerState, data
     else if (draftPostId && ['draft', 'schedule'].includes(field('intent'))) {
       await updatePost(actor(viewer), { ...input, postId: draftPostId });
       if (field('intent') === 'schedule') {
-        const at = wallTimeToInstant(field('scheduleDate'), field('scheduleTime'), viewer.membership.workspace.timezone);
-        if (!at.ok) throw new Error('schedule');
-        await schedulePost(actor(viewer), draftPostId, at.instant, modes);
+        // "Publish now" is computed here (now plus the Root lead), never from a browser-derived wall time.
+        if (field('publishNow') === '1') await schedulePost(actor(viewer), draftPostId, new Date(Date.now() + (await loadContent()).policy.publishNowLeadMinutes * 60_000), modes);
+        else {
+          const at = wallTimeToInstant(field('scheduleDate'), field('scheduleTime'), viewer.membership.workspace.timezone);
+          if (!at.ok) throw new Error('schedule');
+          await schedulePost(actor(viewer), draftPostId, at.instant, modes);
+        }
       }
     } else throw new Error('intent');
     refresh();
-    return { status: 'success', destination: '/content?notice=' + (field('intent') === 'draft' ? 'created' : 'scheduled'), values, ...(receipt ? { queued: { scheduledAt: receipt.scheduledAt.toISOString(), status: receipt.status === 'pending_approval' ? 'pending_approval' as const : 'scheduled' as const } } : {}) };
+    return { status: 'success', destination: '/content?notice=' + (field('intent') === 'draft' ? 'created' : 'scheduled'), values, ...(receipt ? { queued: { scheduledAt: receipt.scheduledAt.toISOString(), scheduledLabel: formatDate(receipt.scheduledAt, viewer.membership.workspace.timezone, true, field('queueLocale') === 'fr' ? 'fr' : 'en'), status: receipt.status === 'pending_approval' ? 'pending_approval' as const : 'scheduled' as const } } : {}) };
   } catch (error) {
     if (error instanceof QueueAfterSaveError) {
       refresh();
@@ -74,7 +81,7 @@ export async function saveQueueComposerAction(previous: QueueComposerState, data
   }
 }
 
-export type AutosaveState = { status: 'saved'; draftPostId: string; savedAt: string } | { status: 'skipped' } | { status: 'error' };
+export type AutosaveState = { status: 'saved'; draftPostId: string; savedAt: string; savedLabel: string } | { status: 'skipped' } | { status: 'error' };
 
 /**
  * Background draft save for the composer. The first call creates a draft through the same lifecycle service
@@ -94,13 +101,14 @@ export async function autosaveDraftAction(draftPostId: string | null, data: Form
       destinationFormats: JSON.parse(field('destinationFormatsJson') || '{}'), targetIds: data.getAll('targetIds').filter((id): id is string => typeof id === 'string'),
     };
     const savedAt = new Date().toISOString();
+    const savedLabel = new Intl.DateTimeFormat(field('queueLocale') === 'fr' ? 'fr' : 'en', { timeZone: viewer.membership.workspace.timezone, hour: '2-digit', minute: '2-digit' }).format(new Date(savedAt));
     if (draftPostId) {
       if (!/^[A-Za-z0-9_-]{1,200}$/.test(draftPostId)) return { status: 'error' };
       await updatePost(actor(viewer), { ...input, postId: draftPostId });
-      return { status: 'saved', draftPostId, savedAt };
+      return { status: 'saved', draftPostId, savedAt, savedLabel };
     }
     const created = await createPost(actor(viewer), input);
-    return { status: 'saved', draftPostId: created.id, savedAt };
+    return { status: 'saved', draftPostId: created.id, savedAt, savedLabel };
   } catch {
     return { status: 'error' };
   }

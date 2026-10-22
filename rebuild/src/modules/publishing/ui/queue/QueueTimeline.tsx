@@ -10,6 +10,8 @@ import styles from './queue.module.css';
 
 type TimelinePost = {
   id: string; message: string; link: string | null; media: unknown; status: string; scheduledAt: Date | null;
+  /** Slot time formatted on the server in the workspace zone, so hydration and browser ICU data cannot disagree. */
+  scheduledLabel?: string;
   targets: Array<{ status: string; target: { id: string; name: string; pictureUrl: string | null; platformName?: string | null } }>;
 };
 
@@ -27,10 +29,9 @@ export function groupByChannel(posts: TimelinePost[]) {
 }
 
 /** Upcoming slots per channel. Times are formatted by the server in the workspace time zone. */
-export function QueueTimeline({ posts, timeZone, locale = 'en', maxPerChannel }: { posts: TimelinePost[]; timeZone: string; locale?: KitLocale; maxPerChannel: number }) {
+export function QueueTimeline({ posts, locale = 'en', maxPerChannel }: { posts: TimelinePost[]; locale?: KitLocale; maxPerChannel: number }) {
   const copy = usePublishingCopy(locale);
   const channels = groupByChannel(posts);
-  const time = new Intl.DateTimeFormat(locale, { timeZone, weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
   return <div className={styles.channels}>
     {channels.map(channel => {
       const shown = channel.posts.slice(0, maxPerChannel);
@@ -44,7 +45,7 @@ export function QueueTimeline({ posts, timeZone, locale = 'en', maxPerChannel }:
             return <li key={post.id} className={styles.slot}>
               <PostThumb thumb={postThumbnail(post.media)} size="sm" />
               <div className={styles.slotBody}>
-                <time className={styles.slotTime} dateTime={post.scheduledAt?.toISOString()}>{post.scheduledAt ? time.format(post.scheduledAt) : copy.queueUnscheduled}</time>
+                <time className={styles.slotTime} dateTime={post.scheduledAt?.toISOString()}>{post.scheduledAt && post.scheduledLabel ? post.scheduledLabel : copy.queueUnscheduled}</time>
                 <span className={styles.slotText}>{postContentSummary(post.message, post.media, post.link, copy) || copy.noText}</span>
                 <ScheduleBadge mode={remote ? 'remote' : 'application'} locale={locale} platformName={platformName} />
               </div>

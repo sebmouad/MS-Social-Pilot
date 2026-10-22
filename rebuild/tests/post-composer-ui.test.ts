@@ -308,8 +308,8 @@ describe('scheduling from the action bar', () => {
       expect(mocks.action).toHaveBeenCalledTimes(1);
       const sent = mocks.action.mock.calls[0]![1] as FormData;
       expect(sent.get('intent')).toBe('schedule');
-      expect(sent.get('scheduleDate')).toBe('2026-10-22');
-      expect(sent.get('scheduleTime')).toBe('10:02');
+      // The server computes now plus the Root lead; the browser sends no zoned wall time of its own.
+      expect(sent.get('publishNow')).toBe('1');
     } finally { vi.useRealTimers(); }
   });
 

@@ -21,7 +21,7 @@ const form = (fields: Record<string, string | string[]>) => {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mocks.viewer.mockResolvedValue({ user: { id: 'user-1' }, workspaceId: 'workspace-1', permissions: { pageScope: { all: false, ids: ['channel-1'] } } });
+  mocks.viewer.mockResolvedValue({ user: { id: 'user-1' }, workspaceId: 'workspace-1', membership: { workspace: { timezone: 'UTC' } }, permissions: { pageScope: { all: false, ids: ['channel-1'] } } });
   mocks.createPost.mockResolvedValue({ id: 'draft-1' });
   mocks.updatePost.mockResolvedValue(undefined);
 });

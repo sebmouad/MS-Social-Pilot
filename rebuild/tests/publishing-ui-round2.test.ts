@@ -10,7 +10,7 @@ const mocks = vi.hoisted(() => ({
   push: vi.fn(),
   refresh: vi.fn(),
   action: vi.fn(async (_previous: unknown, _data: FormData): Promise<ComposerActionState> => ({ status: 'error', message: 'safe failure', values: {} })),
-  autosave: vi.fn(async (_id: string | null, _data: FormData) => ({ status: 'saved' as const, draftPostId: 'draft-1', savedAt: '2026-10-20T10:00:00.000Z' })),
+  autosave: vi.fn(async (_id: string | null, _data: FormData) => ({ status: 'saved' as const, draftPostId: 'draft-1', savedAt: '2026-10-20T10:00:00.000Z', savedLabel: '10:00 AM' })),
   saveExisting: vi.fn(async (_previous: unknown, _data: FormData): Promise<ComposerActionState> => ({ status: 'error', message: 'safe failure', values: {} })),
   targetRows: vi.fn(async () => [] as Array<{ id: string; socialAccount: { provider: string } | null }>),
 }));
@@ -181,12 +181,14 @@ describe('queue timeline by channel', () => {
   });
 
   it('limits slots per channel from the setting, says how many more, and badges who sends each post', () => {
-    const html = renderToStaticMarkup(createElement(QueueTimeline, { posts, timeZone: 'UTC', maxPerChannel: 2 }));
+    const html = renderToStaticMarkup(createElement(QueueTimeline, { posts: posts.map(post => ({ ...post, scheduledLabel: 'Wed, Oct 21, 9:00 AM' })), maxPerChannel: 2 }));
     expect(html).toContain('+1 more on this page');
     expect(html).not.toContain('Third');
     expect(html).toContain('>Facebook<');
     expect(html).toContain('>App<');
-    const fr = renderToStaticMarkup(createElement(QueueTimeline, { posts, timeZone: 'UTC', maxPerChannel: 2, locale: 'fr' }));
+    // The slot time is the server's preformatted label, never a browser-formatted zoned date.
+    expect(html).toContain('Wed, Oct 21, 9:00 AM');
+    const fr = renderToStaticMarkup(createElement(QueueTimeline, { posts, maxPerChannel: 2, locale: 'fr' }));
     expect(fr).toContain('+1 de plus sur cette page');
   });
 
@@ -307,7 +309,7 @@ describe('composer steps, scheduling words and autosave', () => {
     await type('#composer-message', 'WordPress recipe: apple tart with cinnamon');
     await act(async () => { await vi.advanceTimersByTimeAsync(20000); });
     expect(mocks.autosave).toHaveBeenCalledTimes(1);
-    await act(async () => finish({ status: 'saved', draftPostId: 'recipe-draft', savedAt: '2026-10-20T10:00:00Z' }));
+    await act(async () => finish({ status: 'saved', draftPostId: 'recipe-draft', savedAt: '2026-10-20T10:00:00Z', savedLabel: '10:00 AM' }));
     await act(async () => { await vi.advanceTimersByTimeAsync(5100); });
     expect(mocks.autosave).toHaveBeenCalledTimes(2);
     expect(mocks.autosave.mock.calls[1]![0]).toBe('recipe-draft');
@@ -328,7 +330,7 @@ describe('composer steps, scheduling words and autosave', () => {
     const button = [...container.querySelectorAll<HTMLButtonElement>('button')].find(item => item.textContent === 'Schedule for Oct 25, 10:30')!;
     await act(async () => { button.click(); button.click(); });
     expect(mocks.saveExisting).not.toHaveBeenCalled();
-    await act(async () => finish({ status: 'saved', draftPostId: 'recipe-draft', savedAt: '2026-10-20T10:00:00Z' }));
+    await act(async () => finish({ status: 'saved', draftPostId: 'recipe-draft', savedAt: '2026-10-20T10:00:00Z', savedLabel: '10:00 AM' }));
     expect(mocks.saveExisting).toHaveBeenCalledTimes(1);
     const data = mocks.saveExisting.mock.calls[0]![1];
     expect(data.get('draftPostId')).toBe('recipe-draft');

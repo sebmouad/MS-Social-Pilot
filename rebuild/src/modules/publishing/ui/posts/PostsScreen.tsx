@@ -16,6 +16,7 @@ import { publishingDestinationChoices } from '@/modules/publishing/server/destin
 import { formatDate } from "@/modules/publishing/ui/publishing-ui";
 import { EmptyPanel, type FilterChip } from "../kit/kit";
 import { pageLocale } from "../kit/locale";
+import { formatPostPreviewTime } from "@/components/PostPreview";
 import { PostsTable, type PostsTableRow } from "./PostsTable";
 import { PostsHeaderTools } from "./PostsHeaderTools";
 import { ImportCsv } from "./ImportCsv";
@@ -94,7 +95,7 @@ export default async function PostsPage({ searchParams }: { searchParams: Promis
   };
   const origins = await loadPostOrigins(viewer.workspaceId, listing.posts.map(post => post.id), locale);
   const originOptions = await originFilterOptions(viewer.workspaceId, locale).catch(() => []);
-  const rows: PostsTableRow[] = listing.posts.map(post => ({ ...post, origin: origins.get(post.id) ?? null, media: post.media as Array<{ kind: string; url: string; altText?: string }>, authorName: post.authorId === viewer.user.id ? viewer.user.name : copy.approvalsMember, ...authority(post), whenLabel: formatDate(post.scheduledAt ?? post.publishedAt, timeZone, true, locale, copy) }));
+  const rows: PostsTableRow[] = listing.posts.map(post => ({ ...post, origin: origins.get(post.id) ?? null, media: post.media as Array<{ kind: string; url: string; altText?: string }>, authorName: post.authorId === viewer.user.id ? viewer.user.name : copy.approvalsMember, ...authority(post), whenLabel: formatDate(post.scheduledAt ?? post.publishedAt, timeZone, true, locale, copy), firstCommentDueLabels: firstCommentDueLabels(post, timeZone) }));
   const noticeText = notice ? postsNotice(notice, locale, noticeCatalog) ?? undefined : undefined;
   // Every address keeps the sidebar's channel parameter and the other filters; only the omitted one is dropped.
   const hrefWith = (page: number | null, omit?: 'status' | 'q' | 'origin') => {
@@ -144,4 +145,15 @@ function safeOperationError(error: unknown, copy: typeof defaultCopy.en) {
   if (code === 'not_found') return copy.missingError;
   if (code === 'unavailable' || code === 'conflict') return copy.unavailableError;
   return copy.loadError;
+}
+
+/** First-comment due times per destination, formatted here so the browser never applies its own time-zone data. */
+function firstCommentDueLabels(post: { firstCommentDelayMinutes?: number | null; targets: Array<{ id: string; publishedAt?: Date | string | null }> }, timeZone: string) {
+  const delay = post.firstCommentDelayMinutes ?? 0;
+  const labels: Record<string, string> = {};
+  for (const target of post.targets) {
+    const published = target.publishedAt ? new Date(target.publishedAt) : null;
+    if (published && Number.isFinite(published.getTime())) labels[target.id] = formatPostPreviewTime(new Date(published.getTime() + delay * 60_000), timeZone);
+  }
+  return labels;
 }

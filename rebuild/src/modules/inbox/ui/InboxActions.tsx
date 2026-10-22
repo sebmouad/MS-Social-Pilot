@@ -59,7 +59,7 @@ async function send(payload: Record<string, unknown>, locale: InboxLocale = 'en'
 }
 
 /** "Last synced" plus Sync now, reporting what the sync found. */
-export function InboxSyncBar({ targetId, lastSynced, timeZone, disabled = false, locale = 'en' }: { targetId?: string; lastSynced: string | null; timeZone: string; disabled?: boolean; locale?: InboxLocale }) {
+export function InboxSyncBar({ targetId, lastSynced, disabled = false, locale = 'en' }: { targetId?: string; lastSynced: string | null; timeZone?: string; disabled?: boolean; locale?: InboxLocale }) {
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
   const [syncedNow, setSyncedNow] = useState<string | null>(null);
@@ -68,7 +68,7 @@ export function InboxSyncBar({ targetId, lastSynced, timeZone, disabled = false,
 
   async function sync() {
     setBusy(true); setResult(null);
-    const outcome = await send({ action: 'sync', ...(targetId ? { targetId } : {}) }, locale, copy.uncertain);
+    const outcome = await send({ action: 'sync', locale, ...(targetId ? { targetId } : {}) }, locale, copy.uncertain);
     setBusy(false);
     if (!outcome.ok) { setResult({ kind: 'error', text: outcome.error }); return; }
     const fields = ['conversationCount', 'messageCount', 'commentCount', 'targetCount', 'failedCount'] as const;
@@ -81,7 +81,7 @@ export function InboxSyncBar({ targetId, lastSynced, timeZone, disabled = false,
     const reviewCount = outcome.body.reviewCount;
     const reviews = typeof reviewCount === 'number' && Number.isSafeInteger(reviewCount) && reviewCount >= 0 ? reviewCount : null;
     setResult({ kind: failedCount ? 'error' : 'ok', text: copy.synced({ targets: Number(targetCount), conversations: Number(conversationCount), messages: Number(messageCount), comments: Number(commentCount), reviews, failed: failedCount }) });
-    setSyncedNow(new Intl.DateTimeFormat(locale === 'fr' ? 'fr-FR' : 'en-US', { timeZone, month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZoneName: 'short' }).format(new Date(syncedAt)));
+    if (typeof outcome.body.syncedLabel === 'string') setSyncedNow(outcome.body.syncedLabel);
     router.refresh();
   }
 

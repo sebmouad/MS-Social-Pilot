@@ -6,11 +6,11 @@ import { Button } from '@/components/Button';
 import { DataTable } from '@/components/DataTable';
 import { useConfirm } from '@/components/useConfirm';
 import { FieldError, useFormValidation } from '@/components/FormValidation';
-import { CHAT_EVENTS, chatConfirmation, type ChatView } from '../contracts';
+import { CHAT_EVENTS, chatConfirmation, type ChatViewRow } from '../contracts';
 import type { ChatCopy, CHAT_POLICY } from '../config';
 import styles from './chat-channels.module.css';
 
-export function ChatChannels({ initial, policy, copy, locale, timeZone }: { initial: ChatView[]; policy: { [K in keyof typeof CHAT_POLICY]: typeof CHAT_POLICY[K] extends number ? number : string }; copy: ChatCopy; locale: 'en' | 'fr'; timeZone: string }) {
+export function ChatChannels({ initial, policy, copy, locale }: { initial: ChatViewRow[]; policy: { [K in keyof typeof CHAT_POLICY]: typeof CHAT_POLICY[K] extends number ? number : string }; copy: ChatCopy; locale: 'en' | 'fr'; timeZone?: string }) {
   const router = useRouter();
   const [kind, setKind] = useState('slack');
   const [busy, setBusy] = useState(false);
@@ -49,7 +49,7 @@ export function ChatChannels({ initial, policy, copy, locale, timeZone }: { init
     <DataTable rows={initial} rowKey={row => row.id} caption={copy.title} emptyMessage={copy.empty} zebra={false} columns={[
       { key: 'name', label: copy.name, render: row => <span className={styles.identity}>{row.kind === 'slack' ? <IconBrandSlack size={24} aria-hidden="true" /> : <IconBrandTelegram size={24} aria-hidden="true" />}<span><strong>{row.name}</strong><span className={styles.muted}>{row.enabled ? copy.active : copy.paused}{row.hasError ? ` · ${copy.failed}` : ''}</span></span></span> },
       { key: 'events', label: copy.events, render: row => <details><summary>{row.events.map(event => CHAT_EVENTS.includes(event as typeof CHAT_EVENTS[number]) ? copy[event as typeof CHAT_EVENTS[number]] : event).join(' · ')}</summary><form onSubmit={event => { event.preventDefault(); const data = new FormData(event.currentTarget); void mutate('PATCH', `/api/chat-channels/${encodeURIComponent(row.id)}`, { events: data.getAll('events') }, chatConfirmation.update(row.id), row.id); }}><fieldset disabled={busy}>{CHAT_EVENTS.map(event => <label key={event} className={styles.choice}><input type="checkbox" name="events" value={event} defaultChecked={row.events.includes(event)} />{copy[event]}</label>)}</fieldset><Button disabled={busy} type="submit">{copy.updateEvents}</Button></form></details> },
-      { key: 'lastSent', label: copy.lastSent, render: row => row.lastSentAt ? new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short', timeZone }).format(new Date(row.lastSentAt)) + ` ${timeZone}` : copy.never },
+      { key: 'lastSent', label: copy.lastSent, render: row => row.lastSentAt && row.lastSentLabel ? row.lastSentLabel : copy.never },
       { key: 'actions', label: copy.confirmTitle, render: row => <div className={styles.actions}>
         <Button disabled={busy} leading={<IconSend size={16} aria-hidden="true" />} onClick={() => void mutate('POST', `/api/chat-channels/${encodeURIComponent(row.id)}/test`, {}, chatConfirmation.test(row.id), row.id)}>{copy.test}</Button>
         <Button disabled={busy} onClick={() => void mutate('PATCH', `/api/chat-channels/${encodeURIComponent(row.id)}`, { enabled: !row.enabled }, chatConfirmation.update(row.id), row.id)}>{row.enabled ? copy.disable : copy.enable}</Button>

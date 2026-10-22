@@ -46,7 +46,7 @@ describe('PostThumb', () => {
 describe('thumbnail placement', () => {
   it('shows each queued post thumbnail in the channel timeline', () => {
     const html = renderToStaticMarkup(createElement(QueueTimeline, {
-      timeZone: 'UTC', maxPerChannel: 3,
+      maxPerChannel: 3,
       posts: [{ id: 'p1', message: 'Hello', link: null, media: [{ kind: 'image', url: `media:${id}` }], status: 'scheduled', scheduledAt: new Date('2026-10-22T10:00:00Z'), targets: [{ status: 'pending', target: { id: 'c1', name: 'Studio', pictureUrl: null } }] }],
     }));
     expect(html).toContain(`/api/media/${id}`);

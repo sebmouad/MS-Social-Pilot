@@ -25,12 +25,11 @@ import { QueuePostButton } from './QueuePostButton';
 import { AuthoringMediaPreview, PostAttachments, usePostAttachments, type PostMediaItem } from '@/modules/publishing/components/PostAttachments';
 import { publishingMediaIssue, publishingMediaFormatter } from '@/modules/publishing/media-support';
 import type { PublishingFormatDescriptor, PublishingMediaSupport } from '@/platforms/types';
-import { formatPostPreviewTime } from '@/components/PostPreview';
 
 type LocalImageUpload = { maxBytes: number; mimeTypes: readonly string[] };
 type TargetChoice = { id: string; name: string; type: string; provider: string | null; canPublish: boolean; publishingMedia?: PublishingMediaSupport; publishingFormats?: readonly PublishingFormatDescriptor[]; defaultPublishingFormatId?: string; localImageUpload?: LocalImageUpload };
 type ImageRules = { allowedMimeTypes: string[]; maxUploadBytes: number; maxAltCharacters: number; maxMedia: number; maxFirstCommentDelayMinutes: number };
-type PostRow = { format?: string; id: string; message: string; firstComment: string | null; firstCommentDelayMinutes?: number; link: string | null; media: Array<{kind: string; url: string; altText?: string}>; status: string; publishedAt: Date | null; targets: Array<{ id: string; formatId?: string | null; status: string; remotePostId: string | null; publishedAt?: Date | string | null; firstCommentId?: string | null; firstCommentAt?: Date | string | null; firstCommentError?: string | null; target: { id: string; name?: string | null } }> };
+type PostRow = { format?: string; id: string; message: string; firstComment: string | null; firstCommentDelayMinutes?: number; /** Per-destination first-comment due time, formatted on the server in the workspace zone (hydration-safe). */ firstCommentDueLabels?: Record<string, string>; link: string | null; media: Array<{kind: string; url: string; altText?: string}>; status: string; publishedAt: Date | null; targets: Array<{ id: string; formatId?: string | null; status: string; remotePostId: string | null; publishedAt?: Date | string | null; firstCommentId?: string | null; firstCommentAt?: Date | string | null; firstCommentError?: string | null; target: { id: string; name?: string | null } }> };
 
 const MEDIA_KINDS = ['image', 'video'] as const;
 
@@ -133,7 +132,7 @@ export function PostRowActions({ post, targets, canEdit, canPublish, imageRules,
   return <div className={styles.rowActions}>
     {canOrganize && <a className="ui-button ui-button--secondary ui-button--sm" href={`/content/post/${encodeURIComponent(post.id)}`}>{t('organizePost')}</a>}
     {canDuplicate ? <DuplicatePost postId={post.id} disabled={rowPending} onPendingChange={setDuplicatePending} /> : null}
-    {canQueue ? <QueuePostButton postId={post.id} postMessage={post.message} destinations={queueDestinations.map(target => target.target.name ?? t('destination'))} timeZone={timeZone} eligible={isQueueEligible} /> : null}
+    {canQueue ? <QueuePostButton postId={post.id} postMessage={post.message} destinations={queueDestinations.map(target => target.target.name ?? t('destination'))} eligible={isQueueEligible} /> : null}
     {canEdit && isDraft ? <details className={styles.editDetails}>
       <summary onClick={event => { if (rowPending) event.preventDefault(); }}>{t('editPost')}</summary>
       <PostEditForm post={post} targets={targets} selected={selected} imageRules={imageRules} disabled={rowPending} onPendingChange={setEditPending} />
@@ -149,14 +148,14 @@ export function PostRowActions({ post, targets, canEdit, canPublish, imageRules,
     <PublicationRecovery postId={post.id} excerpt={post.message} targets={post.targets.map(item => ({ id: item.id, name: item.target.name, status: item.status, remotePostId: item.remotePostId }))} />
     {post.firstComment?.trim() ? <section className={styles.help} aria-label={t('firstCommentStatus')}>
       <strong>{t('firstCommentDelivery')}</strong>
-      {post.targets.map(target => <FirstCommentControl key={target.id} postId={post.id} postComment={post.firstComment!} delayMinutes={post.firstCommentDelayMinutes ?? 0} timeZone={timeZone} target={target} />)}
+      {post.targets.map(target => <FirstCommentControl key={target.id} postId={post.id} postComment={post.firstComment!} delayMinutes={post.firstCommentDelayMinutes ?? 0} timeZone={timeZone} dueLabel={post.firstCommentDueLabels?.[target.id]} target={target} />)}
     </section> : null}
     <Button variant="danger" size="sm" type="button" disabled={rowPending} onClick={() => setDeleteOpen(true)}>{t('deleteLocally')}</Button>
     {deleteOpen && <PostDeleteDialog postId={post.id} postMessage={post.message} hasRemote={hasRemote} onDismiss={() => setDeleteOpen(false)} onPendingChange={setDeletePending} />}
   </div>;
 }
 
-function FirstCommentControl({ postId, postComment, delayMinutes, timeZone, target }: { postId: string; postComment: string; delayMinutes: number; timeZone: string; target: PostRow['targets'][number] }) {
+function FirstCommentControl({ postId, postComment, delayMinutes, timeZone, dueLabel, target }: { postId: string; postComment: string; delayMinutes: number; timeZone: string; dueLabel?: string; target: PostRow['targets'][number] }) {
   const t = usePublishingActionText();
   const numberLocale = usePublishingActionLocale();
   const [mode, setMode] = useState<'send' | 'record' | null>(null);
@@ -178,7 +177,7 @@ function FirstCommentControl({ postId, postComment, delayMinutes, timeZone, targ
   const rejected = displayState === 'ready' && target.firstCommentError === FIRST_COMMENT_REJECTED;
   const isScheduled = !rejected && displayState === 'ready' && delayMinutes > 0;
   const stateText = displayState === 'scheduled' ? t('firstCommentIsScheduled')
-    : isScheduled && dueAt ? t('firstCommentScheduled', { time: formatPostPreviewTime(dueAt, timeZone), zone: timeZone.replaceAll('_', ' ') })
+    : isScheduled && dueAt && dueLabel ? t('firstCommentScheduled', { time: dueLabel, zone: timeZone.replaceAll('_', ' ') })
       : isScheduled ? t('firstCommentWait', { minutes: delayMinutes.toLocaleString(numberLocale) })
         : t(`comment_${displayState}`);
   const open = (next: 'send' | 'record') => setMode(next);

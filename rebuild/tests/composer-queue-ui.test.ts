@@ -15,7 +15,7 @@ beforeEach(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
   vi.clearAllMocks();
   container = document.createElement('div'); document.body.append(container); root = createRoot(container);
-  h.preview.mockResolvedValue({ status: 'ready', scheduledAt: '2026-10-23T10:00:00Z', channels: [{ targetId: 'a', nextAt: '2026-10-23T10:00:00Z' }] });
+  h.preview.mockResolvedValue({ status: 'ready', scheduledAt: '2026-10-23T10:00:00Z', scheduledLabel: 'Oct 23, 2026, 10:00 AM', channels: [{ targetId: 'a', nextAt: '2026-10-23T10:00:00Z' }] });
 });
 afterEach(async () => { await act(async () => root.unmount()); container.remove(); });
 async function render(locale: 'en' | 'fr' = 'en', queueAvailable = true, copyCatalog?: ComposerCatalog, content = resolveContentCopy(contentCopyDefaults as never, locale)) {
@@ -51,7 +51,7 @@ it('shows the chosen time before enabling queue save, and retains content and re
   expect(message.value).toBe('Retain this post');
   expect(h.push).not.toHaveBeenCalled();
   await act(async () => new Promise(resolve => setTimeout(resolve, 280)));
-  h.save.mockResolvedValueOnce({ status: 'success', destination: '/content?notice=scheduled', values: {}, queued: { scheduledAt: '2026-10-23T10:00:00Z', status: 'pending_approval' } });
+  h.save.mockResolvedValueOnce({ status: 'success', destination: '/content?notice=scheduled', values: {}, queued: { scheduledAt: '2026-10-23T10:00:00Z', scheduledLabel: 'Oct 23, 2026, 10:00 AM', status: 'pending_approval' } });
   await openMenu();
   await act(async () => queueItem()!.click());
   expect((h.save.mock.calls[1]![1] as FormData).get('intent')).toBe('queue');

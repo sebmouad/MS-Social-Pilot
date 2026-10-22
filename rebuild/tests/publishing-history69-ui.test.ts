@@ -44,7 +44,7 @@ describe('Publishing history batch 69 organization UX', () => {
 
   it('renders the timestamp returned by the server for a newly saved note', async () => {
     const createdAt = '2026-10-18T12:34:56.000Z';
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({ id: 'note-db', createdAt, notified: 'none' }) }));
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({ id: 'note-db', createdAt, createdLabel: 'Oct 18, 2026, 12:34 PM UTC', notified: 'none' }) }));
     await act(async () => root.render(createElement(PostPanel, {
       postId: 'p1', canWrite: true, labels: [], assigned: [], fields: [], notes: [], mentionable: [], noteMax: 2000,
       viewerId: 'u1', canModerate: true, versions: [], restore: false, recycle: null, canRestoreNow: false, timeZone: 'UTC',

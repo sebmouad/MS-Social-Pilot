@@ -7,7 +7,6 @@ import { useEffect, useId, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/Button';
-import { formatRootTimestamp } from '@/lib/root-time';
 import { diagnosticConfirmation, diagnosticRunSchema, type DiagnosticReceipt } from '@/lib/diagnostics';
 import type { listRootDiagnostics } from '@/server/root/diagnostics';
 import { diagnosticsCopyText, type RootDiagnosticsCopy } from '@/lib/config/root-diagnostics-copy';
@@ -21,6 +20,7 @@ export function RootDiagnosticsClient({ initial, copy }: { initial: Snapshot; co
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [receipt, setReceipt] = useState<DiagnosticReceipt | null>(null);
+  const [receiptLabel, setReceiptLabel] = useState('');
   useRootActionFeedback(error, receipt ? diagnosticsCopyText(copy.checksFinished, { passed: receipt.checks.filter(check => check.status === 'pass').length, failed: receipt.checks.filter(check => check.status === 'fail').length, skipped: receipt.checks.filter(check => check.status === 'skipped').length }) : '', () => router.refresh(), receipt?.checks.some(check => check.status === 'fail') ? 'error' : 'success');
   const feedback = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -35,12 +35,14 @@ export function RootDiagnosticsClient({ initial, copy }: { initial: Snapshot; co
       if (!response.ok) { setError(typeof body.error === 'string' ? body.error : copy.fallbackFailure); return; }
       const parsed = diagnosticRunSchema.safeParse({ id: body.id, scope: body.scope, connectionId: body.connectionId, startedAt: body.startedAt, finishedAt: body.finishedAt, checks: body.checks });
       if (!parsed.success || parsed.data.scope !== initial.scope || parsed.data.connectionId !== (connectionId || null) || typeof body.auditRecorded !== 'boolean') throw new Error(copy.invalidReceipt);
+      setReceiptLabel(typeof body.finishedLabel === 'string' ? body.finishedLabel : '');
       setReceipt({ ...parsed.data, auditRecorded: body.auditRecorded, ...(body.auditRecorded ? {} : { warning: copy.auditWarning }) });
       router.refresh();
     } catch { setError(copy.outcomeUnconfirmed); }
     finally { lock.current = false; setBusy(false); }
   }
   const latest = receipt ?? initial.history.find(item => item.result)?.result ?? null;
+  const latestLabel = receipt ? receiptLabel : initial.history.find(item => item.result)?.finishedLabel ?? '';
   return <section className="root-jobs" aria-label={diagnosticsCopyText(copy.sectionLabel, { label: initial.label })} aria-busy={busy}>
     <form id={formId} method="post" noValidate onSubmit={event => { event.preventDefault(); void run(); }} />
     <section className="root-diagnostics__tools" aria-label={copy.controls}><h2>{copy.title}</h2>
@@ -56,10 +58,10 @@ export function RootDiagnosticsClient({ initial, copy }: { initial: Snapshot; co
       {error && <p role="alert">{error}</p>}{receipt && <p role="status">{diagnosticsCopyText(copy.checksFinished, { passed: receipt.checks.filter(check => check.status === 'pass').length, failed: receipt.checks.filter(check => check.status === 'fail').length, skipped: receipt.checks.filter(check => check.status === 'skipped').length })}</p>}
       {receipt?.warning && <p role="alert">{receipt.warning}</p>}
     </div>
-    {latest ? <><h3>{copy.latestResults}</h3><p>{formatRootTimestamp(latest.finishedAt, initial.timeZone)} · {latest.connectionId ? diagnosticsCopyText(copy.connection, { id: latest.connectionId }) : copy.noConnection}</p><ul className="root-jobs__latest">{latest.checks.map(check => <li key={check.id}>
+    {latest ? <><h3>{copy.latestResults}</h3><p>{latestLabel} · {latest.connectionId ? diagnosticsCopyText(copy.connection, { id: latest.connectionId }) : copy.noConnection}</p><ul className="root-jobs__latest">{latest.checks.map(check => <li key={check.id}>
       <strong>{check.label}</strong><span><Badge tone={check.status === 'pass' ? 'success' : check.status === 'fail' ? 'danger' : 'neutral'}>{check.status === 'pass' ? copy.pass : check.status === 'fail' ? copy.fail : copy.skipped}</Badge> · {check.durationMs}ms</span><span>{check.message}</span><small>{check.code}</small>
     </li>)}</ul></> : <p>{copy.noResults}</p>}
-    <h3>{copy.recentRuns}</h3>{initial.history.length ? <ul className="root-diagnostics__history">{initial.history.map(item => <li key={item.id}><time dateTime={item.startedAt}>{formatRootTimestamp(item.startedAt, initial.timeZone)}</time> · {item.result ? diagnosticsCopyText(copy.historyResult, { failed: item.result.checks.filter(check => check.status === 'fail').length, skipped: item.result.checks.filter(check => check.status === 'skipped').length }) : copy.startedUnconfirmed}<small>{item.id}</small>{item.result && <details><summary>{copy.viewResults}</summary><ul>{item.result.checks.map(check => <li key={check.id}><strong>{check.label}: {check.status === 'pass' ? copy.pass : check.status === 'fail' ? copy.fail : copy.skipped}</strong> · {check.durationMs}ms<p>{check.message}</p></li>)}</ul></details>}</li>)}</ul> : <p>{copy.noRuns}</p>}
+    <h3>{copy.recentRuns}</h3>{initial.history.length ? <ul className="root-diagnostics__history">{initial.history.map(item => <li key={item.id}><time dateTime={item.startedAt}>{item.startedLabel}</time> · {item.result ? diagnosticsCopyText(copy.historyResult, { failed: item.result.checks.filter(check => check.status === 'fail').length, skipped: item.result.checks.filter(check => check.status === 'skipped').length }) : copy.startedUnconfirmed}<small>{item.id}</small>{item.result && <details><summary>{copy.viewResults}</summary><ul>{item.result.checks.map(check => <li key={check.id}><strong>{check.label}: {check.status === 'pass' ? copy.pass : check.status === 'fail' ? copy.fail : copy.skipped}</strong> · {check.durationMs}ms<p>{check.message}</p></li>)}</ul></details>}</li>)}</ul> : <p>{copy.noRuns}</p>}
     <p><Link href="/root/activity?q=diagnostics">{copy.auditActivity}</Link></p>
   </section>;
 }

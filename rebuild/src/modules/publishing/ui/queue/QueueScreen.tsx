@@ -46,6 +46,7 @@ export default async function QueuePage({ searchParams }: { searchParams: Promis
     runtimeConfig('publishing.queueTimelineSlotsPerChannel'),
   ]);
   const now = new Date();
+  const slotFormat = new Intl.DateTimeFormat(locale, { timeZone, weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
   const today = workspaceDateKey(now, timeZone);
   const tomorrow = addDaysToKey(today, 1);
 
@@ -89,7 +90,7 @@ export default async function QueuePage({ searchParams }: { searchParams: Promis
           : <>
             <Tabs label={copy.queueTitle} items={[
               { id: 'day', label: copy.byDay, count: listing.posts.length, content: byDay },
-              { id: 'channel', label: copy.queueByChannel, content: <QueueTimeline posts={listing.posts} timeZone={timeZone} locale={locale} maxPerChannel={Number(slotsPerChannel)} /> },
+              { id: 'channel', label: copy.queueByChannel, content: <QueueTimeline posts={listing.posts.map(post => ({ ...post, scheduledLabel: post.scheduledAt ? slotFormat.format(post.scheduledAt) : undefined }))} locale={locale} maxPerChannel={Number(slotsPerChannel)} /> },
             ]} />
             <PublishingPagination path="/content/queue" page={listing.page} pages={listing.pages} locale={locale} copy={copy} />
           </>}

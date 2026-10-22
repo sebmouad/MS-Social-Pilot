@@ -1,5 +1,6 @@
 "use server";
 import { publishingErrorClassificationMessage, PublishingOperationError, defaultPublishingErrorText, type PublishingErrorText } from '@/modules/publishing/error-catalog';
+import { loadContent } from '@/modules/publishing/server/content-copy';
 import { loadPublishingErrorText } from '@/modules/publishing/server/error-copy';
 
 
@@ -125,7 +126,8 @@ export async function createPostWithRecoveryAction(previous: ComposerActionState
     const viewer = await requireViewer({ feature: 'publishing/posts', channelScoped: true, write: true });
     if (!canAccessFeature(viewer.permissions, 'publishing/posts', 'write')) throw new Error('permission');
     if (values.intent !== 'draft' && values.intent !== 'schedule') throw new Error('intent');
-    const scheduledAt = values.intent === 'schedule' ? (() => {
+    const publishNowLead = values.intent === 'schedule' && data.get('publishNow') === '1' ? (await loadContent()).policy.publishNowLeadMinutes : null;
+    const scheduledAt = publishNowLead !== null ? new Date(Date.now() + publishNowLead * 60_000) : values.intent === 'schedule' ? (() => {
       const result = wallTimeToInstant(values.scheduleDate, values.scheduleTime, viewer.membership.workspace.timezone);
       if (!result.ok) throw new Error('schedule');
       return result.instant;
