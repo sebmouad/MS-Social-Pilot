@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { OperationError } from '@/lib/operation-error';
 import { prisma } from '@/server/data';
 import { runtimeConfig } from '@/server/config/store';
-import { verifyLegacyPassword } from '@/server/auth';
+import { verifyPassword } from '@/server/auth';
 import { needsTwoStepEnrollment } from '@/server/auth-policy';
 import { authRateLimit } from '@/server/auth-flow';
 import { hit } from '@/server/rate-limit';
@@ -43,7 +43,7 @@ export async function changeAccountSecurity(actor: AccountActor, action: 'begin'
     // Serialize credential changes, including removal of the final required factor.
     await tx.$queryRaw`SELECT id FROM users WHERE id = ${actor.userId} FOR UPDATE`;
     const user = await tx.user.findUnique({ where: { id: actor.userId } });
-    if (!user || user.disabledAt || !verifyLegacyPassword(value.currentPassword, user.passwordHash)) throw invalid();
+    if (!user || user.disabledAt || !verifyPassword(value.currentPassword, user.passwordHash)) throw invalid();
     const session = await tx.session.findUnique({ where: { tokenHash: actor.sessionTokenHash } });
     if (!session || session.userId !== actor.userId || session.pending || session.expiresAt <= new Date()) throw new OperationError('unauthorized', 'Sign in to continue.');
     const [roles, policy, passkeyCount] = await Promise.all([

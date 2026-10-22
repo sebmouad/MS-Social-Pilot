@@ -2,7 +2,7 @@
 import {randomBytes,randomUUID} from 'node:crypto';
 import {chromium} from 'playwright';
 import {Prisma,PrismaClient} from '../generated/client';
-import {hashLegacySessionToken} from '../src/server/auth';
+import {hashSessionToken} from '../src/server/auth';
 function check(value:unknown,label:string):asserts value {if(!value)throw Error(label);}
 async function main(){
  const raw=process.env.REBUILD_PREVIEW_DATABASE_URL,origin=process.env.REBUILD_PREVIEW_ORIGIN;
@@ -22,7 +22,7 @@ async function main(){
   original=await db.appSetting.findUnique({where:{key}});
   for(const row of await db.$queryRaw<Array<{id:string}>>`SELECT id FROM root_activities WHERE "actorId"=${owner} AND action='config.changed' AND detail->>'key'=${key}`)baseline.add(row.id);
   baselineCaptured=true;
-  await db.session.create({data:{id:tag,userId:owner,tokenHash:hashLegacySessionToken(token)!,pending:null,expiresAt:new Date(Date.now()+600000)}});sessionCreated=true;
+  await db.session.create({data:{id:tag,userId:owner,tokenHash:hashSessionToken(token)!,pending:null,expiresAt:new Date(Date.now()+600000)}});sessionCreated=true;
   check((await fetch(`${origin}/api/root/config`)).status===401,'Unauthenticated Root settings must be denied');
   const metadata=await rpc('get_root_config');const config=metadata.result?.structuredContent;
   check(config?.schemaVersion>=76&&Array.isArray(config.definitions),'MCP must expose current Root registry');

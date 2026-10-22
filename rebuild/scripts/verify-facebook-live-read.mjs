@@ -1,6 +1,6 @@
 /**
  * Read-only operator probe for a separately bundled rebuild Facebook engine.
- * Run ON the authorized legacy host; never copy credentials off that host.
+ * Run ON the authorized rebuild host; never copy credentials off that host.
  * See docs/FACEBOOK_REQUEST_SIGNING.md for explicit inputs and limited proof.
  */
 import { createHash } from 'node:crypto';
@@ -36,18 +36,10 @@ try {
   }
   const require = createRequire(join(resolve(appRoot), 'package.json'));
   const { PrismaClient } = require('@prisma/client');
-  const settingsImport = await import(pathToFileURL(join(appRoot, 'src/lib/settings/index.ts')).href);
-  const settings = settingsImport.default ?? settingsImport;
-  await settings.ensureSettings(); // Loads legacy settings; never saves or changes them.
-  const envImport = await import(pathToFileURL(join(appRoot, 'src/lib/env.ts')).href);
-  const { env } = envImport.default ?? envImport;
-  const cryptoImport = await import(pathToFileURL(join(appRoot, 'src/lib/crypto.ts')).href);
-  const { decryptSecret } = cryptoImport.default ?? cryptoImport;
+  const credentialsImport = await import(pathToFileURL(join(appRoot, 'src/platforms/facebook/probe-credentials.ts')).href);
+  const { decryptSecret, configuredFacebookProbeConfig } = credentialsImport.default ?? credentialsImport;
   const config = JSON.parse(await readFile(join(probeDir, 'socialpilot-facebook-defaults49.json'), 'utf8'));
-  config.graphBaseUrl = env.graphBaseUrl;
-  config.graphVersion = env.graphVersion;
-  config.requestTimeoutMs = env.graphTimeoutMs;
-  config.appSecret = env.facebookAppSecret;
+  Object.assign(config, await configuredFacebookProbeConfig(config));
   const expectedOrigin = new URL(required('MSP_FACEBOOK_PROBE_GRAPH_ORIGIN'));
   const actualEndpoint = new URL(config.graphBaseUrl);
   if (expectedOrigin.protocol !== 'https:' || expectedOrigin.username || expectedOrigin.password

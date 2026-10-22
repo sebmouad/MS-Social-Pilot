@@ -1,7 +1,7 @@
 import { withinSynchronousLimit } from '@/lib/config/synchronous-policy';
 import { z } from 'zod';
-import { disconnectRootConnection, previewRootConnectionDeletion } from '@/server/root/legacy/connections';
-import { readBody, rootRoute } from '@/server/root/legacy/http';
+import { disconnectRootConnection, previewRootConnectionDeletion } from '@/modules/root/server/admin/connections';
+import { readBody, rootRoute } from '@/modules/root/server/admin/http';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';

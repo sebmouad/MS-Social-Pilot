@@ -3,9 +3,9 @@ import { runtimeConfig } from '@/server/config/store';
 import { z } from 'zod';
 import { prisma } from '@/server/data';
 import { OperationError } from '@/lib/operation-error';
-import { assertRootActor, lockRootActor, invalid, isMissingRelation, redact } from '@/server/root/legacy/authz';
-import { writeRootAudit } from '@/server/root/legacy/audit';
-import { rootResultLimit, legacySetting, rootTransaction } from '@/server/root/legacy/policy';
+import { assertRootActor, lockRootActor, invalid, isMissingRelation, redact } from '@/modules/root/server/admin/authz';
+import { writeRootAudit } from '@/modules/root/server/admin/audit';
+import { rootResultLimit, adminSetting, rootTransaction } from '@/modules/root/server/admin/policy';
 
 type ErrorRow = { id: string; source: string; name: string; message: string; stack?: string | null; location: string | null; release: string; count: number; firstSeenAt: Date; lastSeenAt: Date; resolvedAt: Date | null; total?: number };
 
@@ -14,7 +14,7 @@ const like = (value: string) => `%${value.replace(/[\\%_]/g, match => `\\${match
 const unavailable = () => new OperationError('unavailable', 'The error log is not available in this database.');
 
 async function errorShapePolicy(withStack: boolean) {
-  const [message, stack, name, location, release] = await Promise.all([legacySetting('root.legacy.errorMessageMaxCharacters'), withStack ? legacySetting('root.legacy.errorStackMaxCharacters') : Promise.resolve(0), runtimeConfig('root.errorNameMaxCharacters'), runtimeConfig('root.errorLocationMaxCharacters'), runtimeConfig('root.errorReleaseMaxCharacters')]);
+  const [message, stack, name, location, release] = await Promise.all([adminSetting('root.admin.errorMessageMaxCharacters'), withStack ? adminSetting('root.admin.errorStackMaxCharacters') : Promise.resolve(0), runtimeConfig('root.errorNameMaxCharacters'), runtimeConfig('root.errorLocationMaxCharacters'), runtimeConfig('root.errorReleaseMaxCharacters')]);
   return { message, stack, name, location, release };
 }
 
@@ -30,10 +30,10 @@ function shape(row: ErrorRow, withStack: boolean, { message, stack, name, locati
 export async function listRootErrors(actorId: string, input: unknown = {}, resultCap?: number) {
   await assertRootActor(prisma, actorId);
   const parsed = filterSchema.safeParse(input);
-  const max = await legacySetting('root.legacy.searchMaxCharacters');
+  const max = await adminSetting('root.admin.searchMaxCharacters');
   if (!parsed.success || (parsed.data.q?.length ?? 0) > max) throw invalid('Use a shorter search and a valid filter.');
   const { status = 'open', source, q, page = 1 } = parsed.data;
-  const size = rootResultLimit(await legacySetting('root.legacy.errorPageSize'), resultCap);
+  const size = rootResultLimit(await adminSetting('root.admin.errorPageSize'), resultCap);
   const pattern = q ? like(q) : null;
   const sourceFilter = source ?? null;
   try {

@@ -1,6 +1,6 @@
 import { randomBytes, randomUUID, createHash } from 'node:crypto';
 import { PrismaClient } from '../generated/client';
-import { hashLegacySessionToken } from '../src/server/auth';
+import { hashSessionToken } from '../src/server/auth';
 class ProbeFailure extends Error {}
 function check(value: unknown, label: string): asserts value { if (!value) throw new ProbeFailure(label); }
 async function main() {
@@ -30,7 +30,7 @@ async function main() {
     await client.$executeRaw`UPDATE memberships SET "allPages" = false WHERE id = ${membershipId}`;
     await client.$executeRaw`INSERT INTO member_page_access ("membershipId", "targetId") VALUES (${membershipId}, 'preview_target_north')`;
     // Verified session fixtures exercise request authorization; password/TOTP login is covered by verify-installation-mcp.ts.
-    for (const [suffix, sessionUser, token] of [['viewer', userId, viewerToken], ['owner', owner.id, ownerToken]]) await client.session.create({ data: { id: `${id}_${suffix}_session`, userId: sessionUser, tokenHash: hashLegacySessionToken(token)!, pending: null, expiresAt: new Date(Date.now() + 300000) } });
+    for (const [suffix, sessionUser, token] of [['viewer', userId, viewerToken], ['owner', owner.id, ownerToken]]) await client.session.create({ data: { id: `${id}_${suffix}_session`, userId: sessionUser, tokenHash: hashSessionToken(token)!, pending: null, expiresAt: new Date(Date.now() + 300000) } });
     await client.mcpApiKey.create({ data: { id: keyId, workspaceId, createdById: owner.id, name: 'Temporary Inbox read-only probe', tokenHash: createHash('sha256').update(bearer).digest('hex'), tokenPrefix: bearer.slice(0, 12), readFeatures: ['inbox/conversations'], writeFeatures: [], expiresAt: new Date(Date.now() + 300000) } });
     const scoped = await get('/api/inbox?limit=1'); const scopedData = await scoped.json();
     check(scoped.ok && scoped.headers.get('cache-control') === 'no-store' && scopedData.items.length === 1 && scopedData.items.every((item: { target: { id: string } }) => item.target.id === 'preview_target_north'), 'Viewer list must use actual current channel grants.');

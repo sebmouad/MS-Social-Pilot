@@ -5,7 +5,7 @@ import { OperationError } from '@/lib/operation-error';
 import { prisma } from '@/server/data';
 import { runtimeConfig } from '@/server/config/store';
 import { accountPasswordPolicy, validateNewPassword } from '@/server/account-settings';
-import { hashLegacyPassword } from '@/server/auth';
+import { hashStoredPassword } from '@/server/auth';
 import { mailReady, publicMailOrigin, sendTransactionalMail } from '@/server/mail';
 
 /**
@@ -86,7 +86,7 @@ export function createRegistrationService(deps: RegistrationDeps = defaults) {
       const minutes = await ttl(deps);
       const origin = await deps.mailOrigin();
       if (!origin) throw unavailable();
-      const passwordHash = hashLegacyPassword(password); // slow on purpose; outside the lock
+      const passwordHash = hashStoredPassword(password); // slow on purpose; outside the lock
       const now = deps.now();
       let created: { id: string } | null = null;
       try {
@@ -169,7 +169,7 @@ export const registerAccount = service.register;
 export const resendVerification = service.resend;
 export const verifyEmail = service.verify;
 
-/** Evidence distinguishes self-registration from legacy/invited unverified accounts. Alias must be `u`. */
+/** Evidence distinguishes self-registration from existing or invited unverified accounts. Alias must be `u`. */
 export const unverifiedRegistrationWhere = Prisma.sql`
   u."emailVerifiedAt" IS NULL AND u."isInstanceOwner" = false
   AND NOT EXISTS (SELECT 1 FROM memberships m WHERE m."userId" = u.id)

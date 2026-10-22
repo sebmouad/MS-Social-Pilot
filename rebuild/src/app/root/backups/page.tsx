@@ -4,10 +4,10 @@ import { DataTable } from '@/components/DataTable';
 import { PageHeader } from '@/components/PageHeader';
 import { requireRootPage } from '@/server/config/access';
 import { RootFrame } from '@/server/root/RootFrame';
-import { readRootBackupStatus, readRootDiagnosticsSummary } from '@/server/root/legacy/backups';
+import { readRootBackupStatus, readRootDiagnosticsSummary } from '@/modules/root/server/admin/backups';
 import { runtimeConfig } from '@/server/config/store';
 import { ROOT_BACKUPS_COPY, backupsCopyText } from '@/lib/config/root-backups-copy';
-import '../plans/legacy-ops.css';
+import '../plans/root-ops.css';
 
 export const dynamic = 'force-dynamic';
 export async function generateMetadata() {

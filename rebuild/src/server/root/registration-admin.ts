@@ -4,9 +4,9 @@ import { z } from 'zod';
 import { prisma } from '@/server/data';
 import { runtimeConfig } from '@/server/config/store';
 import { OperationError } from '@/lib/operation-error';
-import { assertRootActor, lockRootActor, invalid } from './legacy/authz';
-import { rootTransaction, legacySetting, rootResultLimit } from './legacy/policy';
-import { writeRootAudit } from './legacy/audit';
+import { assertRootActor, lockRootActor, invalid } from '@/modules/root/server/admin/authz';
+import { rootTransaction, adminSetting, rootResultLimit } from '@/modules/root/server/admin/policy';
+import { writeRootAudit } from '@/modules/root/server/admin/audit';
 import { invitationStatusSql as statusSql, revokeInstallationInvitation } from '@/modules/settings/server/invitations';
 import { deleteUnverifiedRegistration, resendUnverifiedRegistration, unverifiedRegistrationWhere } from '@/modules/settings/server/registration';
 
@@ -27,10 +27,10 @@ type Account = { id: string; name: string; email: string; createdAt: Date; disab
 export async function listRootRegistration(actorId: string, input: unknown = {}, resultCap?: number) {
   await assertRootActor(prisma, actorId);
   const parsed = filters.safeParse(input);
-  const max = await legacySetting('root.legacy.searchMaxCharacters');
+  const max = await adminSetting('root.admin.searchMaxCharacters');
   if (!parsed.success || (parsed.data.q?.length ?? 0) > max) throw invalid('Choose valid registration filters.');
   const { q = '', workspaceId, status, page, accountsPage } = parsed.data;
-  const limit = rootResultLimit(await legacySetting('root.legacy.lifecycleListLimit'), resultCap);
+  const limit = rootResultLimit(await adminSetting('root.admin.lifecycleListLimit'), resultCap);
   const literal = `%${q.replace(/[\\%_]/g, '\\$&')}%`;
   const [openRegistration, invitations, accounts] = await Promise.all([
     runtimeConfig('auth.openRegistration'),

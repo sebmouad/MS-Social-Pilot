@@ -3,10 +3,10 @@ const h = vi.hoisted(() => ({
   findUnique: vi.fn(), assertRoot: vi.fn(), disconnect: vi.fn(), preview: vi.fn(), tx: { user: { findUnique: vi.fn() } },
 }));
 vi.mock('../src/server/data', () => ({ prisma: { socialAccount: { findUnique: h.findUnique } } }));
-vi.mock('../src/server/root/legacy/authz', () => ({ assertRootActor: h.assertRoot, invalid: (m: string) => new Error(m), redact: (v: unknown) => v }));
-vi.mock('../src/server/root/legacy/policy', () => ({ legacySetting: vi.fn(), rootResultLimit: vi.fn() }));
+vi.mock('../src/modules/root/server/admin/authz', () => ({ assertRootActor: h.assertRoot, invalid: (m: string) => new Error(m), redact: (v: unknown) => v }));
+vi.mock('../src/modules/root/server/admin/policy', () => ({ adminSetting: vi.fn(), rootResultLimit: vi.fn() }));
 vi.mock('../src/server/connection-mutations', () => ({ disconnectSocialAccount: h.disconnect, previewSocialAccountDeletionAsRoot: h.preview }));
-import { disconnectRootConnection, previewRootConnectionDeletion, rootDisconnectConfirmation, rootDisconnectDeleteConfirmation } from '../src/server/root/legacy/connections';
+import { disconnectRootConnection, previewRootConnectionDeletion, rootDisconnectConfirmation, rootDisconnectDeleteConfirmation } from '../src/modules/root/server/admin/connections';
 
 const counts = { channels: 1, adAccounts: 0, postTargets: 2, orphanPosts: 1, comments: 3, conversations: 1, conversationMessages: 4, pageInsights: 5, adInsights: 0, scheduledRemote: 0 };
 beforeEach(() => {

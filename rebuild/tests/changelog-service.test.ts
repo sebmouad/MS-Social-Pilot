@@ -5,9 +5,9 @@ const mocks = vi.hoisted(() => ({
 }));
 vi.mock('../src/server/data', () => ({ prisma: mocks.prisma }));
 vi.mock('../src/server/config/store', () => ({ runtimeConfigBatch: mocks.batch, runtimeConfig: vi.fn() }));
-vi.mock('../src/server/root/legacy/authz', () => ({ assertRootActor: mocks.assertRoot, lockRootActor: mocks.lock }));
-vi.mock('../src/server/root/legacy/audit', () => ({ writeRootAudit: mocks.audit }));
-vi.mock('../src/server/root/legacy/policy', () => ({
+vi.mock('../src/modules/root/server/admin/authz', () => ({ assertRootActor: mocks.assertRoot, lockRootActor: mocks.lock }));
+vi.mock('../src/modules/root/server/admin/audit', () => ({ writeRootAudit: mocks.audit }));
+vi.mock('../src/modules/root/server/admin/policy', () => ({
   rootResultLimit: (configured: number, requested?: number) => requested === undefined ? configured : Math.min(configured, requested),
   rootTransaction: async (run: (tx: unknown) => unknown) => run(mocks.tx),
 }));

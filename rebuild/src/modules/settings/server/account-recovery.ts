@@ -3,7 +3,7 @@ import { OperationError } from '@/lib/operation-error';
 import { prisma } from '@/server/data';
 import { runtimeConfig } from '@/server/config/store';
 import { accountPasswordPolicy, validateNewPassword } from '@/server/account-settings';
-import { hashLegacyPassword } from '@/server/auth';
+import { hashStoredPassword } from '@/server/auth';
 import { mailReady, publicMailOrigin, sendTransactionalMail } from '@/server/mail';
 
 const genericFailure = () => new OperationError('unavailable', 'Password recovery is temporarily unavailable. Try again later.');
@@ -59,7 +59,7 @@ async function consume(token: string, passwordHash: string, now: Date) {
   });
 }
 
-/** Cheap indexed token check before doing the expensive legacy scrypt hash.
+/** Cheap indexed token check before doing the expensive stored-format scrypt hash.
  * `consume` repeats every condition under account/token row locks. */
 async function tokenIsUsable(token: string, now: Date) {
   const hash = tokenHash(token);
@@ -118,7 +118,7 @@ export function createAccountRecoveryService(deps: RecoveryDeps = defaults) {
       catch { throw genericFailure(); }
       if (password.length > 200 || !validateNewPassword(password, { ...policy, maxBytes: Math.min(policy.maxBytes, 800) })) throw new OperationError('invalid_request', `Password must be at least ${policy.minLength} characters and no more than ${Math.min(policy.maxBytes, 800)} bytes.`);
       let encoded: string;
-      try { encoded = hashLegacyPassword(password); }
+      try { encoded = hashStoredPassword(password); }
       catch { throw new OperationError('invalid_request', 'Choose a shorter password.'); }
       try {
         if (!(await deps.consume(token, encoded, deps.now()))) throw new OperationError('invalid_request', 'This recovery link is invalid or has expired. Request a new one.');

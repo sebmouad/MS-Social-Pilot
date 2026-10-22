@@ -3,9 +3,9 @@ import { z } from 'zod';
 import { OperationError } from '@/lib/operation-error';
 import { runtimeConfigBatch } from '@/server/config/store';
 import { prisma } from '@/server/data';
-import { assertRootActor, lockRootActor } from '@/server/root/legacy/authz';
-import { writeRootAudit } from '@/server/root/legacy/audit';
-import { rootResultLimit, rootTransaction } from '@/server/root/legacy/policy';
+import { assertRootActor, lockRootActor } from '@/modules/root/server/admin/authz';
+import { writeRootAudit } from '@/modules/root/server/admin/audit';
+import { rootResultLimit, rootTransaction } from '@/modules/root/server/admin/policy';
 
 /**
  * The public changelog ("What's new"). Anyone may read it when the public site is on; only the installation owner

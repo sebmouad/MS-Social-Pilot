@@ -4,22 +4,22 @@ import { DataTable } from '@/components/DataTable';
 import { PageHeader } from '@/components/PageHeader';
 import { cookies, headers } from 'next/headers';
 import { requireRootPage } from '@/server/config/access';
-import { hashLegacySessionToken, LEGACY_SESSION_COOKIE } from '@/server/auth';
+import { hashSessionToken, SESSION_COOKIE } from '@/server/auth';
 import { prisma } from '@/server/data';
-import { pageSearchParamsObject } from '@/server/root/legacy/http';
+import { pageSearchParamsObject } from '@/modules/root/server/admin/http';
 import { RootFrame } from '@/server/root/RootFrame';
 import { OperationError } from '@/lib/operation-error';
-import { listRootSessions } from '@/server/root/legacy/sessions';
-import { fill, rootCopy, rootCopyLocale } from '@/server/root/legacy/copy';
+import { listRootSessions } from '@/modules/root/server/admin/sessions';
+import { fill, rootCopy, rootCopyLocale } from '@/modules/root/server/admin/copy';
 import { SignOutSession } from './SignOutSession';
-import '../plans/legacy-ops.css';
+import '../plans/root-ops.css';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Sessions · Root' };
 
 async function currentSessionId() {
-  const token = (await cookies()).get(LEGACY_SESSION_COOKIE)?.value;
-  const tokenHash = token ? hashLegacySessionToken(token) : null;
+  const token = (await cookies()).get(SESSION_COOKIE)?.value;
+  const tokenHash = token ? hashSessionToken(token) : null;
   if (!tokenHash) return null;
   return (await prisma.session.findUnique({ where: { tokenHash: tokenHash }, select: { id: true } }))?.id ?? null;
 }

@@ -2,12 +2,12 @@ import { synchronousPolicy, withinSynchronousLimit } from '@/lib/config/synchron
 import { z } from 'zod';
 
 /**
- * Client-safe vocabulary for the private Root legacy operations: confirmation
+ * Client-safe vocabulary for the private Root administration operations: confirmation
  * phrases and input schemas shared by the UI, HTTP routes, MCP definitions and
  * services. Nothing here imports server code.
  */
 export const WORKSPACE_ROLES = ['owner', 'admin', 'editor', 'contributor', 'viewer', 'client'] as const;
-export type LegacyWorkspaceRole = typeof WORKSPACE_ROLES[number];
+export type WorkspaceRole = typeof WORKSPACE_ROLES[number];
 
 export const idSchema = z.string().min(1).refine(withinSynchronousLimit('root.identifierMaxCharacters'));
 export const confirmationSchema = z.string().min(1).refine(withinSynchronousLimit('root.confirmationMaxCharacters'));
@@ -22,9 +22,9 @@ export const roleConfirmation = (email: string, workspaceId: string, role: strin
 export const transferConfirmation = (workspaceId: string, email: string) => `TRANSFER WORKSPACE ${workspaceId} TO ${email}`;
 
 /**
- * Plan feature keys stored on legacy plans. Keys are grouped by the module that
+ * Plan feature keys stored on existing plans. Keys are grouped by the module that
  * owns the capability, so Root presents entitlements per module. Platform keys
- * follow the `platform_<providerId>` protocol of the legacy plan table.
+ * follow the `platform_<providerId>` protocol of the existing plan table.
  */
 export type PlanFeatureGroup = { id: string; title: string; features: readonly { key: string; label: string }[] };
 export const SHARED_PLAN_FEATURES: PlanFeatureGroup = { id: 'shared', title: 'Shared controls', features: [

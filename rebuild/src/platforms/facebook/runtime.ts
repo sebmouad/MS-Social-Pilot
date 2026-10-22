@@ -17,7 +17,7 @@ async function configured<T>(key: string): Promise<T> {
 }
 
 /** Server-only adapter construction; all operational inputs come from Root. */
-async function configuredFacebookConfig(): Promise<FacebookConfig> {
+export async function configuredFacebookConfig(): Promise<FacebookConfig> {
   const [graphBaseUrl, oauthBaseUrl, graphVersion, requestTimeoutMs, maxPages, pageSize, pageInsightMetrics, adInsightFields, maxImageUploadBytes, allowedImageMimeTypes, appSecretProofEnabled, appSecret] = await Promise.all([
     configured<string>('meta.graphBaseUrl'),
     configured<string>('meta.oauthBaseUrl'),

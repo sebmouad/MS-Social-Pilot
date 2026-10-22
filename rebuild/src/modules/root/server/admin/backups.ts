@@ -1,6 +1,6 @@
 import { prisma } from '@/server/data';
 import { assertRootActor, isMissingRelation, redact } from './authz';
-import { rootResultLimit, legacySetting } from './policy';
+import { rootResultLimit, adminSetting } from './policy';
 import { runtimeConfig } from '@/server/config/store';
 import { ROOT_BACKUPS_COPY } from '@/lib/config/root-backups-copy';
 
@@ -18,7 +18,7 @@ async function backupCopy() {
 
 export async function readRootBackupStatus(actorId: string, now: Date = new Date(), resultCap?: number) {
   await assertRootActor(prisma, actorId);
-  const [copy, limit, offsiteHours, restoreDays] = await Promise.all([backupCopy(), legacySetting('root.legacy.backupRunHistoryLimit'), legacySetting('root.legacy.offsiteBackupMaxAgeHours'), legacySetting('root.legacy.restoreTestMaxAgeDays')]);
+  const [copy, limit, offsiteHours, restoreDays] = await Promise.all([backupCopy(), adminSetting('root.admin.backupRunHistoryLimit'), adminSetting('root.admin.offsiteBackupMaxAgeHours'), adminSetting('root.admin.restoreTestMaxAgeDays')]);
   let runs: Run[];
   let latestRuns: Run[];
   let successRuns: Run[];
@@ -43,7 +43,7 @@ export async function readRootBackupStatus(actorId: string, now: Date = new Date
       verification: 'recorded_by_script' as const,
     };
   });
-  const detailMax = await legacySetting('root.legacy.errorMessageMaxCharacters');
+  const detailMax = await adminSetting('root.admin.errorMessageMaxCharacters');
   return {
     source: 'backup_runs' as const, checks, limits: [copy.limitEntries, copy.limitRestore, copy.limitNoActions],
     runs: runs.map(run => ({ id: run.id, kind: run.kind, status: run.status, detail: redact(run.detail, detailMax), startedAt: run.startedAt.toISOString(), finishedAt: run.finishedAt.toISOString() })),
@@ -54,7 +54,7 @@ export async function readRootBackupStatus(actorId: string, now: Date = new Date
 /** Open installation alerts and error counts: facts the app itself recorded. Provider health is deliberately not assessed. */
 export async function readRootDiagnosticsSummary(actorId: string, now: Date = new Date(), resultCap?: number) {
   await assertRootActor(prisma, actorId);
-  const [copy, alertLimit] = await Promise.all([backupCopy(), legacySetting('root.legacy.openAlertLimit')]);
+  const [copy, alertLimit] = await Promise.all([backupCopy(), adminSetting('root.admin.openAlertLimit')]);
   const limit = rootResultLimit(alertLimit, resultCap);
   const alerts = await prisma.$queryRaw<Array<{ id: string; key: string; openedAt: Date }>>`SELECT id, key, "openedAt" FROM system_alerts WHERE "resolvedAt" IS NULL ORDER BY "openedAt" DESC, id LIMIT ${limit}`.then(rows => ({ available: true as const, rows }), error => { if (isMissingRelation(error)) return { available: false as const, rows: [] }; throw error; });
   // The openLast24h response field and its reporting window are existing metric semantics; the catalog controls only its display copy.

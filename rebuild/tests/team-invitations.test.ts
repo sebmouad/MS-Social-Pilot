@@ -18,7 +18,7 @@ vi.mock('../src/server/permissions/loader', () => ({ loadPermissions: state.load
 vi.mock('../src/server/data-control/guard', () => ({ withWorkspaceOperation: state.withWorkspaceOperation }));
 vi.mock('../src/server/mail', () => ({ mailReady: state.mailReady, publicMailOrigin: state.publicMailOrigin, sendTransactionalMail: state.sendTransactionalMail }));
 vi.mock('../src/server/account-settings', () => ({ accountPasswordPolicy: async () => ({ minLength: 8, maxBytes: 800 }), validateNewPassword: (value: unknown) => typeof value === 'string' && value.length >= 8 }));
-vi.mock('../src/server/auth', () => ({ hashLegacyPassword: (value: string) => `hash:${value}` }));
+vi.mock('../src/server/auth', () => ({ hashStoredPassword: (value: string) => `hash:${value}` }));
 
 import { OperationError } from '../src/lib/operation-error';
 import { acceptTeamInvitation, inviteTeamConfirmation, inviteTeamMember, invitationAvailability, previewTeamInvitation, registerTeamInvitation, revokeTeamInvitation, revokeTeamInvitationConfirmation } from '../src/modules/settings/server/invitations';

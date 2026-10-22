@@ -1,6 +1,6 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { PrismaClient } from '../generated/client';
-import { hashLegacySessionToken } from '../src/server/auth';
+import { hashSessionToken } from '../src/server/auth';
 import { CONFIG_BY_KEY } from '../src/lib/config/registry';
 class ProbeFailure extends Error {}
 function check(value: unknown, label: string): asserts value { if (!value) throw new ProbeFailure(label); }
@@ -30,7 +30,7 @@ async function main() {
     await client.membership.create({ data: { id: membershipId, userId, workspaceId, role: 'editor' } });
     await client.$executeRaw`UPDATE memberships SET "allPages" = false WHERE id = ${membershipId}`;
     await client.$executeRaw`INSERT INTO member_page_access ("membershipId", "targetId") VALUES (${membershipId}, ${channelId})`;
-    await client.session.create({ data: { id: sessionId, userId: ownerId, tokenHash: hashLegacySessionToken(ownerToken)!, pending: null, expiresAt: new Date(Date.now() + 300000) } });
+    await client.session.create({ data: { id: sessionId, userId: ownerId, tokenHash: hashSessionToken(ownerToken)!, pending: null, expiresAt: new Date(Date.now() + 300000) } });
     for (const [suffix, bearer, writable] of [['write', writeBearer, true], ['read', readBearer, false]] as const) await client.mcpApiKey.create({ data: { id: `${id}_${suffix}_key`, workspaceId, createdById: userId, name: `Disposable Publishing ${suffix} probe`, tokenHash: createHash('sha256').update(bearer).digest('hex'), tokenPrefix: bearer.slice(0, 12), readFeatures: ['publishing/posts'], writeFeatures: writable ? ['publishing/posts'] : [], expiresAt: new Date(Date.now() + 300000) } });
     const stored = await client.appSetting.findUnique({ where: { key: 'mcp.authenticatedRoles' } });
     previousRoles = (stored?.value ?? CONFIG_BY_KEY.get('mcp.authenticatedRoles')!.defaultValue) as string[];

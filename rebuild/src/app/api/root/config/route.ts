@@ -1,5 +1,5 @@
 import { readRootConfig, saveRootConfig } from '@/modules/root/server/configuration';
-import { rootRoute, readBody, searchParamsObject } from '@/server/root/legacy/http';
+import { rootRoute, readBody, searchParamsObject } from '@/modules/root/server/admin/http';
 export const runtime = 'nodejs';
 export const GET = rootRoute({}, async (request, actorId) => {
   searchParamsObject(request);

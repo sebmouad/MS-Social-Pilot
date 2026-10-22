@@ -3,7 +3,7 @@ const m = vi.hoisted(() => ({ authorize: vi.fn(), config: vi.fn(), user: { findU
 vi.mock('@/modules/settings/server/account', () => ({ authorizeAccountSession: m.authorize }));
 vi.mock('@/server/data', () => ({ prisma: { user: m.user, passkey: m.passkey, membership: m.membership, $transaction: m.transaction } }));
 vi.mock('@/server/config/store', () => ({ runtimeConfig: m.config }));
-vi.mock('@/server/auth', () => ({ verifyLegacyPassword: m.verify }));
+vi.mock('@/server/auth', () => ({ verifyPassword: m.verify }));
 vi.mock('@/server/auth-flow', () => ({ authRateLimit: async () => ({ limit: 3, windowMs: 1000 }) }));
 vi.mock('@/server/rate-limit', () => ({ hit: m.rate }));
 vi.mock('@/server/secret-crypto', () => ({ encryptSecret: (v: string) => `encrypted:${v}`, decryptSecret: (v: string) => v.replace('encrypted:', '') }));

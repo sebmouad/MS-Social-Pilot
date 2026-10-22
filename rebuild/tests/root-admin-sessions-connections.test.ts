@@ -11,18 +11,18 @@ const h = vi.hoisted(() => {
 vi.mock('../src/server/data', () => ({ prisma: h.prisma }));
 vi.mock('../src/server/config/store', () => ({ runtimeConfig: async () => h.reasonLimit }));
 vi.mock('../src/server/config/access', () => ({ currentRootActor: h.actor }));
-vi.mock('../src/server/root/legacy/policy', () => ({
-  legacySetting: vi.fn(async (key: string) => (key === 'root.legacy.searchMaxCharacters' ? 50 : 2)),
+vi.mock('../src/modules/root/server/admin/policy', () => ({
+  adminSetting: vi.fn(async (key: string) => (key === 'root.admin.searchMaxCharacters' ? 50 : 2)),
   rootResultLimit: (configured: number, requested?: number) => (requested === undefined ? configured : Math.min(configured, requested)),
   rootTransaction: (fn: (tx: unknown) => unknown) => fn(h.tx),
 }));
 
-import { listRootSessions, signOutRootSession } from '../src/server/root/legacy/sessions';
-import { listRootConnections } from '../src/server/root/legacy/connections';
-import { callRootLegacyTool, rootLegacyToolDefinitions, rootLegacyResources } from '../src/server/root/legacy/mcp';
+import { listRootSessions, signOutRootSession } from '../src/modules/root/server/admin/sessions';
+import { listRootConnections } from '../src/modules/root/server/admin/connections';
+import { callRootAdminTool, rootAdminToolDefinitions, rootAdminResources } from '../src/modules/root/server/admin/mcp';
 import { DELETE as signOutRoute } from '../src/app/api/root/sessions/[id]/route';
 import { GET as connectionsRoute } from '../src/app/api/root/connections/route';
-import { ROOT_OPERATIONS_COPY, rootCopyLocale } from '../src/server/root/legacy/copy';
+import { ROOT_OPERATIONS_COPY, rootCopyLocale } from '../src/modules/root/server/admin/copy';
 
 const root = { isInstanceOwner: true, disabledAt: null };
 const future = new Date(Date.now() + 3600_000);
@@ -130,10 +130,10 @@ describe('HTTP and MCP surfaces', () => {
   });
 
   it('installs tools/resources and refuses API keys and wrong confirmations', async () => {
-    expect(rootLegacyToolDefinitions.map(tool => tool.name)).toEqual(expect.arrayContaining(['list_root_sessions', 'sign_out_root_session', 'list_root_connections']));
-    expect(rootLegacyResources.map(resource => resource.uri)).toEqual(expect.arrayContaining(['msp://root/sessions', 'msp://root/connections']));
-    await expect(callRootLegacyTool({ userId: 'root', isInstanceOwner: true, apiKeyId: 'k' } as never, 'list_root_sessions', {})).rejects.toMatchObject({ code: 'forbidden' });
-    await expect(callRootLegacyTool({ userId: 'root', isInstanceOwner: true } as never, 'sign_out_root_session', { sessionId: 's1', confirmation: 'yes' })).rejects.toMatchObject({ code: 'invalid_request' });
+    expect(rootAdminToolDefinitions.map(tool => tool.name)).toEqual(expect.arrayContaining(['list_root_sessions', 'sign_out_root_session', 'list_root_connections']));
+    expect(rootAdminResources.map(resource => resource.uri)).toEqual(expect.arrayContaining(['msp://root/sessions', 'msp://root/connections']));
+    await expect(callRootAdminTool({ userId: 'root', isInstanceOwner: true, apiKeyId: 'k' } as never, 'list_root_sessions', {})).rejects.toMatchObject({ code: 'forbidden' });
+    await expect(callRootAdminTool({ userId: 'root', isInstanceOwner: true } as never, 'sign_out_root_session', { sessionId: 's1', confirmation: 'yes' })).rejects.toMatchObject({ code: 'invalid_request' });
   });
 });
 

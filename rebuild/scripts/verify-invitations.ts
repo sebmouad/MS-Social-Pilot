@@ -2,7 +2,7 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { createServer, type AddressInfo, type Socket } from 'node:net';
 import { Prisma, PrismaClient } from '../generated/client';
-import { hashLegacySessionToken } from '../src/server/auth';
+import { hashSessionToken } from '../src/server/auth';
 
 class ProbeFailure extends Error {}
 function check(condition: unknown, message: string): asserts condition { if (!condition) throw new ProbeFailure(message); }
@@ -163,9 +163,9 @@ async function main() {
     await db.user.create({ data: { id: recipientId, email: recipientEmail, name: 'Disposable invited account', passwordHash: 'unusable-preview-password', totpEnabledAt: new Date() } });
     await db.$executeRaw`UPDATE users SET "emailVerifiedAt" = NOW() WHERE id = ANY(${[rootId, recipientId]}::text[])`;
     await db.membership.create({ data: { id: `${prefix}_membership`, userId: rootId, workspaceId, role: 'owner' } });
-    await db.session.create({ data: { id: `${prefix}_root_session`, userId: rootId, tokenHash: hashLegacySessionToken(ownerSession)!, expiresAt, pending: null } });
-    await db.session.create({ data: { id: `${prefix}_recipient_session`, userId: recipientId, tokenHash: hashLegacySessionToken(recipientSession)!, expiresAt, pending: null } });
-    await db.session.create({ data: { id: `${prefix}_pending_session`, userId: recipientId, tokenHash: hashLegacySessionToken(pendingSession)!, expiresAt, pending: 'verify' } });
+    await db.session.create({ data: { id: `${prefix}_root_session`, userId: rootId, tokenHash: hashSessionToken(ownerSession)!, expiresAt, pending: null } });
+    await db.session.create({ data: { id: `${prefix}_recipient_session`, userId: recipientId, tokenHash: hashSessionToken(recipientSession)!, expiresAt, pending: null } });
+    await db.session.create({ data: { id: `${prefix}_pending_session`, userId: recipientId, tokenHash: hashSessionToken(pendingSession)!, expiresAt, pending: 'verify' } });
     for (const [index, bearer] of [readBearer, writeBearer].entries()) await db.mcpApiKey.create({ data: { id: keyIds[index]!, workspaceId, createdById: rootId, name: 'Disposable invitation verification key', tokenHash: tokenHash(bearer), tokenPrefix: bearer.slice(0, 12), expiresAt, readFeatures: ['settings/team'], writeFeatures: index === 1 ? ['settings/team'] : [] } });
     await configureRootAndMail();
 

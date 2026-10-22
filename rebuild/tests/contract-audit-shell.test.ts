@@ -7,7 +7,7 @@ vi.mock('next/headers', () => ({ headers: async () => new Headers({ 'accept-lang
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: vi.fn() }), notFound: () => { throw new Error('not found'); } }));
 vi.mock('@/server/config/store', () => ({ runtimeConfig: state.config }));
 vi.mock('@/server/config/access', () => ({ requireRootPage: async () => ({ id: 'root' }) }));
-vi.mock('@/server/root/legacy/errors', () => ({ listRootErrors: state.list, getRootError: state.detail }));
+vi.mock('@/modules/root/server/admin/errors', () => ({ listRootErrors: state.list, getRootError: state.detail }));
 vi.mock('@/server/root/RootFrame', () => ({ RootFrame: ({ children, controls }: { children: ReactNode; controls?: ReactNode }) => createElement('main', null, controls, children) }));
 vi.mock('@/server/root/RootFilters', () => ({
   RootFilters: ({ children }: { children: ReactNode }) => createElement('aside', null, children),

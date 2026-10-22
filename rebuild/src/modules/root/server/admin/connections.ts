@@ -6,7 +6,7 @@ import { prisma } from '@/server/data';
 import { connectionState, type ConnectionState } from '@/lib/connection-status';
 import { platformModule } from '@/platforms';
 import { assertRootActor, invalid, redact } from './authz';
-import { legacySetting, rootResultLimit } from './policy';
+import { adminSetting, rootResultLimit } from './policy';
 
 const filterSchema = z.object({
   q: z.string().trim().optional(),
@@ -23,10 +23,10 @@ const filterSchema = z.object({
 export async function listRootConnections(actorId: string, input: unknown = {}, resultCap?: number) {
   await assertRootActor(prisma, actorId);
   const parsed = filterSchema.safeParse(input);
-  const max = await legacySetting('root.legacy.searchMaxCharacters');
+  const max = await adminSetting('root.admin.searchMaxCharacters');
   if (!parsed.success || (parsed.data.q?.length ?? 0) > max) throw invalid('Use a shorter search and a valid filter.');
   const { q, provider, state, page = 1 } = parsed.data;
-  const size = rootResultLimit(await legacySetting('root.legacy.privilegePageSize'), resultCap);
+  const size = rootResultLimit(await adminSetting('root.admin.privilegePageSize'), resultCap);
   const now = new Date();
   const stateWhere = state === 'revoked' ? { invalidatedAt: { not: null } }
     : state === 'expired' ? { invalidatedAt: null, tokenExpiresAt: { lte: now } }

@@ -1,7 +1,7 @@
 import { OperationError } from '@/lib/operation-error';
-import { ROOT_PRIVILEGE_CSV_FORMAT, ROOT_PRIVILEGE_CSV_NAME } from '@/server/root/legacy/shared';
-import { exportRootPrivileges } from '@/server/root/legacy/privileges';
-import { rootRoute, searchParamsObject } from '@/server/root/legacy/http';
+import { ROOT_PRIVILEGE_CSV_FORMAT, ROOT_PRIVILEGE_CSV_NAME } from '@/modules/root/server/admin/shared';
+import { exportRootPrivileges } from '@/modules/root/server/admin/privileges';
+import { rootRoute, searchParamsObject } from '@/modules/root/server/admin/http';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';

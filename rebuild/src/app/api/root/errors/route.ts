@@ -1,5 +1,5 @@
-import { listRootErrors } from '@/server/root/legacy/errors';
-import { rootRoute, searchParamsObject } from '@/server/root/legacy/http';
+import { listRootErrors } from '@/modules/root/server/admin/errors';
+import { rootRoute, searchParamsObject } from '@/modules/root/server/admin/http';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';

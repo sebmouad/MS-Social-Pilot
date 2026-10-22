@@ -1,16 +1,16 @@
 import { CONFIG_BY_KEY } from '@/lib/config/registry';
-import { ROOT_LEGACY_CONFIG } from './config';
+import { ROOT_ADMIN_CONFIG } from './config';
 import { runtimeConfig } from '@/server/config/store';
 import { OperationError } from '@/lib/operation-error';
 import { prisma } from '@/server/data';
-import type { Prisma } from '../../../../generated/client';
+import type { Prisma } from '../../../../../generated/client';
 
-type Key = typeof ROOT_LEGACY_CONFIG[number]['key'];
-const DEFINITIONS = new Map<string, typeof ROOT_LEGACY_CONFIG[number]>(ROOT_LEGACY_CONFIG.map(item => [item.key, item]));
+type Key = typeof ROOT_ADMIN_CONFIG[number]['key'];
+const DEFINITIONS = new Map<string, typeof ROOT_ADMIN_CONFIG[number]>(ROOT_ADMIN_CONFIG.map(item => [item.key, item]));
 const unavailable = () => new OperationError('unavailable', 'Root operational limits are unavailable. Try again after the Root settings are registered.');
 
 /** Never run a bounded Root operation using source defaults when host registration is missing. */
-export async function legacySetting(key: Key): Promise<number> {
+export async function adminSetting(key: Key): Promise<number> {
   const definition = DEFINITIONS.get(key);
   if (!definition || !CONFIG_BY_KEY.has(key)) throw unavailable();
   try {

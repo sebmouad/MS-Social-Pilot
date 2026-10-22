@@ -7,9 +7,9 @@ import { statfs } from 'node:fs/promises';
 import { prisma } from '@/server/data';
 import { runtimeConfig } from '@/server/config/store';
 import { monitoringPolicySchema } from '../config';
-import { assertRootActor, lockRootActor } from '@/server/root/legacy/authz';
-import { rootResultLimit, rootTransaction } from '@/server/root/legacy/policy';
-import { writeRootAudit } from '@/server/root/legacy/audit';
+import { assertRootActor, lockRootActor } from '@/modules/root/server/admin/authz';
+import { rootResultLimit, rootTransaction } from '@/modules/root/server/admin/policy';
+import { writeRootAudit } from '@/modules/root/server/admin/audit';
 import { OperationError } from '@/lib/operation-error';
 
 export const MONITORING_TEST_CONFIRMATION = 'TEST ROOT MONITORING';
@@ -25,7 +25,7 @@ export async function runOperatorMonitoring(now: Date = new Date(), actorId?: st
     prisma.$queryRaw<Array<{ count: number }>>`SELECT COUNT(*)::int AS count FROM post_targets WHERE status = 'failed' AND "updatedAt" >= ${new Date(now.getTime() - policy.publishFailureWindowSeconds * 1000)}`,
     prisma.$queryRaw<Array<{ disconnected: number; expiring: number }>>`SELECT COUNT(*) FILTER (WHERE "invalidatedAt" IS NOT NULL)::int AS disconnected, COUNT(*) FILTER (WHERE "invalidatedAt" IS NULL AND "tokenExpiresAt" > ${now} AND "tokenExpiresAt" <= ${new Date(now.getTime() + policy.tokenExpiryWarningDays * 86400000)})::int AS expiring FROM social_accounts`,
     prisma.$queryRaw<Array<{ status: string; lastOk: Date | null }>>`SELECT status, (SELECT MAX("finishedAt") FROM backup_runs WHERE kind = 'offsite' AND status = 'ok') AS "lastOk" FROM backup_runs ORDER BY "finishedAt" DESC LIMIT 1`,
-    runtimeConfig('root.legacy.offsiteBackupMaxAgeHours'),
+    runtimeConfig('root.admin.offsiteBackupMaxAgeHours'),
   ]);
   const worker = Boolean(heartbeat[0] && heartbeat[0].seenAt <= now && now.getTime() - heartbeat[0].seenAt.getTime() <= policy.workerStaleSeconds * 1000);
   const checks: Check[] = [

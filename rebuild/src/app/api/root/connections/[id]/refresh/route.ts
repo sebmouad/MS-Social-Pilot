@@ -1,7 +1,7 @@
 import { withinSynchronousLimit } from '@/lib/config/synchronous-policy';
 import { z } from 'zod';
-import { refreshRootConnection } from '@/server/root/legacy/connection-refresh';
-import { readBody, rootRoute } from '@/server/root/legacy/http';
+import { refreshRootConnection } from '@/modules/root/server/admin/connection-refresh';
+import { readBody, rootRoute } from '@/modules/root/server/admin/http';
 
 export const runtime = 'nodejs';
 const schema = z.object({ confirmation: z.string().min(1).refine(withinSynchronousLimit('root.confirmationMaxCharacters')) }).strict();

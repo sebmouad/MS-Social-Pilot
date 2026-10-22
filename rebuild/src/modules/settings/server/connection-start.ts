@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { OperationError } from '@/lib/operation-error';
 import { prisma, getSessionByTokenHash } from '@/server/data';
-import { isUsableLegacySession } from '@/server/auth';
+import { isUsableSession } from '@/server/auth';
 import { auditAccountMutation } from '@/server/account-settings';
 import { runtimeConfig } from '@/server/config/store';
 import { loadEntitlements, canUseFeature, hasPlatformCapability } from '@/server/entitlements';
@@ -21,7 +21,7 @@ export const connectionStartConfirmation = (platform: string) => `START CONNECTI
  */
 export async function startConnection(actor: AccountActor, input: unknown, request: Request): Promise<NextResponse> {
   if (actor.apiKeyId || !actor.sessionTokenHash) throw new OperationError('forbidden', 'Use a signed-in browser session to connect an account.');
-  if (!isUsableLegacySession(await getSessionByTokenHash(actor.sessionTokenHash), actor.userId)) throw new OperationError('unauthorized', 'Sign in to continue.');
+  if (!isUsableSession(await getSessionByTokenHash(actor.sessionTokenHash), actor.userId)) throw new OperationError('unauthorized', 'Sign in to continue.');
   const parsed = z.object({ platform: z.string().min(1), confirmation: z.string() }).strict().safeParse(input);
   if (!parsed.success || parsed.data.confirmation !== connectionStartConfirmation(parsed.data.platform)) throw new OperationError('invalid_request', 'Confirm the account connection before continuing.');
   // A configured public origin wins over proxy/Host input. The HTTP adapter also

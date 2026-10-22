@@ -3,7 +3,7 @@ import { SYNCHRONOUS_POLICY } from '@/lib/config/synchronous-policy';
 import { applySynchronousPolicy, refreshSynchronousPolicy, synchronousPolicy } from '@/server/synchronous-policy';
 import { hit, reset } from '@/server/rate-limit';
 import { validateProfileName } from '@/server/account-settings';
-import { hashLegacyPassword, verifyLegacyPassword } from '@/server/auth';
+import { hashStoredPassword, verifyPassword } from '@/server/auth';
 
 vi.mock('@/server/config/store', () => ({ runtimeConfig: vi.fn() }));
 afterEach(() => {
@@ -31,18 +31,18 @@ describe('Root policies for synchronous guards', () => {
   it('uses the same configured UTF-8 byte guard for hashing and verification', () => {
     applySynchronousPolicy('auth.passwordMaxBytes', 1000);
     const password = 'é'.repeat(450);
-    const encoded = hashLegacyPassword(password);
-    expect(verifyLegacyPassword(password, encoded)).toBe(true);
+    const encoded = hashStoredPassword(password);
+    expect(verifyPassword(password, encoded)).toBe(true);
     applySynchronousPolicy('auth.passwordMaxBytes', 800);
-    expect(verifyLegacyPassword(password, encoded)).toBe(false);
-    expect(() => hashLegacyPassword(password)).toThrow('Password is too long');
+    expect(verifyPassword(password, encoded)).toBe(false);
+    expect(() => hashStoredPassword(password)).toThrow('Password is too long');
   });
   it('preserves legacy verification when only the new-password ceiling is lowered', () => {
     const password = 'a'.repeat(100);
-    const hash = hashLegacyPassword(password);
+    const hash = hashStoredPassword(password);
     applySynchronousPolicy('auth.passwordMaxBytes', 64);
-    expect(() => hashLegacyPassword(password)).toThrow('Password is too long');
-    expect(verifyLegacyPassword(password, hash)).toBe(true);
+    expect(() => hashStoredPassword(password)).toThrow('Password is too long');
+    expect(verifyPassword(password, hash)).toBe(true);
   });
   it('updates profile validation without changing synchronous callers', () => {
     applySynchronousPolicy('settings.accountNameMaxLength', 3);
@@ -75,7 +75,7 @@ describe('Root input policies', () => {
     expect(rootUserIdSchema.safeParse('x'.repeat(201)).success).toBe(true);
   });
   it('uses Root plan policy for names, feature counts and financial ceilings', async () => {
-    const { planPatchSchema } = await import('@/server/root/legacy/shared');
+    const { planPatchSchema } = await import('@/modules/root/server/admin/shared');
     applySynchronousPolicy('root.planNameMaxCharacters', 4);
     applySynchronousPolicy('root.planFeatureMaxItems', 1);
     applySynchronousPolicy('root.planMonthlyPriceMaxValue', 100);

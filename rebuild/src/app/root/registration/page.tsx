@@ -3,12 +3,12 @@ import { headers } from 'next/headers';
 import { requireRootPage } from '@/server/config/access';
 import { RootFrame } from '@/server/root/RootFrame';
 import { listRootRegistration } from '@/server/root/registration-admin';
-import { pageSearchParamsObject } from '@/server/root/legacy/http';
+import { pageSearchParamsObject } from '@/modules/root/server/admin/http';
 import { DataTable } from '@/components/DataTable';
 import { Button } from '@/components/Button';
 import { registrationCopy } from './copy';
 import { RegistrationAction } from './RegistrationAction';
-import '../plans/legacy-ops.css';
+import '../plans/root-ops.css';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Registration / Invitations · Root' };

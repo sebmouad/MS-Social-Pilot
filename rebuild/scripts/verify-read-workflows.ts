@@ -1,7 +1,7 @@
 /** Guarded synthetic-only HTTP/MCP/PostgreSQL probe for Ads directory and Analytics read workflows. */
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { Prisma, PrismaClient } from '../generated/client';
-import { hashLegacySessionToken } from '../src/server/auth';
+import { hashSessionToken } from '../src/server/auth';
 import { CONFIG_SCHEMA_VERSION } from '../src/lib/config/registry';
 
 class ProbeFailure extends Error {}
@@ -45,7 +45,7 @@ async function main() {
     await db.target.create({data:{id:targetBId,workspaceId:workspaceBId,socialAccountId:socialBId,type:'page',providerId:`${prefix}_page_b`,name:'Foreign disposable analytics page',enabled:true,canPublish:false,createdAt:new Date()}});
     await db.adAccount.create({data:{id:accountId,workspaceId,socialAccountId:socialId,actId:`${prefix}_act`,name:'Disposable ad account',currency:'USD',enabled:true}});
     await db.membership.create({data:{id:`${prefix}_membership`,userId,workspaceId,role:'owner'}});
-    await db.session.create({data:{id:`${prefix}_session`,userId,tokenHash:hashLegacySessionToken(token)!,expiresAt,pending:null}});
+    await db.session.create({data:{id:`${prefix}_session`,userId,tokenHash:hashSessionToken(token)!,expiresAt,pending:null}});
     await db.mcpApiKey.create({data:{id:`${prefix}_key`,workspaceId,createdById:userId,name:'Disposable read probe',tokenHash:hash(bearer),tokenPrefix:bearer.slice(0,12),readFeatures:['ads/objects','ads/compare','analytics/demographics','analytics/compare','analytics/pins'],writeFeatures:[],expiresAt}});
     await db.mcpApiKey.create({data:{id:`${prefix}_write_key`,workspaceId,createdById:userId,name:'Disposable pins writer',tokenHash:hash(writeBearer),tokenPrefix:writeBearer.slice(0,12),readFeatures:['analytics/pins'],writeFeatures:['analytics/pins'],expiresAt}});
     stage='enable modules and seed synthetic stored insights';

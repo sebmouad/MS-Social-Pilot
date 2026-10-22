@@ -8,8 +8,8 @@ const shared = vi.hoisted(() => ({ client: undefined as unknown as Record<string
 vi.mock('../src/server/data', () => ({ prisma: new Proxy({}, { get: (_t, key) => { const v = shared.client?.[key as string]; return typeof v === 'function' ? v.bind(shared.client) : v; } }) }));
 vi.mock('@/server/data', () => ({ prisma: new Proxy({}, { get: (_t, key) => { const v = shared.client?.[key as string]; return typeof v === 'function' ? v.bind(shared.client) : v; } }) }));
 
-import { disconnectRootConnection, previewRootConnectionDeletion, rootDisconnectConfirmation, rootDisconnectDeleteConfirmation } from '../src/server/root/legacy/connections';
-import { installationTransferConfirmation, transferInstallationOwnership } from '../src/server/root/legacy/transfer';
+import { disconnectRootConnection, previewRootConnectionDeletion, rootDisconnectConfirmation, rootDisconnectDeleteConfirmation } from '../src/modules/root/server/admin/connections';
+import { installationTransferConfirmation, transferInstallationOwnership } from '../src/modules/root/server/admin/transfer';
 
 function isolated(value: string) {
   const parsed = new URL(value);

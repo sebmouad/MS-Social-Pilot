@@ -5,7 +5,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 const h = vi.hoisted(() => ({ refresh: vi.fn() }));
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: h.refresh }) }));
 import { RefreshConnection } from '../src/app/root/connections/RefreshConnection';
-import { rootCopy } from '../src/server/root/legacy/copy';
+import { rootCopy } from '../src/modules/root/server/admin/copy';
 let root: ReturnType<typeof createRoot>;
 let container: HTMLDivElement;
 beforeEach(() => {

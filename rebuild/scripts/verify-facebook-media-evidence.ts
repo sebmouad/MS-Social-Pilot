@@ -1,6 +1,6 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { PrismaClient } from '../generated/client';
-import { hashLegacySessionToken } from '../src/server/auth';
+import { hashSessionToken } from '../src/server/auth';
 import { createFacebookEngine } from '../src/platforms/facebook/publishing';
 import { facebookMediaJournal } from '../src/platforms/facebook/media-journal';
 
@@ -38,7 +38,7 @@ async function main() {
     stage = 'membership fixture';
     await db.membership.create({ data:{ id:`${prefix}_membership`, userId, workspaceId, role:'owner' } });
     stage = 'session fixture';
-    for (const [index, token] of [rootToken, memberToken].entries()) await db.session.create({ data:{ id:sessionIds[index]!, userId:index === 0 ? ownerId : userId, tokenHash:hashLegacySessionToken(token)!, expiresAt, pending:null } });
+    for (const [index, token] of [rootToken, memberToken].entries()) await db.session.create({ data:{ id:sessionIds[index]!, userId:index === 0 ? ownerId : userId, tokenHash:hashSessionToken(token)!, expiresAt, pending:null } });
     stage = 'key fixture';
     await db.mcpApiKey.create({ data:{ id:keyId, workspaceId, createdById:userId, name:'Disposable media evidence key', tokenHash:createHash('sha256').update(key).digest('hex'), tokenPrefix:key.slice(0,12), readFeatures:['publishing/posts'], writeFeatures:[], expiresAt } });
     stage = 'target fixture';

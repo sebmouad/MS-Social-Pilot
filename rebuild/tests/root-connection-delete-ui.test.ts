@@ -5,7 +5,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 const h = vi.hoisted(() => ({ refresh: vi.fn() }));
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: h.refresh }) }));
 import { DeleteConnectionData } from '../src/app/root/connections/DeleteConnectionData';
-import { rootCopy } from '../src/server/root/legacy/copy';
+import { rootCopy } from '../src/modules/root/server/admin/copy';
 let root: ReturnType<typeof createRoot>;
 let container: HTMLDivElement;
 const counts = { channels: 2, adAccounts: 1, postTargets: 7, orphanPosts: 3, comments: 9, conversations: 4, conversationMessages: 11, pageInsights: 30, adInsights: 5, scheduledRemote: 0 };

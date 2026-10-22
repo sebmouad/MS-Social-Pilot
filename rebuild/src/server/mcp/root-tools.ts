@@ -2,7 +2,7 @@ import { rootMonitoringToolDefinitions, rootMonitoringTools, rootMonitoringResou
 import { readRootConfig, saveRootConfig } from '@/modules/root/server/configuration';
 import { listRootInboxDeletions, confirmRootInboxDeletion } from '../root/inbox-deletions';
 import { listRootPostDeletions, recordRootPostDeletionOutcome } from '../root/post-deletions';
-import { adoptRootLegacyPublication, finishRootPublicationProjection, listRootPublicationAttempts, recordRootPublicationOutcome } from '../root/publication-attempts';
+import { adoptRootAdminPublication, finishRootPublicationProjection, listRootPublicationAttempts, recordRootPublicationOutcome } from '../root/publication-attempts';
 import { z } from 'zod';
 import { listRootDiagnostics, runRootDiagnostics } from '../root/diagnostics';
 import { loadRootOperations } from '../root/operations';
@@ -18,14 +18,14 @@ import { loadRootUsers } from '../root/users';
 import { resetRootUserTwoStep, revokeRootUserSessions, setRootUserDisabled } from '../root/user-controls';
 import { readRootPlatformPublicationEvidence, runRootPlatformPublicationAction } from '../root/platform-publication-evidence';
 import { rootUserActions, rootUserConfirmationSchema, rootUserIdSchema } from '@/lib/root-user-controls';
-import { rootLegacyToolDefinitions, rootLegacyResources, rootLegacyTools, callRootLegacyTool } from '../root/legacy/mcp';
+import { rootAdminToolDefinitions, rootAdminResources, rootAdminTools, callRootAdminTool } from '@/modules/root/server/admin/mcp';
 import { executeRootChangelogTool, rootChangelogResources, rootChangelogToolDefinitions, rootChangelogTools } from '@/modules/history/root-mcp';
 import type { RootMcpActor } from './types';
 import { ROOT_EVIDENCE_POLICY } from '@/lib/config/root-evidence-policy';
 import { loadRootEvidencePolicy, loadRootEvidenceCopy } from '../root/platform-publication-evidence';
 
 export const rootToolDefinitions = [
-  ...rootLegacyToolDefinitions,
+  ...rootAdminToolDefinitions,
   ...rootMonitoringToolDefinitions,
   ...rootChangelogToolDefinitions,
   { name: 'list_root_inbox_deletions', description: 'Private bounded Inbox deletion recovery history. Includes remote object identity for operator verification, never credentials or comment content. Workspace keys cannot use this tool.', inputSchema: { type: 'object', properties: {}, additionalProperties: false } },
@@ -55,7 +55,7 @@ export const rootToolDefinitions = [
 export const rootTools = new Set(rootToolDefinitions.map(tool => tool.name));
 export const canUseRootTool = (viewer: RootMcpActor) => viewer.isInstanceOwner === true && !viewer.apiKeyId;
 const resourceDefinitions = [
-  ...rootLegacyResources,
+  ...rootAdminResources,
   ...rootMonitoringResources,
   ...rootChangelogResources,
   { uri: 'msp://root/inbox-deletions', name: 'Inbox deletion recovery', description: 'Private bounded operator deletion history and remote identity; credentials excluded.', tool: 'list_root_inbox_deletions' },
@@ -82,7 +82,7 @@ export async function runRootTool(viewer: RootMcpActor, name: string, args: Reco
     if (!actor?.isInstanceOwner || actor.disabledAt) throw new OperationError('forbidden', 'Installation-owner access is required.');
     if (!args || typeof args !== 'object' || Array.isArray(args)) throw new OperationError('invalid_request', 'Tool arguments must be an object.');
     if (rootMonitoringTools.has(name)) return await executeRootMonitoringTool(viewer.userId, name, args, viewer.maxResultItems ?? Number(await runtimeConfig('mcp.maxResultItems')));
-    if (rootLegacyTools.has(name)) return await callRootLegacyTool({ ...viewer, maxResultItems: viewer.maxResultItems ?? Number(await runtimeConfig('mcp.maxResultItems')) }, name, args);
+    if (rootAdminTools.has(name)) return await callRootAdminTool({ ...viewer, maxResultItems: viewer.maxResultItems ?? Number(await runtimeConfig('mcp.maxResultItems')) }, name, args);
     if (rootChangelogTools.has(name)) return await executeRootChangelogTool(viewer.userId, name, args, viewer.maxResultItems ?? Number(await runtimeConfig('mcp.maxResultItems')));
     switch (name) {
       case 'list_root_inbox_deletions':
@@ -113,7 +113,7 @@ export async function runRootTool(viewer: RootMcpActor, name: string, args: Reco
         }
       case 'record_root_publication_outcome': return await recordRootPublicationOutcome(viewer.userId, args);
       case 'finish_root_publication_projection': return await finishRootPublicationProjection(viewer.userId, args);
-      case 'adopt_root_legacy_publication': return await adoptRootLegacyPublication(viewer.userId, args);
+      case 'adopt_root_legacy_publication': return await adoptRootAdminPublication(viewer.userId, args);
       case 'get_root_operations': {
         const parsed = z.object({ moduleId: z.string().optional() }).strict().safeParse(args);
         if (!parsed.success) throw new OperationError('invalid_request', 'Choose a valid product module.');

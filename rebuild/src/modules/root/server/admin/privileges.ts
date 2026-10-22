@@ -4,7 +4,7 @@ import { prisma } from '@/server/data';
 import { OperationError } from '@/lib/operation-error';
 import { assertRootActor, lockWorkspaceOwners, conflict, invalid } from './authz';
 import { writeRootAudit } from './audit';
-import { rootResultLimit, legacySetting, rootTransaction } from './policy';
+import { rootResultLimit, adminSetting, rootTransaction } from './policy';
 import { roleChangeSchema, roleConfirmation, WORKSPACE_ROLES } from './shared';
 
 type PrivilegeRow = { membershipId: string; workspaceId: string; workspace: string; userId: string; name: string; email: string; role: string; allPages: boolean; pageCount: number; isRoot: boolean; disabled: boolean; suspended: boolean; lastSession: Date | null };
@@ -31,12 +31,12 @@ const view = (row: PrivilegeRow) => ({
 export async function listRootPrivileges(actorId: string, input: unknown = {}, resultCap?: number) {
   await assertRootActor(prisma, actorId);
   const parsed = filterSchema.safeParse(input);
-  const max = await legacySetting('root.legacy.searchMaxCharacters');
+  const max = await adminSetting('root.admin.searchMaxCharacters');
   if (!parsed.success || (parsed.data.q?.length ?? 0) > max) throw invalid('Use a shorter search and a valid role.');
-  const size = rootResultLimit(await legacySetting('root.legacy.privilegePageSize'), resultCap);
+  const size = rootResultLimit(await adminSetting('root.admin.privilegePageSize'), resultCap);
   const page = parsed.data.page ?? 1;
   const rows = await query(parsed.data, size, (page - 1) * size);
-  const [maxRows, maxBytes] = await Promise.all([legacySetting('root.legacy.privilegeExportMaxRows'), legacySetting('root.legacy.privilegeExportMaxBytes')]);
+  const [maxRows, maxBytes] = await Promise.all([adminSetting('root.admin.privilegeExportMaxRows'), adminSetting('root.admin.privilegeExportMaxBytes')]);
   return { items: rows.map(view), page, pageSize: size, total: rows[0]?.total ?? 0, limits: { searchMaxCharacters: max, exportMaxRows: maxRows, exportMaxBytes: maxBytes } };
 }
 
@@ -51,9 +51,9 @@ function cell(value: string | number | boolean | null) {
 export async function exportRootPrivileges(actorId: string, input: unknown = {}, resultCap?: number) {
   await assertRootActor(prisma, actorId);
   const parsed = filterSchema.omit({ page: true }).safeParse(input);
-  const searchLimit = await legacySetting('root.legacy.searchMaxCharacters');
+  const searchLimit = await adminSetting('root.admin.searchMaxCharacters');
   if (!parsed.success || (parsed.data.q?.length ?? 0) > searchLimit) throw invalid('Use a valid role filter and shorter search.');
-  const cap = rootResultLimit(await legacySetting('root.legacy.privilegeExportMaxRows'), resultCap);
+  const cap = rootResultLimit(await adminSetting('root.admin.privilegeExportMaxRows'), resultCap);
   const rows = await query(parsed.data, cap, 0);
   const total = rows[0]?.total ?? 0;
   if (total > rows.length) throw invalid('The complete export exceeds the current row limit. Narrow the filters or raise the Root export limit.');
@@ -61,7 +61,7 @@ export async function exportRootPrivileges(actorId: string, input: unknown = {},
   const lines = [header, ...rows.map(view).map(row => [row.workspace, row.name, row.email, row.role, row.root ? 'yes' : 'no', row.disabled ? 'yes' : 'no', String(row.channels), row.latestSessionStartedAt ?? ''])];
   const csv = lines.map(line => line.map(cell).join(',')).join('\r\n') + '\r\n';
   const bytes = Buffer.byteLength(csv, 'utf8');
-  if (bytes > await legacySetting('root.legacy.privilegeExportMaxBytes')) throw invalid('The complete export exceeds the byte limit. Narrow the filters or raise the Root export limit.');
+  if (bytes > await adminSetting('root.admin.privilegeExportMaxBytes')) throw invalid('The complete export exceeds the byte limit. Narrow the filters or raise the Root export limit.');
   return { csv, bytes, rows: rows.length, total, truncated: false };
 }
 

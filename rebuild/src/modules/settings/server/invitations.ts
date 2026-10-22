@@ -1,7 +1,7 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { Prisma } from '../../../../generated/client';
-import { lockRootActor } from '@/server/root/legacy/authz';
-import { writeRootAudit } from '@/server/root/legacy/audit';
+import { lockRootActor } from '@/modules/root/server/admin/authz';
+import { writeRootAudit } from '@/modules/root/server/admin/audit';
 import { OperationError } from '@/lib/operation-error';
 import { prisma } from '@/server/data';
 import { runtimeConfig } from '@/server/config/store';
@@ -10,7 +10,7 @@ import { canAccessFeature } from '@/server/permissions';
 import { loadPermissions } from '@/server/permissions/loader';
 import { withWorkspaceOperation } from '@/server/data-control/guard';
 import { accountPasswordPolicy, validateNewPassword } from '@/server/account-settings';
-import { hashLegacyPassword } from '@/server/auth';
+import { hashStoredPassword } from '@/server/auth';
 import { needsTwoStepEnrollment } from '@/server/auth-policy';
 import { mailReady, publicMailOrigin, sendTransactionalMail } from '@/server/mail';
 import { TEAM_ROLES, TEAM_INVITE_SCHEMA, TEAM_INVITATION_REGISTRATION_SCHEMA, TEAM_INVITATION_REVOKE_SCHEMA, inviteTeamConfirmation, revokeTeamInvitationConfirmation, type InvitationStatus, type TeamActor, type TeamRole } from '../invitations';
@@ -277,7 +277,7 @@ export async function registerTeamInvitation(input: unknown): Promise<{ created:
   requireConfirmation(value.confirmation, `CREATE ACCOUNT AND JOIN ${invite.id}`);
   await validateCurrentInviter(invite);
   const policy = await accountPasswordPolicy(); if (!validateNewPassword(value.password, policy)) throw new OperationError('invalid_request', `Password must be at least ${policy.minLength} characters and no more than ${policy.maxBytes} bytes.`);
-  const passwordHash = hashLegacyPassword(value.password);
+  const passwordHash = hashStoredPassword(value.password);
   return protect(transaction(invite.workspaceId, bounds, async tx => {
     const locked = await lockedInvite(tx, value.token); requireUsableInvite(locked);
     await validateCurrentInviter(locked, tx);

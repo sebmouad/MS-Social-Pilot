@@ -7,7 +7,7 @@ import { lockSelectedResources } from '@/server/platforms/resource-lock';
 import { decryptSecret, encryptSecret } from '@/server/secret-crypto';
 import { OperationError } from '@/lib/operation-error';
 import { assertRootActor, lockRootActor } from './authz';
-import { legacySetting } from './policy';
+import { adminSetting } from './policy';
 import { writeRootAudit } from './audit';
 
 export const rootRefreshConfirmation = (id: string) => `REFRESH CONNECTION ${id}`;
@@ -28,7 +28,7 @@ export async function refreshRootConnection(actorId: string, input: unknown) {
   const owner = await prisma.socialAccount.findUnique({ where: { id: socialAccountId }, select: { workspaceId: true } });
   if (!owner) throw new OperationError('not_found', 'Connection not found.');
   const [timeout, grace, maxWait] = await Promise.all([
-    legacySetting('root.legacy.connectionRefreshTimeoutMs'), legacySetting('root.legacy.connectionRefreshGraceMs'), legacySetting('root.legacy.connectionRefreshMaxWaitMs'),
+    adminSetting('root.admin.connectionRefreshTimeoutMs'), adminSetting('root.admin.connectionRefreshGraceMs'), adminSetting('root.admin.connectionRefreshMaxWaitMs'),
   ]);
   return prisma.$transaction(async tx => {
     const workspaces = await tx.$queryRaw<Array<{ id: string; suspendedAt: Date | null }>>`SELECT id, "suspendedAt" FROM workspaces WHERE id = ${owner.workspaceId} FOR SHARE`;

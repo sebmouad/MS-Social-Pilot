@@ -1,6 +1,6 @@
 import { randomUUID, randomBytes, createHash } from 'node:crypto';
 import { PrismaClient } from '../generated/client';
-import { hashLegacySessionToken } from '../src/server/auth';
+import { hashSessionToken } from '../src/server/auth';
 import { encryptSecret } from '../src/server/secret-crypto';
 
 class ProbeFailure extends Error {}
@@ -33,7 +33,7 @@ async function main() {
   try {
     const owner = await client.user.findUnique({ where: { id: ownerId }, select: { isInstanceOwner: true, disabledAt: true, memberships: { select: { workspaceId: true } } } });
     check(owner?.isInstanceOwner && !owner.disabledAt && owner.memberships.some(row => row.workspaceId === workspaceId), 'Seeded synthetic preview owner required.');
-    await client.session.create({ data: { id: sessionId, userId: ownerId, tokenHash: hashLegacySessionToken(token)!, expiresAt: expires, pending: null } });
+    await client.session.create({ data: { id: sessionId, userId: ownerId, tokenHash: hashSessionToken(token)!, expiresAt: expires, pending: null } });
     await client.user.create({ data: { id: viewerId, email: `${id}@example.test`, name: 'Unassigned deletion probe reader', passwordHash: 'unusable-test-credential' } });
     await client.membership.create({ data: { id: viewerMembershipId, userId: viewerId, workspaceId, role: 'viewer' } });
     await client.$executeRaw`UPDATE memberships SET "allPages" = false WHERE id = ${viewerMembershipId}`;

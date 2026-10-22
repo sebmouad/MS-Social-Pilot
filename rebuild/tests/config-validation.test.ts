@@ -5,10 +5,19 @@ import { describe, expect, it } from 'vitest';
 import { CONFIG_BY_KEY, CONFIG_REGISTRY, CONFIG_SCHEMA_VERSION, safeConfigShape } from '../src/lib/config/registry';
 import { configAuditDetail } from '../src/server/config/store';
 import { publishingManifest } from '../src/modules/publishing/manifest';
+import { ROOT_ADMIN_CONFIG } from '../src/modules/root/server/admin/config';
 
 describe('configuration registry', () => {
+  it('registers Root administration settings under their canonical names', () => {
+    expect(CONFIG_REGISTRY.some(item => item.key.startsWith('root.legacy.'))).toBe(false);
+    for (const definition of ROOT_ADMIN_CONFIG) {
+      expect(definition.key).toMatch(/^root\.admin\./);
+      expect(CONFIG_BY_KEY.get(definition.key)).toBe(definition);
+      expect(definition.schema.safeParse(definition.defaultValue).success).toBe(true);
+    }
+  });
   it('keeps operator alerts in the single Root monitoring system', () => {
-    expect(CONFIG_SCHEMA_VERSION).toBe(131);
+    expect(CONFIG_SCHEMA_VERSION).toBe(132);
     for (const key of ['notifications.systemAlertPolicy', 'notifications.systemAlertCopy', 'notifications.systemAlertTelegramToken']) {
       expect(CONFIG_BY_KEY.has(key)).toBe(false);
     }
@@ -53,7 +62,7 @@ describe('configuration registry', () => {
   });
 
   it('covers the operational configuration areas with explicit consumption status', () => {
-    expect(CONFIG_SCHEMA_VERSION).toBe(131);
+    expect(CONFIG_SCHEMA_VERSION).toBe(132);
     expect(safeConfigShape().find(setting => setting.key === 'settings.teamDefaultRole')).toMatchObject({ defaultValue: 'contributor', consumption: 'active', owner: { kind: 'product', id: 'settings' } });
     expect(safeConfigShape().find(setting => setting.key === 'settings.teamDefaultAllChannels')).toMatchObject({ defaultValue: false, consumption: 'active', owner: { kind: 'product', id: 'settings' } });
     expect(CONFIG_BY_KEY.get('settings.teamDefaultRole')!.schema.safeParse('owner').success).toBe(false);

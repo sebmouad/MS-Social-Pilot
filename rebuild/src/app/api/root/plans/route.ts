@@ -1,5 +1,5 @@
-import { listRootPlanHistory, listRootPlans, listRootSubscribers } from '@/server/root/legacy/plans';
-import { rootRoute, searchParamsObject } from '@/server/root/legacy/http';
+import { listRootPlanHistory, listRootPlans, listRootSubscribers } from '@/modules/root/server/admin/plans';
+import { rootRoute, searchParamsObject } from '@/modules/root/server/admin/http';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';

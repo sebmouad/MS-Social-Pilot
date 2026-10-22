@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 const state = vi.hoisted(() => ({ actor: vi.fn(), count: vi.fn(), find: vi.fn(), access: vi.fn() }));
 vi.mock('../src/server/data', () => ({ prisma: { user: { findUnique: state.actor, count: state.count, findMany: state.find }, workspace: { count: state.count, findMany: state.find }, $queryRaw: state.access } }));
-vi.mock('../src/server/config/store', () => ({ runtimeConfig: async (key: string) => ({ 'root.directoryPageSize': 25, 'root.legacy.searchMaxCharacters': 200, 'root.pageMaxNumber': 1000000 }[key]) }));
+vi.mock('../src/server/config/store', () => ({ runtimeConfig: async (key: string) => ({ 'root.directoryPageSize': 25, 'root.admin.searchMaxCharacters': 200, 'root.pageMaxNumber': 1000000 }[key]) }));
 import { listRootWorkspaces, rootDirectoryQuery } from '../src/server/root/directory';
 
 describe('Root directory pagination', () => {

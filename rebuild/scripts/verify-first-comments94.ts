@@ -5,7 +5,7 @@ import { readFile } from 'node:fs/promises';
 import { chromium } from 'playwright';
 import { Prisma, PrismaClient } from '../generated/client';
 import { encryptSecret } from '../src/server/secret-crypto';
-import { hashLegacySessionToken } from '../src/server/auth';
+import { hashSessionToken } from '../src/server/auth';
 import { runtimeConfig } from '../src/server/config/store';
 
 class ProbeFailure extends Error {}
@@ -118,8 +118,8 @@ async function main() {
     await db.membership.create({ data: { id: `${workspaceId}_membership`, workspaceId, userId, role: 'owner' } });
     const expiry = new Date(Date.now() + 10 * 60_000);
     await db.session.createMany({ data: [
-      { id: sessionIds[0]!, userId: rootId, tokenHash: hashLegacySessionToken(rootToken)!, expiresAt: expiry, pending: null },
-      { id: sessionIds[1]!, userId, tokenHash: hashLegacySessionToken(sessionToken)!, expiresAt: expiry, pending: null },
+      { id: sessionIds[0]!, userId: rootId, tokenHash: hashSessionToken(rootToken)!, expiresAt: expiry, pending: null },
+      { id: sessionIds[1]!, userId, tokenHash: hashSessionToken(sessionToken)!, expiresAt: expiry, pending: null },
     ] });
     await db.socialAccount.create({ data: { id: accountId, workspaceId, provider: 'facebook', providerUserId: `${workspaceId}_account`, name: 'Synthetic Facebook source',
       accessToken: encryptSecret(`synthetic_fb_comments94_${randomBytes(20).toString('hex')}`), scopes: facebookScopes.join(',') } });

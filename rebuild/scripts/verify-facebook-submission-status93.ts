@@ -4,7 +4,7 @@ import { createServer as createHttpsServer } from 'node:https';
 import { readFile } from 'node:fs/promises';
 import { Prisma, PrismaClient } from '../generated/client';
 import { encryptSecret } from '../src/server/secret-crypto';
-import { hashLegacySessionToken } from '../src/server/auth';
+import { hashSessionToken } from '../src/server/auth';
 import { runtimeConfig } from '../src/server/config/store';
 
 class ProbeFailure extends Error {}
@@ -132,8 +132,8 @@ async function main() {
     await db.membership.create({ data: { id: `${workspaceId}_membership`, workspaceId, userId, role: 'owner' } });
     const expiry = new Date(Date.now() + 10 * 60_000);
     await db.session.createMany({ data: [
-      { id: sessionId, userId, tokenHash: hashLegacySessionToken(sessionToken)!, expiresAt: expiry, pending: null },
-      { id: rootSessionId, userId: rootId, tokenHash: hashLegacySessionToken(rootToken)!, expiresAt: expiry, pending: null },
+      { id: sessionId, userId, tokenHash: hashSessionToken(sessionToken)!, expiresAt: expiry, pending: null },
+      { id: rootSessionId, userId: rootId, tokenHash: hashSessionToken(rootToken)!, expiresAt: expiry, pending: null },
     ] });
     pageToken = `synthetic_fb_status93_${randomBytes(18).toString('hex')}`;
     accountId = `${workspaceId}_account`;

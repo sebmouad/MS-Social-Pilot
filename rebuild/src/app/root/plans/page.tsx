@@ -3,10 +3,10 @@ import { PageHeader } from '@/components/PageHeader';
 import { synchronousPolicy } from '@/lib/config/synchronous-policy';
 import { requireRootPage } from '@/server/config/access';
 import { RootFrame } from '@/server/root/RootFrame';
-import { listRootPlanHistory, listRootPlans, listRootSubscribers } from '@/server/root/legacy/plans';
+import { listRootPlanHistory, listRootPlans, listRootSubscribers } from '@/modules/root/server/admin/plans';
 import { PlanEditor } from './PlanEditor';
 import { AssignPlan } from './AssignPlan';
-import './legacy-ops.css';
+import './root-ops.css';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Plans · Root' };

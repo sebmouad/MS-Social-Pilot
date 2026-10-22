@@ -1,7 +1,7 @@
 /** Guarded synthetic-only localhost/PostgreSQL/MCP verification for Publishing post history and restore. */
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { Prisma, PrismaClient } from '../generated/client';
-import { hashLegacySessionToken } from '../src/server/auth';
+import { hashSessionToken } from '../src/server/auth';
 import { CONFIG_SCHEMA_VERSION } from '../src/lib/config/registry';
 
 class ProbeFailure extends Error {}
@@ -92,7 +92,7 @@ async function main() {
       await db.workspace.create({ data: { id: workspaceId, slug: workspaceId, name: `Disposable history workspace ${index ? 'B' : 'A'}`, timezone: 'UTC' } });
       await db.membership.create({ data: { id: `${prefix}_membership_${index}`, userId, workspaceId, role: 'owner' } });
     }
-    await db.session.create({ data: { id: sessionId, userId, tokenHash: hashLegacySessionToken(sessionToken)!, expiresAt, pending: null } });
+    await db.session.create({ data: { id: sessionId, userId, tokenHash: hashSessionToken(sessionToken)!, expiresAt, pending: null } });
     await db.socialAccount.create({ data: { id: socialId, workspaceId: workspaceA, provider: 'facebook', providerUserId: `${prefix}_provider`, name: 'Disposable Facebook channel', accessToken: 'synthetic-no-credential', scopes: 'pages_manage_posts' } });
     await db.target.create({ data: { id: targetId, workspaceId: workspaceA, socialAccountId: socialId, type: 'page', providerId: `${prefix}_page`, name: 'Disposable history channel', accessToken: 'synthetic-no-credential', enabled: true, canPublish: true, createdAt: new Date() } });
     await db.$executeRaw`INSERT INTO labels (id, "workspaceId", name, color, "createdAt") VALUES (${labelId}, ${workspaceA}, 'Disposable history label', 'blue', NOW())`;

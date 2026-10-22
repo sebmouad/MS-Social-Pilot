@@ -1,6 +1,6 @@
 import { randomBytes, randomUUID, createHash } from 'node:crypto';
 import { PrismaClient, Prisma } from '../generated/client';
-import { hashLegacyPassword, hashLegacySessionToken } from '../src/server/auth';
+import { hashStoredPassword, hashSessionToken } from '../src/server/auth';
 import { newTotpSecret, totpCode, timeStep } from '../src/server/totp';
 import { encryptSecret } from '../src/server/secret-crypto';
 
@@ -46,7 +46,7 @@ async function main() {
     const fixture = await client.user.findUnique({ where: { email: 'preview-qa@example.test' }, select: { id: true, memberships: { select: { workspaceId: true } } } });
     check(fixture?.memberships.length, 'The seeded preview fixture is required.');
     savedSetting = await client.appSetting.findUnique({ where: { key: configKey } });
-    await client.user.create({ data: { id, email, name: 'Installation MCP probe', passwordHash: hashLegacyPassword(password), isInstanceOwner: true, totpSecret: encryptSecret(totp), totpEnabledAt: new Date() } });
+    await client.user.create({ data: { id, email, name: 'Installation MCP probe', passwordHash: hashStoredPassword(password), isInstanceOwner: true, totpSecret: encryptSecret(totp), totpEnabledAt: new Date() } });
     check(await client.membership.count({ where: { userId: id } }) === 0, 'Probe user must have no memberships.');
     const signedIn = await post('/api/auth/sign-in', { email, password });
     check(signedIn.ok && (await signedIn.json()).next === 'verify' && cookie, 'Password login must require second-step verification.');
@@ -88,9 +88,9 @@ async function main() {
     const audit = await client.$queryRaw<Array<{ count: bigint }>>`SELECT COUNT(*) AS count FROM root_activities WHERE "actorId" = ${id} AND action = 'config.changed' AND detail->>'key' = ${configKey}`;
     check(Number(audit[0]?.count) === 1, 'Configuration change must have its transactional domain audit.');
     // Real HTTP/MCP account controls affect only this disposable synthetic target.
-    await client.user.create({ data: { id: targetId, email: targetEmail, name: 'Disposable user control probe', passwordHash: hashLegacyPassword(randomBytes(24).toString('base64url')), totpSecret: encryptSecret(newTotpSecret()), totpEnabledAt: new Date() } });
+    await client.user.create({ data: { id: targetId, email: targetEmail, name: 'Disposable user control probe', passwordHash: hashStoredPassword(randomBytes(24).toString('base64url')), totpSecret: encryptSecret(newTotpSecret()), totpEnabledAt: new Date() } });
     const targetToken = randomBytes(32).toString('base64url');
-    await client.session.create({ data: { id: `${targetId}_active`, userId: targetId, tokenHash: hashLegacySessionToken(targetToken)!, expiresAt: new Date(Date.now() + 300000), pending: null } });
+    await client.session.create({ data: { id: `${targetId}_active`, userId: targetId, tokenHash: hashSessionToken(targetToken)!, expiresAt: new Date(Date.now() + 300000), pending: null } });
     await client.session.create({ data: { id: `${targetId}_pending`, userId: targetId, tokenHash: randomUUID(), expiresAt: new Date(Date.now() + 300000), pending: 'verify' } });
     await client.passkey.create({ data: { id: `${targetId}_passkey`, userId: targetId, credentialId: randomUUID(), publicKey: Buffer.from('synthetic-unused-public-key'), counter: 0, transports: [], name: 'Synthetic unused credential', createdAt: new Date() } });
     await client.recoveryCode.create({ data: { id: `${targetId}_recovery`, userId: targetId, codeHash: randomUUID(), createdAt: new Date() } });

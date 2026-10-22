@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { transferConfirmation } from '@/server/root/legacy/shared';
+import { transferConfirmation } from '@/modules/root/server/admin/shared';
 import { ConfirmAction } from '../plans/ConfirmAction';
 
 export function TransferOwnership() {

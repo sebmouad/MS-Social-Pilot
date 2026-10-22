@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { hashLegacyPassword, verifyLegacyPassword } from '../src/server/auth';
+import { hashStoredPassword, verifyPassword } from '../src/server/auth';
 import { validateNewPassword, validateProfileName } from '../src/server/account-settings';
 
 describe('account settings validation', () => {
@@ -19,10 +19,10 @@ describe('account settings validation', () => {
 
   it('hashes new passwords in the existing sign-in format without storing the cleartext', () => {
     const password = 'correct horse battery staple';
-    const hash = hashLegacyPassword(password);
+    const hash = hashStoredPassword(password);
     expect(hash).toMatch(/^scrypt:16384:[A-Za-z0-9_-]+:[A-Za-z0-9_-]+$/);
     expect(hash).not.toContain(password);
-    expect(verifyLegacyPassword(password, hash)).toBe(true);
-    expect(verifyLegacyPassword('wrong password', hash)).toBe(false);
+    expect(verifyPassword(password, hash)).toBe(true);
+    expect(verifyPassword('wrong password', hash)).toBe(false);
   });
 });

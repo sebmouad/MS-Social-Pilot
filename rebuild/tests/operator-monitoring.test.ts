@@ -6,9 +6,9 @@ vi.mock('@/server/jobs/worker', () => ({ createWorker: (deps: { execute: (name: 
 vi.mock('@/server/data', () => ({ prisma: { $queryRaw: m.query, $executeRaw: m.execute } }));
 vi.mock('@/server/mail', () => ({ sendTransactionalMail: m.mail }));
 vi.mock('@/server/config/store', () => ({ runtimeConfig: m.config }));
-vi.mock('@/server/root/legacy/authz', () => ({ assertRootActor: m.auth, lockRootActor: m.auth }));
-vi.mock('@/server/root/legacy/audit', () => ({ writeRootAudit: m.audit }));
-vi.mock('@/server/root/legacy/policy', () => ({ rootTransaction: (fn: (tx: unknown) => unknown) => fn({ $queryRaw: m.query, $executeRaw: m.execute }), rootResultLimit: (n: number, cap?: number) => Math.min(n, cap ?? n) }));
+vi.mock('@/modules/root/server/admin/authz', () => ({ assertRootActor: m.auth, lockRootActor: m.auth }));
+vi.mock('@/modules/root/server/admin/audit', () => ({ writeRootAudit: m.audit }));
+vi.mock('@/modules/root/server/admin/policy', () => ({ rootTransaction: (fn: (tx: unknown) => unknown) => fn({ $queryRaw: m.query, $executeRaw: m.execute }), rootResultLimit: (n: number, cap?: number) => Math.min(n, cap ?? n) }));
 vi.mock('node:fs/promises', () => ({ statfs: m.disk }));
 import { runOperatorMonitoring, runRootOperatorMonitoring, readRootOperatorMonitoring } from '@/modules/root/server/operator-monitoring';
 const now = new Date('2026-10-22T12:10:00Z');

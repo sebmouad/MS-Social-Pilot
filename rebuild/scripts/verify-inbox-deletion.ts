@@ -1,6 +1,6 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { Prisma, PrismaClient } from '../generated/client';
-import { hashLegacySessionToken } from '../src/server/auth';
+import { hashSessionToken } from '../src/server/auth';
 import { encryptSecret } from '../src/server/secret-crypto';
 
 class ProbeFailure extends Error {}
@@ -89,8 +89,8 @@ async function main() {
     await client.user.create({ data: { id: viewerId, email: `${id}@example.test`, name: 'Temporary unassigned Inbox viewer', passwordHash: 'unusable-test-credential', createdAt: now, updatedAt: now } });
     await client.membership.create({ data: { id: viewerMembershipId, userId: viewerId, workspaceId, role: 'viewer' } });
     await client.$executeRaw`UPDATE memberships SET "allPages" = false WHERE id = ${viewerMembershipId}`;
-    await client.session.create({ data: { id: ownerSessionId, userId: ownerId, tokenHash: hashLegacySessionToken(ownerToken)!, expiresAt: new Date(Date.now() + 300_000), pending: null } });
-    await client.session.create({ data: { id: viewerSessionId, userId: viewerId, tokenHash: hashLegacySessionToken(viewerToken)!, expiresAt: new Date(Date.now() + 300_000), pending: null } });
+    await client.session.create({ data: { id: ownerSessionId, userId: ownerId, tokenHash: hashSessionToken(ownerToken)!, expiresAt: new Date(Date.now() + 300_000), pending: null } });
+    await client.session.create({ data: { id: viewerSessionId, userId: viewerId, tokenHash: hashSessionToken(viewerToken)!, expiresAt: new Date(Date.now() + 300_000), pending: null } });
     const expiry = new Date(Date.now() + 300_000);
     await client.mcpApiKey.create({ data: { id: writeKeyId, workspaceId, createdById: ownerId, name: 'Temporary Inbox deletion write probe', tokenHash: createHash('sha256').update(writeBearer).digest('hex'), tokenPrefix: writeBearer.slice(0, 12), readFeatures: ['inbox/conversations'], writeFeatures: ['inbox/conversations'], expiresAt: expiry } });
     await client.mcpApiKey.create({ data: { id: readKeyId, workspaceId, createdById: ownerId, name: 'Temporary Inbox deletion read probe', tokenHash: createHash('sha256').update(readBearer).digest('hex'), tokenPrefix: readBearer.slice(0, 12), readFeatures: ['inbox/conversations'], writeFeatures: [], expiresAt: expiry } });

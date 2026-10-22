@@ -4,7 +4,7 @@ import { prisma } from '@/server/data';
 import { runtimeConfig } from '@/server/config/store';
 import { sendTransactionalMail } from '@/server/mail';
 import { OperationError } from '@/lib/operation-error';
-import { assertRootActor, lockRootActor } from '@/server/root/legacy/authz';
+import { assertRootActor, lockRootActor } from '@/modules/root/server/admin/authz';
 import { clientInvitationPolicySchema, clientInvitationCopySchema, clientInviteConfirmation, clientRevokeConfirmation } from '../invitation-policy';
 
 export { clientInviteConfirmation, clientRevokeConfirmation } from '../invitation-policy';
@@ -41,7 +41,7 @@ export async function listClientInvitations(actorId: string) {
   return { invitations, truncated: rows.length > config.listLimit, policy: config };
 }
 
-/** Preserves legacy pending-invitation replacement and direct-link delivery, with atomic authority and audit. */
+/** Preserves existing pending-invitation replacement and direct-link delivery, with atomic authority and audit. */
 export async function issueClientInvitation(actorId: string, input: unknown) {
   await assertRootActor(prisma, actorId);
   const config = await policy();

@@ -3,9 +3,9 @@ const m = vi.hoisted(() => ({ auth: vi.fn(), query: vi.fn(), execute: vi.fn(), a
 vi.mock('@/server/data', () => ({ prisma: { $queryRaw: m.query, $executeRaw: m.execute } }));
 vi.mock('@/server/config/store', () => ({ runtimeConfig: m.config }));
 vi.mock('@/server/mail', () => ({ sendTransactionalMail: m.mail }));
-vi.mock('@/server/root/legacy/authz', () => ({ assertRootActor: m.auth, lockRootActor: m.auth }));
-vi.mock('@/server/root/legacy/audit', () => ({ writeRootAudit: m.audit }));
-vi.mock('@/server/root/legacy/policy', () => ({ rootTransaction: (fn: (tx: unknown) => unknown) => fn({ $queryRaw: m.query, $executeRaw: m.execute }) }));
+vi.mock('@/modules/root/server/admin/authz', () => ({ assertRootActor: m.auth, lockRootActor: m.auth }));
+vi.mock('@/modules/root/server/admin/audit', () => ({ writeRootAudit: m.audit }));
+vi.mock('@/modules/root/server/admin/policy', () => ({ rootTransaction: (fn: (tx: unknown) => unknown) => fn({ $queryRaw: m.query, $executeRaw: m.execute }) }));
 vi.mock('@/modules/notifications/chat-channels/server/delivery', () => ({ enqueueOperatorIncident: m.enqueue }));
 import { testRootOperatorMonitoring } from '@/modules/root/server/operator-monitoring';
 import { ROOT_MONITORING_CONFIG } from '@/modules/root/config';

@@ -1,6 +1,6 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { PrismaClient } from '../generated/client';
-import { hashLegacySessionToken } from '../src/server/auth';
+import { hashSessionToken } from '../src/server/auth';
 import { encryptSecret } from '../src/server/secret-crypto';
 
 class ProbeFailure extends Error {}
@@ -79,8 +79,8 @@ async function main() {
     await client.user.create({ data: { id: viewerId, email: `${id}@example.test`, name: 'Temporary Inbox workflow viewer', passwordHash: 'unusable-test-credential', createdAt: now, updatedAt: now } });
     await client.membership.create({ data: { id: viewerMembershipId, userId: viewerId, workspaceId, role: 'viewer' } });
     await client.$executeRaw`UPDATE memberships SET "allPages" = false WHERE id = ${viewerMembershipId}`;
-    await client.session.create({ data: { id: ownerSessionId, userId: ownerId, tokenHash: hashLegacySessionToken(ownerToken)!, expiresAt: new Date(Date.now() + 300_000), pending: null } });
-    await client.session.create({ data: { id: viewerSessionId, userId: viewerId, tokenHash: hashLegacySessionToken(viewerToken)!, expiresAt: new Date(Date.now() + 300_000), pending: null } });
+    await client.session.create({ data: { id: ownerSessionId, userId: ownerId, tokenHash: hashSessionToken(ownerToken)!, expiresAt: new Date(Date.now() + 300_000), pending: null } });
+    await client.session.create({ data: { id: viewerSessionId, userId: viewerId, tokenHash: hashSessionToken(viewerToken)!, expiresAt: new Date(Date.now() + 300_000), pending: null } });
     await client.mcpApiKey.create({ data: { id: keyId, workspaceId, createdById: ownerId, name: 'Temporary Inbox workflow probe', tokenHash: createHash('sha256').update(bearer).digest('hex'), tokenPrefix: bearer.slice(0, 12), readFeatures: ['inbox/conversations'], writeFeatures: ['inbox/conversations'], expiresAt: new Date(Date.now() + 300_000) } });
 
     await client.socialAccount.create({ data: { id: socialId, workspaceId, provider: 'facebook', providerUserId: `${id}_remote_account`, name: 'Expired local Inbox probe', accessToken: fakeCredential, refreshToken: null, tokenExpiresAt: expired, scopes: 'pages_messaging,pages_manage_engagement', invalidatedAt: null, createdAt: now, updatedAt: now } });

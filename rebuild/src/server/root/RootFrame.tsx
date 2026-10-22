@@ -1,7 +1,7 @@
 import { headers } from 'next/headers';
 import { runtimeConfig } from '@/server/config/store';
 import { ROOT_INTERFACE_COPY } from '@/lib/config/root-interface-copy';
-import { rootCopyLocale } from './legacy/copy';
+import { rootCopyLocale } from '@/modules/root/server/admin/copy';
 import { RootInterfaceProvider } from './RootInterface';
 import type { ReactNode } from 'react';
 import { AppShell } from '@/components';

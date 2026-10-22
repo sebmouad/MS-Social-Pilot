@@ -1,6 +1,6 @@
-import { errorResolveSchema } from '@/server/root/legacy/shared';
-import { getRootError, setRootErrorResolved } from '@/server/root/legacy/errors';
-import { readBody, rootRoute, searchParamsObject } from '@/server/root/legacy/http';
+import { errorResolveSchema } from '@/modules/root/server/admin/shared';
+import { getRootError, setRootErrorResolved } from '@/modules/root/server/admin/errors';
+import { readBody, rootRoute, searchParamsObject } from '@/modules/root/server/admin/http';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';

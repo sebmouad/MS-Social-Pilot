@@ -4,7 +4,7 @@ import { prisma } from '@/server/data';
 import { OperationError } from '@/lib/operation-error';
 import { assertRootActor, invalid, lockRootActor } from './authz';
 import { writeRootAudit } from './audit';
-import { legacySetting, rootResultLimit, rootTransaction } from './policy';
+import { adminSetting, rootResultLimit, rootTransaction } from './policy';
 
 const filterSchema = z.object({ q: z.string().trim().optional() }).strict();
 
@@ -18,9 +18,9 @@ export const sessionSignOutConfirmation = (sessionId: string) => `SIGN OUT SESSI
 export async function listRootSessions(actorId: string, input: unknown = {}, resultCap?: number, currentSessionId?: string | null) {
   await assertRootActor(prisma, actorId);
   const parsed = filterSchema.safeParse(input);
-  const max = await legacySetting('root.legacy.searchMaxCharacters');
+  const max = await adminSetting('root.admin.searchMaxCharacters');
   if (!parsed.success || (parsed.data.q?.length ?? 0) > max) throw invalid('Use a shorter search.');
-  const limit = rootResultLimit(await legacySetting('root.legacy.lifecycleListLimit'), resultCap);
+  const limit = rootResultLimit(await adminSetting('root.admin.lifecycleListLimit'), resultCap);
   const q = parsed.data.q || undefined;
   const rows = await prisma.session.findMany({
     where: { expiresAt: { gt: new Date() }, ...(q ? { user: { OR: [{ email: { contains: q, mode: 'insensitive' as const } }, { name: { contains: q, mode: 'insensitive' as const } }] } } : {}) },

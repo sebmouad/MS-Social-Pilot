@@ -7,7 +7,7 @@ vi.mock('next/headers', () => ({ headers: async () => new Headers({ 'accept-lang
 vi.mock('@/server/config/access', () => ({ requireRootPage: deps.access }));
 vi.mock('@/server/config/store', () => ({ runtimeConfig: async () => ROOT_INTERFACE_COPY }));
 vi.mock('@/server/root/read-model', () => ({ getRootOverview: deps.counts }));
-vi.mock('@/server/root/legacy/backups', () => ({ readRootDiagnosticsSummary: deps.diagnostics }));
+vi.mock('@/modules/root/server/admin/backups', () => ({ readRootDiagnosticsSummary: deps.diagnostics }));
 vi.mock('@/server/root/module-health', () => ({ loadRootModuleHealth: deps.health }));
 vi.mock('@/server/root/RootFrame', () => ({ RootFrame: 'main' }));
 vi.mock('@/components/RootMcpConnection', () => ({ RootMcpConnection: () => null }));

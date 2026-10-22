@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-vi.mock('../src/server/root/legacy/connection-refresh', () => ({ refreshRootConnection: state.refreshConnection }));
+vi.mock('../src/modules/root/server/admin/connection-refresh', () => ({ refreshRootConnection: state.refreshConnection }));
 vi.mock('../src/server/root/registration-admin', async importOriginal => ({
   ...await importOriginal<typeof import('../src/server/root/registration-admin')>(),
   ...state.registration,

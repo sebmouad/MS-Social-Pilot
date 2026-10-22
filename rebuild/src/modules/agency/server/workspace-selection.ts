@@ -1,7 +1,7 @@
 import { cookies } from 'next/headers';
 import { z } from 'zod';
 import { copyError, withCustomerCopy } from './copy';
-import { isUsableLegacySession } from '@/server/auth';
+import { isUsableSession } from '@/server/auth';
 import { prisma, getSessionByTokenHash } from '@/server/data';
 import { runtimeConfig } from '@/server/config/store';
 import { withWorkspaceOperation } from '@/server/data-control/guard';
@@ -13,7 +13,7 @@ export const workspaceSelectionConfirmation = (id: string) => `SELECT WORKSPACE 
 /** A workspace preference belongs to a current browser session, never to a bearer credential. */
 async function assertAgencySessionImpl(actor: AccountActor): Promise<void> {
   if (actor.apiKeyId || 'personKeyId' in actor || !actor.sessionTokenHash) throw copyError('forbidden', 'Use a signed-in browser session.');
-  if (!isUsableLegacySession(await getSessionByTokenHash(actor.sessionTokenHash), actor.userId)) throw copyError('unauthorized', 'Sign in to continue.');
+  if (!isUsableSession(await getSessionByTokenHash(actor.sessionTokenHash), actor.userId)) throw copyError('unauthorized', 'Sign in to continue.');
 }
 
 /** Every entry point requires the same exact selection consent before membership lookup. */

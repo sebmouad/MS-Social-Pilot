@@ -2,7 +2,7 @@
 import {randomBytes,randomUUID} from 'node:crypto';
 import {chromium} from 'playwright';
 import {Prisma,PrismaClient} from '../generated/client';
-import {hashLegacySessionToken} from '../src/server/auth';
+import {hashSessionToken} from '../src/server/auth';
 import {CONFIG_BY_KEY} from '../src/lib/config/registry';
 function check(value:unknown,label:string):asserts value{if(!value)throw Error(label);}
 async function main(){
@@ -22,7 +22,7 @@ async function main(){
   check(await db.post.count({where:{message:{startsWith:tag}}})===0,'Fixture namespace must be unused');
   original=await db.appSetting.findUnique({where:{key:proofKey}});
   await db.appSetting.upsert({where:{key:proofKey},create:{key:proofKey,value:false,encrypted:false,updatedAt:new Date()},update:{value:false,encrypted:false,updatedAt:new Date()}});changed=true;
-  await db.session.create({data:{id:sessionId,userId:owner,tokenHash:hashLegacySessionToken(token)!,pending:null,expiresAt:new Date(Date.now()+600000)}});
+  await db.session.create({data:{id:sessionId,userId:owner,tokenHash:hashSessionToken(token)!,pending:null,expiresAt:new Date(Date.now()+600000)}});
   const labelRow=await db.appSetting.findUnique({where:{key:'meta.feedFormatLabel'}});
   const label=typeof labelRow?.value==='string'?labelRow.value:String(CONFIG_BY_KEY.get('meta.feedFormatLabel')!.defaultValue);
   browser=await chromium.launch({headless:true,proxy:{server:'http://127.0.0.1:9',bypass:'localhost,127.0.0.1,[::1]'}});

@@ -2,7 +2,7 @@ import { configuredDiscoverFacebookAdObjects } from './ads-discovery';
 import { saveAdObject } from '@/modules/ads/server/object-store';
 import { storeInboxMetadata } from '@/modules/inbox/server/metadata';
 import { CONFIG_BY_KEY } from '@/lib/config/registry';
-import { redact } from '@/server/root/legacy/authz';
+import { redact } from '@/modules/root/server/admin/authz';
 import { randomUUID } from 'node:crypto';
 import { prisma } from '@/server/data';
 import { decryptSecret } from '@/server/secret-crypto';

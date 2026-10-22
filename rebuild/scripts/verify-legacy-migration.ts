@@ -4,7 +4,7 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { PrismaClient, Prisma } from '../generated/client';
 import { CONFIG_BY_KEY } from '../src/lib/config/registry';
-import { legacyConfigCandidates } from '../src/server/config/legacy-import';
+import { expectedMigratedSettings } from './migration-setting-expectations';
 import { parseResourceScope } from '../src/modules/settings/mcp-access/resource-scope';
 import { PAGES } from '../src/lib/product';
 
@@ -73,7 +73,7 @@ export function configChecks(rows: Row[], requiredKeys: string[]): Check[] {
   // Reuse the importer's mapping, including environment-backed import requirements.
   // Opaque secrets are checked for presence/encrypted envelope, never decrypted or printed.
   try {
-    for (const candidate of legacyConfigCandidates(rows as Array<{ key: string; value: unknown; encrypted: boolean }>, {
+    for (const candidate of expectedMigratedSettings(rows as Array<{ key: string; value: unknown; encrypted: boolean }>, {
       appUrl: process.env.APP_URL, authPolicy: process.env.SECURITY_TWO_STEP,
       loginAttempts: process.env.LOGIN_ATTEMPTS, loginWindowMinutes: process.env.LOGIN_WINDOW_MINUTES,
       decrypt: value => value,

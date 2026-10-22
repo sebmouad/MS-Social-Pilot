@@ -1,7 +1,7 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { createInterface } from 'node:readline/promises';
 import { Prisma, PrismaClient } from '../generated/client';
-import { hashLegacySessionToken } from '../src/server/auth';
+import { hashSessionToken } from '../src/server/auth';
 import { CONFIG_BY_KEY } from '../src/lib/config/registry';
 
 class ProbeFailure extends Error {}
@@ -45,7 +45,7 @@ async function main() {
   try {
     check(await client.user.count({ where: { id: userId, isInstanceOwner: true, disabledAt: null, memberships: { some: { workspaceId, role: 'owner' } } } }) === 1, 'Seeded synthetic installation/workspace owner required.');
     check(workspaceBefore.length === 1 && workspaceBefore[0]?.suspendedAt === null, 'Synthetic preview workspace must initially be active.');
-    await client.session.create({ data: { id: sessionId, userId, tokenHash: hashLegacySessionToken(sessionToken)!, pending: null, expiresAt: new Date(Date.now() + 600_000) } });
+    await client.session.create({ data: { id: sessionId, userId, tokenHash: hashSessionToken(sessionToken)!, pending: null, expiresAt: new Date(Date.now() + 600_000) } });
     await client.mcpApiKey.create({ data: { id: keyId, workspaceId, createdById: userId, name: 'Disposable platform access probe', tokenHash: createHash('sha256').update(bearer).digest('hex'), tokenPrefix: bearer.slice(0, 12),
       readFeatures: ['settings/connections', 'publishing/posts', 'inbox/conversations', 'analytics/overview', 'ads/campaigns'], writeFeatures: ['settings/connections'], expiresAt: new Date(Date.now() + 600_000) } });
     const before = await call('list_pages');

@@ -541,7 +541,7 @@ or person credential access. Root resources read through these same tools.
 | list_root_publication_attempts | installation/root | read | GET /api/root/publication-attempts | listRootPublicationAttempts. |
 | record_root_publication_outcome | installation/root | write | POST /api/root/publication-attempts | recordRootPublicationOutcome; action=record. |
 | finish_root_publication_projection | installation/root | write | POST /api/root/publication-attempts | finishRootPublicationProjection; action=finish. |
-| adopt_root_legacy_publication | installation/root | write | POST /api/root/publication-attempts | adoptRootLegacyPublication; action=adopt. |
+| adopt_root_legacy_publication | installation/root | write | POST /api/root/publication-attempts | adoptRootAdminPublication; action=adopt. |
 | delete_root_unverified_registration | installation/root | write | DELETE /api/root/registration/accounts/[id] | controlRootRegistrationAccount; action=delete. |
 | resend_root_registration_verification | installation/root | write | POST /api/root/registration/accounts/[id] | controlRootRegistrationAccount; action=resend. |
 | revoke_root_invitation | installation/root | write | DELETE /api/root/registration/invitations/[id] | revokeRootRegistrationInvitation. |
@@ -679,7 +679,7 @@ exact resolve/reopen confirmation in the service (whether MCP still adds a separ
 transport confirmation was not re-inspected). `src/server/root/*` re-export these, and the
 REST routes and MCP tools call them (`tests/root-config-authority.test.ts`,
 `root-workspace-controls.test.ts`, `root-directory.test.ts`,
-`root-legacy-services.test.ts`; mocked database, no PostgreSQL rollback, real MCP
+`root-admin-services.test.ts`; mocked database, no PostgreSQL rollback, real MCP
 client or browser evidence). Settings single-selection and disconnect callers
 (`connections-mcp.ts`, `/api/connections`, the browser manager) now use
 `changeConnectionSelections` / `changeConnectionDisconnect`. Agency switching and
@@ -701,7 +701,7 @@ and remain open because service/UI files are outside this lane:
   Root configuration operation. REST `saveConfig` does not require the exact text
   demanded by MCP's `set_root_config`; do not claim confirmation parity from the
   mapping. MCP config read also omits HTTP's availability catalog.
-- `src/server/root/legacy/errors.ts` and error UI/callers: reconcile the documented
+- `src/modules/root/server/admin/errors.ts` and error UI/callers: reconcile the documented
   reversible no-confirmation service/REST action with MCP's extra transport
   confirmation. Service-owned audit exists; confirmation policy is inconsistent.
 - Architecture, delivery plan and handoff owners must record the new Root mapping,
@@ -762,3 +762,7 @@ proof remain open. No server, deployment or push was run in this lane.
 
 Existing Analytics snapshot and metric-detail UI/REST/MCP operations now retain provider-normalized `audienceGrowth: { kind, direction }`. Likes/followers and gained/lost identities are kept separate; incompatible identities refuse comparison. Existing snapshot service owns authorization; this stored-read normalization adds no write or job. Evidence: `analytics-audience-growth.test.ts`, the REST/MCP detail case in `integrations-v1-analytics-ads.test.ts`. The shared cross-site middleware adds transport security to all mutation routes without a new product action or tool.
 | Root operator monitoring | `/root/operations` alert/availability panel and exact-confirmation evaluation | `GET /api/root/monitoring`, `POST /api/root/monitoring` | `get_root_monitoring`, `evaluate_root_monitoring`; `msp://root/monitoring` | `modules/root/server/operator-monitoring.ts`: installation-owner authorization, bounded evidence, exact `EVALUATE ROOT MONITORING`, shared leased runner and evaluation audit. Observation minutes are not continuous-uptime proof. |
+
+## Root administration naming (2026-10-22)
+
+Root administration UI and REST routes retain their existing capabilities and MCP tool names. All moved administration services and MCP dispatch now live in `src/modules/root/server/admin/`; authorization, exact confirmations and audit remain in those shared services. Root configuration uses `root.admin.*` (schema 132), with a collision-preserving saved-key migration. No new operation or customer capability is introduced.

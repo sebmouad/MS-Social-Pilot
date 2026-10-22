@@ -13,7 +13,7 @@ import { promisify } from 'node:util';
 import { chromium, type Browser, type Page } from 'playwright';
 import { Prisma, PrismaClient } from '../generated/client';
 import { CONFIG_SCHEMA_VERSION } from '../src/lib/config/registry';
-import { hashLegacySessionToken } from '../src/server/auth';
+import { hashSessionToken } from '../src/server/auth';
 
 class ProbeFailure extends Error {}
 function check(value: unknown, message: string): asserts value { if (!value) throw new ProbeFailure(message); }
@@ -130,7 +130,7 @@ async function main() {
     await db.user.create({ data: { id: userId, email: `${userId}@example.invalid`, name: 'Disposable Reports QA owner', passwordHash: 'unusable-preview-password', isInstanceOwner: true, totpEnabledAt: now } });
     await db.workspace.create({ data: { id: workspaceId, name: `${tag} Reports QA`, slug: workspaceId, timezone: 'Africa/Casablanca' } });
     await db.membership.create({ data: { id: membershipId, workspaceId, userId, role: 'owner' } });
-    await db.session.create({ data: { id: sessionId, userId, tokenHash: hashLegacySessionToken(sessionToken)!, expiresAt: new Date(Date.now() + 3600000), pending: null } });
+    await db.session.create({ data: { id: sessionId, userId, tokenHash: hashSessionToken(sessionToken)!, expiresAt: new Date(Date.now() + 3600000), pending: null } });
     await db.socialAccount.create({ data: { id: connectionId, workspaceId, provider: 'facebook', providerUserId: id('provider'), name: 'Synthetic Reports connection', accessToken: 'synthetic-never-used', scopes: '' } });
     await db.target.create({ data: { id: targetId, workspaceId, socialAccountId: connectionId, type: 'page', providerId: id('provider_channel'), name: 'Synthetic Reports channel', enabled: true, canPublish: false, createdAt: now } });
     await db.target.create({ data: { id: orphanId, workspaceId, type: 'page', providerId: id('orphan_provider'), name: 'Synthetic Reports orphan', enabled: true, canPublish: false, createdAt: now } });

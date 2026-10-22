@@ -28,14 +28,14 @@ vi.mock('../src/server/data', () => ({
 vi.mock('../src/server/config/store', () => ({ runtimeConfig: vi.fn(async (key: string) => key === 'mcp.enabled' ? state.enabled : key === 'mcp.authenticatedRoles' ? ['owner', 'admin'] : key === 'mcp.requestsPerMinute' ? state.budget : 1_048_576) }));
 vi.mock('../src/modules/publishing/server/read', () => ({ readPublishingPostList: state.publishingRead }));
 
-import { hashLegacySessionToken } from '../src/server/auth';
+import { hashSessionToken } from '../src/server/auth';
 import { GET, POST } from '../src/app/api/mcp/route';
 import { clear } from '../src/server/rate-limit';
 import { runtimeConfig } from '../src/server/config/store';
 
 const token = Buffer.alloc(32, 3).toString('base64url');
 const session = {
-  id: 's1', userId: 'u1', tokenHash: hashLegacySessionToken(token)!,
+  id: 's1', userId: 'u1', tokenHash: hashSessionToken(token)!,
   expiresAt: new Date(Date.now() + 60_000), pending: null,
   user: { id: 'u1', disabledAt: null },
 };
@@ -204,7 +204,7 @@ describe('MCP route authentication', () => {
     expect(authorized.status).toBe(200);
     const body = await authorized.json();
     expect(body.result.instructions).toContain('Admin');
-    expect(state.getSessionByTokenHash).toHaveBeenCalledWith(hashLegacySessionToken(token));
+    expect(state.getSessionByTokenHash).toHaveBeenCalledWith(hashSessionToken(token));
   });
 
   it('accepts a hashed bearer key and fixes it to its stored workspace and feature scopes', async () => {

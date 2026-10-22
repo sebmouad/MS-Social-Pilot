@@ -620,3 +620,9 @@ monitoring thresholds and configure its chat workspace deliberately.
 See [LANE_43_FOLLOWUPS.md](LANE_43_FOLLOWUPS.md) for exact verification and remaining
 gates. No browser, real PostgreSQL, provider/chat/mail delivery or production
 verification is claimed. Changes remain uncommitted as requested for this lane.
+
+## Root administration naming lane (2026-10-22)
+
+Root administration moved to `src/modules/root/server/admin/`; consumers and regression test names follow the new paths. Root settings are renamed to `root.admin.*`, schema 132. The idempotent `20261022200000_root_admin_settings` migration preserves existing canonical values; it has not been applied to a database here. The one-time configuration importer is removed; read-only historical migration expectations remain in `scripts/migration-setting-expectations.ts`. Facebook live probes resolve configuration and credential decoding through the Facebook module. Stored auth hash and cookie formats remain unchanged. No server, provider call, deployment or push was run. See `LEGACY_COMPAT_RENAME.md` for verification.
+
+Root naming follow-up: live probes merge Root configuration in the Facebook module and explicitly clear bundled app secrets when current signing material is absent. Automated regression tests cover this boundary and saved-setting SQL collisions/idempotence (SQLite only); no provider or PostgreSQL proof is claimed. See `LEGACY_COMPAT_RENAME.md` for current verification.

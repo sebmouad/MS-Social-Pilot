@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { beforeEach, expect, it, vi } from 'vitest';
 const deps = vi.hoisted(() => ({ runtime: vi.fn(), client: vi.fn(), targets: vi.fn(), accounts: vi.fn(), keyLimit: 100, session: false, consent: vi.fn() }));
 vi.mock('next/headers', () => ({ headers: async () => new Headers(), cookies: async () => ({ get: () => deps.session ? { value: 'synthetic-session' } : undefined }) }));
-vi.mock('@/server/auth', () => ({ LEGACY_SESSION_COOKIE: 'session', hashLegacySessionToken: () => 'hash', isUsableLegacySession: () => true }));
+vi.mock('@/server/auth', () => ({ SESSION_COOKIE: 'session', hashSessionToken: () => 'hash', isUsableSession: () => true }));
 vi.mock('@/server/data', () => ({ getSessionByTokenHash: async () => ({}), prisma: { target: { findMany: deps.targets }, adAccount: { findMany: deps.accounts } } }));
 vi.mock('@/server/PageFrame', () => ({ PageFrame: ({ children }: { children: React.ReactNode }) => createElement('main', {}, children) }));
 vi.mock('@/modules/settings/ui/_components', () => ({ SettingsPanel: ({ children }: { children: React.ReactNode }) => createElement('section', {}, children), styles: {} }));

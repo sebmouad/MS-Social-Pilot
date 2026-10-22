@@ -2,7 +2,7 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { open, rename, unlink } from 'node:fs/promises';
 import { Prisma, PrismaClient } from '../generated/client';
-import { hashLegacySessionToken } from '../src/server/auth';
+import { hashSessionToken } from '../src/server/auth';
 import { CONFIG_SCHEMA_VERSION } from '../src/lib/config/registry';
 
 class ProbeFailure extends Error {}
@@ -140,8 +140,8 @@ async function main() {
     await db.membership.create({ data: { id: ownerMembershipId, userId: ownerId, workspaceId, role: 'owner' } });
     await db.membership.create({ data: { id: contributorMembershipId, userId: contributorId, workspaceId, role: 'contributor' } });
     await db.membership.create({ data: { id: foreignMembershipId, userId: ownerId, workspaceId: foreignWorkspaceId, role: 'owner' } });
-    await db.session.create({ data: { id: sessionId, userId: ownerId, tokenHash: hashLegacySessionToken(sessionToken)!, expiresAt, pending: null } });
-    await db.session.create({ data: { id: contributorSessionId, userId: contributorId, tokenHash: hashLegacySessionToken(contributorSessionToken)!, expiresAt, pending: null } });
+    await db.session.create({ data: { id: sessionId, userId: ownerId, tokenHash: hashSessionToken(sessionToken)!, expiresAt, pending: null } });
+    await db.session.create({ data: { id: contributorSessionId, userId: contributorId, tokenHash: hashSessionToken(contributorSessionToken)!, expiresAt, pending: null } });
     await db.socialAccount.create({ data: { id: socialId, workspaceId, provider: 'facebook', providerUserId: `${prefix}_provider`, name: 'Disposable queue connection', accessToken: 'synthetic-no-credential', scopes: 'pages_manage_posts' } });
     await db.socialAccount.create({ data: { id: foreignSocialId, workspaceId: foreignWorkspaceId, provider: 'facebook', providerUserId: `${prefix}_foreign_provider`, name: 'Disposable foreign queue connection', accessToken: 'synthetic-no-credential', scopes: 'pages_manage_posts' } });
     await db.target.create({ data: { id: targetId, workspaceId, socialAccountId: socialId, type: 'page', providerId: `${prefix}_page`, name: 'Disposable queue channel', accessToken: 'synthetic-no-credential', enabled: true, canPublish: true, createdAt: new Date() } });

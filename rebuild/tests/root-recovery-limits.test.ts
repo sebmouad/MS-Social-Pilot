@@ -9,13 +9,13 @@ vi.mock('@/modules/publishing/server/guard', () => ({ lockPublishingTargets: vi.
 vi.mock('@/modules/publishing/server/publication', () => ({ adoptLegacyPublicationInTransaction: vi.fn(), projectPublicationInTransaction: vi.fn(), recordPublicationOutcomeInTransaction: vi.fn() }));
 vi.mock('@/modules/publishing/server/deletion', () => ({ recordPostDeletionOutcomeInTransaction: vi.fn() }));
 vi.mock('@/modules/inbox/server/comment-guard', () => ({ withInboxChannelOperation: vi.fn() }));
-import { adoptRootLegacyPublication, finishRootPublicationProjection, recordRootPublicationOutcome } from '@/server/root/publication-attempts';
+import { adoptRootAdminPublication, finishRootPublicationProjection, recordRootPublicationOutcome } from '@/server/root/publication-attempts';
 import { recordRootPostDeletionOutcome } from '@/server/root/post-deletions';
 import { confirmRootInboxDeletion } from '@/server/root/inbox-deletions';
 const cases = [
   { run: recordRootPublicationOutcome, input: (id: string) => ({ operationId: id, outcome: 'ABSENT', verifiedExternally: true, confirmation: `ROOT RECORD PUBLICATION ${id} ABSENT` }) },
   { run: finishRootPublicationProjection, input: (id: string) => ({ operationId: id, confirmation: `ROOT FINISH PUBLICATION ${id}` }) },
-  { run: adoptRootLegacyPublication, input: (id: string) => ({ postTargetId: id, confirmation: `ROOT ADOPT PUBLICATION ${id}` }) },
+  { run: adoptRootAdminPublication, input: (id: string) => ({ postTargetId: id, confirmation: `ROOT ADOPT PUBLICATION ${id}` }) },
   { run: recordRootPostDeletionOutcome, input: (id: string) => ({ operationId: id, outcome: 'deleted', verifiedOnPlatform: true, confirmation: `ROOT RECORD POST DELETION ${id} DELETED` }) },
   { run: confirmRootInboxDeletion, input: (id: string) => ({ operationId: id, verifiedOnPlatform: true, confirmation: `CONFIRM REMOTE DELETION ${id}` }) },
 ];
@@ -34,7 +34,7 @@ describe.each(cases)('current Root recovery limits: $run.name', ({ run, input })
   });
   it('accepts raised limits beyond the old 200/300 ceilings while retaining identifier syntax', async () => {
     deps.idMax = 300; deps.confirmationMax = 500;
-    await expect(run('root', input('x'.repeat(280)))).rejects.toMatchObject({ code: run === adoptRootLegacyPublication ? 'conflict' : 'not_found' });
+    await expect(run('root', input('x'.repeat(280)))).rejects.toMatchObject({ code: run === adoptRootAdminPublication ? 'conflict' : 'not_found' });
     expect(deps.query.mock.calls.length + deps.find.mock.calls.length).toBe(1);
     deps.query.mockClear(); deps.find.mockClear();
     await expect(run('root', input('bad/id'))).rejects.toMatchObject({ code: 'invalid_request' });

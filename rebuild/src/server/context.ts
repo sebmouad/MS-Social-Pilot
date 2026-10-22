@@ -1,6 +1,6 @@
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
-import { hashLegacySessionToken, isUsableLegacySession, LEGACY_SESSION_COOKIE } from './auth';
+import { hashSessionToken, isUsableSession, SESSION_COOKIE } from './auth';
 import { getSessionByTokenHash, listWorkspaces, prisma } from './data';
 import { loadEntitlements, requireFeature, requireModule } from './entitlements';
 import { PERMISSION_MODULES, canAccessFeature, canAccessModule } from './permissions';
@@ -9,11 +9,11 @@ import { assertWorkspaceNotPurging } from './data-control/guard';
 
 /** Each request starts with a validated user and a current workspace membership. */
 export async function requireViewer(access?: { module?: string; feature?: string; channelScoped?: boolean; write?: boolean }) {
-  const token = (await cookies()).get(LEGACY_SESSION_COOKIE)?.value;
-  const hash = token ? hashLegacySessionToken(token) : null;
+  const token = (await cookies()).get(SESSION_COOKIE)?.value;
+  const hash = token ? hashSessionToken(token) : null;
   if (!hash) redirect('/sign-in');
   const session = await getSessionByTokenHash(hash);
-  if (!isUsableLegacySession(session, undefined)) redirect('/sign-in');
+  if (!isUsableSession(session, undefined)) redirect('/sign-in');
   const user = await prisma.user.findUnique({ where: { id: session.userId }, select: { id: true, name: true, email: true, isInstanceOwner: true } });
   if (!user) redirect('/sign-in');
   const workspaces = await listWorkspaces(user.id);

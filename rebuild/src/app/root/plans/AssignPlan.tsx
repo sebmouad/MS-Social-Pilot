@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { planConfirmation } from '@/server/root/legacy/shared';
+import { planConfirmation } from '@/modules/root/server/admin/shared';
 import { ConfirmAction } from './ConfirmAction';
 
 export function AssignPlan({ userId, email, current, plans }: { userId: string; email: string; current: string | null; plans: readonly { key: string; name: string }[] }) {

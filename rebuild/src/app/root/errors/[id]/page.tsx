@@ -5,9 +5,9 @@ import { notFound } from 'next/navigation';
 import { requireRootPage } from '@/server/config/access';
 import { RootFrame } from '@/server/root/RootFrame';
 import { OperationError } from '@/lib/operation-error';
-import { getRootError } from '@/server/root/legacy/errors';
+import { getRootError } from '@/modules/root/server/admin/errors';
 import { ResolveError } from '../ResolveError';
-import '../../plans/legacy-ops.css';
+import '../../plans/root-ops.css';
 
 export const dynamic = 'force-dynamic';
 export async function generateMetadata() { return { title: `${(await loadRootErrorCopy()).copy.detailTitle} · Root` }; }

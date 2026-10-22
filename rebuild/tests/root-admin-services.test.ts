@@ -28,12 +28,12 @@ vi.mock('../src/server/config/store', () => ({ runtimeConfig: h.config }));
 vi.mock('../src/server/root/user-controls', () => ({ setRootUserDisabled: h.setUserAccess }));
 vi.mock('../src/server/root/workspace-access', () => ({ setRootWorkspaceAccess: h.setWorkspaceAccess }));
 
-import { assignRootPlan, listRootPlanHistory, listRootPlans, listRootSubscribers, updateRootPlan } from '../src/server/root/legacy/plans';
-import { changeRootMemberRole, exportRootPrivileges, listRootPrivileges } from '../src/server/root/legacy/privileges';
-import { loadRootLifecycle, setLifecycleUserAccess, setLifecycleWorkspaceAccess, transferWorkspaceOwnership } from '../src/server/root/legacy/lifecycle';
-import { getRootError, listRootErrors, setRootErrorResolved } from '../src/server/root/legacy/errors';
-import { readRootBackupStatus, readRootDiagnosticsSummary } from '../src/server/root/legacy/backups';
-import { ROOT_LEGACY_CONFIG } from '../src/server/root/legacy/config';
+import { assignRootPlan, listRootPlanHistory, listRootPlans, listRootSubscribers, updateRootPlan } from '../src/modules/root/server/admin/plans';
+import { changeRootMemberRole, exportRootPrivileges, listRootPrivileges } from '../src/modules/root/server/admin/privileges';
+import { loadRootLifecycle, setLifecycleUserAccess, setLifecycleWorkspaceAccess, transferWorkspaceOwnership } from '../src/modules/root/server/admin/lifecycle';
+import { getRootError, listRootErrors, setRootErrorResolved } from '../src/modules/root/server/admin/errors';
+import { readRootBackupStatus, readRootDiagnosticsSummary } from '../src/modules/root/server/admin/backups';
+import { ROOT_ADMIN_CONFIG } from '../src/modules/root/server/admin/config';
 import { CONFIG_BY_KEY } from '../src/lib/config/registry';
 
 const when = (pattern: RegExp, value: unknown) => h.rules.unshift([pattern, value]);
@@ -50,7 +50,7 @@ beforeEach(() => {
   h.rules.length = 0; h.executed.length = 0; h.queried.length = 0;
   for (const key of Object.keys(h.users)) delete h.users[key];
   h.db.workspaceDataPurge.findUnique.mockResolvedValue(null);
-  for (const definition of ROOT_LEGACY_CONFIG) {
+  for (const definition of ROOT_ADMIN_CONFIG) {
     CONFIG_BY_KEY.set(definition.key, definition);
   }
   h.config.mockImplementation(async (key: string) => CONFIG_BY_KEY.get(key)?.defaultValue);
@@ -98,7 +98,7 @@ describe('Root-only authorization', () => {
 
 describe('Root operational bounds', () => {
   it('fails closed when a Root limit is absent from the host registry or invalid at runtime', async () => {
-    const definition = ROOT_LEGACY_CONFIG.find(item => item.key === 'root.legacy.planHistoryLimit')!;
+    const definition = ROOT_ADMIN_CONFIG.find(item => item.key === 'root.admin.planHistoryLimit')!;
     CONFIG_BY_KEY.delete(definition.key);
     await expect(listRootPlanHistory('root')).rejects.toMatchObject({ code: 'unavailable' });
     CONFIG_BY_KEY.set(definition.key, definition);
@@ -399,7 +399,7 @@ describe('backup status and diagnostics', () => {
 describe('review hardening', () => {
   const member = [{ id: 'm1', userId: 'u1', workspaceId: 'w1', role: 'editor', email: 'ann@x.test' }];
   it('bounds the plan catalog and subscriber list and labels cut-off results', async () => {
-    h.config.mockImplementation(async (key: string) => key === 'root.legacy.planCatalogLimit' || key === 'root.legacy.subscriberListLimit' ? 1 : CONFIG_BY_KEY.get(key)?.defaultValue);
+    h.config.mockImplementation(async (key: string) => key === 'root.admin.planCatalogLimit' || key === 'root.admin.subscriberListLimit' ? 1 : CONFIG_BY_KEY.get(key)?.defaultValue);
     when(/FROM plans p/, [{ ...plan, subscribers: 1 }, { ...plan, id: 'p2', key: 'b', subscribers: 0 }]);
     const catalog = await listRootPlans('root');
     expect(catalog).toMatchObject({ limit: 1, truncated: true });

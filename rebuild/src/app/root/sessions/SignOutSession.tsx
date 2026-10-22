@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/Button';
 import { Dialog } from '@/components/Dialog';
-import type { RootCopy } from '@/server/root/legacy/copy';
+import type { RootCopy } from '@/modules/root/server/admin/copy';
 
 const fill = (template: string, values: Record<string, string>) => template.replace(/\{(\w+)\}/g, (match, key: string) => values[key] ?? match);
 

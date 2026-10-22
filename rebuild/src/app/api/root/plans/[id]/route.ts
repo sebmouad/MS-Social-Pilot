@@ -1,5 +1,5 @@
-import { updateRootPlan } from '@/server/root/legacy/plans';
-import { readBody, rootRoute } from '@/server/root/legacy/http';
+import { updateRootPlan } from '@/modules/root/server/admin/plans';
+import { readBody, rootRoute } from '@/modules/root/server/admin/http';
 
 export const runtime = 'nodejs';
 

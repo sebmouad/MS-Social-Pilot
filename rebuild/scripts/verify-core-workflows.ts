@@ -1,7 +1,7 @@
 /** Guarded, synthetic-only localhost/PostgreSQL/MCP verification for core batch 63 workflows. */
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { Prisma, PrismaClient } from '../generated/client';
-import { hashLegacySessionToken } from '../src/server/auth';
+import { hashSessionToken } from '../src/server/auth';
 
 class ProbeFailure extends Error {}
 function check(condition: unknown, message: string): asserts condition { if (!condition) throw new ProbeFailure(message); }
@@ -109,7 +109,7 @@ async function main() {
     stage = 'initialize workspace B policy fixture';
     await db.$executeRaw`UPDATE workspaces SET timezone = 'America/Toronto', "requiresApproval" = false WHERE id = ${workspaceB}`;
     stage = 'create authenticated synthetic session';
-    await db.session.create({ data: { id: `${prefix}_session`, userId, tokenHash: hashLegacySessionToken(sessionToken)!, expiresAt, pending: null } });
+    await db.session.create({ data: { id: `${prefix}_session`, userId, tokenHash: hashSessionToken(sessionToken)!, expiresAt, pending: null } });
     for (const [index, bearer] of [readBearer, writeBearerA, writeBearerB].entries()) {
       stage = `create synthetic MCP key ${index + 1}`;
       const workspaceId = index === 2 ? workspaceB : workspaceA;

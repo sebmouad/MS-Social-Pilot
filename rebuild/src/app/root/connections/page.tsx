@@ -7,13 +7,13 @@ import { DeleteConnectionData } from './DeleteConnectionData';
 import { ConfirmAction } from '../plans/ConfirmAction';
 import { headers } from 'next/headers';
 import { requireRootPage } from '@/server/config/access';
-import { pageSearchParamsObject } from '@/server/root/legacy/http';
+import { pageSearchParamsObject } from '@/modules/root/server/admin/http';
 import { RootFrame } from '@/server/root/RootFrame';
 import { OperationError } from '@/lib/operation-error';
 import { PLATFORM_MODULES } from '@/platforms';
-import { listRootConnections } from '@/server/root/legacy/connections';
-import { fill, rootCopy, rootCopyLocale } from '@/server/root/legacy/copy';
-import '../plans/legacy-ops.css';
+import { listRootConnections } from '@/modules/root/server/admin/connections';
+import { fill, rootCopy, rootCopyLocale } from '@/modules/root/server/admin/copy';
+import '../plans/root-ops.css';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Connections · Root' };

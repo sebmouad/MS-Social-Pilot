@@ -1,6 +1,6 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { Prisma, PrismaClient } from '../generated/client';
-import { hashLegacySessionToken } from '../src/server/auth';
+import { hashSessionToken } from '../src/server/auth';
 import { CONFIG_SCHEMA_VERSION } from '../src/lib/config/registry';
 
 class ProbeFailure extends Error {}
@@ -83,8 +83,8 @@ async function main() {
     await db.user.create({ data: { id: rootId, email: rootEmail, name: 'Disposable Ads Root owner', passwordHash: 'unused-preview-password', isInstanceOwner: true } });
     await db.user.create({ data: { id: userId, email, name: 'Disposable Ads policy probe', passwordHash: 'unused-preview-password' } });
     await db.membership.create({ data: { id: memberId, userId, workspaceId, role: 'owner' } });
-    await db.session.create({ data: { id: rootSessionId, userId: rootId, tokenHash: hashLegacySessionToken(rootToken)!, expiresAt, pending: null } });
-    await db.session.create({ data: { id: sessionId, userId, tokenHash: hashLegacySessionToken(userToken)!, expiresAt, pending: null } });
+    await db.session.create({ data: { id: rootSessionId, userId: rootId, tokenHash: hashSessionToken(rootToken)!, expiresAt, pending: null } });
+    await db.session.create({ data: { id: sessionId, userId, tokenHash: hashSessionToken(userToken)!, expiresAt, pending: null } });
     await db.mcpApiKey.create({ data: { id: keyId, workspaceId, createdById: userId, name: 'Disposable Ads report reader', tokenHash: createHash('sha256').update(bearer).digest('hex'), tokenPrefix: bearer.slice(0, 12), readFeatures: ['ads/campaigns'], writeFeatures: [], expiresAt } });
     const userCookie = cookie(userToken, workspaceId);
     check((await fetch(`${previewOrigin.origin}/api/root/config`, { headers: { cookie: userCookie } })).status === 404, 'Workspace owner must not read Root configuration.');

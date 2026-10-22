@@ -1,5 +1,5 @@
 import { addRootChangelogEntry, listRootChangelog } from '@/modules/history/server/changelog';
-import { readBody, rootRoute, searchParamsObject } from '@/server/root/legacy/http';
+import { readBody, rootRoute, searchParamsObject } from '@/modules/root/server/admin/http';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';

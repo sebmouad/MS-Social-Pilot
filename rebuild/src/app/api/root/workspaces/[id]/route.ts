@@ -1,5 +1,5 @@
 import { renameRootWorkspace } from '@/server/root/workspace-controls';
-import { rootRoute } from '@/server/root/legacy/http';
+import { rootRoute } from '@/modules/root/server/admin/http';
 import { z } from 'zod';
 export const runtime = 'nodejs';
 const schema = z.object({ name: z.string(), confirmation: z.string() }).strict();

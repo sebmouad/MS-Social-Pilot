@@ -6,7 +6,7 @@ vi.mock('@/server/permissions', () => ({ canAccessFeature: m.allowed }));
 vi.mock('@/server/entitlements', () => ({ loadEntitlements: m.entitlements, canUseFeature: () => true }));
 vi.mock('@/server/config/store', () => ({ runtimeConfig: m.config }));
 vi.mock('@/server/account-settings', () => ({ accountPasswordPolicy: async () => ({ minLength: 12, maxBytes: 100 }), validateNewPassword: (v: string) => v.length >= 12, auditAccountMutation: m.audit }));
-vi.mock('@/server/auth', async original => ({ ...await original<typeof import('@/server/auth')>(), verifyLegacyPassword: m.verify, hashLegacyPassword: m.hash }));
+vi.mock('@/server/auth', async original => ({ ...await original<typeof import('@/server/auth')>(), verifyPassword: m.verify, hashStoredPassword: m.hash }));
 import { readAccount, updateAccountProfile, changeAccountPassword, listAccountSessions, revokeAccountSession } from '@/modules/settings/server/account';
 const actor = { userId: 'user', workspaceId: 'workspace', sessionTokenHash: 'current-hash' };
 beforeEach(() => {

@@ -9,7 +9,7 @@ import { ModalDialog } from '@/components/ModalDialog';
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null;
 
 /**
- * One typed-confirmation flow for every Root legacy mutation. The request is
+ * One typed-confirmation flow for every Root administration mutation. The request is
  * only reported as successful when the response is an explicit `ok: true`
  * receipt; anything else tells the operator to check current state first.
  */

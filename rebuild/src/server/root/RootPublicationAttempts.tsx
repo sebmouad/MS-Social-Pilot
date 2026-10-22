@@ -2,7 +2,7 @@ import { DataTable } from '@/components/DataTable';
 import { requireRootPage } from '@/server/config/access';
 import { formatRootTimestamp } from '@/lib/root-time';
 import { listRootPublicationAttempts } from './publication-attempts';
-import { RootLegacyPublicationControl, RootPublicationControls } from './RootPublicationControls';
+import { RootAdminPublicationControl, RootPublicationControls } from './RootPublicationControls';
 
 const stateLabel: Record<string, string> = { started: 'Started', uncertain: 'Outcome unconfirmed', submitted: 'Submitted; awaiting verification', receipt_recorded: 'Receipt saved; local record pending', projected: 'Recorded locally', rejected: 'Provider rejected', attested_absent: 'Externally checked absent' };
 
@@ -34,7 +34,7 @@ export async function RootPublicationAttempts() {
       { key: 'post', label: 'Local post', render: (row: typeof history.legacyProcessing[number]) => <><code>{row.postId}</code><small className="root-inbox-deletions__id">Destination record {row.postTargetId}</small></> },
       { key: 'destination', label: 'Destination', render: (row: typeof history.legacyProcessing[number]) => row.targetName || 'Destination removed' },
       { key: 'platform', label: 'Platform', render: (row: typeof history.legacyProcessing[number]) => row.provider },
-      { key: 'recovery', label: 'Recovery', render: (row: typeof history.legacyProcessing[number]) => <RootLegacyPublicationControl limits={history.limits} row={row} /> },
+      { key: 'recovery', label: 'Recovery', render: (row: typeof history.legacyProcessing[number]) => <RootAdminPublicationControl limits={history.limits} row={row} /> },
     ]} rowKey={row => row.postTargetId} caption="Legacy processing destinations" emptyMessage="No older processing destinations need adoption." />
     {history.legacyTruncated ? <p role="status">More older processing destinations exist than this history limit. Increase the Publishing recovery history limit to inspect them.</p> : null}
   </section>;

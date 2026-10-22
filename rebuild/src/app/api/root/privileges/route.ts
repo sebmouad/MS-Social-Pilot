@@ -1,5 +1,5 @@
-import { changeRootMemberRole, listRootPrivileges } from '@/server/root/legacy/privileges';
-import { readBody, rootRoute, searchParamsObject } from '@/server/root/legacy/http';
+import { changeRootMemberRole, listRootPrivileges } from '@/modules/root/server/admin/privileges';
+import { readBody, rootRoute, searchParamsObject } from '@/modules/root/server/admin/http';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';

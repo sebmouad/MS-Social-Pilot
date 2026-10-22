@@ -1,4 +1,4 @@
-import type { Prisma } from '../../../../generated/client';
+import type { Prisma } from '../../../../../generated/client';
 import { OperationError } from '@/lib/operation-error';
 
 type Reader = { user: { findUnique(args: { where: { id: string }; select: { isInstanceOwner: true; disabledAt: true } }): Promise<{ isInstanceOwner: boolean; disabledAt: Date | null } | null> } };
@@ -16,7 +16,7 @@ export async function assertRootActor(db: Reader, actorId: string) {
 export const invalid = (message = 'Check the request and try again.') => new OperationError('invalid_request', message);
 export const conflict = (message: string) => new OperationError('conflict', message);
 
-/** True when a legacy table is absent from this database (PostgreSQL 42P01). */
+/** True when an expected table is absent from this database (PostgreSQL 42P01). */
 export function isMissingRelation(error: unknown) {
   const text = error instanceof Error ? `${error.message} ${JSON.stringify((error as { meta?: unknown }).meta ?? '')}` : '';
   return /42P01|does not exist/i.test(text);

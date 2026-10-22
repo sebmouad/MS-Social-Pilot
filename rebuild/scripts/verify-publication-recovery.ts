@@ -1,6 +1,6 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { PrismaClient } from '../generated/client';
-import { hashLegacySessionToken } from '../src/server/auth';
+import { hashSessionToken } from '../src/server/auth';
 
 class ProbeFailure extends Error {}
 function check(value: unknown, label: string): asserts value { if (!value) throw new ProbeFailure(label); }
@@ -54,12 +54,12 @@ async function main() {
     const channel = await client.target.findFirst({ where: { id: targetId, workspaceId, enabled: true, canPublish: true }, select: { id: true } });
     check(channel, 'Seeded selected synthetic North destination is required.');
     check(!await client.user.findUnique({ where: { id: readerId } }), 'Disposable scoped publication reader identity must be unused.');
-    await client.session.create({ data: { id: rootSessionId, userId: ownerId, tokenHash: hashLegacySessionToken(rootToken)!, expiresAt, pending: null } });
+    await client.session.create({ data: { id: rootSessionId, userId: ownerId, tokenHash: hashSessionToken(rootToken)!, expiresAt, pending: null } });
     await client.user.create({ data: { id: readerId, email: `${id}@example.test`, name: 'Disposable scoped publication reader', passwordHash: 'unusable-test-credential' } });
     await client.membership.create({ data: { id: membershipId, userId: readerId, workspaceId, role: 'viewer' } });
     await client.$executeRaw`UPDATE memberships SET "allPages" = false WHERE id = ${membershipId}`;
     await client.$executeRaw`INSERT INTO member_page_access ("membershipId", "targetId") VALUES (${membershipId}, ${targetId})`;
-    await client.session.create({ data: { id: viewerSessionId, userId: readerId, tokenHash: hashLegacySessionToken(sessionToken)!, expiresAt, pending: null } });
+    await client.session.create({ data: { id: viewerSessionId, userId: readerId, tokenHash: hashSessionToken(sessionToken)!, expiresAt, pending: null } });
     for (const [keyId, key, writes] of [[readKeyId, readKey, false], [writeKeyId, writeKey, true]] as const) {
       await client.mcpApiKey.create({ data: {
         id: keyId, workspaceId, createdById: ownerId, name: 'Disposable publication recovery probe',

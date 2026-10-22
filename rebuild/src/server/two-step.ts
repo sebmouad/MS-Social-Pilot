@@ -1,6 +1,6 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { cookies } from 'next/headers';
-import { hashLegacySessionToken, LEGACY_SESSION_COOKIE } from './auth';
+import { hashSessionToken, SESSION_COOKIE } from './auth';
 import { prisma } from './data';
 import { decryptSecret, encryptSecret } from './secret-crypto';
 import { matchTotp, newTotpSecret, otpauthUri } from './totp';
@@ -11,8 +11,8 @@ import { generateAuthenticationOptions, verifyAuthenticationResponse, type Authe
 const RECOVERY_ALPHABET = 'abcdefghjkmnpqrstuvwxyz23456789';
 
 async function pendingSession(kind: 'verify' | 'enroll') {
-  const token = (await cookies()).get(LEGACY_SESSION_COOKIE)?.value;
-  const tokenHash = token ? hashLegacySessionToken(token) : null;
+  const token = (await cookies()).get(SESSION_COOKIE)?.value;
+  const tokenHash = token ? hashSessionToken(token) : null;
   if (!tokenHash) throw new Error('Your sign-in has expired.');
   const session = await prisma.session.findUnique({
     where: { tokenHash },
@@ -111,8 +111,8 @@ async function completePending(tx: Prisma.TransactionClient, sessionId: string, 
 async function extendSessionCookie(sessionDays: number) {
   // The cookie already contains the same token; extend its browser expiry.
   const store = await cookies();
-  const token = store.get(LEGACY_SESSION_COOKIE)?.value;
-  if (token) store.set(LEGACY_SESSION_COOKIE, token, { httpOnly: true, sameSite: 'lax', secure: process.env.NODE_ENV === 'production', path: '/', maxAge: sessionDays * 24 * 60 * 60 });
+  const token = store.get(SESSION_COOKIE)?.value;
+  if (token) store.set(SESSION_COOKIE, token, { httpOnly: true, sameSite: 'lax', secure: process.env.NODE_ENV === 'production', path: '/', maxAge: sessionDays * 24 * 60 * 60 });
 }
 
 function normalizeRecoveryCode(value: string) {

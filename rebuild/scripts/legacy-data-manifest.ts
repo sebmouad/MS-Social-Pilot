@@ -48,7 +48,7 @@ export const LEGACY_TABLES: readonly LegacyTable[] = [
   t('mcp_api_keys', 'McpApiKey', 'in_place', 'prisma', 'required', 'settings (mcp access)'),
   t('api_tokens', 'ApiToken', 'needed_unbuilt', 'none', 'required', 'integrations / settings (api)', 'Legacy REST tokens are not honoured; issue replacement mcp_api_keys or accept the break before deleting.'),
   t('plans', 'Plan', 'in_place', 'sql', 'none', 'shared entitlements'),
-  t('app_settings', 'AppSetting', 'in_place', 'prisma', 'none', 'Root configuration', 'Legacy-only keys are retained; typed keys are imported by import-legacy-config.ts.'),
+  t('app_settings', 'AppSetting', 'in_place', 'prisma', 'none', 'Root configuration', 'Historical source keys are retained; typed settings are verified by migration-setting-expectations.ts. The completed one-time importer is retired.'),
   t('workspace_data_purges', 'WorkspaceDataPurge', 'in_place', 'prisma', 'required', 'shared data-control', 'Erasure recovery state; never delete.'),
   t('client_invitations', 'ClientInvitation', 'needed_unbuilt', 'none', 'none', 'agency', 'Pending client invitations are unread by the rebuild Agency module.'),
 

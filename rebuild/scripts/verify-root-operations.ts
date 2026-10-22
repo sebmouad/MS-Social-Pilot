@@ -1,7 +1,7 @@
 /** Synthetic-only installation HTTP/MCP/PostgreSQL verification; never production. */
 import { randomBytes, randomUUID } from 'node:crypto';
 import { Prisma, PrismaClient } from '../generated/client';
-import { hashLegacySessionToken } from '../src/server/auth';
+import { hashSessionToken } from '../src/server/auth';
 
 class ProbeFailure extends Error {}
 function check(value: unknown, message: string): asserts value { if (!value) throw new ProbeFailure(message); }
@@ -47,7 +47,7 @@ async function main() {
     await db.membership.create({ data: { id: rootMembership, workspaceId: workspace, userId: root, role: 'owner' } });
     await db.membership.create({ data: { id: memberMembership, workspaceId: workspace, userId: member, role: 'owner' } });
     const expiresAt = new Date(Date.now() + 1800000);
-    for (const [id, token] of [[root, rootToken], [member, memberToken]]) await db.session.create({ data: { id: `${id}_session`, userId: id, tokenHash: hashLegacySessionToken(token)!, expiresAt, pending: null } });
+    for (const [id, token] of [[root, rootToken], [member, memberToken]]) await db.session.create({ data: { id: `${id}_session`, userId: id, tokenHash: hashSessionToken(token)!, expiresAt, pending: null } });
     await db.$executeRaw`INSERT INTO plans (id, key, name, features, "isDefault", "createdAt", "updatedAt") VALUES (${plan}, ${plan}, 'Disposable plan', ARRAY['product_v2', 'publishing/posts']::text[], false, NOW(), NOW())`;
     await db.$executeRaw`INSERT INTO error_events (id, fingerprint, source, name, message, stack, location, release, "firstSeenAt", "lastSeenAt") VALUES (${errorId}, ${errorId}, 'server', 'Synthetic error', ${`password=${secretMarker}`}, ${`cookie=${secretMarker}`}, '/preview?token=not-real', 'preview', NOW(), NOW())`;
     for (const [index, kind] of ['offsite', 'restore_test'].entries()) await db.$executeRaw`INSERT INTO backup_runs (id, kind, status, detail, "startedAt", "finishedAt") VALUES (${backupIds[index]}, ${kind}, 'ok', 'Synthetic probe record; no actual backup', NOW(), NOW())`;

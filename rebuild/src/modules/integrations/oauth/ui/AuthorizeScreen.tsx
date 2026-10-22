@@ -1,7 +1,7 @@
 import { cookies, headers } from 'next/headers';
 import { PageFrame } from '@/server/PageFrame';
 import { requireViewer } from '@/server/context';
-import { hashLegacySessionToken, isUsableLegacySession, LEGACY_SESSION_COOKIE } from '@/server/auth';
+import { hashSessionToken, isUsableSession, SESSION_COOKIE } from '@/server/auth';
 import { getSessionByTokenHash, prisma } from '@/server/data';
 import { runtimeConfig } from '@/server/config/store';
 import { canUseFeature, entitledPlatformIds } from '@/server/entitlements';
@@ -16,10 +16,10 @@ import { findClient, oauthRuntime } from '../server';
 import { ConsentForm } from './ConsentForm';
 
 async function hasSession() {
-  const token = (await cookies()).get(LEGACY_SESSION_COOKIE)?.value;
-  const hash = token ? hashLegacySessionToken(token) : null;
+  const token = (await cookies()).get(SESSION_COOKIE)?.value;
+  const hash = token ? hashSessionToken(token) : null;
   if (!hash) return false;
-  return isUsableLegacySession(await getSessionByTokenHash(hash), undefined);
+  return isUsableSession(await getSessionByTokenHash(hash), undefined);
 }
 
 const first = (value: string | string[] | undefined) => (Array.isArray(value) ? value[0] : value) ?? '';

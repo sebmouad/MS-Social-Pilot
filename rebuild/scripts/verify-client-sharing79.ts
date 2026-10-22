@@ -20,7 +20,7 @@ import path from 'node:path';
 import { promisify } from 'node:util';
 import { chromium, type Browser, type Page } from 'playwright';
 import { Prisma, PrismaClient } from '../generated/client';
-import { hashLegacySessionToken } from '../src/server/auth';
+import { hashSessionToken } from '../src/server/auth';
 import { CONFIG_SCHEMA_VERSION } from '../src/lib/config/registry';
 
 const run = promisify(execFile);
@@ -205,7 +205,7 @@ async function main() {
     await q(Prisma.sql`UPDATE memberships SET "allPages" = false WHERE id = ${scopedMembership}`);
     const now = new Date();
     for (const [who, userId] of [['owner', U.owner], ['admin', U.admin], ['editor', U.editor], ['foreign', U.foreign]] as const) {
-      await db.session.create({ data: { id: id(`session_${who}`), userId, tokenHash: hashLegacySessionToken(sessionToken[who])!, expiresAt, pending: null } });
+      await db.session.create({ data: { id: id(`session_${who}`), userId, tokenHash: hashSessionToken(sessionToken[who])!, expiresAt, pending: null } });
     }
     const target = (key: keyof typeof T, workspaceId: string, name: string, enabled: boolean) => db.target.create({ data: { id: T[key], workspaceId, type: 'page', providerId: id(`provider_${key}`), name, accessToken: 'synthetic-never-used', enabled, canPublish: true, createdAt: now } });
     await target('orphan', W.main, marker('Orphan channel'), true);

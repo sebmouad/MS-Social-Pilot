@@ -2,15 +2,15 @@ import { synchronousPolicy, withinSynchronousLimit } from '@/lib/config/synchron
 import { z } from 'zod';
 import { refreshRootConnection } from './connection-refresh';
 import { revokeTeamInvitationConfirmation } from '@/modules/settings/invitations';
-import { listRootRegistration, revokeRootRegistrationInvitation, controlRootRegistrationAccount, registrationConfirmation } from '../registration-admin';
+import { listRootRegistration, revokeRootRegistrationInvitation, controlRootRegistrationAccount, registrationConfirmation } from '@/server/root/registration-admin';
 import { OperationError } from '@/lib/operation-error';
 import type { RootMcpActor } from '@/server/mcp/types';
 import { assignRootPlan, listRootPlanHistory, listRootPlans, listRootSubscribers, updateRootPlan } from './plans';
 import { changeRootMemberRole, exportRootPrivileges, listRootPrivileges } from './privileges';
 import { loadRootLifecycle, transferWorkspaceOwnership } from './lifecycle';
-import { deleteRootWorkspace } from '../workspace-access';
-import { deleteRootUser } from '../user-controls';
-import { exportRootActivity } from '../audit-export';
+import { deleteRootWorkspace } from '@/server/root/workspace-access';
+import { deleteRootUser } from '@/server/root/user-controls';
+import { exportRootActivity } from '@/server/root/audit-export';
 import { transferInstallationOwnership } from './transfer';
 import { getRootError, listRootErrors, setRootErrorResolved } from './errors';
 import { readRootBackupStatus, readRootDiagnosticsSummary } from './backups';
@@ -27,7 +27,7 @@ const idProperty = { type: 'string', minLength: 1 } as const;
 const confirmationProperty = { type: 'string' } as const;
 
 /** Definitions merged automatically into the private installation MCP host. */
-export const rootLegacyToolDefinitions = [
+export const rootAdminToolDefinitions = [
   { name: 'list_root_registration', description: 'Inspect read-only open-registration status, workspace invitations and eligible unverified self-registrations installation-wide. Invitation filters workspaceId and status do not filter accounts; q searches both. Independently paged and capped by Root and MCP limits; no total is inferred.' + privateNote, annotations: { readOnlyHint: true }, inputSchema: { type: 'object', properties: { q: { type: 'string' }, workspaceId: idProperty, status: { type: 'string', enum: ['pending', 'expired', 'accepted'] }, page: { type: 'integer', minimum: 1 }, accountsPage: { type: 'integer', minimum: 1 } }, additionalProperties: false } },
   { name: 'revoke_root_invitation', description: 'Revoke an unaccepted invitation in the exact workspace; its link stops working. Confirmation must exactly match REVOKE INVITATION <invitationId>.' + privateNote, annotations: { readOnlyHint: false, destructiveHint: true }, inputSchema: { type: 'object', required: ['workspaceId', 'invitationId', 'confirmation'], properties: { workspaceId: idProperty, invitationId: idProperty, confirmation: confirmationProperty }, additionalProperties: false } },
   { name: 'resend_root_registration_verification', description: 'Replace the verification link and send mail for an eligible active self-registration. Requires open registration and working mail. Only delivery sent confirms submission; inspect mail/account state before retrying an uncertain outcome. Confirmation must exactly match RESEND VERIFICATION <userId>.' + privateNote, annotations: { readOnlyHint: false, destructiveHint: true }, inputSchema: { type: 'object', required: ['userId', 'confirmation'], properties: { userId: idProperty, confirmation: confirmationProperty }, additionalProperties: false } },
@@ -59,7 +59,7 @@ export const rootLegacyToolDefinitions = [
   { name: 'list_root_connections', description: 'Read-only provider connections across every workspace: platform, workspace, state (connected|expired|revoked), token expiry, scope count and selected/discovered channels. No credentials. Filters: q, provider, state, page.' + privateNote, inputSchema: { type: 'object', properties: { q: { type: 'string' }, provider: { type: 'string' }, state: { type: 'string', enum: ['connected', 'expired', 'revoked'] }, page: { type: 'integer', minimum: 1 } }, additionalProperties: false } },
 ] as const;
 
-export const rootLegacyResources = [
+export const rootAdminResources = [
   { uri: 'msp://root/plans', name: 'Plans', description: 'Private plan catalog and subscriber counts.', mimeType: 'application/json', tool: 'list_root_plans' },
   { uri: 'msp://root/privileges', name: 'Privileges', description: 'Private first page of the member and role audit.', mimeType: 'application/json', tool: 'list_root_privileges' },
   { uri: 'msp://root/lifecycle', name: 'Account and workspace lifecycle', description: 'Private disabled accounts and suspended workspaces.', mimeType: 'application/json', tool: 'get_root_lifecycle' },
@@ -69,15 +69,15 @@ export const rootLegacyResources = [
   { uri: 'msp://root/backups', name: 'Backup status', description: 'Private recorded backup runs; unverified archives.', mimeType: 'application/json', tool: 'get_root_backup_status' },
 ] as const;
 
-export const rootLegacyTools = new Set<string>(rootLegacyToolDefinitions.map(tool => tool.name));
+export const rootAdminTools = new Set<string>(rootAdminToolDefinitions.map(tool => tool.name));
 /** Root is the account itself, never an API key or workspace role. */
-export const canUseRootLegacyTool = (viewer: RootMcpActor) => viewer.isInstanceOwner === true && !viewer.apiKeyId;
+export const canUseRootAdminTool = (viewer: RootMcpActor) => viewer.isInstanceOwner === true && !viewer.apiKeyId;
 
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
 const reject = (extra: Record<string, unknown>) => { if (Object.keys(extra).length) throw new OperationError('invalid_request', 'This tool does not accept those arguments.'); };
 
-export async function callRootLegacyTool(viewer: RootMcpActor, name: string, args: unknown) {
-  if (!canUseRootLegacyTool(viewer)) throw new OperationError('forbidden', 'Installation-owner access is required.');
+export async function callRootAdminTool(viewer: RootMcpActor, name: string, args: unknown) {
+  if (!canUseRootAdminTool(viewer)) throw new OperationError('forbidden', 'Installation-owner access is required.');
   if (!isRecord(args)) throw new OperationError('invalid_request', 'Tool arguments must be an object.');
   const id = viewer.userId;
   const cap = viewer.maxResultItems;

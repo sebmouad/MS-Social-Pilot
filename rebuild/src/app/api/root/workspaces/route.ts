@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { createRootWorkspace } from '@/server/root/workspace-controls';
 import { listRootWorkspaces } from '@/server/root/directory';
-import { rootRoute, searchParamsObject } from '@/server/root/legacy/http';
+import { rootRoute, searchParamsObject } from '@/modules/root/server/admin/http';
 
 export const runtime = 'nodejs';
 const schema = z.object({ name: z.string().trim().min(1), ownerEmail: z.string().trim().email(), confirmation: z.string().min(1), timezone: z.string().optional() }).strict();

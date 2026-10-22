@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextResponse } from 'next/server';
 const m = vi.hoisted(() => ({ session: vi.fn(), usable: vi.fn(), membership: vi.fn(), permissions: vi.fn(), entitlements: vi.fn(), allowed: vi.fn(), feature: vi.fn(), capability: vi.fn(), config: vi.fn(), flow: vi.fn(), start: vi.fn(), ready: vi.fn(), lock: vi.fn(), audit: vi.fn(), tx: vi.fn() }));
 vi.mock('@/server/data', () => ({ getSessionByTokenHash: m.session, prisma: { membership: { findUnique: m.membership }, $transaction: m.tx } }));
-vi.mock('@/server/auth', () => ({ isUsableLegacySession: m.usable }));
+vi.mock('@/server/auth', () => ({ isUsableSession: m.usable }));
 vi.mock('@/server/permissions/loader', () => ({ loadPermissions: m.permissions }));
 vi.mock('@/server/permissions', () => ({ canAccessFeature: m.allowed }));
 vi.mock('@/server/entitlements', () => ({ loadEntitlements: m.entitlements, canUseFeature: m.feature, hasPlatformCapability: m.capability }));

@@ -85,3 +85,18 @@ monitoring settings after duplicate-key removal, select the owner workspace for
 operator chat alerts, and verify real email/Slack/Telegram outcomes. Browser
 checks for the new caption controls and Root test dialog remain open. No commit,
 push, server or production action is authorized in this lane.
+
+## Root administration naming lane (2026-10-22)
+
+Root administration moved to `src/modules/root/server/admin/`; consumers and regression test names follow the new paths. Root settings are renamed to `root.admin.*`, schema 132. The idempotent `20261022200000_root_admin_settings` migration preserves existing canonical values; it has not been applied to a database here. The one-time configuration importer is removed; read-only historical migration expectations remain in `scripts/migration-setting-expectations.ts`. Facebook live probes resolve configuration and credential decoding through the Facebook module. Stored auth hash and cookie formats remain unchanged. No server, provider call, deployment or push was run. See `LEGACY_COMPAT_RENAME.md` for verification.
+
+
+Root naming continuation verification: typecheck and explicit `tsc -p .` pass;
+162 focused tests pass. Final cache-disabled suite (diagnostic transport excluded):
+699 files pass, one fails, 49 skip; 11,370 tests pass, five fail, 2,525 skip.
+Every failure is unchanged `facebook-native-http` localhost `listen EPERM ::1`.
+Keep those tests intact and rerun where sockets are permitted. Migration SQL
+passed a synthetic SQLite collision/idempotence/metadata check, but PostgreSQL
+rehearsal and real live-probe execution remain open. No servers, deploy or push.
+
+Root naming final continuation: module-owned probe configuration now clears bundled signing secrets when Root has none; three regression tests cover policy and credential fallback. The saved-key SQL collision/idempotence/metadata check is now an automated test (built-in SQLite, not PostgreSQL). Unused historical mapping exports and a residual plans comment are removed. Typecheck and explicit tsc pass; 10 focused files / 164 tests pass. Full cache-disabled suite excluding diagnostic transport: 701 files passed, one failed, 49 skipped; 11,374 tests passed, five failed, 2,525 skipped. All five failures are unchanged sandbox `listen EPERM ::1` in facebook-native-http. No server, live probe, database migration, deploy, push or staging was performed. Source changes remain uncommitted.

@@ -3,11 +3,11 @@ import { randomUUID } from 'node:crypto';
 import { prisma } from '@/server/data';
 import { OperationError } from '@/lib/operation-error';
 import { rootUserConfirmationSchema, rootUserIdSchema } from '@/lib/root-user-controls';
-import { setRootUserDisabled } from '../user-controls';
-import { setRootWorkspaceAccess } from '../workspace-access';
+import { setRootUserDisabled } from '@/server/root/user-controls';
+import { setRootWorkspaceAccess } from '@/server/root/workspace-access';
 import { assertRootActor, lockWorkspaceOwners, conflict, invalid } from './authz';
 import { writeRootAudit } from './audit';
-import { rootResultLimit, legacySetting, rootTransaction } from './policy';
+import { rootResultLimit, adminSetting, rootTransaction } from './policy';
 import { transferConfirmation, transferSchema } from './shared';
 
 /**
@@ -28,7 +28,7 @@ export async function setLifecycleWorkspaceAccess(actorId: string, workspaceId: 
 /** Disabled accounts, suspended workspaces and queued deletions, bounded. Read only. */
 export async function loadRootLifecycle(actorId: string, resultCap?: number) {
   await assertRootActor(prisma, actorId);
-  const limit = rootResultLimit(await legacySetting('root.legacy.lifecycleListLimit'), resultCap);
+  const limit = rootResultLimit(await adminSetting('root.admin.lifecycleListLimit'), resultCap);
   const [users, workspaces, purges] = await Promise.all([
     prisma.$queryRaw<Array<{ id: string; name: string; email: string; disabledAt: Date; isInstanceOwner: boolean }>>`SELECT id, name, email, "disabledAt", "isInstanceOwner" FROM users WHERE "disabledAt" IS NOT NULL ORDER BY "disabledAt" DESC, id LIMIT ${limit}`,
     prisma.$queryRaw<Array<{ id: string; name: string; suspendedAt: Date; owners: string[] }>>`SELECT w.id, w.name, w."suspendedAt", ARRAY(SELECT u.email FROM memberships m JOIN users u ON u.id = m."userId" WHERE m."workspaceId" = w.id AND m.role::text = 'owner' ORDER BY u.email) AS owners FROM workspaces w WHERE w."suspendedAt" IS NOT NULL ORDER BY w."suspendedAt" DESC, w.id LIMIT ${limit}`,

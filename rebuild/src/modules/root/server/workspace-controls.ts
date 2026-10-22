@@ -1,9 +1,9 @@
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { runtimeConfig } from '@/server/config/store';
-import { lockRootActor, invalid, conflict } from '@/server/root/legacy/authz';
+import { lockRootActor, invalid, conflict } from '@/modules/root/server/admin/authz';
 import { OperationError } from '@/lib/operation-error';
-import { rootTransaction } from '@/server/root/legacy/policy';
+import { rootTransaction } from '@/modules/root/server/admin/policy';
 
 type CreateInput = { name: string; ownerEmail: string; timezone?: string; confirmation: string };
 

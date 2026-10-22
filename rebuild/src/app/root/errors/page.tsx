@@ -4,12 +4,12 @@ import { RootFilters, RootFilterSelect } from '@/server/root/RootFilters';
 import { DataTable } from '@/components/DataTable';
 import { PageHeader } from '@/components/PageHeader';
 import { requireRootPage } from '@/server/config/access';
-import { pageSearchParamsObject } from '@/server/root/legacy/http';
+import { pageSearchParamsObject } from '@/modules/root/server/admin/http';
 import { RootFrame } from '@/server/root/RootFrame';
 import { OperationError } from '@/lib/operation-error';
-import { listRootErrors } from '@/server/root/legacy/errors';
+import { listRootErrors } from '@/modules/root/server/admin/errors';
 import { ResolveError } from './ResolveError';
-import '../plans/legacy-ops.css';
+import '../plans/root-ops.css';
 
 export const dynamic = 'force-dynamic';
 export async function generateMetadata() { return { title: `${(await loadRootErrorCopy()).copy.title} · Root` }; }

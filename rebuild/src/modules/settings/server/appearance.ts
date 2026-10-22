@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { MODE_COOKIE, THEME_COOKIE, THEMES, MODES, isThemeId, isModeId, type ModeId } from '@/lib/themes';
 import { OperationError } from '@/lib/operation-error';
 import { prisma, getSessionByTokenHash } from '@/server/data';
-import { hashLegacySessionToken, isUsableLegacySession, LEGACY_SESSION_COOKIE } from '@/server/auth';
+import { hashSessionToken, isUsableSession, SESSION_COOKIE } from '@/server/auth';
 import { runtimeConfig } from '@/server/config/store';
 import { auditAccountMutation } from '@/server/account-settings';
 import { authorizeAccountSession, type AccountActor } from './account';
@@ -27,10 +27,10 @@ export async function initialAppearance() {
   const cachedMode = jar.get(MODE_COOKIE)?.value;
   let account: Awaited<ReturnType<typeof storedAppearance>> | undefined;
   if (!isThemeId(cachedTheme) || !isModeId(cachedMode)) {
-    const token = jar.get(LEGACY_SESSION_COOKIE)?.value;
-    const hash = token ? hashLegacySessionToken(token) : null;
+    const token = jar.get(SESSION_COOKIE)?.value;
+    const hash = token ? hashSessionToken(token) : null;
     const session = hash ? await getSessionByTokenHash(hash) : null;
-    if (isUsableLegacySession(session, undefined)) account = await storedAppearance(session.userId);
+    if (isUsableSession(session, undefined)) account = await storedAppearance(session.userId);
   }
   return {
     theme: isThemeId(cachedTheme) ? cachedTheme : account?.theme ?? await runtimeConfig('theme.default'),
@@ -49,7 +49,7 @@ export async function updateAppearance(actor: AccountActor, input: unknown) {
   const { theme, mode } = parsed.data;
   const cookieMaxAge = await runtimeConfig('settings.appearanceCookieMaxAgeSeconds');
   await prisma.$transaction(async tx => {
-    // The compatibility Prisma model omits this existing legacy users column.
+    // The compatibility Prisma model omits this existing users column.
     const changed = await tx.$executeRaw`UPDATE users SET theme = ${theme}, "updatedAt" = NOW() WHERE id = ${actor.userId} AND "disabledAt" IS NULL`;
     if (changed !== 1) throw new OperationError('conflict', 'Account unavailable.');
     const key = modeKey(actor.userId);

@@ -1,6 +1,6 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { Prisma, PrismaClient } from '../generated/client';
-import { hashLegacySessionToken } from '../src/server/auth';
+import { hashSessionToken } from '../src/server/auth';
 import { CONFIG_BY_KEY } from '../src/lib/config/registry';
 
 class ProbeFailure extends Error {}
@@ -69,7 +69,7 @@ async function main() {
     await client.membership.create({ data: { id: membershipId, userId, workspaceId, role: 'editor' } });
     await client.$executeRaw`UPDATE memberships SET "allPages" = false WHERE id = ${membershipId}`;
     await client.$executeRaw`INSERT INTO member_page_access ("membershipId", "targetId") VALUES (${membershipId}, 'preview_target_north')`;
-    await client.session.create({ data: { id: sessionId, userId, tokenHash: hashLegacySessionToken(sessionToken)!, pending: null, expiresAt } });
+    await client.session.create({ data: { id: sessionId, userId, tokenHash: hashSessionToken(sessionToken)!, pending: null, expiresAt } });
     await client.mcpApiKey.create({ data: { id: writeKeyId, workspaceId, createdById: userId, name: 'Temporary post duplication write probe', tokenHash: createHash('sha256').update(writeBearer).digest('hex'), tokenPrefix: writeBearer.slice(0, 12), readFeatures: ['publishing/posts', 'settings/connections'], writeFeatures: ['publishing/posts'], expiresAt } });
     await client.mcpApiKey.create({ data: { id: readKeyId, workspaceId, createdById: userId, name: 'Temporary post duplication read probe', tokenHash: createHash('sha256').update(readBearer).digest('hex'), tokenPrefix: readBearer.slice(0, 12), readFeatures: ['publishing/posts'], writeFeatures: [], expiresAt } });
 

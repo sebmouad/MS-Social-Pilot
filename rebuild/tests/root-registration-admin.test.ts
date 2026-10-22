@@ -8,14 +8,14 @@ const h = vi.hoisted(() => {
 vi.mock('../src/server/data', () => ({ prisma: h.prisma }));
 vi.mock('../src/server/config/access', () => ({ currentRootActor: h.actor }));
 vi.mock('../src/server/config/store', () => ({ runtimeConfig: h.config }));
-vi.mock('../src/server/root/legacy/policy', () => ({
-  rootTransaction: (fn: (tx: unknown) => unknown) => fn(h.tx), legacySetting: async (key: string) => key.includes('search') ? 40 : 2,
+vi.mock('../src/modules/root/server/admin/policy', () => ({
+  rootTransaction: (fn: (tx: unknown) => unknown) => fn(h.tx), adminSetting: async (key: string) => key.includes('search') ? 40 : 2,
   rootResultLimit: (limit: number, cap?: number) => Math.min(limit, cap ?? limit),
 }));
 vi.mock('../src/server/mail', () => ({ mailReady: h.ready, publicMailOrigin: h.origin, sendTransactionalMail: h.send }));
 vi.mock('../src/server/data-control/guard', () => ({ withWorkspaceOperation: h.guard }));
 vi.mock('../src/server/account-settings', () => ({ accountPasswordPolicy: vi.fn(), validateNewPassword: vi.fn() }));
-vi.mock('../src/server/auth', () => ({ hashLegacyPassword: vi.fn() }));
+vi.mock('../src/server/auth', () => ({ hashStoredPassword: vi.fn() }));
 
 import { controlRootRegistrationAccount, listRootRegistration, revokeRootRegistrationInvitation } from '../src/server/root/registration-admin';
 import { unverifiedRegistrationWhere } from '../src/modules/settings/server/registration';

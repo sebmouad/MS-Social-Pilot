@@ -1,6 +1,6 @@
 import { randomBytes, randomUUID, createHash } from 'node:crypto';
 import { PrismaClient } from '../generated/client';
-import { hashLegacySessionToken } from '../src/server/auth';
+import { hashSessionToken } from '../src/server/auth';
 import { CONFIG_BY_KEY } from '../src/lib/config/registry';
 import { encryptSecret } from '../src/server/secret-crypto';
 class ProbeFailure extends Error {}
@@ -51,7 +51,7 @@ async function main() {
     await client.membership.create({ data: { id: membershipId, userId, workspaceId, role: 'viewer' } });
     await client.$executeRaw`UPDATE memberships SET "allPages" = false WHERE id = ${membershipId}`;
     await client.$executeRaw`INSERT INTO member_page_access ("membershipId", "targetId") VALUES (${membershipId}, ${channelId})`;
-    for (const [sessionId, sessionUser, token] of [[ownerSession, ownerId, ownerToken], [viewerSession, userId, viewerToken]]) await client.session.create({ data: { id: sessionId!, userId: sessionUser!, tokenHash: hashLegacySessionToken(token)!, pending: null, expiresAt: new Date(Date.now() + 300000) } });
+    for (const [sessionId, sessionUser, token] of [[ownerSession, ownerId, ownerToken], [viewerSession, userId, viewerToken]]) await client.session.create({ data: { id: sessionId!, userId: sessionUser!, tokenHash: hashSessionToken(token)!, pending: null, expiresAt: new Date(Date.now() + 300000) } });
     await client.mcpApiKey.create({ data: { id: keyId, workspaceId, createdById: userId, name: 'Temporary Analytics reader', tokenHash: createHash('sha256').update(bearer).digest('hex'), tokenPrefix: bearer.slice(0, 12), readFeatures: ['analytics/overview'], writeFeatures: [], expiresAt: new Date(Date.now() + 300000) } });
     const roleSetting = await client.appSetting.findUnique({ where: { key: 'mcp.authenticatedRoles' } });
     priorRoles = (roleSetting?.value ?? CONFIG_BY_KEY.get('mcp.authenticatedRoles')!.defaultValue) as string[];

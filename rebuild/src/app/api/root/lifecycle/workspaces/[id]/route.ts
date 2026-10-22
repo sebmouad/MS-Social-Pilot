@@ -1,8 +1,8 @@
 import { withinSynchronousLimit } from '@/lib/config/synchronous-policy';
 import { z } from 'zod';
-import { setLifecycleWorkspaceAccess } from '@/server/root/legacy/lifecycle';
+import { setLifecycleWorkspaceAccess } from '@/modules/root/server/admin/lifecycle';
 import { deleteRootWorkspace } from '@/server/root/workspace-access';
-import { readBody, rootRoute } from '@/server/root/legacy/http';
+import { readBody, rootRoute } from '@/modules/root/server/admin/http';
 
 export const runtime = 'nodejs';
 const schema = z.object({ suspended: z.boolean(), confirmation: z.string().min(1).refine(withinSynchronousLimit('root.confirmationMaxCharacters')) }).strict();

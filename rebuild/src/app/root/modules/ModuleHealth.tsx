@@ -3,7 +3,7 @@ import { IconActivity } from '@tabler/icons-react';
 import { headers } from 'next/headers';
 import { requireRootPage } from '@/server/config/access';
 import { loadRootModuleHealth } from '@/server/root/module-health';
-import { rootCopyLocale } from '@/server/root/legacy/copy';
+import { rootCopyLocale } from '@/modules/root/server/admin/copy';
 
 const copy = {
   en: { title: 'Stored module health', enabled: 'Enabled', disabled: 'Disabled', shared: 'Shared controls', product: 'Product modules', platform: 'Platform modules', pass: 'Pass', fail: 'Fail', unknown: 'Unknown', unavailable: 'Not available', config: 'Configuration validity', jobs: 'Job freshness / last outcome', queues: 'Pending queues', audit: 'Inspection audit', timing: 'Checked at', help: 'Stored evidence only. Unknown means evidence is missing, disabled, unscoped or outside the freshness window. Queue counts alone do not establish health. No provider calls are made.', error: 'Health could not be loaded. Check service availability and reload.', scheduledPosts: 'Due scheduled posts', publicationAttempts: 'Unresolved publication attempts', workspaceExports: 'Pending workspace exports' },

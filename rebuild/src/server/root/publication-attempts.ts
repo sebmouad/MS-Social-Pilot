@@ -75,7 +75,7 @@ export async function finishRootPublicationProjection(userId: string, input: unk
   return rootWorkspaceOperation(userId, row.workspaceId, row.postId, row.targetId, tx => projectPublicationInTransaction(tx, { userId, workspaceId: row.workspaceId }, parsed.data.operationId).then(ok => ({ ok, operationId: parsed.data.operationId, state: ok ? 'projected' : 'receipt_recorded' })));
 }
 
-export async function adoptRootLegacyPublication(userId: string, input: unknown) {
+export async function adoptRootAdminPublication(userId: string, input: unknown) {
   await requireActiveRoot(userId);
   const fields = rootRecoveryFields(await recoveryLimits());
   const parsed = z.object({ postTargetId: fields.operationId, confirmation: fields.confirmation }).strict().safeParse(input);

@@ -1,6 +1,6 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { Prisma, PrismaClient } from '../generated/client';
-import { hashLegacySessionToken } from '../src/server/auth';
+import { hashSessionToken } from '../src/server/auth';
 import { CONFIG_BY_KEY } from '../src/lib/config/registry';
 
 class ProbeFailure extends Error {}
@@ -57,7 +57,7 @@ async function main() {
     await client.membership.create({ data: { id: membershipId, userId, workspaceId, role: 'viewer' } });
     await client.$executeRaw`UPDATE memberships SET "allPages" = false WHERE id = ${membershipId}`;
     await client.$executeRaw`INSERT INTO member_page_access ("membershipId", "targetId") VALUES (${membershipId}, 'preview_target_north')`;
-    await client.session.create({ data: { id: sessionId, userId, tokenHash: hashLegacySessionToken(sessionToken)!, pending: null, expiresAt } });
+    await client.session.create({ data: { id: sessionId, userId, tokenHash: hashSessionToken(sessionToken)!, pending: null, expiresAt } });
     await client.mcpApiKey.create({ data: { id: keyId, workspaceId, createdById: userId, name: 'Temporary Publishing read probe', tokenHash: createHash('sha256').update(bearer).digest('hex'), tokenPrefix: bearer.slice(0, 12), readFeatures: ['publishing/posts'], writeFeatures: [], expiresAt } });
     await client.post.create({ data: {
       id: draftId, workspaceId, authorId: userId, message: `${id} unconnected draft`, status: 'draft', firstComment: null, media: [],

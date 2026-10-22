@@ -1,6 +1,6 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { PrismaClient } from '../generated/client';
-import { hashLegacySessionToken } from '../src/server/auth';
+import { hashSessionToken } from '../src/server/auth';
 import { facebookMediaJournal } from '../src/platforms/facebook/media-journal';
 
 class ProbeFailure extends Error {}
@@ -45,7 +45,7 @@ async function main() {
     await db.workspace.create({ data: { id: workspaceId, slug: workspaceId, name: 'Disposable cleanup evidence workspace', timezone: 'UTC' } });
     await db.user.create({ data: { id: userId, email: `${prefix}@example.test`, name: 'Disposable ordinary workspace owner', passwordHash: 'unusable-preview-password' } });
     await db.membership.create({ data: { id: `${prefix}_membership`, userId, workspaceId, role: 'owner' } });
-    for (const [index, token] of [rootToken, memberToken].entries()) await db.session.create({ data: { id: sessionIds[index]!, userId: index === 0 ? ownerId : userId, tokenHash: hashLegacySessionToken(token)!, expiresAt, pending: null } });
+    for (const [index, token] of [rootToken, memberToken].entries()) await db.session.create({ data: { id: sessionIds[index]!, userId: index === 0 ? ownerId : userId, tokenHash: hashSessionToken(token)!, expiresAt, pending: null } });
     await db.mcpApiKey.create({ data: { id: keyId, workspaceId, createdById: userId, name: 'Disposable media cleanup key', tokenHash: createHash('sha256').update(key).digest('hex'), tokenPrefix: key.slice(0, 12), readFeatures: ['publishing/posts'], writeFeatures: ['publishing/posts'], expiresAt } });
     await db.target.create({ data: { id: targetId, workspaceId, providerId: remoteTargetId, type: 'page', name: 'Synthetic cleanup Page', enabled: true, canPublish: true, createdAt: new Date() } });
     await db.$executeRaw`INSERT INTO rebuild_publication_attempts (id,"workspaceId","postId","postTargetId","targetId",provider,"actorId",state,reason) VALUES (${operationId},${workspaceId},${postId},${postTargetId},${targetId},'facebook',${ownerId},'uncertain','outcome_unknown')`;
@@ -143,7 +143,7 @@ async function main() {
         // Browser/approval waits can outlive this disposable fixture session.
         // Renew only its own session; the MCP service still checks current Root
         // authority before accepting the audited restoration.
-        await db.session.updateMany({ where: { id: sessionIds[0], userId: ownerId, tokenHash: hashLegacySessionToken(rootToken)! }, data: { expiresAt: new Date(Date.now() + 300000) } });
+        await db.session.updateMany({ where: { id: sessionIds[0], userId: ownerId, tokenHash: hashSessionToken(rootToken)! }, data: { expiresAt: new Date(Date.now() + 300000) } });
         await setEnabled(originalSetting ? originalSetting.value as boolean : false);
         if (!originalSetting) await db.appSetting.deleteMany({ where: { key: configKey, encrypted: false, value: { equals: false } } });
         const restored = await db.appSetting.findUnique({ where: { key: configKey }, select: { value: true, encrypted: true } });

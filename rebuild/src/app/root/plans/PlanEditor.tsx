@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { planConfirmation, type PlanFeatureGroup } from '@/server/root/legacy/shared';
+import { planConfirmation, type PlanFeatureGroup } from '@/modules/root/server/admin/shared';
 import { ConfirmAction } from './ConfirmAction';
 
 export type PlanView = { id: string; key: string; name: string; currency: string; priceMonthly: number; priceYearly: number; extraChannelPrice: number; channels: number | null; members: number | null; workspaces: number | null; postsPerMonth: number | null; aiCredits: number | null; features: string[]; isDefault: boolean; unlistedFeatures: string[] };

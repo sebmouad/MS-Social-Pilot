@@ -11,7 +11,7 @@ import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { writeFile, unlink } from 'node:fs/promises';
 import { chromium, type Browser } from 'playwright';
 import { Prisma, PrismaClient } from '../generated/client';
-import { hashLegacySessionToken } from '../src/server/auth';
+import { hashSessionToken } from '../src/server/auth';
 import { CONFIG_SCHEMA_VERSION } from '../src/lib/config/registry';
 
 class ProbeFailure extends Error {}
@@ -138,7 +138,7 @@ async function main() {
     await db.$executeRaw`UPDATE memberships SET "disabledModules" = ARRAY['agency/overview']::text[] WHERE id = ${hotelMembership}`;
 
     const now = new Date();
-    for (const [who, userId] of [['actor', actorId], ['other', otherOwnerId], ['editor', editorOnlyId]] as const) await db.session.create({ data: { id: id(`session_${who}`), userId, tokenHash: hashLegacySessionToken(token[who])!, expiresAt, pending: null } });
+    for (const [who, userId] of [['actor', actorId], ['other', otherOwnerId], ['editor', editorOnlyId]] as const) await db.session.create({ data: { id: id(`session_${who}`), userId, tokenHash: hashSessionToken(token[who])!, expiresAt, pending: null } });
     const target = (suffix: string, workspaceId: string, enabled: boolean, canPublish: boolean, accessToken: string | null) => db.target.create({ data: { id: id(`target_${suffix}`), workspaceId, type: 'page', providerId: id(`provider_${suffix}`), name: 'Disposable Agency channel', accessToken, enabled, canPublish, createdAt: now } });
     await target('alpha_broken', W.alpha, true, false, null); await target('alpha_ok', W.alpha, true, true, 'synthetic-never-used'); await target('alpha_off', W.alpha, false, false, null);
     await target('bravo_ok', W.bravo, true, true, 'synthetic-never-used');

@@ -94,3 +94,17 @@ temporary files/directory afterward and verify health.
 Local synthetic browser and automated transport evidence lives in
 [PREVIEW_QA.md](PREVIEW_QA.md). Official Meta documentation requests during this
 batch returned HTTP 429; no fresh documentation-verification claim is made.
+
+
+## Current probe credential source — 2026-10-22
+
+The retained live probe now imports `src/platforms/facebook/probe-credentials.ts`
+from the **rebuild application directory** selected by
+`MSP_FACEBOOK_PROBE_APP_ROOT`. Run from that directory with its environment and
+`--import tsx` so its own TypeScript aliases resolve. The Facebook module reads
+validated Root settings and the existing encrypted credential format; the probe
+no longer loads repository-root `src/lib/settings`, `env` or `crypto`. Existing
+endpoint/signing guards and private canary ledgers/locks remain required. Do not
+replay an unresolved write to verify this source refactor. This change has local
+import/syntax/unit evidence only; historical provider results above do not prove
+the refactored probe on a live host.

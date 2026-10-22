@@ -2,7 +2,7 @@ import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { isDeepStrictEqual } from 'node:util';
 import { Prisma, PrismaClient } from '../generated/client';
-import { hashLegacySessionToken } from '../src/server/auth';
+import { hashSessionToken } from '../src/server/auth';
 import { CONFIG_BY_KEY } from '../src/lib/config/registry';
 
 class ProbeFailure extends Error {}
@@ -61,7 +61,7 @@ async function main() {
     await client.$executeRaw`INSERT INTO member_page_access ("membershipId", "targetId") VALUES (${membershipId}, 'preview_target_north')`;
     await client.workspace.create({ data: { id: foreignWorkspaceId, name: 'Disposable media isolation workspace', slug: foreignWorkspaceId, timezone: 'UTC' } });
     await client.membership.create({ data: { id: foreignMembershipId, workspaceId: foreignWorkspaceId, userId, role: 'owner' } });
-    await client.session.create({ data: { id: sessionId, userId, tokenHash: hashLegacySessionToken(token)!, pending: null, expiresAt } });
+    await client.session.create({ data: { id: sessionId, userId, tokenHash: hashSessionToken(token)!, pending: null, expiresAt } });
     for (const [index, bearer] of [writeBearer, readBearer].entries()) await client.mcpApiKey.create({ data: { id: keyIds[index]!, workspaceId, createdById: userId, name: 'Temporary ordered-media probe', tokenHash: createHash('sha256').update(bearer).digest('hex'), tokenPrefix: bearer.slice(0, 12), readFeatures: ['publishing/posts', 'publishing/media', 'settings/connections'], writeFeatures: index === 0 ? ['publishing/posts', 'publishing/media'] : [], expiresAt } });
     if (!roles.includes('editor')) await setting('mcp.authenticatedRoles', [...roles, 'editor']);
     await setting('meta.appSecretProofEnabled', false);

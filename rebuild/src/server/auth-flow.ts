@@ -1,6 +1,6 @@
 import { cookies } from 'next/headers';
 import { createHash, randomBytes, scryptSync } from 'node:crypto';
-import { verifyLegacyPassword, hashLegacySessionToken, LEGACY_SESSION_COOKIE } from './auth';
+import { verifyPassword, hashSessionToken, SESSION_COOKIE } from './auth';
 import { prisma } from './data';
 import { runtimeConfig } from './config/store';
 import { needsTwoStepEnrollment } from './auth-policy';
@@ -33,13 +33,13 @@ export async function authRateLimit() {
   };
 }
 
-/** Password login compatible with legacy accounts; no database migration or hash rewrite. */
+/** Password login accepts existing stored hashes without migration or rewriting. */
 export async function signIn(email: string, password: string): Promise<'signed-in' | 'verify' | 'enroll'> {
   const user = await prisma.user.findUnique({
     where: { email: email.trim().toLowerCase() },
     select: { id: true, passwordHash: true, disabledAt: true, isInstanceOwner: true, totpEnabledAt: true, _count: { select: { passkeys: true } } },
   });
-  const valid = verifyLegacyPassword(password, user?.passwordHash ?? getDummyPasswordHash());
+  const valid = verifyPassword(password, user?.passwordHash ?? getDummyPasswordHash());
   if (!user || !valid || user.disabledAt) throw new Error('Invalid email or password.');
 
   // Config registry validates the policy and supplies its default.
@@ -62,17 +62,17 @@ export async function signIn(email: string, password: string): Promise<'signed-i
   const expiresAt = new Date(Date.now() + (next ? pendingMinutes * 60 * 1000 : sessionDays * 24 * 60 * 60 * 1000));
   await prisma.session.create({ data: { id: randomBytes(18).toString('base64url'), userId: user.id, tokenHash: hashToken(token), expiresAt, pending: next, challenge: null } });
   const store = await cookies();
-  store.set(LEGACY_SESSION_COOKIE, token, { ...cookieOptions, maxAge: next ? pendingMinutes * 60 : sessionDays * 24 * 60 * 60 });
+  store.set(SESSION_COOKIE, token, { ...cookieOptions, maxAge: next ? pendingMinutes * 60 : sessionDays * 24 * 60 * 60 });
   return next ?? 'signed-in';
 }
 
 export async function signOut(): Promise<void> {
   const store = await cookies();
-  const token = store.get(LEGACY_SESSION_COOKIE)?.value;
-  const tokenHash = token ? hashLegacySessionToken(token) : null;
+  const token = store.get(SESSION_COOKIE)?.value;
+  const tokenHash = token ? hashSessionToken(token) : null;
   try {
     if (tokenHash) await prisma.session.deleteMany({ where: { tokenHash } });
   } finally {
-    store.set(LEGACY_SESSION_COOKIE, '', { ...cookieOptions, maxAge: 0, expires: new Date(0) });
+    store.set(SESSION_COOKIE, '', { ...cookieOptions, maxAge: 0, expires: new Date(0) });
   }
 }

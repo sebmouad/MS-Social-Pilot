@@ -3,7 +3,7 @@ import { OperationError } from '@/lib/operation-error';
 import { PLATFORM_MODULES } from '@/platforms';
 import { assertRootActor, lockRootActor, conflict, invalid } from './authz';
 import { writeRootAudit } from './audit';
-import { rootResultLimit, legacySetting, rootTransaction } from './policy';
+import { rootResultLimit, adminSetting, rootTransaction } from './policy';
 import { planAssignSchema, planConfirmation, planFeatureCatalog, planPatchSchema, planUpdateSchema, type PlanPatch } from './shared';
 
 type PlanRow = {
@@ -19,7 +19,7 @@ export const featureCatalog = () => planFeatureCatalog(PLATFORM_MODULES.map(modu
 /** Plan catalog with subscriber counts and the per-module feature grouping used to edit it. */
 export async function listRootPlans(actorId: string, resultCap?: number) {
   await assertRootActor(prisma, actorId);
-  const limit = rootResultLimit(await legacySetting('root.legacy.planCatalogLimit'), resultCap);
+  const limit = rootResultLimit(await adminSetting('root.admin.planCatalogLimit'), resultCap);
   const fetched = await prisma.$queryRaw<PlanRow[]>`SELECT p.id, p.key, p.name, p.position, p.currency, p."priceMonthly", p."priceYearly", p."extraChannelPrice", p.channels, p.members, p.workspaces, p."postsPerMonth", p."aiCredits", p.features, p."isDefault", (SELECT COUNT(*)::int FROM users u WHERE u."planId" = p.id) AS subscribers FROM plans p ORDER BY p.position, p.name, p.id LIMIT ${limit + 1}`;
   const truncated = fetched.length > limit;
   const plans = fetched.slice(0, limit);
@@ -30,7 +30,7 @@ export async function listRootPlans(actorId: string, resultCap?: number) {
 /** Recent plan edits and assignments, newest first. Detail is limited to our own audit shape. */
 export async function listRootPlanHistory(actorId: string, resultCap?: number) {
   await assertRootActor(prisma, actorId);
-  const limit = rootResultLimit(await legacySetting('root.legacy.planHistoryLimit'), resultCap);
+  const limit = rootResultLimit(await adminSetting('root.admin.planHistoryLimit'), resultCap);
   const rows = await prisma.$queryRaw<Array<{ id: string; action: string; createdAt: Date; actorEmail: string | null; detail: Record<string, unknown> | null; subjectEmail: string | null }>>`SELECT a.id, a.action, a."createdAt", u.email AS "actorEmail", a.detail, s.email AS "subjectEmail" FROM root_activities a LEFT JOIN users u ON u.id = a."actorId" LEFT JOIN users s ON s.id = a.detail->>'userId' WHERE a.action = ANY(${PLAN_ACTIONS}::text[]) ORDER BY a."createdAt" DESC, a.id DESC LIMIT ${limit}`;
   return { items: rows.map(row => {
     const detail = row.detail ?? {};
@@ -106,7 +106,7 @@ export async function assignRootPlan(actorId: string, input: unknown) {
 /** Subscribers (accounts owning a workspace) with their plan, for assignment. Bounded and private. */
 export async function listRootSubscribers(actorId: string, resultCap?: number) {
   await assertRootActor(prisma, actorId);
-  const limit = rootResultLimit(await legacySetting('root.legacy.subscriberListLimit'), resultCap);
+  const limit = rootResultLimit(await adminSetting('root.admin.subscriberListLimit'), resultCap);
   const rows = await prisma.$queryRaw<Array<{ id: string; name: string; email: string; isInstanceOwner: boolean; disabled: boolean; planKey: string | null; workspaces: number }>>`SELECT u.id, u.name, u.email, u."isInstanceOwner", (u."disabledAt" IS NOT NULL) AS disabled, p.key AS "planKey", (SELECT COUNT(*)::int FROM memberships m WHERE m."userId" = u.id AND m.role = 'owner') AS workspaces FROM users u LEFT JOIN plans p ON p.id = u."planId" WHERE EXISTS (SELECT 1 FROM memberships m WHERE m."userId" = u.id AND m.role = 'owner') ORDER BY u.email, u.id LIMIT ${limit + 1}`;
   return { items: rows.slice(0, limit), limit, truncated: rows.length > limit };
 }

@@ -1,6 +1,6 @@
 import { readRootConfig } from '@/modules/root/server/configuration';
 import { headers } from 'next/headers';
-import { rootCopyLocale } from '@/server/root/legacy/copy';
+import { rootCopyLocale } from '@/modules/root/server/admin/copy';
 import { ROOT_INTERFACE_COPY, type RootInterfaceCatalog } from '@/lib/config/root-interface-copy';
 import { PageHeader } from '@/components/PageHeader';
 import { ROOT_CONFIG_COPY, type RootConfigCopy } from '@/lib/config/root-config-copy';

@@ -2,7 +2,7 @@
 import {randomBytes,randomUUID} from 'node:crypto';
 import {chromium} from 'playwright';
 import {PrismaClient,Prisma} from '../generated/client';
-import {hashLegacySessionToken} from '../src/server/auth';
+import {hashSessionToken} from '../src/server/auth';
 import {executeFacebookNativeWithJournal,type FacebookNativeJournalBinding} from '../src/platforms/facebook/formats/journal';
 function check(value:unknown,message:string):asserts value {if(!value)throw Error(message);}
 async function main(){
@@ -40,8 +40,8 @@ async function main(){
    {database:db,limits:async()=>({timeout:10000,maxWait:5000}),transport:{postGraph:async()=>{starts++;return {video_id:'native89_synthetic_upload',upload_url:'https://example.invalid/upload'};},upload:async()=>{uploads++;throw Error('Identifiable synthetic uncertain transfer');}}});
   check(outcome.status==='uncertain'&&starts===1&&uploads===1,'Synthetic uncertain phase must remain held');
   await db.$executeRaw`UPDATE rebuild_publication_attempts SET state='uncertain',reason='outcome_unknown' WHERE id=${operationId}`;
-  await db.session.createMany({data:[{id:`${tag}_session`,userId:owner,tokenHash:hashLegacySessionToken(token)!,pending:null,expiresAt:new Date(Date.now()+600000)},
-   {id:`${tag}_regular_session`,userId:`${tag}_user`,tokenHash:hashLegacySessionToken(regularToken)!,pending:null,expiresAt:new Date(Date.now()+600000)}]});
+  await db.session.createMany({data:[{id:`${tag}_session`,userId:owner,tokenHash:hashSessionToken(token)!,pending:null,expiresAt:new Date(Date.now()+600000)},
+   {id:`${tag}_regular_session`,userId:`${tag}_user`,tokenHash:hashSessionToken(regularToken)!,pending:null,expiresAt:new Date(Date.now()+600000)}]});
   const endpoint=`${origin}/api/root/platform-publication-evidence?providerId=facebook&operationId=${operationId}`;
   check((await fetch(endpoint,{headers:{cookie:regularCookie}})).status===403,'Workspace owner must not acquire Root access');
   const response=await fetch(endpoint,{headers:{cookie}});check(response.ok&&response.headers.get('cache-control')==='no-store','Root API must return no-store evidence');

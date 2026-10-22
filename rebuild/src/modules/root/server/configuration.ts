@@ -6,7 +6,7 @@ import type { Prisma } from '../../../../generated/client';
 import { applySynchronousPolicy } from '@/server/synchronous-policy';
 import { applyConnectionHealthCopy } from '@/lib/connection-health';
 import { readConfig } from '@/server/config/store';
-import { assertRootActor, lockRootActor, invalid } from '@/server/root/legacy/authz';
+import { assertRootActor, lockRootActor, invalid } from '@/modules/root/server/admin/authz';
 // Versioned AES-GCM envelope and random audit entropy, not operational limits.
 const CONFIG_SECRET_KEY_BYTES = 32;
 const CONFIG_SECRET_IV_BYTES = 12;
@@ -71,7 +71,7 @@ export async function saveRootConfig(input: unknown, actorId: string) {
 }
 
 async function audit(tx: Prisma.TransactionClient, actorId: string, key: string, change: string) {
-  // Existing installation-wide audit table from the legacy schema. Parameterized
+  // Existing installation-wide audit table. Parameterized
   // values keep the query safe; the secret itself is never included in detail.
   await tx.$executeRaw`INSERT INTO root_activities (id, "actorId", action, detail, "createdAt") VALUES (${`cfg_${randomBytes(CONFIG_AUDIT_ID_BYTES).toString('hex')}`}, ${actorId}, 'config.changed', ${JSON.stringify(configAuditDetail(key, change))}::jsonb, NOW())`;
 }

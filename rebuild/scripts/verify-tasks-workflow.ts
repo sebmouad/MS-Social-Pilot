@@ -3,7 +3,7 @@ import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { writeFile, unlink } from 'node:fs/promises';
 import { inflateRawSync } from 'node:zlib';
 import { Prisma, PrismaClient } from '../generated/client';
-import { hashLegacySessionToken } from '../src/server/auth';
+import { hashSessionToken } from '../src/server/auth';
 import { CONFIG_SCHEMA_VERSION } from '../src/lib/config/registry';
 class ProbeFailure extends Error {}
 function check(value: unknown, message: string): asserts value { if (!value) throw new ProbeFailure(message); }
@@ -50,7 +50,7 @@ async function main() {
     await db.membership.create({data:{id:`${prefix}_owner_membership`,workspaceId,userId:ownerId,role:'owner'}});
     await db.membership.create({data:{id:editorMembership,workspaceId,userId:editorId,role:'editor'}});
     await db.$executeRaw`UPDATE memberships SET "allPages"=false WHERE id=${editorMembership}`;
-    await db.session.create({data:{id:`${prefix}_session`,userId:ownerId,tokenHash:hashLegacySessionToken(token)!,expiresAt,pending:null}});
+    await db.session.create({data:{id:`${prefix}_session`,userId:ownerId,tokenHash:hashSessionToken(token)!,expiresAt,pending:null}});
     await db.socialAccount.create({data:{id:socialId,workspaceId,provider:'facebook',providerUserId:`${prefix}_provider`,name:'Disposable synthetic connection',accessToken:'synthetic-never-used'}});
     for(const id of [allowedId,hiddenId])await db.target.create({data:{id,workspaceId,socialAccountId:socialId,type:'page',providerId:id,name:'Disposable Tasks channel',enabled:true,canPublish:false,createdAt:new Date()}});
     await db.$executeRaw`INSERT INTO member_page_access ("membershipId","targetId") VALUES (${editorMembership},${allowedId})`;

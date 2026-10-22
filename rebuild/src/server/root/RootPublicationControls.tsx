@@ -17,7 +17,7 @@ export function RootPublicationControls({ row, limits = ROOT_RECOVERY_LIMITS }: 
   const mode = row.state === 'receipt_recorded' ? 'finish' : ['started', 'uncertain'].includes(row.state) || submitted ? 'record' : null;
   return <RecoveryControl limits={limits} mode={mode ?? 'record'} context={row} identity={row.operationId} available={mode !== null} knownRemoteId={submitted ? row.remotePostId : null} />;
 }
-export function RootLegacyPublicationControl({ row, limits = ROOT_RECOVERY_LIMITS }: { row: Context & { postTargetId: string }; limits?: RootRecoveryLimits }) {
+export function RootAdminPublicationControl({ row, limits = ROOT_RECOVERY_LIMITS }: { row: Context & { postTargetId: string }; limits?: RootRecoveryLimits }) {
   return <RecoveryControl limits={limits} mode="adopt" context={row} identity={row.postTargetId} />;
 }
 function RecoveryControl({ limits, mode, context, identity, available = true, knownRemoteId = null }: { limits: RootRecoveryLimits; mode: Mode; context: Context; identity: string; available?: boolean; knownRemoteId?: string | null }) {

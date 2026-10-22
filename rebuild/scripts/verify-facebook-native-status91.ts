@@ -5,7 +5,7 @@ import { readFile } from 'node:fs/promises';
 import { chromium } from 'playwright';
 import { Prisma, PrismaClient } from '../generated/client';
 import { encryptSecret } from '../src/server/secret-crypto';
-import { hashLegacySessionToken } from '../src/server/auth';
+import { hashSessionToken } from '../src/server/auth';
 import { runtimeConfig } from '../src/server/config/store';
 import { executeFacebookNativeWithJournal, type FacebookNativeJournalBinding } from '../src/platforms/facebook/formats/journal';
 import { facebookNativeStatusConfirmation } from '../src/platforms/facebook/formats/status-recovery-contract';
@@ -171,8 +171,8 @@ async function main() {
     await db.user.create({ data: { id: ordinaryId, email: `${prefix}@example.invalid`, name: 'Disposable ordinary workspace owner', passwordHash: 'unusable-preview-password' } });
     const expiry = new Date(Date.now() + 10 * 60_000);
     await db.session.createMany({ data: [
-      { id: sessionIds[0]!, userId: rootId, tokenHash: hashLegacySessionToken(rootToken)!, expiresAt: expiry, pending: null },
-      { id: sessionIds[1]!, userId: ordinaryId, tokenHash: hashLegacySessionToken(ordinaryToken)!, expiresAt: expiry, pending: null },
+      { id: sessionIds[0]!, userId: rootId, tokenHash: hashSessionToken(rootToken)!, expiresAt: expiry, pending: null },
+      { id: sessionIds[1]!, userId: ordinaryId, tokenHash: hashSessionToken(ordinaryToken)!, expiresAt: expiry, pending: null },
     ] });
     stage = 'audited Root policy changes';
     anySettingWriteStarted = true;

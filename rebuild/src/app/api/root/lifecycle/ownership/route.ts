@@ -1,5 +1,5 @@
-import { transferWorkspaceOwnership } from '@/server/root/legacy/lifecycle';
-import { readBody, rootRoute } from '@/server/root/legacy/http';
+import { transferWorkspaceOwnership } from '@/modules/root/server/admin/lifecycle';
+import { readBody, rootRoute } from '@/modules/root/server/admin/http';
 
 export const runtime = 'nodejs';
 

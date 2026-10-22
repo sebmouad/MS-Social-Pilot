@@ -1,7 +1,7 @@
 import { withinSynchronousLimit } from '@/lib/config/synchronous-policy';
 import { z } from 'zod';
-import { setLifecycleUserAccess } from '@/server/root/legacy/lifecycle';
-import { readBody, rootRoute } from '@/server/root/legacy/http';
+import { setLifecycleUserAccess } from '@/modules/root/server/admin/lifecycle';
+import { readBody, rootRoute } from '@/modules/root/server/admin/http';
 import { deleteRootUser } from '@/server/root/user-controls';
 
 export const runtime = 'nodejs';

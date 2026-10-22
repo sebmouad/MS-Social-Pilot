@@ -1,6 +1,6 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { Prisma, PrismaClient } from '../generated/client';
-import { hashLegacySessionToken } from '../src/server/auth';
+import { hashSessionToken } from '../src/server/auth';
 import { CONFIG_BY_KEY } from '../src/lib/config/registry';
 
 class ProbeFailure extends Error {}
@@ -61,7 +61,7 @@ async function main() {
     await client.membership.create({ data: { id: membershipId, workspaceId, userId, role: 'editor' } });
     await client.$executeRaw`UPDATE memberships SET "allPages" = false WHERE id = ${membershipId}`;
     await client.$executeRaw`INSERT INTO member_page_access ("membershipId", "targetId") VALUES (${membershipId}, 'preview_target_north')`;
-    await client.session.create({ data: { id: sessionId, userId, tokenHash: hashLegacySessionToken(token)!, pending: null, expiresAt } });
+    await client.session.create({ data: { id: sessionId, userId, tokenHash: hashSessionToken(token)!, pending: null, expiresAt } });
     await client.mcpApiKey.create({ data: { id: keyId, workspaceId, createdById: userId, name: 'Temporary post export read probe', tokenHash: createHash('sha256').update(bearer).digest('hex'), tokenPrefix: bearer.slice(0, 12), readFeatures: ['publishing/posts'], writeFeatures: [], expiresAt } });
     if (!roles.includes('editor')) { check((await rpc('export_posts')).response.status === 401, 'Original MCP policy must deny editor authentication.'); await setting('mcp.authenticatedRoles', [...roles, 'editor']); }
     await setting('publishing.exportBatchSize', 1);

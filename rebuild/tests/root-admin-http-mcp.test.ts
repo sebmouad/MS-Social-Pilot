@@ -13,13 +13,13 @@ const h = vi.hoisted(() => ({
   errs: { listRootErrors: vi.fn(), getRootError: vi.fn(), setRootErrorResolved: vi.fn() },
   back: { readRootBackupStatus: vi.fn(), readRootDiagnosticsSummary: vi.fn() },
 }));
-vi.mock('../src/server/root/legacy/connection-refresh', () => ({ refreshRootConnection: h.refreshConnection }));
+vi.mock('../src/modules/root/server/admin/connection-refresh', () => ({ refreshRootConnection: h.refreshConnection }));
 vi.mock('../src/server/config/access', () => ({ currentRootActor: h.actor }));
-vi.mock('../src/server/root/legacy/plans', () => h.plans);
-vi.mock('../src/server/root/legacy/privileges', () => h.priv);
-vi.mock('../src/server/root/legacy/lifecycle', () => h.life);
-vi.mock('../src/server/root/legacy/errors', () => h.errs);
-vi.mock('../src/server/root/legacy/backups', () => h.back);
+vi.mock('../src/modules/root/server/admin/plans', () => h.plans);
+vi.mock('../src/modules/root/server/admin/privileges', () => h.priv);
+vi.mock('../src/modules/root/server/admin/lifecycle', () => h.life);
+vi.mock('../src/modules/root/server/admin/errors', () => h.errs);
+vi.mock('../src/modules/root/server/admin/backups', () => h.back);
 
 import { GET as plansGet } from '../src/app/api/root/plans/route';
 import { PATCH as planPatch } from '../src/app/api/root/plans/[id]/route';
@@ -31,7 +31,7 @@ import { POST as transfer } from '../src/app/api/root/lifecycle/ownership/route'
 import { POST as resolveError } from '../src/app/api/root/errors/[id]/route';
 import { GET as backupsGet } from '../src/app/api/root/backups/route';
 import * as backupsModule from '../src/app/api/root/backups/route';
-import { rootLegacyToolDefinitions, rootLegacyResources, callRootLegacyTool, canUseRootLegacyTool } from '../src/server/root/legacy/mcp';
+import { rootAdminToolDefinitions, rootAdminResources, callRootAdminTool, canUseRootAdminTool } from '../src/modules/root/server/admin/mcp';
 import { rootToolDefinitions } from '../src/server/mcp/root-tools';
 
 const url = 'https://app.example.test/api/root/x';
@@ -103,20 +103,20 @@ describe('private Root HTTP boundary', () => {
 
 describe('Root MCP definitions', () => {
   it('uses unique names that do not collide with existing Root tools, and every resource targets a defined tool', () => {
-    const names = rootLegacyToolDefinitions.map(tool => tool.name);
+    const names = rootAdminToolDefinitions.map(tool => tool.name);
     expect(names).toContain('refresh_root_connection');
     expect(new Set(names).size).toBe(names.length);
     const merged = rootToolDefinitions.map(tool => tool.name);
     expect(new Set(merged).size).toBe(merged.length);
     expect(names.every(name => merged.includes(name))).toBe(true);
-    expect(rootLegacyResources.every(resource => names.includes(resource.tool))).toBe(true);
-    expect(rootLegacyToolDefinitions.every(tool => tool.description.includes('API keys cannot use'))).toBe(true);
+    expect(rootAdminResources.every(resource => names.includes(resource.tool))).toBe(true);
+    expect(rootAdminToolDefinitions.every(tool => tool.description.includes('API keys cannot use'))).toBe(true);
   });
 
   it('denies workspace API keys and non-owners before any service call', async () => {
-    expect(canUseRootLegacyTool({ userId: 'u', isInstanceOwner: true, apiKeyId: 'k' } as never)).toBe(false);
-    await expect(callRootLegacyTool({ userId: 'u', isInstanceOwner: true, apiKeyId: 'k' } as never, 'list_root_plans', {})).rejects.toMatchObject({ code: 'forbidden' });
-    await expect(callRootLegacyTool({ userId: 'u', isInstanceOwner: false } as never, 'get_root_backup_status', {})).rejects.toMatchObject({ code: 'forbidden' });
+    expect(canUseRootAdminTool({ userId: 'u', isInstanceOwner: true, apiKeyId: 'k' } as never)).toBe(false);
+    await expect(callRootAdminTool({ userId: 'u', isInstanceOwner: true, apiKeyId: 'k' } as never, 'list_root_plans', {})).rejects.toMatchObject({ code: 'forbidden' });
+    await expect(callRootAdminTool({ userId: 'u', isInstanceOwner: false } as never, 'get_root_backup_status', {})).rejects.toMatchObject({ code: 'forbidden' });
     expect(h.plans.listRootPlans).not.toHaveBeenCalled();
     expect(h.back.readRootBackupStatus).not.toHaveBeenCalled();
   });
@@ -124,17 +124,17 @@ describe('Root MCP definitions', () => {
   it('dispatches for the installation owner, rejects stray arguments and unknown tools', async () => {
     const viewer = { userId: 'root', isInstanceOwner: true } as never;
     h.plans.updateRootPlan.mockResolvedValue({ changed: true });
-    await callRootLegacyTool(viewer, 'update_root_plan', { planId: 'p1', patch: { name: 'X' }, confirmation: 'c' });
+    await callRootAdminTool(viewer, 'update_root_plan', { planId: 'p1', patch: { name: 'X' }, confirmation: 'c' });
     expect(h.plans.updateRootPlan).toHaveBeenCalledWith('root', 'p1', { patch: { name: 'X' }, confirmation: 'c' });
-    await callRootLegacyTool(viewer, 'transfer_root_workspace_ownership', { workspaceId: 'w' });
+    await callRootAdminTool(viewer, 'transfer_root_workspace_ownership', { workspaceId: 'w' });
     expect(h.life.transferWorkspaceOwnership).toHaveBeenCalledWith('root', { workspaceId: 'w' });
-    await expect(callRootLegacyTool(viewer, 'get_root_backup_status', { force: true })).rejects.toMatchObject({ code: 'invalid_request' });
-    await expect(callRootLegacyTool(viewer, 'run_backup', {})).rejects.toMatchObject({ code: 'not_found' });
-    await expect(callRootLegacyTool(viewer, 'list_root_plans', [] as never)).rejects.toMatchObject({ code: 'invalid_request' });
+    await expect(callRootAdminTool(viewer, 'get_root_backup_status', { force: true })).rejects.toMatchObject({ code: 'invalid_request' });
+    await expect(callRootAdminTool(viewer, 'run_backup', {})).rejects.toMatchObject({ code: 'not_found' });
+    await expect(callRootAdminTool(viewer, 'list_root_plans', [] as never)).rejects.toMatchObject({ code: 'invalid_request' });
   });
 
   it('offers only the explicitly confirmed account and workspace deletion tools', () => {
-    expect(rootLegacyToolDefinitions.map(tool => tool.name).filter(name => /backup|restore|delete|purge/.test(name) && !name.startsWith('get_'))).toEqual(['delete_root_unverified_registration', 'delete_root_user', 'delete_root_workspace']); // deliberate, confirmed deletions of disabled accounts and suspended workspaces
+    expect(rootAdminToolDefinitions.map(tool => tool.name).filter(name => /backup|restore|delete|purge/.test(name) && !name.startsWith('get_'))).toEqual(['delete_root_unverified_registration', 'delete_root_user', 'delete_root_workspace']); // deliberate, confirmed deletions of disabled accounts and suspended workspaces
   });
 });
 
@@ -164,11 +164,11 @@ describe('REST error action confirmation', () => {
 describe('MCP error action confirmation', () => {
   it('requires the exact explicit confirmation and rejects stray read arguments', async () => {
     const viewer = { userId: 'root', isInstanceOwner: true } as never;
-    await expect(callRootLegacyTool(viewer, 'set_root_error_resolved', { id: 'e1', resolved: true })).rejects.toMatchObject({ code: 'invalid_request' });
+    await expect(callRootAdminTool(viewer, 'set_root_error_resolved', { id: 'e1', resolved: true })).rejects.toMatchObject({ code: 'invalid_request' });
     expect(h.errs.setRootErrorResolved).not.toHaveBeenCalled();
-    await callRootLegacyTool(viewer, 'set_root_error_resolved', { id: 'e1', resolved: true, confirmation: 'RESOLVE ROOT ERROR e1' });
+    await callRootAdminTool(viewer, 'set_root_error_resolved', { id: 'e1', resolved: true, confirmation: 'RESOLVE ROOT ERROR e1' });
     expect(h.errs.setRootErrorResolved).toHaveBeenCalledWith('root', 'e1', true, 'RESOLVE ROOT ERROR e1');
-    await expect(callRootLegacyTool(viewer, 'get_root_error', { id: 'e1', extra: true })).rejects.toMatchObject({ code: 'invalid_request' });
+    await expect(callRootAdminTool(viewer, 'get_root_error', { id: 'e1', extra: true })).rejects.toMatchObject({ code: 'invalid_request' });
   });
 });
 
@@ -181,8 +181,8 @@ describe('registration MCP service parity', () => {
   ] as const;
 
   it('declares strict schemas and explicit read/write hints', () => {
-    expect(rootLegacyToolDefinitions.find(t => t.name === 'list_root_registration')).toMatchObject({ annotations: { readOnlyHint: true }, inputSchema: { additionalProperties: false } });
-    for (const [name] of writes) expect(rootLegacyToolDefinitions.find(t => t.name === name)).toMatchObject({ annotations: { readOnlyHint: false, destructiveHint: true }, inputSchema: { additionalProperties: false, required: expect.arrayContaining(['confirmation']) } });
+    expect(rootAdminToolDefinitions.find(t => t.name === 'list_root_registration')).toMatchObject({ annotations: { readOnlyHint: true }, inputSchema: { additionalProperties: false } });
+    for (const [name] of writes) expect(rootAdminToolDefinitions.find(t => t.name === name)).toMatchObject({ annotations: { readOnlyHint: false, destructiveHint: true }, inputSchema: { additionalProperties: false, required: expect.arrayContaining(['confirmation']) } });
   });
 
   it('dispatches scoped writes and bounded reads to the HTTP service', async () => {
@@ -192,9 +192,9 @@ describe('registration MCP service parity', () => {
     h.registration.listRootRegistration.mockResolvedValue(receipt);
     expect((await GET(get(`${url}?${new URLSearchParams(filters)}`), undefined)).status).toBe(200);
     expect(h.registration.listRootRegistration).toHaveBeenLastCalledWith('root', filters);
-    expect(await callRootLegacyTool(viewer, 'list_root_registration', filters)).toBe(receipt);
+    expect(await callRootAdminTool(viewer, 'list_root_registration', filters)).toBe(receipt);
     expect(h.registration.listRootRegistration).toHaveBeenLastCalledWith('root', filters, 7);
-    for (const [name, args] of writes) await callRootLegacyTool(viewer, name, args);
+    for (const [name, args] of writes) await callRootAdminTool(viewer, name, args);
     expect(h.registration.revokeRootRegistrationInvitation).toHaveBeenCalledWith('root', 'w1', 'i1', { confirmation: 'REVOKE INVITATION i1' });
     expect(h.registration.controlRootRegistrationAccount.mock.calls).toEqual([
       ['root', 'u1', 'resend', { confirmation: 'RESEND VERIFICATION u1' }],
@@ -204,15 +204,15 @@ describe('registration MCP service parity', () => {
 
   it.each(writes)('rejects invalid confirmations and arguments for %s before dispatch', async (name, args) => {
     const { confirmation, ...without } = args;
-    for (const input of [without, { ...args, confirmation: 'yes' }, { ...args, confirmation: confirmation.toLowerCase() }, { ...args, confirmation: `${confirmation} ` }, { ...args, confirmation: confirmation.replace(/ (i1|u1)$/, ' other') }, { ...args, force: true }]) await expect(callRootLegacyTool(viewer, name, input)).rejects.toMatchObject({ code: 'invalid_request' });
-    for (const field of Object.keys(without)) for (const value of [null, 1, '', 'x'.repeat(256), 'bad\nidentifier']) await expect(callRootLegacyTool(viewer, name, { ...args, [field]: value })).rejects.toMatchObject({ code: 'invalid_request' });
+    for (const input of [without, { ...args, confirmation: 'yes' }, { ...args, confirmation: confirmation.toLowerCase() }, { ...args, confirmation: `${confirmation} ` }, { ...args, confirmation: confirmation.replace(/ (i1|u1)$/, ' other') }, { ...args, force: true }]) await expect(callRootAdminTool(viewer, name, input)).rejects.toMatchObject({ code: 'invalid_request' });
+    for (const field of Object.keys(without)) for (const value of [null, 1, '', 'x'.repeat(256), 'bad\nidentifier']) await expect(callRootAdminTool(viewer, name, { ...args, [field]: value })).rejects.toMatchObject({ code: 'invalid_request' });
     expect(h.registration.revokeRootRegistrationInvitation).not.toHaveBeenCalled();
     expect(h.registration.controlRootRegistrationAccount).not.toHaveBeenCalled();
   });
 
   it('denies non-Root and workspace-key identities for all four tools before services', async () => {
     for (const actor of [{ userId: 'member', isInstanceOwner: false }, { userId: 'root', isInstanceOwner: true, apiKeyId: 'key' }]) {
-      for (const [name, args] of [['list_root_registration', {}], ...writes] as const) await expect(callRootLegacyTool(actor, name, args)).rejects.toMatchObject({ code: 'forbidden' });
+      for (const [name, args] of [['list_root_registration', {}], ...writes] as const) await expect(callRootAdminTool(actor, name, args)).rejects.toMatchObject({ code: 'forbidden' });
     }
     for (const fn of Object.values(h.registration)) expect(fn).not.toHaveBeenCalled();
   });
@@ -227,9 +227,9 @@ describe('connection refresh HTTP/MCP parity', () => {
     const args = { socialAccountId: 'c1', confirmation: 'REFRESH CONNECTION c1' };
     expect(await (await POST(post({ confirmation: args.confirmation }), ctx('c1'))).json()).toEqual({ ok: true, ...receipt });
     expect(h.refreshConnection).toHaveBeenLastCalledWith('root', args);
-    expect(await callRootLegacyTool({ userId: 'root', isInstanceOwner: true }, 'refresh_root_connection', args)).toEqual(receipt);
+    expect(await callRootAdminTool({ userId: 'root', isInstanceOwner: true }, 'refresh_root_connection', args)).toEqual(receipt);
     expect(h.refreshConnection).toHaveBeenLastCalledWith('root', args);
-    expect(rootLegacyToolDefinitions.find(t => t.name === 'refresh_root_connection')).toMatchObject({ annotations: { readOnlyHint: false }, inputSchema: { additionalProperties: false, required: ['socialAccountId', 'confirmation'] } });
+    expect(rootAdminToolDefinitions.find(t => t.name === 'refresh_root_connection')).toMatchObject({ annotations: { readOnlyHint: false }, inputSchema: { additionalProperties: false, required: ['socialAccountId', 'confirmation'] } });
   });
   it('enforces HTTP authentication, origin and strict bodies before the service', async () => {
     const { POST } = await import('../src/app/api/root/connections/[id]/refresh/route');
@@ -243,7 +243,7 @@ describe('connection refresh HTTP/MCP parity', () => {
   });
   it('rejects workspace-key and non-Root MCP identities before service dispatch', async () => {
     for (const actor of [{ userId: 'member', isInstanceOwner: false }, { userId: 'root', isInstanceOwner: true, apiKeyId: 'key' }]) {
-      await expect(callRootLegacyTool(actor, 'refresh_root_connection', {})).rejects.toMatchObject({ code: 'forbidden' });
+      await expect(callRootAdminTool(actor, 'refresh_root_connection', {})).rejects.toMatchObject({ code: 'forbidden' });
     }
     expect(h.refreshConnection).not.toHaveBeenCalled();
   });

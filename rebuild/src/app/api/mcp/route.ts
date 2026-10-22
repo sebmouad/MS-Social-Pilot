@@ -3,7 +3,7 @@ import { authenticatePersonBearer } from '@/modules/settings/person-keys/service
 import { authenticateBearerHeader } from '@/server/mcp/bearer';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
-import { hashLegacySessionToken, isUsableLegacySession, LEGACY_SESSION_COOKIE } from '@/server/auth';
+import { hashSessionToken, isUsableSession, SESSION_COOKIE } from '@/server/auth';
 import { getSessionByTokenHash, listWorkspaces, prisma } from '@/server/data';
 import { loadEntitlements } from '@/server/entitlements';
 import { handleMcpMessage, type McpIdentity, type McpViewer, type McpInstallationViewer } from '@/server/mcp/server';
@@ -30,11 +30,11 @@ function requestScope(request: Request): RequestScope {
 async function getViewer(scope: RequestScope): Promise<McpIdentity | null> {
   if (await runtimeConfig('mcp.enabled') !== true) return null;
   const jar = await cookies();
-  const token = jar.get(LEGACY_SESSION_COOKIE)?.value;
-  const hash = token ? hashLegacySessionToken(token) : null;
+  const token = jar.get(SESSION_COOKIE)?.value;
+  const hash = token ? hashSessionToken(token) : null;
   if (!hash) return null;
   const session = await getSessionByTokenHash(hash);
-  if (!isUsableLegacySession(session, undefined)) return null;
+  if (!isUsableSession(session, undefined)) return null;
   const user = await prisma.user.findUnique({ where: { id: session.userId }, select: { id: true, isInstanceOwner: true, disabledAt: true } });
   if (!user || user.disabledAt) return null;
   const maxResultItems = await runtimeConfig('mcp.maxResultItems') as number;

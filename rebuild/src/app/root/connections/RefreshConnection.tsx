@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/Button';
 import { useConfirm } from '@/components/useConfirm';
-import { fill, rootCopy, type RootCopyLocale } from '@/server/root/legacy/copy';
+import { fill, rootCopy, type RootCopyLocale } from '@/modules/root/server/admin/copy';
 
 export function RefreshConnection({ id, name, locale }: { id: string; name: string; locale: RootCopyLocale }) {
   const t = rootCopy(locale);

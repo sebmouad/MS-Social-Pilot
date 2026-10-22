@@ -1,5 +1,5 @@
-import { readRootBackupStatus, readRootDiagnosticsSummary } from '@/server/root/legacy/backups';
-import { rootRoute, searchParamsObject } from '@/server/root/legacy/http';
+import { readRootBackupStatus, readRootDiagnosticsSummary } from '@/modules/root/server/admin/backups';
+import { rootRoute, searchParamsObject } from '@/modules/root/server/admin/http';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';

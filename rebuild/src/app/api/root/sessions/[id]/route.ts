@@ -1,5 +1,5 @@
-import { signOutRootSession } from '@/server/root/legacy/sessions';
-import { readBody, rootRoute } from '@/server/root/legacy/http';
+import { signOutRootSession } from '@/modules/root/server/admin/sessions';
+import { readBody, rootRoute } from '@/modules/root/server/admin/http';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';

@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/Button';
 import { useConfirm } from '@/components/useConfirm';
-import { fill, rootCopy, type RootCopyLocale } from '@/server/root/legacy/copy';
+import { fill, rootCopy, type RootCopyLocale } from '@/modules/root/server/admin/copy';
 
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null;
 const COUNT_KEYS = ['channels', 'adAccounts', 'postTargets', 'orphanPosts', 'comments', 'conversations', 'conversationMessages', 'pageInsights', 'adInsights', 'scheduledRemote'] as const;

@@ -1,4 +1,4 @@
-import { rootRoute, readBody, searchParamsObject } from '@/server/root/legacy/http';
+import { rootRoute, readBody, searchParamsObject } from '@/modules/root/server/admin/http';
 import { listClientInvitations, issueClientInvitation, revokeClientInvitation } from './client-invitations';
 
 /** Thin adapters for /api/root/client-invitations and /api/root/client-invitations/[id]. */

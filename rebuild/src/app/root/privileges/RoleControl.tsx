@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { roleConfirmation, WORKSPACE_ROLES } from '@/server/root/legacy/shared';
+import { roleConfirmation, WORKSPACE_ROLES } from '@/modules/root/server/admin/shared';
 import { ConfirmAction } from '../plans/ConfirmAction';
 
 export function RoleControl({ membershipId, email, workspaceId, workspace, role }: { membershipId: string; email: string; workspaceId: string; workspace: string; role: string }) {

@@ -1,5 +1,5 @@
-import { loadRootLifecycle } from '@/server/root/legacy/lifecycle';
-import { rootRoute, searchParamsObject } from '@/server/root/legacy/http';
+import { loadRootLifecycle } from '@/modules/root/server/admin/lifecycle';
+import { rootRoute, searchParamsObject } from '@/modules/root/server/admin/http';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';

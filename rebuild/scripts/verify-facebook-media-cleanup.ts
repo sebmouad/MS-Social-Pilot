@@ -1,6 +1,6 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { PrismaClient } from '../generated/client';
-import { hashLegacySessionToken } from '../src/server/auth';
+import { hashSessionToken } from '../src/server/auth';
 
 class ProbeFailure extends Error {}
 function check(value: unknown, message: string): asserts value { if (!value) throw new ProbeFailure(message); }
@@ -43,7 +43,7 @@ async function main() {
     await db.workspace.create({ data: { id: workspaceId, slug: workspaceId, name: 'Disposable cleanup evidence workspace', timezone: 'UTC' } });
     await db.user.create({ data: { id: userId, email: `${prefix}@example.test`, name: 'Disposable ordinary workspace owner', passwordHash: 'unusable-preview-password' } });
     await db.membership.create({ data: { id: `${prefix}_membership`, userId, workspaceId, role: 'owner' } });
-    for (const [index, token] of [rootToken, memberToken].entries()) await db.session.create({ data: { id: sessionIds[index]!, userId: index === 0 ? ownerId : userId, tokenHash: hashLegacySessionToken(token)!, expiresAt, pending: null } });
+    for (const [index, token] of [rootToken, memberToken].entries()) await db.session.create({ data: { id: sessionIds[index]!, userId: index === 0 ? ownerId : userId, tokenHash: hashSessionToken(token)!, expiresAt, pending: null } });
     await db.mcpApiKey.create({ data: { id: keyId, workspaceId, createdById: userId, name: 'Disposable media cleanup key', tokenHash: createHash('sha256').update(key).digest('hex'), tokenPrefix: key.slice(0, 12), readFeatures: ['publishing/posts'], writeFeatures: ['publishing/posts'], expiresAt } });
     await db.target.create({ data: { id: targetId, workspaceId, providerId: remoteTargetId, type: 'page', name: 'Synthetic cleanup Page', enabled: true, canPublish: true, createdAt: new Date() } });
     await db.$executeRaw`INSERT INTO rebuild_publication_attempts (id,"workspaceId","postId","postTargetId","targetId",provider,"actorId",state,reason) VALUES (${operationId},${workspaceId},${postId},${postTargetId},${targetId},'facebook',${ownerId},'uncertain','outcome_unknown')`;

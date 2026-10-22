@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { OperationError } from '@/lib/operation-error';
 import { prisma, getSessionByTokenHash } from '@/server/data';
-import { hashLegacyPassword, isUsableLegacySession, verifyLegacyPassword } from '@/server/auth';
+import { hashStoredPassword, isUsableSession, verifyPassword } from '@/server/auth';
 import { accountPasswordPolicy, auditAccountMutation, validateNewPassword } from '@/server/account-settings';
 import { runtimeConfig } from '@/server/config/store';
 import { loadEntitlements, canUseFeature } from '@/server/entitlements';
@@ -20,7 +20,7 @@ export async function authorizeAccountSession(actor: AccountActor, write = false
     getSessionByTokenHash(actor.sessionTokenHash), loadPermissions(actor.userId, actor.workspaceId),
     loadEntitlements(actor.userId, actor.workspaceId, { allowInstallationInspection: false }),
   ]);
-  if (!isUsableLegacySession(session, actor.userId)) throw new OperationError('unauthorized', 'Sign in to continue.');
+  if (!isUsableSession(session, actor.userId)) throw new OperationError('unauthorized', 'Sign in to continue.');
   if (!permissions || !entitlements || entitlements.workspaceId !== actor.workspaceId || !canUseFeature(entitlements, feature) || !canAccessFeature(permissions, feature, write ? 'write' : 'read')) throw new OperationError('forbidden', 'Account settings are unavailable.');
 }
 const authorize = authorizeAccountSession;
@@ -49,8 +49,8 @@ export async function changeAccountPassword(actor: AccountActor, input: unknown)
   const parsed = z.object({ currentPassword: z.string().min(1), newPassword: z.string(), confirmation: z.literal(accountConfirmations.password) }).strict().safeParse(input);
   if (!parsed.success || !validateNewPassword(parsed.data.newPassword, policy) || Buffer.byteLength(parsed.data.currentPassword, 'utf8') > policy.maxBytes) throw invalid();
   const user = await prisma.user.findUnique({ where: { id: actor.userId }, select: { passwordHash: true, disabledAt: true } });
-  if (!user || user.disabledAt || !verifyLegacyPassword(parsed.data.currentPassword, user.passwordHash)) throw new OperationError('invalid_request', 'Current password is incorrect.');
-  const passwordHash = hashLegacyPassword(parsed.data.newPassword);
+  if (!user || user.disabledAt || !verifyPassword(parsed.data.currentPassword, user.passwordHash)) throw new OperationError('invalid_request', 'Current password is incorrect.');
+  const passwordHash = hashStoredPassword(parsed.data.newPassword);
   await prisma.$transaction(async tx => {
     const changed = await tx.user.updateMany({ where: { id: actor.userId, disabledAt: null, passwordHash: user.passwordHash }, data: { passwordHash } });
     if (changed.count !== 1) throw new OperationError('conflict', 'Account changed. Refresh before retrying.');

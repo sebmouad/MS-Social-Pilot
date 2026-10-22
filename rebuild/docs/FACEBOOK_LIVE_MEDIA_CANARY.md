@@ -112,3 +112,17 @@ Its corresponding hashed Page lock remains beside the run directories. Temporary
 nonsecret probe files remain at `/tmp/socialpilot-media55-3kdilqlk` for this
 investigation. Preserve the ledger and lock until an explicitly documented,
 externally verified resolution. Do not delete evidence to make the canary pass.
+
+
+## Current probe credential source — 2026-10-22
+
+The retained live probe now imports `src/platforms/facebook/probe-credentials.ts`
+from the **rebuild application directory** selected by
+`MSP_FACEBOOK_PROBE_APP_ROOT`. Run from that directory with its environment and
+`--import tsx` so its own TypeScript aliases resolve. The Facebook module reads
+validated Root settings and the existing encrypted credential format; the probe
+no longer loads repository-root `src/lib/settings`, `env` or `crypto`. Existing
+endpoint/signing guards and private canary ledgers/locks remain required. Do not
+replay an unresolved write to verify this source refactor. This change has local
+import/syntax/unit evidence only; historical provider results above do not prove
+the refactored probe on a live host.

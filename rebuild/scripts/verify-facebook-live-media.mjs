@@ -1,12 +1,12 @@
 /**
  * Explicit, bounded live multi-photo canary for the reviewed Facebook engine.
  *
- * This is an engine-only bridge to legacy credentials, not a rebuild UI/API/MCP
+ * This is an engine-only bridge to stored credentials, not a rebuild UI/API/MCP
  * or production-journal test. It never writes to the database. The private
  * file journal commits each photo/feed/delete intent and receipt before the
  * engine can continue. Unknown outcomes are retained and never replayed.
  *
- * Run only after review, on the authorized host, from the legacy app root with
+ * Run only after review, on the authorized host, from the rebuild app root with
  * `node --env-file=.env --import tsx`. Required inputs are documented in the
  * final operator note returned to the parent; no environment values are logged.
  */
@@ -367,21 +367,13 @@ export async function main() {
   if (expectedGraphOrigin.protocol !== 'https:' || expectedGraphOrigin.username || expectedGraphOrigin.password
     || expectedGraphOrigin.pathname !== '/' || expectedGraphOrigin.search || expectedGraphOrigin.hash) throw shapeError();
   const requireFromApp = createRequire(join(resolve(appRoot), 'package.json'));
-  activeStage = 'legacy_credential_preflight';
+  activeStage = 'stored_credential_preflight';
   const { PrismaClient } = requireFromApp('@prisma/client');
-  const settingsImport = await import(pathToFileURL(join(appRoot, 'src/lib/settings/index.ts')).href);
-  const settings = settingsImport.default ?? settingsImport;
-  await settings.ensureSettings();
-  const envImport = await import(pathToFileURL(join(appRoot, 'src/lib/env.ts')).href);
-  const { env } = envImport.default ?? envImport;
-  const cryptoImport = await import(pathToFileURL(join(appRoot, 'src/lib/crypto.ts')).href);
-  const { decryptSecret } = cryptoImport.default ?? cryptoImport;
+  const credentialsImport = await import(pathToFileURL(join(appRoot, 'src/platforms/facebook/probe-credentials.ts')).href);
+  const { decryptSecret, configuredFacebookProbeConfig } = credentialsImport.default ?? credentialsImport;
   const config = JSON.parse(defaultsFile.bytes.toString('utf8'));
   if (!Number.isSafeInteger(config.maxImageUploadBytes) || fixtureImages.some(image => image.bytes.byteLength > config.maxImageUploadBytes)) throw shapeError();
-  config.graphBaseUrl = env.graphBaseUrl;
-  config.graphVersion = env.graphVersion;
-  config.requestTimeoutMs = env.graphTimeoutMs;
-  config.appSecret = env.facebookAppSecret;
+  Object.assign(config, await configuredFacebookProbeConfig(config));
   const graphEndpoint = new URL(config.graphBaseUrl);
   if (graphEndpoint.origin !== expectedGraphOrigin.origin || graphEndpoint.username || graphEndpoint.password
     || config.appSecretProofEnabled !== true || !config.appSecret?.trim()) throw shapeError();
@@ -539,7 +531,7 @@ export async function main() {
     providerWriteMayHaveOccurred: ledger.steps.length > 0 || ledger.feed !== null,
     productionDatabaseWrites: false,
     rebuildUiApiMcpVerified: false,
-    limitation: 'Engine-only legacy credential bridge; no production database journal or rebuild UI/API/MCP path was exercised.',
+    limitation: 'Engine-only stored credential bridge; no production database journal or rebuild UI/API/MCP path was exercised.',
   });
   if (!cleanLedger) process.exitCode = 2;
 }

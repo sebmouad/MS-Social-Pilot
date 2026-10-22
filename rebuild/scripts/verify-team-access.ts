@@ -1,7 +1,7 @@
 /** Disposable localhost-only verification of the real Team HTTP, PostgreSQL and MCP boundaries. */
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { PrismaClient } from '../generated/client';
-import { hashLegacySessionToken } from '../src/server/auth';
+import { hashSessionToken } from '../src/server/auth';
 
 class ProbeFailure extends Error {}
 function check(condition: unknown, message: string): asserts condition { if (!condition) throw new ProbeFailure(message); }
@@ -45,7 +45,7 @@ async function main() {
     for (const [id, userId, role] of [[actorMembershipId, actorId, 'owner'], [secondMembershipId, secondOwnerId, 'owner'], [adminMembershipId, adminId, 'admin']] as const) await db.membership.create({ data: { id, userId, workspaceId, role } });
     // An independent membership proves removal preserves unrelated access.
     await db.membership.create({ data: { id: `${prefix}_foreign_membership`, userId: memberId, workspaceId: foreignWorkspaceId, role: 'viewer' } });
-    for (const [id, userId, value] of [[`${prefix}_session`, actorId, token], [`${prefix}_admin_session`, adminId, adminToken]]) await db.session.create({ data: { id, userId, tokenHash: hashLegacySessionToken(value)!, expiresAt, pending: null } });
+    for (const [id, userId, value] of [[`${prefix}_session`, actorId, token], [`${prefix}_admin_session`, adminId, adminToken]]) await db.session.create({ data: { id, userId, tokenHash: hashSessionToken(value)!, expiresAt, pending: null } });
     for (const [index, bearer] of [readKey, writeKey].entries()) await db.mcpApiKey.create({ data: { id: keyIds[index]!, workspaceId, createdById: actorId, name: 'Disposable Team probe', tokenHash: createHash('sha256').update(bearer).digest('hex'), tokenPrefix: bearer.slice(0, 12), expiresAt, readFeatures: ['settings/team'], writeFeatures: index ? ['settings/team'] : [] } });
     for (const [id, workspace] of [[targetId, workspaceId], [foreignTargetId, foreignWorkspaceId]]) {
       const socialId = `${id}_source`;

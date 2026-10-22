@@ -1,5 +1,5 @@
-import { listRootConnections } from '@/server/root/legacy/connections';
-import { rootRoute, searchParamsObject } from '@/server/root/legacy/http';
+import { listRootConnections } from '@/modules/root/server/admin/connections';
+import { rootRoute, searchParamsObject } from '@/modules/root/server/admin/http';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';

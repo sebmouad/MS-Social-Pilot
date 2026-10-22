@@ -1,7 +1,7 @@
 import { CONFIG_BY_KEY } from '@/lib/config/registry';
 import { synchronousPolicy } from './synchronous-policy';
 import { cookies } from 'next/headers';
-import { hashLegacySessionToken, isUsableLegacySession, LEGACY_SESSION_COOKIE } from './auth';
+import { hashSessionToken, isUsableSession, SESSION_COOKIE } from './auth';
 import { prisma } from './data';
 import { runtimeConfig } from './config/store';
 import { decryptSecret, encryptSecret } from './secret-crypto';
@@ -47,10 +47,10 @@ export async function postAuthenticationPath(): Promise<'/join' | '/home'> {
 
 export type InvitationAccount = { id: string; email: string; sessionId: string; totpEnabled: boolean; hasPasskey: boolean; isInstanceOwner: boolean };
 
-/** Returns account details only for the current, unexpired, fully verified legacy session. */
+/** Returns account details only for the current, unexpired, fully verified stored session. */
 export async function signedInInvitationAccount(): Promise<InvitationAccount | null> {
-  const token = (await cookies()).get(LEGACY_SESSION_COOKIE)?.value;
-  const tokenHash = token ? hashLegacySessionToken(token) : null;
+  const token = (await cookies()).get(SESSION_COOKIE)?.value;
+  const tokenHash = token ? hashSessionToken(token) : null;
   if (!tokenHash) return null;
   const session = await prisma.session.findUnique({
     where: { tokenHash },
@@ -59,7 +59,7 @@ export async function signedInInvitationAccount(): Promise<InvitationAccount | n
       user: { select: { id: true, email: true, disabledAt: true, totpEnabledAt: true, isInstanceOwner: true, _count: { select: { passkeys: true } } } },
     },
   });
-  if (!isUsableLegacySession(session, undefined)) return null;
+  if (!isUsableSession(session, undefined)) return null;
   return {
     id: session.user.id, email: session.user.email, sessionId: session.id,
     totpEnabled: Boolean(session.user.totpEnabledAt), hasPasskey: session.user._count.passkeys > 0,
@@ -71,8 +71,8 @@ export async function signedInInvitationAccount(): Promise<InvitationAccount | n
 export async function beginInvitationEnrollment(): Promise<void> {
   const account = await signedInInvitationAccount();
   if (!account || account.totpEnabled || account.hasPasskey) throw new Error('A verified account without a second factor is required.');
-  const token = (await cookies()).get(LEGACY_SESSION_COOKIE)?.value;
-  const tokenHash = token ? hashLegacySessionToken(token) : null;
+  const token = (await cookies()).get(SESSION_COOKIE)?.value;
+  const tokenHash = token ? hashSessionToken(token) : null;
   if (!tokenHash) throw new Error('Your sign-in has expired.');
   const pendingMinutes = await runtimeConfig('auth.pendingMinutes') as number;
   if (!CONFIG_BY_KEY.get('auth.pendingMinutes')?.schema.safeParse(pendingMinutes).success) throw new Error('Two-step policy is unavailable.');
@@ -82,5 +82,5 @@ export async function beginInvitationEnrollment(): Promise<void> {
     data: { pending: 'enroll', challenge: null, expiresAt },
   });
   if (result.count !== 1) throw new Error('Your sign-in has expired.');
-  (await cookies()).set(LEGACY_SESSION_COOKIE, token!, { httpOnly: true, sameSite: 'lax', secure: process.env.NODE_ENV === 'production', path: '/', maxAge: pendingMinutes * 60, expires: expiresAt });
+  (await cookies()).set(SESSION_COOKIE, token!, { httpOnly: true, sameSite: 'lax', secure: process.env.NODE_ENV === 'production', path: '/', maxAge: pendingMinutes * 60, expires: expiresAt });
 }

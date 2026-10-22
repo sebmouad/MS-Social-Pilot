@@ -1,7 +1,7 @@
 import { requestOrigin } from '@/server/request-origin';
 import { currentRootActor } from '@/server/config/access';
 import { OperationError, operationFailure } from '@/lib/operation-error';
-import { adoptRootLegacyPublication, finishRootPublicationProjection, listRootPublicationAttempts, recordRootPublicationOutcome } from '@/server/root/publication-attempts';
+import { adoptRootAdminPublication, finishRootPublicationProjection, listRootPublicationAttempts, recordRootPublicationOutcome } from '@/server/root/publication-attempts';
 
 export const dynamic = 'force-dynamic';
 const reply = (body: unknown, status = 200) => Response.json(body, { status, headers: { 'cache-control': 'no-store' } });
@@ -30,7 +30,7 @@ export async function POST(request: Request) {
     const current = await actor();
     const input = await request.json();
     if (input?.action === 'finish') return reply(await finishRootPublicationProjection(current.id, { operationId: input.operationId, confirmation: input.confirmation }));
-    if (input?.action === 'adopt') return reply(await adoptRootLegacyPublication(current.id, { postTargetId: input.postTargetId, confirmation: input.confirmation }));
+    if (input?.action === 'adopt') return reply(await adoptRootAdminPublication(current.id, { postTargetId: input.postTargetId, confirmation: input.confirmation }));
     if (input?.action !== undefined && input.action !== 'record') throw new OperationError('invalid_request', 'Choose a supported publication recovery action.');
     const { action: _action, ...outcome } = input;
     return reply(await recordRootPublicationOutcome(current.id, outcome));

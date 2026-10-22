@@ -1,5 +1,5 @@
 import { PrismaClient, type PostStatus, type PostTargetStatus } from '../generated/client';
-import { hashLegacyPassword } from '../src/server/auth';
+import { hashStoredPassword } from '../src/server/auth';
 import { encryptSecret } from '../src/server/secret-crypto';
 import { preparePreviewInbox } from './preview-inbox';
 import { preparePreviewMedia, PREVIEW_IMAGES } from './preview-media';
@@ -113,7 +113,7 @@ async function main() {
   const fakeChannelCredential = encryptSecret('FAKE_PREVIEW_CHANNEL_TOKEN_NOT_VALID');
   await setPreviewConfig();
   if (images) await prisma.appSetting.upsert({ where: { key: 'storage.mediaRoot' }, create: { key: 'storage.mediaRoot', value: images.root, encrypted: false, updatedAt: stamp }, update: { value: images.root, encrypted: false, updatedAt: stamp } });
-  const passwordHash = hashLegacyPassword(password!);
+  const passwordHash = hashStoredPassword(password!);
   await prisma.user.upsert({ where: { id: userId }, create: { id: userId, email: email!, name: 'Preview QA', passwordHash, isInstanceOwner: true, createdAt: stamp, updatedAt: stamp }, update: { email: email!, name: 'Preview QA', passwordHash, isInstanceOwner: true, disabledAt: null, updatedAt: stamp } });
   await prisma.$executeRaw`UPDATE users SET "emailVerifiedAt" = ${stamp} WHERE id = ${userId}`;
   await prisma.workspace.upsert({ where: { id: workspaceId }, create: { id: workspaceId, name: 'Preview QA Workspace', slug: `${FIXTURE}qa-workspace`, timezone: 'Africa/Casablanca', createdAt: stamp, updatedAt: stamp }, update: { name: 'Preview QA Workspace', timezone: 'Africa/Casablanca', updatedAt: stamp } });

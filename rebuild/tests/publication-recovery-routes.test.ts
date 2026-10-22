@@ -5,7 +5,7 @@ vi.mock('../src/server/context', () => ({ requireViewer: state.viewer }));
 vi.mock('../src/server/config/access', () => ({ currentRootActor: state.root }));
 vi.mock('../src/modules/publishing/server/publication', () => ({ getPublicationStatus: state.status, recordPublicationOutcome: state.record, finishPublicationProjection: state.finish, adoptLegacyPublication: state.adopt }));
 vi.mock('../src/modules/publishing/server/status', () => ({ syncPublicationStatus: state.sync }));
-vi.mock('../src/server/root/publication-attempts', () => ({ listRootPublicationAttempts: state.rootList, recordRootPublicationOutcome: state.rootRecord, finishRootPublicationProjection: state.rootFinish, adoptRootLegacyPublication: state.rootAdopt }));
+vi.mock('../src/server/root/publication-attempts', () => ({ listRootPublicationAttempts: state.rootList, recordRootPublicationOutcome: state.rootRecord, finishRootPublicationProjection: state.rootFinish, adoptRootAdminPublication: state.rootAdopt }));
 import * as customer from '../src/app/api/publishing/recovery/route';
 import * as root from '../src/app/api/root/publication-attempts/route';
 

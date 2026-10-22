@@ -4,10 +4,10 @@ const h = vi.hoisted(() => ({
   tx: { user: { findUnique: vi.fn() }, socialAccount: { findFirst: vi.fn(), updateMany: vi.fn() }, workspaceDataPurge: { findUnique: vi.fn() }, $queryRaw: vi.fn(), $executeRaw: vi.fn() },
 }));
 vi.mock('../src/server/data', () => ({ prisma: { user: { findUnique: h.root }, socialAccount: { findUnique: h.owner }, $transaction: h.transaction } }));
-vi.mock('../src/server/root/legacy/policy', () => ({ legacySetting: async (key: string) => key.endsWith('TimeoutMs') ? 60000 : 5000 }));
+vi.mock('../src/modules/root/server/admin/policy', () => ({ adminSetting: async (key: string) => key.endsWith('TimeoutMs') ? 60000 : 5000 }));
 vi.mock('../src/server/platforms', () => ({ PLATFORM_HOSTS: { facebook: { connection: { renewToken: h.renew } }, nohook: { connection: {} } } }));
 import { encryptSecret, decryptSecret } from '../src/server/secret-crypto';
-import { refreshRootConnection } from '../src/server/root/legacy/connection-refresh';
+import { refreshRootConnection } from '../src/modules/root/server/admin/connection-refresh';
 
 const input = { socialAccountId: 'c1', confirmation: 'REFRESH CONNECTION c1' };
 const root = { isInstanceOwner: true, disabledAt: null };

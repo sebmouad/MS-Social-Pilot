@@ -1,8 +1,9 @@
+/** Read-only historical mapping for migration verification; no import/write entry point. */
 import type { ConfigKey } from '@/lib/config/registry';
 import { FACEBOOK_CONNECTION_CALLBACK_PATH } from '@/platforms/facebook/protocol';
 
-export type LegacySettingRow = { key: string; value: unknown; encrypted: boolean };
-export type LegacyConfigCandidate = { key: ConfigKey; source: string; value: unknown; secret: boolean };
+export type SourceSettingRow = { key: string; value: unknown; encrypted: boolean };
+export type ExpectedSetting = { key: ConfigKey; source: string; value: unknown; secret: boolean };
 
 const mappings = [
   ['facebook.appId', 'meta.appId'],
@@ -12,17 +13,11 @@ const mappings = [
   ['facebook.scopes', 'meta.oauthScopes'],
 ] as const satisfies ReadonlyArray<readonly [string, ConfigKey]>;
 
-export const legacyFacebookSettingKeys = [
-  ...mappings.map(([source]) => source),
-  'facebook.requestTimeoutSeconds',
-  'ai.openaiKey', 'ai.geminiKey', 'ai.provider', 'ai.model', 'ai.rateLimitPerHour',
-] as const;
-
-/** Legacy stored one model for the selected provider; the rebuild keeps one model per provider. */
+/** The source application stored one model for the selected provider; the rebuild keeps one model per provider. */
 const AI_MODEL_KEY: Record<string, ConfigKey> = { anthropic: 'ai.model', openai: 'ai.openaiModel', gemini: 'ai.geminiModel' };
 
-export function legacyConfigCandidates(
-  rows: readonly LegacySettingRow[],
+export function expectedMigratedSettings(
+  rows: readonly SourceSettingRow[],
   options: {
     appUrl?: string;
     authPolicy?: string;
@@ -30,15 +25,15 @@ export function legacyConfigCandidates(
     loginWindowMinutes?: string;
     decrypt: (encrypted: string) => string;
   },
-): LegacyConfigCandidate[] {
+): ExpectedSetting[] {
   const byKey = new Map(rows.map(row => [row.key, row]));
-  const candidates: LegacyConfigCandidate[] = [];
+  const candidates: ExpectedSetting[] = [];
   for (const [source, key] of mappings) {
     const row = byKey.get(source);
     if (!row || row.value === null || row.value === '') continue;
     let value = row.value;
     if (source === 'facebook.appSecret') {
-      if (typeof value !== 'string' || !row.encrypted) throw new Error('Legacy Facebook app secret is not stored in the expected encrypted format.');
+      if (typeof value !== 'string' || !row.encrypted) throw new Error('Source Facebook app secret is not stored in the expected encrypted format.');
       value = options.decrypt(value);
     }
     if (source === 'facebook.scopes' && typeof value === 'string') value = value.split(',').map(part => part.trim()).filter(Boolean);
@@ -51,18 +46,18 @@ export function legacyConfigCandidates(
   }
   if (options.appUrl) {
     const base = new URL(options.appUrl);
-    if (base.protocol !== 'https:') throw new Error('Legacy APP_URL must use HTTPS before importing an OAuth redirect.');
+    if (base.protocol !== 'https:') throw new Error('Source APP_URL must use HTTPS before importing an OAuth redirect.');
     candidates.push({ key: 'meta.oauthRedirectUri', source: 'APP_URL', value: new URL(FACEBOOK_CONNECTION_CALLBACK_PATH, base).toString(), secret: false });
   }
   if (options.authPolicy !== undefined) {
-    // Legacy sign-in treated any defined, unrecognized value as "everyone".
+    // Source sign-in treated any defined, unrecognized value as "everyone".
     const policy = ['off', 'admins', 'everyone'].includes(options.authPolicy) ? options.authPolicy : 'everyone';
     candidates.push({ key: 'security.twoStep', source: 'SECURITY_TWO_STEP', value: policy, secret: false });
   }
   for (const [source, key] of [['ai.openaiKey', 'ai.openaiApiKey'], ['ai.geminiKey', 'ai.geminiApiKey']] as const) {
     const row = byKey.get(source);
     if (!row || row.value === null || row.value === '') continue;
-    if (typeof row.value !== 'string' || !row.encrypted) throw new Error(`Legacy ${source} is not stored in the expected encrypted format.`);
+    if (typeof row.value !== 'string' || !row.encrypted) throw new Error(`Source ${source} is not stored in the expected encrypted format.`);
     candidates.push({ key, source, value: options.decrypt(row.value), secret: true });
   }
   const provider = byKey.get('ai.provider')?.value;

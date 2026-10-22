@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { revokeRootRegistrationInvitation } from '@/server/root/registration-admin';
-import { readBody, rootRoute } from '@/server/root/legacy/http';
+import { readBody, rootRoute } from '@/modules/root/server/admin/http';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const DELETE = rootRoute<{ params: Promise<{ id: string }> }>({ write: true }, async (request, actorId, { params }) => {

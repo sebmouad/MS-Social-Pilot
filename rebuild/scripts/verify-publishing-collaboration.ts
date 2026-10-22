@@ -1,7 +1,7 @@
 /** Guarded, synthetic-only localhost/PostgreSQL/MCP probe for Publishing collaboration. */
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { Prisma, PrismaClient } from '../generated/client';
-import { hashLegacySessionToken } from '../src/server/auth';
+import { hashSessionToken } from '../src/server/auth';
 
 class ProbeFailure extends Error {}
 function check(condition: unknown, message: string): asserts condition { if (!condition) throw new ProbeFailure(message); }
@@ -74,7 +74,7 @@ async function main() {
       await db.membership.create({ data: { id: `${prefix}_root_membership_${index}`, userId: rootId, workspaceId, role: 'owner' } });
       await db.membership.create({ data: { id: `${prefix}_owner_membership_${index}`, userId: ownerId, workspaceId, role: 'owner' } });
     }
-    await db.session.create({ data: { id: `${prefix}_root_session`, userId: rootId, tokenHash: hashLegacySessionToken(token)!, expiresAt, pending: null } });
+    await db.session.create({ data: { id: `${prefix}_root_session`, userId: rootId, tokenHash: hashSessionToken(token)!, expiresAt, pending: null } });
     await db.mcpApiKey.create({ data: { id: keyId, workspaceId: workspaceA, createdById: ownerId, name: 'Disposable labels and explorer probe key', tokenHash: tokenHash(bearer), tokenPrefix: bearer.slice(0, 12), expiresAt, readFeatures: ['publishing/collaboration'], writeFeatures: ['publishing/collaboration'] } });
 
     stage = 'enable collaboration and authenticated workspace MCP';

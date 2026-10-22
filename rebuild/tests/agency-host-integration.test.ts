@@ -3,7 +3,7 @@ import { resolveEntitlements } from '@/server/entitlements';
 import { resolvePermissions } from '@/server/permissions';
 import { CONFIG_BY_KEY, safeConfigShape } from '@/lib/config/registry';
 import { moduleManifests } from '@/modules';
-import { PRODUCT_PLAN_FEATURES } from '@/server/root/legacy/shared';
+import { PRODUCT_PLAN_FEATURES } from '@/modules/root/server/admin/shared';
 const source = { workspace: { id: 'w', disabledModules: [] as string[] }, membership: { userId: 'u', disabledModules: [] as string[] }, planFeatures: null as string[] | null };
 describe('Agency host authority and Root controls', () => {
   it('declares separate pages and Root configuration ownership', () => {
