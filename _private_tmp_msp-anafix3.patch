@@ -1,0 +1,172 @@
+diff --git a/rebuild/src/modules/analytics/config.ts b/rebuild/src/modules/analytics/config.ts
+index 21f08e50..43e6b119 100644
+--- a/rebuild/src/modules/analytics/config.ts
++++ b/rebuild/src/modules/analytics/config.ts
+@@ -1,6 +1,7 @@
+ import { reportDocumentCatalogDefaults, reportDocumentCopySchema } from './reports/generation/copy';
+ import { overviewCopyCatalogDefaults, overviewCopySchema } from './overview-copy';
+ import { responseTimeCopyDefaults, responseTimeCopySchema, errorCopyDefaults, errorCopySchema, recordsCopyDefaults, recordsCopySchema, workspaceCopyDefaults, workspaceCopySchema, demographicsCopyDefaults, demographicsCopySchema, reportCopyDefaults, goalsCopyDefaults, downloadCopyDefaults, reportCopySchema, goalsCopySchema, downloadCopySchema } from './copy';
++import { overviewOrderDefaults, overviewOrderSchema } from './overview-order';
+ import { z } from 'zod';
+ import { entry, cron } from '@/lib/config/entry';
+ import { DEMOGRAPHICS_CONFIG } from './demographics/config';
+@@ -37,6 +38,7 @@ export const ANALYTICS_MODULE_CONFIG = [
+   ...ANALYTICS_EXPLORER_CONFIG,
+   entry({ key: 'analytics.defaultRangeDays', group: 'Analytics metrics', label: 'Default analytics window (days)', kind: 'number', description: 'Default inclusive UTC calendar window; capped by the maximum range.', defaultValue: 30, schema: z.number().int().min(1).max(3650), consumption: 'active' }),
+   entry({ key: 'analytics.metricPageSize', group: 'Analytics metrics', label: 'Metrics per page', kind: 'number', description: 'Number of metric summaries shown on one Analytics page.', defaultValue: 12, schema: z.number().int().min(1).max(100), consumption: 'active' }),
++  entry({ key: 'analytics.overviewOrder', group: 'Analytics metrics', label: 'Overview metric order', kind: 'json', description: 'Which resource kind leads the overview, the metric-key fragments that rank first (views and reach, then engagement, then follows) and whether empty ratio or cost metrics sink to the end.', defaultValue: overviewOrderDefaults, schema: overviewOrderSchema, consumption: 'active' }),
+   entry({ key: 'analytics.detailPageSize', group: 'Analytics metrics', label: 'Metric detail rows per page', kind: 'number', description: 'Number of dated values or resource/category rows on one detail page.', defaultValue: 50, schema: z.number().int().min(1).max(1000), consumption: 'active' }),
+   entry({ key: 'analytics.chartPoints', group: 'Analytics metrics', label: 'Chart preview points', kind: 'number', description: 'Latest dated points shown in metric previews; full series remains available through detail pagination.', defaultValue: 28, schema: z.number().int().min(1).max(3660), consumption: 'active' }),
+   entry({ key: 'analytics.searchMaxLength', group: 'Analytics metrics', label: 'Metric search length', kind: 'number', description: 'Maximum characters accepted by Analytics metric search.', defaultValue: 200, schema: z.number().int().min(1).max(2000), consumption: 'active' }),
+diff --git a/rebuild/src/modules/analytics/overview-order.ts b/rebuild/src/modules/analytics/overview-order.ts
+new file mode 100644
+index 00000000..1b33d688
+--- /dev/null
++++ b/rebuild/src/modules/analytics/overview-order.ts
+@@ -0,0 +1,19 @@
++import { z } from 'zod';
++
++/** Root-managed order of overview metric cards; every value is a setting, nothing here is a rule about a provider. */
++export const overviewOrderSchema = z.object({
++  /** Which kind of resource leads: channel measures before ad-account measures by default. */
++  resourceOrder: z.array(z.enum(['channel', 'ad-account'])).min(1).max(2),
++  /** Case-insensitive fragments of a metric key, most important first (views/reach, then engagement, then follows). */
++  headlinePriority: z.array(z.string().min(1).max(100)).max(100),
++  /** Ratio, cost and rate measures whose total is zero or unknown sink below real figures. */
++  demoteEmptyRatios: z.boolean(),
++}).strict();
++
++export type OverviewOrder = z.infer<typeof overviewOrderSchema>;
++
++export const overviewOrderDefaults: OverviewOrder = {
++  resourceOrder: ['channel', 'ad-account'],
++  headlinePriority: ['media_view', 'views', 'reach', 'impressions', 'engage', 'reaction', 'comment', 'share', 'click', 'follow', 'fan'],
++  demoteEmptyRatios: true,
++};
+diff --git a/rebuild/src/modules/analytics/server/aggregate.ts b/rebuild/src/modules/analytics/server/aggregate.ts
+index eadff6d1..36cda50b 100644
+--- a/rebuild/src/modules/analytics/server/aggregate.ts
++++ b/rebuild/src/modules/analytics/server/aggregate.ts
+@@ -1,4 +1,5 @@
+ import { workspaceCopyDefaults, workspaceText, type WorkspaceCopy } from '../workspace-copy';
++import type { OverviewOrder } from '../overview-order';
+ import { aggregateValues, type AnalyticsAudienceEntry, type AnalyticsKind, type AnalyticsMetricInput } from './catalog';
+ 
+ export type MetricView = {
+@@ -81,6 +82,18 @@ function metricView(input: AnalyticsMetricInput, copy: WorkspaceCopy, locale: 'e
+   };
+ }
+ 
++const ratioUnits = new Set(['currency', 'percent', 'multiple']);
++
++/** Overview order: configured resource kind first, then empty ratios last, then configured priority, source and label. */
++export function orderOverviewMetrics(metrics: MetricView[], order: OverviewOrder): MetricView[] {
++  const fragments = order.headlinePriority.map(item => item.toLocaleLowerCase());
++  const resourceRank = (metric: MetricView) => { const index = order.resourceOrder.indexOf(metric.resourceKind); return index < 0 ? order.resourceOrder.length : index; };
++  const priority = (metric: MetricView) => { const key = metric.key.toLocaleLowerCase(); const index = fragments.findIndex(item => key.includes(item)); return index < 0 ? fragments.length : index; };
++  const emptyRatio = (metric: MetricView) => order.demoteEmptyRatios && (metric.kind === 'ratio' || ratioUnits.has(metric.unit)) && (metric.total === null || metric.total === 0) ? 1 : 0;
++  return metrics.slice().sort((a, b) => resourceRank(a) - resourceRank(b) || emptyRatio(a) - emptyRatio(b) || priority(a) - priority(b)
++    || (a.sourceLabel === b.sourceLabel ? a.label.localeCompare(b.label) : a.sourceLabel.localeCompare(b.sourceLabel)));
++}
++
+ /** Generic aggregation over normalized inputs. It has no provider/schema knowledge. */
+ export function buildAnalytics(metrics: AnalyticsMetricInput[], audienceEntries: AnalyticsAudienceEntry[], audienceSelected: number, copy: WorkspaceCopy = workspaceCopyDefaults, locale: 'en' | 'fr' = 'en') {
+   const audience = {
+diff --git a/rebuild/src/modules/analytics/server/read.ts b/rebuild/src/modules/analytics/server/read.ts
+index 6194022c..7179206a 100644
+--- a/rebuild/src/modules/analytics/server/read.ts
++++ b/rebuild/src/modules/analytics/server/read.ts
+@@ -13,7 +13,9 @@ import { prisma } from '@/server/data';
+ import { assertWorkspaceNotPurging } from '@/server/data-control/guard';
+ import { canAccessFeature } from '@/server/permissions';
+ import { loadPermissions } from '@/server/permissions/loader';
+-import { buildAnalytics, type MetricView } from '@/modules/analytics/server/aggregate';
++import { overviewOrderSchema } from '../overview-order';
++import { configOrDefault } from '@/server/config/config-or-default';
++import { buildAnalytics, orderOverviewMetrics, type MetricView } from '@/modules/analytics/server/aggregate';
+ import { loadAnalytics, type AnalyticsAdScope } from '@/modules/analytics/server/data';
+ import { AnalyticsComparisonError, analyticsDateRange, compareAnalytics } from './comparison';
+ import { buildPreviousPoints } from './previous-points';
+@@ -194,7 +196,7 @@ async function loadSnapshot(actor: AnalyticsReadActor, rawInput: unknown, constr
+   assertUniqueMetricKeys(currentData.metrics);
+   const [copy, locale] = await Promise.all([metricCopy(), analyticsLanguage()]);
+   const view = buildAnalytics(currentData.metrics, currentData.audienceEntries, currentData.audienceSelected, copy, locale);
+-  const allMetrics = view.metrics;
++  const allMetrics = orderOverviewMetrics(view.metrics, await configOrDefault('analytics.overviewOrder', overviewOrderSchema));
+   const comparisonData = period.comparison
+     ? await loadAnalytics(actor.workspaceId, selectedChannelIds, period.comparison.range, access.allowedChannelIds, selectedAdIds, access.allowedProviders, access.adScope)
+     : null;
+diff --git a/rebuild/tests/analytics-overview-order.test.ts b/rebuild/tests/analytics-overview-order.test.ts
+new file mode 100644
+index 00000000..096f4410
+--- /dev/null
++++ b/rebuild/tests/analytics-overview-order.test.ts
+@@ -0,0 +1,55 @@
++import { describe, expect, it, vi } from 'vitest';
++
++vi.mock('../src/server/data', () => ({ prisma: {} }));
++vi.mock('@/modules/analytics/server/error-copy', () => ({ analyticsLanguage: async () => 'en' }));
++vi.mock('@/server/config/store', () => ({ runtimeConfig: async () => ({}), runtimeConfigBatch: async () => ({}) }));
++
++import { normalizeFacebookAnalytics } from '../src/platforms/facebook/analytics';
++import { buildAnalytics, orderOverviewMetrics } from '../src/modules/analytics/server/aggregate';
++import { overviewOrderDefaults, overviewOrderSchema } from '../src/modules/analytics/overview-order';
++import { ANALYTICS_MODULE_CONFIG } from '../src/modules/analytics/config';
++
++const targets = Array.from({ length: 10 }, (_, index) => ({ id: `page-${index}`, name: `Page ${index}`, type: 'page', providerId: 'facebook', socialAccountId: 's' })) as Array<{ id: string; name: string }>;
++const account = { id: 'ad-1', name: 'Ad account', currency: 'USD' };
++const posts = targets.flatMap(target => [10, 11].map(day => ({
++  createdTime: new Date(`2026-10-${day}T10:00:00Z`), insightsSyncedAt: new Date('2026-10-12T00:00:00Z'), target: { id: target.id, name: target.name },
++  insights: { post_media_view: 20, post_total_media_view_unique: 12, reactions: 3, comments: 1 },
++})));
++const adRow = { date: new Date('2026-10-10'), spend: 0, impressions: 0, clicks: 0, reach: 0, cpc: 0, cpm: 0, cpp: 0, ctr: 0, frequency: 0, actions: [], fields: {}, fetchedAt: new Date('2026-10-12'), adAccount: account };
++
++function overview(order = overviewOrderDefaults) {
++  const input = normalizeFacebookAnalytics({ locale: 'en', pageRows: [], audienceRows: [], adRows: [adRow] as never, postRows: posts as never, selectedTargets: targets as never, selectedAdAccounts: [account] });
++  return orderOverviewMetrics(buildAnalytics(input.metrics, [], 10).metrics, order);
++}
++
++describe('overview metric order', () => {
++  it('returns Page series built from post insights for ten Pages next to an ad account', () => {
++    const views = overview().find(metric => metric.key === 'post:post_media_view')!;
++    expect(views.coverage).toBe(10);
++    expect(views.total).toBe(400);
++  });
++  it('leads with Page media views, then reach, then engagement, with channel metrics before ads', () => {
++    const items = overview();
++    expect(items[0]!.key).toBe('post:post_media_view');
++    const keys = items.map(metric => metric.key);
++    expect(keys.indexOf('post:post_total_media_view_unique')).toBeLessThan(keys.indexOf('post:reactions'));
++    const firstAd = items.findIndex(metric => metric.resourceKind === 'ad-account');
++    expect(firstAd).toBeGreaterThan(0);
++    expect(items.slice(0, firstAd).every(metric => metric.resourceKind === 'channel')).toBe(true);
++  });
++  it('never leads with an empty cost or ratio metric', () => {
++    const items = overview({ ...overviewOrderDefaults, resourceOrder: ['ad-account', 'channel'] });
++    const cost = items.find(metric => /per person reached/i.test(metric.label));
++    expect(cost).toBeDefined();
++    expect(items[0]).not.toBe(cost);
++  });
++  it('lets Root change the order', () => {
++    const items = overview({ ...overviewOrderDefaults, headlinePriority: ['reactions'] });
++    expect(items[0]!.key).toBe('post:reactions');
++  });
++  it('declares an active, valid Root setting', () => {
++    const entry = ANALYTICS_MODULE_CONFIG.find(item => item.key === 'analytics.overviewOrder')!;
++    expect(entry.consumption).toBe('active');
++    expect(overviewOrderSchema.safeParse(entry.defaultValue).success).toBe(true);
++  });
++});
+diff --git a/rebuild/tests/analytics-read.test.ts b/rebuild/tests/analytics-read.test.ts
+index cff93016..f46acfe4 100644
+--- a/rebuild/tests/analytics-read.test.ts
++++ b/rebuild/tests/analytics-read.test.ts
+@@ -138,7 +138,7 @@ describe('shared Analytics read service', () => {
+   it('applies metric search to export snapshots while keeping the full metric catalog available', async () => {
+     const snapshot = await readAnalyticsSnapshot(actor, { search: 'spend', page: '3', pointPage: '2' });
+     expect(snapshot.allMetrics.map(metric => metric.key)).toEqual(['spend::USD']);
+-    expect(snapshot.options.metrics.map(metric => metric.key)).toEqual(['spend::USD', 'followers', 'views']);
++    expect(snapshot.options.metrics.map(metric => metric.key)).toEqual(['views', 'followers', 'spend::USD']);
+     const query = new URLSearchParams(snapshot.query);
+     expect(query.get('page')).toBe('3'); expect(query.get('pointPage')).toBe('2');
+   });

@@ -1,0 +1,547 @@
+diff --git a/rebuild/docs/LEGACY_CAPABILITY_PARITY.md b/rebuild/docs/LEGACY_CAPABILITY_PARITY.md
+index f3a121fc..60ce2837 100644
+--- a/rebuild/docs/LEGACY_CAPABILITY_PARITY.md
++++ b/rebuild/docs/LEGACY_CAPABILITY_PARITY.md
+@@ -16,7 +16,7 @@ a manifest, saved setting or unit test is not complete workflow proof. See
+ | P0 | Eleven network connectors and publishing destinations in `src/lib/networks/index.ts` and `src/lib/networks/connect.ts` | Partial: Facebook is the only installed customer platform. Instagram and the other legacy destinations lack usable rebuild adapters. Removed provider APIs cannot be restored by configuration. | Adapter-level connection, discovery, publishing/status/delete, analytics, inbox, and ads where provider supports them; scoped UI/API/MCP and live tests. |
+ | P0 | Facebook feed, photo, carousel, video, Reel, Story, Group and native scheduling in `src/lib/facebook/publish.ts` | Partial: Page feed/photo and native video/Reel/Story source, proof/recovery and app versus Meta-native scheduling exist. Per-destination choices, queue and mix/recycle share Publishing services. Private/default-off native paths and mocked tests do not establish every format live. Group publishing is not advertised. | Provider fixture and live create/status/delete tests for each supported format; visible choices limited to available capabilities. |
+ | P0 | Analytics views, comparisons, post explorer, demographics, network analysis, pinned metrics and coverage in `src/app/(app)/analytics/AnalyticsScreen.tsx` and `src/lib/analytics-views.ts` | Partial: catalog/details/explorer, posts, comparisons, pins, goals, audience history/CSV and ad-object analysis have UI/REST/MCP. Shared charts now consume actual previous-period points. Facebook post history/reactions/hierarchy collection exists; live Graph v26.0 probe verifies five current post metrics and refuses three older ones (RELEASE_GATES_PLAN); exhaustive history/collection and dynamic labels remain incomplete. Root-editable EN/FR catalogs and validated-default fallback are integrated. | Shared metric catalog feeding full UI, export, and MCP with date/channel/ad-account scope, comparison, availability, and refresh evidence. |
+-| P0 | Reports and CSV exports in `src/app/(app)/reports/page.tsx`, `src/lib/reports.ts`, and `src/lib/analytics-export.ts` | Partial: templates/schedules/runs, CSV/JSON/printable artifacts, response time/business hours, top posts, goals, destinations/link counts and AI recap exist. Downloads/UI were refined in 0589ddd0. Round-6 Published posts adds three stored-data report views through the existing confirmed UI/REST/MCP generator: a destination-specific content log with attempt counts, daily UTC publication counts independent of log limits, and currently failed destinations last updated in the period (explicitly not historical failure attempts). EN/FR catalogs disclose excerpts, current-state semantics and clipping; Root `analytics.reports.publicationDetails` controls each log ceiling and excerpt length. Local verification: TypeScript 0 errors; 155 targeted tests across 10 files passed, including scoped SQL shapes, bilingual artifacts, row/byte limits and confirmed MCP generation/audit. PostgreSQL, browser, real-client and production evidence remain open. Response reports now include first direct replies to stored root comments, slowest calendar/business-hours first response, and business-hours resolution through the same report generator used by UI downloads, REST and MCP. Round-2 response reports retain pre-period conversation context, reconstruct recorded resolution/reopening cycles, and disclose stored-history coverage and incomplete boundary exclusions in bilingual artifacts through the existing shared generator. Round-3 reports separate comment/conversation answer shares, response and resolution durations, and member business-hours first-response medians through the shared generator. Round-5 member outcomes add slowest first replies, answered-wait resolution counts and calendar/business-hours resolution medians, with last-run first-responder attribution through the same report workflow. Per-channel reports retain member attribution and disclose source limits; complete provider history, actual mail delivery, volume and current-browser proof remain open.  Rounds 1–3 (`23b7be84`, `6ef753e4`, `b725c415`) have local arithmetic, bilingual artifact and mocked workflow tests; bounded history and concurrent-read consistency remain limits. | Complete relevant report sections and exports, schedule/template workflows, UI/API/MCP parity and provider-shaped tests. |
++| P0 | Reports and CSV exports in `src/app/(app)/reports/page.tsx`, `src/lib/reports.ts`, and `src/lib/analytics-export.ts` | Partial: round-7 Top posts restores destination-specific saved text, ordered image/video references with Root-switchable image previews, and saved article link/title/description through the existing confirmed UI download, REST and MCP report workflow. Root `analytics.reports.topPostContent` owns ranking/content/media/URL bounds, image previews and the authenticated media path template; EN/FR artifacts disclose current saved content, expiry, workspace access and clipping. Targeted mocked/render tests and TypeScript verification are local only; PostgreSQL, actual browser/download and real-client/provider proof remain open. Existing templates/schedules/runs, CSV/JSON/printable artifacts, response time/business hours, top posts, goals, destinations/link counts and AI recap exist. Downloads/UI were refined in 0589ddd0. Round-6 Published posts adds three stored-data report views through the existing confirmed UI/REST/MCP generator: a destination-specific content log with attempt counts, daily UTC publication counts independent of log limits, and currently failed destinations last updated in the period (explicitly not historical failure attempts). EN/FR catalogs disclose excerpts, current-state semantics and clipping; Root `analytics.reports.publicationDetails` controls each log ceiling and excerpt length. Local verification: TypeScript 0 errors; 155 targeted tests across 10 files passed, including scoped SQL shapes, bilingual artifacts, row/byte limits and confirmed MCP generation/audit. PostgreSQL, browser, real-client and production evidence remain open. Response reports now include first direct replies to stored root comments, slowest calendar/business-hours first response, and business-hours resolution through the same report generator used by UI downloads, REST and MCP. Round-2 response reports retain pre-period conversation context, reconstruct recorded resolution/reopening cycles, and disclose stored-history coverage and incomplete boundary exclusions in bilingual artifacts through the existing shared generator. Round-3 reports separate comment/conversation answer shares, response and resolution durations, and member business-hours first-response medians through the shared generator. Round-5 member outcomes add slowest first replies, answered-wait resolution counts and calendar/business-hours resolution medians, with last-run first-responder attribution through the same report workflow. Per-channel reports retain member attribution and disclose source limits; complete provider history, actual mail delivery, volume and current-browser proof remain open.  Rounds 1–3 (`23b7be84`, `6ef753e4`, `b725c415`) have local arithmetic, bilingual artifact and mocked workflow tests; bounded history and concurrent-read consistency remain limits. | Complete relevant report sections and exports, schedule/template workflows, UI/API/MCP parity and provider-shaped tests. |
+ | P1 | Composer overrides, queue slots, approvals, labels, custom fields, notes, versions, templates, first-comment retries, and UTM/link preparation in `src/lib/posts.ts` and related API routes | Partial: composer, slots/approvals/templates/labels/fields/notes/version restore, delayed comments and rejected-only retry, best times, mix/recycle, UTM and shortening are integrated. Scheduling modes are per destination. Newest scheduling/restore/comment database/browser/provider checks remain open; unknown remote attempts stay held. | Full end-to-end tests on production-shaped staging, per-target behavior, provider create/status/delete and permission verification, bulk actions, scheduling rules, plus remaining legacy workflows. |
+ | P1 | Post list filters, saved views, pagination, bulk actions, retry/duplicate, CSV export and public Posts v1 API in `src/app/(app)/posts/page.tsx` and `src/app/api/posts` | Partial: scoped lists/search/paging/views/export and bulk actions share services; key REST v1 Posts includes scheduling. Large asynchronous Posts CSV is absent (workspace ZIP is different); draft aliases and v1 create now share confirmed lifecycle boundaries (`acb56bd7`); real client outcomes remain unverified. Missing-image fallback and saved-view expired-session feedback are source/unit fixes (`36946d9e`), without browser rerun. | Full list/action/API parity with workspace authorization and large-data pagination tests. |
+ | P1 | Publishing calendar navigation and month coverage in `src/app/(app)/calendar` | Partial: Month/Week/phone agenda, workspace-day grouping, previews, saved views and drag/keyboard moves exist. Shared lifecycle supports adapter-held cancel/reschedule. Calendar editing, queue-slot presentation, high-volume months and actual drag/remote-schedule browser/provider evidence remain open. | Browser and database tests with records on timezone and month boundaries, high-volume month, permissions, drag-and-drop E2E, and edit workflows. |
+diff --git a/rebuild/src/modules/analytics/reports/TOP_POST_CONTENT.md b/rebuild/src/modules/analytics/reports/TOP_POST_CONTENT.md
+new file mode 100644
+index 00000000..c6912c0e
+--- /dev/null
++++ b/rebuild/src/modules/analytics/reports/TOP_POST_CONTENT.md
+@@ -0,0 +1,71 @@
++# Top post content — local parity round 7
++
++Legacy reference: `src/lib/reports.ts` `TopPost`, `rankTopPosts`, and the Reports
++screen's media/article presentation. This slice restores three details in the
++existing Top posts section: saved destination-specific text, ordered media with
++optional image previews, and saved article link/title/description.
++
++`generation/document.ts` uses the neutral installed platform ranking hook, then
++`server/top-post-content.ts` enriches only that ranked channel's currently
++published rows in the requested inclusive UTC period. Workspace predicates bind
++posts and targets. Destination messageOverride (including an intentionally empty
++string) and skipMedia are respected. Missing/unpublished destinations are dropped
++rather than using stale adapter content. These are current saved values, not
++immutable publication snapshots or proof that remote content matches.
++
++UI Prepare report, session REST `/api/analytics/report-workflows/run`, key REST
++`/api/v1/analytics/generate_report` and MCP `generate_report` retain their shared
++confirmed, authorized and audited `runReportNow`/generator workflow. No new route,
++authorization exception, confirmation or provider-specific rule is introduced.
++CSV/JSON carry explicit content/media/link records; printable HTML has a native
++content disclosure, image previews and attachment/article links. Text reports
++include the same context. Images are references, not embedded file copies. No
++media or article is fetched by report generation. Preview images load only in the
++viewing browser; Root can disable images while preserving attachment links.
++
++Root `analytics.reports.topPostContent` owns posts, textCharacters, mediaPerPost,
++urlCharacters, previewCharacters, imagePreviews and mediaUrlTemplate. It is typed,
++validated and read with runtimeConfig. The existing `app.publicOrigin` turns valid
++local media UUID references into absolute authenticated application links. Empty
++or invalid origin means local media references are omitted and clipping is
++reported. Local media still requires current workspace access. Unsafe schemes,
++credential-bearing URLs and overlong URLs are omitted. SQL limits text/JSON
++projection and media count before returning rows; private storage keys and
++provider errors are never selected. Unicode text cuts preserve whole characters.
++
++Existing Root EN/FR document/UI catalogs provide labels, context and clipping
++notices. CSV formula escaping, HTML escaping and UTF-8 output bounds remain in the
++shared renderer. The platform ranking request respects the smaller of Root's post
++count and the caller's result ceiling. Schema version is intentionally unchanged.
++
++Evidence: targeted unit, query-shape, fake-database confirmed service/MCP workflow,
++UI-render and HTTP/MCP host tests; TypeScript. These do not prove PostgreSQL SQL
++execution, real MCP/REST clients, browser download/disclosure/image behavior,
++provider completeness or production. Signed external media URLs may expire;
++authenticated local media is not portable to recipients without workspace access.
++
++Integrator changes outside this worker's ownership: bump CONFIG_SCHEMA_VERSION
++for the new setting/catalog entries; add this source/test scope and pending
++PostgreSQL/browser/client checks to ARCHITECTURE.md and continuation docs. Do not
++claim all report, analytics or legacy parity complete.
++
++Local verification (2026-10-21): `npx tsc --noEmit -p .` — 0 errors.
++`npx vitest run --cache=false` with the following targeted files — 12 files,
++193 tests passed:
++
++- `tests/report-top-post-content.test.ts`
++- `tests/report-top-post-content-workflow.test.ts`
++- `tests/report-top-posts.test.ts`
++- `tests/report-document-copy.test.ts`
++- `tests/report-publication-details.test.ts`
++- `tests/analytics-parity-report-generation.test.ts`
++- `tests/analytics-parity-reports.test.ts`
++- `tests/reports82-http-host.test.ts`
++- `tests/reports82-mcp-host.test.ts`
++- `tests/reports82-ui.test.ts`
++- `tests/report82-engine-manual.test.ts`
++- `tests/ui-copy-coverage.test.ts`
++
++Caching was disabled because the dependency symlink points outside the writable
++worktree; the first run passed assertions but failed to write Vitest's cache.
++No whole suite, server, live remote call, deployment, commit or push was run.
+diff --git a/rebuild/src/modules/analytics/reports/config.ts b/rebuild/src/modules/analytics/reports/config.ts
+index c53610a9..21bd270c 100644
+--- a/rebuild/src/modules/analytics/reports/config.ts
++++ b/rebuild/src/modules/analytics/reports/config.ts
+@@ -10,12 +10,24 @@ export const PUBLICATION_REPORT_POLICY_SCHEMA = z.object({
+ }).strict();
+ export const PUBLICATION_REPORT_DEFAULTS = { publishedRows: 100, failedRows: 100, excerptCharacters: 240 };
+ 
++export const TOP_POST_CONTENT_POLICY_SCHEMA = z.object({
++  imagePreviews: z.boolean(),
++  mediaUrlTemplate: z.string().min(1).max(2000).refine(value => /^\/(?!\/)[a-zA-Z0-9/_-]*\{id\}$/.test(value), 'Use an absolute application path ending in {id}.'),
++  posts: z.number().int().min(1).max(100),
++  textCharacters: z.number().int().min(120).max(20000),
++  mediaPerPost: z.number().int().min(1).max(50),
++  urlCharacters: z.number().int().min(100).max(8000),
++  previewCharacters: z.number().int().min(20).max(2000),
++}).strict();
++export const TOP_POST_CONTENT_DEFAULTS = { imagePreviews: true, mediaUrlTemplate: '/api/media/{id}', posts: 10, textCharacters: 4000, mediaPerPost: 10, urlCharacters: 2000, previewCharacters: 240 };
++
+ const G = 'Analytics · Report workflows';
+ const num = (key: string, label: string, description: string, defaultValue: number, min: number, max: number) =>
+   entry({ key, group: G, label, kind: 'number', description, defaultValue, schema: z.number().int().min(min).max(max), consumption: 'active' });
+ 
+ /** Root-managed bounds for report templates and schedule definitions. */
+ export const REPORT_WORKFLOW_CONFIG = [
++  entry({ key: 'analytics.reports.topPostContent', group: G, label: 'Top post content', kind: 'json', description: 'Ranked post count, destination text, attachment count, URL and article preview bounds, image preview switch and authenticated media path template. Report content is saved local state, not a remote snapshot.', defaultValue: TOP_POST_CONTENT_DEFAULTS, schema: TOP_POST_CONTENT_POLICY_SCHEMA, consumption: 'active' }),
+   entry({ key: 'analytics.reports.publicationDetails', group: G, label: 'Publication report details', kind: 'json', description: 'Maximum published and currently failed destination rows and content excerpt length in the Published posts report section. Daily UTC totals are counted independently; clipped logs are disclosed.', defaultValue: PUBLICATION_REPORT_DEFAULTS, schema: PUBLICATION_REPORT_POLICY_SCHEMA, consumption: 'active' }),
+   num('analytics.reports.responseEventLimit', 'Response analysis workflow events', 'Maximum stored resolution and reopening events examined per channel report. Truncation suppresses resolution durations and is disclosed.', RESPONSE_ANALYSIS_LIMITS.events.default, RESPONSE_ANALYSIS_LIMITS.events.min, RESPONSE_ANALYSIS_LIMITS.events.max),
+   num('analytics.reports.responseMessageLimit', 'Response analysis records per source', 'Maximum stored messages and comments examined separately, including pre-period context. Incomplete boundary threads are excluded; truncation and stored-only coverage are disclosed.', RESPONSE_ANALYSIS_LIMITS.messages.default, RESPONSE_ANALYSIS_LIMITS.messages.min, RESPONSE_ANALYSIS_LIMITS.messages.max),
+diff --git a/rebuild/src/modules/analytics/reports/generation/copy.ts b/rebuild/src/modules/analytics/reports/generation/copy.ts
+index bf852386..c0b0824d 100644
+--- a/rebuild/src/modules/analytics/reports/generation/copy.ts
++++ b/rebuild/src/modules/analytics/reports/generation/copy.ts
+@@ -1,5 +1,13 @@
+ import { z } from 'zod';
+ const en = {
++  "Locally stored media requires access to this workspace.": "Locally stored media requires access to this workspace.",
++  "Post content": "Post content",
++  "Image": "Image",
++  "Video": "Video",
++  "Article link": "Article link",
++  "Content is saved local content, not a snapshot from the connected platform. Media opens separately; access may expire.": "Content is saved local content, not a snapshot from the connected platform. Media opens separately; access may expire.",
++  "Post content was shortened to the configured limits.": "Post content was shortened to the configured limits.",
++
+   "Publication log": "Publication log",
+   "Daily publications (UTC)": "Daily publications (UTC)",
+   "Currently failed destinations": "Currently failed destinations",
+@@ -173,6 +181,14 @@ const en = {
+   "Channel": "Channel"
+ };
+ const fr: typeof en = {
++  "Locally stored media requires access to this workspace.": "Les médias enregistrés localement nécessitent un accès à cet espace de travail.",
++  "Post content": "Contenu de la publication",
++  "Image": "Image",
++  "Video": "Vidéo",
++  "Article link": "Lien de l’article",
++  "Content is saved local content, not a snapshot from the connected platform. Media opens separately; access may expire.": "Ce contenu est enregistré dans l’application, pas une copie de la plateforme connectée. Les médias s’ouvrent séparément ; leur accès peut expirer.",
++  "Post content was shortened to the configured limits.": "Le contenu a été raccourci selon les limites configurées.",
++
+   "Publication log": "Journal des publications",
+   "Daily publications (UTC)": "Publications quotidiennes (UTC)",
+   "Currently failed destinations": "Destinations actuellement en échec",
+diff --git a/rebuild/src/modules/analytics/reports/generation/document.ts b/rebuild/src/modules/analytics/reports/generation/document.ts
+index e9f1fec2..dd94ba3d 100644
+--- a/rebuild/src/modules/analytics/reports/generation/document.ts
++++ b/rebuild/src/modules/analytics/reports/generation/document.ts
+@@ -1,3 +1,6 @@
++import { readTopPostContent, reportUrl, type ReportTopPost } from '../server/top-post-content';
++import { runtimeConfig } from '@/server/config/store';
++import { TOP_POST_CONTENT_POLICY_SCHEMA } from '../config';
+ import { readPublicationReport, type PublicationReport } from '../server/publication-report';
+ import { publicationDetails } from './publication-details';
+ import { documentText, reportDocumentCopyDefaults, type ReportDocumentCopy } from './copy';
+@@ -69,7 +72,7 @@ type Snapshot = Awaited<ReturnType<typeof readAnalyticsSnapshot>>;
+  * as-of times; a metric without data is "Not available", never zero. Every rendering is bounded in rows and UTF-8 bytes, and
+  * anything cut is marked; when even the fixed parts exceed the bound a minimal notice is returned instead of an overflowing page.
+  */
+-export function renderReport(snapshot: Snapshot, input: { channelName: string; sections: ReportSectionId[]; generatedAt: Date; publications?: PublicationReport | null; responseTime?: ResponseTimeSummary | null; topPosts?: PostPerformance[] | null; destination?: DestinationSummary | null; goals?: { month: GoalMonth; goals: GoalProgress[] } | null; recap?: RecapState | null }, bounds: ReportBounds, copy: ReportDocumentCopy = reportDocumentCopyDefaults.en, locale: 'en' | 'fr' = 'en', responseCopy: ResponseTimeCopy = responseTimeCopyDefaults): ReportOutput {
++export function renderReport(snapshot: Snapshot, input: { channelName: string; sections: ReportSectionId[]; generatedAt: Date; publications?: PublicationReport | null; responseTime?: ResponseTimeSummary | null; topPosts?: ReportTopPost[] | null; destination?: DestinationSummary | null; goals?: { month: GoalMonth; goals: GoalProgress[] } | null; recap?: RecapState | null }, bounds: ReportBounds, copy: ReportDocumentCopy = reportDocumentCopyDefaults.en, locale: 'en' | 'fr' = 'en', responseCopy: ResponseTimeCopy = responseTimeCopyDefaults): ReportOutput {
+   const t = documentText(copy);
+   const formatDuration = (ms: number | null) => responseDuration(ms, responseCopy, locale);
+   const describeBusinessHours = (hours: Parameters<typeof responseHours>[0]) => responseHours(hours, responseCopy, locale);
+@@ -79,7 +82,7 @@ export function renderReport(snapshot: Snapshot, input: { channelName: string; s
+   const valueText = (m: MetricView) => m.total === null ? t("Not available") : (m.displayTotal ?? String(m.total));
+   const asOf = (date: Date | null | undefined) => date ? date.toISOString().slice(0, 10) : t("unknown");
+   const publication = input.sections.includes('published') && input.publications ? publicationDetails(input.publications, copy) : null;
+-  const sourceTruncated = publication?.truncated ?? false;
++  const sourceTruncated = (publication?.truncated ?? false) || Boolean(input.sections.includes('topPosts') && input.topPosts?.some(p => p.content?.shortened));
+   const wanted = new Set(input.sections);
+   // The recap is included only when the run produced it or recorded that it could not; otherwise (AI off or not permitted) it is not included.
+   const included = REPORT_SECTION_IDS.filter(s => wanted.has(s) && (REPORT_SUPPORTED_SECTIONS as readonly string[]).includes(s) && (s !== 'aiRecap' || Boolean(input.recap)));
+@@ -142,6 +145,9 @@ export function renderReport(snapshot: Snapshot, input: { channelName: string; s
+   const linkClicksText = destination ? (destination.linkClicks === null ? t("Not available") : String(destination.linkClicks)) : '';
+   const measureText = (m: DestinationMeasures['measures'][number]) => m.value === null ? t("Not available") : `${m.value}${m.measuredPosts < (destination?.posts ?? 0) ? t(" (stored for {v0} of {v1} posts)", { v0: m.measuredPosts, v1: destination?.posts ?? 0 }) : ''}`;
+   const postTitle = (p: PostPerformance) => clamp(p.text || t("(no text)"), 120);
++  const contentNote = t('Content is saved local content, not a snapshot from the connected platform. Media opens separately; access may expire.') + ' ' + t('Locally stored media requires access to this workspace.');
++  const contentLines = (p: ReportTopPost) => p.content ? [contentNote, p.content.text, ...p.content.media.map(m => `${t(m.kind === 'image' ? 'Image' : 'Video')}: ${m.url}`), ...(p.content.link ? [`${t('Article link')}: ${p.content.link}`, p.content.articleTitle, p.content.articleDescription] : []), ...(p.content.shortened ? [t('Post content was shortened to the configured limits.')] : [])].filter(Boolean) : [];
++  const contentHtml = (p: ReportTopPost) => p.content ? `<details><summary>${esc(t('Post content'))}</summary><p>${esc(contentNote)}</p><p style="white-space:pre-wrap">${esc(p.content.text)}</p>${p.content.media.map(m => `<p><a rel="noreferrer noopener" href="${esc(reportUrl(m.url) ?? '')}">${esc(t(m.kind === 'image' ? 'Image' : 'Video'))}${p.content!.previewImages && m.kind === 'image' ? `<img loading="lazy" referrerpolicy="no-referrer" style="display:block;max-width:100%;height:auto" src="${esc(reportUrl(m.url) ?? '')}" alt="${esc(t('Image'))}">` : ''}</a></p>`).join('')}${p.content.link ? `<p><a rel="noreferrer noopener" href="${esc(reportUrl(p.content.link) ?? '')}">${esc(p.content.articleTitle || t('Article link'))}</a></p><p>${esc(p.content.articleDescription)}</p>` : ''}${p.content.shortened ? `<p>${esc(t('Post content was shortened to the configured limits.'))}</p>` : ''}</details>` : '';
+   const goals = included.includes('goals') ? input.goals ?? { month: { month: '', start: '', end: '', timeZone: '' }, goals: [] } : null;
+   const goalText = (g: GoalProgress) => t("{v0}: {v1} of {v2} ({v3}%, {v4})", { v0: g.label, v1: g.actual === null ? t("No data") : g.actual, v2: g.target, v3: g.percent, v4: g.paceLabel });
+   const audienceAsOf = audience ? audience.entries.map(e => e.asOf).filter((d): d is Date => d instanceof Date).sort((a, b) => b.getTime() - a.getTime())[0] : undefined;
+@@ -235,6 +241,12 @@ export function renderReport(snapshot: Snapshot, input: { channelName: string; s
+     } else rows.push(['destination', 'unavailable', t("Destination summary"), '', '', '', '', '', '', t("Not available")]);
+   }
+   if (topPosts) topPosts.forEach((p, i) => {
++    if (p.content) {
++      rows.push(['top_post_content', 'destination_text', t('Post content'), '', p.postId, p.publishedAt, p.content.text, '', '', contentNote]);
++      for (const media of p.content.media) rows.push(['top_post_media', media.kind, t(media.kind === 'image' ? 'Image' : 'Video'), '', p.postId, p.publishedAt, media.url, '', '', contentNote]);
++      if (p.content.link) rows.push(['top_post_link', 'article_link', p.content.articleTitle || t('Article link'), '', p.postId, p.publishedAt, p.content.link, '', '', p.content.articleDescription]);
++      if (p.content.shortened) rows.push(['top_post_coverage', 'content_shortened', t('Post content was shortened to the configured limits.'), '', p.postId, '', '', '', '', '']);
++    }
+     rows.push(['top_post', `rank_${i + 1}`, postTitle(p), p.rankLabel, p.url ?? '', p.publishedAt, p.rankValue ?? '', p.rankLabel.toLowerCase(), '', t("Stored per-post measures; missing is not zero")]);
+     for (const m of p.measures) rows.push(['top_post_measure', m.key, m.label, p.rankLabel, postTitle(p), p.publishedAt, m.value ?? '', '', '', t("Rank {v0}", { v0: i + 1 })]);
+   });
+@@ -278,7 +290,7 @@ export function renderReport(snapshot: Snapshot, input: { channelName: string; s
+       + (response ? `<h2>${esc(t("Response time"))}</h2><p>${esc(responseLine)}</p>${responseDetails.map(line => `<p>${esc(line)}</p>`).join('')}${memberLines.length ? `<ul>${memberLines.map(l => `<li>${esc(l)}</li>`).join('')}</ul>` : ''}${resolveLine ? `<p>${esc(resolveLine)}</p>` : ''}` : '')
+       + (goals ? `<h2>${esc(t("Goals"))}</h2>${goals.goals.length ? `<p><small>${esc(t("Month {v0} to {v1} ({v2}), up to generation for the current month.", { v0: goals.month.start, v1: goals.month.end, v2: goals.month.timeZone }))}</small></p><table><thead><tr><th>${esc(t("Goal"))}</th><th>${esc(t("Target"))}</th><th>${esc(t("This month"))}</th><th>${esc(t("Progress"))}</th><th>${esc(t("Pace"))}</th></tr></thead><tbody>${goals.goals.map(g => `<tr><td>${esc(g.label)}</td><td>${esc(g.target)}</td><td>${g.actual === null ? esc(t("No data")) : esc(g.actual)}</td><td>${esc(g.percent)}%</td><td>${esc(g.paceLabel)}</td></tr>`).join('')}</tbody></table>` : `<p>${esc(t("No goals are set for this channel."))}</p>`}` : '')
+       + (included.includes('destinations') ? `<h2>${esc(t("Destinations"))}</h2>${destination ? `<p><small>${esc(destinationNote)}</small></p><table><thead><tr><th>${esc(t("Destination"))}</th><th>${esc(t("Type"))}</th><th>${esc(t("Posts"))}</th>${destination.measures.map(m => `<th>${esc(m.label)}</th>`).join('')}<th>${esc(t("Link clicks (lifetime)"))}</th></tr></thead><tbody><tr><td>${esc(destination.name)}</td><td>${esc(destination.type)}</td><td>${esc(destination.posts)}</td>${destination.measures.map(m => `<td>${esc(measureText(m))}</td>`).join('')}<td>${esc(linkClicksText)}</td></tr></tbody></table><p><small>${esc(t("Link clicks are lifetime totals for links attributed to this channel. Legacy links without a destination count only when the post has a single published destination."))}</small></p>` : `<p>${esc(t("Destination summary not available."))}</p>`}` : '')
+-      + (topPosts ? `<h2>${esc(t("Top posts"))}</h2>${topPosts.length ? `<table><thead><tr><th>#</th><th>${esc(t("Post"))}</th><th>${esc(t("Published"))}</th><th>${esc(topPosts[0]!.rankLabel)}</th>${topPosts[0]!.measures.map(m => `<th>${esc(m.label)}</th>`).join('')}</tr></thead><tbody>${topPosts.map((p, i) => `<tr><td>${i + 1}</td><td>${p.url ? `<a href="${esc(p.url)}">${esc(postTitle(p))}</a>` : esc(postTitle(p))}</td><td>${esc(asOf(p.publishedAt))}</td><td>${p.rankValue === null ? esc(t("Not available")) : esc(p.rankValue)}</td>${p.measures.map(m => `<td>${m.value === null ? esc(t("Not available")) : esc(m.value)}</td>`).join('')}</tr>`).join('')}</tbody></table>` : `<p>${esc(t("No published posts with stored measures in this period."))}</p>`}` : '')
++      + (topPosts ? `<h2>${esc(t("Top posts"))}</h2>${topPosts.length ? `<table><thead><tr><th>#</th><th>${esc(t("Post"))}</th><th>${esc(t("Published"))}</th><th>${esc(topPosts[0]!.rankLabel)}</th>${topPosts[0]!.measures.map(m => `<th>${esc(m.label)}</th>`).join('')}</tr></thead><tbody>${topPosts.map((p, i) => `<tr><td>${i + 1}</td><td>${reportUrl(p.url) ? `<a rel="noreferrer noopener" href="${esc(reportUrl(p.url))}">${esc(postTitle(p))}</a>` : esc(postTitle(p))}${contentHtml(p)}</td><td>${esc(asOf(p.publishedAt))}</td><td>${p.rankValue === null ? esc(t("Not available")) : esc(p.rankValue)}</td>${p.measures.map(m => `<td>${m.value === null ? esc(t("Not available")) : esc(m.value)}</td>`).join('')}</tr>`).join('')}</tbody></table>` : `<p>${esc(t("No published posts with stored measures in this period."))}</p>`}` : '')
+       + publicationHtml
+       + audienceHtml
+       + (metrics.length ? `<h2>${esc(t("Metrics"))}</h2><table><thead><tr><th>${esc(t("Metric"))}</th><th>${esc(t("Source"))}</th><th>${esc(t("Value"))}</th><th>${esc(t("Basis"))}</th><th>${esc(t("Coverage"))}</th><th>${esc(t("As of"))}</th></tr></thead><tbody>${shown.map(m => `<tr><td>${esc(m.label)}</td><td>${esc(m.sourceLabel)}</td><td>${esc(valueText(m))}</td><td>${esc([m.aggregationLabel, m.aggregationNote].filter(Boolean).join('. '))}</td><td>${esc(coverageText(m))}</td><td>${esc(asOf(m.latestAt))}</td></tr>`).join('')}</tbody></table>` : '')
+@@ -287,7 +299,7 @@ export function renderReport(snapshot: Snapshot, input: { channelName: string; s
+   };
+   const metricCap = Math.min(metrics.length, Math.max(0, bounds.maxRows - publicationRows.length));
+   const htmlCount = fit(metricCap, bounds.maxBytes, c => htmlOf(c, true));
+-  let htmlTruncated = publicationCut || htmlCount < metrics.length;
++  let htmlTruncated = sourceTruncated || publicationCut || htmlCount < metrics.length;
+   let html = htmlOf(htmlCount, htmlTruncated);
+   if (bytes(html) > bounds.maxBytes) { // the fixed parts alone do not fit
+     html = cutBytes(`<!doctype html><html lang="${locale}"><body><p>${esc(clamp(title, 80))}</p><p><strong>${esc(t("This report was shortened to fit its size limit."))}</strong></p></body></html>`, bounds.maxBytes);
+@@ -297,13 +309,13 @@ export function renderReport(snapshot: Snapshot, input: { channelName: string; s
+     ...(response ? [t("Response time: {v0}", { v0: responseLine }), ...responseDetails, ...memberLines.map(l => `  ${l}`), ...(resolveLine ? [resolveLine] : [])] : []),
+     ...(goals ? [t("Goals (month {v0} to {v1}):", { v0: goals.month.start, v1: goals.month.end }), ...(goals.goals.length ? goals.goals.map(goalText) : [t("No goals are set for this channel.")])] : []),
+     ...(included.includes('destinations') ? [t("Destinations:"), ...(destination ? [t("{v0} ({v1}): {v2} posts; {v3}; link clicks (lifetime) {v4}", { v0: clamp(destination.name, 200), v1: destination.type, v2: destination.posts, v3: destination.measures.map(m => `${m.label} ${measureText(m)}`).join('; '), v4: linkClicksText })] : [t("Destination summary not available.")])] : []),
+-    ...(topPosts ? [t("Top posts:"), ...(topPosts.length ? topPosts.map((p, i) => `${i + 1}. ${postTitle(p)} (${asOf(p.publishedAt)}): ${p.rankLabel} ${p.rankValue ?? t("Not available")}`) : [t("No published posts with stored measures in this period.")])] : []),
++    ...(topPosts ? [t("Top posts:"), ...(topPosts.length ? topPosts.flatMap((p, i) => [`${i + 1}. ${postTitle(p)} (${asOf(p.publishedAt)}): ${p.rankLabel} ${p.rankValue ?? t("Not available")}`, ...contentLines(p)]) : [t("No published posts with stored measures in this period.")])] : []),
+     ...(audience ? [t("Audience: {v0} ({v1} of {v2} channels{v3}; not unique people)", { v0: audience.covered ? audience.total : t("Not available"), v1: audience.covered, v2: audience.selected, v3: audienceAsOf ? t("; as of {v0}", { v0: asOf(audienceAsOf) }) : '' })] : [])];
+   const metricLines = metrics.map(m => t("{v0} ({v1}): {v2}; {v3}; as of {v4}", { v0: clamp(m.label, 200), v1: clamp(m.sourceLabel, 200), v2: valueText(m), v3: coverageText(m), v4: asOf(m.latestAt) }));
+   const tail = (cut: boolean) => [...(cut ? [t("Shortened to fit the size limit.")] : []), ...(notIncluded.length ? [t("Not included: {v0}", { v0: notIncluded.join(', ') })] : [])];
+   const textOf = (count: number, cut: boolean) => [...baseLines, ...metricLines.slice(0, count), ...tail(cut)].join('\n');
+   const textCount = fit(metricCap, bounds.maxBytes, c => textOf(c, true));
+-  let textTruncated = publicationCut || textCount < metricLines.length;
++  let textTruncated = sourceTruncated || publicationCut || textCount < metricLines.length;
+   let text = textOf(textCount, textTruncated);
+   if (bytes(text) > bounds.maxBytes) { text = cutBytes(text, bounds.maxBytes); textTruncated = true; }
+   return { channelName, period, generatedAt: input.generatedAt.toISOString(), sections: included, notIncluded, csv, html, text, json, rowCount: csvRows, bytes: bytes(csv), htmlBytes: bytes(html), textBytes: bytes(text), jsonBytes: bytes(json), truncated: csvTruncated || htmlTruncated || textTruncated || jsonTruncated || csv !== csvRaw };
+@@ -316,7 +328,7 @@ const factText = (text: unknown) => String(text ?? '').replace(/[\u0000-\u0008\u
+  * authorized to read. No post text, URLs, message text or recipients are included; missing data is stated as such, never zero.
+  * Returns '' when no other section supplies a figure.
+  */
+-export function recapFacts(snapshot: Snapshot, input: { sections: ReportSectionId[]; responseTime?: ResponseTimeSummary | null; topPosts?: PostPerformance[] | null; destination?: DestinationSummary | null; goals?: { month: GoalMonth; goals: GoalProgress[] } | null }): string {
++export function recapFacts(snapshot: Snapshot, input: { sections: ReportSectionId[]; responseTime?: ResponseTimeSummary | null; topPosts?: ReportTopPost[] | null; destination?: DestinationSummary | null; goals?: { month: GoalMonth; goals: GoalProgress[] } | null }): string {
+   const wanted = new Set(input.sections);
+   const lines: string[] = [];
+   if (wanted.has('published')) lines.push(`Posts: published ${snapshot.publishing.published}, scheduled ${snapshot.publishing.scheduled}, failed ${snapshot.publishing.failed}.`);
+@@ -359,7 +371,7 @@ export function createReportGenerator(deps: { bounds: () => Promise<ReportBounds
+         const bounds = { maxRows: ceiling === undefined ? base.maxRows : Math.min(base.maxRows, ceiling), maxBytes: base.maxBytes };
+         const responseTime = request.sections.includes('responseTime') ? await readResponseTime(actor.workspaceId, request.channelId, request.period, documentCopy.locale) : null;
+         const publications = request.sections.includes('published') ? await readPublicationReport(actor.workspaceId, request.channelId, request.period) : null;
+-        const topPosts = request.sections.includes('topPosts') ? await readTopPosts(actor.workspaceId, request.channelId, request.period) : null;
++        const topPosts = request.sections.includes('topPosts') ? await readTopPosts(actor.workspaceId, request.channelId, request.period, bounds.maxRows) : null;
+         const destination = request.sections.includes('destinations') ? await readDestination(actor.workspaceId, request.channelId, request.period) : null;
+         const goals = request.sections.includes('goals') ? await channelGoalProgress(actor.workspaceId, request.channelId, request.period.end, deps.now?.() ?? new Date(), documentCopy.locale) : null;
+         const recap = request.sections.includes('aiRecap') ? await makeRecap(deps.recap ?? defaultRecap, actor, channel?.name ?? documentText(documentCopy.copy)('Channel'), snapshot, { sections: request.sections, responseTime, topPosts, destination, goals }, documentCopy.locale) : null;
+@@ -390,16 +402,17 @@ async function makeRecap(write: RecapWriter, actor: ReportActor, channelName: st
+   }
+ }
+ 
+-/** Ten best posts by the channel's own module ranking; a module without the hook yields an empty, honest section. */
+-export const TOP_POSTS_LIMIT = 10;
+-async function readTopPosts(workspaceId: string, channelId: string, period: { start: string; end: string }): Promise<PostPerformance[]> {
++/** Root-bounded best posts by the channel's own module ranking; a module without the hook yields an empty, honest section. */
++async function readTopPosts(workspaceId: string, channelId: string, period: { start: string; end: string }, maxRows: number): Promise<ReportTopPost[]> {
+   const rows = await prisma.$queryRaw<Array<{ provider: string }>>`SELECT a.provider FROM targets t JOIN social_accounts a ON a.id = t."socialAccountId" AND a."workspaceId" = t."workspaceId" WHERE t.id = ${channelId} AND t."workspaceId" = ${workspaceId} LIMIT 1`;
+   const provider = rows[0]?.provider;
+   const analytics = provider ? await platformAnalytics(provider) : null;
+   if (!analytics?.postPerformance) return [];
+   const from = new Date(`${period.start}T00:00:00.000Z`);
+   const to = new Date(new Date(`${period.end}T00:00:00.000Z`).getTime() + 86_400_000);
+-  return analytics.postPerformance({ workspaceId, targetId: channelId, from, to, limit: TOP_POSTS_LIMIT });
++  const policy = TOP_POST_CONTENT_POLICY_SCHEMA.parse(await runtimeConfig('analytics.reports.topPostContent'));
++  const ranked = await analytics.postPerformance({ workspaceId, targetId: channelId, from, to, limit: Math.min(policy.posts, maxRows) });
++  return readTopPostContent(workspaceId, channelId, period, ranked);
+ }
+ 
+ /** Per-destination summary for one channel: neutral counts from stored publications and short links, platform measures through the module hook (stored data only). */
+diff --git a/rebuild/src/modules/analytics/reports/mcp.ts b/rebuild/src/modules/analytics/reports/mcp.ts
+index e1f7bc98..68f27344 100644
+--- a/rebuild/src/modules/analytics/reports/mcp.ts
++++ b/rebuild/src/modules/analytics/reports/mcp.ts
+@@ -17,7 +17,7 @@ export const analyticsReportToolDefinitions = [
+   { name: 'list_report_schedules', description: 'List scheduled report definitions within your channel scope. Recipient addresses are shown only to people (and keys) that can manage schedules. A key limited to selected channels cannot attach or change templates.', inputSchema: page },
+   { name: 'manage_report_schedule', description: 'Create, update or delete a weekly or monthly report schedule definition. Confirmations: CREATE REPORT SCHEDULE <channelId> <frequency>, UPDATE REPORT SCHEDULE <id>, DELETE REPORT SCHEDULE <id>. Saving a schedule does not send anything immediately.', inputSchema: { type: 'object', required: ['action', 'confirmation'], properties: { action: { type: 'string', enum: ['create', 'update', 'delete'] }, id, channelId: id, frequency: { type: 'string', enum: [...REPORT_FREQUENCIES] }, recipients: { type: 'array', items: { type: 'string' } }, templateId: { anyOf: [id, { type: 'null' }] }, confirmation: { type: 'string' } }, additionalProperties: false } },
+   { name: 'list_report_runs', description: 'List report run history (status, period, row count, per-recipient delivery status) within your channel scope.', inputSchema: page },
+-  { name: 'generate_report', description: 'Prepare a report as CSV, JSON and printable HTML for download (the result carries csv, json and html strings; older retained runs may lack json). The published section includes a bounded content log, complete daily UTC publication counts and currently failed destinations last updated in the period, with scoped content excerpts and attempt counts. Failed rows are current state, not historical failures; provider errors are excluded. The responseTime section includes separate stored comment and conversation answer shares, median/slowest first responses and resolution times, member first-reply counts and calendar/business-hours medians split by source, member slowest replies and saved-resolution counts/medians attributed to the first responder of the last visitor run (not the resolver), period-start context, historical resolution/reopening event counts and calendar/business-hours resolution cycles split by source with stored-history coverage; absent history is excluded and unset business hours never become zero. All renderings share the same row and byte bounds and truncation marking. Nothing is emailed; the run is recorded as Prepared, never Sent, and works without email delivery. Two forms. (1) A schedule\'s most recent complete period: scheduleId, confirmation "GENERATE REPORT <scheduleId>". (2) One channel over explicit inclusive UTC dates: channelId, start and end (YYYY-MM-DD, within the Analytics range limit), optional templateId (null = default sections), confirmation "GENERATE CHANNEL REPORT <channelId>". requestId is a fresh UUID; repeating the same requestId with the same input returns the already prepared result (while still retained and authorised) instead of regenerating, and a different input with that id is refused. Returned rows are bounded by this key\'s result ceiling.', inputSchema: { type: 'object', required: ['requestId', 'confirmation'], properties: { scheduleId: id, channelId: id, templateId: { anyOf: [id, { type: 'null' }] }, start: { type: 'string', pattern: '^\\d{4}-\\d{2}-\\d{2}$' }, end: { type: 'string', pattern: '^\\d{4}-\\d{2}-\\d{2}$' }, requestId: { type: 'string', format: 'uuid' }, confirmation: { type: 'string' } }, oneOf: [{ required: ['scheduleId'] }, { required: ['channelId', 'start', 'end'] }], additionalProperties: false } },
++  { name: 'generate_report', description: 'Prepare a report as CSV, JSON and printable HTML for download (the result carries csv, json and html strings; older retained runs may lack json). The topPosts section includes saved destination-specific text, ordered image/video links and article title/description/link, bounded by Root policy. Local media links require workspace access; content is current saved state, not a remote publication snapshot. The published section includes a bounded content log, complete daily UTC publication counts and currently failed destinations last updated in the period, with scoped content excerpts and attempt counts. Failed rows are current state, not historical failures; provider errors are excluded. The responseTime section includes separate stored comment and conversation answer shares, median/slowest first responses and resolution times, member first-reply counts and calendar/business-hours medians split by source, member slowest replies and saved-resolution counts/medians attributed to the first responder of the last visitor run (not the resolver), period-start context, historical resolution/reopening event counts and calendar/business-hours resolution cycles split by source with stored-history coverage; absent history is excluded and unset business hours never become zero. All renderings share the same row and byte bounds and truncation marking. Nothing is emailed; the run is recorded as Prepared, never Sent, and works without email delivery. Two forms. (1) A schedule\'s most recent complete period: scheduleId, confirmation "GENERATE REPORT <scheduleId>". (2) One channel over explicit inclusive UTC dates: channelId, start and end (YYYY-MM-DD, within the Analytics range limit), optional templateId (null = default sections), confirmation "GENERATE CHANNEL REPORT <channelId>". requestId is a fresh UUID; repeating the same requestId with the same input returns the already prepared result (while still retained and authorised) instead of regenerating, and a different input with that id is refused. Returned rows are bounded by this key\'s result ceiling.', inputSchema: { type: 'object', required: ['requestId', 'confirmation'], properties: { scheduleId: id, channelId: id, templateId: { anyOf: [id, { type: 'null' }] }, start: { type: 'string', pattern: '^\\d{4}-\\d{2}-\\d{2}$' }, end: { type: 'string', pattern: '^\\d{4}-\\d{2}-\\d{2}$' }, requestId: { type: 'string', format: 'uuid' }, confirmation: { type: 'string' } }, oneOf: [{ required: ['scheduleId'] }, { required: ['channelId', 'start', 'end'] }], additionalProperties: false } },
+ ] as const;
+ /** Definitions to list now: generation tools appear only when generation is registered and its history exists. */
+ export async function analyticsReportAvailableToolDefinitions() {
+diff --git a/rebuild/src/modules/analytics/reports/server/top-post-content.ts b/rebuild/src/modules/analytics/reports/server/top-post-content.ts
+new file mode 100644
+index 00000000..6b52c977
+--- /dev/null
++++ b/rebuild/src/modules/analytics/reports/server/top-post-content.ts
+@@ -0,0 +1,67 @@
++import type { PostPerformance } from '@/server/platforms/host';
++import { prisma } from '@/server/data';
++import { runtimeConfig } from '@/server/config/store';
++import { TOP_POST_CONTENT_POLICY_SCHEMA } from '../config';
++
++export type TopPostContent = { previewImages: boolean; text: string; media: Array<{ kind: 'image' | 'video'; url: string }>; link: string | null; articleTitle: string; articleDescription: string; shortened: boolean };
++export type ReportTopPost = PostPerformance & { content?: TopPostContent };
++/** Report URLs are passive public HTTP(S) references, never executable schemes or credentials. */
++export function reportUrl(value: unknown, max = Infinity): string | null {
++  if (typeof value !== 'string' || value.length > max) return null;
++  try { const url = new URL(value); return ['https:', 'http:'].includes(url.protocol) && !url.username && !url.password && url.href.length <= max ? url.href : null; } catch { return null; }
++}
++const object = (value: unknown): Record<string, unknown> => value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
++/** Enrich only the ranked, authorized channel's published destinations. No other
++ * destination overrides, storage keys, author identities or provider errors leave this read.
++ * Saved content may have changed after publication: it is not a remote snapshot.
++ */
++export async function readTopPostContent(workspaceId: string, channelId: string, period: { start: string; end: string }, ranked: PostPerformance[]): Promise<ReportTopPost[]> {
++  const policy = TOP_POST_CONTENT_POLICY_SCHEMA.parse(await runtimeConfig('analytics.reports.topPostContent'));
++  if (!ranked.length) return [];
++  const publicOrigin = reportUrl(await runtimeConfig('app.publicOrigin'));
++  const ids = ranked.slice(0, policy.posts).map(p => p.postId);
++  const from = new Date(`${period.start}T00:00:00.000Z`);
++  const to = new Date(`${period.end}T00:00:00.000Z`); to.setUTCDate(to.getUTCDate() + 1);
++  const rows = await prisma.$queryRaw<Array<{ postId: string; text: string; media: unknown; link: string | null; articleTitle: string | null; articleDescription: string | null }>>`
++    SELECT pt."postId", left(COALESCE(pt."messageOverride", p.message), ${policy.textCharacters + 1}) AS text,
++      CASE WHEN pt."skipMedia" THEN '[]'::jsonb ELSE COALESCE((
++        SELECT jsonb_agg(jsonb_build_object('kind', item->>'kind', 'url', left(item->>'url', ${policy.urlCharacters + 1})) ORDER BY ordinal)
++        FROM (SELECT item, ordinal FROM jsonb_array_elements(CASE WHEN jsonb_typeof(p.media) = 'array' THEN p.media ELSE '[]'::jsonb END)
++          WITH ORDINALITY AS media(item, ordinal) ORDER BY ordinal LIMIT ${policy.mediaPerPost + 1}) bounded
++      ), '[]'::jsonb) END AS media,
++      left(p.link, ${policy.urlCharacters + 1}) AS link,
++      left(p."linkPreview"->>'title', ${policy.previewCharacters + 1}) AS "articleTitle",
++      left(p."linkPreview"->>'description', ${policy.previewCharacters + 1}) AS "articleDescription"
++    FROM post_targets pt JOIN posts p ON p.id = pt."postId"
++    JOIN targets t ON t.id = pt."targetId" AND t."workspaceId" = p."workspaceId"
++    WHERE p."workspaceId" = ${workspaceId} AND pt."targetId" = ${channelId}
++      AND pt."postId" = ANY(${ids}::text[]) AND pt.status = 'published'
++      AND pt."publishedAt" >= ${from} AND pt."publishedAt" < ${to}
++    LIMIT ${policy.posts}`;
++  const byId = new Map(rows.map(row => [row.postId, row]));
++  return ranked.slice(0, policy.posts).flatMap(post => {
++    const row = byId.get(post.postId);
++    if (!row) return []; // A removed/unpublished destination cannot leak stale adapter content.
++    let shortened = false;
++    const clip = (value: unknown, max: number) => {
++      const text = typeof value === 'string' ? value : '';
++      const characters = [...text];
++      if (characters.length <= max) return text;
++      shortened = true; return characters.slice(0, max - 1).join('') + '…';
++    };
++    const rawMedia = Array.isArray(row.media) ? row.media : [];
++    if (rawMedia.length > policy.mediaPerPost) shortened = true;
++    const media = rawMedia.slice(0, policy.mediaPerPost).flatMap(item => {
++      const m = object(item);
++      const localId = typeof m.url === 'string' && /^media:[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(m.url) ? m.url.slice('media:'.length) : null;
++      const url = localId && publicOrigin ? reportUrl(new URL(policy.mediaUrlTemplate.replace('{id}', localId), new URL(publicOrigin).origin).href, policy.urlCharacters) : reportUrl(m.url, policy.urlCharacters);
++      if (!url) shortened = true;
++      return url && (m.kind === 'image' || m.kind === 'video') ? [{ kind: m.kind, url } as { kind: 'image' | 'video'; url: string }] : [];
++    });
++    if (row.link && !reportUrl(row.link, policy.urlCharacters)) shortened = true;
++    const content: TopPostContent = { previewImages: policy.imagePreviews, text: clip(row.text, policy.textCharacters), media,
++      link: reportUrl(row.link, policy.urlCharacters), articleTitle: clip(row.articleTitle, policy.previewCharacters), articleDescription: clip(row.articleDescription, policy.previewCharacters), shortened: false };
++    content.shortened = shortened;
++    return [{ ...post, text: content.text, url: reportUrl(post.url, policy.urlCharacters), content }];
++  });
++}
+diff --git a/rebuild/src/modules/analytics/ui/reports/ReportsManager.tsx b/rebuild/src/modules/analytics/ui/reports/ReportsManager.tsx
+index 5fbe82f0..5d427f4e 100644
+--- a/rebuild/src/modules/analytics/ui/reports/ReportsManager.tsx
++++ b/rebuild/src/modules/analytics/ui/reports/ReportsManager.tsx
+@@ -248,6 +248,7 @@ export function ReportsManager({ templates, templateOptions, schedules, runs, ca
+       {prepared && <div className={styles.prepared} role="region" aria-labelledby="prepared-title"><div><h3 id="prepared-title">{t("Report prepared")}</h3><p>{prepared.rowCount} {t("rows ·")} {prepared.bytes.toLocaleString(locale)} {t("bytes")}{prepared.truncated ? t(" · Shortened to fit the configured limit") : ''}</p>{prepared.notIncluded.length > 0 && <p>{t("Not included yet:")} {prepared.notIncluded.map(section => t(sectionLabels.get(section) ?? t("Some sections"))).join(', ')}.</p>}</div><ReportDownloads copy={downloadCopy} locale={locale} prepared={prepared} /></div>}
+       <p>{t("Published posts includes a content log, daily UTC publication totals and currently failed destinations updated in the period. Failed rows are current state, not attempt history. Logs may be shortened; daily totals cover the full period.")}</p>
+       <p className={styles.note}>{t("Reports use stored analytics. Missing data is shown as unavailable, not zero. “Prepare report” creates a download and does not email anyone; scheduled runs send to their saved recipients.")}</p>
++      <p className={styles.note}>{t("Top posts includes saved destination text, media links and article details. Content may have changed since publication; links may expire.")}</p>
+     </section>
+ 
+     <section className={styles.panel} aria-labelledby="run-h"><div className={styles.panelHeading}><div><h2 id="run-h"><IconHistory aria-hidden="true" /> {t("Report history")}</h2><p>{t("Preparation and email outcomes, by channel and reporting period.")}</p></div></div>
+diff --git a/rebuild/src/modules/analytics/ui/reports/copy.ts b/rebuild/src/modules/analytics/ui/reports/copy.ts
+index 24a4cc23..00bbcfcb 100644
+--- a/rebuild/src/modules/analytics/ui/reports/copy.ts
++++ b/rebuild/src/modules/analytics/ui/reports/copy.ts
+@@ -1,6 +1,7 @@
+ /** Module-owned customer copy. Root catalog registration is coordinated by the host owner. */
+ export type UiLocale = 'en' | 'fr';
+ const french: Record<string, string> = {
++  "Top posts includes saved destination text, media links and article details. Content may have changed since publication; links may expire.": "Les meilleures publications incluent le texte enregistré par canal, les liens des médias et les détails de l’article. Le contenu peut avoir changé depuis la publication ; les liens peuvent expirer.",
+   "Published posts includes a content log, daily UTC publication totals and currently failed destinations updated in the period. Failed rows are current state, not attempt history. Logs may be shortened; daily totals cover the full period.": "La section Publications publiées comprend un journal de contenu, les totaux quotidiens UTC et les destinations actuellement en échec modifiées pendant la période. Les échecs reflètent l’état actuel, pas l’historique des tentatives. Les journaux peuvent être raccourcis ; les totaux quotidiens couvrent toute la période.",
+   "Member details include slowest replies, resolved answered waits and median resolution times. Resolution is credited to the first responder of the last visitor run, not the person who marked it resolved.": "Les détails par membre comprennent les réponses les plus lentes, les attentes avec réponse résolues et les délais médians de résolution. La résolution est attribuée au premier répondant de la dernière série de messages du visiteur, pas à la personne ayant marqué la résolution.",
+   "Response reports separate comments and conversations: answer shares, response and resolution times, member first replies, recorded resolution cycles and resolution/reopening counts. Business hours and saved-history limits remain explicit; events may concern waits missing from stored visitor history. Complete platform history is not guaranteed.": "Les rapports distinguent commentaires et conversations : parts traitées, délais de réponse et de résolution, premières réponses par membre, cycles de résolution enregistrés et nombres de résolutions/réouvertures. Les heures ouvrées et limites de l’historique restent explicites ; les événements peuvent concerner des attentes absentes de l’historique enregistré. L’historique complet de la plateforme n’est pas garanti.",
+diff --git a/rebuild/tests/report-top-post-content-workflow.test.ts b/rebuild/tests/report-top-post-content-workflow.test.ts
+new file mode 100644
+index 00000000..955836ed
+--- /dev/null
++++ b/rebuild/tests/report-top-post-content-workflow.test.ts
+@@ -0,0 +1,69 @@
++vi.mock('@/modules/analytics/reports/generation/copy-server', async () => ({ loadReportDocumentCopy: async () => ({ copy: (await import('@/modules/analytics/reports/generation/copy')).reportDocumentCopyDefaults.en, locale: 'en' }) }));
++import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
++const platform = vi.hoisted(() => ({ posts: vi.fn() }));
++vi.mock('@/server/platforms/registry', () => ({ platformAnalytics: async () => ({ postPerformance: platform.posts }) }));
++
++vi.mock('@/server/data', async () => ({ prisma: (await import('./report82-engine-harness')).db }));
++vi.mock('@/server/config/store', async () => { const h = await import('./report82-engine-harness'); return { runtimeConfig: async (key: string) => h.configValue(key) }; });
++vi.mock('@/server/entitlements', async () => { const h = await import('./report82-engine-harness'); return { loadEntitlements: async (_u: string, w: string) => (h.state.entitled ? { workspaceId: w } : null), canUseFeature: () => h.state.entitled, entitledPlatformIds: () => h.state.providers }; });
++vi.mock('@/server/permissions', async () => {
++  const h = await import('./report82-engine-harness');
++  return {
++    canAccessFeature: (p: { deny?: string[] }) => h.state.canAccess && !(p?.deny ?? []).includes('analytics/reports'),
++    resolvePermissions: () => ({ pageScope: h.state.freshScope ? { all: false, ids: h.state.freshScope } : { all: true, ids: [] }, deny: h.state.freshDeny }),
++  };
++});
++vi.mock('@/server/permissions/loader', async () => { const h = await import('./report82-engine-harness'); return { loadPermissions: async () => h.permissionsFor() }; });
++vi.mock('@/server/platforms/resource-visibility', async () => { const h = await import('./report82-engine-harness'); return { selectedResourceConnectionWhere: async () => ({ provider: { in: h.state.providers } }) }; });
++vi.mock('@/server/data-control/guard', async () => { const h = await import('./report82-engine-harness'); return { assertWorkspaceNotPurging: async () => { if (h.state.purge) throw Object.assign(new Error('purging'), { code: 'conflict' }); } }; });
++vi.mock('../src/modules/analytics/server/read', async () => { const h = await import('./report82-engine-harness'); return { readAnalyticsSnapshot: h.readSnapshot }; });
++
++import { db, state, reset, resetGen, snapshot, gen, execs } from './report82-engine-harness';
++import { TOP_POST_CONTENT_DEFAULTS } from '../src/modules/analytics/reports/config';
++import { createReportGenerator } from '../src/modules/analytics/reports/generation/document';
++import { registerReportGeneration, resetReportCapabilityCache, unregisterReportGeneration } from '../src/modules/analytics/reports/generation/registry';
++import { runReportNow } from '../src/modules/analytics/reports/generation/runs';
++import { executeAnalyticsReportTool } from '../src/modules/analytics/reports/mcp';
++const original = db.$queryRaw.getMockImplementation()!;
++const now = new Date('2026-10-21T10:00:00Z');
++const actor = { userId: 'u1', workspaceId: 'w1' };
++const content = { postId: 'post1', text: 'Destination text', media: [{ kind: 'image', url: 'https://cdn.example/image' }], link: 'https://article.example/', articleTitle: 'Read this article', articleDescription: 'Article context' };
++beforeEach(() => {
++  vi.clearAllMocks(); reset(); resetGen(); resetReportCapabilityCache(); vi.useFakeTimers(); vi.setSystemTime(now);
++  state.config['analytics.reports.topPostContent'] = TOP_POST_CONTENT_DEFAULTS;
++  state.config['app.publicOrigin'] = 'https://app.example'; state.templateSections = ['topPosts']; state.scheduleSections = ['topPosts'];
++  gen.snapshot = snapshot({ period: { start: '2026-10-01', end: '2026-10-18' } });
++  platform.posts.mockResolvedValue([{ postId: 'post1', text: 'Generic adapter text', publishedAt: new Date('2026-10-15T10:00Z'), url: 'https://social.example/post1', rankLabel: 'Engagement', rankValue: 5, measures: [], measuredAt: null }]);
++  db.$queryRaw.mockImplementation(async (sql, ...args) => {
++    const query = sql.join('?');
++    if (query.includes('SELECT a.provider')) return [{ provider: 'p1' }];
++    if (query.includes('pt."messageOverride"') && query.includes('ANY(')) return [content];
++    return original(sql, ...args);
++  });
++  registerReportGeneration({ generation: createReportGenerator({ bounds: async () => ({ maxRows: 100, maxBytes: 20000 }) }) });
++});
++afterEach(() => { db.$queryRaw.mockImplementation(original); unregisterReportGeneration(); vi.useRealTimers(); });
++describe('ranked content through the confirmed shared workflow', () => {
++  it.each(['service', 'mcp'] as const)('releases all three details and audited receipts through %s', async surface => {
++    const input = { channelId: 'c1', templateId: 't1', start: '2026-10-01', end: '2026-10-18', requestId: '6f1d0b6e-0f4b-4c5d-8a43-2d5b1d1f6a11', confirmation: 'GENERATE CHANNEL REPORT c1' };
++    const output = (surface === 'service' ? await runReportNow(actor, input, now) : await executeAnalyticsReportTool(actor, 'generate_report', input)) as Awaited<ReturnType<typeof runReportNow>>;
++    expect(output).toMatchObject({ ok: true, outcome: 'prepared' });
++    expect(output.html).toContain('Destination text'); expect(output.html).toContain('https://cdn.example/image'); expect(output.html).toContain('Read this article');
++    expect(output.html).not.toContain('Generic adapter text');
++    expect(JSON.parse(output.json!).records.map((r: { record_type: string }) => r.record_type)).toEqual(expect.arrayContaining(['top_post_content', 'top_post_media', 'top_post_link']));
++    expect(execs('activity_logs').some(row => row.values.includes('analytics.report_run_finished'))).toBe(true);
++  });
++  it('refuses bad consent or lost channel scope before reading ranked content', async () => {
++    const input = { channelId: 'c1', templateId: 't1', start: '2026-10-01', end: '2026-10-18', requestId: '6f1d0b6e-0f4b-4c5d-8a43-2d5b1d1f6a11', confirmation: 'WRONG' };
++    await expect(executeAnalyticsReportTool(actor, 'generate_report', input)).rejects.toMatchObject({ code: 'invalid_request' });
++    state.scope = ['other'];
++    await expect(runReportNow(actor, { ...input, confirmation: 'GENERATE CHANNEL REPORT c1' }, now)).rejects.toMatchObject({ code: 'unavailable' });
++    expect(platform.posts).not.toHaveBeenCalled();
++  });
++  it('honors the key result ceiling when asking the platform for ranked posts', async () => {
++    const generator = createReportGenerator({ bounds: async () => ({ maxRows: 100, maxBytes: 20000 }) });
++    const out = await generator.generate({ actor: { ...actor, maxResultItems: 1 }, channelId: 'c1', sections: ['topPosts'], period: { start: '2026-10-01', end: '2026-10-18' } });
++    expect(out.ok).toBe(true); expect(platform.posts).toHaveBeenCalledWith(expect.objectContaining({ limit: 1 }));
++    if (out.ok) expect(out.output.rowCount).toBeLessThanOrEqual(1);
++  });
++});
+diff --git a/rebuild/tests/report-top-post-content.test.ts b/rebuild/tests/report-top-post-content.test.ts
+new file mode 100644
+index 00000000..b9b23eb3
+--- /dev/null
++++ b/rebuild/tests/report-top-post-content.test.ts
+@@ -0,0 +1,78 @@
++import { beforeEach, describe, expect, it, vi } from 'vitest';
++const mocks = vi.hoisted(() => ({ query: vi.fn(), config: vi.fn() }));
++vi.mock('@/server/data', () => ({ prisma: { $queryRaw: mocks.query } }));
++vi.mock('@/server/config/store', () => ({ runtimeConfig: mocks.config }));
++import { readTopPostContent, reportUrl, type ReportTopPost } from '../src/modules/analytics/reports/server/top-post-content';
++import { TOP_POST_CONTENT_DEFAULTS, TOP_POST_CONTENT_POLICY_SCHEMA } from '../src/modules/analytics/reports/config';
++import { renderReport } from '../src/modules/analytics/reports/generation/document';
++import { reportDocumentCopyDefaults } from '../src/modules/analytics/reports/generation/copy';
++const period = { start: '2026-10-01', end: '2026-10-02' };
++const ranked = { postId: 'p1', text: 'generic', publishedAt: new Date('2026-10-01T10:00Z'), url: 'https://social.example/post', measures: [], rankValue: 4, rankLabel: 'Engagement', measuredAt: null };
++const stored = { postId: 'p1', text: '=destination <script>\nSecond line', media: [{ kind: 'image', url: 'https://cdn.example/image.jpg', storageKey: 'PRIVATE' }, { kind: 'video', url: 'https://cdn.example/video.mp4' }], link: 'https://article.example/', articleTitle: 'Article <b>', articleDescription: 'Description' };
++beforeEach(() => { vi.clearAllMocks(); mocks.config.mockImplementation(async key => key === 'app.publicOrigin' ? 'https://app.example' : TOP_POST_CONTENT_DEFAULTS); mocks.query.mockResolvedValue([stored]); });
++describe('scoped ranked post content', () => {
++  it('keeps destination text, attachment order and article metadata without private storage fields', async () => {
++    const out = await readTopPostContent('w', 'c', period, [ranked]);
++    expect(out[0].text).toBe(stored.text);
++    expect(out[0].content).toMatchObject({ text: stored.text, media: [{ kind: 'image', url: 'https://cdn.example/image.jpg' }, { kind: 'video', url: 'https://cdn.example/video.mp4' }], articleTitle: 'Article <b>', link: 'https://article.example/' });
++    expect(JSON.stringify(out)).not.toContain('PRIVATE');
++    const [sql, ...args] = mocks.query.mock.calls[0]; const text = sql.join('?');
++    for (const clause of ['pt."messageOverride"', 'pt."skipMedia"', 'p."workspaceId" =', 'pt."targetId" =', 't."workspaceId" = p."workspaceId"', "pt.status = 'published'", 'pt."publishedAt" >=', 'pt."publishedAt" <', 'ANY(', 'WITH ORDINALITY', 'LIMIT']) expect(text).toContain(clause);
++    expect(args).toContain('w'); expect(args).toContain('c'); expect(args).toContainEqual(['p1']); expect(args).toContainEqual(new Date('2026-10-03T00:00Z'));
++  });
++  it('maps local image references to the Root-configured authenticated media URL and discloses inaccessible references', async () => {
++    const id = '123e4567-e89b-42d3-a456-426614174000';
++    mocks.query.mockResolvedValue([{ ...stored, media: [{ kind: 'image', url: `media:${id}` }] }]);
++    expect((await readTopPostContent('w', 'c', period, [ranked]))[0].content!.media[0].url).toBe(`https://app.example/api/media/${id}`);
++    mocks.config.mockImplementation(async key => key === 'app.publicOrigin' ? '' : TOP_POST_CONTENT_DEFAULTS);
++    const missing = (await readTopPostContent('w', 'c', period, [ranked]))[0].content!;
++    expect(missing.media).toEqual([]); expect(missing.shortened).toBe(true);
++  });
++  it('drops destinations no longer published or present; never falls back to adapter text', async () => {
++    mocks.query.mockResolvedValue([]);
++    expect(await readTopPostContent('w', 'c', period, [ranked])).toEqual([]);
++  });
++  it('uses Root bounds, discloses content cuts, removes unsafe URLs and ignores unknown attachment types', async () => {
++    mocks.config.mockResolvedValue({ ...TOP_POST_CONTENT_DEFAULTS, textCharacters: 120, mediaPerPost: 1, previewCharacters: 20 });
++    mocks.query.mockResolvedValue([{ ...stored, text: 'x'.repeat(121), articleTitle: 'a'.repeat(21), media: [{ kind: 'image', url: 'javascript:alert(1)' }, { kind: 'video', url: 'https://cdn.example/v' }], link: 'https://user:password@article.example' }]);
++    const out = await readTopPostContent('w', 'c', period, [{ ...ranked, url: 'data:text/html,hi' }]);
++    expect(out[0].content).toMatchObject({ shortened: true, media: [], link: null, text: 'x'.repeat(119) + '…', articleTitle: 'a'.repeat(19) + '…' }); expect(out[0].url).toBeNull();
++    expect(TOP_POST_CONTENT_POLICY_SCHEMA.safeParse({ ...TOP_POST_CONTENT_DEFAULTS, posts: 0 }).success).toBe(false);
++    mocks.config.mockResolvedValue({ posts: 0 }); mocks.query.mockClear();
++    await expect(readTopPostContent('w', 'c', period, [ranked])).rejects.toThrow(); expect(mocks.query).not.toHaveBeenCalled();
++  });
++  it('clips whole Unicode characters within the configured content ceiling', async () => {
++    mocks.config.mockImplementation(async key => key === 'app.publicOrigin' ? '' : { ...TOP_POST_CONTENT_DEFAULTS, textCharacters: 120 });
++    mocks.query.mockResolvedValue([{ ...stored, text: '😀'.repeat(121) }]);
++    const text = (await readTopPostContent('w', 'c', period, [ranked]))[0].content!.text;
++    expect([...text]).toHaveLength(120); expect(text).toBe('😀'.repeat(119) + '…'); expect(text).not.toContain('�');
++  });
++  it.each(['javascript:alert(1)', 'file:///etc/passwd', '//host/path', 'https://user:pass@host/', 'data:image/png,hi'])('refuses unsafe URL %s', value => expect(reportUrl(value)).toBeNull());
++});
++describe('shared report artifacts', () => {
++  const snapshot = { period, allMetrics: [], audience: null, publishing: { published: 1, scheduled: 0, failed: 0 } };
++  const render = (posts: ReportTopPost[], locale: 'en' | 'fr', maxRows = 100, maxBytes = 30000, sections: Array<'topPosts' | 'audience'> = ['topPosts']) => renderReport(snapshot as never, { channelName: 'C', sections, generatedAt: new Date(0), topPosts: posts }, { maxRows, maxBytes }, reportDocumentCopyDefaults[locale], locale);
++  it.each(['en', 'fr'] as const)('exposes all three content capabilities through CSV/JSON/HTML/text in %s', async locale => {
++    const out = render(await readTopPostContent('w', 'c', period, [ranked]), locale);
++    expect(out.csv).toContain("'=destination"); expect(out.html).toContain('&lt;script&gt;'); expect(out.html).not.toContain('<script>');
++    expect(out.html).toContain('<details>'); expect(out.html).toContain('<img loading="lazy" referrerpolicy="no-referrer"'); expect(out.html).toContain('https://cdn.example/image.jpg'); expect(out.html).toContain('https://article.example/');
++    expect(out.text).toContain(stored.text); expect(out.text).toContain('Description');
++    expect(out.html).toContain(locale === 'fr' ? 'Contenu de la publication' : 'Post content');
++    const records = JSON.parse(out.json!).records;
++    expect(records.map((r: { record_type: string }) => r.record_type)).toEqual(expect.arrayContaining(['top_post_content', 'top_post_media', 'top_post_link']));
++    expect(out.truncated).toBe(false);
++  });
++  it('allows Root to disable embedded image previews while retaining attachment links', async () => {
++    mocks.config.mockImplementation(async key => key === 'app.publicOrigin' ? '' : { ...TOP_POST_CONTENT_DEFAULTS, imagePreviews: false });
++    const out = render(await readTopPostContent('w', 'c', period, [ranked]), 'en');
++    expect(out.html).not.toContain('<img '); expect(out.html).toContain('https://cdn.example/image.jpg');
++  });
++  it('respects byte/record ceilings, discloses content clipping and excludes unselected sections', async () => {
++    const posts = await readTopPostContent('w', 'c', period, [ranked]); posts[0].content!.shortened = true;
++    const out = render(posts, 'en', 2, 1500);
++    expect(out.rowCount).toBeLessThanOrEqual(2); expect(JSON.parse(out.json!).records.length).toBeLessThanOrEqual(2);
++    for (const value of [out.csv, out.json!, out.html, out.text]) expect(Buffer.byteLength(value)).toBeLessThanOrEqual(1500);
++    expect(out.truncated).toBe(true); expect(JSON.parse(out.json!).truncated).toBe(true);
++    const omitted = render(posts, 'en', 100, 30000, ['audience']); expect(omitted.html).not.toContain('destination'); expect(omitted.csv).not.toContain('top_post_content');
++  });
++});

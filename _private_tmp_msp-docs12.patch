@@ -1,0 +1,590 @@
+diff --git a/rebuild/docs/AGENT_HANDOFF.md b/rebuild/docs/AGENT_HANDOFF.md
+index d3f6a249..ff4e8955 100644
+--- a/rebuild/docs/AGENT_HANDOFF.md
++++ b/rebuild/docs/AGENT_HANDOFF.md
+@@ -1,8 +1,11 @@
+ # Shared agent handoff
+ 
+-Updated 2026-10-21 against local HEAD `ffdb1cdf` (round 9), reviewing current
+-source, round 7–9 diffs and dated release/browser records. This supersedes the
+-`960831df` continuation. The contract is unchanged; the full goal remains active.
++Updated 2026-10-21 against local HEAD `a910d774` (rounds 10–12 appended after
++round 9 below; deployed release recorded as `a910d774`, schema **120**, an
++owner/integrator statement not re-observed here). Earlier text reviewed `ffdb1cdf`
++and where it names `ffdb1cdf`/118 as current, the rounds 10–12 section supersedes
++it. Reviewed source, round 7–12 diffs and dated release/browser records. This
++supersedes the `960831df` continuation. The contract is unchanged; the full goal remains active.
+ No fresh database, browser, provider or production observation was made by this
+ documentation worker; production facts below are owner/integrator records.
+ 
+@@ -256,6 +259,66 @@ no fresh browser, PostgreSQL or live-provider verification by this lane):
+   `facebook-post-history`, `root-config-authority`, `report-link-details*`.
+   No new screen, route, MCP tool or migration for these report details.
+ 
++## Rounds 10–12 (HEAD `a910d774`; schema 120)
++
++Evidence kinds are labelled per item. Nothing here is a fresh database, browser
++or provider run by this documentation lane.
++
++- **Round 10 (`75923335`, schema 119; source/unit):** Facebook Page insight
++  metric resolution before transport construction
++  (`configuredFacebookPageInsightMetrics`, `page-insights.ts`; the `.metrics`
++  projection gap in item 7 of the next actions is not shown closed here), media
++  rename REST (`/api/media-library/[id]`), feed preview disclosure and
++  reviewer notices (new active key `feeds.approvalNotificationsEnabled`, default
++  true; the local queued count is not SMTP delivery), Publishing/Settings
++  polish, and the Published-posts weekday/hour/attempt distributions (typed fields
++  inside `analytics.reports.publicationDetails`, no new key; see
++  `PUBLICATION_DISTRIBUTIONS.md`).
++- **Round 11 (`d6ff1f17`, schema 120; source/unit/mocked):** new Root keys
++  `feeds.wordpress.reuseEnabled` (false) and `feeds.wordpress.reuseCooldownDays`
++  (365) with the shared recipe supply view (details in FEEDS.md), supply card and
++  warning, Ads/Home/Root polish, and `mcp-scope-feeds-service` /
++  `mcp-scope-host-matrix` scoped-key tests (mocked ports; not a real MCP client).
++  `RecipeSupplyCard` is built; mounting it on Home was a stated integration need.
++  Confirm that mount before claiming the Home warning.
++- **Live-defect fixes (source plus regression tests; fakes):**
++  - `806a0ef5`: the Facebook analytics target reported the remote Page id as the
++    provider id, so the host lookup failed and no channel had post performance.
++    The target now reports the platform id. `6e111754`: the post explorer also
++    reads synced insights for posts the application published.
++  - `a47a339c`: Analytics no longer lists identifier-like metrics; the post
++    explorer is lighter with local dates (`facebook-analytics-live-defects`,
++    `analytics-posts-table-live-defects`). Whether production now shows post
++    performance has not been observed by this lane; the owner should confirm.
++- **Facebook OAuth (`c0e5386a`; source/unit):** callback checks, redirects and the
++  secure state cookie use the Root public origin (`app.publicOrigin`), not
++  `request.url`, which is the internal listener behind the proxy and had sent
++  browsers to localhost. **Reconnect is pending the owner's retry**; there is no
++  recorded successful connection after the fix.
++- **Recipe captions (`a47a339c`, `a910d774`; unit/mocked):** WordPress caption
++  text decodes the HTML5 named catalog and numeric references once and keeps
++  U+00A0/U+202F. The caption plugin stores a C0 control (seen U+0016) where French
++  typography needs U+202F, and Facebook rendered it as `0`. `stripCaptionControls`
++  maps such controls before `? ! : ; »` (and after `«`) to U+202F and drops other
++  C0 controls. Seven WordPress captions were affected (owner/integrator record).
++  One already-published post is kept as it is; the audited preview/apply repair
++  service (`caption-repair.ts`, `CAPTION_REPAIR.md`; owner/admin, dry-run receipt
++  then exact confirmation, planned/never-attempted posts only) cannot and does not
++  edit published content. The repair outcome for the other six is not recorded
++  here: confirm each stored caption privately without logging the text. The
++  independent RSS decoder in `feeds.ts` still maps `&nbsp;` to an ordinary space.
++- **Browser lane, round 6 (partial; harness only):** the lane hung. `d24fcd40`
++  holds the matrix script changes (WebKit on macOS uses Option+Tab so links and
++  buttons are reachable; end-of-tab-order detection replaces the false "trap" in
++  Firefox/WebKit headless; layout-settled focus measurement), a date/time input
++  focus ring in `tokens.css` and `browser-matrix-round6` jsdom tests. No matrix
++  was completed, so rounds 6–12 have no browser result and the round 5 findings
++  stay unrerun. A stray local `premium-audit.json` was untracked in `7095d92b`;
++  keep it out of Git.
++- **Production-side facts (owner/integrator, not re-observed):** deployed
++  `a910d774`, schema 120. The migration receipts and the proxy cutback gaps in
++  the next actions still apply.
++
+ ## Browser evidence, not an all-green gate
+ 
+ BROWSER_MATRIX_2026-10-21 records local production builds against a synthetic
+diff --git a/rebuild/docs/ARCHITECTURE.md b/rebuild/docs/ARCHITECTURE.md
+index 1373ebb6..f94b64d5 100644
+--- a/rebuild/docs/ARCHITECTURE.md
++++ b/rebuild/docs/ARCHITECTURE.md
+@@ -1,6 +1,6 @@
+ # MS Social Pilot architecture
+ 
+-Updated 2026-10-21 against local HEAD `ffdb1cdf` (round 9); reviewed current source and the round 7–9 diffs.
++Updated 2026-10-21 against local HEAD `a910d774` (rounds 10–12 appended below; configuration schema **120**, deployed release recorded by the integrator as `a910d774`, not re-observed); reviewed the round 7–12 diffs. Statements below naming `ffdb1cdf` or schema 118 as current are superseded by the "Rounds 10–12" section.
+ [ARCHITECTURE_CONTRACT.md](ARCHITECTURE_CONTRACT.md) remains the binding target,
+ unchanged. This document describes implementation and gaps; deployment, source,
+ automated tests, browser checks and live-provider evidence are separate claims.
+@@ -432,6 +432,43 @@ no fresh browser, PostgreSQL or live-provider verification by this lane):
+   `facebook-post-history`, `root-config-authority`, `report-link-details*`.
+   No new screen, route, MCP tool or migration for these report details.
+ 
++### Rounds 10–12 (`75923335` to `a910d774`; schema 120)
++
++Source and unit/mocked evidence unless stated; no fresh browser, PostgreSQL,
++provider or production observation by this documentation lane.
++
++- **Facebook ownership of analytics identity (`806a0ef5`, `6e111754`):** the
++  Facebook analytics target now reports the platform id (not the remote Page id)
++  to the shared host, which resolves the platform module by that id; before this,
++  shared post explorer and insights found no host and showed no post performance.
++  `facebook/post-performance.ts` also reads synced insights for app-published posts.
++  The shared Analytics code gained no provider branch. Production effect is unobserved here.
++- **Public origin (`c0e5386a`):** Facebook OAuth callback validation, redirects and
++  the secure state cookie derive from the Root public origin (see "Configuration and
++  public origin"), not `request.url`, which is the internal listener behind the proxy.
++  Files: `app/api/connections/[platform]/callback/route.ts`, `platforms/facebook/connection.ts`.
++  The owner's reconnect retry is pending; no successful post-fix connection is recorded.
++- **Page metrics (round 10):** `platforms/facebook/page-insights.ts` resolves the
++  configured Page metric list (additions and explicit exclusions) before constructing
++  the transport. The array-versus-policy registration gap noted for round 9 stays on
++  the ledger until `module.ts`, `runtime.ts`, `adset.ts` and `ads-ops` are shown to use it.
++- **Reports and Analytics:** Published posts adds weekday, UTC-hour and recorded-attempt
++  distributions (typed fields in `analytics.reports.publicationDetails`; saved-data
++  counts, not engagement or provider proof). The Analytics post explorer drops
++  identifier-like metrics and uses local dates.
++- **Feeds:** reviewer notices on held feed posts (`feeds.approvalNotificationsEnabled`),
++  WordPress reuse policy and supply view (`feeds.wordpress.reuseEnabled`,
++  `feeds.wordpress.reuseCooldownDays`), and caption text handling in
++  `modules/feeds/wordpress/text.ts` (entity decoding, C0 controls mapped to U+202F or
++  dropped) plus the audited repair service `caption-repair.ts`. See [FEEDS.md](FEEDS.md).
++- **Other:** media rename REST, Publishing/Settings/Ads/Home/Root polish, and scoped
++  MCP key tests (`mcp-scope-feeds-service`, `mcp-scope-host-matrix`, mocked ports).
++- **Schema:** 119 added `feeds.approvalNotificationsEnabled`; 120 added the two reuse
++  keys. This lane edits no registry.
++- **Browser:** round 6's lane hung. Only the matrix harness and a date/time focus ring
++  (`d24fcd40`, `tokens.css`) are committed; there is no round 6 result, so rounds 6–12
++  UI changes remain without a browser run.
++
+ Historical 328/328 synthetic checks and the production Chrome sweep remain dated
+ evidence. No browser round covers every later merge, and no declaration guard
+ replaces actual MCP/provider verification. [MCP_PARITY.md](MCP_PARITY.md) records
+diff --git a/rebuild/docs/DELIVERY_PLAN.md b/rebuild/docs/DELIVERY_PLAN.md
+index 11235c27..11bc9a89 100644
+--- a/rebuild/docs/DELIVERY_PLAN.md
++++ b/rebuild/docs/DELIVERY_PLAN.md
+@@ -1,6 +1,36 @@
+ # Shared delivery plan
+ 
+-Updated 2026-10-21 against local HEAD `960831df`; reviewed merges since `46c6bdae` (rounds 6–8).
++Updated 2026-10-21 against local HEAD `a910d774`; the sections below were reviewed
++at `960831df` (rounds 6–8) and rounds 9–12 are summarised in the next block.
++
++## Rounds 9–12 delta (HEAD `a910d774`, schema 120)
++
++Deployed release is recorded by the owner/integrator as `a910d774` (schema 120);
++this lane did not observe it. Items below are source/unit evidence unless marked.
++
++- **Live-defect fixes:** `806a0ef5` (Facebook analytics targets report the platform
++  id, not the Page id, so the Analytics post explorer was empty) and `6e111754`
++  (the post explorer reads synced insights for app-published Facebook posts).
++  Regression tests are mocked; no fresh production observation is recorded here.
++- **Facebook OAuth:** `c0e5386a` uses the Root public origin for callback checks
++  and redirects (behind the proxy the internal listener made the redirect point at
++  localhost). Reconnect is **pending the owner's retry**; unverified until a
++  successful connection is observed.
++- **Recipe captions:** `a47a339c` decodes the HTML5 entity catalog, keeps nonbreaking
++  spaces and adds the audited preview/apply repair service; `a910d774` maps the C0
++  control (seen U+0016) before French high punctuation to U+202F and drops other C0
++  controls. Seven WordPress captions were affected; one already-published post is
++  kept as it is. Recipe supply (reuse settings, supply card) and Feeds reviewer
++  notices come from rounds 10–11.
++- **Rounds 10–11:** Facebook Page collection wiring, publication distributions and
++  link report details, media rename REST, Publishing/Settings and Ads/Home/Root
++  polish, MCP scoped-key matrix tests, schema 119 and 120.
++- **Browser round 6:** the lane hung. Only the harness (WebKit uses Option+Tab on
++  macOS, end-of-tab-order detection) and a date/time focus ring were committed
++  (`d24fcd40`). No round 6 result exists; rounds 6–12 UI changes remain unrerun.
++- **Order changes:** batch 1 now also confirms `a910d774` and migration receipts;
++  batch 5 reruns the browser matrix from scratch; add a successful Facebook
++  reconnect check after the OAuth fix.
+ Goal remains active: [GOAL.md](GOAL.md). Binding target:
+ [ARCHITECTURE_CONTRACT.md](ARCHITECTURE_CONTRACT.md), unchanged. Current source
+ and evidence: [ARCHITECTURE.md](ARCHITECTURE.md).
+diff --git a/rebuild/docs/FEEDS.md b/rebuild/docs/FEEDS.md
+index 7553628f..2db4a0b1 100644
+--- a/rebuild/docs/FEEDS.md
++++ b/rebuild/docs/FEEDS.md
+@@ -252,3 +252,34 @@ Vite CJS deprecation and existing missing Tailwind content warnings were emitted
+ there were no test failures. TypeScript uses `--incremental false` to avoid
+ writing an unowned build-info artifact. This working tree is left uncommitted
+ for the integrator; no push/deploy was authorized in this lane.
++
++### Rounds 10–12: reviewer notices, reuse keys and caption handling (HEAD `a910d774`)
++
++Evidence kinds: source and unit/mocked tests; the production statements are
++owner/integrator records, not observed by this documentation lane.
++
++- **Root keys and schema:** `feeds.approvalNotificationsEnabled` (round 10, schema
++  119) and `feeds.wordpress.reuseEnabled` / `feeds.wordpress.reuseCooldownDays`
++  (round 11, schema 120). The "Recipe supply lane" section above is now merged
++  (`d6ff1f17`); its "working tree" label is historical. Home mounting of
++  `RecipeSupplyCard` was a stated integration need; confirm it before claiming the
++  Home low-supply warning.
++- **Caption text (`a47a339c`, `a910d774`):** the WordPress path decodes the HTML5
++  named catalog and numeric references once, keeps U+00A0/U+202F, then
++  `stripCaptionControls` maps C0 controls (seen: U+0016) that precede `? ! : ; »`, or
++  follow `«`, to U+202F and removes any other C0 control except tab/newline. Cause
++  recorded by the integrator: the caption plugin stores U+0016 where French
++  typography needs U+202F, and Facebook rendered it as `0`. This resolves the
++  earlier note that no inspected source turned a nonbreaking space into `0`: the
++  damaged character was a control byte, not U+00A0. Tests:
++  `feeds-wordpress-caption`, `feeds-wordpress-caption-controls`,
++  `feeds-wordpress-caption-repair`.
++- **Affected data (owner/integrator record):** seven WordPress captions carried the
++  control byte. One had already been published and is kept as published; the
++  repair service refuses published, due, claimed or attempted records by design.
++  This document does not record the outcome for the other six planned captions:
++  verify stored text privately (code points, no logging) before treating them as
++  repaired.
++- **Still open:** the RSS decoder in `feeds.ts` (incomplete named catalog,
++  `&nbsp;` to an ordinary space); repair is a service export with no UI, REST or MCP
++  entry point; no live PostgreSQL/MariaDB locking evidence for the repair.
+diff --git a/rebuild/docs/GOAL.md b/rebuild/docs/GOAL.md
+index a3df8b3b..f8ceaa98 100644
+--- a/rebuild/docs/GOAL.md
++++ b/rebuild/docs/GOAL.md
+@@ -1,6 +1,18 @@
+ # Active delivery goal
+ 
+-Updated 2026-10-21 against local HEAD `960831df` (since `46c6bdae`; rounds 6–8). **Status: active; incomplete. Rebuild is in production.**
++Updated 2026-10-21 against local HEAD `a910d774` (since `960831df`; rounds 9–12). **Status: active; incomplete. Rebuild is in production.**
++
++Latest state (integrator statement, not re-observed here): deployed release
++`a910d774`, configuration schema **120**. Since `960831df` the source adds the
++Facebook Page metric/label wiring, link and publication-distribution report
++details, recipe reuse and supply settings, Feeds reviewer notices, a live-defect
++fix for the empty Analytics post explorer (`806a0ef5`, `6e111754`), a Facebook
++OAuth fix to use the Root public origin (`c0e5386a`; the owner's reconnect retry
++is still pending, so no successful post-fix connection is recorded), and WordPress
++caption repairs (`a47a339c`, `a910d774`). Details and evidence kinds are in
++[AGENT_HANDOFF.md](AGENT_HANDOFF.md) (rounds 10–12). The browser round 6 lane
++hung and delivered only a partial harness change; no round 6 matrix result exists.
++The paragraphs below still describe the `960831df` snapshot where dated.
+ 
+ Deliver the full modular, platform-neutral MS Social Pilot replacement in
+ `rebuild/`: complete useful legacy capabilities, Facebook integration, one themed
+diff --git a/rebuild/docs/RELEASE_GATES_PLAN.md b/rebuild/docs/RELEASE_GATES_PLAN.md
+index aa996f1b..ee9b9e2f 100644
+--- a/rebuild/docs/RELEASE_GATES_PLAN.md
++++ b/rebuild/docs/RELEASE_GATES_PLAN.md
+@@ -533,3 +533,12 @@ records 80 scheduled posts, not 80 confirmed Facebook publications or comments.
+ ### 2026-10-21 first full recipe day
+ 
+ All four Europe/Paris slots (07:00, 11:00, 15:00, 17:00) published 10/10 posts with 10/10 first comments and no errors (40/40). 70 further plans pending on the rolling horizon.
++
++### 2026-10-21 rounds 9–12 release state (record only; appended by the documentation lane)
++
++Owner/integrator statement, not re-observed here: deployed release `a910d774`, configuration schema **120**. Included since `ffdb1cdf`: Facebook analytics target platform-id fix (`806a0ef5`), post explorer reads synced insights for app-published posts (`6e111754`), round 10/11 items (schemas 119 and 120), Facebook OAuth callback and redirects on the Root public origin (`c0e5386a`), recipe caption entity decoding and audited repair (`a47a339c`) and U+0016 control-byte mapping to U+202F (`a910d774`).
++
++- **Facebook reconnect:** pending the owner's retry after `c0e5386a`; no successful post-fix connection or live callback is recorded.
++- **Captions:** seven WordPress captions were affected; one already-published post was kept as it is. The repair outcome for the remaining six is not recorded here.
++- **Browser round 6:** the lane hung; only the harness and a date/time focus-ring change are committed (`d24fcd40`). No matrix result exists for rounds 6–12.
++- **Not shown by this entry:** migration receipts for the newest releases, a proxy cutback, media restoration, or any gate pass. Earlier results in this file remain dated and unchanged.
+diff --git a/rebuild/premium-audit.json b/rebuild/premium-audit.json
+new file mode 100644
+index 00000000..cdcad133
+--- /dev/null
++++ b/rebuild/premium-audit.json
+@@ -0,0 +1,320 @@
++{
++  "findings": [
++    {
++      "category": "violation",
++      "file": "src/components/Button.tsx",
++      "line": 11,
++      "message": "Enabled literal button has no detectable action or submit behavior.",
++      "remediation": "Connect the button to a real action, make it a submit button, or disable/remove it.",
++      "ruleId": "affordance.actionless-button",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/app/agency/AgencyFilters.tsx",
++      "line": 17,
++      "message": "Application-owned form does not declare its validation owner.",
++      "remediation": "Add noValidate/novalidate and implement the canonical validation contract.",
++      "ruleId": "form.novalidate-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/app/agency/AgencyFilters.tsx",
++      "line": 30,
++      "message": "Application-owned form does not declare its validation owner.",
++      "remediation": "Add noValidate/novalidate and implement the canonical validation contract.",
++      "ruleId": "form.novalidate-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/app/analytics/explorer/sidebar.tsx",
++      "line": 10,
++      "message": "Application-owned form does not declare its validation owner.",
++      "remediation": "Add noValidate/novalidate and implement the canonical validation contract.",
++      "ruleId": "form.novalidate-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/app/media/MediaLibrary.tsx",
++      "line": 56,
++      "message": "Application-owned form does not declare its validation owner.",
++      "remediation": "Add noValidate/novalidate and implement the canonical validation contract.",
++      "ruleId": "form.novalidate-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/app/password-recovery/recovery-form.tsx",
++      "line": 63,
++      "message": "Application-owned form does not declare its validation owner.",
++      "remediation": "Add noValidate/novalidate and implement the canonical validation contract.",
++      "ruleId": "form.novalidate-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/app/password-recovery/recovery-form.tsx",
++      "line": 69,
++      "message": "Application-owned form does not declare its validation owner.",
++      "remediation": "Add noValidate/novalidate and implement the canonical validation contract.",
++      "ruleId": "form.novalidate-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/app/publishing/collaboration/BulkLabels.tsx",
++      "line": 45,
++      "message": "Application-owned form does not declare its validation owner.",
++      "remediation": "Add noValidate/novalidate and implement the canonical validation contract.",
++      "ruleId": "form.novalidate-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/app/publishing/labels/LabelManager.tsx",
++      "line": 78,
++      "message": "Application-owned form does not declare its validation owner.",
++      "remediation": "Add noValidate/novalidate and implement the canonical validation contract.",
++      "ruleId": "form.novalidate-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/app/publishing/templates/TemplateManager.tsx",
++      "line": 72,
++      "message": "Application-owned form does not declare its validation owner.",
++      "remediation": "Add noValidate/novalidate and implement the canonical validation contract.",
++      "ruleId": "form.novalidate-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/app/root/errors/page.tsx",
++      "line": 21,
++      "message": "Application-owned form does not declare its validation owner.",
++      "remediation": "Add noValidate/novalidate and implement the canonical validation contract.",
++      "ruleId": "form.novalidate-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/app/root/privileges/page.tsx",
++      "line": 25,
++      "message": "Application-owned form does not declare its validation owner.",
++      "remediation": "Add noValidate/novalidate and implement the canonical validation contract.",
++      "ruleId": "form.novalidate-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/app/settings/api-access/connect/ConnectForm.tsx",
++      "line": 16,
++      "message": "Application-owned form does not declare its validation owner.",
++      "remediation": "Add noValidate/novalidate and implement the canonical validation contract.",
++      "ruleId": "form.novalidate-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/app/settings/bio/BioManager.tsx",
++      "line": 43,
++      "message": "Application-owned form does not declare its validation owner.",
++      "remediation": "Add noValidate/novalidate and implement the canonical validation contract.",
++      "ruleId": "form.novalidate-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/app/settings/notifications/NotificationCenter.tsx",
++      "line": 118,
++      "message": "Application-owned form does not declare its validation owner.",
++      "remediation": "Add noValidate/novalidate and implement the canonical validation contract.",
++      "ruleId": "form.novalidate-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/app/settings/sharing/LinksManager.tsx",
++      "line": 173,
++      "message": "Application-owned form does not declare its validation owner.",
++      "remediation": "Add noValidate/novalidate and implement the canonical validation contract.",
++      "ruleId": "form.novalidate-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/app/settings/workspace/policy-form.tsx",
++      "line": 16,
++      "message": "Application-owned form does not declare its validation owner.",
++      "remediation": "Add noValidate/novalidate and implement the canonical validation contract.",
++      "ruleId": "form.novalidate-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/app/share/[token]/ReviewActions.tsx",
++      "line": 24,
++      "message": "Application-owned form does not declare its validation owner.",
++      "remediation": "Add noValidate/novalidate and implement the canonical validation contract.",
++      "ruleId": "form.novalidate-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/app/tasks/TaskBoard.tsx",
++      "line": 166,
++      "message": "Application-owned form does not declare its validation owner.",
++      "remediation": "Add noValidate/novalidate and implement the canonical validation contract.",
++      "ruleId": "form.novalidate-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/app/tasks/TaskBoard.tsx",
++      "line": 193,
++      "message": "Application-owned form does not declare its validation owner.",
++      "remediation": "Add noValidate/novalidate and implement the canonical validation contract.",
++      "ruleId": "form.novalidate-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/app/tasks/TaskFilters.tsx",
++      "line": 11,
++      "message": "Application-owned form does not declare its validation owner.",
++      "remediation": "Add noValidate/novalidate and implement the canonical validation contract.",
++      "ruleId": "form.novalidate-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/app/ads/objects/ChangeHistory.tsx",
++      "line": 77,
++      "message": "Literal product textarea does not show evidence of the canonical resize-none rule.",
++      "remediation": "Use the shared Textarea owner or apply resize-none/resize: none with adequate height or auto-grow behavior.",
++      "ruleId": "form.textarea-resize-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/app/feeds/FeedManager.tsx",
++      "line": 85,
++      "message": "Literal product textarea does not show evidence of the canonical resize-none rule.",
++      "remediation": "Use the shared Textarea owner or apply resize-none/resize: none with adequate height or auto-grow behavior.",
++      "ruleId": "form.textarea-resize-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/app/publishing/templates/TemplateManager.tsx",
++      "line": 85,
++      "message": "Literal product textarea does not show evidence of the canonical resize-none rule.",
++      "remediation": "Use the shared Textarea owner or apply resize-none/resize: none with adequate height or auto-grow behavior.",
++      "ruleId": "form.textarea-resize-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/app/publishing/templates/TemplateManager.tsx",
++      "line": 86,
++      "message": "Literal product textarea does not show evidence of the canonical resize-none rule.",
++      "remediation": "Use the shared Textarea owner or apply resize-none/resize: none with adequate height or auto-grow behavior.",
++      "ruleId": "form.textarea-resize-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/app/publishing/templates/TemplateManager.tsx",
++      "line": 87,
++      "message": "Literal product textarea does not show evidence of the canonical resize-none rule.",
++      "remediation": "Use the shared Textarea owner or apply resize-none/resize: none with adequate height or auto-grow behavior.",
++      "ruleId": "form.textarea-resize-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/app/settings/sharing/LinksManager.tsx",
++      "line": 179,
++      "message": "Literal product textarea does not show evidence of the canonical resize-none rule.",
++      "remediation": "Use the shared Textarea owner or apply resize-none/resize: none with adequate height or auto-grow behavior.",
++      "ruleId": "form.textarea-resize-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/app/share/[token]/ReviewActions.tsx",
++      "line": 26,
++      "message": "Literal product textarea does not show evidence of the canonical resize-none rule.",
++      "remediation": "Use the shared Textarea owner or apply resize-none/resize: none with adequate height or auto-grow behavior.",
++      "ruleId": "form.textarea-resize-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/app/tasks/TaskBoard.tsx",
++      "line": 169,
++      "message": "Literal product textarea does not show evidence of the canonical resize-none rule.",
++      "remediation": "Use the shared Textarea owner or apply resize-none/resize: none with adequate height or auto-grow behavior.",
++      "ruleId": "form.textarea-resize-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/app/tasks/TaskBoard.tsx",
++      "line": 195,
++      "message": "Literal product textarea does not show evidence of the canonical resize-none rule.",
++      "remediation": "Use the shared Textarea owner or apply resize-none/resize: none with adequate height or auto-grow behavior.",
++      "ruleId": "form.textarea-resize-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/app/tasks/TaskBoard.tsx",
++      "line": 224,
++      "message": "Literal product textarea does not show evidence of the canonical resize-none rule.",
++      "remediation": "Use the shared Textarea owner or apply resize-none/resize: none with adequate height or auto-grow behavior.",
++      "ruleId": "form.textarea-resize-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/components/AutoTextarea.tsx",
++      "line": 42,
++      "message": "Literal product textarea does not show evidence of the canonical resize-none rule.",
++      "remediation": "Use the shared Textarea owner or apply resize-none/resize: none with adequate height or auto-grow behavior.",
++      "ruleId": "form.textarea-resize-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/modules/inbox/components/ThreadProductivity.tsx",
++      "line": 32,
++      "message": "Literal product textarea does not show evidence of the canonical resize-none rule.",
++      "remediation": "Use the shared Textarea owner or apply resize-none/resize: none with adequate height or auto-grow behavior.",
++      "ruleId": "form.textarea-resize-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/modules/inbox/components/ThreadProductivity.tsx",
++      "line": 35,
++      "message": "Literal product textarea does not show evidence of the canonical resize-none rule.",
++      "remediation": "Use the shared Textarea owner or apply resize-none/resize: none with adequate height or auto-grow behavior.",
++      "ruleId": "form.textarea-resize-missing",
++      "severity": "error"
++    }
++  ],
++  "mode": "strict",
++  "projectRoot": "/Users/mouad/Documents/ChatGPT/MS Social Pilot/app/rebuild",
++  "schemaVersion": 1,
++  "summary": {
++    "errors": 34,
++    "total": 34,
++    "unresolved": 0,
++    "violations": 34,
++    "warnings": 0
++  }
++}

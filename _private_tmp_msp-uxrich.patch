@@ -1,0 +1,398 @@
+diff --git a/rebuild/src/components/PostThumb.tsx b/rebuild/src/components/PostThumb.tsx
+new file mode 100644
+index 00000000..fa928ef0
+--- /dev/null
++++ b/rebuild/src/components/PostThumb.tsx
+@@ -0,0 +1,30 @@
++'use client';
++import { useState } from 'react';
++import { IconPhoto, IconPlayerPlayFilled } from '@tabler/icons-react';
++import type { PostThumbnail } from './post-thumbnail';
++
++type Props = {
++  thumb: PostThumbnail | null;
++  size?: 'sm' | 'md' | 'lg';
++  /** Spoken name when the image is missing; omit when adjacent text already describes the post. */
++  label?: string;
++};
++
++/**
++ * Square post thumbnail: the image or video poster, a play mark for video, a "+n" count for
++ * further attachments, and a quiet icon tile when there is no media or the file fails to load.
++ * Size comes from the --post-thumb-* tokens.
++ */
++export function PostThumb({ thumb, size = 'md', label }: Props) {
++  const [failed, setFailed] = useState<string | null>(null);
++  const url = thumb?.url && failed !== thumb.url ? thumb.url : null;
++  const named = !url && !!label;
++  return <span className="ui-post-thumb" data-size={size} data-empty={url ? undefined : true} data-video={thumb?.video || undefined} role={named ? 'img' : undefined} aria-label={named ? label : undefined} aria-hidden={!url && !label ? true : undefined}>
++    {url
++      // eslint-disable-next-line @next/next/no-img-element
++      ? <img src={url} alt="" loading="lazy" onError={() => setFailed(url)} />
++      : thumb?.video ? <IconPlayerPlayFilled size={18} aria-hidden="true" /> : <IconPhoto size={18} stroke={1.6} aria-hidden="true" />}
++    {url && thumb?.video ? <span className="ui-post-thumb__play" aria-hidden="true"><IconPlayerPlayFilled size={12} /></span> : null}
++    {thumb && thumb.count > 1 ? <span className="ui-post-thumb__count" aria-hidden="true">+{thumb.count - 1}</span> : null}
++  </span>;
++}
+diff --git a/rebuild/src/components/index.ts b/rebuild/src/components/index.ts
+index 2bfc5692..f0a71aa9 100644
+--- a/rebuild/src/components/index.ts
++++ b/rebuild/src/components/index.ts
+@@ -35,3 +35,6 @@ export { FilterPanel, FilterSection, FilterChips, DatePresets } from "./FilterPa
+ export type { ActiveFilter, DatePreset } from "./FilterPanel";
+ export { Avatar, AvatarStack, avatarSlot, avatarInitials } from "./Avatar";
+ export { computePopupPlacement } from "./usePopupPlacement";
++export { PostThumb } from "./PostThumb";
++export { postThumbnail } from "./post-thumbnail";
++export type { PostThumbnail } from "./post-thumbnail";
+diff --git a/rebuild/src/components/post-thumbnail.ts b/rebuild/src/components/post-thumbnail.ts
+new file mode 100644
+index 00000000..ed0e08a8
+--- /dev/null
++++ b/rebuild/src/components/post-thumbnail.ts
+@@ -0,0 +1,52 @@
++/**
++ * Neutral post thumbnail resolution shared by Publishing, Home and Analytics. It reads only the
++ * stored media list (or an already stored picture URL) and never branches on a provider.
++ */
++export type PostThumbnail = {
++  /** Safe image URL, or null when only a video without a poster (or nothing displayable) exists. */
++  url: string | null;
++  /** The representative attachment is a video; shown with a play mark. */
++  video: boolean;
++  /** Number of attachments on the post. */
++  count: number;
++};
++
++const MEDIA_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
++
++export function safeWebUrl(value: unknown): string | null {
++  if (typeof value !== 'string' || !value) return null;
++  try {
++    const url = new URL(value);
++    return (url.protocol === 'https:' || url.protocol === 'http:') && !url.username && !url.password ? url.href : null;
++  } catch {
++    return null;
++  }
++}
++
++/** Library references resolve through the authorized media route; anything else must be a web URL. */
++export function imageSource(value: unknown): string | null {
++  if (typeof value === 'string' && value.startsWith('media:')) {
++    const id = value.slice('media:'.length);
++    return MEDIA_ID.test(id) ? `/api/media/${encodeURIComponent(id)}` : null;
++  }
++  return safeWebUrl(value);
++}
++
++/** First displayable image (or video poster) of a stored media list; null when the post has no media. */
++export function postThumbnail(media: unknown, fallbackUrl?: string | null): PostThumbnail | null {
++  const items = Array.isArray(media) ? media.filter((item): item is Record<string, unknown> => !!item && typeof item === 'object') : [];
++  const fallback = safeWebUrl(fallbackUrl);
++  if (!items.length) return fallback ? { url: fallback, video: false, count: 1 } : null;
++  let video = false;
++  for (const item of items) {
++    if (item.kind === 'image') {
++      const url = imageSource(item.url);
++      if (url) return { url, video: false, count: items.length };
++    } else if (item.kind === 'video') {
++      video = true;
++      const poster = imageSource(item.posterUrl ?? item.thumbnailUrl);
++      if (poster) return { url: poster, video: true, count: items.length };
++    }
++  }
++  return { url: fallback, video: video && !fallback, count: items.length };
++}
+diff --git a/rebuild/src/modules/analytics/ui/analytics.css b/rebuild/src/modules/analytics/ui/analytics.css
+index 5439339c..12b4cd09 100644
+--- a/rebuild/src/modules/analytics/ui/analytics.css
++++ b/rebuild/src/modules/analytics/ui/analytics.css
+@@ -83,6 +83,9 @@
+ .analytics-posts__text a, .analytics-posts__text > span { overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow-wrap: anywhere; }
+ .analytics-posts__text a svg { margin-inline-start: 4px; vertical-align: -2px; }
+ .analytics-posts__text small { color: var(--ink-soft); }
++.analytics-posts__channel { display: inline-flex; align-items: center; gap: 6px; }
++.analytics-posts__channel .ui-avatar { --size: 18px; width: 18px; height: 18px; font-size: 9px; }
++.analytics-posts__media { display: inline-flex; flex: 0 0 auto; }
+ .analytics-posts__value { display: inline-grid; justify-items: end; gap: 4px; min-width: 72px; }
+ .analytics-posts__bar { display: block; width: 100%; height: 4px; border-radius: 2px; background: var(--mod-soft, var(--line)); overflow: hidden; }
+ .analytics-posts__bar > span { display: block; height: 100%; background: var(--mod, var(--chart-1)); border-radius: 2px; }
+diff --git a/rebuild/src/modules/analytics/ui/posts/PostsTable.tsx b/rebuild/src/modules/analytics/ui/posts/PostsTable.tsx
+index 07989a4b..d65690cb 100644
+--- a/rebuild/src/modules/analytics/ui/posts/PostsTable.tsx
++++ b/rebuild/src/modules/analytics/ui/posts/PostsTable.tsx
+@@ -3,11 +3,15 @@ import { recordsCopyDefaults, type RecordsCopy } from '../../records-copy';
+ import { useMemo, useState } from 'react';
+ import { IconChartBar, IconExternalLink } from '@tabler/icons-react';
+ import { Avatar } from '@/components/Avatar';
++import { PostThumb } from '@/components/PostThumb';
++import type { PostThumbnail } from '@/components/post-thumbnail';
+ import { DataTable } from '@/components/DataTable';
+ import '../analytics.css';
+ 
+ export type PostsTableRow = {
+   key: string; text: string; url: string | null; channelName: string;
++  /** Image, video poster or stored picture to show beside the post; null shows a quiet placeholder. */
++  thumbnail?: PostThumbnail | null;
+   publishedAt: string | null; measuredAt: string | null;
+   /** Stored measure values by key; null is unknown, never zero. */
+   measures: Record<string, number | null>;
+@@ -55,10 +59,10 @@ export function PostsTable({ rows, measures: allMeasures, locale, emptyAction, c
+       emptyIcon={<IconChartBar />} emptyMessage={t("No published posts for this selection and period.")} emptyAction={emptyAction}
+       columns={[
+         { key: 'post', label: t("Post"), hideCardLabel: true, render: row => <span className="analytics-posts__post">
+-          <Avatar name={row.channelName} size="sm" decorative />
++          <span data-module="analytics" className="analytics-posts__media"><PostThumb thumb={row.thumbnail ?? null} size="sm" /></span>
+           <span className="analytics-posts__text">
+             {row.url ? <a href={row.url} rel="noreferrer" target="_blank">{row.text || unavailable}<IconExternalLink size={14} aria-hidden="true" /></a> : <span>{row.text || unavailable}</span>}
+-            <small>{row.channelName}</small>
++            <small className="analytics-posts__channel"><Avatar name={row.channelName} size="sm" decorative />{row.channelName}</small>
+           </span>
+         </span> },
+         { key: 'publishedAt', label: t("Published"), render: row => when(row.publishedAt) },
+diff --git a/rebuild/src/modules/analytics/ui/posts/rows.ts b/rebuild/src/modules/analytics/ui/posts/rows.ts
+index 85a84e92..803c07b4 100644
+--- a/rebuild/src/modules/analytics/ui/posts/rows.ts
++++ b/rebuild/src/modules/analytics/ui/posts/rows.ts
+@@ -1,15 +1,18 @@
++import type { PostThumbnail } from '@/components/post-thumbnail';
+ import type { PostsTableMeasure, PostsTableRow } from './PostsTable';
+ 
+ type PostItem = {
+   channelId: string; channelName: string; postId: string; text: string; url: string | null;
+   publishedAt: Date | null; measuredAt: Date | null;
+   measures: Array<{ key: string; value: number | null }>;
++  /** Stored image/poster/picture reference resolved by the read model; absent when none is stored. */
++  thumbnail?: PostThumbnail | null;
+ };
+ 
+ /** Serializable rows for PostsTable: dates become ISO strings and measures a keyed record. */
+ export function postsTableRows(items: readonly PostItem[]): PostsTableRow[] {
+   return items.map(item => ({
+-    key: `${item.channelId}:${item.postId}`, text: item.text, url: item.url, channelName: item.channelName,
++    key: `${item.channelId}:${item.postId}`, thumbnail: item.thumbnail ?? null, text: item.text, url: item.url, channelName: item.channelName,
+     publishedAt: item.publishedAt?.toISOString() ?? null, measuredAt: item.measuredAt?.toISOString() ?? null,
+     measures: Object.fromEntries(item.measures.map(measure => [measure.key, measure.value])),
+   }));
+diff --git a/rebuild/src/modules/home/ui/HomeScreen.tsx b/rebuild/src/modules/home/ui/HomeScreen.tsx
+index 481a12f9..d16a71e8 100644
+--- a/rebuild/src/modules/home/ui/HomeScreen.tsx
++++ b/rebuild/src/modules/home/ui/HomeScreen.tsx
+@@ -4,6 +4,8 @@ import { Badge } from '@/components/Badge';
+ import { EmptyState } from '@/components/EmptyState';
+ import { MetricCard, type MetricDelta } from '@/components/MetricCard';
+ import { PageHeader } from '@/components/PageHeader';
++import { PostThumb } from '@/components/PostThumb';
++import type { PostThumbnail } from '@/components/post-thumbnail';
+ import { BarChart, DonutChart, HeatmapChart } from '@/components/charts';
+ import { PageFrame } from '@/server/PageFrame';
+ import { requireViewer } from '@/server/context';
+@@ -137,10 +139,13 @@ export default async function HomePage() {
+       {overview.upcoming && <Card module="publishing" icon={<IconCalendarEvent size={20} />} title={t.upcoming} t={t} span="span4" id="home-upcoming">
+         <Body section={overview.upcoming} t={t} empty={<Empty title={t.upcomingEmptyTitle} body={t.upcomingEmptyBody} action={t.upcomingEmptyAction} href="/publishing/compose" />}>
+           {upcoming => <>
+-            <ul className={styles.list}>{upcoming.items.map(item => <li className={styles.item} key={item.id}>
+-              <strong>{item.text || '—'}</strong>
+-              <span className={styles.meta}><time dateTime={item.scheduledAt}>{Number.isNaN(new Date(item.scheduledAt).getTime()) ? item.scheduledAt : timeFormat.format(new Date(item.scheduledAt))}</time><Badge tone="module" module="publishing">{t[MODE_COPY[item.mode]]}</Badge></span>
+-              <span className={styles.meta}>{item.channels.join(', ')}</span>
++            <ul className={styles.list}>{upcoming.items.map(item => <li className={styles.item} key={item.id} data-module="publishing">
++              <PostThumb thumb={(item as typeof item & { thumbnail?: PostThumbnail | null }).thumbnail ?? null} size="md" />
++              <div className={styles.itemBody}>
++                <strong>{item.text || '—'}</strong>
++                <span className={styles.meta}><time dateTime={item.scheduledAt}>{Number.isNaN(new Date(item.scheduledAt).getTime()) ? item.scheduledAt : timeFormat.format(new Date(item.scheduledAt))}</time><Badge tone="module" module="publishing">{t[MODE_COPY[item.mode]]}</Badge></span>
++                <span className={styles.meta}>{item.channels.join(', ')}</span>
++              </div>
+             </li>)}</ul>
+             {upcoming.total > upcoming.items.length && <p className={styles.note}>{fill(t.upcomingMore, { n: upcoming.total })}</p>}
+             <a className={styles.link} href="/publishing/queue">{t.viewQueue}</a>
+diff --git a/rebuild/src/modules/home/ui/home.module.css b/rebuild/src/modules/home/ui/home.module.css
+index ba7c45a9..fa871442 100644
+--- a/rebuild/src/modules/home/ui/home.module.css
++++ b/rebuild/src/modules/home/ui/home.module.css
+@@ -34,7 +34,8 @@
+ .note { margin: 0; color: var(--ink-soft); font-size: .8125rem; line-height: 1.5; }
+ 
+ .list { display: grid; gap: .5rem; margin: 0; padding: 0; list-style: none; }
+-.item { display: grid; gap: .25rem; padding: .7rem .8rem; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface-muted); min-width: 0; }
++.itemBody { display: grid; gap: .25rem; min-width: 0; flex: 1 1 auto; }
++.item { display: flex; align-items: flex-start; gap: .75rem; padding: .7rem .8rem; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface-muted); min-width: 0; }
+ .item strong { overflow-wrap: anywhere; font-size: .88rem; font-weight: 650; }
+ .meta { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem .6rem; min-width: 0; color: var(--ink-soft); font-size: .8125rem; overflow-wrap: anywhere; }
+ .item { transition: border-color var(--ease); }
+diff --git a/rebuild/src/modules/publishing/ui/calendar/CalendarBoard.tsx b/rebuild/src/modules/publishing/ui/calendar/CalendarBoard.tsx
+index 6acfea84..22199be5 100644
+--- a/rebuild/src/modules/publishing/ui/calendar/CalendarBoard.tsx
++++ b/rebuild/src/modules/publishing/ui/calendar/CalendarBoard.tsx
+@@ -9,6 +9,8 @@ import { useRouter } from "next/navigation";
+ import { Button, ChannelBadge, Dialog, StatusChip } from "@/components";
+ import { OriginBadge } from "../origins/OriginBadge";
+ import { PostPreview } from "@/components/PostPreview";
++import { PostThumb } from "@/components/PostThumb";
++import { postThumbnail } from "@/components/post-thumbnail";
+ import { SidebarDock } from "@/components/SidebarDock";
+ import { instantToWall, wallTimeToInstant } from "@/lib/calendar-dates";
+ import { moveCandidates } from "@/lib/reschedule";
+@@ -52,7 +54,10 @@ export function CalendarBoard({ view, days, timeZone, nowIso, canCreate, filterQ
+   const postCard = (post: BoardPost) => <div key={post.id} className={styles.post} data-status={post.status} data-movable={post.movable || undefined} style={post.channels[0] ? { ["--chip" as string]: post.channels[0].mark.color } : undefined}
+     draggable={post.movable} onDragStart={event => { dragged.current = post; event.dataTransfer.effectAllowed = "move"; event.dataTransfer.setData("text/plain", post.id); }} onDragEnd={() => { dragged.current = null; setOver(null); }}>
+     <div className={styles.postMeta}><time dateTime={post.whenIso}>{timeOf(post)}</time><StatusChip status={post.status} compact /></div>
+-    <p className={styles.postText} title={post.text}>{post.text || copy.calendarNoText}</p>
++    <div className={styles.postBody}>
++      {post.preview && postThumbnail(post.preview.media) ? <PostThumb thumb={postThumbnail(post.preview.media)} size="sm" /> : null}
++      <p className={styles.postText} title={post.text}>{post.text || copy.calendarNoText}</p>
++    </div>
+     {post.origin ? <OriginBadge origin={post.origin} compact /> : null}
+     <div className={styles.postChannels}>{post.channels.length ? post.channels.slice(0, 4).map(channel => <ChannelBadge key={channel.id} name={channel.name} platformName={channel.platformName} mark={channel.mark} compact />) : <span className={styles.muted}>{copy.calendarNoChannels}</span>}{post.channels.length > 4 && <span className={styles.muted}>+{post.channels.length - 4}</span>}</div>
+     {post.movable && <button type="button" className={styles.moveButton} aria-haspopup="dialog" onClick={() => startMove(post)}>{copy.move}<span className="ui-visually-hidden">{fillCopy(copy.movePostLabel, {text: post.text.slice(0, 40) || copy.noText, time: timeOf(post)})}</span></button>}
+diff --git a/rebuild/src/modules/publishing/ui/calendar/calendar.module.css b/rebuild/src/modules/publishing/ui/calendar/calendar.module.css
+index b36888a4..049824e4 100644
+--- a/rebuild/src/modules/publishing/ui/calendar/calendar.module.css
++++ b/rebuild/src/modules/publishing/ui/calendar/calendar.module.css
+@@ -37,6 +37,9 @@
+ .postMeta { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px; }
+ .postMeta time { color: var(--ink-soft); font-weight: 700; font-variant-numeric: tabular-nums; }
+ .postText { margin: 0; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; color: var(--ink); line-height: 1.35; overflow-wrap: anywhere; }
++.postBody { display: flex; align-items: flex-start; gap: 8px; min-width: 0; }
++.postBody > :global(.ui-post-thumb) { --thumb: calc(var(--post-thumb-sm) * .8); }
++.postBody .postText { flex: 1 1 auto; min-width: 0; }
+ .postChannels { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+ .moveButton { justify-self: start; min-height: 28px; padding: 0 9px; border: 1px solid var(--line-strong); border-radius: 6px; background: var(--surface); color: var(--ink); font-size: 11px; font-weight: 650; cursor: pointer; }
+ .moveButton:hover { background: var(--surface-muted); }
+diff --git a/rebuild/src/modules/publishing/ui/queue/QueueTimeline.tsx b/rebuild/src/modules/publishing/ui/queue/QueueTimeline.tsx
+index 6816ae57..7bfb1bb3 100644
+--- a/rebuild/src/modules/publishing/ui/queue/QueueTimeline.tsx
++++ b/rebuild/src/modules/publishing/ui/queue/QueueTimeline.tsx
+@@ -3,6 +3,8 @@ import { usePublishingCopy } from '../kit/CopyProvider';
+ import { Avatar, ScheduleBadge } from '../kit/kit';
+ import { type KitLocale } from '../kit/copy';
+ import { remotePlatformName } from '../remote-platform-name';
++import { PostThumb } from '@/components/PostThumb';
++import { postThumbnail } from '@/components/post-thumbnail';
+ import { postContentSummary } from '@/modules/publishing/content-summary';
+ import styles from './queue.module.css';
+ 
+@@ -40,9 +42,12 @@ export function QueueTimeline({ posts, timeZone, locale = 'en', maxPerChannel }:
+             const remote = post.targets.some(row => row.target.id === channel.id && row.status === 'scheduled_remote');
+             const platformName = remote ? remotePlatformName({ targets: post.targets.filter(row => row.target.id === channel.id) }) : undefined;
+             return <li key={post.id} className={styles.slot}>
+-              <time className={styles.slotTime} dateTime={post.scheduledAt?.toISOString()}>{post.scheduledAt ? time.format(post.scheduledAt) : copy.queueUnscheduled}</time>
+-              <span className={styles.slotText}>{postContentSummary(post.message, post.media, post.link, copy) || copy.noText}</span>
+-              <ScheduleBadge mode={remote ? 'remote' : 'application'} locale={locale} platformName={platformName} />
++              <PostThumb thumb={postThumbnail(post.media)} size="sm" />
++              <div className={styles.slotBody}>
++                <time className={styles.slotTime} dateTime={post.scheduledAt?.toISOString()}>{post.scheduledAt ? time.format(post.scheduledAt) : copy.queueUnscheduled}</time>
++                <span className={styles.slotText}>{postContentSummary(post.message, post.media, post.link, copy) || copy.noText}</span>
++                <ScheduleBadge mode={remote ? 'remote' : 'application'} locale={locale} platformName={platformName} />
++              </div>
+             </li>;
+           })}
+         </ol>
+diff --git a/rebuild/src/modules/publishing/ui/queue/queue.module.css b/rebuild/src/modules/publishing/ui/queue/queue.module.css
+index d075506f..81aa664c 100644
+--- a/rebuild/src/modules/publishing/ui/queue/queue.module.css
++++ b/rebuild/src/modules/publishing/ui/queue/queue.module.css
+@@ -3,7 +3,8 @@
+ .channelHead { display: flex; align-items: center; gap: 10px; min-width: 0; }
+ .channelHead h3 { margin: 0; font-size: var(--text-md); overflow-wrap: anywhere; }
+ .slots { display: grid; gap: 0; margin: 0; padding: 0; list-style: none; border-inline-start: 2px solid var(--line-strong); }
+-.slot { position: relative; display: grid; gap: 4px; padding: 8px 0 12px 16px; }
++.slot { position: relative; display: flex; align-items: flex-start; gap: 12px; padding: 8px 0 12px 16px; }
++.slotBody { display: grid; gap: 4px; min-width: 0; justify-items: start; }
+ .slot::before { content: ""; position: absolute; inset-inline-start: -6px; top: 13px; width: 10px; height: 10px; border-radius: 50%; background: var(--mod, var(--accent)); box-shadow: 0 0 0 3px var(--surface); }
+ .slotTime { color: var(--ink); font-size: var(--text-sm); font-weight: 700; font-variant-numeric: tabular-nums; }
+ .slotText { display: -webkit-box; overflow: hidden; -webkit-line-clamp: 2; -webkit-box-orient: vertical; color: var(--ink-soft); font-size: var(--text-md); line-height: 1.4; overflow-wrap: anywhere; }
+diff --git a/rebuild/src/styles/components.css b/rebuild/src/styles/components.css
+index 745e4f60..26b52473 100644
+--- a/rebuild/src/styles/components.css
++++ b/rebuild/src/styles/components.css
+@@ -361,3 +361,13 @@ th[aria-sort="ascending"], th[aria-sort="descending"] { color: var(--ink); }
+ .ui-avatar-stack { display: inline-flex; align-items: center; }
+ .ui-avatar-stack .ui-avatar { box-shadow: 0 0 0 2px var(--surface); }
+ .ui-avatar-stack .ui-avatar + .ui-avatar { margin-inline-start: -8px; }
++
++/* Post thumbnail (PostThumb): module-tinted tile, image fills it, play mark and count overlay. */
++.ui-post-thumb { --thumb: var(--post-thumb-md); position: relative; display: inline-grid; flex: 0 0 auto; place-items: center; width: var(--thumb); height: var(--thumb); overflow: hidden; border-radius: var(--radius-sm); background: var(--mod-soft, var(--surface-muted)); color: var(--mod, var(--ink-soft)); }
++.ui-post-thumb[data-size="sm"] { --thumb: var(--post-thumb-sm); }
++.ui-post-thumb[data-size="lg"] { --thumb: var(--post-thumb-lg); }
++.ui-post-thumb img { width: 100%; height: 100%; object-fit: cover; }
++.ui-post-thumb[data-empty] { border: 1px dashed var(--line-strong); }
++.ui-post-thumb__play { position: absolute; inset: 0; display: grid; place-items: center; color: #fff; background: color-mix(in srgb, #000 28%, transparent); }
++.ui-post-thumb__count { position: absolute; right: 3px; bottom: 3px; padding: 0 5px; border-radius: 999px; background: color-mix(in srgb, var(--ink) 78%, transparent); color: var(--surface); font-size: 10px; font-weight: 750; }
++@media (forced-colors: active) { .ui-post-thumb { border: 1px solid CanvasText; } }
+diff --git a/rebuild/src/styles/tokens.css b/rebuild/src/styles/tokens.css
+index cfd999d8..fa53549f 100644
+--- a/rebuild/src/styles/tokens.css
++++ b/rebuild/src/styles/tokens.css
+@@ -1,6 +1,7 @@
+ :root {
+   --shell-rail-width: 84px; --shell-context-width: 252px;
+   --radius-sm: 8px;
++  --post-thumb-sm: 40px; --post-thumb-md: 56px; --post-thumb-lg: 72px;
+   --radius-md: 12px;
+   --radius-lg: 18px;
+   --font-sans: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+diff --git a/rebuild/tests/post-thumbnails.test.ts b/rebuild/tests/post-thumbnails.test.ts
+new file mode 100644
+index 00000000..d35e5310
+--- /dev/null
++++ b/rebuild/tests/post-thumbnails.test.ts
+@@ -0,0 +1,59 @@
++import { createElement } from 'react';
++import { renderToStaticMarkup } from 'react-dom/server';
++import { describe, expect, it } from 'vitest';
++import { PostThumb } from '@/components/PostThumb';
++import { postThumbnail } from '@/components/post-thumbnail';
++import { QueueTimeline } from '@/modules/publishing/ui/queue/QueueTimeline';
++import { PostsTable } from '@/modules/analytics/ui/posts/PostsTable';
++import { postsTableRows } from '@/modules/analytics/ui/posts/rows';
++
++const id = '123e4567-e89b-42d3-a456-426614174000';
++
++describe('postThumbnail', () => {
++  it('resolves a library image through the authorized media route', () => {
++    expect(postThumbnail([{ kind: 'image', url: `media:${id}` }])).toEqual({ url: `/api/media/${id}`, video: false, count: 1 });
++  });
++  it('prefers the first displayable image and counts every attachment', () => {
++    expect(postThumbnail([{ kind: 'image', url: 'javascript:alert(1)' }, { kind: 'image', url: 'https://cdn.example.test/a.jpg' }, { kind: 'video', url: 'https://cdn.example.test/v.mp4' }]))
++      .toEqual({ url: 'https://cdn.example.test/a.jpg', video: false, count: 3 });
++  });
++  it('uses a video poster when stored and a play mark otherwise', () => {
++    expect(postThumbnail([{ kind: 'video', url: 'https://cdn.example.test/v.mp4', posterUrl: 'https://cdn.example.test/p.jpg' }])?.url).toBe('https://cdn.example.test/p.jpg');
++    expect(postThumbnail([{ kind: 'video', url: 'https://cdn.example.test/v.mp4' }])).toEqual({ url: null, video: true, count: 1 });
++  });
++  it('falls back to a stored picture URL and to null when nothing is stored', () => {
++    expect(postThumbnail([], 'https://cdn.example.test/pic.jpg')?.url).toBe('https://cdn.example.test/pic.jpg');
++    expect(postThumbnail(null)).toBeNull();
++    expect(postThumbnail([], 'ftp://nope')).toBeNull();
++  });
++});
++
++describe('PostThumb', () => {
++  it('renders the image decoratively with an attachment count', () => {
++    const html = renderToStaticMarkup(createElement(PostThumb, { thumb: { url: 'https://cdn.example.test/a.jpg', video: false, count: 3 } }));
++    expect(html).toContain('src="https://cdn.example.test/a.jpg"');
++    expect(html).toContain('alt=""');
++    expect(html).toContain('+2');
++  });
++  it('shows a named placeholder when there is no image', () => {
++    const html = renderToStaticMarkup(createElement(PostThumb, { thumb: null, label: 'No image' }));
++    expect(html).toContain('data-empty');
++    expect(html).toContain('aria-label="No image"');
++    expect(html).not.toContain('<img');
++  });
++});
++
++describe('thumbnail placement', () => {
++  it('shows each queued post thumbnail in the channel timeline', () => {
++    const html = renderToStaticMarkup(createElement(QueueTimeline, {
++      timeZone: 'UTC', maxPerChannel: 3,
++      posts: [{ id: 'p1', message: 'Hello', link: null, media: [{ kind: 'image', url: `media:${id}` }], status: 'scheduled', scheduledAt: new Date('2026-10-22T10:00:00Z'), targets: [{ status: 'pending', target: { id: 'c1', name: 'Studio', pictureUrl: null } }] }],
++    }));
++    expect(html).toContain(`/api/media/${id}`);
++  });
++  it('shows the Analytics post explorer thumbnail from the row', () => {
++    const rows = postsTableRows([{ channelId: 'c1', channelName: 'Studio', postId: 'p1', text: 'Hi', url: null, publishedAt: null, measuredAt: null, measures: [{ key: 'views', value: 3 }], thumbnail: { url: 'https://cdn.example.test/t.jpg', video: false, count: 1 } }]);
++    const html = renderToStaticMarkup(createElement(PostsTable, { rows, measures: [{ key: 'views', label: 'Views' }], locale: 'en' }));
++    expect(html).toContain('https://cdn.example.test/t.jpg');
++  });
++});

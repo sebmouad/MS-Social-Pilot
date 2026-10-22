@@ -1,0 +1,149 @@
+diff --git a/rebuild/src/platforms/facebook/config.ts b/rebuild/src/platforms/facebook/config.ts
+index ebfcf687..810e590a 100644
+--- a/rebuild/src/platforms/facebook/config.ts
++++ b/rebuild/src/platforms/facebook/config.ts
+@@ -63,10 +63,49 @@ export const facebookHistoryPolicySchema = z.object({
+   metrics: z.array(z.string().regex(/^[a-z][a-z0-9_]*$/)).max(100),
+   reactionTypes: z.array(z.string().regex(/^[A-Z_]+$/)).max(30),
+ });
+-export const FACEBOOK_HISTORY_CONFIG = [entry({ key: 'meta.postHistoryPolicy', group: 'Facebook · Analytics collection', label: 'Page post history policy', kind: 'json', description: 'Resumable Page history window, per-run feed page budget, fields, lifetime metrics and reaction types. Metric eligibility depends on Graph version and grants.', defaultValue: { lookbackDays: 365, pageBudget: 2, edge: 'published_posts', fields: ['id', 'message', 'created_time', 'permalink_url', 'status_type', 'full_picture', 'shares', 'comments.limit(0).summary(true)'], metrics: ['post_media_view', 'post_total_media_view_unique', 'post_clicks_by_type', 'post_reactions_by_type_total'], reactionTypes: ['LIKE', 'LOVE', 'WOW', 'HAHA', 'SAD', 'ANGRY', 'CARE'] }, schema: facebookHistoryPolicySchema, consumption: 'active' })] as const;
++export const FACEBOOK_HISTORY_CONFIG = [entry({ key: 'meta.postHistoryPolicy', group: 'Facebook · Analytics collection', label: 'Page post history policy', kind: 'json', description: 'Resumable Page history window, per-run feed page budget, fields, lifetime metrics and reaction types. Video metrics are requested only for positively identified video posts. Metric eligibility depends on Graph version and grants; explicitly saved metric lists replace the defaults.', defaultValue: { lookbackDays: 365, pageBudget: 2, edge: 'published_posts', fields: ['id', 'message', 'created_time', 'permalink_url', 'status_type', 'full_picture', 'shares', 'comments.limit(0).summary(true)'], metrics: ['post_media_view', 'post_total_media_view_unique', 'post_clicks', 'post_clicks_by_type', 'post_reactions_by_type_total', 'post_video_views', 'post_video_view_time'], reactionTypes: ['LIKE', 'LOVE', 'WOW', 'HAHA', 'SAD', 'ANGRY', 'CARE'] }, schema: facebookHistoryPolicySchema, consumption: 'active' })] as const;
+ 
+ export const facebookAdHierarchySchema = z.object({ levels: z.array(z.enum(['campaign', 'adset', 'ad'])).max(3), actionBreakdowns: z.array(z.string().regex(/^[a-z][a-z0-9_]*$/)).max(10) });
++/** Normalized post keys and raw Page keys; saved labels override these defaults. */
++export const FACEBOOK_METRIC_LABEL_DEFAULTS = {
++  impressions: { en: 'Impressions', fr: 'Impressions' },
++  reach: { en: 'People reached', fr: 'Personnes touchées' },
++  clicks: { en: 'Clicks', fr: 'Clics' },
++  comments: { en: 'Comments', fr: 'Commentaires' },
++  shares: { en: 'Shares', fr: 'Partages' },
++  reactions: { en: 'Reactions', fr: 'Réactions' },
++  engagement: { en: 'Engagement', fr: 'Interactions' },
++  post_media_view: { en: 'Media views', fr: 'Vues des médias' },
++  post_total_media_view_unique: { en: 'People who viewed media', fr: 'Personnes ayant vu les médias' },
++  post_clicks_by_type: { en: 'Clicks by type', fr: 'Clics par type' },
++  post_reactions_by_type_total: { en: 'Reactions by type', fr: 'Réactions par type' },
++  video_views: { en: 'Video views', fr: 'Vues de vidéo' },
++  video_watch_time: { en: 'Video watch time (milliseconds)', fr: 'Durée de visionnage (millisecondes)' },
++  page_follows: { en: 'Followers', fr: 'Abonnés' },
++  page_daily_follows: { en: 'Daily follows', fr: 'Abonnements quotidiens' },
++  page_daily_follows_unique: { en: 'New followers', fr: 'Nouveaux abonnés' },
++  page_daily_unfollows_unique: { en: 'Lost followers', fr: 'Abonnés perdus' },
++  page_media_view: { en: 'Media views', fr: 'Vues des médias' },
++  page_total_media_view_unique: { en: 'People who viewed media', fr: 'Personnes ayant vu les médias' },
++  page_post_engagements: { en: 'Post engagements', fr: 'Interactions avec les publications' },
++  page_views_total: { en: 'Page views', fr: 'Vues de la Page' },
++  page_video_views: { en: 'Video views', fr: 'Vues de vidéo' },
++  reactions_like: { en: 'Likes', fr: 'Mentions J’aime' },
++  reactions_love: { en: 'Love reactions', fr: 'Réactions J’adore' },
++  reactions_wow: { en: 'Wow reactions', fr: 'Réactions Wouah' },
++  reactions_haha: { en: 'Haha reactions', fr: 'Réactions Haha' },
++  reactions_sad: { en: 'Sad reactions', fr: 'Réactions Triste' },
++  reactions_angry: { en: 'Angry reactions', fr: 'Réactions Grrr' },
++  reactions_care: { en: 'Care reactions', fr: 'Réactions Solidaire' },
++} satisfies Record<string, { en: string; fr: string }>;
++
++// Runtime single/batch reads and Root reads/saves all parse the owning schema.
++// Merge catalogs here so older stored catalogs gain newly shipped labels without
++// overwriting custom labels or forcing removed metrics back into collection lists.
++export const facebookMetricLabelsSchema = z.record(z.string(), z.object({ en: z.string().min(1), fr: z.string().min(1) }))
++  .transform(overrides => ({ ...FACEBOOK_METRIC_LABEL_DEFAULTS, ...overrides }));
++
+ export const FACEBOOK_DATA_DETAIL_CONFIG = [
+  entry({ key: 'meta.adHierarchyPolicy', group: 'Facebook · Analytics collection', label: 'Ads hierarchy and action dimensions', kind: 'json', description: 'Additional daily campaign, ad set and ad reports. Action dimensions apply to these reports.', defaultValue: { levels: ['campaign', 'adset', 'ad'], actionBreakdowns: ['action_type'] }, schema: facebookAdHierarchySchema, consumption: 'active' }),
+- entry({ key: 'meta.metricLabels', group: 'Facebook · Analytics collection', label: 'Bilingual metric labels', kind: 'json', description: 'English and French labels keyed by normalized metric name.', defaultValue: { engagement: { en: 'Engagement', fr: 'Interactions' }, video_views: { en: 'Video views', fr: 'Vues de vidéo' }, video_watch_time: { en: 'Video watch time (milliseconds)', fr: 'Durée de visionnage (millisecondes)' }, reactions_like: { en: 'Likes', fr: 'Mentions J’aime' }, reactions_love: { en: 'Love reactions', fr: 'Réactions J’adore' }, reactions_wow: { en: 'Wow reactions', fr: 'Réactions Wouah' }, reactions_haha: { en: 'Haha reactions', fr: 'Réactions Haha' }, reactions_sad: { en: 'Sad reactions', fr: 'Réactions Triste' }, reactions_angry: { en: 'Angry reactions', fr: 'Réactions Grrr' }, reactions_care: { en: 'Care reactions', fr: 'Réactions Solidaire' } }, schema: z.record(z.string(), z.object({ en: z.string().min(1), fr: z.string().min(1) })), consumption: 'active' }),
++ entry({ key: 'meta.metricLabels', group: 'Facebook · Analytics collection', label: 'Bilingual metric labels', kind: 'json', description: 'English and French labels keyed by normalized metric name. Saved entries override defaults; newly shipped labels are inherited automatically.', defaultValue: FACEBOOK_METRIC_LABEL_DEFAULTS, schema: facebookMetricLabelsSchema, consumption: 'active' }),
+ ] as const;
+diff --git a/rebuild/src/platforms/facebook/module.ts b/rebuild/src/platforms/facebook/module.ts
+index 88998fdb..5998dfd6 100644
+--- a/rebuild/src/platforms/facebook/module.ts
++++ b/rebuild/src/platforms/facebook/module.ts
+@@ -59,7 +59,7 @@ const facebookConfigEntries = [
+   entry({ key: 'meta.requestTimeoutMs', group: 'Facebook · API endpoints', label: 'Meta request timeout (ms)', kind: 'number', description: 'Maximum time allowed for one Meta API request.', defaultValue: 15000, schema: z.number().int().min(1000).max(120000), consumption: 'active' }),
+   entry({ key: 'meta.maxPages', group: 'Facebook · API endpoints', label: 'Meta pagination limit', kind: 'number', description: 'Maximum Graph response pages read per collection request.', defaultValue: 20, schema: z.number().int().min(1).max(100), consumption: 'active' }),
+   entry({ key: 'meta.pageSize', group: 'Facebook · API endpoints', label: 'Meta response page size', kind: 'number', description: 'Items requested per Graph response page.', defaultValue: 100, schema: z.number().int().min(1).max(100), consumption: 'active' }),
+-  entry({ key: 'meta.pageInsightMetrics', group: 'Facebook · Analytics metrics', label: 'Meta Page insight metrics', kind: 'json', description: 'JSON array of Page insight metric names approved for this app. Unsupported metrics may need removal after provider changes.', defaultValue: ['page_follows', 'page_media_view', 'page_post_engagements', 'page_views_total'], schema: stringList, consumption: 'active' }),
++  entry({ key: 'meta.pageInsightMetrics', group: 'Facebook · Analytics metrics', label: 'Meta Page insight metrics', kind: 'json', description: 'JSON array of Page insight metric names approved for this app. Unsupported metrics may need removal after provider changes.', defaultValue: ['page_follows', 'page_daily_follows', 'page_daily_follows_unique', 'page_daily_unfollows_unique', 'page_media_view', 'page_total_media_view_unique', 'page_post_engagements', 'page_views_total', 'page_video_views'], schema: stringList, consumption: 'active' }),
+   entry({ key: 'meta.pageInsightReadScopes', group: 'Facebook · API scopes · analytics', label: 'Page insight read scopes', kind: 'json', description: 'Recorded provider grants required before automatic Page insight reads. Configuring scope names does not grant provider access.', defaultValue: ['read_insights', 'pages_read_engagement'], schema: stringList.min(1), consumption: 'active' }),
+   entry({ key: 'meta.pageAnalyticsLookbackDays', group: 'Facebook · Analytics collection', label: 'Page sync lookback days', kind: 'number', description: 'Inclusive UTC calendar days requested by automatic Page insight collection. Provider availability still determines returned history.', defaultValue: 7, schema: FACEBOOK_ANALYTICS_LOOKBACK_DAYS_SCHEMA, consumption: 'active' }),
+   entry({ key: 'meta.adsAnalyticsLookbackDays', group: 'Facebook · Analytics collection', label: 'Ads sync lookback days', kind: 'number', description: 'Inclusive UTC calendar days requested by automatic Ads insight collection. Provider availability and configured fields still determine coverage.', defaultValue: 30, schema: FACEBOOK_ANALYTICS_LOOKBACK_DAYS_SCHEMA, consumption: 'active' }),
+diff --git a/rebuild/tests/facebook-metric-config.test.ts b/rebuild/tests/facebook-metric-config.test.ts
+new file mode 100644
+index 00000000..4124c8ff
+--- /dev/null
++++ b/rebuild/tests/facebook-metric-config.test.ts
+@@ -0,0 +1,45 @@
++import { beforeEach, describe, expect, it, vi } from 'vitest';
++
++const db = vi.hoisted(() => ({ findUnique: vi.fn(), findMany: vi.fn() }));
++vi.mock('@/server/data', () => ({ prisma: { appSetting: db } }));
++import { FACEBOOK_CONFIG } from '../src/platforms/facebook/module';
++import { FACEBOOK_HISTORY_CONFIG, FACEBOOK_METRIC_LABEL_DEFAULTS, facebookMetricLabelsSchema } from '../src/platforms/facebook/config';
++import { readConfig, runtimeConfig, runtimeConfigBatch } from '../src/server/config/store';
++
++beforeEach(() => vi.clearAllMocks());
++
++describe('Facebook metric configuration', () => {
++  it('declares Page collection defaults with bilingual labels', () => {
++    const setting = FACEBOOK_CONFIG.find(item => item.key === 'meta.pageInsightMetrics')!;
++    const metrics = setting.schema.parse(setting.defaultValue) as string[];
++    expect(metrics).toEqual(expect.arrayContaining(['page_daily_follows', 'page_daily_follows_unique', 'page_daily_unfollows_unique', 'page_total_media_view_unique', 'page_video_views']));
++    for (const metric of metrics) expect(FACEBOOK_METRIC_LABEL_DEFAULTS).toHaveProperty(metric, { en: expect.any(String), fr: expect.any(String) });
++    expect(setting.owner).toEqual({ kind: 'platform', id: 'facebook' });
++  });
++
++  it('adds clicks and eligible video metrics while retaining explicit Root collection choices', () => {
++    const setting = FACEBOOK_HISTORY_CONFIG[0];
++    expect(setting.defaultValue.metrics).toEqual(expect.arrayContaining(['post_clicks', 'post_video_views', 'post_video_view_time']));
++    const aliases: Record<string, string> = { post_clicks: 'clicks', post_video_views: 'video_views', post_video_view_time: 'video_watch_time' };
++    for (const metric of setting.defaultValue.metrics) expect(FACEBOOK_METRIC_LABEL_DEFAULTS).toHaveProperty(aliases[metric] ?? metric);
++    expect(setting.schema.parse({ ...setting.defaultValue, metrics: [] }).metrics).toEqual([]);
++    expect(setting.schema.parse({ ...setting.defaultValue, metrics: ['custom_metric'] }).metrics).toEqual(['custom_metric']);
++  });
++
++  it('inherits new labels through single, batch and Root reads of an older saved catalog', async () => {
++    const overrides = { engagement: { en: 'Custom engagement', fr: 'Interactions personnalisées' }, custom_metric: { en: 'Custom', fr: 'Personnalisé' } };
++    const row = { key: 'meta.metricLabels', encrypted: false, value: overrides };
++    db.findUnique.mockResolvedValue(row);
++    db.findMany.mockResolvedValue([row]);
++    const expected = { ...FACEBOOK_METRIC_LABEL_DEFAULTS, ...overrides };
++    expect(await runtimeConfig('meta.metricLabels')).toEqual(expected);
++    expect((await runtimeConfigBatch(['meta.metricLabels']))['meta.metricLabels']).toEqual(expected);
++    expect((await readConfig()).find(item => item.key === row.key)).toMatchObject({ value: expected, source: 'database', isSet: true });
++    expect(row.value).toEqual(overrides);
++    expect(facebookMetricLabelsSchema.parse(expected)).toEqual(expected);
++  });
++
++  it.each([{ clicks: { en: '', fr: 'Clics' } }, { clicks: { en: 'Clicks' } }, []])('rejects invalid label overrides instead of hiding them: %j', overrides => {
++    expect(facebookMetricLabelsSchema.safeParse(overrides).success).toBe(false);
++  });
++});
+diff --git a/rebuild/tests/facebook-post-history.test.ts b/rebuild/tests/facebook-post-history.test.ts
+index 50f8e867..afaebbb2 100644
+--- a/rebuild/tests/facebook-post-history.test.ts
++++ b/rebuild/tests/facebook-post-history.test.ts
+@@ -56,10 +56,12 @@ describe('v26 insight authority', () => {
+     { id: 'unknown', created_time: '2026-10-01' },
+    ] });
+    requested.push(url.pathname);
+-   return response({ data: [{ name: 'post_video_views', values: [{ value: 8 }] }] });
++   return response({ data: [{ name: url.searchParams.get('metric'), values: [{ value: 8 }] }] });
+   });
+-  const result = await createFacebookPostHistory(config, { ...policy, metrics: ['post_video_views'], reactionTypes: [] }, fetcher).collect('token', 'page', now);
+-  expect(requested).toHaveLength(2);
++  const result = await createFacebookPostHistory(config, { ...policy, metrics: FACEBOOK_HISTORY_CONFIG[0].defaultValue.metrics.filter(metric => metric.startsWith('post_video_')), reactionTypes: [] }, fetcher).collect('token', 'page', now);
++  expect(requested).toHaveLength(4);
++  expect(requested.every(path => /\/(video|attached)\/insights$/.test(path))).toBe(true);
++  expect(result.posts.map(post => post.insights.video_watch_time)).toEqual([undefined, 8, 8, undefined]);
+   expect(result.posts.map(post => post.insights.video_views)).toEqual([undefined, 8, 8, undefined]);
+  });
+ });
+@@ -96,7 +98,7 @@ describe('Page history', () => {
+ describe('round 3 history evidence', () => {
+  it('uses replacement defaults and permits Root overrides', () => {
+   const defaults = FACEBOOK_HISTORY_CONFIG[0].defaultValue;
+-  expect(defaults.metrics).toEqual(['post_media_view', 'post_total_media_view_unique', 'post_clicks_by_type', 'post_reactions_by_type_total']);
++  expect(defaults.metrics).toEqual(['post_media_view', 'post_total_media_view_unique', 'post_clicks', 'post_clicks_by_type', 'post_reactions_by_type_total', 'post_video_views', 'post_video_view_time']);
+   expect(FACEBOOK_HISTORY_CONFIG[0].schema.safeParse({ ...defaults, metrics: ['custom_metric'] }).success).toBe(true);
+  });
+  it('uses unix seconds and retains metric successes around a refusal', async () => {

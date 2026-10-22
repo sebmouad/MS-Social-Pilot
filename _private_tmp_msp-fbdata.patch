@@ -1,0 +1,294 @@
+diff --git a/rebuild/docs/CHARTS.md b/rebuild/docs/CHARTS.md
+index f922b570..0fd866f0 100644
+--- a/rebuild/docs/CHARTS.md
++++ b/rebuild/docs/CHARTS.md
+@@ -118,6 +118,64 @@ repeat the number already shown in the card.
+ 
+ Both sides use one symmetric axis; values are always shown as positive numbers.
+ 
++## Facebook collection and reaction provenance (2026-10-21)
++
++Source changes in `src/platforms/facebook/post-history.ts` select a valid,
++nonempty `post_reactions_by_type_total` breakdown before a reaction summary,
++then a fully read set of configured reaction-type edges. Counts from competing
++sources are never added. An insight zero is authoritative; an empty or invalid
++breakdown is unknown. `reactions` and `reactions_<type>` use one selected source.
++The raw insight breakdown remains stored. `reactionProvenance` retains the
++selected source, metric identity, insight/summary/edge totals, edge-type counts,
++configured-edge completeness, disagreement flag and collection observation time.
++Partial edge counts remain in provenance, without becoming a complete total.
++This prevents the recorded summary 0 / insights 1 mismatch from replacing 1 with
++0. It does not explain Meta's discrepancy; provider lag remains unproven.
++
++History reads every configured metric independently and retains scalar and
++structured values. Fixture coverage exercises `post_media_view`,
++`post_total_media_view_unique`, `post_reactions_by_type_total`, `post_clicks`
++(normalized to `clicks`) and `post_clicks_by_type`, including `total_value`
++responses. Configured `post_video_*` metrics are requested only for posts
++positively identified by `status_type=added_video` or video attachment metadata,
++including nested attachments. Unknown media type is not assumed to be video.
++
++The content insights loader now treats lifetime paging links as time-window
++links, and retains lifetime points without `end_time` when an explicit requested
++end is available. That end is a snapshot anchor, not an occurrence timestamp.
++Lifetime totals remain lifetime snapshots; non-lifetime totals retain their
++explicit range identity. Content discovery and Ads still enforce full bounded
++pagination. Page follows/views remain independently configured requests: one
++rejected metric does not erase successful observations.
++
++Evidence: fixture tests only (`tests/facebook-post-history.test.ts` and
++`tests/facebook-data-coverage.test.ts`). No fresh Graph eligibility, complete
++history, browser, transport parity or production evidence is established here.
++Neither new Root keys nor a schema-version change are included.
++
++Required integration outside this lane:
++
++- In `src/platforms/facebook/config.ts`, add `post_clicks` to the
++  `meta.postHistoryPolicy` default metrics. Review persisted Root overrides too;
++  changing a default does not update an existing policy.
++- Configure version/grant-verified video metrics in that policy and retain
++  `status_type` in its fields; add `attachments{media_type,type,subattachments}`
++  if attachment-based video detection is needed. Alternatively configure the
++  existing `meta.contentInsightCollections` video/video-insights path. The
++  fixture metric names demonstrate transport behavior, not v26 eligibility.
++- Review `meta.pageInsightMetrics` in `src/platforms/facebook/module.ts` and
++  persisted Root settings for the desired eligible follows/views measures,
++  including `page_total_media_view_unique`, and compatible
++  `meta.pageInsightPeriods`. No speculative metric list is injected by loaders.
++- Extend the existing `meta.metricLabels` bilingual catalog for the selected
++  metrics. Full customer presentation of nested post click categories and
++  provenance, and correct duration units for video watch-time charts, remain
++  separate work; the neutral analytics unit contract currently lacks duration.
++- Recollect historical snapshots to replace previously stored edge-derived
++  canonical totals. This change does not rewrite existing records. An integrator
++  owns configuration versioning and updates to architecture/handoff documents
++  outside this worker's ownership.
++
+ ## Tests
+ 
+ `tests/charts-options.test.ts` (props → option mapping per chart, formatting),
+diff --git a/rebuild/src/platforms/facebook/data-collection.ts b/rebuild/src/platforms/facebook/data-collection.ts
+index 6edfd5cd..38ef4b24 100644
+--- a/rebuild/src/platforms/facebook/data-collection.ts
++++ b/rebuild/src/platforms/facebook/data-collection.ts
+@@ -13,7 +13,7 @@ export function createFacebookDataCollector(config: FacebookConfig, policy: Poli
+   validateFacebookConfig(config);
+   const periods = facebookInsightPeriodsSchema.parse(policy.periods);
+   const content = facebookContentInsightsSchema.parse(policy.content);
+-  async function rows(path: string, token: string, params: Record<string, string>): Promise<unknown[]> {
++  async function rows(path: string, token: string, params: Record<string, string>, lifetimeSnapshot = false): Promise<unknown[]> {
+     const first = graphObjectUrl(config, path);
+     for (const [key, value] of Object.entries(params)) first.searchParams.set(key, value);
+     first.searchParams.set('limit', String(config.pageSize));
+@@ -41,6 +41,9 @@ export function createFacebookDataCollector(config: FacebookConfig, policy: Poli
+       // Provider messages can contain request URLs/tokens. Keep failures content-free.
+       if (!response.ok || payload.error || !Array.isArray(payload.data)) throw new Error('Analytics request was rejected or returned an invalid collection.');
+       values.push(...payload.data);
++      // Lifetime insight links describe other time windows, not more objects in this snapshot.
++      // Discovery and Ads still require complete cursor pagination.
++      if (lifetimeSnapshot) return values;
+       const link = object(payload.paging).next;
+       next = typeof link === 'string' && link ? new URL(link) : null;
+     }
+@@ -95,7 +98,7 @@ export function createFacebookDataCollector(config: FacebookConfig, policy: Poli
+         for (const metric of new Set(metrics)) for (const period of new Set(requestedPeriods)) {
+           signal?.throwIfAborted();
+           try {
+-            const data = await rows(`${encodeURIComponent(id)}/${edge}`, token, { ...range, metric, period });
++            const data = await rows(`${encodeURIComponent(id)}/${edge}`, token, { ...range, metric, period }, period === 'lifetime');
+             for (const raw of data) {
+               const item = object(raw);
+               // A provider cannot inject another metric into this request's identity.
+@@ -108,9 +111,11 @@ export function createFacebookDataCollector(config: FacebookConfig, policy: Poli
+               const normalized = [...points, ...(Object.hasOwn(total, 'value') && until ? [{ value: total.value, end_time: until.toISOString() }] : [])];
+               for (const rawPoint of normalized) {
+                 const point = object(rawPoint);
+-                const endTime = typeof point.end_time === 'string' ? new Date(point.end_time) : null;
++                // Lifetime values often omit end_time. The explicit requested end is a
++                // snapshot anchor, not evidence of when each view/reaction occurred.
++                const endTime = typeof point.end_time === 'string' ? new Date(point.end_time) : responsePeriod === 'lifetime' ? until : null;
+                 if (!endTime || !Number.isFinite(endTime.getTime()) || !Object.hasOwn(point, 'value')) continue;
+-                result.push({ metric: `${prefix}${metric}`, period: points.includes(rawPoint) ? responsePeriod : `total_over_range:${since?.toISOString() ?? "unspecified"}`, endTime, value: point.value, numeric: numeric(point.value) });
++                result.push({ metric: `${prefix}${metric}`, period: points.includes(rawPoint) || responsePeriod === 'lifetime' ? responsePeriod : `total_over_range:${since?.toISOString() ?? "unspecified"}`, endTime, value: point.value, numeric: numeric(point.value) });
+               }
+               // Retain total_value breakdowns independently from its numeric value.
+               if (until && Array.isArray(total.breakdowns)) {
+diff --git a/rebuild/src/platforms/facebook/post-history.ts b/rebuild/src/platforms/facebook/post-history.ts
+index 6c00a501..ff954ffc 100644
+--- a/rebuild/src/platforms/facebook/post-history.ts
++++ b/rebuild/src/platforms/facebook/post-history.ts
+@@ -8,6 +8,38 @@ const obj = (v: unknown): Record<string, unknown> => v && typeof v === 'object'
+ const number = (v: unknown): number | null => (typeof v === 'number' || typeof v === 'string' && v.trim()) && Number.isFinite(Number(v)) && Number(v) >= 0 ? Number(v) : null;
+ const aliases: Record<string, string> = { post_impressions: 'impressions', post_impressions_unique: 'reach', post_engaged_users: 'engagement', post_clicks: 'clicks', post_video_views: 'video_views', post_video_view_time: 'video_watch_time' };
+ 
++function hasVideo(post: Record<string, unknown>): boolean {
++  const attachments = (value: unknown): boolean => {
++    const data = obj(value).data;
++    return Array.isArray(data) && data.some(raw => {
++      const item = obj(raw);
++      return item.media_type === 'video' || item.type === 'video_inline' || item.type === 'video_autoplay' || attachments(item.subattachments);
++    });
++  };
++  return post.status_type === 'added_video' || attachments(post.attachments);
++}
++
++/** Keep observations separate: edge visibility and insights can disagree at the same fetch. */
++function resolveReactions(insights: Record<string, unknown>, post: Record<string, unknown>, edges: Record<string, number>, complete: boolean, observedAt: Date) {
++  const categories = Object.entries(obj(insights.post_reactions_by_type_total));
++  const validInsights = categories.length > 0 && categories.every(([, value]) => number(value) !== null);
++  const insightTotal = validInsights ? categories.reduce((sum, [, value]) => sum + number(value)!, 0) : null;
++  const summaryTotal = number(obj(obj(post.reactions).summary).total_count);
++  const edgeTotal = complete ? Object.values(edges).reduce((sum, value) => sum + value, 0) : null;
++  const source = insightTotal !== null ? 'insights' : summaryTotal !== null ? 'summary' : edgeTotal !== null ? 'edges' : 'unknown';
++  const total = insightTotal ?? summaryTotal ?? edgeTotal;
++  if (total !== null) insights.reactions = total;
++  // Never mix individual reaction types from different observations into a total.
++  const selected = validInsights ? categories : source === 'edges' ? Object.entries(edges) : [];
++  for (const [type, value] of selected) insights[`reactions_${type.toLowerCase()}`] = number(value);
++  const totals = [insightTotal, summaryTotal, edgeTotal].filter(value => value !== null);
++  insights.reactionProvenance = {
++    source, metric: validInsights ? 'post_reactions_by_type_total' : null,
++    insightTotal, summaryTotal, edgeTotal, edgeTypes: edges, edgesComplete: complete,
++    conflict: new Set(totals).size > 1, observedAt: observedAt.toISOString(),
++  };
++}
++
+ /** Cursor-only continuation: never persist or follow a provider URL containing credentials. */
+ export function createFacebookPostHistory(config: FacebookConfig, policyInput: z.input<typeof facebookHistoryPolicySchema>, fetcher: typeof fetch = fetch, signal?: AbortSignal) {
+   const policy = facebookHistoryPolicySchema.parse(policyInput);
+@@ -57,13 +89,16 @@ export function createFacebookPostHistory(config: FacebookConfig, policyInput: z
+         const postFailures: string[] = [];
+         for (const [key, value] of [['shares', obj(post.shares).count], ['comments', obj(obj(post.comments).summary).total_count]] as const) { const n = number(value); if (n !== null) insights[key] = n; }
+         for (const metric of new Set(policy.metrics)) {
++          // Eligibility is based on provider metadata, never a speculative call on every photo/text post.
++          if (metric.startsWith('post_video_') && !hasVideo(post)) continue;
+           try {
+             const data = await page(`${encodeURIComponent(post.id)}/insights`, token, { metric, period: 'lifetime', limit: String(config.pageSize) }, { timeWindow: true });
+             // Insights always return time-window paging links (previous/next) even for one lifetime value; they are not a continuation of this metric.
+             for (const rawMetric of data.rows) { const item = obj(rawMetric); if (item.name !== metric) continue; const values = Array.isArray(item.values) ? item.values : []; const value = obj(values.at(-1)).value ?? obj(item.total_value).value; if (value !== undefined) insights[aliases[metric] ?? metric] = number(value) ?? value; }
+           } catch { signal?.throwIfAborted(); failures.push(metric); postFailures.push(metric); }
+         }
+-        let reactionTotal = 0; let reactionsComplete = policy.reactionTypes.length > 0;
++        const edgeReactions: Record<string, number> = {};
++        let reactionsComplete = policy.reactionTypes.length > 0;
+         for (const type of new Set(policy.reactionTypes)) {
+           try {
+             let after: string | null = null; let total = 0; let complete = false; const cursors = new Set<string>();
+@@ -73,10 +108,10 @@ export function createFacebookPostHistory(config: FacebookConfig, policyInput: z
+               total += data.rows.length; after = data.after; if (!after) { complete = true; break; }
+             }
+             if (!complete) throw new Error('Reaction budget exceeded.');
+-            insights[`reactions_${type.toLowerCase()}`] = total; reactionTotal += total;
++            edgeReactions[type.toLowerCase()] = total;
+           } catch { signal?.throwIfAborted(); reactionsComplete = false; failures.push(`reactions_${type}`); postFailures.push(`reactions_${type}`); }
+         }
+-        if (reactionsComplete) insights.reactions = reactionTotal;
++        resolveReactions(insights, post, edgeReactions, reactionsComplete, now);
+         insights.collectionFailures = [...new Set(postFailures)];
+         const text = (key: string) => typeof post[key] === 'string' ? post[key] as string : null;
+         posts.push({ remoteId: post.id, message: text('message'), permalink: text('permalink_url'), statusType: text('status_type'), pictureUrl: text('full_picture'), createdTime, insights });
+diff --git a/rebuild/tests/facebook-data-coverage.test.ts b/rebuild/tests/facebook-data-coverage.test.ts
+index fee503d1..e3ef6252 100644
+--- a/rebuild/tests/facebook-data-coverage.test.ts
++++ b/rebuild/tests/facebook-data-coverage.test.ts
+@@ -12,6 +12,31 @@ const response = (value: unknown, status = 200) => new Response(JSON.stringify(v
+ const point = (name: string, value: unknown) => ({ name, period: 'day', values: [{ end_time: until.toISOString(), value }] });
+ const collector = (fetcher: typeof fetch, periods: Array<'day' | 'lifetime'> = ['day']) => createFacebookDataCollector(config, { periods, content: [] }, fetcher);
+ describe('Facebook data coverage collection', () => {
++  it('collects lifetime video insights without following time-window links or discarding undated snapshots', async () => {
++    const fetcher = vi.fn(async (input: RequestInfo | URL) => {
++      const url = new URL(String(input));
++      if (url.pathname.endsWith('/videos')) return response({ data: [{ id: 'video-1' }] });
++      expect(url.searchParams.get('period')).toBe('lifetime');
++      return response({ data: [{ name: url.searchParams.get('metric'), period: 'lifetime', values: [{ value: 12 }] }], paging: { next: 'https://graph.facebook.test/v26.0/video-1/video_insights?since=1&until=2' } });
++    });
++    const result = await createFacebookDataCollector({ ...config, graphVersion: 'v26.0', pageInsightMetrics: [] }, { periods: ['day'], content: [{ edge: 'videos', insightEdge: 'video_insights', metrics: ['total_video_views'], periods: ['lifetime'] }] }, fetcher).getPageInsightObservations('token', 'page', since, until);
++    expect(result).toEqual([{ metric: 'content:videos:video-1:total_video_views', period: 'lifetime', endTime: until, value: 12, numeric: 12 }]);
++    expect(fetcher).toHaveBeenCalledTimes(2);
++  });
++  it('keeps lifetime totals as snapshots rather than range totals', async () => {
++    const fetcher = vi.fn(async () => response({ data: [{ name: 'page_follows', total_value: { value: 100 } }] }));
++    const result = await createFacebookDataCollector({ ...config, pageInsightMetrics: ['page_follows'] }, { periods: ['lifetime'], content: [] }, fetcher).getPageInsightObservations('token', 'page', since, until);
++    expect(result[0]).toMatchObject({ metric: 'page_follows', period: 'lifetime', endTime: until, numeric: 100 });
++  });
++  it('retains supported follows and views independently when another configured Page metric is rejected', async () => {
++    const fetcher = vi.fn(async (input: RequestInfo | URL) => {
++      const metric = new URL(String(input)).searchParams.get('metric');
++      return metric === 'invalid_metric' ? response({ error: { code: 100 } }, 400) : response({ data: [point(String(metric), 3)] });
++    });
++    const result = await createFacebookDataCollector({ ...config, graphVersion: 'v26.0', pageInsightMetrics: ['page_follows', 'invalid_metric', 'page_media_view', 'page_total_media_view_unique'] }, { periods: ['day'], content: [] }, fetcher).getPageInsightObservations('token', 'page', since, until);
++    expect(result.map(row => row.metric)).toEqual(['page_follows', 'page_media_view', 'page_total_media_view_unique']);
++    expect(result.failedMetrics?.map(row => row.metric)).toEqual(['invalid_metric::day']);
++  });
+   it('validates all new Root defaults', () => {
+     for (const setting of FACEBOOK_DATA_CONFIG) expect(setting.schema.safeParse(setting.defaultValue).success).toBe(true);
+   });
+diff --git a/rebuild/tests/facebook-post-history.test.ts b/rebuild/tests/facebook-post-history.test.ts
+index 96904c3f..50f8e867 100644
+--- a/rebuild/tests/facebook-post-history.test.ts
++++ b/rebuild/tests/facebook-post-history.test.ts
+@@ -5,6 +5,64 @@ const config: FacebookConfig = { graphBaseUrl: 'https://graph.example.test', oau
+ const now = new Date('2026-10-20T00:00:00Z');
+ const policy = { lookbackDays: 365, pageBudget: 1, edge: 'published_posts' as const, fields: ['message'], metrics: ['post_clicks'], reactionTypes: ['LIKE'] };
+ const response = (data: unknown) => new Response(JSON.stringify(data));
++describe('v26 insight authority', () => {
++ const metrics = ['post_media_view', 'post_total_media_view_unique', 'post_reactions_by_type_total', 'post_clicks', 'post_clicks_by_type'];
++ function fixture(value: unknown, summary = 0) {
++  return vi.fn(async (input: RequestInfo | URL) => {
++   const url = new URL(String(input));
++   if (url.pathname.endsWith('/published_posts')) return response({ data: [{ id: 'p', created_time: '2026-10-01', reactions: { summary: { total_count: summary } } }] });
++   if (url.pathname.endsWith('/reactions')) return response({ data: [] });
++   const metric = url.searchParams.get('metric');
++   return response({ data: [{ name: metric, total_value: { value: metric === 'post_reactions_by_type_total' ? value : metric === 'post_clicks_by_type' ? { 'link clicks': 2 } : 3 } }], paging: { next: 'unused-window' } });
++  });
++ }
++ it('prefers insights over conflicting summary and edge counts without adding sources', async () => {
++  const result = await createFacebookPostHistory({ ...config, graphVersion: 'v26.0' }, { ...policy, metrics }, fixture({ like: 1, love: 0 })).collect('token', 'page', now);
++  expect(result.posts[0].insights).toMatchObject({ post_media_view: 3, post_total_media_view_unique: 3, clicks: 3, post_clicks_by_type: { 'link clicks': 2 }, reactions: 1, reactions_like: 1,
++   reactionProvenance: { source: 'insights', metric: 'post_reactions_by_type_total', insightTotal: 1, summaryTotal: 0, edgeTotal: 0, conflict: true, observedAt: now.toISOString() } });
++ });
++ it('preserves an authoritative insight zero against a positive summary', async () => {
++  const result = await createFacebookPostHistory(config, { ...policy, metrics }, fixture({ like: 0 }, 4)).collect('token', 'page', now);
++  expect(result.posts[0].insights).toMatchObject({ reactions: 0, reactionProvenance: { source: 'insights', conflict: true } });
++ });
++ it('retains authoritative reaction types even when a reaction edge fails', async () => {
++  const fetcher = vi.fn(async (input: RequestInfo | URL) => {
++   const url = new URL(String(input));
++   if (url.pathname.endsWith('/published_posts')) return response({ data: [{ id: 'p', created_time: '2026-10-01' }] });
++   if (url.pathname.endsWith('/reactions')) return response({ error: { code: 100 } });
++   return response({ data: [{ name: 'post_reactions_by_type_total', values: [{ value: { like: '1', care: 2 } }] }] });
++  });
++  const result = await createFacebookPostHistory(config, { ...policy, metrics: ['post_reactions_by_type_total'] }, fetcher).collect('token', 'page', now);
++  expect(result.posts[0].insights).toMatchObject({ reactions: 3, reactions_like: 1, reactions_care: 2, collectionFailures: ['reactions_LIKE'], reactionProvenance: { source: 'insights', edgeTotal: null, edgesComplete: false } });
++ });
++ it('records an unknown total when every reaction source is missing', async () => {
++  const fetcher = vi.fn(async () => response({ data: [{ id: 'p', created_time: '2026-10-01' }] }));
++  const result = await createFacebookPostHistory(config, { ...policy, metrics: [], reactionTypes: [] }, fetcher).collect('token', 'page', now);
++  expect(result.posts[0].insights.reactions).toBeUndefined();
++  expect(result.posts[0].insights.reactionProvenance).toMatchObject({ source: 'unknown', insightTotal: null, summaryTotal: null, edgeTotal: null, conflict: false });
++ });
++ it.each([{}, { like: null }, { like: -1 }, { like: true }])('does not fabricate an insight total from invalid categories %j', async value => {
++  const result = await createFacebookPostHistory(config, { ...policy, metrics, reactionTypes: [] }, fixture(value, 4)).collect('token', 'page', now);
++  expect(result.posts[0].insights).toMatchObject({ reactions: 4, reactionProvenance: { source: 'summary', insightTotal: null, edgeTotal: null } });
++ });
++ it('requests configured video metrics only for positively identified video posts', async () => {
++  const requested: string[] = [];
++  const fetcher = vi.fn(async (input: RequestInfo | URL) => {
++   const url = new URL(String(input));
++   if (url.pathname.endsWith('/published_posts')) return response({ data: [
++    { id: 'photo', created_time: '2026-10-01', status_type: 'added_photos' },
++    { id: 'video', created_time: '2026-10-01', status_type: 'added_video' },
++    { id: 'attached', created_time: '2026-10-01', attachments: { data: [{ media_type: 'video' }] } },
++    { id: 'unknown', created_time: '2026-10-01' },
++   ] });
++   requested.push(url.pathname);
++   return response({ data: [{ name: 'post_video_views', values: [{ value: 8 }] }] });
++  });
++  const result = await createFacebookPostHistory(config, { ...policy, metrics: ['post_video_views'], reactionTypes: [] }, fetcher).collect('token', 'page', now);
++  expect(requested).toHaveLength(2);
++  expect(result.posts.map(post => post.insights.video_views)).toEqual([undefined, 8, 8, undefined]);
++ });
++});
+ describe('Page history', () => {
+  it('validates Root defaults', () => { for (const setting of [...FACEBOOK_HISTORY_CONFIG, ...FACEBOOK_DATA_DETAIL_CONFIG]) expect(setting.schema.safeParse(setting.defaultValue).success).toBe(true); });
+  it('resumes a stable interval and normalizes paginated reaction counts and insights', async () => {

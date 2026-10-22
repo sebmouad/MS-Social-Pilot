@@ -1,0 +1,236 @@
+diff --git a/rebuild/docs/LEGACY_CAPABILITY_PARITY.md b/rebuild/docs/LEGACY_CAPABILITY_PARITY.md
+index 441f279a..55364be6 100644
+--- a/rebuild/docs/LEGACY_CAPABILITY_PARITY.md
++++ b/rebuild/docs/LEGACY_CAPABILITY_PARITY.md
+@@ -19,7 +19,7 @@ a manifest, saved setting or unit test is not complete workflow proof. See
+ | P0 | Reports and CSV exports in `src/app/(app)/reports/page.tsx`, `src/lib/reports.ts`, and `src/lib/analytics-export.ts` | Partial: Round 10 adds stored publication counts by ISO weekday and hour (UTC), plus recorded-attempt distributions, through the existing confirmed report UI download/REST/MCP generator. The existing Root analytics.reports.publicationDetails setting now owns three switches and the final attempt bucket ceiling; the report-document catalog supplies EN/FR labels and counter/timing limitations. Counts are independent of clipped content logs, include only current published destinations in the selected channel/period, and do not claim recommended times or historical retry outcomes. Local mocked/query-shape/render/host tests only; PostgreSQL execution and actual browser/client downloads remain open. Round-8 Destinations adds a scoped per-link lifetime click inventory, retained period clicks per link and daily UTC retained click counts through the existing confirmed report UI download/REST/MCP generator. Root `analytics.reports.linkDetails` bounds inventory and daily rows independently; EN/FR artifacts disclose publication-cohort scope, excluded ambiguous legacy links, retention gaps and clipping. No visitor metadata or destination URLs are projected. Local mocked/query-shape/workflow tests and TypeScript only; PostgreSQL, browser downloads and real-client proof remain open. round-7 Top posts restores destination-specific saved text, ordered image/video references with Root-switchable image previews, and saved article link/title/description through the existing confirmed UI download, REST and MCP report workflow. Root `analytics.reports.topPostContent` owns ranking/content/media/URL bounds, image previews and the authenticated media path template; EN/FR artifacts disclose current saved content, expiry, workspace access and clipping. Targeted mocked/render tests and TypeScript verification are local only; PostgreSQL, actual browser/download and real-client/provider proof remain open. Existing templates/schedules/runs, CSV/JSON/printable artifacts, response time/business hours, top posts, goals, destinations/link counts and AI recap exist. Downloads/UI were refined in 0589ddd0. Round-6 Published posts adds three stored-data report views through the existing confirmed UI/REST/MCP generator: a destination-specific content log with attempt counts, daily UTC publication counts independent of log limits, and currently failed destinations last updated in the period (explicitly not historical failure attempts). EN/FR catalogs disclose excerpts, current-state semantics and clipping; Root `analytics.reports.publicationDetails` controls each log ceiling and excerpt length. Local verification: TypeScript 0 errors; 155 targeted tests across 10 files passed, including scoped SQL shapes, bilingual artifacts, row/byte limits and confirmed MCP generation/audit. PostgreSQL, browser, real-client and production evidence remain open. Response reports now include first direct replies to stored root comments, slowest calendar/business-hours first response, and business-hours resolution through the same report generator used by UI downloads, REST and MCP. Round-2 response reports retain pre-period conversation context, reconstruct recorded resolution/reopening cycles, and disclose stored-history coverage and incomplete boundary exclusions in bilingual artifacts through the existing shared generator. Round-3 reports separate comment/conversation answer shares, response and resolution durations, and member business-hours first-response medians through the shared generator. Round-5 member outcomes add slowest first replies, answered-wait resolution counts and calendar/business-hours resolution medians, with last-run first-responder attribution through the same report workflow. Per-channel reports retain member attribution and disclose source limits; complete provider history, actual mail delivery, volume and current-browser proof remain open.  Rounds 1–3 (`23b7be84`, `6ef753e4`, `b725c415`) have local arithmetic, bilingual artifact and mocked workflow tests; bounded history and concurrent-read consistency remain limits. | Complete relevant report sections and exports, schedule/template workflows, UI/API/MCP parity and provider-shaped tests. |
+ | P1 | Composer overrides, queue slots, approvals, labels, custom fields, notes, versions, templates, first-comment retries, and UTM/link preparation in `src/lib/posts.ts` and related API routes | Partial: composer, slots/approvals/templates/labels/fields/notes/version restore, delayed comments and rejected-only retry, best times, mix/recycle, UTM and shortening are integrated. Scheduling modes are per destination. Newest scheduling/restore/comment database/browser/provider checks remain open; unknown remote attempts stay held. | Full end-to-end tests on production-shaped staging, per-target behavior, provider create/status/delete and permission verification, bulk actions, scheduling rules, plus remaining legacy workflows. |
+ | P1 | Post list filters, saved views, pagination, bulk actions, retry/duplicate, CSV export and public Posts v1 API in `src/app/(app)/posts/page.tsx` and `src/app/api/posts` | Partial: scoped lists/search/paging/views/export and bulk actions share services; key REST v1 Posts includes scheduling. Large asynchronous Posts CSV is absent (workspace ZIP is different); draft aliases and v1 create now share confirmed lifecycle boundaries (`acb56bd7`); real client outcomes remain unverified. Missing-image fallback and saved-view expired-session feedback are source/unit fixes (`36946d9e`), without browser rerun. | Full list/action/API parity with workspace authorization and large-data pagination tests. |
+-| P1 | Publishing calendar navigation and month coverage in `src/app/(app)/calendar` | Partial: Month/Week/phone agenda, workspace-day grouping, previews, saved views and drag/keyboard moves exist. Shared lifecycle supports adapter-held cancel/reschedule. Calendar editing, queue-slot presentation, high-volume months and actual drag/remote-schedule browser/provider evidence remain open. | Browser and database tests with records on timezone and month boundaries, high-volume month, permissions, drag-and-drop E2E, and edit workflows. |
++| P1 | Publishing calendar navigation and month coverage in `src/app/(app)/calendar` | Partial: Month/Week/phone agenda, workspace-day grouping, previews, saved views and drag/keyboard moves exist. Shared lifecycle supports adapter-held cancel/reschedule. Round 13 re-offers previously deferred platform destinations after a time change through the same UI/REST/MCP lifecycle, retaining per-destination choices, current authorization, expected-time race protection and uncertain-outcome recovery; Root withdrawal prevents new holds. Targeted mocked regression evidence only (see modules/publishing/server/RESCHEDULE_HANDOFF.md); database/browser/provider checks remain open. Calendar editing, queue-slot presentation, high-volume months and actual drag/remote-schedule browser/provider evidence remain open. | Browser and database tests with records on timezone and month boundaries, high-volume month, permissions, drag-and-drop E2E, and edit workflows. |
+ | P1 | Inbox assignment, private notes, saved replies, moderation rules, comment deletion and full discovery in `src/lib/inbox.ts` and `src/app/api/inbox` | Partial: scoped conversations/comments/nested replies/reviews, sync/actions/recovery, assignment/notes/replies and moderation rules exist. New quick filters, stored contact/sentiment details, bulk actions, replies drawer and shortcuts have mocked/DOM tests. Contact REST and bulk UI/REST/MCP exist (`f5c21c96`). Facebook Inbox reads now fetch before the locked write phase (`e0584777`); write-time scope/binding checks remain. Complete discovery/backfill, attachments/participants and live moderation remain open. | Multi-user assignment, notes, moderation log/undo, all relevant posts/reviews, and provider/MCP tests. |
+ | P1 | Image/video media library, import, usage/quota, holder attribution and stream/raw delivery in `src/lib/media.ts` | Partial: modules/media owns images/videos/search/usage/holders/quota, guarded import and delete with UI/REST/MCP. Round 11 adds still-WebP URL import converted to PNG, durable/searchable imported-image names, and first-rename metadata for uploaded/stored images through shared UI/REST/MCP services. Canonical image metadata reuses media rows without double-counting storage; the existing PATCH route is present and mapped. Root media.webpImportPolicy bounds conversion, with EN/FR guidance/errors. TypeScript and 78 focused tests (including parity guard, real WebP conversion, mocked services/HTTP and jsdom) pass locally; PostgreSQL, browser and actual client proof remain open. Older image-delete/orphan-cleanup paths still need metadata cleanup integration. Thumbnails and real video/storage/browser workflows still need completion or proof. Reference/export completeness needs actual-data checks. | Video upload/library, imports, quotas, usage and reference display, secure retrieval/deletion tests. |
+ | P1 | Connections for Groups, Instagram and other networks, token health and lifecycle callbacks in `src/app/(app)/connections/page.tsx` and `src/app/api/facebook` | Partial: Facebook Page/ad-account discovery, selection, stored health, reconnect and retain/delete exist. OAuth startup including compatibility route shares service; batch selection UI/REST/MCP share confirmed wrapper. Single selection/disconnect confirmations differ. New Instagram/Group adapters and provider lifecycle/revocation proof remain absent. | Channel/ad-account selection, token/grant status, remote lifecycle callbacks, retain/delete semantics and complete provider discovery. |
+diff --git a/rebuild/src/modules/publishing/server/RESCHEDULE_HANDOFF.md b/rebuild/src/modules/publishing/server/RESCHEDULE_HANDOFF.md
+new file mode 100644
+index 00000000..ae51773b
+--- /dev/null
++++ b/rebuild/src/modules/publishing/server/RESCHEDULE_HANDOFF.md
+@@ -0,0 +1,31 @@
++# Deferred platform scheduling after a time change
++
++Round 13: `reschedulePostToInstant` commits the time change and releases its
++operation locks before re-entering the ordinary platform handoff service. This
++applies to Calendar/Queue actions, session REST, REST v1 and MCP through their
++existing shared lifecycle calls; no additional entry point is required.
++
++When Root `publishing.remoteScheduling.offered` is true, a post whose stored
++`publishMode` is native gets a fresh handoff attempt. The existing per-destination
++mode, adapter format/lead-window checks, current authorization, approval checks,
++publication journal and audit remain authoritative. Application choices stay
++local, existing held copies are not recreated, and first comments wait for
++confirmed publication. No new Root keys or schema version change.
++
++The follow-up carries the committed instant into `publishPost`'s existing
++expected-time guard. A concurrent move/cancel makes it skip. There is no nested
++post lock. A follow-up failure does not undo or misreport the committed time
++change; unknown provider effects retain their normal recovery state. The normal
++publication handoff records its own audit independently of the time-change audit.
++
++Evidence: `publishing-scheduling-verification.test.ts` uses mocked persistence,
++operation guards and publication journaling. It checks too-soon/too-far moves,
++still-deferred and application destinations, Root withdrawal, concurrent moves,
++revoked membership, uncertain results and already-held copies. Existing remote
++hold, reschedule, REST write and destination-mode tests provide regression checks.
++These are not PostgreSQL locking, browser, real-client or live-provider evidence.
++
++Integration documentation outside this lane: update ARCHITECTURE.md's scheduling
++section and AGENT_HANDOFF.md with this behavior/evidence; remove the stale
++"Rescheduling does not re-offer" gap from docs/PARITY_PUBLISHING_INBOX.md. Live
++hold/reschedule verification and the independent periodic handoff job remain open.
+diff --git a/rebuild/src/modules/publishing/server/lifecycle.ts b/rebuild/src/modules/publishing/server/lifecycle.ts
+index 94450ee7..ca03b4b4 100644
+--- a/rebuild/src/modules/publishing/server/lifecycle.ts
++++ b/rebuild/src/modules/publishing/server/lifecycle.ts
+@@ -307,9 +307,10 @@ export async function schedulePost(actor: PublishingActor, postId: string, sched
+ export type RescheduleInput = { postId: string; date: string; time: string; timeZone: string };
+ 
+ /**
+- * Move a still-local scheduled post to a new workspace-local date and time.
++ * Move a scheduled post to a new workspace-local date and time.
+  * The wall-clock time is interpreted in the workspace time zone (DST-aware) and
+- * must be in the future. Posts already handed to the platform cannot be moved.
++ * must be in the future. Existing platform-held copies move before the local time;
++ * deferred destinations are offered the new time after the local change commits.
+  */
+ export async function reschedulePost(actor: PublishingActor, input: RescheduleInput) {
+   const errorText = await loadPublishingErrorText();
+@@ -323,7 +324,7 @@ export async function reschedulePost(actor: PublishingActor, input: RescheduleIn
+ export async function reschedulePostToInstant(actor: PublishingActor, postId: string, scheduledAt: Date) {
+   const errorText = await loadPublishingErrorText();
+   const input = { postId };
+-  return withPublishingOperation(actor, { postId: input.postId }, async ({ actor, signal, lockTargets }) => {
++  const result = await withPublishingOperation(actor, { postId: input.postId }, async ({ actor, signal, lockTargets }) => {
+     const role = await membership(actor);
+     await assertPostScope(actor, input.postId);
+     if (!(scheduledAt instanceof Date) || !Number.isFinite(scheduledAt.getTime())) throw new PublishingOperationError('invalid_request', 'chooseAValidDateAndTime', {}, errorText);
+@@ -347,6 +348,15 @@ export async function reschedulePostToInstant(actor: PublishingActor, postId: st
+     });
+     return { scheduledAt };
+   });
++  // Re-enter the shared publication boundary only after releasing the reschedule
++  // locks. It rechecks current access, approval and each destination's saved mode;
++  // the expected instant prevents this follow-up from acting on a concurrent move.
++  // A failed handoff must not report the already-committed time change as failed:
++  // uncertain attempts retain their journal and the ordinary recovery path.
++  if (await runtimeConfig('publishing.remoteScheduling.offered').catch(() => false) === true) {
++    await holdScheduledPostAtProvider(actor, postId, scheduledAt).catch(() => null);
++  }
++  return result;
+ }
+ 
+ /** Cancel a locally queued post back to draft while it is still pending delivery. */
+@@ -490,10 +500,10 @@ const NO_HOLD: RemoteHoldSummary = { held: 0, deferred: 0, reasons: [] };
+  * Hand a scheduled post chosen for platform-held scheduling to the destinations that can hold it. Destinations that cannot
+  * (unsupported, too soon, too far) stay with the application worker. Returns null when the post did not choose platform holding.
+  */
+-export async function holdScheduledPostAtProvider(actor: PublishingActor, postId: string) {
++export async function holdScheduledPostAtProvider(actor: PublishingActor, postId: string, expectedScheduledAt?: Date) {
+   const rows = await prisma.$queryRaw<Array<{ publishMode: string }>>`SELECT "publishMode"::text AS "publishMode" FROM posts WHERE id = ${postId} AND "workspaceId" = ${actor.workspaceId} AND status::text = 'scheduled'`;
+   if (rows[0]?.publishMode !== 'native') return null;
+-  return publishPost(actor, postId, undefined, { nativeSchedule: true, nativeFallback: true });
++  return publishPost(actor, postId, expectedScheduledAt, { nativeSchedule: true, nativeFallback: true });
+ }
+ 
+ export async function publishPost(actor: PublishingActor, postId: string, expectedScheduledAt?: Date, options: { retryOnly?: boolean; nativeSchedule?: boolean; nativeFallback?: boolean } = {}) {
+diff --git a/rebuild/tests/publishing-scheduling-verification.test.ts b/rebuild/tests/publishing-scheduling-verification.test.ts
+index 8df27ee2..3c1e640e 100644
+--- a/rebuild/tests/publishing-scheduling-verification.test.ts
++++ b/rebuild/tests/publishing-scheduling-verification.test.ts
+@@ -19,10 +19,11 @@ const db = vi.hoisted(() => ({
+   $queryRaw: vi.fn(),
+ }));
+ const adapters = vi.hoisted(() => ({ holding: { publish: vi.fn(), getRemoteStatus: vi.fn(), deleteRemote: vi.fn(), rescheduleRemote: vi.fn() }, plain: { publish: vi.fn() } }));
++const policy = vi.hoisted(() => ({ offered: true }));
+ vi.mock('../src/server/data', () => ({ prisma: db }));
+ vi.mock('../src/server/config/store', () => ({ runtimeConfig: async (key: string) => ({
+   'publishing.collab.versionRetention': 50, 'publishing.maxMessageCharacters': 10000, 'publishing.maxTargetsPerPost': 20, 'publishing.maxRemoteMediaPerPost': 4, 'publishing.maxImageAltCharacters': 500,
+-  'publishing.remoteScheduling.leadMarginSeconds': 60, 'publishing.remoteScheduling.offered': true, 'publishing.remoteScheduling.defaultMode': 'application',
++  'publishing.remoteScheduling.leadMarginSeconds': 60, 'publishing.remoteScheduling.offered': policy.offered, 'publishing.remoteScheduling.defaultMode': 'application',
+ })[key] }));
+ vi.mock('../src/server/entitlements', () => ({ loadEntitlements: async () => ({}), hasPlatformCapability: () => true }));
+ const media = { kinds: ['image', 'video'], maxImages: null, maxVideos: 1, mixedKinds: false, linkWithMedia: false, imageAltText: true };
+@@ -42,12 +43,13 @@ import { publishDestinationInOperation } from '@/modules/publishing/server/publi
+ 
+ const actor = { userId: 'u1', workspaceId: 'w1' };
+ const target = (id: string, provider: string) => ({ id, name: `Page ${id}`, type: 'page', providerId: `page-${id}`, canPublish: true, enabled: true, accessToken: 'token', socialAccount: { provider, invalidatedAt: null, tokenExpiresAt: null, scopes: 'publish' } });
+-const row = (id: string, provider: string) => ({ id: `pt-${id}`, formatId: 'post', status: 'pending', remotePostId: null, target: target(id, provider) });
++const row = (id: string, provider: string) => ({ id: `pt-${id}`, formatId: 'post', status: 'pending', remotePostId: null as string | null, target: target(id, provider) });
+ const at = (seconds: number) => new Date(Date.now() + seconds * 1000);
+ const scheduled = (when: Date) => ({ id: 'p1', authorId: 'u1', format: 'post', message: 'Hello', firstComment: 'First', link: null, media: [], status: 'scheduled', scheduledAt: when, targets: [row('a', 'holding'), row('b', 'plain')] });
+ 
+ beforeEach(() => {
+   vi.clearAllMocks();
++  policy.offered = true;
+   attemptFirstComment.mockResolvedValue({ state: 'sent' });
+   db.membership.findUnique.mockResolvedValue({ role: 'owner' });
+   db.post.update.mockResolvedValue({});
+@@ -58,6 +60,98 @@ beforeEach(() => {
+   db.$transaction.mockImplementation(async (work: (tx: typeof db) => Promise<unknown>) => work(db));
+ });
+ 
++describe('reschedule re-offers deferred platform destinations', () => {
++  function deferredPost(oldTime: Date, modes = ['remote', 'application']) {
++    let current = scheduled(oldTime);
++    db.post.findFirst.mockImplementation(async () => current);
++    db.post.updateMany.mockImplementation(async ({ data }: { data: { scheduledAt: Date } }) => {
++      current = { ...current, scheduledAt: data.scheduledAt };
++      return { count: 1 };
++    });
++    db.$queryRaw.mockImplementation(async (sql: TemplateStringsArray) => {
++      const query = sql.join('');
++      if (query.includes('SELECT "publishMode"')) return [{ publishMode: 'native' }];
++      if (query.includes('SELECT id, "scheduleMode"')) return modes.map((scheduleMode, i) => ({ id: `pt-${i ? 'b' : 'a'}`, scheduleMode }));
++      return [];
++    });
++    return { change: (value: ReturnType<typeof scheduled>) => { current = value; } };
++  }
++
++  it.each([120, 7000000])('offers a previously out-of-window time (%s seconds) at the new accepted time', async oldSeconds => {
++    deferredPost(at(oldSeconds));
++    const when = at(10800);
++    const result = await reschedulePostToInstant(actor, 'p1', when);
++    expect(result.scheduledAt).toEqual(when);
++    expect(adapters.holding.publish).toHaveBeenCalledTimes(1);
++    expect(adapters.holding.publish).toHaveBeenCalledWith(expect.objectContaining({ scheduledAt: when }));
++    expect(adapters.plain.publish).not.toHaveBeenCalled();
++    expect(db.post.updateMany.mock.invocationCallOrder[0]).toBeLessThan(adapters.holding.publish.mock.invocationCallOrder[0]!);
++    expect(attemptFirstComment).not.toHaveBeenCalled();
++    expect(db.post.update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ status: 'scheduled' }) }));
++  });
++
++  it('keeps application choices and still-too-soon remote choices local', async () => {
++    deferredPost(at(120));
++    await reschedulePostToInstant(actor, 'p1', at(240));
++    expect(publishDestinationInOperation).not.toHaveBeenCalled();
++    expect(db.post.update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ status: 'scheduled' }) }));
++  });
++
++  it('never changes an application destination to platform scheduling', async () => {
++    deferredPost(at(120), ['application', 'remote']);
++    await reschedulePostToInstant(actor, 'p1', at(10800));
++    expect(publishDestinationInOperation).not.toHaveBeenCalled();
++  });
++
++  it('honors Root withdrawing new platform holds', async () => {
++    policy.offered = false;
++    deferredPost(at(120));
++    await reschedulePostToInstant(actor, 'p1', at(10800));
++    expect(publishDestinationInOperation).not.toHaveBeenCalled();
++    expect(db.$queryRaw.mock.calls.some(([sql]) => sql.join('').includes('SELECT "publishMode"'))).toBe(false);
++  });
++
++  it('refuses a stale follow-up after another operation moves the post', async () => {
++    const state = deferredPost(at(120));
++    db.$queryRaw.mockImplementation(async () => {
++      state.change(scheduled(at(18000)));
++      return [{ publishMode: 'native' }];
++    });
++    const when = at(10800);
++    await expect(reschedulePostToInstant(actor, 'p1', when)).resolves.toMatchObject({ scheduledAt: when });
++    expect(publishDestinationInOperation).not.toHaveBeenCalled();
++    expect(db.post.update).not.toHaveBeenCalled();
++  });
++
++  it('keeps the committed time change successful when a provider result is uncertain', async () => {
++    deferredPost(at(120));
++    vi.mocked(publishDestinationInOperation).mockResolvedValueOnce('needs_review');
++    const when = at(10800);
++    await expect(reschedulePostToInstant(actor, 'p1', when)).resolves.toMatchObject({ scheduledAt: when });
++    expect(publishDestinationInOperation).toHaveBeenCalledTimes(1);
++    expect(db.post.update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ status: 'publishing' }) }));
++    expect(attemptFirstComment).not.toHaveBeenCalled();
++  });
++
++  it('does not create another copy of an already-held destination', async () => {
++    const oldTime = at(10800);
++    deferredPost(oldTime).change(mixed(oldTime));
++    db.postTarget.findMany.mockResolvedValue([heldRow()]);
++    await reschedulePostToInstant(actor, 'p1', at(18000));
++    expect(adapters.holding.rescheduleRemote).toHaveBeenCalledTimes(1);
++    expect(publishDestinationInOperation).not.toHaveBeenCalled();
++    expect(attemptFirstComment).not.toHaveBeenCalled();
++  });
++
++  it('rechecks membership before a follow-up dispatch', async () => {
++    deferredPost(at(120));
++    db.membership.findUnique.mockResolvedValueOnce({ role: 'owner' }).mockResolvedValueOnce(null);
++    await expect(reschedulePostToInstant(actor, 'p1', at(10800))).resolves.toBeTruthy();
++    expect(publishDestinationInOperation).not.toHaveBeenCalled();
++    expect(db.post.update).not.toHaveBeenCalled();
++  });
++});
++
+ const heldRow = () => ({ id: 'pt-a', targetId: 'a', formatId: 'post', remotePostId: 'remote-a', post: { format: 'post' }, target: target('a', 'holding') });
+ const mixed = (when: Date) => ({ ...scheduled(when), targets: [
+   { ...row('a', 'holding'), status: 'scheduled_remote', remotePostId: 'remote-a' }, row('b', 'plain'),

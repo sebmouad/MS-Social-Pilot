@@ -1,0 +1,638 @@
+diff --git a/rebuild/docs/MCP_PARITY.md b/rebuild/docs/MCP_PARITY.md
+index 60dcb14b..67b11280 100644
+--- a/rebuild/docs/MCP_PARITY.md
++++ b/rebuild/docs/MCP_PARITY.md
+@@ -17,6 +17,7 @@ selected-resource, person-key and installation authority remain distinct.
+ | --- | --- | --- |
+ | Home | `readHomeOverview`, GET `/api/home/overview`, `get_home_overview` | Present; workspace-wide read intentionally refuses resource-limited keys |
+ | Publishing | Drafts, create/edit/import, lists/search/export, publish/retry/sync, schedule/reschedule/cancel/queue, approvals, deletion/recovery, first-comment send/retry/record, templates/labels/fields/notes/versions, saved views, mix/recycle/best times/media | Broad source coverage. Per-destination schedule modes flow through session REST, key REST v1 and MCP. Draft aliases and REST v1 create now use confirmed `api-writes` lifecycle boundaries (`acb56bd7`); real scheduling/provider and remaining write-boundary evidence stay partial |
++| Facebook Groups | No customer Group selection/publish UI, REST route or MCP operation is enabled. Private `configuredFacebookGroupOperations` is a provider port only, using neutral requests/results; it is not a new domain service or an authorization boundary. | Incomplete in all three surfaces. Fixture-tested discovery distinguishes missing grants/provider denial from an empty collection; private feed/link/single-photo transport requires fresh exact-Group discovery and maps create receipts to submitted, with identity-bound explicit status proof. Installed capabilities remain Page-only because current provider access is unverified and neutral per-kind descriptors/shared service integration are missing. No independent route/tool bypasses tenant, confirmation or audit services. See [Groups integration dependencies](../src/platforms/facebook/GROUPS.md). |
+ | Inbox | List/thread/sync/reply/resolve, nested replies/reviews, moderation/deletion/recovery, productivity, assignment/notes/saved replies and contact details | Broad source coverage; GET `/api/inbox/threads/[key]/details` calls `readInboxContactDetails` (added in `8852d367`). `bulkInboxAction` now has UI, `POST /api/inbox/bulk` and `bulk_inbox_action` (`f5c21c96`); mocked route tests only |
+ | Analytics | Overview/details/explorer/previous points, comparisons, posts/ad objects, demographics/history CSV, pins/goals, report exports/templates/schedules/runs/generation | Present at source; session HTTP and MCP share cores, key REST v1 delegates declared tools to host. Completeness of collected metrics and real transport/provider results remain unproven |
+ | Ads | Accounts/performance/directory/rows/exports/compare/status, creation choices, creative sources/image/create/assignment, change preview/apply/history/recovery | Present at source with session routes and key REST v1 through owning MCP groups. `ad.create` (paused) uses the same `previewAdsManagement`/`performAdsManagement` path from `AdCreateForm`, session REST and `preview_ads_change`/`apply_ads_change`; a missing `ads_management` grant yields a reconnect notice and localized error. The ledger CHECK migration for `ad.create` (`20261031180000_rebuild_ads_ad_creation`) exists since `960831df` and is recorded applied in production by the owner/integrator; the Ads MCP tools do not yet pass the customer locale to the runtime Ads copy scope (English default). Live manager/grant/spend/creative outcomes remain partial |
+diff --git a/rebuild/src/platforms/facebook/GROUPS.md b/rebuild/src/platforms/facebook/GROUPS.md
+new file mode 100644
+index 00000000..fbadeecf
+--- /dev/null
++++ b/rebuild/src/platforms/facebook/GROUPS.md
+@@ -0,0 +1,112 @@
++# Facebook Groups compatibility boundary
++
++This is **private provider transport and fixture evidence**, not customer Group
++support. No Group selection, UI/REST/MCP publishing capability or live-provider
++success is claimed. `facebookModule.channelKinds`, the installed adapter and
++normal OAuth remain Page-only. No setting here restores a retired Meta API.
++
++The legacy implementation in root `src/lib/facebook/oauth.ts` treats permission
++or invalid-request discovery errors as an empty collection and incorrectly
++describes the April 2024 change as a restriction to app-installed Groups. Meta's
++[v19 notice](https://developers.facebook.com/docs/graph-api/changelog/version19.0/)
++describes removal across versions on April 22, 2024. This lane attempted to read
++that official page and its linked January 23 announcement, but Meta returned HTTP
++429; there is no fresh authenticated/provider availability verification. Existing
++module policy already records Groups as removed. Do not pin an older version,
++request retired scopes in normal OAuth, or advertise Group support from fixtures.
++
++`configuredFacebookGroupOperations` reads typed Root policies from the Facebook
++config list, registered by `module.ts`:
++
++- `meta.groupDiscoveryScopes`
++- `meta.groupPublishScopes`
++- `meta.groupReadScopes`
++
++These are configured private dependencies, not enabled product operations. All
++endpoints, versions, pagination, timeouts, signing and binary photo validation
++reuse existing Root-managed Facebook configuration and transport. The selected
++single-photo/feed implementation is an implementation boundary: multi-photo,
++video, Reels, Stories, comments, deletion and provider-held scheduling are not
++implemented for Groups. There is no Group enablement switch.
++
++`groups.ts` accepts neutral `PlatformCredential`, `PlatformTarget`,
++`PublishRequest`, `PublishResult` and `RemoteStatusRequest` types. Discovery emits
++`kind: 'group'` targets only after a successful signed response, and distinguishes
++a successful empty collection from missing recorded grants or provider denial.
++Strict bounded pagination refuses incomplete or unsafe listings. Authentication,
++throttling, transient and network failures are not disguised as empty results.
++
++Every private write requires configured publishing grants and a fresh positive
++discovery of the exact selected Group using the connected **user token**. Feed
++and link posts use `/{group}/feed`. Single photos use `/{group}/photos` with
++`message`, retaining `post_id` when returned. Binary uploads reuse signature,
++MIME, byte and filename validation. Page tokens are not discovered or substituted.
++Positive discovery is provider access evidence, not workspace authorization.
++
++A creation receipt maps to `submitted`, allowing for moderation or incomplete
++publication. Status maps to `published` only when the response id matches the
++requested id, `is_published` is explicitly true, and a composite id prefix or
++explicit recipient establishes the exact Group. Contradictory recipients override
++the prefix. Missing fields, an unpublished response, denied readback or uncertain
++ownership yield `unknown`, never scheduled, absent or deleted. Transport failures
++remain failures; callers must retain the shared uncertain-outcome policy and must
++not blindly retry a create.
++
++## Required integration outside this lane
++
++Before exposing any Group capability, the integrator must first establish current
++provider support with actual grants and outcome/cleanup evidence. If Meta denies
++access, keep Groups unavailable in every surface.
++
++1. Extend neutral `src/platforms/types.ts`/platform host metadata with per-target-kind
++   format, credential, scheduling, comment/delete and availability declarations.
++   Currently adapter-level Page descriptors would offer Group-incompatible choices.
++   Shared product code must consume metadata, not branch on `group` or Facebook.
++2. Settings' shared connection service must project safe availability/recovery copy,
++   check usable kind and current grants before selection, and retain exact service
++   confirmation, tenant locks and audit for UI/REST/MCP. Register bilingual
++   customer copy and channel labels in owning Root catalogs. Current selection
++   checks connection/entitlement, but not per-kind adapter eligibility.
++3. Wire Group discovery/persistence into the common connection workflow only after
++   that boundary exists. Persist new targets disabled, encrypt the user token,
++   preserve cross-account binding and lock rules, and never set `canPublish` from
++   an old recorded scope alone. `TargetType.group` already exists; this batch adds
++   no table or migration.
++4. Publishing's shared service must select target-specific descriptors and grants,
++   dispatch to this provider port under existing tenant/role/resource/confirmation/
++   audit rules, and reconcile submitted Group receipts through the Group reader.
++   Keep unsupported operations absent. Add owner/member/viewer and cross-workspace
++   UI/REST/MCP denial/success coverage there; the private transport is not an auth
++   service and is not independently exposed through a new route/tool.
++5. Update `ARCHITECTURE.md`, `DELIVERY_PLAN.md`, `AGENT_HANDOFF.md` and the Groups
++   portions of `LEGACY_CAPABILITY_PARITY.md`; the integrator owns the schema-version
++   bump for the three keys. This worker leaves `CONFIG_SCHEMA_VERSION` untouched.
++
++Tests: `facebook-groups.test.ts` covers transport fixtures, scope/target refusals,
++denied discovery/readback, strict pagination, Group photo fields, conservative
++receipts/status and unsupported intent. `facebook-groups-runtime.test.ts` covers
++registered policies and non-default Root values. There is no database, browser,
++actual MCP client, provider or production evidence for this slice. No customer
++screen changed, so there is no visual change to report.
++
++## Worker verification (2026-10-21)
++
++- `npx tsc --noEmit -p .`: exit 0, zero errors.
++- Focused eight-file Vitest run with `--no-cache`: 132/132 passed, including
++  both Group files (30 tests), Page engine/held-scheduling/readiness/status,
++  `config-validation.test.ts` and `parity-guard.test.ts`.
++- Final whole suite, `npx vitest run --exclude
++  "**/facebook-diagnostic-transport.test.ts" --no-cache`: 613 files passed,
++  49 skipped, two failed; 7,011 tests passed, 245 skipped, six failed.
++  Five failures in `facebook-native-http.test.ts` cannot bind the sandbox's
++  loopback socket (`listen EPERM ::1`). `root-config-form.test.ts`'s exhaustive
++  owner-aware settings search exceeds the default five-second timeout; all
++  11 tests pass in an isolated rerun with `--testTimeout=30000` (the exhaustive
++  search took 5.88 seconds). No timeout or HTTP-test source was changed.
++- The first full run also had `first-comment-retry-ui.test.ts` timeout and two
++  `post-composer-ui.test.ts` best-time-fetch assertion failures. Those files
++  passed the focused rerun and the final whole run without source changes.
++- `git diff --check`: passed. No servers, deployment, production calls or push.
++  Git worktree metadata is outside this worker's writable roots; all nine changed
++  or added files remain uncommitted for integration. Pre-existing node_modules
++  symlinks are untouched. The batch is not an all-green release candidate.
+diff --git a/rebuild/src/platforms/facebook/config.ts b/rebuild/src/platforms/facebook/config.ts
+index f79b7e2b..9a7f8379 100644
+--- a/rebuild/src/platforms/facebook/config.ts
++++ b/rebuild/src/platforms/facebook/config.ts
+@@ -55,6 +55,16 @@ export const FACEBOOK_DATA_CONFIG = [
+   entry({ key: 'meta.contentInsightCollections', group: 'Facebook · Analytics collection', label: 'Content insight collections', kind: 'json', description: 'Version-verified posts, videos, Reels and Stories metrics and periods. Empty until verified against the configured Graph version. Uses existing insight read grants; does not grant permissions.', defaultValue: [], schema: facebookContentInsightsSchema, consumption: 'active' }),
+ ] as const;
+ 
++/** Private protocol compatibility policy. These settings do not advertise Groups,
++ * restore Meta's retired API or add retired permissions to normal OAuth requests.
++ */
++export const facebookGroupScopesSchema = z.array(z.string().trim().min(1));
++export const FACEBOOK_GROUP_CONFIG = [
++  entry({ key: 'meta.groupDiscoveryScopes', group: 'Facebook · Groups compatibility', label: 'Group discovery grants', kind: 'json', description: 'Recorded grants required by the private Group discovery transport. Meta removed Groups API access across all versions in April 2024. This policy does not enable customer Group choices or restore access.', defaultValue: ['groups_access_member_info'], schema: facebookGroupScopesSchema, consumption: 'configured' }),
++  entry({ key: 'meta.groupPublishScopes', group: 'Facebook · Groups compatibility', label: 'Group publishing grants', kind: 'json', description: 'Recorded grants required in addition to positive Group discovery before private feed/link/single-photo dispatch. Configured scope names cannot grant Meta access. Empty refuses every write.', defaultValue: ['publish_to_groups'], schema: facebookGroupScopesSchema, consumption: 'configured' }),
++  entry({ key: 'meta.groupReadScopes', group: 'Facebook · Groups compatibility', label: 'Group status grants', kind: 'json', description: 'Recorded grants required before private Group post readback. Missing grants or provider denial leave status unknown; they never prove publication or deletion.', defaultValue: ['groups_access_member_info'], schema: facebookGroupScopesSchema, consumption: 'configured' }),
++] as const;
++
+ /**
+  * Legacy arrays cannot distinguish an old default snapshot from deliberate removal.
+  * Migrate them as additions, never infer exclusions from absence. Operators record
+diff --git a/rebuild/src/platforms/facebook/groups.ts b/rebuild/src/platforms/facebook/groups.ts
+new file mode 100644
+index 00000000..e3103a12
+--- /dev/null
++++ b/rebuild/src/platforms/facebook/groups.ts
+@@ -0,0 +1,87 @@
++import type { PlatformCredential, PlatformTarget, PublishRequest, PublishResult, RemoteStatus, RemoteStatusRequest } from '../types';
++import type { FacebookConfig } from './config';
++import { createFacebookEngine, FacebookApiError, type FacebookFetch } from './publishing';
++
++/** Private compatibility transport, deliberately absent from the installed capability manifest.
++ * Meta removed Groups API access across versions on 2024-04-22. Recorded grants
++ * alone never establish availability; each write first needs positive discovery.
++ * This is a provider port, not a workspace authorization/confirmation boundary.
++ */
++export interface FacebookGroupPolicy {
++  discoveryScopes: readonly string[];
++  publishScopes: readonly string[];
++  readScopes: readonly string[];
++}
++export type FacebookGroupDiscovery =
++  | { state: 'available'; targets: PlatformTarget[] }
++  | { state: 'unavailable'; targets: []; reason: 'missing_grant' | 'provider_denied' };
++
++/** Graph permission / retired-edge responses. Authentication, throttling,
++ * transport failures and transient errors must retain their original meaning.
++ */
++function denied(error: unknown): boolean {
++  return error instanceof FacebookApiError && !error.transient && error.status >= 400 && error.status < 500
++    && error.status !== 429 && (error.code === 10 || error.code === 100 || error.code === 200);
++}
++function hasScopes(credential: PlatformCredential, required: readonly string[]): boolean {
++  const scopes = required.map(scope => scope.trim()).filter(Boolean);
++  const granted = new Set(credential.grantedScopes ?? []);
++  return Boolean(credential.accessToken.trim()) && scopes.length > 0 && scopes.every(scope => granted.has(scope));
++}
++function validTarget(target: PlatformTarget): boolean {
++  return target?.kind === 'group' && /^\d+$/.test(target.id);
++}
++function assertGroupIntent(request: PublishRequest) {
++  if (!validTarget(request.target) || request.scheduledAt || (request.formatId !== undefined && request.formatId !== 'post')) {
++    throw new FacebookApiError('Group publishing requires a Group feed destination without a provider-held schedule.', 400, 100);
++  }
++  // Single-create operations only. Page multi-photo staging and native video
++  // journals must never be reused for Groups without their own protocol proof.
++  const media = request.media ?? [];
++  if (media.length > 1 || media.some(item => item.kind !== 'image') || (media.length && request.link?.trim())) {
++    throw new FacebookApiError('Group publishing supports text, links or one photo.', 400, 100);
++  }
++}
++
++export function createFacebookGroupOperations(config: FacebookConfig, policy: FacebookGroupPolicy, fetchImpl: FacebookFetch = fetch) {
++  async function discover(credential: PlatformCredential, signal?: AbortSignal): Promise<FacebookGroupDiscovery> {
++    if (!hasScopes(credential, policy.discoveryScopes)) return { state: 'unavailable', targets: [], reason: 'missing_grant' };
++    try {
++      return { state: 'available', targets: await createFacebookEngine(config, fetchImpl, signal).discoverGroups(credential.accessToken) };
++    } catch (error) {
++      if (denied(error)) return { state: 'unavailable', targets: [], reason: 'provider_denied' };
++      throw error;
++    }
++  }
++  async function isDiscovered(credential: PlatformCredential, target: PlatformTarget, signal?: AbortSignal): Promise<boolean> {
++    if (!validTarget(target)) return false;
++    const result = await discover(credential, signal);
++    return result.state === 'available' && result.targets.some(item => item.id === target.id);
++  }
++  return {
++    discover,
++    async publish(request: PublishRequest): Promise<PublishResult> {
++      assertGroupIntent(request);
++      if (!hasScopes(request.credential, policy.publishScopes) || !await isDiscovered(request.credential, request.target, request.signal)) {
++        throw new FacebookApiError('Group publishing is unavailable for this destination.', 400, 200);
++      }
++      const result = await createFacebookEngine(config, fetchImpl, request.signal).publish({
++        targetId: request.target.id, targetKind: 'group', accessToken: request.credential.accessToken,
++        text: request.text, link: request.link, media: request.media, operationId: request.operationId,
++      });
++      // Groups can require moderation. A create receipt is not proof the post is live.
++      return { ...result, state: 'submitted' };
++    },
++    async getRemoteStatus(request: RemoteStatusRequest): Promise<RemoteStatus> {
++      if (!validTarget(request.target) || (request.formatId !== undefined && request.formatId !== 'post')
++        || !/^[A-Za-z0-9_:-]+$/.test(request.remoteId) || !hasScopes(request.credential, policy.readScopes)
++        || !await isDiscovered(request.credential, request.target, request.signal)) return { state: 'unknown' };
++      try {
++        return await createFacebookEngine(config, fetchImpl, request.signal).getGroupStatus(request.credential.accessToken, request.remoteId, request.target.id);
++      } catch (error) {
++        if (denied(error)) return { state: 'unknown' };
++        throw error;
++      }
++    },
++  };
++}
+diff --git a/rebuild/src/platforms/facebook/module.ts b/rebuild/src/platforms/facebook/module.ts
+index 5998dfd6..0b6d324e 100644
+--- a/rebuild/src/platforms/facebook/module.ts
++++ b/rebuild/src/platforms/facebook/module.ts
+@@ -1,4 +1,4 @@
+-import { FACEBOOK_DATA_DETAIL_CONFIG, FACEBOOK_HISTORY_CONFIG, FACEBOOK_DATA_CONFIG } from './config';
++import { FACEBOOK_DATA_DETAIL_CONFIG, FACEBOOK_HISTORY_CONFIG, FACEBOOK_DATA_CONFIG, FACEBOOK_GROUP_CONFIG } from './config';
+ import { z } from 'zod';
+ import { FACEBOOK_NATIVE_CONFIG, FACEBOOK_NATIVE_TRANSPORT_CONFIG } from './native-config';
+ import { entry, url, stringList } from '@/lib/config/entry';
+@@ -31,6 +31,7 @@ export const facebookModule = {
+ export const FACEBOOK_ANALYTICS_LOOKBACK_DAYS_SCHEMA = z.number().int().min(1).max(366);
+ 
+ const facebookConfigEntries = [
++  ...FACEBOOK_GROUP_CONFIG,
+   ...FACEBOOK_DATA_CONFIG,
+   ...FACEBOOK_HISTORY_CONFIG,
+   ...FACEBOOK_DATA_DETAIL_CONFIG,
+diff --git a/rebuild/src/platforms/facebook/publishing.ts b/rebuild/src/platforms/facebook/publishing.ts
+index 8f481aa4..1a9c1af4 100644
+--- a/rebuild/src/platforms/facebook/publishing.ts
++++ b/rebuild/src/platforms/facebook/publishing.ts
+@@ -37,6 +37,8 @@ export interface FacebookAdAccount { id: string; name: string; currency: string
+ export type FacebookMedia = { kind: 'image' | 'video'; url: string; altText?: string; localFile?: { bytes: Uint8Array; mimeType: string; fileName: string } };
+ export interface FacebookPublishInput {
+   targetId: string; accessToken: string; text?: string; link?: string | null; operationId?: string;
++  /** Private Group compatibility calls use a user token and Group photo semantics. */
++  targetKind?: 'page' | 'group';
+   media?: readonly FacebookMedia[];
+   /** Whole unix seconds: Facebook holds the post (`published=false` + `scheduled_publish_time`) until then. */
+   scheduledUnix?: number;
+@@ -68,6 +70,8 @@ export interface FacebookEngine {
+   getCurrentUser(accessToken: string): Promise<FacebookCurrentUser>;
+   getGrantedPermissions(accessToken: string): Promise<string[]>;
+   discoverPages(accessToken: string): Promise<FacebookPage[]>;
++  discoverGroups(accessToken: string): Promise<import('../types').PlatformTarget[]>;
++  getGroupStatus(accessToken: string, remoteId: string, targetId: string): Promise<RemoteStatus>;
+   discoverAdAccounts(accessToken: string): Promise<FacebookAdAccount[]>;
+   publish(input: FacebookPublishInput): Promise<FacebookPublished>;
+   getStatus(accessToken: string, remoteId: string, context: { targetId: string; contentKind?: 'text' | 'image' | 'video'; nativeFormat?: 'video' | 'reel' | 'story_photo' | 'story_video' }): Promise<RemoteStatus>;
+@@ -190,7 +194,7 @@ export function createFacebookEngine(rawConfig: FacebookConfig, fetchImpl: Faceb
+     return (await pagesCore<T>(first, token, config.maxPages, true)).items;
+   }
+   /** Reads at most `limit` Graph pages. `strict` throws when more remain; otherwise it stops and reports `truncated`. */
+-  async function pagesCore<T>(first: string, token: string, limit: number, strict: boolean): Promise<{ items: T[]; truncated: boolean }> {
++  async function pagesCore<T>(first: string, token: string, limit: number, strict: boolean, collectionPath?: string): Promise<{ items: T[]; truncated: boolean }> {
+     const results: T[] = []; let next: string | undefined = first; const seen = new Set<string>(); let truncated = false;
+     const pageLimit = Math.min(limit, config.maxPages);
+     for (let page = 0; page < pageLimit && next; page++) {
+@@ -200,6 +204,9 @@ export function createFacebookEngine(rawConfig: FacebookConfig, fetchImpl: Faceb
+       if (nextUrl.origin !== configuredBase.origin || nextUrl.username || nextUrl.password || nextUrl.hash || !nextUrl.pathname.startsWith(`/${config.graphVersion}/`)) {
+         throw new FacebookApiError('Facebook returned a pagination URL outside the configured Graph endpoint.', 0);
+       }
++      if (collectionPath !== undefined && nextUrl.pathname !== collectionPath) {
++        throw new FacebookApiError('Facebook pagination changed the requested resource collection.', 0);
++      }
+       nextUrl.searchParams.delete('access_token');
+       nextUrl.searchParams.delete('appsecret_proof');
+       nextUrl.searchParams.set('access_token', token);
+@@ -305,6 +312,30 @@ export function createFacebookEngine(rawConfig: FacebookConfig, fetchImpl: Faceb
+       const raw = await pages<JsonObject>(collectionUrl('me/accounts', token, 'id,name,category,access_token'), token);
+       return raw.map(toPage).filter((p): p is FacebookPage => p !== null);
+     },
++    async discoverGroups(token) {
++      const url = new URL(collectionUrl('me/groups', token, 'id,name'));
++      url.searchParams.set('admin_only', 'true');
++      // Strict paging: a truncated collection cannot establish target authority.
++      const { items: raw } = await pagesCore<JsonObject>(url.toString(), token, config.maxPages, true, url.pathname);
++      const targets = new Map<string, import('../types').PlatformTarget>();
++      for (const row of raw) {
++        if (typeof row.id === 'string' && /^\d+$/.test(row.id) && typeof row.name === 'string' && row.name.trim()) {
++          targets.set(row.id, { id: row.id, name: row.name, kind: 'group' });
++        }
++      }
++      return [...targets.values()];
++    },
++    async getGroupStatus(token, remoteId, targetId) {
++      const unknown = (): RemoteStatus => ({ state: 'unknown' });
++      if (!/^\d+$/.test(targetId) || !/^[A-Za-z0-9_:-]+$/.test(remoteId)) return unknown();
++      const raw = object(await request(encodeURIComponent(remoteId), { token, params: { fields: 'id,to,is_published,created_time' } }));
++      if (raw.id !== remoteId || raw.is_published !== true) return unknown();
++      const recipients = object(raw.to).data;
++      // Explicit contradictory ownership overrides even a composite-id prefix.
++      if (raw.to !== undefined && (!Array.isArray(recipients) || !recipients.some(item => object(item).id === targetId))) return unknown();
++      if (!remoteId.startsWith(`${targetId}_`) && !(Array.isArray(recipients) && recipients.some(item => object(item).id === targetId))) return unknown();
++      return { state: 'published', remoteId, targetId, publishedAt: date(raw.created_time) };
++    },
+     async discoverAdAccounts(token) {
+       const raw = await pages<JsonObject>(collectionUrl('me/adaccounts', token, 'id,name,currency,account_status'), token);
+       return raw.filter(x => typeof x.id === 'string').map(x => ({ id: x.id as string, name: typeof x.name === 'string' ? x.name : x.id as string,
+@@ -312,6 +343,9 @@ export function createFacebookEngine(rawConfig: FacebookConfig, fetchImpl: Faceb
+     },
+     async publish(input) {
+       const media = input.media ?? [];
++      if (input.targetKind === 'group' && (input.scheduledUnix !== undefined || media.length > 1 || media.some(item => item.kind !== 'image'))) {
++        throw new FacebookApiError('Group publishing supports feed or single-photo posts without native scheduling.', 400, 100);
++      }
+       if (!Array.isArray(media) || media.some(item => !item || (item.kind !== 'image' && item.kind !== 'video') || typeof item.url !== 'string' || !item.url.trim() || (item.kind === 'video' && item.localFile))) {
+         throw new FacebookApiError('Facebook received an unsupported media attachment.', 0);
+       }
+@@ -341,7 +375,7 @@ export function createFacebookEngine(rawConfig: FacebookConfig, fetchImpl: Faceb
+           body: { file_url: videos[0].url, description: input.text?.trim() || undefined, ...hold } });
+       } else if (images.length === 1) {
+         payload = await request(`${encodeURIComponent(input.targetId)}/photos`, { method: 'POST', token: input.accessToken,
+-          body: { url: images[0].localFile ? undefined : images[0].url, caption: input.text?.trim() || undefined, alt_text_custom: images[0].altText, ...hold }, file: images[0].localFile });
++          body: { url: images[0].localFile ? undefined : images[0].url, [input.targetKind === 'group' ? 'message' : 'caption']: input.text?.trim() || undefined, alt_text_custom: images[0].altText, ...hold }, file: images[0].localFile });
+         if (Object.prototype.hasOwnProperty.call(payload, 'post_id') && (typeof payload.post_id !== 'string' || !payload.post_id.trim())) {
+           throw new FacebookApiError('Facebook returned an invalid photo post id.', 200);
+         }
+diff --git a/rebuild/src/platforms/facebook/runtime.ts b/rebuild/src/platforms/facebook/runtime.ts
+index b1290504..951ed895 100644
+--- a/rebuild/src/platforms/facebook/runtime.ts
++++ b/rebuild/src/platforms/facebook/runtime.ts
+@@ -11,6 +11,8 @@ import { runtimeConfig, runtimeConfigBatch, runtimeSecret } from '@/server/confi
+ import { facebookMediaJournal } from './media-journal';
+ import { FACEBOOK_NATIVE_CONFIG, FACEBOOK_NATIVE_TRANSPORT_CONFIG, facebookNativePolicyFrom, facebookNativeTransportPolicyFrom } from './native-config';
+ import { createFacebookNativeTransport } from './formats/transport';
++import { createFacebookGroupOperations } from './groups';
++import { facebookGroupScopesSchema } from './config';
+ 
+ async function configured<T>(key: string): Promise<T> {
+   return await runtimeConfig(key) as T;
+@@ -72,6 +74,22 @@ export async function configuredFacebookAdapter() {
+   return createFacebookAdapter(config, fetch, { feedFormatLabel, postReadScopes, postPublishScopes, postDeleteScopes, firstCommentScopes, mediaJournalFactory: facebookMediaJournal, ...(native ? { native } : {}), ...(feedSchedule ? { feedSchedule } : {}) });
+ }
+ 
++/** Private dependency only. Not installed as customer publishing/discovery:
++ * neutral per-kind capabilities and a shared authorized selection/publish flow
++ * are still required. No retired Group scopes are added to normal OAuth.
++ */
++export async function configuredFacebookGroupOperations() {
++  const [config, discoveryScopes, publishScopes, readScopes] = await Promise.all([
++    configuredFacebookConfig(), runtimeConfig('meta.groupDiscoveryScopes'),
++    runtimeConfig('meta.groupPublishScopes'), runtimeConfig('meta.groupReadScopes'),
++  ]);
++  return createFacebookGroupOperations(config, {
++    discoveryScopes: facebookGroupScopesSchema.parse(discoveryScopes),
++    publishScopes: facebookGroupScopesSchema.parse(publishScopes),
++    readScopes: facebookGroupScopesSchema.parse(readScopes),
++  });
++}
++
+ /** Private switch: native formats are declared only while it is on and the native policy is valid. */
+ export async function configuredFacebookNativePublishing(): Promise<FacebookNativePublishingPolicy | null> {
+   try {
+diff --git a/rebuild/tests/facebook-groups-runtime.test.ts b/rebuild/tests/facebook-groups-runtime.test.ts
+new file mode 100644
+index 00000000..d1130898
+--- /dev/null
++++ b/rebuild/tests/facebook-groups-runtime.test.ts
+@@ -0,0 +1,66 @@
++import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
++
++const state = vi.hoisted(() => ({ values: new Map<string, unknown>() }));
++vi.mock('../src/server/config/store', () => ({
++  runtimeConfig: async (key: string) => state.values.get(key),
++  runtimeConfigBatch: async (keys: string[]) => Object.fromEntries(keys.map(key => [key, state.values.get(key)])),
++  runtimeSecret: async () => 'fixture-secret',
++}));
++
++import { configuredFacebookGroupOperations } from '../src/platforms/facebook/runtime';
++import { CONFIG_BY_KEY, safeConfigShape } from '../src/lib/config/registry';
++
++beforeEach(() => {
++  state.values = new Map([...CONFIG_BY_KEY].map(([key, setting]) => [key, setting.defaultValue]));
++  state.values.set('meta.graphBaseUrl', 'https://configured.example.test');
++  state.values.set('meta.pageSize', 3);
++  state.values.set('meta.groupDiscoveryScopes', ['custom_discovery']);
++  state.values.set('meta.groupPublishScopes', ['custom_publish']);
++  state.values.set('meta.groupReadScopes', ['custom_read']);
++});
++afterEach(() => vi.unstubAllGlobals());
++
++describe('Root-configured private Group transport', () => {
++  it('registers typed policies and uses the saved discovery grants and endpoint', async () => {
++    for (const key of ['meta.groupDiscoveryScopes', 'meta.groupPublishScopes', 'meta.groupReadScopes']) {
++      const setting = CONFIG_BY_KEY.get(key)!;
++      expect(safeConfigShape().find(item => item.key === key)?.owner).toEqual({ kind: 'platform', id: 'facebook' });
++      expect(setting.schema.safeParse(['']).success).toBe(false);
++      expect(setting.schema.safeParse([]).success).toBe(true);
++    }
++    const fetcher = vi.fn<typeof fetch>(async () => new Response(JSON.stringify({ data: [] })));
++    vi.stubGlobal('fetch', fetcher);
++    const groups = await configuredFacebookGroupOperations();
++    await expect(groups.discover({ accessToken: 'fixture', grantedScopes: ['groups_access_member_info'] }))
++      .resolves.toMatchObject({ state: 'unavailable', reason: 'missing_grant' });
++    expect(fetcher).not.toHaveBeenCalled();
++    await expect(groups.discover({ accessToken: 'fixture', grantedScopes: ['custom_discovery'] }))
++      .resolves.toEqual({ state: 'available', targets: [] });
++    const url = new URL(String(fetcher.mock.calls[0][0]));
++    expect(url.origin).toBe('https://configured.example.test');
++    expect(url.searchParams.get('limit')).toBe('3');
++    expect(url.searchParams.get('appsecret_proof')).toMatch(/^[a-f0-9]{64}$/);
++  });
++
++  it('consumes independent publishing and status policies without relaxing either', async () => {
++    const fetcher = vi.fn<typeof fetch>();
++    vi.stubGlobal('fetch', fetcher);
++    const groups = await configuredFacebookGroupOperations();
++    const request = { target: { id: '123', kind: 'group', name: 'Example' }, credential: { accessToken: 'fixture', grantedScopes: ['custom_discovery', 'publish_to_groups', 'groups_access_member_info'] } };
++    await expect(groups.publish({ ...request, text: 'Example' })).rejects.toThrow();
++    await expect(groups.getRemoteStatus({ ...request, remoteId: '123_456' })).resolves.toEqual({ state: 'unknown' });
++    expect(fetcher).not.toHaveBeenCalled();
++  });
++
++  it('permits the saved custom publishing/read policies only with exact target discovery', async () => {
++    const payloads = [
++      { data: [{ id: '123', name: 'Example' }] }, { id: '123_456' },
++      { data: [{ id: '123', name: 'Example' }] }, { id: '123_456', is_published: true },
++    ];
++    vi.stubGlobal('fetch', vi.fn<typeof fetch>(async () => new Response(JSON.stringify(payloads.shift()))));
++    const groups = await configuredFacebookGroupOperations();
++    const request = { target: { id: '123', kind: 'group', name: 'Example' }, credential: { accessToken: 'fixture', grantedScopes: ['custom_discovery', 'custom_publish', 'custom_read'] } };
++    await expect(groups.publish({ ...request, text: 'Example' })).resolves.toMatchObject({ state: 'submitted', remoteId: '123_456' });
++    await expect(groups.getRemoteStatus({ ...request, remoteId: '123_456' })).resolves.toMatchObject({ state: 'published', targetId: '123', remoteId: '123_456' });
++  });
++});
+diff --git a/rebuild/tests/facebook-groups.test.ts b/rebuild/tests/facebook-groups.test.ts
+new file mode 100644
+index 00000000..b1a64c7a
+--- /dev/null
++++ b/rebuild/tests/facebook-groups.test.ts
+@@ -0,0 +1,171 @@
++import { describe, expect, it, vi } from 'vitest';
++import { createFacebookGroupOperations } from '../src/platforms/facebook/groups';
++import { createFacebookAdapter, createFacebookEngine } from '../src/platforms/facebook/publishing';
++import type { FacebookConfig } from '../src/platforms/facebook/config';
++
++const config: FacebookConfig = {
++  graphBaseUrl: 'https://graph.example.test', oauthBaseUrl: 'https://login.example.test', graphVersion: 'v99.0',
++  requestTimeoutMs: 2000, maxPages: 2, pageSize: 7, pageInsightMetrics: [], adInsightFields: [],
++  maxImageUploadBytes: 1024, allowedImageMimeTypes: ['image/jpeg'], appSecretProofEnabled: true, appSecret: 'fixture-secret',
++};
++const policy = { discoveryScopes: ['groups_access_member_info'], publishScopes: ['publish_to_groups'], readScopes: ['groups_access_member_info'] };
++const credential = { accessToken: 'fixture-user-token', grantedScopes: ['groups_access_member_info', 'publish_to_groups'] };
++const target = { id: '123', name: 'Example community', kind: 'group' };
++const reply = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status });
++const listing = () => reply({ data: [{ id: '123', name: 'Example community' }] });
++function transport(...responses: Response[]) {
++  return vi.fn<typeof fetch>(async () => {
++    const next = responses.shift();
++    if (!next) throw new Error('Unexpected fixture request');
++    return next;
++  });
++}
++
++describe('private Facebook Group protocol compatibility', () => {
++  it('does not expose Groups as usable customer targets or publishing formats', () => {
++    const adapter = createFacebookAdapter(config, transport());
++    expect(adapter.supportsTargetKind?.('group', 'publishing')).toBe(false);
++    expect(adapter.publishingFormats?.map(format => format.id)).toEqual(['post']);
++  });
++
++  it('discovers neutral Group targets using the user token, signing and Root pagination bounds', async () => {
++    const fetcher = transport(reply({ data: [{ id: '123', name: 'Example community' }], paging: { next: 'https://graph.example.test/v99.0/me/groups?after=next&access_token=other' } }), reply({ data: [{ id: '456', name: 'Second community' }] }));
++    const result = await createFacebookGroupOperations(config, policy, fetcher).discover(credential);
++    expect(result).toEqual({ state: 'available', targets: [target, { id: '456', name: 'Second community', kind: 'group' }] });
++    const url = new URL(String(fetcher.mock.calls[0][0]));
++    expect(url.pathname).toBe('/v99.0/me/groups');
++    expect(url.searchParams.get('limit')).toBe('7');
++    expect(url.searchParams.get('admin_only')).toBe('true');
++    expect(url.searchParams.get('appsecret_proof')).toMatch(/^[a-f0-9]{64}$/);
++    const next = new URL(String(fetcher.mock.calls[1][0]));
++    expect(next.searchParams.get('access_token')).toBe('fixture-user-token');
++    expect(next.searchParams.get('appsecret_proof')).toBe(url.searchParams.get('appsecret_proof'));
++  });
++
++  it('distinguishes a successful empty collection from missing grants and provider denial', async () => {
++    const fetcher = transport(reply({ data: [] }));
++    const groups = createFacebookGroupOperations(config, policy, fetcher);
++    await expect(groups.discover(credential)).resolves.toEqual({ state: 'available', targets: [] });
++    fetcher.mockClear();
++    await expect(groups.discover({ accessToken: 'fixture', grantedScopes: ['pages_manage_posts'] })).resolves.toEqual({ state: 'unavailable', targets: [], reason: 'missing_grant' });
++    expect(fetcher).not.toHaveBeenCalled();
++    for (const code of [10, 100, 200]) {
++      await expect(createFacebookGroupOperations(config, policy, transport(reply({ error: { code, message: 'Private provider text' } }, 400))).discover(credential))
++        .resolves.toEqual({ state: 'unavailable', targets: [], reason: 'provider_denied' });
++    }
++  });
++
++  it.each([190, 4])('does not disguise authentication/rate failures (%s) as an empty collection', async code => {
++    await expect(createFacebookGroupOperations(config, policy, transport(reply({ error: { code } }, 400))).discover(credential)).rejects.toMatchObject({ code });
++  });
++
++  it.each([
++    { data: [{ id: '123', name: 'Example' }], paging: { next: 'https://evil.example/v99.0/me/groups' } },
++    { data: [{ id: '123', name: 'Example' }], paging: { next: 'https://graph.example.test/v99.0/me/groups?after=1' } },
++  ])('never treats an unsafe or truncated listing as complete authority', async body => {
++    await expect(createFacebookGroupOperations({ ...config, maxPages: 1 }, policy, transport(reply(body))).discover(credential)).rejects.toThrow();
++  });
++
++  it.each([{ text: 'A community update' }, { text: 'Read this', link: 'https://example.test/article' }])('publishes feed/link content only after positive discovery', async content => {
++    const fetcher = transport(listing(), reply({ id: '123_987' }));
++    const result = await createFacebookGroupOperations(config, policy, fetcher).publish({ credential, target, ...content });
++    expect(result).toEqual({ state: 'submitted', remoteId: '123_987', url: null });
++    expect(new URL(String(fetcher.mock.calls[1][0])).pathname).toBe('/v99.0/123/feed');
++    const form = fetcher.mock.calls[1][1]?.body as URLSearchParams;
++    expect(form.get('message')).toBe(content.text);
++    expect(form.get('link')).toBe('link' in content ? content.link : null);
++    expect(form.get('access_token')).toBe('fixture-user-token');
++    expect(form.has('appsecret_proof')).toBe(true);
++  });
++
++  it('uses Group photo message semantics and keeps the post receipt rather than the photo id', async () => {
++    const fetcher = transport(listing(), reply({ id: 'photo987', post_id: '123_987' }));
++    await expect(createFacebookGroupOperations(config, policy, fetcher).publish({ credential, target, text: 'Photo caption', media: [{ kind: 'image', url: 'https://example.test/image.jpg' }] }))
++      .resolves.toEqual({ state: 'submitted', remoteId: '123_987', url: null });
++    expect(new URL(String(fetcher.mock.calls[1][0])).pathname).toBe('/v99.0/123/photos');
++    const body = fetcher.mock.calls[1][1]?.body as URLSearchParams;
++    expect(body.get('message')).toBe('Photo caption');
++    expect(body.has('caption')).toBe(false);
++    expect(body.get('url')).toBe('https://example.test/image.jpg');
++  });
++
++  it('refuses Page grants, absent targets, denied discovery and empty policy before creating content', async () => {
++    for (const [grants, discovered, selectedPolicy] of [
++      [['pages_manage_posts'], listing(), policy],
++      [credential.grantedScopes, reply({ data: [{ id: '456', name: 'Other' }] }), policy],
++      [credential.grantedScopes, reply({ error: { code: 200 } }, 400), policy],
++      [credential.grantedScopes, listing(), { ...policy, publishScopes: [] }],
++    ] as const) {
++      const fetcher = transport(discovered);
++      await expect(createFacebookGroupOperations(config, selectedPolicy, fetcher).publish({ credential: { ...credential, grantedScopes: grants }, target, text: 'Example' })).rejects.toThrow();
++      expect(fetcher.mock.calls.every(call => !call[1]?.method || call[1]?.method === 'GET')).toBe(true);
++    }
++  });
++
++  it.each([
++    { scheduledAt: new Date('2030-01-01') }, { formatId: 'reel' },
++    { media: [{ kind: 'video' as const, url: 'https://example.test/video.mp4' }] },
++    { media: [{ kind: 'image' as const, url: 'https://example.test/a.jpg' }, { kind: 'image' as const, url: 'https://example.test/b.jpg' }] },
++  ])('rejects Page-only intent without transport', async input => {
++    const fetcher = transport();
++    await expect(createFacebookGroupOperations(config, policy, fetcher).publish({ credential, target, text: 'Example', ...input })).rejects.toThrow();
++    expect(fetcher).not.toHaveBeenCalled();
++  });
++
++  it.each([
++    [{ id: '123_987', is_published: true, created_time: '2026-10-01T12:00:00Z' }, 'published'],
++    [{ id: 'photo987', to: { data: [{ id: '123' }] }, is_published: true }, 'published'],
++    [{ id: '123_987', is_published: false }, 'unknown'],
++    [{ id: '123_987', created_time: '2026-10-01T12:00:00Z' }, 'unknown'],
++    [{ id: '456_987', is_published: true }, 'unknown'],
++    [{ id: '123_987', to: { data: [{ id: '456' }] }, is_published: true }, 'unknown'],
++  ])('maps only exact Group identity and explicit publication proof (%s)', async (body, state) => {
++    const fetcher = transport(listing(), reply(body));
++    const remoteId = body.id === 'photo987' ? 'photo987' : '123_987';
++    const result = await createFacebookGroupOperations(config, policy, fetcher).getRemoteStatus({ credential, target, remoteId });
++    expect(result.state).toBe(state);
++    if (result.state === 'published') expect(result).toMatchObject({ remoteId, targetId: '123' });
++  });
++
++  it('maps denied readback to unknown rather than published, scheduled or deleted', async () => {
++    const groups = createFacebookGroupOperations(config, policy, transport(listing(), reply({ error: { code: 200 } }, 400)));
++    await expect(groups.getRemoteStatus({ credential, target, remoteId: '123_987' })).resolves.toEqual({ state: 'unknown' });
++  });
++
++  it('guards the low-level Group publish path against native schedules too', async () => {
++    const fetcher = transport();
++    await expect(createFacebookEngine(config, fetcher).publish({ accessToken: 'fixture', targetId: '123', targetKind: 'group', text: 'Example', scheduledUnix: 1900000000 })).rejects.toThrow();
++    expect(fetcher).not.toHaveBeenCalled();
++  });
++
++  it('retains local photo validation and multipart signing for Group uploads', async () => {
++    const fetcher = transport(listing(), reply({ id: 'photo987', post_id: '123_987' }));
++    const groups = createFacebookGroupOperations(config, policy, fetcher);
++    await groups.publish({ credential, target, text: 'Example', media: [{ kind: 'image', url: 'local-reference', localFile: { bytes: new Uint8Array([255, 216, 255, 224]), mimeType: 'image/jpeg', fileName: 'example.jpg' } }] });
++    const body = fetcher.mock.calls[1][1]?.body as FormData;
++    expect(body.get('source')).toBeInstanceOf(Blob);
++    expect(body.get('message')).toBe('Example');
++    expect(body.get('access_token')).toBe('fixture-user-token');
++    expect(body.get('appsecret_proof')).toMatch(/^[a-f0-9]{64}$/);
++    const invalid = transport(listing());
++    await expect(createFacebookGroupOperations(config, policy, invalid).publish({ credential, target, text: 'Example', media: [{ kind: 'image', url: 'local-reference', localFile: { bytes: new Uint8Array([1, 2, 3]), mimeType: 'image/jpeg', fileName: 'example.jpg' } }] })).rejects.toThrow('content does not match');
++    expect(invalid.mock.calls).toHaveLength(1); // Discovery only; no upload.
++  });
++
++  it('does not create a post after cancellation during discovery', async () => {
++    const controller = new AbortController();
++    const fetcher = vi.fn<typeof fetch>(async () => { controller.abort(); return listing(); });
++    await expect(createFacebookGroupOperations(config, policy, fetcher).publish({ credential, target, text: 'Example', signal: controller.signal })).rejects.toThrow('cancelled');
++    expect(fetcher.mock.calls).toHaveLength(1);
++  });
++
++  it('does not suppress transient provider failures as retired-edge denial', async () => {
++    await expect(createFacebookGroupOperations(config, policy, transport(reply({ error: { code: 200, is_transient: true } }, 400))).discover(credential)).rejects.toMatchObject({ transient: true });
++  });
++
++  it('does not accept targets from pagination that changes to another Graph collection', async () => {
++    const fetcher = transport(reply({ data: [], paging: { next: 'https://graph.example.test/v99.0/me/accounts?after=1' } }), listing());
++    await expect(createFacebookGroupOperations(config, policy, fetcher).discover(credential)).rejects.toThrow();
++    expect(fetcher.mock.calls).toHaveLength(1);
++  });
++});

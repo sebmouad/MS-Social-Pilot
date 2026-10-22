@@ -1,0 +1,379 @@
+diff --git a/rebuild/docs/MCP_PARITY.md b/rebuild/docs/MCP_PARITY.md
+index 52a28101..88bf9592 100644
+--- a/rebuild/docs/MCP_PARITY.md
++++ b/rebuild/docs/MCP_PARITY.md
+@@ -23,7 +23,7 @@ selected-resource, person-key and installation authority remain distinct.
+ | Settings connections | Directory/health, OAuth start, single/batch selection, disconnect preview/retain/delete | OAuth start UI/REST/session MCP share service; compatibility route also delegates. REST single/batch selection and disconnect now use confirmed module services; batch UI/MCP share selection wrapper. Single MCP selection and disconnect MCP still confirm outside the lower core; browser disconnect payload is stale. See explicit caller fixes below |
+ | Settings account/security/keys | Profile/password/session reads and changes; authenticator begin/enable/disable, passkey removal; workspace/person key list/issue/revoke | Session-only tools now exist; old claim that account/key issuance has no MCP is superseded. Bearer credentials cannot manage credentials/security. General authentication/passkey ceremony remains interactive |
+ | Settings appearance | `appearanceSession`, GET/PATCH `/api/settings/appearance`, `get_appearance`, `update_appearance` | Shell ThemeProvider/mode toggle and Settings now share confirmed persistence (`2b42470b`); theme and mode are account-stored, cookies use Root lifetime, layout falls back to validated-session preferences. Cross-device/live persistence proof remains separate |
+-| Settings workspace/data/notifications | Policy/operations, team/invitations, profiles/watermark, notification preferences/items, snapshot/ZIP/jobs/erasure | Broad source coverage. Snapshot JSON is partial; never equate it with complete ZIP export. Recent-table/account supplementary coverage and deletion hooks are implemented; partial account-export service/adapters still lack public route/MCP registration/UI. Purge-gate migration needs rehearsal integration and database proof; mail/concurrency remain open |
++| Settings workspace/data/notifications | Policy/operations, team/invitations, profiles/watermark, notification preferences/items, snapshot/ZIP/jobs/erasure | Broad source coverage. Snapshot JSON is partial; never equate it with complete ZIP export. Recent-table/account supplementary coverage and deletion hooks are implemented; partial account export now has a session-only GET route, installed MCP tool and bilingual Account download control through the same service. Coverage remains partial. Purge-gate migration needs rehearsal integration and database proof; mail/concurrency remain open |
+ | Media | Image/video library, usage/holders/quota, guarded import and delete | Shared service/API/MCP; complete UI workflows and storage/runtime proof still partial |
+ | Feeds | Source CRUD/check modes plus recipe read/save/preview/run/pause/resume | Shared UI/REST/MCP. Recipe tools: `get_recipe_source`, `save_recipe_source`, `preview_recipe_source`, `run_recipe_planner`, `set_recipe_source_state`, `retry_recipe_slots`. Feature off by default on new installs; production log records live source/image work and 80 scheduled posts. Owner-recorded first-day 07:00 and 11:00 batches each published 10/10 with comments; full transport/browser/retry/pause-cancel recovery evidence remains separate |
+ | AI | Assist availability/write tools and HTTP/UI; report recap and stored sentiment use AI service internally | Present for advertised assist; internal jobs are not separate customer writes. OpenAI/Gemini limited live checks do not prove every consumer |
+@@ -61,9 +61,9 @@ Mocked route/host tests are not a live key/client verification of every tool.
+   claim is superseded. Preserve actual lifecycle/scope and live evidence limits.
+ - Reconcile Agency workspace switching and Sharing copy-only save policy with
+   the binding service contract.
+-- Register the partial account-export HTTP/MCP adapters and add bilingual download
+-  UI; adapters alone expose no new public capability. Extend this guard's mapping
+-  when those routes/tools are installed, preserving session-only authority.
++- Partial account export is registered in HTTP/MCP and exposed in the bilingual
++  Account UI with explicit coverage/exclusions. Mapping and targeted automated
++  checks cover those surfaces; real browser/MCP/database verification remains open.
+ - Finish operational/configurable copy, localization and ownership gaps recorded
+   in CONFIG_LITERAL_AUDIT.md; recheck after integration instead of repeating old
+   lane claims (OAuth compatibility and batch-selection wiring are already fixed).
+@@ -204,6 +204,7 @@ live catalog inside the test or add a blanket exclusion to make it pass.
+ | enable_account_two_step | settings/account | write | POST /api/settings/account/security/enable | Shared customer operation; transport arguments may differ. |
+ | disable_account_two_step | settings/account | write | POST /api/settings/account/security/disable | Shared customer operation; transport arguments may differ. |
+ | remove_account_passkey | settings/account | write | DELETE /api/settings/account/passkeys | Shared customer operation; transport arguments may differ. |
++| export_account_data | settings/account | read | GET /api/settings/account/export | Session-only partial profile/appearance/safe-metadata export through exportAccountData; no workspace content or secrets. |
+ | get_account | settings/account | read | GET /api/settings/account | Shared customer operation; transport arguments may differ. |
+ | update_account_profile | settings/account | write | PATCH /api/settings/account | Shared customer operation; transport arguments may differ. |
+ | change_account_password | settings/account | write | POST /api/settings/account | Shared customer operation; transport arguments may differ. |
+@@ -604,3 +605,27 @@ evidence; complete history, live clients and report download behavior stay open.
+ The current documentation lane adds no keys, source, routes or tools. Historical
+ lane test counts above describe their original runs; current validation is recorded
+ in AGENT_HANDOFF.md. Full parity remains partial.
++
++## Partial personal account export exposure — 2026-10-21
++
++`GET /api/settings/account/export` delegates to `accountHttp(request, 'export')`;
++Settings installs the existing `ACCOUNT_EXPORT_MCP` group (`export_account_data`).
++Both reach `exportAccountData` through the current session actor. Bearer/API-key
++credentials remain refused. Account settings provides an English/French download
++with explicit included/excluded coverage, pending state and safe retry guidance.
++It validates JSON format/version, partial-coverage marker and exact UTF-8 bytes
++before handing the file to the browser. Success describes preparation, not proof
++of a locally saved file. Unmount aborts the request and suppresses late downloads.
++
++No new Root registry keys: copy fields extend `settings.uiCopy.account.en/fr`,
++and both service and UI consume `data.maxArchiveBytes`. Its description now
++covers workspace archives and partial personal JSON. The integrator owns the
++configuration schema-version bump and reconciliation of stored copy overrides.
++The inventory now includes 239 customer/person tools (51 private Root tools).
++
++Evidence: `npx tsc --noEmit -p .` passes with zero errors. Targeted Vitest with
++`--no-cache` covers account-export UI (16), transport (6), service (8), parity
++guard (22), and Settings copy parity (48). These are synthetic DOM/mocked checks;
++no browser, live MCP, PostgreSQL, provider or production check was performed.
++Complete portability, supplementary purge migration rehearsal and concurrency
++proof remain open. No server, deployment or push was run in this lane.
+diff --git a/rebuild/src/app/api/settings/account/export/route.ts b/rebuild/src/app/api/settings/account/export/route.ts
+new file mode 100644
+index 00000000..5bd77091
+--- /dev/null
++++ b/rebuild/src/app/api/settings/account/export/route.ts
+@@ -0,0 +1,3 @@
++import { accountHttp } from '@/modules/settings/server/account-http';
++export const runtime = 'nodejs';
++export const GET = (request: Request) => accountHttp(request, 'export');
+diff --git a/rebuild/src/modules/settings/config.ts b/rebuild/src/modules/settings/config.ts
+index 1499d350..990647c4 100644
+--- a/rebuild/src/modules/settings/config.ts
++++ b/rebuild/src/modules/settings/config.ts
+@@ -51,7 +51,7 @@ export const SETTINGS_MODULE_CONFIG = [
+   entry({ key: 'connections.statusLabels', group: 'Connections', label: 'Connection status labels', kind: 'json', description: 'Customer-facing labels for connected, expired and revoked sources. Health and permission checks are independent of these labels.', defaultValue: { connected: 'Connected', expired: 'Reconnect needed', revoked: 'Reconnect needed' }, schema: z.object({ connected: z.string().trim().min(1).max(80), expired: z.string().trim().min(1).max(80), revoked: z.string().trim().min(1).max(80) }).strict(), consumption: 'active' }),
+   entry({ key: 'data.purgeRecoverySchedule', group: 'Data controls', label: 'Workspace erasure recovery schedule', kind: 'text', description: 'Five-field cron schedule for resuming already-confirmed workspace deletions after interruption.', defaultValue: '*/7 * * * *', schema: cron, consumption: 'active' }),
+   entry({ key: 'data.deleteTransactionTimeoutMs', group: 'Data controls', label: 'Workspace deletion timeout (ms)', kind: 'number', description: 'Maximum time allowed for one transactional workspace database deletion.', defaultValue: 120000, schema: z.number().int().min(5000).max(3600000), consumption: 'active' }),
+-  entry({ key: 'data.maxArchiveBytes', group: 'Data controls', label: 'Maximum workspace archive bytes', kind: 'number', description: 'Safety ceiling for a synchronous workspace export. Exceeding it stops the download without creating a partial archive.', defaultValue: 268435456, schema: z.number().int().min(1048576).max(2147483648), consumption: 'active' }),
++  entry({ key: 'data.maxArchiveBytes', group: 'Data controls', label: 'Maximum workspace archive bytes', kind: 'number', description: 'Safety ceiling for synchronous workspace archives and partial personal account JSON exports. Exceeding it refuses the download rather than truncating the declared coverage.', defaultValue: 268435456, schema: z.number().int().min(1048576).max(2147483648), consumption: 'active' }),
+   entry({ key: 'mcp.keys.maxActivePerWorkspace', group: 'MCP · API keys', label: 'Active API keys per workspace', kind: 'number', description: 'Maximum non-expired, non-revoked MCP bearer keys in each workspace.', defaultValue: 10, schema: z.number().int().min(1).max(1000), consumption: 'active' }),
+   entry({ key: 'mcp.keys.maxLifetimeDays', group: 'MCP · API keys', label: 'Maximum API key lifetime (days)', kind: 'number', description: 'Longest lifetime workspace admins may select when issuing an MCP key.', defaultValue: 365, schema: z.number().int().min(1).max(3650), consumption: 'active' }),
+   entry({ key: 'mcp.keys.maxResourceIds', group: 'MCP · API keys', label: 'API key resource selection limit', kind: 'number', description: 'Maximum explicitly selected channel and ad account identities on one key; also bounds issuance discovery.', defaultValue: 1000, schema: z.number().int().min(1).max(10000), consumption: 'active' }),
+diff --git a/rebuild/src/modules/settings/mcp.ts b/rebuild/src/modules/settings/mcp.ts
+index 23917c24..b4a97c5f 100644
+--- a/rebuild/src/modules/settings/mcp.ts
++++ b/rebuild/src/modules/settings/mcp.ts
+@@ -1,6 +1,7 @@
+ import { changeConnectionSelections } from './server/connection-selection';
+ import { exportWorkspaceArchive } from '@/server/data-control/archive';
+ import { ACCOUNT_MCP } from './account-mcp';
++import { ACCOUNT_EXPORT_MCP } from './server/account-export-mcp';
+ import { SESSION_PARITY_MCP } from './session-parity-mcp';
+ import { CONNECTION_START_MCP } from './connection-start-mcp';
+ import { AGENCY_SESSION_MCP } from '@/modules/agency/mcp';
+@@ -28,6 +29,7 @@ export const SETTINGS_MCP: readonly McpToolGroup[] = [
+   CONNECTION_START_MCP,
+   AGENCY_SESSION_MCP,
+   ACCOUNT_MCP,
++  ACCOUNT_EXPORT_MCP,
+   WORKSPACE_EXPORT_MCP,
+   CHANNEL_PROFILES_MCP,
+   WATERMARK_MCP,
+diff --git a/rebuild/src/modules/settings/ui/account/AccountScreen.tsx b/rebuild/src/modules/settings/ui/account/AccountScreen.tsx
+index 86122b66..3454bc5d 100644
+--- a/rebuild/src/modules/settings/ui/account/AccountScreen.tsx
++++ b/rebuild/src/modules/settings/ui/account/AccountScreen.tsx
+@@ -1,5 +1,6 @@
+ import { configOrDefault } from '@/server/config/config-or-default';
+ import { AccountSettings } from './settings';
++import { AccountExport } from './export';
+ import { readSettingsUiCopy } from '@/modules/settings/ui/copy-server';
+ import { canAccessFeature } from '@/server/permissions';
+ import { runtimeConfig } from '@/server/config/store';
+@@ -44,6 +45,7 @@ export default async function AccountPage() {
+ 
+   return <PageFrame module="settings" scopedAccess><SettingsPage copy={uiCopy} active="settings/account" title={t.title} description={t.description} locale={locale}>
+     <AccountSettings canWrite={canAccessFeature(viewer.permissions, 'settings/account', 'write')} nameMaxLength={nameMaxLength} confirmationCopy={confirmationCopy} locale={locale} initialName={account.name} email={account.email} passwordPolicy={passwordPolicy} />
++    <AccountExport locale={locale} maxBytes={await runtimeConfig('data.maxArchiveBytes')} />
+     <PersonKeysManager locale={locale} initial={personKeys} />
+     <SettingsPanel title={t.contextTitle}>
+       <dl className={styles['settings-account-grid']}>{values.map(item => <div className={styles['settings-account-item']} key={item.label}><dt>{item.label}</dt><dd>{item.value}</dd></div>)}</dl>
+diff --git a/rebuild/src/modules/settings/ui/account/copy.ts b/rebuild/src/modules/settings/ui/account/copy.ts
+index ea814e87..30404ae8 100644
+--- a/rebuild/src/modules/settings/ui/account/copy.ts
++++ b/rebuild/src/modules/settings/ui/account/copy.ts
+@@ -1,5 +1,15 @@
+ export const accountCopy = {
+   en: {
++    exportTitle: 'Download account data',
++    exportCoverage: 'This is a partial export of your profile, saved appearance, and safe metadata about your personal access keys and connected app permissions.',
++    exportExclusions: 'It excludes workspace content, media files, passwords, secret keys, sign-in history, notification preferences, and audit history. It is not a full copy of your data.',
++    exportDownload: 'Download partial account export', exportPending: 'Preparing account export…',
++    exportReady: 'Partial account export prepared. Check your browser downloads.',
++    exportFailed: 'Could not prepare your account export. Try again.',
++    exportSignIn: 'Sign in again, then retry your account export.',
++    exportForbidden: 'Account export requires access to Account settings in a signed-in browser session.',
++    exportUnavailable: 'Account export is unavailable or exceeds the download limit. Try again later or contact support.',
++    exportFileName: 'partial-account-export.json',
+     title: 'Account', description: 'Your profile and the workspace context used for this session.',
+     contextTitle: 'Workspace context', workspace: 'Workspace', role: 'Your role', timezone: 'Workspace time zone', slug: 'Workspace slug',
+     profile: 'Profile', profileDetail: 'Update the name shown to your team.', name: 'Name', email: 'Email',
+@@ -15,6 +25,16 @@ export const accountCopy = {
+     revokeFailed: 'Could not revoke session.', sessionRevoked: 'Session signed out.',
+   },
+   fr: {
++    exportTitle: 'Télécharger les données du compte',
++    exportCoverage: 'Cet export partiel contient votre profil, l’apparence enregistrée et les informations non secrètes sur vos clés d’accès personnelles et les autorisations des applications connectées.',
++    exportExclusions: 'Il exclut le contenu des espaces, les fichiers multimédias, les mots de passe, les clés secrètes, l’historique des connexions, les préférences de notification et l’historique d’audit. Ce n’est pas une copie intégrale de vos données.',
++    exportDownload: 'Télécharger l’export partiel du compte', exportPending: 'Préparation de l’export du compte…',
++    exportReady: 'Export partiel du compte préparé. Consultez les téléchargements de votre navigateur.',
++    exportFailed: 'Impossible de préparer l’export du compte. Réessayez.',
++    exportSignIn: 'Reconnectez-vous, puis réessayez l’export du compte.',
++    exportForbidden: 'L’export du compte nécessite l’accès aux paramètres du compte dans une session de navigateur connectée.',
++    exportUnavailable: 'L’export du compte est indisponible ou dépasse la limite de téléchargement. Réessayez plus tard ou contactez l’assistance.',
++    exportFileName: 'export-partiel-du-compte.json',
+     title: 'Compte', description: 'Votre profil et le contexte d’espace utilisé pour cette session.',
+     contextTitle: 'Contexte de l’espace', workspace: 'Espace', role: 'Votre rôle', timezone: 'Fuseau horaire de l’espace', slug: 'Identifiant de l’espace',
+     profile: 'Profil', profileDetail: 'Modifiez le nom affiché à votre équipe.', name: 'Nom', email: 'E-mail',
+diff --git a/rebuild/src/modules/settings/ui/account/export.tsx b/rebuild/src/modules/settings/ui/account/export.tsx
+new file mode 100644
+index 00000000..98abe98e
+--- /dev/null
++++ b/rebuild/src/modules/settings/ui/account/export.tsx
+@@ -0,0 +1,69 @@
++'use client';
++
++import { useEffect, useRef, useState } from 'react';
++import { Button } from '@/components/Button';
++import { useSettingsCopy } from '../copy-context';
++import styles from '../settings.module.css';
++
++/** Personal JSON download; workspace ZIP controls have a different coverage contract. */
++export function AccountExport({ locale = 'en', maxBytes }: { locale?: 'en' | 'fr'; maxBytes: number }) {
++  const t = useSettingsCopy('account', locale);
++  const [busy, setBusy] = useState(false);
++  const [feedback, setFeedback] = useState<{ error: boolean; text: string } | null>(null);
++  const active = useRef<AbortController | null>(null);
++  const feedbackRef = useRef<HTMLParagraphElement>(null);
++  useEffect(() => () => { active.current?.abort(); active.current = null; }, []);
++  useEffect(() => { if (feedback?.error) feedbackRef.current?.focus(); }, [feedback]);
++
++  async function download() {
++    if (active.current) return;
++    const controller = new AbortController();
++    active.current = controller;
++    const current = () => active.current === controller && !controller.signal.aborted;
++    setBusy(true); setFeedback(null);
++    try {
++      const response = await fetch('/api/settings/account/export', { cache: 'no-store', signal: controller.signal });
++      if (!current()) return;
++      if (!response.ok) {
++        const failure = await response.json().catch(() => null) as { code?: string } | null;
++        if (!current()) return;
++        const text = response.status === 401 ? t.exportSignIn : response.status === 403 ? t.exportForbidden : failure?.code === 'unavailable' ? t.exportUnavailable : t.exportFailed;
++        setFeedback({ error: true, text });
++        return;
++      }
++      const declared = response.headers.get('content-length');
++      const bytes = Number(declared);
++      if (response.redirected || response.headers.get('content-type')?.split(';')[0].trim() !== 'application/json' ||
++        response.headers.get('content-disposition') !== 'attachment' || !declared || !/^\d+$/.test(declared) ||
++        !Number.isSafeInteger(bytes) || bytes <= 0 || bytes > maxBytes) throw new Error('Unconfirmed export');
++      const content = await response.text();
++      if (!current()) return;
++      const snapshot = JSON.parse(content);
++      // Serialization identifiers belong to the service protocol, not operational policy.
++      if (snapshot?.format !== 'ms-social-pilot-account-export' || snapshot.version !== 1 || snapshot.coverage?.complete !== false ||
++        !Array.isArray(snapshot.coverage.included) || !Array.isArray(snapshot.coverage.excluded)) throw new Error('Unconfirmed coverage');
++      const blob = new Blob([content], { type: 'application/json' });
++      if (blob.size !== bytes || blob.size > maxBytes) throw new Error('Unconfirmed bytes');
++      const url = URL.createObjectURL(blob);
++      const anchor = document.createElement('a');
++      try {
++        anchor.href = url; anchor.download = t.exportFileName; anchor.hidden = true;
++        document.body.append(anchor); anchor.click();
++      } finally {
++        anchor.remove(); URL.revokeObjectURL(url);
++      }
++      setFeedback({ error: false, text: t.exportReady });
++    } catch {
++      if (current()) setFeedback({ error: true, text: t.exportFailed });
++    } finally {
++      if (current()) { active.current = null; setBusy(false); }
++    }
++  }
++
++  return <section className={styles['settings-panel']} aria-labelledby="account-export-title">
++    <div className={styles['settings-panel__heading']}><div><h2 id="account-export-title">{t.exportTitle}</h2><p id="account-export-coverage">{t.exportCoverage}</p></div></div>
++    <p id="account-export-exclusions" className={styles['settings-note']}>{t.exportExclusions}</p>
++    <Button onClick={download} disabled={busy} aria-busy={busy} aria-describedby="account-export-coverage account-export-exclusions">{busy ? t.exportPending : t.exportDownload}</Button>
++    {feedback && <p ref={feedbackRef} tabIndex={-1} role={feedback.error ? 'alert' : 'status'} className={feedback.error ? 'ui-error' : styles['settings-note']}>{feedback.text}</p>}
++  </section>;
++}
+diff --git a/rebuild/tests/account-export-transports.test.ts b/rebuild/tests/account-export-transports.test.ts
+index 5592787f..998e8251 100644
+--- a/rebuild/tests/account-export-transports.test.ts
++++ b/rebuild/tests/account-export-transports.test.ts
+@@ -7,6 +7,7 @@ vi.mock('@/server/context', () => ({ requireViewer: m.viewer }));
+ vi.mock('@/server/request-origin', () => ({ requestOrigin: () => 'https://example.test' }));
+ vi.mock('@/modules/settings/server/account', () => ({}));
+ vi.mock('@/modules/settings/server/account-security', () => ({}));
++import { GET } from '@/app/api/settings/account/export/route';
+ import { accountHttp } from '@/modules/settings/server/account-http';
+ import { ACCOUNT_EXPORT_MCP } from '@/modules/settings/server/account-export-mcp';
+ const actor = { userId: 'self', workspaceId: 'w1', sessionTokenHash: 'session-hash' };
+@@ -18,9 +19,9 @@ beforeEach(() => {
+   const content = '{"name":"Émilie"}';
+   m.export.mockResolvedValue({ mimeType: 'application/json', content, bytes: Buffer.byteLength(content) });
+ });
+-describe('account export transport adapters (host registration pending)', () => {
++describe('registered account export transport adapters', () => {
+   it('returns an uncached JSON attachment through the same service', async () => {
+-    const response = await accountHttp(new Request('https://example.test/api/settings/account/export'), 'export');
++    const response = await GET(new Request('https://example.test/api/settings/account/export'));
+     expect(response.status).toBe(200);
+     expect(response.headers.get('cache-control')).toBe('private, no-store');
+     expect(response.headers.get('content-disposition')).toBe('attachment');
+diff --git a/rebuild/tests/account-export-ui.test.ts b/rebuild/tests/account-export-ui.test.ts
+new file mode 100644
+index 00000000..6c21af6c
+--- /dev/null
++++ b/rebuild/tests/account-export-ui.test.ts
+@@ -0,0 +1,98 @@
++// @vitest-environment jsdom
++import { act, createElement } from 'react';
++import { createRoot } from 'react-dom/client';
++import { afterEach, beforeEach, expect, it, vi } from 'vitest';
++import { AccountExport } from '@/modules/settings/ui/account/export';
++import { SettingsCopyProvider } from '@/modules/settings/ui/copy-context';
++import { settingsUiCopy, settingsUiCopySchema } from '@/modules/settings/ui/copy-catalog';
++
++let root: ReturnType<typeof createRoot>, container: HTMLDivElement;
++const snapshot = { format: 'ms-social-pilot-account-export', version: 1, profile: { name: 'Émilie' }, coverage: { complete: false, included: ['profile'], excluded: ['workspaceContent', 'media'] } };
++const content = JSON.stringify(snapshot);
++const bytes = new TextEncoder().encode(content).length;
++const clickDownload = () => act(async () => container.querySelector<HTMLButtonElement>('button')!.click());
++function response(value = content, headers: Record<string, string> = {}) {
++  return { ok: true, status: 200, redirected: false, headers: new Headers({ 'content-type': 'application/json', 'content-length': String(new TextEncoder().encode(value).length), 'content-disposition': 'attachment', ...headers }), text: async () => value } as Response;
++}
++async function render(locale: 'en' | 'fr' = 'en', maxBytes = bytes) {
++  await act(async () => root.render(createElement(AccountExport, { locale, maxBytes })));
++}
++beforeEach(() => {
++  (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
++  container = document.createElement('div'); document.body.append(container); root = createRoot(container);
++  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response()));
++  vi.stubGlobal('Blob', class { size: number; constructor(parts: string[]) { this.size = new TextEncoder().encode(parts.join('')).length; } });
++  Object.defineProperty(URL, 'createObjectURL', { value: vi.fn(() => 'blob:test'), configurable: true });
++  Object.defineProperty(URL, 'revokeObjectURL', { value: vi.fn(), configurable: true });
++  vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
++});
++afterEach(async () => { await act(async () => root.unmount()); container.remove(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
++
++it.each(['en', 'fr'] as const)('discloses partial coverage and prepares a verified UTF-8 download in %s', async locale => {
++  await render(locale);
++  const t = settingsUiCopy.account[locale];
++  expect(container.textContent).toContain(t.exportCoverage);
++  expect(container.textContent).toContain(t.exportExclusions);
++  expect(container.querySelector('button')!.getAttribute('aria-describedby')).toContain('account-export-exclusions');
++  let fileName = '';
++  vi.mocked(HTMLAnchorElement.prototype.click).mockImplementation(function (this: HTMLAnchorElement) { fileName = this.download; });
++  await clickDownload();
++  expect(fetch).toHaveBeenCalledWith('/api/settings/account/export', expect.objectContaining({ cache: 'no-store', signal: expect.any(AbortSignal) }));
++  expect(fileName).toBe(t.exportFileName);
++  expect(URL.createObjectURL).toHaveBeenCalledOnce(); expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:test');
++  expect(container.querySelector('[role=status]')?.textContent).toBe(t.exportReady);
++});
++it('consumes configured bilingual labels from the existing Root catalog', async () => {
++  const copy = settingsUiCopySchema.parse(settingsUiCopy);
++  copy.account.fr.exportDownload = 'Copie personnelle partielle';
++  await act(async () => root.render(createElement(SettingsCopyProvider, { copy, children: createElement(AccountExport, { locale: 'fr', maxBytes: bytes }) })));
++  expect(container.querySelector('button')!.textContent).toBe('Copie personnelle partielle');
++});
++it('deduplicates pending downloads and aborts late results on unmount', async () => {
++  let resolve!: (r: Response) => void;
++  vi.mocked(fetch).mockImplementation(() => new Promise(r => { resolve = r; }));
++  await render(); await clickDownload(); await clickDownload();
++  expect(fetch).toHaveBeenCalledOnce();
++  expect(container.querySelector('button')!.disabled).toBe(true);
++  expect(container.textContent).toContain(settingsUiCopy.account.en.exportPending);
++  const signal = vi.mocked(fetch).mock.calls[0][1]!.signal!;
++  await act(async () => root.render(null));
++  expect(signal.aborted).toBe(true);
++  await act(async () => resolve(response()));
++  expect(URL.createObjectURL).not.toHaveBeenCalled();
++});
++it.each([
++  ['HTML sign-in redirect', () => ({ ...response('<html>sign in</html>'), redirected: true })],
++  ['invalid JSON', () => response('{')],
++  ['full-coverage claim', () => response(JSON.stringify({ ...snapshot, coverage: { ...snapshot.coverage, complete: true } }))],
++  ['wrong byte count', () => response(content, { 'content-length': String(bytes + 1) })],
++  ['wrong MIME', () => response(content, { 'content-type': 'text/html' })],
++  ['missing attachment', () => response(content, { 'content-disposition': 'inline' })],
++] as const)('refuses an unconfirmed receipt: %s', async (_name, receipt) => {
++  vi.mocked(fetch).mockResolvedValue(receipt() as Response);
++  await render('en', bytes * 2); await clickDownload();
++  expect(URL.createObjectURL).not.toHaveBeenCalled();
++  expect(container.querySelector('[role=alert]')?.textContent).toBe(settingsUiCopy.account.en.exportFailed);
++  expect(document.activeElement).toBe(container.querySelector('[role=alert]'));
++  expect(container.querySelector('button')!.disabled).toBe(false);
++});
++it('uses the server-provided archive byte ceiling', async () => {
++  await render('en', bytes - 1); await clickDownload();
++  expect(URL.createObjectURL).not.toHaveBeenCalled(); expect(container.querySelector('[role=alert]')).not.toBeNull();
++});
++it.each([
++  [401, 'unauthorized', 'exportSignIn'], [403, 'forbidden', 'exportForbidden'], [409, 'unavailable', 'exportUnavailable'], [502, 'upstream_failure', 'exportFailed'],
++] as const)('shows safe French recovery for %s and allows retry', async (status, code, key) => {
++  vi.mocked(fetch).mockResolvedValueOnce({ ok: false, status, json: async () => ({ code, error: 'PRIVATE DATABASE FAILURE' }) } as Response);
++  await render('fr'); await clickDownload();
++  expect(container.querySelector('[role=alert]')?.textContent).toBe(settingsUiCopy.account.fr[key]);
++  expect(container.textContent).not.toContain('PRIVATE');
++  await clickDownload(); expect(container.querySelector('[role=status]')).not.toBeNull();
++});
++it('handles network failures without downloading and permits retry', async () => {
++  vi.mocked(fetch).mockRejectedValueOnce(new Error('private network details'));
++  await render(); await clickDownload();
++  expect(container.querySelector('[role=alert]')?.textContent).toBe(settingsUiCopy.account.en.exportFailed);
++  expect(URL.createObjectURL).not.toHaveBeenCalled();
++  await clickDownload(); expect(container.querySelector('[role=status]')).not.toBeNull();
++});
+diff --git a/rebuild/tests/parity-guard.test.ts b/rebuild/tests/parity-guard.test.ts
+index 660738f0..c35c2c4b 100644
+--- a/rebuild/tests/parity-guard.test.ts
++++ b/rebuild/tests/parity-guard.test.ts
+@@ -150,6 +150,11 @@ describe('reviewed customer UI/REST/MCP declaration parity', () => {
+   it('requires an exact bidirectional mapping or reasoned route exception', () => {
+     expect(parityErrors([...tools, ...privateTools], routes, [...mappings, ...rootMappings], aliases, exceptions)).toEqual([]);
+   });
++  it('maps the installed session-only partial account export to its exact GET route', () => {
++    expect(tools.find(tool => tool.name === 'export_account_data')).toEqual({ name: 'export_account_data', feature: 'settings/account', access: 'read' });
++    expect(mappings.find(mapping => mapping.name === 'export_account_data')?.routes).toEqual(['GET /api/settings/account/export']);
++    expect(exceptions.some(exception => exception.id === 'GET /api/settings/account/export')).toBe(false);
++  });
+   it('maps private Root tools explicitly without treating installation authority as a customer feature', () => {
+     expect(rootMappings.every(mapping => mapping.feature === 'installation/root')).toBe(true);
+     expect(mappings.some(mapping => mapping.feature === 'installation/root')).toBe(false);

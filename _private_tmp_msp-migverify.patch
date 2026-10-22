@@ -1,0 +1,512 @@
+diff --git a/rebuild/docs/CUTOVER.md b/rebuild/docs/CUTOVER.md
+index 96ea6e91..2e1f9d30 100644
+--- a/rebuild/docs/CUTOVER.md
++++ b/rebuild/docs/CUTOVER.md
+@@ -471,8 +471,8 @@ It opens one repeatable-read, PostgreSQL-enforced **READ ONLY** transaction and
+ never starts services, applies migrations, imports settings, or contacts providers.
+ Use an account restricted to SELECT as an additional operational boundary.
+ 
+-First capture source counts and the names of persisted Root registry settings
+-from the local pre-migration copy (the command does not export their values):
++First capture source counts, authorization fingerprints and config-import
++requirements from the local pre-migration copy (no raw values are exported):
+ 
+ ```sh
+ # DATABASE_URL must already name the isolated source copy, never production.
+@@ -504,27 +504,38 @@ Checks cover compatibility-view required tables/columns/nulls/enums and declared
+ relations even when FK constraints are absent, catalog FK orphans, workspace
+ boundaries, post destinations, member Page access, workspace owner memberships,
+ MCP feature/resource shapes and scoped resource ownership/current creator
+-membership. Stored pre-scope NULL MCP scopes retain their supported legacy
+-meaning. Root registry settings present in the source must remain present and
++membership. Order-independent authorization fingerprints also detect changed roles,
++member Page assignments, workspace/member switches, provider scopes and MCP scopes
++when row counts stay unchanged. Fingerprints are integrity comparisons, not a
++cryptographic attestation. A source missing the required authorization projection
++cannot prove preservation for a nonempty target table; verification fails closed.
++Stored pre-scope NULL MCP scopes retain their supported legacy meaning.
++Root registry settings present in the source must remain present and
+ valid; legacy import candidates must have destination settings (nonsecret values
+-must match). Supply the same `APP_URL`, `SECURITY_TWO_STEP`, `LOGIN_ATTEMPTS` and
+-`LOGIN_WINDOW_MINUTES` used by the importer to include environment-backed import
+-requirements. Defaults need not all be persisted. Secret settings are checked
++must match). The baseline retains destination-key requirements and SHA-256
++fingerprints of nonsecret values even if legacy source keys are later removed.
++Secret values have presence requirements only, never fingerprints. Supply the
++same `APP_URL`, `SECURITY_TWO_STEP`, `LOGIN_ATTEMPTS` and `LOGIN_WINDOW_MINUTES`
++used by the importer to include environment-backed import requirements in both
++snapshot and verification runs. Defaults need not all be persisted. Secret settings are checked
+ for encrypted envelopes only; decryption/equality and live provider grants remain
+ separate gates.
+ 
+ Post media JSON must contain image/video entries with nonempty URLs. Local media
+-storage keys and `media:` post references must resolve to regular files within
++storage keys (including legacy post-attachment `storageKey` fields) and
++`media:` post references must resolve to regular files within
+ the restored root, without traversal or symlink components. Library references
+ must belong to the post's workspace; file-only images use
+ `<workspace>/images/<uuid>`. External URLs are not fetched. Filesystem contents
+ must remain stable during verification. This proves reference/file presence,
+ not bytes/checksums, unreferenced-file cleanup, arbitrary provider JSON semantics,
+ application authorization workflows, or real provider permission validity. The
+-report contains no row IDs, contents, credentials or secret values. Existing
++report contains no row IDs, contents, credentials or secret values. Keep baseline
++manifests private too: they contain setting names and integrity fingerprints.
++Schema failures stop dependent checks and cannot produce a pass. Existing
+ migration, backup/media recovery, functional and cutover gates still apply.
+ 
+ Tests: `npx vitest run tests/verify-legacy-migration*.test.ts tests/raw-sql-void-guard.test.ts`.
+ The real PostgreSQL test requires `REBUILD_PREVIEW_DATABASE_URL`, applies the
+-same URL guard, reads existing isolated fixtures and verifies count drift without
+-mutating records. Without that variable it explicitly skips.
++same URL guard, reads existing isolated fixtures and verifies count/authorization
++drift without mutating records. Without that variable it explicitly skips.
+diff --git a/rebuild/scripts/verify-legacy-migration.ts b/rebuild/scripts/verify-legacy-migration.ts
+index 24c95cf0..242bda4d 100644
+--- a/rebuild/scripts/verify-legacy-migration.ts
++++ b/rebuild/scripts/verify-legacy-migration.ts
+@@ -1,4 +1,5 @@
+ /** Read-only migration evidence. No application singleton, writes, or provider calls. */
++import { createHash } from 'node:crypto';
+ import { readFile, realpath, lstat } from 'node:fs/promises';
+ import path from 'node:path';
+ import { pathToFileURL } from 'node:url';
+@@ -10,11 +11,54 @@ import { PAGES } from '../src/lib/product';
+ 
+ // Raw rows remain internal and are never serialized.
+ type Row = Record<string, any>;
+-export type Baseline = { version: 1; counts: Record<string, string>; rootKeys: string[] };
++export type Baseline = { version: 1; counts: Record<string, string>; rootKeys: string[]; configImports: Record<string, string | null>; authorization: Record<string, string> };
+ export type Check = { table: string; rule: string; failures: string };
+ const quote = (name: string) => '"' + name.replaceAll('"', '""') + '"';
+ const tableSql = (name: string) => `public.${quote(name)}`;
+ 
++// These raw-SQL authorization fields are absent from the compatibility client.
++const authorizationColumns = {
++  memberships: ['id', 'userId', 'workspaceId', 'role', 'allPages', 'disabledModules'],
++  workspaces: ['id', 'disabledModules', 'clientAccess'],
++  member_page_access: ['membershipId', 'targetId'],
++  social_accounts: ['id', 'workspaceId', 'scopes'],
++  mcp_api_keys: ['id', 'workspaceId', 'createdById', 'readFeatures', 'writeFeatures', 'resourceScope'],
++} as const;
++
++function valueDigest(value: unknown): string {
++  const canonical = (v: any): any => Array.isArray(v) ? v.map(canonical)
++    : v && typeof v === 'object' ? Object.fromEntries(Object.keys(v).sort().map(k => [k, canonical(v[k])])) : v;
++  return createHash('sha256').update(JSON.stringify(canonical(value))).digest('hex');
++}
++
++/** Include source import obligations even if migration removes the old keys. No secret hashes. */
++export function configImportRequirements(rows: Row[]): Record<string, string | null> {
++  const requirements: Record<string, string | null> = {};
++  for (const row of rows) {
++    const definition = CONFIG_BY_KEY.get(row.key);
++    if (definition) requirements[row.key] = definition.kind === 'secret' ? null : valueDigest(row.value);
++  }
++  for (const candidate of legacyConfigCandidates(rows as Array<{ key: string; value: unknown; encrypted: boolean }>, {
++    appUrl: process.env.APP_URL, authPolicy: process.env.SECURITY_TWO_STEP,
++    loginAttempts: process.env.LOGIN_ATTEMPTS, loginWindowMinutes: process.env.LOGIN_WINDOW_MINUTES,
++    decrypt: value => value,
++  })) requirements[candidate.key] = candidate.secret ? null : valueDigest(candidate.value);
++  return requirements;
++}
++
++function reportFor(counts: Record<string, string>, baseline: Baseline, checks: Check[]) {
++  const totals = new Map<string, Check>();
++  for (const check of checks) {
++    const k = `${check.table}\0${check.rule}`;
++    const existing = totals.get(k);
++    if (existing) existing.failures = (BigInt(existing.failures) + BigInt(check.failures)).toString();
++    else totals.set(k, { ...check });
++  }
++  const results = [...totals.values()];
++  return { version: 1 as const, ok: results.every(c => c.failures === '0'), counts, sourceCounts: baseline.counts, checks: results,
++    scope: 'Local data integrity only; no live permissions, providers, application workflows or production cutover proof. / Intégrité locale uniquement ; aucune preuve des droits distants ni de mise en production.' };
++}
++
+ /** Reject libpq/Prisma routing overrides as well as remote hosts. Never echo URLs. */
+ export function guardedUrl(value: string): string {
+   let url: URL;
+@@ -31,7 +75,9 @@ export function guardedUrl(value: string): string {
+ export function compareCounts(actual: Record<string, string>, baseline: Baseline): Check[] {
+   if (baseline.version !== 1 || !baseline.counts || !Array.isArray(baseline.rootKeys) ||
+       Object.values(baseline.counts).some(n => typeof n !== 'string' || !/^\d+$/.test(n)) ||
+-      baseline.rootKeys.some(k => typeof k !== 'string')) throw new Error('Invalid baseline manifest.');
++      baseline.rootKeys.some(k => typeof k !== 'string' || !CONFIG_BY_KEY.has(k)) ||
++      !baseline.configImports || Object.entries(baseline.configImports).some(([k, v]) => !CONFIG_BY_KEY.has(k) || (v !== null && !/^[a-f0-9]{64}$/.test(v))) ||
++      !baseline.authorization || Object.values(baseline.authorization).some(v => !/^[a-f0-9]{32}$/.test(v))) throw new Error('Invalid baseline manifest.');
+   return [...new Set([...Object.keys(actual), ...Object.keys(baseline.counts)])].sort().map(table => ({
+     table, rule: 'source_row_count',
+     failures: actual[table] === baseline.counts[table] || (baseline.counts[table] === undefined && actual[table] === '0') ? '0' : '1',
+@@ -55,19 +101,21 @@ export async function filePresent(root: string, key: string): Promise<boolean> {
+ export function invalidMedia(value: unknown): boolean {
+   return !Array.isArray(value) || value.some(item => !item || typeof item !== 'object' ||
+     !['image', 'video'].includes(item.kind) || typeof item.url !== 'string' || !item.url.trim() ||
+-    (item.altText !== undefined && typeof item.altText !== 'string'));
++    (item.altText !== undefined && typeof item.altText !== 'string') ||
++    (item.storageKey !== undefined && item.storageKey !== null && typeof item.storageKey !== 'string'));
+ }
+ 
+-export function configChecks(rows: Row[], requiredKeys: string[]): Check[] {
++export function configChecks(rows: Row[], requiredKeys: string[], imports: Record<string, string | null> = {}): Check[] {
+   const byKey = new Map(rows.map(row => [row.key, row]));
+   const result: Check[] = [];
+   const check = (rule: string, failed: boolean) => result.push({ table: 'app_settings', rule, failures: failed ? '1' : '0' });
+   for (const key of requiredKeys) check(`imported:${key}`, !byKey.has(key));
++  for (const [key, digest] of Object.entries(imports)) check(`source_import:${key}`, !byKey.has(key) || (digest !== null && valueDigest(byKey.get(key)!.value) !== digest));
+   for (const row of rows) {
+     const definition = CONFIG_BY_KEY.get(row.key);
+     if (!definition) continue; // Legacy-only keys are retained, not Root settings.
+     check(`valid:${row.key}`, definition.kind === 'secret'
+-      ? row.encrypted !== true || typeof row.value !== 'string' || !/^v1:[^:]+:[^:]+:[^:]+$/.test(row.value)
++      ? row.encrypted !== true || typeof row.value !== 'string' || !/^v1:[A-Za-z0-9_-]{16}:[A-Za-z0-9_-]{22}:[A-Za-z0-9_-]*$/.test(row.value)
+       : row.encrypted !== false || !definition.schema.safeParse(row.value).success);
+   }
+   // Reuse the importer's mapping, including environment-backed import requirements.
+@@ -100,11 +148,41 @@ export async function inspectDatabase(url: string, options: { baseline?: Baselin
+       for (const table of [...columns.keys()].sort()) counts[table] = (await query<{ n: string }>(`SELECT count(*)::text AS n FROM ${tableSql(table)}`))[0].n;
+       const settings = columns.has('app_settings') ? await query(`SELECT key, value, encrypted FROM public.app_settings`) : [];
+       const rootKeys = settings.filter(row => CONFIG_BY_KEY.has(row.key)).map(row => row.key).sort();
+-      if (options.snapshot) return { version: 1 as const, counts, rootKeys };
++      const authorization: Record<string, string> = {};
++      for (const [table, fields] of Object.entries(authorizationColumns)) {
++        if (!fields.every(field => columns.get(table)?.has(field))) continue;
++        // Hash only authorization projections, never tokens/content. Order independent of restore order.
++        const projection = fields.map(quote).join(', ');
++        authorization[table] = (await query<{ digest: string }>(`SELECT md5(COALESCE(string_agg(md5(to_jsonb(s)::text), '' ORDER BY to_jsonb(s)::text), '')) AS digest FROM (SELECT ${projection} FROM ${tableSql(table)}) s`))[0].digest;
++      }
++      if (options.snapshot) return { version: 1 as const, counts, rootKeys, configImports: configImportRequirements(settings), authorization };
+       if (!options.baseline || !options.mediaRoot) throw new Error('Verification requires a source baseline and restored media root.');
+       const checks = compareCounts(counts, options.baseline);
+-      const add = (table: string, rule: string, n: string | number) => checks.push({ table, rule, failures: String(n) });
++      const indexedChecks = new Map(checks.map(check => [`${check.table}\0${check.rule}`, check]));
++      const add = (table: string, rule: string, n: string | number) => {
++        const key = `${table}\0${rule}`;
++        const existing = indexedChecks.get(key);
++        if (existing) existing.failures = (BigInt(existing.failures) + BigInt(n)).toString();
++        else { const check = { table, rule, failures: String(n) }; checks.push(check); indexedChecks.set(key, check); }
++      };
+       const count = async (table: string, rule: string, sql: string) => add(table, rule, (await query<{ n: string }>(`SELECT count(*)::text AS n FROM ${sql}`))[0].n);
++      // Fail with structured schema findings before issuing queries against missing columns.
++      const requiredColumns = new Map<string, Set<string>>();
++      for (const model of Prisma.dmmf.datamodel.models) requiredColumns.set(model.dbName ?? model.name,
++        new Set(model.fields.filter(f => f.kind !== 'object').map(f => f.dbName ?? f.name)));
++      for (const [table, fields] of Object.entries({ ...authorizationColumns, media: ['id', 'workspaceId', 'storageKey', 'storageProvider', 'kind'] })) {
++        if (!requiredColumns.has(table)) requiredColumns.set(table, new Set());
++        for (const field of fields) requiredColumns.get(table)!.add(field);
++      }
++      for (const [table, fields] of requiredColumns) {
++        if (!columns.has(table)) add(table, 'required_table', 1);
++        else for (const field of fields) if (!columns.get(table)!.has(field)) add(table, `required_column:${field}`, 1);
++      }
++      if (checks.some(c => c.rule.startsWith('required_') && c.failures !== '0')) return reportFor(counts, options.baseline, checks);
++      for (const table of Object.keys(authorizationColumns)) {
++        add(table, 'source_authorization', authorization[table] !== undefined && (authorization[table] === options.baseline.authorization[table] ||
++          (options.baseline.authorization[table] === undefined && counts[table] === '0' && (options.baseline.counts[table] === undefined || options.baseline.counts[table] === '0'))) ? 0 : 1);
++      }
+       // The generated compatibility view defines required columns/enums/relations.
+       // Raw SQL avoids Prisma decoding failures hiding invalid enum values.
+       for (const model of Prisma.dmmf.datamodel.models) {
+@@ -175,12 +253,21 @@ export async function inspectDatabase(url: string, options: { baseline?: Baselin
+           add('mcp_api_keys', 'creator_membership', members.length ? 0 : 1);
+         }
+       }
+-      checks.push(...configChecks(settings, options.baseline.rootKeys));
++      checks.push(...configChecks(settings, options.baseline.rootKeys, options.baseline.configImports));
+       if (columns.has('workspaces') && columns.has('memberships')) await count('workspaces', 'owner_membership', `public.workspaces w WHERE NOT EXISTS (SELECT 1 FROM public.memberships m WHERE m."workspaceId"=w.id AND m.role::text='owner')`);
++      for (const [table, field] of [['memberships', 'disabledModules'], ['workspaces', 'disabledModules'], ['workspaces', 'clientAccess']]) {
++        await count(table, `permission_array:${field}`, `${tableSql(table)} WHERE ${quote(field)} IS NULL OR array_position(${quote(field)}, NULL) IS NOT NULL`);
++      }
++      await count('memberships', 'page_scope_shape', 'public.memberships WHERE "allPages" IS NULL');
++      await count('social_accounts', 'scope_shape', `public.social_accounts WHERE scopes IS NULL`);
++      await count('media', 'storage_provider', `public.media WHERE "storageProvider" IS NULL OR "storageProvider"::text NOT IN ('local', 's3')`);
++      await count('media', 'workspace_reference', 'public.media m WHERE NOT EXISTS (SELECT 1 FROM public.workspaces w WHERE w.id=m."workspaceId")');
++      await count('media', 'kind', `public.media WHERE kind IS NULL OR kind::text NOT IN ('image', 'video')`);
+       const root = await realpath(options.mediaRoot);
+       if (!(await lstat(root)).isDirectory()) throw new Error('Media root must be a restored directory.');
+       if (!columns.has('media')) add('media', 'required_table', 1);
+       const mediaRows = columns.has('media') ? await query('SELECT id, "workspaceId", "storageKey", "storageProvider"::text FROM public.media') : [];
++      const mediaById = new Map(mediaRows.map(media => [media.id, media]));
+       for (const media of mediaRows) if (media.storageProvider === 'local') {
+         add('media', 'storage_workspace', typeof media.storageKey === 'string' && media.storageKey.startsWith(`${media.workspaceId}/`) ? 0 : 1);
+         add('media', 'file_present', typeof media.storageKey === 'string' && await filePresent(root, media.storageKey) ? 0 : 1);
+@@ -191,9 +278,14 @@ export async function inspectDatabase(url: string, options: { baseline?: Baselin
+           const posts = await query(`SELECT "workspaceId", media FROM public.posts ORDER BY id LIMIT 500 OFFSET ${offset}`);
+           for (const post of posts) {
+             if (invalidMedia(post.media)) { add('posts', 'media_shape', 1); continue; }
+-            for (const item of post.media) if (item.url.startsWith('media:')) {
++            for (const item of post.media) {
++              // Legacy attachments can retain a storage key alongside an HTTP URL.
++              if (item.storageKey !== undefined && item.storageKey !== null) {
++                add('posts', 'storage_reference_present', item.storageKey.startsWith(`${post.workspaceId}/`) && await filePresent(root, item.storageKey) ? 0 : 1);
++              }
++              if (!item.url.startsWith('media:')) continue;
+               const id = item.url.slice(6);
+-              const media = mediaRows.find(m => m.id === id);
++              const media = mediaById.get(id);
+               const present = media ? media.workspaceId === post.workspaceId && (media.storageProvider !== 'local' || (media.storageKey && await filePresent(root, media.storageKey))) : /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id) && await filePresent(root, `${post.workspaceId}/images/${id}`);
+               add('posts', 'media_reference_present', present ? 0 : 1);
+             }
+@@ -201,17 +293,7 @@ export async function inspectDatabase(url: string, options: { baseline?: Baselin
+           if (posts.length < 500) break;
+         }
+       }
+-      // Fold per-row results into aggregate evidence; never include private IDs or values.
+-      const totals = new Map<string, Check>();
+-      for (const check of checks) {
+-        const k = `${check.table}\0${check.rule}`;
+-        const existing = totals.get(k);
+-        if (existing) existing.failures = (BigInt(existing.failures) + BigInt(check.failures)).toString();
+-        else totals.set(k, { ...check });
+-      }
+-      const results = [...totals.values()];
+-      return { version: 1 as const, ok: results.every(c => c.failures === '0'), counts, sourceCounts: options.baseline.counts, checks: results,
+-        scope: 'Local data integrity only; no live permissions, providers, application workflows or production cutover proof.' };
++      return reportFor(counts, options.baseline, checks);
+     }, { isolationLevel: 'RepeatableRead', timeout: 600_000, maxWait: 10_000 });
+   } finally { await db.$disconnect(); }
+ }
+diff --git a/rebuild/tests/verify-legacy-migration-fixtures.test.ts b/rebuild/tests/verify-legacy-migration-fixtures.test.ts
+index cf86d556..a8b22f1d 100644
+--- a/rebuild/tests/verify-legacy-migration-fixtures.test.ts
++++ b/rebuild/tests/verify-legacy-migration-fixtures.test.ts
+@@ -1,27 +1,40 @@
+-import { mkdtemp, rm } from 'node:fs/promises';
++import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises';
+ import { tmpdir } from 'node:os';
+ import path from 'node:path';
+-import { expect, it, vi } from 'vitest';
++import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+ 
+-const fixture = vi.hoisted(() => ({ sql: [] as string[], catalog: [] as object[], counts: {} as Record<string, string>, disconnects: 0 }));
++const fixture = vi.hoisted(() => ({
++  sql: [] as string[], catalog: [] as Array<{ table_name: string; column_name: string }>,
++  counts: {} as Record<string, string>, disconnects: 0, invalid: false,
++  posts: [] as object[], media: [] as object[], keys: [] as object[], settings: [] as object[],
++  failRead: false,
++}));
+ vi.mock('../generated/client', async original => {
+   const actual = await original<typeof import('../generated/client')>();
+   return { ...actual, PrismaClient: class {
+     async $disconnect() { fixture.disconnects++; }
+-    async $transaction(run: (tx: object) => Promise<unknown>) {
++    async $transaction(run: (tx: object) => Promise<unknown>, options: object) {
++      expect(options).toMatchObject({ isolationLevel: 'RepeatableRead' });
+       return run({
+         $executeRawUnsafe: async (sql: string) => { fixture.sql.push(sql); },
+         $queryRawUnsafe: async (sql: string) => {
+           fixture.sql.push(sql);
++          if (fixture.failRead) throw new Error('private database diagnostic');
+           if (sql.includes('information_schema.columns')) return fixture.catalog;
++          if (sql.includes('SELECT md5(COALESCE')) return [{ digest: 'a'.repeat(32) }];
+           if (sql.includes('FROM pg_constraint')) return [];
+           if (/^SELECT count\(\*\)::text AS n FROM public\."[^\"]+"$/.test(sql)) return [{ n: fixture.counts[/public\."([^\"]+)"/.exec(sql)![1]] }];
+-          if (sql.startsWith('SELECT count(*)')) return [{ n: sql.includes('NOT IN') && sql.includes('public."posts"') || sql.includes('NOT EXISTS') && sql.includes('c."socialAccountId"') ? '1' : '0' }];
+-          if (sql.includes('FROM public.posts ORDER')) return [{ workspaceId: 'synthetic-ws', media: { malformed: true } }];
+-          if (sql.includes('FROM public.mcp_api_keys')) return [{ workspaceId: 'synthetic-ws', createdById: 'synthetic-user', resourceScope: { version: 99 }, readFeatures: ['unknown'], writeFeatures: [] }];
+-          if (sql.includes('FROM public.app_settings')) return [];
+-          if (sql.includes('FROM public.media')) return [];
++          if (sql.startsWith('SELECT count(*)')) return [{ n: fixture.invalid && (
++            sql.includes('NOT IN') && sql.includes('public."posts"') ||
++            sql.includes('NOT EXISTS') && sql.includes('c."socialAccountId"') ||
++            sql.includes('j."membershipId"') && sql.includes('IS DISTINCT FROM')
++          ) ? '1' : '0' }];
++          if (sql.includes('FROM public.posts ORDER')) return fixture.posts;
++          if (sql.includes('FROM public.mcp_api_keys')) return fixture.keys;
++          if (sql.includes('FROM public.app_settings')) return fixture.settings;
++          if (sql.includes('FROM public.media')) return fixture.media;
+           if (sql.includes('FROM public.memberships')) return [{ id: 'synthetic-member' }];
++          if (sql.includes('SELECT id FROM public."targets"')) return []; // Missing/cross-workspace scoped ID.
+           throw new Error('Unrecognized fixture query');
+         },
+       });
+@@ -32,33 +45,88 @@ vi.mock('../generated/client', async original => {
+ import { Prisma } from '../generated/client';
+ import { inspectDatabase, type Baseline } from '../scripts/verify-legacy-migration';
+ 
+-it('reports enum, orphan, JSON and credential-scope failures from aggregate SQL fixtures, with read-only first', async () => {
+-  fixture.sql = []; fixture.counts = {}; fixture.catalog = [];
++let root: string;
++let baseline: Baseline;
++const url = 'postgresql://localhost/synthetic_rehearsal';
++beforeEach(async () => {
++  Object.assign(fixture, { sql: [], counts: {}, catalog: [], disconnects: 0, invalid: false, failRead: false, posts: [], media: [], keys: [], settings: [] });
+   for (const model of Prisma.dmmf.datamodel.models) {
+     const table = model.dbName ?? model.name;
+     fixture.counts[table] = '0';
+     for (const field of model.fields.filter(f => f.kind !== 'object')) fixture.catalog.push({ table_name: table, column_name: field.dbName ?? field.name });
+   }
+-  for (const [table, cols] of Object.entries({ media: ['id', 'workspaceId', 'storageKey', 'storageProvider'], member_page_access: ['membershipId', 'targetId'] })) {
++  for (const [table, cols] of Object.entries({ media: ['id', 'workspaceId', 'storageKey', 'storageProvider', 'kind'], member_page_access: ['membershipId', 'targetId'], memberships: ['allPages', 'disabledModules'], workspaces: ['disabledModules', 'clientAccess'] })) {
+     fixture.counts[table] = '0';
+     for (const column of cols) fixture.catalog.push({ table_name: table, column_name: column });
+   }
+-  const root = await mkdtemp(path.join(tmpdir(), 'migration-sql-fixture-'));
+-  try {
+-    const baseline: Baseline = { version: 1, counts: fixture.counts, rootKeys: [] };
+-    const report = await inspectDatabase('postgresql://localhost/synthetic_rehearsal', { baseline, mediaRoot: root });
+-    expect('ok' in report && report.ok).toBe(false);
+-    expect('checks' in report && report.checks).toEqual(expect.arrayContaining([
+-      { table: 'posts', rule: 'enum:status', failures: '1' },
+-      { table: 'targets', rule: 'relation:socialAccount', failures: '1' },
+-      { table: 'posts', rule: 'media_shape', failures: '1' },
+-      { table: 'mcp_api_keys', rule: 'resource_scope_shape', failures: '1' },
+-      { table: 'mcp_api_keys', rule: 'feature_scope', failures: '1' },
+-    ]));
+-    expect(fixture.sql[0]).toBe('SET TRANSACTION READ ONLY');
+-    expect(fixture.sql.every(sql => !/^(INSERT|UPDATE|DELETE|CREATE|DROP)/.test(sql))).toBe(true);
+-    expect(fixture.sql.some(sql => sql.includes('j."membershipId"') && sql.includes('IS DISTINCT FROM'))).toBe(true);
+-    expect(JSON.stringify(report)).not.toContain('synthetic-user');
+-    expect(fixture.disconnects).toBe(1);
+-  } finally { await rm(root, { recursive: true, force: true }); }
++  root = await mkdtemp(path.join(tmpdir(), 'migration-sql-fixture-'));
++  baseline = { version: 1, counts: { ...fixture.counts }, rootKeys: [], configImports: {},
++    authorization: Object.fromEntries(['memberships', 'workspaces', 'member_page_access', 'social_accounts', 'mcp_api_keys'].map(t => [t, 'a'.repeat(32)])) };
++});
++afterEach(async () => { await rm(root, { recursive: true, force: true }); });
++
++it('passes unchanged valid fixtures using a read-only repeatable snapshot and aggregate-only results', async () => {
++  const report = await inspectDatabase(url, { baseline, mediaRoot: root });
++  expect('ok' in report && report.ok).toBe(true);
++  expect(fixture.sql[0]).toBe('SET TRANSACTION READ ONLY');
++  expect(fixture.sql.every(sql => !/^(INSERT|UPDATE|DELETE|CREATE|DROP)/.test(sql))).toBe(true);
++  expect(fixture.disconnects).toBe(1);
++});
++
++it('reports enum, orphan, tenant, JSON and credential-scope failures even without catalog FKs', async () => {
++  fixture.invalid = true;
++  baseline.authorization.memberships = 'b'.repeat(32);
++  fixture.posts = [{ workspaceId: 'synthetic-ws', media: { malformed: true } }];
++  fixture.keys = [{ workspaceId: 'synthetic-ws', createdById: 'synthetic-user', resourceScope: { version: 99 }, readFeatures: ['unknown'], writeFeatures: [] }];
++  const report = await inspectDatabase(url, { baseline, mediaRoot: root });
++  expect('ok' in report && report.ok).toBe(false);
++  expect('checks' in report && report.checks).toEqual(expect.arrayContaining([
++    { table: 'memberships', rule: 'source_authorization', failures: '1' },
++    { table: 'posts', rule: 'enum:status', failures: '1' },
++    { table: 'targets', rule: 'relation:socialAccount', failures: '1' },
++    { table: 'member_page_access', rule: 'workspace_boundary', failures: '1' },
++    { table: 'posts', rule: 'media_shape', failures: '1' },
++    { table: 'mcp_api_keys', rule: 'resource_scope_shape', failures: '1' },
++    { table: 'mcp_api_keys', rule: 'feature_scope', failures: '1' },
++  ]));
++  expect(JSON.stringify(report)).not.toContain('synthetic-user');
++});
++
++it('reports missing raw authorization columns as schema failure before downstream queries', async () => {
++  fixture.catalog = fixture.catalog.filter(c => c.column_name !== 'allPages');
++  const report = await inspectDatabase(url, { baseline, mediaRoot: root });
++  expect('ok' in report && report.ok).toBe(false);
++  expect('checks' in report && report.checks).toContainEqual({ table: 'memberships', rule: 'required_column:allPages', failures: '1' });
++  expect(fixture.sql.some(sql => sql.includes('FROM public.mcp_api_keys'))).toBe(false);
++});
++
++it('checks local library and file-only post references, workspace ownership, and selected MCP IDs', async () => {
++  const id = '00000000-0000-4000-8000-000000000001';
++  await mkdir(path.join(root, 'synthetic-ws', 'images'), { recursive: true });
++  await writeFile(path.join(root, 'synthetic-ws', 'images', id), 'synthetic');
++  fixture.media = [{ id: 'library', workspaceId: 'other-ws', storageKey: 'other-ws/missing', storageProvider: 'local' }];
++  fixture.posts = [{ workspaceId: 'synthetic-ws', media: [
++    { kind: 'image', url: `media:${id}` }, // Present file-only image.
++    { kind: 'image', url: 'media:library' }, // Different workspace and missing file.
++    { kind: 'image', url: 'media:missing' },
++    { kind: 'image', url: 'https://example.test/legacy-media', storageKey: 'synthetic-ws/missing-file' },
++  ] }];
++  fixture.keys = [{ workspaceId: 'synthetic-ws', createdById: 'synthetic-user', resourceScope: { version: 1, mode: 'selected', ids: ['private-id'] }, readFeatures: [], writeFeatures: [] }];
++  const report = await inspectDatabase(url, { baseline, mediaRoot: root });
++  expect('checks' in report && report.checks).toEqual(expect.arrayContaining([
++    { table: 'media', rule: 'file_present', failures: '1' },
++    { table: 'posts', rule: 'media_reference_present', failures: '2' },
++    { table: 'posts', rule: 'storage_reference_present', failures: '1' },
++    { table: 'mcp_api_keys', rule: 'resource_workspace', failures: '1' },
++  ]));
++  expect(JSON.stringify(report)).not.toContain('private-id');
++});
++
++it('disconnects on database read failure and refuses unsafe URLs before any SQL', async () => {
++  fixture.failRead = true;
++  await expect(inspectDatabase(url, { snapshot: true })).rejects.toThrow();
++  expect(fixture.disconnects).toBe(1);
++  fixture.sql = [];
++  await expect(inspectDatabase('postgresql://remote.example/production', { snapshot: true })).rejects.toThrow();
++  expect(fixture.sql).toEqual([]);
+ });
+diff --git a/rebuild/tests/verify-legacy-migration-postgres.integration.test.ts b/rebuild/tests/verify-legacy-migration-postgres.integration.test.ts
+index 7d2edfbc..c4d85965 100644
+--- a/rebuild/tests/verify-legacy-migration-postgres.integration.test.ts
++++ b/rebuild/tests/verify-legacy-migration-postgres.integration.test.ts
+@@ -7,7 +7,7 @@ import { guardedUrl, inspectDatabase, type Baseline } from '../scripts/verify-le
+ 
+ const url = process.env.REBUILD_PREVIEW_DATABASE_URL;
+ describe.skipIf(!url)('migration verification on guarded real PostgreSQL', () => {
+-  it('reads exact catalog counts, reports count drift and leaves source counts unchanged', async () => {
++  it('reads exact catalog counts, reports count/authorization drift and leaves source counts unchanged', async () => {
+     const safe = guardedUrl(url!); // Guard before opening any client.
+     const root = await mkdtemp(path.join(tmpdir(), 'migration-pg-'));
+     const db = new PrismaClient({ datasources: { db: { url: safe } }, log: [] });
+@@ -15,10 +15,11 @@ describe.skipIf(!url)('migration verification on guarded real PostgreSQL', () =>
+       const before = await inspectDatabase(safe, { snapshot: true }) as Baseline;
+       const count = (await db.$queryRaw<Array<{ n: string }>>`SELECT count(*)::text AS n FROM public.posts`)[0].n;
+       expect(before.counts.posts).toBe(count);
+-      const changed = { ...before, counts: { ...before.counts, posts: (BigInt(count) + BigInt(1)).toString() } };
++      const changed = { ...before, authorization: { ...before.authorization, memberships: '0'.repeat(32) }, counts: { ...before.counts, posts: (BigInt(count) + BigInt(1)).toString() } };
+       const report = await inspectDatabase(safe, { baseline: changed, mediaRoot: root });
+       expect('ok' in report && report.ok).toBe(false);
+       expect('checks' in report && report.checks).toContainEqual({ table: 'posts', rule: 'source_row_count', failures: '1' });
++      expect('checks' in report && report.checks).toContainEqual({ table: 'memberships', rule: 'source_authorization', failures: '1' });
+       expect(await inspectDatabase(safe, { snapshot: true })).toEqual(before);
+     } finally { await db.$disconnect(); await rm(root, { recursive: true, force: true }); }
+   });
+diff --git a/rebuild/tests/verify-legacy-migration.test.ts b/rebuild/tests/verify-legacy-migration.test.ts
+index 3cce7e02..fe2b4e06 100644
+--- a/rebuild/tests/verify-legacy-migration.test.ts
++++ b/rebuild/tests/verify-legacy-migration.test.ts
+@@ -1,10 +1,11 @@
++import { spawnSync } from 'node:child_process';
+ import { mkdtemp, mkdir, writeFile, symlink, rm } from 'node:fs/promises';
+ import { tmpdir } from 'node:os';
+ import path from 'node:path';
+ import { afterEach, describe, expect, it } from 'vitest';
+-import { compareCounts, configChecks, filePresent, guardedUrl, invalidMedia } from '../scripts/verify-legacy-migration';
++import { compareCounts, configChecks, configImportRequirements, filePresent, guardedUrl, invalidMedia } from '../scripts/verify-legacy-migration';
+ 
+-const baseline = { version: 1 as const, counts: { posts: '2', targets: '1' }, rootKeys: [] };
++const baseline = { version: 1 as const, counts: { posts: '2', targets: '1' }, rootKeys: [], configImports: {}, authorization: {} };
+ const dirs: string[] = [];
+ afterEach(async () => { for (const dir of dirs.splice(0)) await rm(dir, { recursive: true, force: true }); });
+ 
+@@ -26,6 +27,15 @@ describe('legacy migration verifier', () => {
+     expect(() => compareCounts({}, { ...baseline, counts: { posts: '-1' } })).toThrow();
+     expect(() => compareCounts({}, { ...baseline, counts: { posts: 0 as unknown as string } })).toThrow();
+   });
++  it('CLI refuses a remote URL with parseable redacted JSON and a failing exit', () => {
++    const result = spawnSync(process.execPath, ['--import', 'tsx', 'scripts/verify-legacy-migration.ts', '--snapshot'], {
++      cwd: process.cwd(), encoding: 'utf8', timeout: 10_000,
++      env: { ...process.env, TSX_TSCONFIG_PATH: 'tsconfig.json', DATABASE_URL: 'postgresql://user:private-password@remote.example/production' },
++    });
++    expect(result.status).toBe(1);
++    expect(JSON.parse(result.stdout)).toMatchObject({ version: 1, ok: false });
++    expect(result.stdout + result.stderr).not.toContain('private-password');
++  });
+   it('rejects malformed post JSON without requiring optional metadata', () => {
+     for (const value of [null, {}, [null], [{ url: 'x' }], [{ kind: 'unknown', url: 'x' }], [{ kind: 'image', url: '' }]]) expect(invalidMedia(value)).toBe(true);
+     expect(invalidMedia([])).toBe(false);
+@@ -44,6 +54,19 @@ describe('legacy migration verifier', () => {
+   it('requires mapped legacy configuration to be imported', () => {
+     expect(configChecks([{ key: 'facebook.appId', value: '123', encrypted: false }], []).some(c => c.rule === 'legacy_import:meta.appId' && c.failures === '1')).toBe(true);
+   });
++  it('retains source config import obligations after legacy keys are removed', () => {
++    const required = configImportRequirements([{ key: 'facebook.appId', value: '123', encrypted: false }]);
++    expect(required['meta.appId']).toMatch(/^[a-f0-9]{64}$/);
++    expect(configChecks([], [], required)).toContainEqual({ table: 'app_settings', rule: 'source_import:meta.appId', failures: '1' });
++    expect(configChecks([{ key: 'meta.appId', value: '123', encrypted: false }], [], required).every(c => c.failures === '0')).toBe(true);
++    expect(configChecks([{ key: 'meta.appId', value: '456', encrypted: false }], [], required)).toContainEqual({ table: 'app_settings', rule: 'source_import:meta.appId', failures: '1' });
++  });
++  it('checks structural encrypted envelopes without secret fingerprints', () => {
++    const row = { key: 'meta.appSecret', value: `v1:${'a'.repeat(16)}:${'b'.repeat(22)}:body`, encrypted: true };
++    expect(configChecks([row], [row.key]).every(c => c.failures === '0')).toBe(true);
++    expect(configImportRequirements([row])[row.key]).toBeNull();
++    expect(configChecks([{ ...row, value: 'v1:a:b:c' }], []).some(c => c.failures === '1')).toBe(true);
++  });
+   it('checks disk references and refuses traversal, directories and symlinks', async () => {
+     const root = await mkdtemp(path.join(tmpdir(), 'migration-fixture-')); dirs.push(root);
+     await mkdir(path.join(root, 'workspace', 'images'), { recursive: true });

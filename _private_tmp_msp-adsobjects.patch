@@ -1,0 +1,703 @@
+diff --git a/rebuild/prisma/migrations/20261101120000_ads_object_inventory/migration.sql b/rebuild/prisma/migrations/20261101120000_ads_object_inventory/migration.sql
+new file mode 100644
+index 00000000..5d528528
+--- /dev/null
++++ b/rebuild/prisma/migrations/20261101120000_ads_object_inventory/migration.sql
+@@ -0,0 +1,11 @@
++-- Object identity is independent of delivery. Account deletion erases its inventory.
++CREATE TABLE ads_objects (
++  "adAccountId" TEXT NOT NULL REFERENCES ad_accounts(id) ON DELETE CASCADE,
++  level TEXT NOT NULL CHECK (level IN ('campaign', 'adset', 'ad')),
++  "objectId" TEXT NOT NULL,
++  name TEXT,
++  "parentId" TEXT,
++  status TEXT,
++  "fetchedAt" TIMESTAMP(3) NOT NULL,
++  PRIMARY KEY ("adAccountId", level, "objectId")
++);
+diff --git a/rebuild/src/modules/ads/copy.ts b/rebuild/src/modules/ads/copy.ts
+index 0b5aa263..d45eb10f 100644
+--- a/rebuild/src/modules/ads/copy.ts
++++ b/rebuild/src/modules/ads/copy.ts
+@@ -937,8 +937,8 @@ export const adsCustomerCopy = {
+     "fr": "jours"
+   },
+   "text171": {
+-    "en": "No delivery",
+-    "fr": "Aucune diffusion"
++    "en": "No delivery yet",
++    "fr": "Aucune diffusion pour le moment"
+   },
+   "text172": {
+     "en": "Daily spend for {value0}",
+diff --git a/rebuild/src/modules/ads/directory/server.ts b/rebuild/src/modules/ads/directory/server.ts
+index 6a4bd54d..e6058aca 100644
+--- a/rebuild/src/modules/ads/directory/server.ts
++++ b/rebuild/src/modules/ads/directory/server.ts
+@@ -1,3 +1,5 @@
++import { listStoredAdObjects, findStoredAdObject } from '../server/object-store';
++import { AdsReportLimitError } from '../read-policy';
+ import { loadAdsManagementPolicy } from '../management/server';
+ import { withAdsCopySnapshot } from '@/modules/ads/server/copy';
+ import { defaultAdsText } from '@/modules/ads/copy';
+@@ -92,6 +94,20 @@ export async function readAdsDirectory(actor: AdsReadActor, input: unknown = {},
+       lastDeliveryDate: delivered ? adsIsoDay(delivered.date) : null, lastFetchedAt: fetched.newestFetchAt,
+     };
+   }));
++  const inventory = await listStoredAdObjects(accounts.filter(account => !filters.accountId || account.id === filters.accountId).map(account => account.id), [level], readPolicy.maxRows + 1);
++  if (inventory.length > readPolicy.maxRows) throw new AdsReportLimitError();
++  const known = new Map(items.map(item => [`${item.accountId}:${item.objectId}`, item]));
++  for (const object of inventory) {
++    const account = accounts.find(account => account.id === object.adAccountId);
++    if (!account) continue;
++    const key = `${object.adAccountId}:${object.objectId}`;
++    const existing = known.get(key);
++    if (existing) { existing.name = object.name ?? existing.name; existing.parentId = object.parentId; continue; }
++    const item: Item = { objectId: object.objectId, name: object.name ?? object.objectId, accountId: account.id, accountName: account.name, currency: account.currency, level, parentId: object.parentId,
++      spend: 0, impressions: 0, clicks: 0, ctr: null, cpc: null, cpm: null, lastDeliveryDate: null, lastFetchedAt: object.fetchedAt.toISOString() };
++    items.push(item); known.set(key, item);
++  }
++  if (items.length > readPolicy.maxRows) throw new AdsReportLimitError();
+   if (parentId !== undefined) items = items.filter(item => item.parentId === parentId);
+   if (q) items = items.filter(item => item.name.toLowerCase().includes(q) || item.objectId.toLowerCase().includes(q));
+   const total = items.length;
+@@ -124,7 +140,8 @@ export async function readAdsObjectDetail(actor: AdsReadActor, input: unknown, n
+   const filters = parseAdsPerformanceFilters({ ...(period === undefined ? {} : { period }), ...(start === undefined ? {} : { start }), ...(end === undefined ? {} : { end }), accountId }, accounts.map(account => account.id), now, reportPolicy);
+   const dataset = await getAdsDataset(actor.workspaceId, filters, access.allowedTargetIds, access.allowedProviders, { levels: [level as AdsInsightLevel], objectId, allowedAdAccountIds: access.allowedAdAccountIds });
+   const rows = dataset.insights as unknown as Row[];
+-  if (!rows.length) throw new OperationError('not_found', await adsServiceText('service094'));
++  const storedObject = accounts.some(account => account.id === accountId) ? await findStoredAdObject(accountId, level as DirectoryLevel, objectId) : null;
++  if (!rows.length && !storedObject) throw new OperationError('not_found', await adsServiceText('service094'));
+   const totals = totalsFromRows(rows.map(flow));
+   let live: { available: true; configuredStatus: string | null; effectiveStatus: string | null } | { available: false } = { available: false };
+   try {
+@@ -137,7 +154,7 @@ export async function readAdsObjectDetail(actor: AdsReadActor, input: unknown, n
+   try { management = await adsDirectoryManagementPort()?.describe(actor, accountId) ?? null; }
+   catch { /* keep scoped stored reporting available if management is unavailable */ }
+   return {
+-    accountId, level, objectId, name: rows[0]!.objectName || objectId, currency: rows[0]!.adAccount.currency, totals,
++    accountId, level, objectId, name: storedObject?.name || rows[0]?.objectName || objectId, currency: rows[0]?.adAccount.currency ?? accounts.find(account => account.id === accountId)?.currency ?? null, totals,
+     range: { from: adsIsoDay(filters.since), to: adsIsoDay(filters.until), endExclusive: true as const },
+     daily: [...rows].sort((a, b) => a.date.getTime() - b.date.getTime()).map(flow), live,
+     management: management
+diff --git a/rebuild/src/modules/ads/management/server.ts b/rebuild/src/modules/ads/management/server.ts
+index 9f1ccf69..841a96d1 100644
+--- a/rebuild/src/modules/ads/management/server.ts
++++ b/rebuild/src/modules/ads/management/server.ts
+@@ -1,3 +1,4 @@
++import { recordAdObjectChange, findStoredAdObject } from '../server/object-store';
+ import { withAdsCopySnapshot } from '@/modules/ads/server/copy';
+ import { defaultAdsText } from '@/modules/ads/copy';
+ import { adsServiceText } from '@/modules/ads/server/copy';
+@@ -184,20 +185,19 @@ function assertCreationScope(operation: AdsNeutralOperation, pageScope: AdsPageS
+   if ((operation.type === 'adset.create' || operation.type === 'ad.create') && (!pageScope.all || allowedTargetIds !== undefined)) throw new OperationError('forbidden', defaultAdsText('validation027'));
+ }
+ 
+-async function assertOwnedObject(accountDbId: string, operation: AdsNeutralOperation) {
++async function assertOwnedObject(ctx: Awaited<ReturnType<typeof managedContext>>, operation: AdsNeutralOperation) {
+   if (operation.type === 'campaign.create' || operation.type === 'creative.create') return;
+-  if (operation.type === 'adset.create') {
+-    const parent = await prisma.adInsight.findFirst({ where: { adAccountId: accountDbId, level: 'campaign', objectId: operation.parentId }, select: { id: true } });
+-    if (!parent) throw new OperationError('not_found', await adsServiceText('service042'));
+-    return;
+-  }
+-  if (operation.type === 'ad.create') {
+-    const parent = await prisma.adInsight.findFirst({ where: { adAccountId: accountDbId, level: 'adset', objectId: operation.parentId }, select: { id: true } });
+-    if (!parent) throw new OperationError('not_found', await adsServiceText('adCreateParentMissing'));
+-    return;
+-  }
+-  const owned = await prisma.adInsight.findFirst({ where: { adAccountId: accountDbId, level: objectLevel[operation.objectType], objectId: operation.objectId }, select: { id: true } });
+-  if (!owned) throw new OperationError('not_found', await adsServiceText('service007'));
++  const objectType = operation.type === 'adset.create' ? 'campaign' : operation.type === 'ad.create' ? 'adset' : operation.objectType;
++  const objectId = 'parentId' in operation ? operation.parentId : 'objectId' in operation ? operation.objectId : '';
++  const owned = await prisma.adInsight.findFirst({ where: { adAccountId: ctx.account.id, level: objectLevel[objectType], objectId }, select: { id: true } });
++  if (owned) return;
++  if (await findStoredAdObject(ctx.account.id, objectType, objectId)) return;
++  // The provider host verifies both remote identity and account ownership before returning.
++  const host = await platformAds(ctx.provider, platformAdsLocale());
++  if (!host || typeof host.read !== 'function') throw new OperationError('not_found', await adsServiceText('service007'));
++  const snapshot = await host.read({ credential: ctx.credential, accountId: ctx.account.actId, objectId, objectType });
++  if (!snapshot || typeof snapshot !== 'object' || !('id' in snapshot) || snapshot.id !== objectId) throw new OperationError('not_found', await adsServiceText('service007'));
++
+ }
+ 
+ /** Resolve only a selected, currently scoped channel from the account's own connection. */
+@@ -279,7 +279,7 @@ export async function previewAdsManagement(actor: AdsManageActor, input: { adAcc
+   const support = supports(ctx.ops, operation);
+   assertCreationScope(operation, ctx.pageScope, actor.allowedTargetIds);
+   await validateWithPolicy(ctx.ops, operation);
+-  await assertOwnedObject(ctx.account.id, operation);
++  await assertOwnedObject(ctx, operation);
+   await creativeContext(actor, ctx, operation);
+   // Best effort: tells the caller an earlier unresolved change will refuse this one. Null when the ledger cannot be read.
+   const held = await prisma.$queryRaw<{ id: string }[]>`SELECT id FROM ads_management_operations WHERE "workspaceId" = ${actor.workspaceId} AND "adAccountId" = ${ctx.account.id} AND "objectType" = ${operation.objectType} AND "objectId" = ${ledgerObjectId(operation)} AND status IN ('pending','uncertain') LIMIT 1`
+@@ -361,7 +361,7 @@ export async function performAdsManagement(actor: AdsManageActor, input: { adAcc
+       const replay = await replayRequest(actor, input.requestId, requestPayloadHash(ctx.account.id, operation));
+       if (replay) return replay;
+     }
+-    await assertOwnedObject(ctx.account.id, operation);
++    await assertOwnedObject(ctx, operation);
+     await creativeContext(actor, ctx, operation);
+   } catch (error) { throw beforeJournal(error); }
+ 
+@@ -413,7 +413,7 @@ export async function performAdsManagement(actor: AdsManageActor, input: { adAcc
+         assertCreationScope(operation, current.pageScope, actor.allowedTargetIds);
+         await validateWithPolicy(current.ops, operation);
+         creative = await creativeContext(actor, current, operation);
+-        if (operation.type === 'adset.create' || operation.type === 'ad.create') await assertOwnedObject(current.account.id, operation);
++        await assertOwnedObject(current, operation);
+         if (current.ops.confirmation(operation, { adAccountId: current.account.id, currency: current.account.currency }) !== expected) throw new OperationError('conflict', await adsServiceText('service056'));
+         signal.throwIfAborted();
+       } catch (error) {
+@@ -456,6 +456,7 @@ export async function performAdsManagement(actor: AdsManageActor, input: { adAcc
+       const created = isCreationOperation(operation) ? { created: { objectType: operation.objectType, remoteId: resultRemoteId! } } : {};
+       const changed = Number(await _tx.$executeRaw`UPDATE ads_management_operations SET status = 'succeeded', "remoteId" = ${resultRemoteId}, "updatedAt" = NOW(), "completedAt" = NOW() WHERE id = ${id} AND "workspaceId" = ${actor.workspaceId} AND status = 'pending'`);
+       if (changed !== 1) return { outcome: 'succeeded' as const, operationId: id, remoteId: resultRemoteId, recorded: false, warning: await adsServiceText('service060'), ...created };
++      await recordAdObjectChange(_tx, ctx.account.id, operation, resultRemoteId);
+       await audit(actor, 'ads.change_applied', { operationId: id, adAccountId: ctx.account.id, operation: operation.type, objectType: operation.objectType, objectId: ledgerObjectId(operation), spendChanging: support.spendChanging, ...(isCreationOperation(operation) ? { remoteId: resultRemoteId, createdPaused: operation.type !== 'creative.create', ...(operation.type === 'creative.create' ? { delivery: 'unattached' } : {}) } : {}) }, _tx);
+       return { outcome: 'succeeded' as const, operationId: id, remoteId: resultRemoteId, recorded: true, ...created };
+     });
+diff --git a/rebuild/src/modules/ads/server/README.md b/rebuild/src/modules/ads/server/README.md
+index 1657a061..58fa35bf 100644
+--- a/rebuild/src/modules/ads/server/README.md
++++ b/rebuild/src/modules/ads/server/README.md
+@@ -10,8 +10,8 @@ UI, REST and MCP creation and management use `modules/ads/management/server.ts`.
+ The service checks current membership, entitlements, write permission, selected
+ account, resource scope, provider availability/grants and exact provider-owned
+ consent before committing an intent. Campaigns, ad sets and ads start paused;
+-creatives remain unattached. Parent campaigns/ad sets must exist in the selected
+-account's stored history. Ad-set/ad creation refuses limited channel scope because
++creatives remain unattached. Parent campaigns/ad sets are verified against the
++selected account's inventory, stored delivery history or account-verified provider read. Ad-set/ad creation refuses limited channel scope because
+ the parent cannot be bounded to a selected channel.
+ 
+ `PlatformAdsHost.configuredOperations(locale)` resolves the module-owned factory
+@@ -69,3 +69,45 @@ provider writes, browser and production evidence. No migration was applied here.
+   pending migration rehearsal/application and locale entry-point integration.
+ 
+ No new Root keys; existing `meta.adsCopy` and Ads customer catalogs are consumed.
++
++## Objects without delivery (2026-10-21 worker lane)
++
++`object-store.ts` owns a neutral `ads_objects` inventory, separate from daily
++insights. Confirmed campaign/ad-set/ad creation persists identity, account, name,
++parent and paused status in the same transaction as success/audit. Rename/status
++updates refresh inventory; delete records a hidden tombstone. Sync upserts reject
++older snapshots so an earlier fetch cannot overwrite a later management change.
++UI/REST/MCP still use the same directory/detail and management services. Existing
++insights remain a valid ownership source; absent local identity can be verified
++by the selected account's provider host read, with authority rechecked under lock.
++
++Facebook Ads sync discovers campaigns/ad sets/ads on account edges independently
++of delivery and keeps neutral parent ids. It reuses Root `meta.pageSize`,
++`meta.maxPages` and the existing configured signed transport/timeouts. Invalid
++identities, cross-account objects and incomplete pagination fail the account sync
++rather than silently claiming a complete inventory. Discovery persists only after
++current workspace/resource access is rechecked under the existing account lock.
++No discovery reconciliation of externally removed objects is implemented yet.
++
++Objects includes inventory with no period rows; detail returns an empty daily
++series and the same management controls. Campaigns merges inventory into summaries
++without inventing daily metric samples. Both screens reuse existing tables,
++responsive row cards, semantic actions, neutral no-delivery text and configurable
++English/French copy (`ads.customerCopy.text171`). No new Root keys.
++
++Additive migration `20261101120000_ads_object_inventory` SHA-256:
++`a6ea92c28d7697c4d229c6c90e068cc6da6b1d5575864b43e1d0976a31b50861`.
++The source checksum is pinned by `tests/ads-object-inventory.test.ts`; **the
++cutover rehearsal pin is pending integration outside lane ownership**. Add the
++migration to `scripts/cutover-rehearsal.sh` approved/history-refusal lists, checksum
++verification, ordered application and post-apply account-FK/level/primary-key
++probes; update `tests/cutover-rehearsal.test.ts` together before applying/releasing.
++No migration, live-provider or browser run occurred here. A database rehearsal
++must verify transaction rollback, cascade erasure and stale-sync tombstones.
++
++Integration also needs architecture/parity/handoff updates and explicit inventory
++coverage in account/workspace exports and retain-account erasure paths; those
++files are outside this lane. Historical creation receipts are not backfilled;
++current discovery populates their objects, and provider ownership fallback permits
++management before the next discovery sync. The configuration schema version is
++unchanged for the integrator to manage.
+diff --git a/rebuild/src/modules/ads/server/actions.ts b/rebuild/src/modules/ads/server/actions.ts
+index 7e425eba..24f99ab1 100644
+--- a/rebuild/src/modules/ads/server/actions.ts
++++ b/rebuild/src/modules/ads/server/actions.ts
+@@ -125,8 +125,6 @@ export async function readWorkspaceAdObject(actor: AdsActionActor, input: AdsObj
+   });
+   const connection = account?.socialAccount;
+   if (!account || !connection || connection.invalidatedAt || (connection.tokenExpiresAt && connection.tokenExpiresAt <= new Date())) throw new OperationError('unavailable', await adsServiceText('service006'));
+-  const owned = await prisma.adInsight.findFirst({ where: { adAccountId: account.id, level: input.objectType, objectId: input.objectId }, select: { id: true } });
+-  if (!owned) throw new OperationError('not_found', await adsServiceText('service007'));
+   const accessToken = decryptSecret(connection.accessToken);
+   if (!accessToken) throw new OperationError('unavailable', await adsServiceText('service006'));
+   const ads = await platformAds(connection.provider);
+diff --git a/rebuild/src/modules/ads/server/object-store.ts b/rebuild/src/modules/ads/server/object-store.ts
+new file mode 100644
+index 00000000..ad192445
+--- /dev/null
++++ b/rebuild/src/modules/ads/server/object-store.ts
+@@ -0,0 +1,36 @@
++import { Prisma } from '../../../../generated/client';
++import { prisma } from '@/server/data';
++import type { AdsObjectType, AdsNeutralOperation } from '../management/types';
++
++export type StoredAdObject = { adAccountId: string; level: AdsObjectType; objectId: string; name: string | null; parentId: string | null; status: string | null; fetchedAt: Date };
++type Store = Pick<typeof prisma, '$executeRaw' | '$queryRaw'>;
++export async function saveAdObject(db: Store, item: StoredAdObject) {
++  await db.$executeRaw`INSERT INTO ads_objects ("adAccountId", level, "objectId", name, "parentId", status, "fetchedAt")
++    VALUES (${item.adAccountId}, ${item.level}, ${item.objectId}, ${item.name}, ${item.parentId}, ${item.status}, ${item.fetchedAt})
++    ON CONFLICT ("adAccountId", level, "objectId") DO UPDATE SET name = EXCLUDED.name,
++    "parentId" = EXCLUDED."parentId", status = EXCLUDED.status, "fetchedAt" = EXCLUDED."fetchedAt"
++    WHERE ads_objects."fetchedAt" <= EXCLUDED."fetchedAt"`;
++}
++/** Call only with account ids from the service's current authorized account query. */
++export async function listStoredAdObjects(accountIds: readonly string[], levels: readonly string[], limit: number, db: Store = prisma) {
++  if (!accountIds.length || !levels.length) return [];
++  return db.$queryRaw<StoredAdObject[]>(Prisma.sql`SELECT * FROM ads_objects WHERE status IS DISTINCT FROM 'deleted' AND "adAccountId" IN (${Prisma.join([...accountIds])}) AND level IN (${Prisma.join([...levels])}) ORDER BY "adAccountId", level, "objectId" LIMIT ${limit}`);
++}
++export async function recordAdObjectChange(db: Store, accountId: string, operation: AdsNeutralOperation, remoteId: string | null, now = new Date()) {
++  if (operation.type === 'creative.create') return;
++  if (operation.type === 'campaign.create' || operation.type === 'adset.create' || operation.type === 'ad.create') {
++    if (!remoteId) throw new Error('Missing created object identity');
++    await saveAdObject(db, { adAccountId: accountId, level: operation.objectType, objectId: remoteId, name: operation.name, parentId: 'parentId' in operation ? operation.parentId : null, status: 'paused', fetchedAt: now });
++  } else if (operation.type === 'delete') {
++    await saveAdObject(db, { adAccountId: accountId, level: operation.objectType, objectId: operation.objectId, name: null, parentId: null, status: 'deleted', fetchedAt: now });
++  } else if (operation.type === 'rename') {
++    await db.$executeRaw`UPDATE ads_objects SET name = ${operation.name}, "fetchedAt" = ${now} WHERE "adAccountId" = ${accountId} AND level = ${operation.objectType} AND "objectId" = ${operation.objectId}`;
++  } else if (operation.type === 'status.set') {
++    await db.$executeRaw`UPDATE ads_objects SET status = ${operation.status}, "fetchedAt" = ${now} WHERE "adAccountId" = ${accountId} AND level = ${operation.objectType} AND "objectId" = ${operation.objectId}`;
++  }
++}
++
++export async function findStoredAdObject(accountId: string, level: AdsObjectType, objectId: string, db: Store = prisma): Promise<StoredAdObject | null> {
++  const rows = await db.$queryRaw<StoredAdObject[]>`SELECT * FROM ads_objects WHERE status IS DISTINCT FROM 'deleted' AND "adAccountId" = ${accountId} AND level = ${level} AND "objectId" = ${objectId}`;
++  return rows[0] ?? null;
++}
+diff --git a/rebuild/src/modules/ads/server/object-summaries.ts b/rebuild/src/modules/ads/server/object-summaries.ts
+new file mode 100644
+index 00000000..2faa0696
+--- /dev/null
++++ b/rebuild/src/modules/ads/server/object-summaries.ts
+@@ -0,0 +1,18 @@
++import type { AdsSummary } from './summary';
++import type { StoredAdObject } from './object-store';
++
++/** Add inventory-only rows without inventing daily delivery, reach or freshness. */
++export function mergeAdObjectSummaries(summaries: AdsSummary[], objects: StoredAdObject[], accounts: readonly { id: string; name: string; currency: string | null }[]): AdsSummary[] {
++  const result = new Map(summaries.map(row => [row.key, row]));
++  const byAccount = new Map(accounts.map(account => [account.id, account]));
++  for (const item of objects) {
++    const account = byAccount.get(item.adAccountId);
++    if (!account) continue;
++    const key = JSON.stringify([item.adAccountId, item.level, item.objectId]);
++    const current = result.get(key);
++    if (current) { result.set(key, { ...current, name: item.name ?? current.name, parentId: item.parentId }); continue; }
++    result.set(key, { key, level: item.level, id: item.objectId, name: item.name ?? item.objectId, accountId: account.id, accountName: account.name, currency: account.currency,
++      spend: 0, impressions: 0, clicks: 0, reach: 0, reachDate: item.fetchedAt, cpc: null, cpm: null, cpp: null, ctr: null, frequency: null, actions: [], fields: null, parentId: item.parentId, fieldsDate: item.fetchedAt, dailyMetrics: [], rows: 0 });
++  }
++  return [...result.values()];
++}
+diff --git a/rebuild/src/modules/ads/server/summary.ts b/rebuild/src/modules/ads/server/summary.ts
+index a6b53dad..4a8e3a3a 100644
+--- a/rebuild/src/modules/ads/server/summary.ts
++++ b/rebuild/src/modules/ads/server/summary.ts
+@@ -41,6 +41,7 @@ export type AdsSummary = {
+   frequency: number | null;
+   actions: Array<{ name: string; value: number }>;
+   fields: unknown;
++  parentId?: string | null;
+   fieldsDate: Date;
+   dailyMetrics: Array<{ date: Date; fetchedAt: Date | null; spend: number; impressions: number; clicks: number; reach: number; cpc: number | null; cpm: number | null; cpp: number | null; ctr: number | null; frequency: number | null; actions: unknown; fields: unknown }>;
+   rows: number;
+diff --git a/rebuild/src/modules/ads/ui/campaigns/CampaignsScreen.tsx b/rebuild/src/modules/ads/ui/campaigns/CampaignsScreen.tsx
+index b834b455..d8885792 100644
+--- a/rebuild/src/modules/ads/ui/campaigns/CampaignsScreen.tsx
++++ b/rebuild/src/modules/ads/ui/campaigns/CampaignsScreen.tsx
+@@ -1,3 +1,6 @@
++import { listStoredAdObjects } from '../../server/object-store';
++import { mergeAdObjectSummaries } from '../../server/object-summaries';
++import { AdsReportLimitError } from '../../read-policy';
+ import { loadAdsCopy } from '@/modules/ads/server/copy';
+ import { customerText } from '@/modules/ads/copy';
+ import { AdsCopyProvider } from '@/modules/ads/ui/AdsCopyProvider';
+@@ -50,10 +53,15 @@ async function CampaignsPage({ searchParams }: { searchParams: Promise<AdsSearch
+   try { requestedPage = parseAdsResultPage(params.page); }
+   catch (error) { return <AdsReportFailureView catalogs={catalogs} locale={locale} accounts={accounts} input={params} filters={filters} error={error} action="/ads/campaigns" title={t('text041')} policy={policy} />; }
+   let dataset;
+-  try { dataset = await getAdsDataset(workspaceId, filters, allowedTargetIds, allowedProviders, { levels: ['campaign', 'adset', 'ad'] }); }
+-  catch (error) { return <AdsReportFailureView catalogs={catalogs} locale={locale} accounts={accounts} input={params} filters={filters} error={error} action="/ads/campaigns" title={t('text041')} policy={policy} />; }
+-  const summaries = summarizeInsights(dataset.insights).filter(row => ['campaign', 'adset', 'ad'].includes(row.level))
+-    .sort((left, right) => left.accountName.localeCompare(right.accountName) || left.level.localeCompare(right.level) || left.name.localeCompare(right.name) || left.id.localeCompare(right.id));
++  let summaries;
++  try {
++    dataset = await getAdsDataset(workspaceId, filters, allowedTargetIds, allowedProviders, { levels: ['campaign', 'adset', 'ad'] });
++    const inventory = await listStoredAdObjects(accounts.filter(account => !filters.accountId || account.id === filters.accountId).map(account => account.id), ['campaign', 'adset', 'ad'], dataset.maxRows + 1);
++    if (inventory.length > dataset.maxRows) throw new AdsReportLimitError();
++    summaries = mergeAdObjectSummaries(summarizeInsights(dataset.insights), inventory, accounts).filter(row => ['campaign', 'adset', 'ad'].includes(row.level))
++      .sort((left, right) => left.accountName.localeCompare(right.accountName) || left.level.localeCompare(right.level) || left.name.localeCompare(right.name) || left.id.localeCompare(right.id));
++    if (summaries.length > dataset.maxRows) throw new AdsReportLimitError();
++  } catch (error) { return <AdsReportFailureView catalogs={catalogs} locale={locale} accounts={accounts} input={params} filters={filters} error={error} action="/ads/campaigns" title={t('text041')} policy={policy} />; }
+   const objectPage = pageAdsRows(summaries, requestedPage, dataset.pageSize);
+   const byAccount = groupSummariesByAccount(objectPage.items);
+   const actionAvailability = new Map(await Promise.all([...byAccount.keys()].map(async accountId => [
+@@ -99,7 +107,7 @@ async function CampaignsPage({ searchParams }: { searchParams: Promise<AdsSearch
+           const known = summaries.filter(row => row.accountId === accountId);
+           const named = new Map(known.map(row => [`${row.level}:${row.id}`, row] as const));
+           const parentOf = (row: typeof known[number]) => {
+-            const parentId = resolveParent && (row.level === 'adset' || row.level === 'ad') ? resolveParent({ level: row.level, fields: row.fields }) : null;
++            const parentId = row.parentId ?? (resolveParent && (row.level === 'adset' || row.level === 'ad') ? resolveParent({ level: row.level, fields: row.fields }) : null);
+             return parentId ? named.get(`${row.level === 'ad' ? 'adset' : 'campaign'}:${parentId}`) : undefined;
+           };
+           // Campaign > ad set > ad: a row's path lists its ancestors that are present in stored data.
+diff --git a/rebuild/src/modules/ads/ui/objects/ObjectsScreen.tsx b/rebuild/src/modules/ads/ui/objects/ObjectsScreen.tsx
+index 8fdc4fed..628c1054 100644
+--- a/rebuild/src/modules/ads/ui/objects/ObjectsScreen.tsx
++++ b/rebuild/src/modules/ads/ui/objects/ObjectsScreen.tsx
+@@ -79,7 +79,7 @@ async function AdsObjectsPage({ searchParams }: { searchParams: Promise<Params>
+         { key: 'spend', label: t('text019'), align: 'end', render: row => `${row.currency ? `${row.currency} ` : ''}${show(row.spend)}` },
+         { key: 'impressions', label: t('text020'), align: 'end', render: row => show(row.impressions) },
+         { key: 'clicks', label: t('text022'), align: 'end', render: row => show(row.clicks) },
+-        { key: 'last', label: t('text262'), render: row => row.lastDeliveryDate ?? t('text263') },
++        { key: 'last', label: t('text262'), render: row => row.lastDeliveryDate ?? t('text171') },
+         { key: 'manage', label: t('text264'), render: row => <ObjectManager adAccountId={row.accountId} level={directory.level} objectId={row.objectId} name={row.name} /> },
+       ]} />
+       <nav aria-label={t('text076')}>{directory.offset > 0 ? <a href={pageLink(Math.max(0, directory.offset - directory.limit))}>{t('text077')}</a> : null}{' '}{directory.nextOffset !== null ? <a href={pageLink(directory.nextOffset)}>{t('text078')}</a> : null}</nav>
+diff --git a/rebuild/src/platforms/facebook/ads-discovery.ts b/rebuild/src/platforms/facebook/ads-discovery.ts
+new file mode 100644
+index 00000000..0480a687
+--- /dev/null
++++ b/rebuild/src/platforms/facebook/ads-discovery.ts
+@@ -0,0 +1,36 @@
++import type { StoredAdObject } from '@/modules/ads/server/object-store';
++import type { FacebookAdsTransport } from './ads-ops/transport';
++import { configuredFacebookAdsTransport } from './ads-ops';
++import { runtimeConfig } from '@/server/config/store';
++
++/** Graph edge/field names are protocol constants. Pagination policy comes from Root. */
++export async function discoverFacebookAdObjects(transport: FacebookAdsTransport, token: string, remoteAccountId: string, adAccountId: string, policy: { pageSize: number; maxPages: number }, now: Date, signal?: AbortSignal): Promise<StoredAdObject[]> {
++  const items: StoredAdObject[] = [];
++  for (const [level, edge, parentField] of [['campaign', 'campaigns', null], ['adset', 'adsets', 'campaign_id'], ['ad', 'ads', 'adset_id']] as const) {
++    let after: string | undefined;
++    const seen = new Set<string>();
++    for (let page = 0; page < policy.maxPages; page++) {
++      const payload = await transport.get(`${encodeURIComponent(remoteAccountId)}/${edge}`, token, {
++        fields: ['id', 'account_id', 'name', 'status', ...(parentField ? [parentField] : [])].join(','),
++        limit: String(policy.pageSize), ...(after ? { after } : {}),
++      }, signal);
++      if (!Array.isArray(payload.data)) throw new Error('Invalid ad object discovery response');
++      for (const raw of payload.data) {
++        if (!raw || typeof raw !== 'object') throw new Error('Invalid ad object discovery identity');
++        const row = raw as Record<string, unknown>;
++        if (typeof row.id !== 'string' || !/^[A-Za-z0-9_-]{1,100}$/.test(row.id) || typeof row.account_id !== 'string' || row.account_id.replace(/^act_/, '') !== remoteAccountId.replace(/^act_/, '')) throw new Error('Ad discovery account mismatch');
++        items.push({ adAccountId, level, objectId: row.id, name: typeof row.name === 'string' ? row.name : null, parentId: parentField && typeof row[parentField] === 'string' ? row[parentField] as string : null, status: typeof row.status === 'string' ? row.status.toLowerCase() : null, fetchedAt: now });
++      }
++      const paging = payload.paging as { next?: unknown; cursors?: { after?: unknown } } | undefined;
++      if (!paging?.next) break;
++      const cursor = paging.cursors?.after;
++      if (typeof cursor !== 'string' || !cursor || seen.has(cursor) || page + 1 === policy.maxPages) throw new Error('Ad discovery pagination incomplete');
++      seen.add(cursor); after = cursor;
++    }
++  }
++  return items;
++}
++export async function configuredDiscoverFacebookAdObjects(token: string, remoteAccountId: string, adAccountId: string, now: Date, signal?: AbortSignal) {
++  const [transport, pageSize, maxPages] = await Promise.all([configuredFacebookAdsTransport(), runtimeConfig('meta.pageSize'), runtimeConfig('meta.maxPages')]);
++  return discoverFacebookAdObjects(transport, token, remoteAccountId, adAccountId, { pageSize: pageSize as number, maxPages: maxPages as number }, now, signal);
++}
+diff --git a/rebuild/src/platforms/facebook/ads-ops/index.ts b/rebuild/src/platforms/facebook/ads-ops/index.ts
+index 5a3e7b54..aca0bf5a 100644
+--- a/rebuild/src/platforms/facebook/ads-ops/index.ts
++++ b/rebuild/src/platforms/facebook/ads-ops/index.ts
+@@ -239,7 +239,7 @@ export function createFacebookAdsOps(loadTransport: () => Promise<FacebookAdsTra
+   };
+ }
+ 
+-async function configuredTransport(fetchImpl?: FacebookAdsFetch, text: FacebookAdsText = defaultFacebookAdsText) {
++export async function configuredFacebookAdsTransport(fetchImpl?: FacebookAdsFetch, text: FacebookAdsText = defaultFacebookAdsText) {
+   const [graphBaseUrl, oauthBaseUrl, graphVersion, requestTimeoutMs, maxPages, pageSize, pageInsightMetrics, adInsightFields, maxImageUploadBytes, allowedImageMimeTypes, appSecretProofEnabled, appSecret] = await Promise.all([
+     runtimeConfig('meta.graphBaseUrl'), runtimeConfig('meta.oauthBaseUrl'), runtimeConfig('meta.graphVersion'), runtimeConfig('meta.requestTimeoutMs'),
+     runtimeConfig('meta.maxPages'), runtimeConfig('meta.pageSize'), runtimeConfig('meta.pageInsightMetrics'), runtimeConfig('meta.adInsightFields'),
+@@ -249,10 +249,10 @@ async function configuredTransport(fetchImpl?: FacebookAdsFetch, text: FacebookA
+ }
+ 
+ /** Runtime host for explicit installation by the host assembly (see docs/ADS_PARITY.md). */
+-export const facebookAdsOps: AdsOpsHost = createFacebookAdsOps(() => configuredTransport());
++export const facebookAdsOps: AdsOpsHost = createFacebookAdsOps(() => configuredFacebookAdsTransport());
+ 
+ /** Resolve once per shared service request, then use the same copy for preview and exact consent checks. */
+ export async function configuredFacebookAdsOps(locale: 'en' | 'fr' = 'en'): Promise<AdsOpsHost> {
+   const text = facebookAdsText(await configOrDefault('meta.adsCopy', FACEBOOK_ADS_COPY_SCHEMA), locale);
+-  return createFacebookAdsOps(() => configuredTransport(undefined, text), configuredCreationUi, text);
++  return createFacebookAdsOps(() => configuredFacebookAdsTransport(undefined, text), configuredCreationUi, text);
+ }
+diff --git a/rebuild/src/platforms/facebook/jobs.ts b/rebuild/src/platforms/facebook/jobs.ts
+index 1e33592e..c7a992bb 100644
+--- a/rebuild/src/platforms/facebook/jobs.ts
++++ b/rebuild/src/platforms/facebook/jobs.ts
+@@ -1,3 +1,5 @@
++import { configuredDiscoverFacebookAdObjects } from './ads-discovery';
++import { saveAdObject } from '@/modules/ads/server/object-store';
+ import { storeInboxMetadata } from '@/modules/inbox/server/metadata';
+ import { CONFIG_BY_KEY } from '@/lib/config/registry';
+ import { redact } from '@/server/root/legacy/authz';
+@@ -313,14 +315,23 @@ export async function syncAdsAnalytics(now = new Date(), retryLimit = 0, retryBa
+         const engine = await configuredFacebookEngine({ signal });
+         const lookbackDays = await readLookbackDays('meta.adsAnalyticsLookbackDays');
+         const since = new Date(until.getTime() - (lookbackDays - 1) * DAY_MS);
+-        return engine.getAdInsights(binding.token, account.actId, since, until);
++        const [insights, objects] = await Promise.all([
++          engine.getAdInsights(binding.token, account.actId, since, until),
++          configuredDiscoverFacebookAdObjects(binding.token, account.actId, account.id, now, signal),
++        ]);
++        return { insights, objects };
+       }, retryLimit, retryBackoff));
+       await withWorkspaceOperation(account.workspaceId, async () => {
+         const outcome = await withSelectedResourceOperation(account.workspaceId, { kind: 'adAccount', id: account.id }, async (tx, signal) => {
+           let persistedCount = 0;
+           await assertFacebookJobAccess(account.workspaceId, jobFeatures.ads);
+           if (!await currentAdsBinding(account, now)) return { updated: 0, skipped: 1 };
+-          for (const row of rows) {
++          for (const item of rows.objects) {
++            signal.throwIfAborted();
++            await saveAdObject(tx, item);
++            persistedCount++;
++          }
++          for (const row of rows.insights) {
+             signal.throwIfAborted();
+             const date = validDate(row.date_start);
+             if (!date) continue;
+diff --git a/rebuild/tests/ads-object-inventory.test.ts b/rebuild/tests/ads-object-inventory.test.ts
+new file mode 100644
+index 00000000..8af9dc4a
+--- /dev/null
++++ b/rebuild/tests/ads-object-inventory.test.ts
+@@ -0,0 +1,21 @@
++import { describe, expect, it } from 'vitest';
++import { createHash } from 'node:crypto';
++import { readFileSync } from 'node:fs';
++import { mergeAdObjectSummaries } from '../src/modules/ads/server/object-summaries';
++import type { StoredAdObject } from '../src/modules/ads/server/object-store';
++
++const object: StoredAdObject = { adAccountId: 'account1', level: 'adset', objectId: 's1', parentId: 'c1', name: 'Autumn audience', status: 'paused', fetchedAt: new Date('2026-10-21T12:00:00Z') };
++describe('neutral ad inventory', () => {
++  it('adds an object without inventing daily metrics or rates and ignores unknown accounts', () => {
++    const [summary] = mergeAdObjectSummaries([], [object], [{ id: 'account1', name: 'Studio', currency: 'EUR' }]);
++    expect(summary).toMatchObject({ id: 's1', parentId: 'c1', rows: 0, dailyMetrics: [], ctr: null, cpc: null });
++    expect(mergeAdObjectSummaries([], [object], [])).toEqual([]);
++    expect(mergeAdObjectSummaries([summary!], [{ ...object, name: 'Winter audience' }], [{ id: 'account1', name: 'Studio', currency: 'EUR' }])).toEqual([{ ...summary, name: 'Winter audience' }]);
++  });
++  it('pins the additive inventory migration and account erasure relationship', () => {
++    const sql = readFileSync('prisma/migrations/20261101120000_ads_object_inventory/migration.sql', 'utf8');
++    expect(createHash('sha256').update(sql).digest('hex')).toBe('a6ea92c28d7697c4d229c6c90e068cc6da6b1d5575864b43e1d0976a31b50861');
++    expect(sql).toContain('REFERENCES ad_accounts(id) ON DELETE CASCADE');
++    expect(sql).not.toMatch(/DROP|ALTER|DELETE FROM|UPDATE/);
++  });
++});
+diff --git a/rebuild/tests/ads-parity-directory.test.ts b/rebuild/tests/ads-parity-directory.test.ts
+index 2441492e..f92bda78 100644
+--- a/rebuild/tests/ads-parity-directory.test.ts
++++ b/rebuild/tests/ads-parity-directory.test.ts
+@@ -1,3 +1,4 @@
++vi.mock('../src/modules/ads/server/object-store', () => ({ listStoredAdObjects: vi.fn(async () => []), findStoredAdObject: vi.fn(async () => null) }));
+ import { ADS_MANAGEMENT_DEFAULT_POLICY } from '../src/modules/ads/management/config';
+ vi.mock('@/modules/ads/server/copy', async () => { const { defaultAdsCatalogs, customerText } = await import('../src/modules/ads/copy'); return { withAdsCopySnapshot: (operation: () => Promise<unknown>) => operation(), loadAdsCopy: async () => defaultAdsCatalogs, adsServiceText: async (key: Parameters<typeof customerText>[2]) => customerText(defaultAdsCatalogs.customer, 'en', key) }; });
+ import { beforeEach, describe, expect, it, vi } from 'vitest';
+@@ -12,6 +13,7 @@ vi.mock('../src/server/config/store', () => ({ runtimeConfig: state.config }));
+ vi.mock('../src/modules/ads/directory/management-port', () => ({ adsDirectoryManagementPort: () => ({ describe: state.describe, listChanges: vi.fn() }) }));
+ vi.mock('../src/server/platforms/registry', () => ({ platformAds: state.platformAds }));
+ 
++import { listStoredAdObjects, findStoredAdObject } from '../src/modules/ads/server/object-store';
+ import { ADS_ANALYSIS_DEFAULT_POLICY } from '../src/modules/ads/analysis/metrics';
+ import { readAdsDirectory, readAdsObjectDetail } from '../src/modules/ads/directory/server';
+ import { executeAdsDirectoryTool } from '../src/modules/ads/directory/mcp';
+@@ -27,6 +29,8 @@ const now = new Date('2026-10-17T12:00:00Z');
+ describe('Ads object directory', () => {
+   beforeEach(() => {
+     vi.clearAllMocks();
++    vi.mocked(listStoredAdObjects).mockResolvedValue([]);
++    vi.mocked(findStoredAdObject).mockResolvedValue(null);
+     state.access.mockResolvedValue({ actor, allowedTargetIds: ['t1'], allowedProviders: ['facebook'] });
+     state.accounts.mockResolvedValue([{ id: 'a1', name: 'Account a1', currency: 'USD', socialAccount: { provider: 'test-platform' } }]);
+     state.platformAds.mockResolvedValue({ parentObjectId: ({ level, fields }: { level: string; fields: unknown }) => level === 'adset' && fields && typeof fields === 'object' ? ((fields as Record<string, unknown>).parentRef as string | undefined) ?? null : null });
+@@ -118,4 +122,16 @@ it('enforces the same non-default parent identifier bound for directory and MCP
+   await expect(executeAdsDirectoryTool(actor, 'list_ads_objects', { parentId: 'abc' })).rejects.toMatchObject({ code: 'invalid_request' });
+ });
+ 
++it('lists a newly created campaign and opens its manager detail without delivery rows', async () => {
++  state.dataset.mockResolvedValue({ insights: [], accounts: [] });
++  const object = { adAccountId: 'a1', level: 'campaign' as const, objectId: 'new1', name: 'Autumn launch', parentId: null, status: 'paused', fetchedAt: now };
++  vi.mocked(listStoredAdObjects).mockResolvedValue([object]);
++  vi.mocked(findStoredAdObject).mockResolvedValue(object);
++  const directory = await readAdsDirectory(actor, { level: 'campaign' }, now);
++  expect(directory.items).toEqual([expect.objectContaining({ objectId: 'new1', name: 'Autumn launch', lastDeliveryDate: null, spend: 0 })]);
++  expect(listStoredAdObjects).toHaveBeenLastCalledWith(['a1'], ['campaign'], 101);
++  const detail = await readAdsObjectDetail(actor, { accountId: 'a1', level: 'campaign', objectId: 'new1' }, now);
++  expect(detail).toMatchObject({ name: 'Autumn launch', daily: [], totals: { spend: 0 } });
++});
++
+ });
+diff --git a/rebuild/tests/ads-parity-management.test.ts b/rebuild/tests/ads-parity-management.test.ts
+index 662082d8..2c72263a 100644
+--- a/rebuild/tests/ads-parity-management.test.ts
++++ b/rebuild/tests/ads-parity-management.test.ts
+@@ -82,7 +82,8 @@ describe('Ads management service', () => {
+     expect(calls[0]).toMatch(/^INSERT INTO ads_management_operations/);
+     expect(calls.indexOf('REMOTE')).toBe(1);
+     expect(calls[2]).toMatch(/^UPDATE ads_management_operations/);
+-    expect(calls[3]).toMatch(/^INSERT INTO root_activities/);
++    expect(calls[3]).toMatch(/^UPDATE ads_objects/);
++    expect(calls[4]).toMatch(/^INSERT INTO root_activities/);
+     expect(state.prisma.$transaction).toHaveBeenCalledTimes(1);
+     expect(state.selectedOperation).toHaveBeenCalledWith('w1', { kind: 'adAccount', id: 'acc1' }, expect.any(Function));
+     expect(execute).toHaveBeenCalledWith(expect.objectContaining({ credential: { accessToken: 'token' }, accountId: 'act_1', signal: expect.anything() }), pause);
+@@ -726,6 +727,7 @@ describe.each(['service', 'UI/REST', 'MCP'] as const)('Ads authorization via %s'
+     return recovering ? resolveAdsOperation(actor, input as Parameters<typeof resolveAdsOperation>[1]) : performAdsManagementService(actor, input as Parameters<typeof performAdsManagementService>[1]);
+   }
+   beforeEach(() => {
++    clearAdsOpsHosts();
+     clearAdsOpsHosts();
+     registerAdsOpsHost({ ...host, operations: [...host.operations, { id: 'delete', objectTypes: ['campaign'], spendChanging: false, irreversible: true, label: 'Delete' }] });
+   });
+@@ -848,3 +850,49 @@ describe('contract audit runtime policy and locale', () => {
+     expect(state.platformAds).toHaveBeenCalledWith('testnet', 'fr');
+   });
+ });
++
++describe('objects without delivery', () => {
++  it('creates, renames and deletes a paused campaign through the shared service without any insight rows', async () => {
++    clearAdsOpsHosts();
++    registerAdsOpsHost({ ...host, operations: [...host.operations, { id: 'delete', objectTypes: ['campaign'], spendChanging: false, irreversible: true, label: 'Delete' }] });
++    state.prisma.adInsight.findFirst.mockResolvedValue(null);
++    let object: { objectId: string; name: string } | null = null;
++    state.prisma.$executeRaw.mockImplementation(async (strings: TemplateStringsArray, ...values: unknown[]) => {
++      const sql = sqlOf(strings);
++      if (sql.includes('INSERT INTO ads_objects')) object = values[5] === 'deleted' ? null : { objectId: values[2] as string, name: values[3] as string };
++      if (sql.includes('UPDATE ads_objects SET name')) object = { ...object!, name: values[0] as string };
++      if (sql.includes('DELETE FROM ads_objects')) object = null;
++      return 1;
++    });
++    state.prisma.$queryRaw.mockImplementation(async (strings: TemplateStringsArray) => {
++      const sql = sqlOf(strings);
++      if (sql.includes('FROM ads_objects')) return object ? [object] : [];
++      if (sql.includes('FOR UPDATE')) return [{ status: 'pending', remoteId: null }];
++      return [];
++    });
++    const create = { type: 'campaign.create', objectType: 'campaign', name: 'Autumn launch', objective: 'traffic' } as const;
++    const preview = await previewAdsManagement(actor, { adAccountId: 'acc1', operation: create });
++    expect(await performAdsManagement(actor, { adAccountId: 'acc1', operation: create, confirmation: preview.confirmation })).toMatchObject({ outcome: 'succeeded' });
++    expect(object).toEqual({ objectId: 'c1', name: 'Autumn launch' });
++    const rename = { type: 'rename', objectType: 'campaign', objectId: 'c1', name: 'Winter launch' } as const;
++    const renamePreview = await previewAdsManagement(actor, { adAccountId: 'acc1', operation: rename });
++    expect(await performAdsManagement(actor, { adAccountId: 'acc1', operation: rename, confirmation: renamePreview.confirmation })).toMatchObject({ outcome: 'succeeded' });
++    expect(object).toEqual({ objectId: 'c1', name: 'Winter launch' });
++    const remove = { type: 'delete', objectType: 'campaign', objectId: 'c1' } as const;
++    const deletePreview = await previewAdsManagement(actor, { adAccountId: 'acc1', operation: remove });
++    expect(await performAdsManagement(actor, { adAccountId: 'acc1', operation: remove, confirmation: deletePreview.confirmation })).toMatchObject({ outcome: 'succeeded' });
++    expect(object).toBeNull();
++    expect(execute).toHaveBeenCalledTimes(3);
++  });
++
++  it('uses the account-verified provider read for an object absent locally', async () => {
++    state.prisma.adInsight.findFirst.mockResolvedValue(null);
++    const read = vi.fn(async () => ({ id: 'c1', accountId: '1' }));
++    state.platformAds.mockResolvedValue({ operations: host, manageScopes: async () => ['ads_management'], validateManageScopes: vi.fn(), read });
++    await expect(previewAdsManagement(actor, { adAccountId: 'acc1', operation: pause })).resolves.toHaveProperty('confirmation');
++    expect(read).toHaveBeenCalledWith({ credential: { accessToken: 'token' }, accountId: 'act_1', objectId: 'c1', objectType: 'campaign' });
++    read.mockRejectedValueOnce(new Error('outside selected account'));
++    await expect(previewAdsManagement(actor, { adAccountId: 'acc1', operation: pause })).rejects.toThrow();
++    expect(execute).not.toHaveBeenCalled();
++  });
++});
+diff --git a/rebuild/tests/facebook-ads-discovery.test.ts b/rebuild/tests/facebook-ads-discovery.test.ts
+new file mode 100644
+index 00000000..4ff9988f
+--- /dev/null
++++ b/rebuild/tests/facebook-ads-discovery.test.ts
+@@ -0,0 +1,28 @@
++import { describe, expect, it, vi } from 'vitest';
++import { discoverFacebookAdObjects } from '../src/platforms/facebook/ads-discovery';
++
++const now = new Date('2026-10-21T12:00:00Z');
++const policy = { pageSize: 25, maxPages: 3 };
++describe('Facebook object discovery independent of insights', () => {
++  it('discovers paused campaigns, ad sets and ads with parent links and follows cursors without following remote URLs', async () => {
++    const get = vi.fn().mockResolvedValueOnce({ data: [{ id: 'c1', account_id: '1', name: 'Autumn', status: 'PAUSED' }], paging: { next: 'https://untrusted.invalid', cursors: { after: 'cursor2' } } })
++      .mockResolvedValueOnce({ data: [{ id: 'c2', account_id: '1', status: 'PAUSED' }] })
++      .mockResolvedValueOnce({ data: [{ id: 's1', account_id: '1', campaign_id: 'c1', status: 'PAUSED' }] })
++      .mockResolvedValueOnce({ data: [{ id: 'a1', account_id: '1', adset_id: 's1', status: 'PAUSED' }] });
++    const rows = await discoverFacebookAdObjects({ get, post: vi.fn() }, 'fixture-token', 'act_1', 'local1', policy, now);
++    expect(rows).toHaveLength(4);
++    expect(rows[0]).toMatchObject({ adAccountId: 'local1', objectId: 'c1', level: 'campaign', status: 'paused' });
++    expect(rows[2]).toMatchObject({ parentId: 'c1', level: 'adset' });
++    expect(rows[3]).toMatchObject({ parentId: 's1', level: 'ad' });
++    expect(get.mock.calls[1]).toMatchObject(['act_1/campaigns', 'fixture-token', { after: 'cursor2', limit: '25' }, undefined]);
++    expect(get.mock.calls.every(call => !call[0].includes('://'))).toBe(true);
++  });
++  it('rejects cross-account objects', async () => {
++    const get = vi.fn(async () => ({ data: [{ id: 'c1', account_id: '2' }] }));
++    await expect(discoverFacebookAdObjects({ get, post: vi.fn() }, 'fixture-token', 'act_1', 'local1', policy, now)).rejects.toThrow('account mismatch');
++  });
++  it('does not silently accept a truncated inventory', async () => {
++    const get = vi.fn(async () => ({ data: [], paging: { next: 'more', cursors: { after: 'same' } } }));
++    await expect(discoverFacebookAdObjects({ get, post: vi.fn() }, 'fixture-token', 'act_1', 'local1', { ...policy, maxPages: 1 }, now)).rejects.toThrow('pagination incomplete');
++  });
++});
+diff --git a/rebuild/tests/facebook-sync-fetch-then-write.test.ts b/rebuild/tests/facebook-sync-fetch-then-write.test.ts
+index 29232e39..93794025 100644
+--- a/rebuild/tests/facebook-sync-fetch-then-write.test.ts
++++ b/rebuild/tests/facebook-sync-fetch-then-write.test.ts
+@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
+ const state = vi.hoisted(() => ({
+   depth: 0, events: [] as string[], providerDepths: [] as number[],
+   targets: vi.fn(), accounts: vi.fn(), freshTarget: vi.fn(), freshAccount: vi.fn(), postTargets: vi.fn(), freshPostTarget: vi.fn(),
+-  insights: vi.fn(), history: vi.fn(), ads: vi.fn(), status: vi.fn(), cursorRows: vi.fn(), insightUpsert: vi.fn(), adUpsert: vi.fn(), executeRaw: vi.fn(), updateMany: vi.fn(),
++  discoverAds: vi.fn(), insights: vi.fn(), history: vi.fn(), ads: vi.fn(), status: vi.fn(), cursorRows: vi.fn(), insightUpsert: vi.fn(), adUpsert: vi.fn(), executeRaw: vi.fn(), updateMany: vi.fn(),
+ }));
+ 
+ const grants = { workspaceId: 'w', accessToken: 'token', scopes: 'read_insights,ads_read,pages_read_engagement', tokenExpiresAt: null, invalidatedAt: null };
+@@ -39,6 +39,7 @@ vi.mock('../src/server/config/store', () => ({ runtimeConfig: async (key: string
+   return [];
+ } }));
+ vi.mock('../src/server/secret-crypto', () => ({ decryptSecret: (value: string) => value }));
++vi.mock('../src/platforms/facebook/ads-discovery', () => ({ configuredDiscoverFacebookAdObjects: async () => { record('objects'); return state.discoverAds(); } }));
+ vi.mock('../src/platforms/facebook/runtime', () => ({ configuredFacebookEngine: async () => ({
+   getPageInsightObservations: async () => { record('insights'); return state.insights(); },
+   getPostHistory: async () => { record('history'); return state.history(); },
+@@ -67,6 +68,7 @@ beforeEach(() => {
+   state.cursorRows.mockResolvedValue([]);
+   state.insights.mockResolvedValue([observation]);
+   state.history.mockResolvedValue({ posts: [{ remoteId: 'p1', message: 'm', permalink: null, statusType: null, pictureUrl: null, createdTime: new Date(), insights: {} }], failures: [], progress });
++  state.discoverAds.mockResolvedValue([{ adAccountId: 'acct-a', level: 'campaign', objectId: 'c1', name: 'Autumn launch', parentId: null, status: 'paused', fetchedAt: new Date('2026-10-21T12:00:00Z') }]);
+   state.ads.mockResolvedValue([{ date_start: '2026-10-16', spend: '1.5', impressions: '10' }]);
+   state.insightUpsert.mockResolvedValue({}); state.adUpsert.mockResolvedValue({}); state.executeRaw.mockResolvedValue(1);
+   state.postTargets.mockResolvedValue([{ id: 'pt1', postId: 'post1', remotePostId: 'remote1', post: { workspaceId: 'w', media: [] }, target: { id: 'target-a', workspaceId: 'w', providerId: 'pa' } }]);
+@@ -119,11 +121,19 @@ describe('Page analytics fetch-then-write', () => {
+ });
+ 
+ describe('Ads analytics fetch-then-write', () => {
++  it('persists discovered paused objects even when there are no insight rows', async () => {
++    state.ads.mockResolvedValue([]);
++    expect(await syncAdsAnalytics()).toMatchObject({ updated: 1, failed: 0 });
++    expect(state.adUpsert).not.toHaveBeenCalled();
++    expect(state.executeRaw).toHaveBeenCalledTimes(1);
++  });
++
+   it('calls the Ads API outside any transaction and re-checks the account before writing', async () => {
+     const result = await syncAdsAnalytics();
+ 
+-    expect(result).toMatchObject({ examined: 1, updated: 1, failed: 0 });
+-    expect(state.providerDepths).toEqual([0]);
++    expect(result).toMatchObject({ examined: 1, updated: 2, failed: 0 });
++    expect(state.providerDepths).toEqual([0, 0]);
++    expect(state.executeRaw).toHaveBeenCalledTimes(1);
+     const events = state.events;
+     expect(events.indexOf('provider:ads')).toBeLessThan(events.indexOf('lock:begin'));
+     expect(events.slice(events.indexOf('lock:begin'), events.indexOf('lock:end')).filter(event => event === 'recheck')).toHaveLength(2);
+@@ -135,6 +145,7 @@ describe('Ads analytics fetch-then-write', () => {
+ 
+     expect(await syncAdsAnalytics()).toMatchObject({ updated: 0, skipped: 1, failed: 0 });
+     expect(state.adUpsert).not.toHaveBeenCalled();
++    expect(state.executeRaw).not.toHaveBeenCalled();
+   });
+ });
+ 

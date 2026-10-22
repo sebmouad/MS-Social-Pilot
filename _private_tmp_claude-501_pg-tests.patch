@@ -1,0 +1,287 @@
+diff --git a/rebuild/generated b/rebuild/generated
+new file mode 120000
+index 00000000..526702ed
+--- /dev/null
++++ b/rebuild/generated
+@@ -0,0 +1 @@
++/Users/mouad/Documents/ChatGPT/MS Social Pilot/app/rebuild/generated
+\ No newline at end of file
+diff --git a/rebuild/scripts/verify-browser-matrix.ts b/rebuild/scripts/verify-browser-matrix.ts
+new file mode 100644
+index 00000000..6b8cf9b0
+--- /dev/null
++++ b/rebuild/scripts/verify-browser-matrix.ts
+@@ -0,0 +1,273 @@
++/**
++ * Whole-app browser matrix against the guarded local preview (localhost:3200, `_preview` database).
++ *
++ * A disposable synthetic owner signs in through a session row (no password). Every static route family is visited
++ * in all four themes at 1440px and 390px; Root routes are visited while the probe user temporarily holds Root, which
++ * is revoked before cleanup. Checks per page: console errors and hydration warnings, page-level horizontal overflow,
++ * keyboard reachability of the main region with a visible focus indicator, and accessible names on interactive
++ * elements (Chromium's computed accessibility tree). At phone width the shell drawer must open from the keyboard and
++ * close on Escape with focus returned to its toggle; at desktop width the first safe "New"/"Create" dialog on a page is
++ * opened and closed the same way. No form is submitted. Table row counts are compared before and after the run.
++ *
++ * Usage (from rebuild/): REBUILD_PREVIEW_DATABASE_URL=... DATABASE_URL=<same> REBUILD_PREVIEW_ORIGIN=http://localhost:3200 \
++ *   node --import tsx scripts/verify-browser-matrix.ts [report.json] [--themes=grove,coast] [--routes=/home,/inbox]
++ */
++import { randomBytes, randomUUID } from 'node:crypto';
++import { writeFile } from 'node:fs/promises';
++import { chromium, type Browser, type BrowserContext, type Page } from 'playwright';
++import { PrismaClient } from '../generated/client';
++import { hashLegacySessionToken } from '../src/server/auth';
++import { THEME_COOKIE, THEMES } from '../src/lib/themes';
++
++class ProbeFailure extends Error {}
++function check(value: unknown, message: string): asserts value { if (!value) throw new ProbeFailure(message); }
++
++const CUSTOMER_ROUTES = [
++  '/home', '/publishing/posts', '/publishing/compose', '/publishing/calendar', '/publishing/queue', '/publishing/approvals', '/publishing/templates',
++  '/publishing/labels', '/publishing/collaboration', '/publishing/media', '/publishing/feeds', '/inbox', '/inbox/moderation',
++  '/analytics', '/analytics/explorer', '/analytics/demographics', '/analytics/compare', '/analytics/goals', '/analytics/pins', '/analytics/reports',
++  '/ads', '/ads/campaigns', '/ads/compare', '/ads/objects', '/settings/account', '/settings/appearance', '/settings/bio', '/settings/connections',
++  '/settings/data', '/settings/mcp', '/settings/notifications', '/settings/sharing', '/settings/team', '/settings/webhooks', '/settings/workspace',
++  '/tasks', '/agency', '/agency/clients', '/oauth/authorize',
++];
++const ROOT_ROUTES = [
++  '/root', '/root/activity', '/root/backups', '/root/config', '/root/connections', '/root/errors', '/root/lifecycle', '/root/modules', '/root/operations',
++  '/root/plans', '/root/platforms', '/root/privileges', '/root/sessions', '/root/users', '/root/workspaces',
++];
++const PUBLIC_ROUTES = ['/sign-in', '/sign-up', '/password-recovery', '/verify-email', '/join', '/two-step', '/access-limited', '/no-workspace'];
++/** Detail routes are taken from the first matching link on their list page. */
++const DETAIL_LINKS: Record<string, string> = {
++  '/publishing/collaboration': '/publishing/collaboration/post/', '/root/modules': '/root/modules/', '/root/platforms': '/root/platforms/', '/root/errors': '/root/errors/',
++};
++const SIZES = [{ name: 'desktop', width: 1440, height: 900 }, { name: 'phone', width: 390, height: 844 }] as const;
++const NAMED_ROLES = new Set(['button', 'link', 'textbox', 'searchbox', 'combobox', 'listbox', 'checkbox', 'radio', 'switch', 'spinbutton', 'slider', 'menuitem', 'tab', 'option']);
++const SAFE_DIALOG_TRIGGER = /^(new|create|add|invite|set up|upload)\b/i;
++
++type PageResult = {
++  route: string; theme: string; size: string; status: number | null; finalPath: string; ok: boolean;
++  consoleErrors: string[]; hydration: string[]; overflowPx: number;
++  keyboard: { reachedMain: boolean; tabs: number; focusVisible: boolean; focused: string } | null;
++  unnamed: Array<{ role: string; html: string }>;
++  escape: { trigger: string; opened: boolean; closed: boolean; focusReturned: boolean } | null;
++};
++
++async function main() {
++  const databaseUrl = process.env.REBUILD_PREVIEW_DATABASE_URL, origin = process.env.REBUILD_PREVIEW_ORIGIN;
++  check(databaseUrl && databaseUrl === process.env.DATABASE_URL && origin && process.env.NODE_ENV !== 'production', 'Explicit matching preview database and origin are required.');
++  const dbUrl = new URL(databaseUrl), base = new URL(origin);
++  check(['postgres:', 'postgresql:'].includes(dbUrl.protocol) && ['localhost', '127.0.0.1', '[::1]'].includes(dbUrl.hostname) && decodeURIComponent(dbUrl.pathname).endsWith('_preview'), 'Only loopback PostgreSQL databases ending in _preview are allowed.');
++  check(base.origin === origin && base.protocol === 'http:' && base.hostname === 'localhost' && base.port === '3200', 'Only the localhost:3200 HTTP preview is allowed.');
++  const args = process.argv.slice(2);
++  const reportPath = args.find(a => !a.startsWith('--')) ?? `/private/tmp/browser-matrix-${Date.now()}.json`;
++  const listArg = (name: string) => args.find(a => a.startsWith(`--${name}=`))?.split('=')[1]?.split(',').filter(Boolean);
++  const themes = listArg('themes') ?? THEMES.map(t => t.id);
++  const only = listArg('routes');
++  const pick = (routes: string[]) => (only ? routes.filter(r => only.includes(r)) : routes);
++
++  const db = new PrismaClient({ datasources: { db: { url: databaseUrl } } });
++  const prefix = `preview_matrix_${randomUUID().replaceAll('-', '')}`;
++  const userId = `${prefix}_user`, token = randomBytes(32).toString('base64url');
++  const results: PageResult[] = [];
++  let created = false;
++  const counts = async () => {
++    const tables = await db.$queryRaw<Array<{ name: string }>>`SELECT table_name AS name FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE' ORDER BY table_name`;
++    const out: Record<string, number> = {};
++    for (const { name } of tables) out[name] = Number((await db.$queryRawUnsafe<Array<{ n: bigint }>>(`SELECT COUNT(*)::bigint AS n FROM "${name.replaceAll('"', '""')}"`))[0]!.n);
++    return out;
++  };
++  let browser: Browser | undefined;
++  try {
++    const workspace = await db.$queryRaw<Array<{ id: string }>>`SELECT w.id FROM workspaces w JOIN memberships m ON m."workspaceId" = w.id WHERE m.role::text = 'owner' AND w."suspendedAt" IS NULL GROUP BY w.id ORDER BY COUNT(*) DESC, w.id LIMIT 1`;
++    check(workspace[0], 'The preview needs a synthetic workspace with an owner.');
++    const workspaceId = workspace[0].id;
++    const before = await counts();
++    await db.user.create({ data: { id: userId, email: `${userId}@example.test`, name: 'Browser matrix probe', passwordHash: 'unusable-preview-password', isInstanceOwner: false, totpEnabledAt: new Date() } });
++    created = true;
++    await db.membership.create({ data: { id: `${prefix}_membership`, userId, workspaceId, role: 'owner' } });
++    await db.session.create({ data: { id: `${prefix}_session`, userId, tokenHash: hashLegacySessionToken(token)!, expiresAt: new Date(Date.now() + 4 * 3_600_000), pending: null } });
++
++    browser = await chromium.launch();
++    const contextFor = async (theme: string, size: (typeof SIZES)[number], signedIn: boolean) => {
++      const context = await browser!.newContext({ viewport: { width: size.width, height: size.height }, locale: 'en-US' });
++      const cookies = [{ name: THEME_COOKIE, value: theme, url: base.origin }];
++      if (signedIn) cookies.push({ name: 'msp_session', value: token, url: base.origin }, { name: 'sp_workspace', value: workspaceId, url: base.origin });
++      await context.addCookies(cookies);
++      return context;
++    };
++    const run = async (routes: string[], signedIn: boolean, label: string) => {
++      for (const theme of themes) for (const size of SIZES) {
++        const context = await contextFor(theme, size, signedIn);
++        const queue = [...routes];
++        for (let index = 0; index < queue.length; index += 1) {
++          const route = queue[index]!;
++          const result = await visit(context, route, theme, size.name, base.origin, signedIn && !route.startsWith('/root'));
++          results.push(result);
++          if (DETAIL_LINKS[route] && !queue.some(r => r.startsWith(DETAIL_LINKS[route]!)) && result.status === 200) {
++            const detail = await firstLink(context, base.origin + route, DETAIL_LINKS[route]!);
++            if (detail) queue.splice(index + 1, 0, detail);
++          }
++          process.stdout.write(`${label} ${theme} ${size.name} ${route} ${result.ok ? 'ok' : 'ISSUE'}\n`);
++        }
++        await context.close();
++      }
++    };
++    await run(pick(CUSTOMER_ROUTES), true, 'customer');
++    const rootRoutes = pick(ROOT_ROUTES);
++    if (rootRoutes.length) {
++      await db.user.update({ where: { id: userId }, data: { isInstanceOwner: true } });
++      try { await run(rootRoutes, true, 'root'); } finally { await db.user.update({ where: { id: userId }, data: { isInstanceOwner: false } }); }
++    }
++    await run(pick(PUBLIC_ROUTES), false, 'public');
++    await browser.close(); browser = undefined;
++
++    // Rows the probe itself wrote (independent of concurrent sessions changing other rows): anything referencing it
++    // other than its own session and membership. A render-only run must leave none.
++    const columns = await db.$queryRaw<Array<{ t: string; c: string }>>`SELECT table_name AS t, column_name AS c FROM information_schema.columns WHERE table_schema = 'public' AND column_name IN ('userId','actorId','authorId','createdById','submittedById') AND table_name NOT IN ('sessions','memberships')`;
++    const probeRows: Array<{ table: string; rows: number }> = [];
++    for (const { t, c } of columns) {
++      const n = Number((await db.$queryRawUnsafe<Array<{ n: bigint }>>(`SELECT COUNT(*)::bigint AS n FROM "${t.replaceAll('"', '""')}" WHERE "${c.replaceAll('"', '""')}" = $1`, userId))[0]!.n);
++      if (n) probeRows.push({ table: `${t}.${c}`, rows: n });
++    }
++
++    await db.session.deleteMany({ where: { userId } });
++    await db.membership.deleteMany({ where: { userId } });
++    await db.$executeRaw`DELETE FROM activity_logs WHERE "actorId" = ${userId}`;
++    await db.$executeRaw`DELETE FROM root_activities WHERE "actorId" = ${userId}`.catch(() => undefined);
++    await db.user.delete({ where: { id: userId } }); created = false;
++    const after = await counts();
++    const changed = Object.keys({ ...before, ...after }).filter(t => before[t] !== after[t]).map(t => ({ table: t, before: before[t] ?? null, after: after[t] ?? null }));
++    const issues = results.filter(r => !r.ok);
++    const summary = { pages: results.length, passed: results.length - issues.length, issues: issues.length, probeWrites: probeRows, tableCountChanges: changed, tableCountNote: 'Count changes can come from other sessions using the preview concurrently; probeWrites lists rows this run created.', themes, generatedAt: new Date().toISOString() };
++    await writeFile(reportPath, JSON.stringify({ summary, results }, null, 1));
++    process.stdout.write(`\n${JSON.stringify(summary)}\nreport: ${reportPath}\n`);
++    if (probeRows.length) process.exitCode = 2;
++  } finally {
++    await browser?.close().catch(() => undefined);
++    if (created) {
++      await db.user.update({ where: { id: userId }, data: { isInstanceOwner: false } }).catch(() => undefined);
++      await db.session.deleteMany({ where: { userId } }).catch(() => undefined);
++      await db.membership.deleteMany({ where: { userId } }).catch(() => undefined);
++      await db.$executeRaw`DELETE FROM activity_logs WHERE "actorId" = ${userId}`.catch(() => undefined);
++      await db.user.delete({ where: { id: userId } }).catch(() => undefined);
++    }
++    await db.$disconnect();
++  }
++}
++
++async function firstLink(context: BrowserContext, url: string, prefix: string): Promise<string | null> {
++  const page = await context.newPage();
++  try {
++    await page.goto(url, { waitUntil: 'networkidle', timeout: 60000 });
++    return await page.evaluate(p => [...document.querySelectorAll<HTMLAnchorElement>('a[href]')].map(a => new URL(a.href).pathname).find(h => h.startsWith(p) && h.length > p.length) ?? null, prefix);
++  } catch { return null; } finally { await page.close(); }
++}
++
++async function visit(context: BrowserContext, route: string, theme: string, size: string, origin: string, tryDialogs: boolean): Promise<PageResult> {
++  const page = await context.newPage();
++  const consoleErrors: string[] = [], hydration: string[] = [];
++  page.on('console', m => {
++    const text = m.text();
++    if (/hydrat/i.test(text)) hydration.push(text.slice(0, 300));
++    else if (m.type() === 'error' && !/Download the React DevTools|\[Fast Refresh\]|\[HMR\]/.test(text)) consoleErrors.push(text.slice(0, 300));
++  });
++  page.on('pageerror', e => { const text = String(e).slice(0, 300); (/hydrat/i.test(text) ? hydration : consoleErrors).push(text); });
++  page.on('dialog', d => { consoleErrors.push(`native ${d.type()} dialog opened: ${d.message().slice(0, 80)}`); void d.dismiss(); });
++  const result: PageResult = { route, theme, size, status: null, finalPath: '', ok: false, consoleErrors, hydration, overflowPx: 0, keyboard: null, unnamed: [], escape: null };
++  try {
++    const response = await page.goto(origin + route, { waitUntil: 'networkidle', timeout: 90000 });
++    result.status = response?.status() ?? null;
++    await page.waitForTimeout(400);
++    result.finalPath = new URL(page.url()).pathname;
++    result.overflowPx = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
++    result.unnamed = await unnamedControls(page);
++    result.keyboard = await keyboardReach(page);
++    if (size === 'phone' && await page.locator('.shell-filter-toggle').count()) result.escape = await drawerEscape(page);
++    else if (size === 'desktop' && tryDialogs) result.escape = await dialogEscape(page);
++  } catch (error) {
++    consoleErrors.push(`visit failed: ${String(error).slice(0, 200)}`);
++  } finally { await page.close(); }
++  const escapeOk = !result.escape || !result.escape.opened || (result.escape.closed && result.escape.focusReturned);
++  const keyboardOk = !result.keyboard || (result.keyboard.reachedMain ? result.keyboard.focusVisible : route.startsWith('/sign') || route === '/two-step' || route === '/verify-email' || route === '/password-recovery' || route === '/join' || route === '/access-limited' || route === '/no-workspace');
++  result.ok = result.status !== null && result.status < 500 && !consoleErrors.length && !hydration.length && result.overflowPx <= 1 && !result.unnamed.length && keyboardOk && escapeOk;
++  return result;
++}
++
++/** Interactive nodes with an empty computed accessible name, from Chromium's accessibility tree. */
++async function unnamedControls(page: Page): Promise<Array<{ role: string; html: string }>> {
++  const cdp = await page.context().newCDPSession(page);
++  try {
++    const { nodes } = await cdp.send('Accessibility.getFullAXTree') as { nodes: Array<{ ignored?: boolean; role?: { value?: string }; name?: { value?: string }; backendDOMNodeId?: number }> };
++    const found: Array<{ role: string; html: string }> = [];
++    for (const node of nodes) {
++      const role = node.role?.value ?? '';
++      if (node.ignored || !NAMED_ROLES.has(role) || (node.name?.value ?? '').trim() || !node.backendDOMNodeId) continue;
++      let html = '';
++      try {
++        const { object } = await cdp.send('DOM.resolveNode', { backendNodeId: node.backendDOMNodeId }) as { object: { objectId?: string } };
++        if (object.objectId) html = String(((await cdp.send('Runtime.callFunctionOn', { objectId: object.objectId, functionDeclaration: 'function(){ const v = this.getBoundingClientRect(); return (v.width && v.height ? "" : "[hidden] ") + this.outerHTML.slice(0, 160); }', returnByValue: true })) as { result: { value?: string } }).result.value ?? '');
++      } catch { html = '(unresolved)'; }
++      if (html.startsWith('[hidden] ')) continue;
++      found.push({ role, html });
++      if (found.length >= 10) break;
++    }
++    return found;
++  } finally { await cdp.detach().catch(() => undefined); }
++}
++
++/** Tab from the top of the page until focus enters the main region; report whether a focus indicator is drawn. */
++async function keyboardReach(page: Page) {
++  await page.evaluate(() => { (document.activeElement as HTMLElement | null)?.blur(); window.scrollTo(0, 0); });
++  for (let tabs = 1; tabs <= 60; tabs += 1) {
++    await page.keyboard.press('Tab');
++    const state = await page.evaluate(() => {
++      const el = document.activeElement as HTMLElement | null;
++      const main = document.querySelector('main');
++      const scope = main ?? document.body;
++      if (!el || el === document.body || !scope.contains(el)) return null;
++      const style = getComputedStyle(el);
++      const visible = (style.outlineStyle !== 'none' && parseFloat(style.outlineWidth) > 0) || (style.boxShadow && style.boxShadow !== 'none');
++      return { focusVisible: Boolean(visible), focused: `${el.tagName.toLowerCase()} ${(el.getAttribute('aria-label') || el.textContent || '').trim().slice(0, 40)}` };
++    });
++    if (state) return { reachedMain: true, tabs, ...state };
++  }
++  return { reachedMain: false, tabs: 60, focusVisible: false, focused: '' };
++}
++
++async function drawerEscape(page: Page) {
++  const toggle = page.locator('.shell-filter-toggle').first();
++  if (!(await toggle.isVisible())) return null;
++  await toggle.focus();
++  await page.keyboard.press('Enter');
++  await page.waitForTimeout(250);
++  const opened = (await toggle.getAttribute('aria-expanded')) === 'true';
++  await page.keyboard.press('Escape');
++  await page.waitForTimeout(250);
++  const closed = (await toggle.getAttribute('aria-expanded')) !== 'true';
++  const focusReturned = await toggle.evaluate(el => document.activeElement === el);
++  return { trigger: 'Menu & filters drawer', opened, closed, focusReturned };
++}
++
++/** Opens the first visible non-submit "New/Create/Add…" button in main if it opens a dialog, then closes it with Escape. */
++async function dialogEscape(page: Page) {
++  const candidates = page.locator('main button:not([type=submit]):visible');
++  const total = Math.min(await candidates.count(), 40);
++  for (let i = 0; i < total; i += 1) {
++    const button = candidates.nth(i);
++    const label = ((await button.getAttribute('aria-label')) || (await button.innerText().catch(() => ''))).trim();
++    if (!SAFE_DIALOG_TRIGGER.test(label) || await button.isDisabled()) continue;
++    if (await button.evaluate(el => Boolean(el.closest('form')))) continue;
++    await button.focus();
++    await page.keyboard.press('Enter');
++    await page.waitForTimeout(300);
++    const opened = await page.locator('dialog[open], [role=dialog][aria-modal=true]').count() > 0;
++    if (!opened) return null;
++    await page.keyboard.press('Escape');
++    await page.waitForTimeout(300);
++    const closed = await page.locator('dialog[open], [role=dialog][aria-modal=true]').count() === 0;
++    const focusReturned = await button.evaluate(el => document.activeElement === el).catch(() => false);
++    return { trigger: label.slice(0, 40), opened, closed, focusReturned };
++  }
++  return null;
++}
++
++main().catch(error => { process.stderr.write(`${error instanceof ProbeFailure ? 'Probe refused' : 'Probe failed'}: ${error instanceof Error ? error.message : String(error)}\n`); process.exit(1); });

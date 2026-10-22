@@ -1,0 +1,70 @@
+diff --git a/rebuild/src/modules/publishing/ui/posts/actions.ts b/rebuild/src/modules/publishing/ui/posts/actions.ts
+index 21943cb9..08aba85d 100644
+--- a/rebuild/src/modules/publishing/ui/posts/actions.ts
++++ b/rebuild/src/modules/publishing/ui/posts/actions.ts
+@@ -12,6 +12,7 @@ import { finishPostDeletion, getPostDeletion, recordPostDeletionOutcome, type Po
+ import { parsePublishingMedia } from '@/modules/publishing/media-support';
+ import { parseFirstCommentDelay } from '@/modules/publishing/first-comment-delay';
+ import { runtimeConfig } from '@/server/config/store';
++import { createQueuedPost, QueueAfterSaveError } from '@/modules/publishing/server/queue-compose';
+ 
+ const PATH = '/publishing/posts';
+ type ActionNotice = 'created' | 'updated' | 'deleted' | 'imported' | 'published' | 'publish-review' | 'synced' | 'failed';
+@@ -35,8 +36,10 @@ export type ComposerValues = {
+   targetIds: string[];
+   scheduleDate: string;
+   scheduleTime: string;
++  /** Set when a queue attempt saved the draft but could not place it; a retry reuses that draft. */
++  draftPostId: string;
+ };
+-export type ComposerActionState = { message?: string; saveUnconfirmed?: boolean; values: Partial<ComposerValues> } & ({ status: 'idle' | 'error'; destination?: never } | { status: 'success'; destination: string });
++export type ComposerActionState = { message?: string; saveUnconfirmed?: boolean; values: Partial<ComposerValues> } & ({ status: 'idle' | 'error'; destination?: never } | { status: 'success'; destination: string; queued?: { scheduledAt: string; status: 'scheduled' | 'pending_approval' } });
+ 
+ export type PostEditActionState = { status: 'idle' | 'error'; message?: string; values: Partial<ComposerValues> };
+ export type PostDeleteActionState = { status: 'idle' | 'error'; message?: string; deleteRemote: boolean; receipt?: PostDeletionReceipt; operationId?: string };
+@@ -112,7 +115,8 @@ export async function createPostWithRecoveryAction(previous: ComposerActionState
+   try {
+     const viewer = await requireViewer({ feature: 'publishing/posts', channelScoped: true, write: true });
+     if (!canAccessFeature(viewer.permissions, 'publishing/posts', 'write')) throw new Error('permission');
+-    if (values.intent !== 'draft' && values.intent !== 'schedule') throw new Error('intent');
++    if (values.intent !== 'draft' && values.intent !== 'schedule' && values.intent !== 'queue') throw new Error('intent');
++    if (values.intent === 'queue') return await queueFromComposer(viewer, data, values);
+     const scheduledAt = values.intent === 'schedule' ? (() => {
+       const result = wallTimeToInstant(values.scheduleDate, values.scheduleTime, viewer.membership.workspace.timezone);
+       if (!result.ok) throw new Error('schedule');
+@@ -138,6 +142,26 @@ export async function createPostWithRecoveryAction(previous: ComposerActionState
+   return { status: 'success', destination: `${PATH}?notice=${values.intent === 'schedule' ? 'scheduled' : 'created'}`, values };
+ }
+ 
++async function queueFromComposer(viewer: Awaited<ReturnType<typeof requireViewer>>, data: FormData, values: ComposerValues): Promise<ComposerActionState> {
++  try {
++    const receipt = await createQueuedPost(actor(viewer), {
++      message: values.message,
++      firstComment: values.firstComment,
++      firstCommentDelayMinutes: await parsedCommentDelay(values.firstCommentDelayMinutes),
++      labelId: values.labelId || null,
++      ...attachments(data),
++      targetIds: values.targetIds,
++    }, values.draftPostId || undefined);
++    try { refreshPublishing(); } catch { console.error('Publishing view refresh failed after a confirmed queue placement.'); }
++    return { status: 'success', destination: `${PATH}?notice=scheduled`, values, queued: { scheduledAt: receipt.scheduledAt.toISOString(), status: receipt.status === 'pending_approval' ? 'pending_approval' : 'scheduled' } };
++  } catch (error) {
++    if (!(error instanceof QueueAfterSaveError)) throw error;
++    try { refreshPublishing(); } catch { /* the saved draft is listed after the next refresh */ }
++    const reason = operationFailure(error.cause, 'The queue time could not be confirmed.').error;
++    return { status: 'error', message: `Saved as a draft, but not added to the queue: ${reason}`, values: { ...values, draftPostId: error.draftPostId } };
++  }
++}
++
+ export async function createPostAction(data: FormData) {
+   await run(async viewer => {
+     const postActor = actor(viewer);
+@@ -348,7 +372,7 @@ function composerValues(data: FormData): ComposerValues {
+     intent: values('intent'), attachmentKind: values('attachmentKind'), mediaJson: values('mediaJson'), destinationFormatsJson: values('destinationFormatsJson'), message: values('message'), firstComment: values('firstComment'), firstCommentDelayMinutes: values('firstCommentDelayMinutes') || '0',
+     link: values('link'), imageUrl: values('imageUrl'), videoUrl: values('videoUrl'), uploadedImageRef: values('uploadedImageRef'),
+     altText: values('altText'), targetIds: data.getAll('targetIds').filter((item): item is string => typeof item === 'string'),
+-    scheduleDate: values('scheduleDate'), scheduleTime: values('scheduleTime'), labelId: values('labelId'),
++    scheduleDate: values('scheduleDate'), scheduleTime: values('scheduleTime'), labelId: values('labelId'), draftPostId: values('draftPostId'),
+   };
+ }
+ 

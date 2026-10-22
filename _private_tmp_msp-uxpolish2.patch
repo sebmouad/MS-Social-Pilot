@@ -1,0 +1,261 @@
+diff --git a/rebuild/src/modules/publishing/ui/compose/PostComposer.module.css b/rebuild/src/modules/publishing/ui/compose/PostComposer.module.css
+index ef2bb785..b4110ce0 100644
+--- a/rebuild/src/modules/publishing/ui/compose/PostComposer.module.css
++++ b/rebuild/src/modules/publishing/ui/compose/PostComposer.module.css
+@@ -95,3 +95,27 @@
+ .modeRow { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; }
+ .modeRow > :global(.ui-select) { flex: 0 1 240px; min-width: 0; }
+ .autosave { margin: 0; color: var(--ink-faint); font-size: var(--text-sm); }
++
++/* UX polish: composer fields, upload zone, chosen channels and sticky actions. */
++.form textarea:focus-visible, .form input:focus-visible, .sidebarControls input:focus-visible { outline: none; border-color: var(--focus); box-shadow: var(--ui-ring); }
++.form textarea:hover, .form input:not([type="checkbox"]):not([type="radio"]):hover { border-color: var(--ink-faint); }
++.form [aria-invalid="true"] { border-color: var(--danger); }
++.form [aria-invalid="true"]:focus-visible { box-shadow: 0 0 0 1px var(--danger) inset, var(--ui-ring); }
++.attachments input[type="file"]:focus-visible { outline: none; border-color: var(--focus); box-shadow: var(--ui-ring); }
++.destinationList label:has(input:focus-visible) { outline: 2px solid var(--focus); outline-offset: 1px; }
++.destinationList label { min-height: 36px; }
++.destinationList input[type="checkbox"], .destinationList input[type="radio"] { width: 18px; height: 18px; flex: 0 0 auto; accent-color: var(--accent); }
++.chosen li { transition: border-color .12s ease; }
++.chosen li:hover { border-color: var(--line-strong); }
++.stepHead h2 { overflow-wrap: anywhere; }
++.actions > * { min-height: 44px; }
++.modeRow > :global(.ui-select) { flex-basis: 220px; }
++@media (max-width: 900px) { .actions { padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px)); } }
++@media (max-width: 540px) {
++  .form { padding: 14px; gap: 14px; }
++  .previewPanel { padding: 12px; }
++  .dateTime { grid-template-columns: minmax(0, 1fr); }
++  .modeRow { flex-direction: column; align-items: stretch; }
++  .modeRow > :global(.ui-select) { flex-basis: auto; }
++}
++@media (prefers-reduced-motion: reduce) { .chosen li { transition: none; } }
+diff --git a/rebuild/src/modules/publishing/ui/kit/kit.module.css b/rebuild/src/modules/publishing/ui/kit/kit.module.css
+index e4ac0fc0..2e167ad7 100644
+--- a/rebuild/src/modules/publishing/ui/kit/kit.module.css
++++ b/rebuild/src/modules/publishing/ui/kit/kit.module.css
+@@ -16,3 +16,9 @@
+ .thumbCount { position: absolute; right: 3px; bottom: 3px; padding: 0 5px; border-radius: 999px; background: color-mix(in srgb, var(--ink) 78%, transparent); color: var(--surface); font-size: 10px; font-weight: 750; }
+ 
+ .chipRow { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
++
++.viewSwitch a { min-height: 44px; }
++.viewSwitch a:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
++.viewSwitch a:not([aria-current="true"]):hover { background: var(--surface-hover); }
++.toolbarRow > * { min-width: 0; }
++@media (max-width: 560px) { .viewSwitch a { padding: 0 10px; } }
+diff --git a/rebuild/src/modules/publishing/ui/publishing-ui.tsx b/rebuild/src/modules/publishing/ui/publishing-ui.tsx
+index 71626b85..22c70717 100644
+--- a/rebuild/src/modules/publishing/ui/publishing-ui.tsx
++++ b/rebuild/src/modules/publishing/ui/publishing-ui.tsx
+@@ -14,7 +14,7 @@ export function PublishingPagination({ path, page, pages, locale = 'en', copy =
+   if (pages <= 1) return null;
+   return <nav className={styles.postPagination} aria-label={copy.pagesLabel}>
+     {page > 1 ? <a className="ui-button ui-button--secondary" href={`${path}?page=${page - 1}`}>{copy.previousPage}</a> : <span />}
+-    <span>{copy.pageOf(page,pages)}</span>
++    <span aria-current="page">{copy.pageOf(page,pages)}</span>
+     {page < pages ? <a className="ui-button ui-button--secondary" href={`${path}?page=${page + 1}`}>{copy.nextPage}</a> : <span />}
+   </nav>;
+ }
+diff --git a/rebuild/src/modules/publishing/ui/publishing.module.css b/rebuild/src/modules/publishing/ui/publishing.module.css
+index 2e58b317..879f0a06 100644
+--- a/rebuild/src/modules/publishing/ui/publishing.module.css
++++ b/rebuild/src/modules/publishing/ui/publishing.module.css
+@@ -109,3 +109,31 @@
+ .savedViewList a[aria-current="page"] { font-weight: 700; }
+ .bulkBar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 12px; }
+ .bulkBar > p:empty { display: none; }
++
++/* UX polish: filter controls, form fields and pagination share the themed focus ring and hover states. */
++.postFilters select:focus-visible, .postFilters input:focus-visible, .postFilters button:focus-visible,
++.draftForm input:focus-visible, .editForm input:focus-visible, .scheduleForm input[type="datetime-local"]:focus-visible { outline: none; border-color: var(--focus); box-shadow: var(--ui-ring); }
++.draftForm textarea:focus-visible, .editForm textarea:focus-visible { outline: none; border-color: var(--focus); box-shadow: var(--ui-ring); }
++.postFilters select:hover, .postFilters input:hover { border-color: var(--ink-faint); }
++.postFilters button:hover { background: var(--surface-hover); }
++.postFilters button:active { background: var(--surface-muted); }
++.postFilters a { min-height: 32px; display: inline-flex; align-items: center; }
++.postFilters a:focus-visible, .tab:focus-visible, .calendarNavigation a:focus-visible, .event:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: 4px; }
++.tabs { scrollbar-width: thin; }
++.tab { min-height: 44px; display: inline-flex; align-items: center; padding-bottom: 0; }
++.postPagination > span[aria-current="page"] { color: var(--ink); font-weight: 650; }
++.empty { border: 1px dashed var(--line-strong); border-radius: var(--radius-md); background: var(--surface-raised); }
++.event { transition: background-color .12s ease; }
++.event:hover { background: var(--accent-soft); filter: brightness(.97); }
++.errorNotice, .successNotice { margin: 0; }
++.editDetails summary { min-height: 36px; display: inline-flex; align-items: center; border-radius: 4px; }
++.editDetails summary:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
++@media (max-width: 720px) {
++  .postPagination { flex-wrap: wrap; justify-content: center; }
++  .postPagination > a { flex: 1 1 140px; justify-content: center; }
++  .card { padding: 16px; }
++  .rowActions { min-width: 0; }
++  .editForm { min-width: 0; }
++  .mediaGrid { grid-template-columns: repeat(auto-fill, minmax(min(100%, 150px), 1fr)); gap: 12px; }
++}
++@media (prefers-reduced-motion: reduce) { .event { transition: none; } }
+diff --git a/rebuild/src/modules/publishing/ui/workflow.module.css b/rebuild/src/modules/publishing/ui/workflow.module.css
+index 4ae9a1ac..80284b23 100644
+--- a/rebuild/src/modules/publishing/ui/workflow.module.css
++++ b/rebuild/src/modules/publishing/ui/workflow.module.css
+@@ -9,3 +9,8 @@
+ .help { margin: 0; color: var(--ink-soft); font-size: 12px; line-height: 1.4; }
+ .reviewButtons { display: flex; flex-wrap: wrap; gap: 8px; }
+ @media (max-width: 720px) { .actions { padding: 12px; } }
++
++.form textarea:hover { border-color: var(--ink-faint); }
++.form textarea:focus-visible { outline: none; border-color: var(--focus); box-shadow: var(--ui-ring); }
++.help { overflow-wrap: anywhere; }
++@media (max-width: 720px) { .items { max-width: none; } .reviewButtons > * { flex: 1 1 120px; min-height: 44px; } .form { width: 100%; } }
+diff --git a/rebuild/src/modules/publishing/ui/worklist.module.css b/rebuild/src/modules/publishing/ui/worklist.module.css
+index dcf1c327..d9934430 100644
+--- a/rebuild/src/modules/publishing/ui/worklist.module.css
++++ b/rebuild/src/modules/publishing/ui/worklist.module.css
+@@ -25,3 +25,19 @@
+   .rowActions { justify-items: start; }
+   .help { text-align: left; }
+ }
++
++/* UX polish: rows react to hover and focus, empty state is a clear dashed surface, phone actions stack. */
++.row { transition: border-color .12s ease; }
++.row:hover { border-color: var(--line-strong); }
++.row:focus-within { border-color: var(--focus); }
++.review textarea:hover { border-color: var(--ink-faint); }
++.review textarea:focus-visible { outline: none; border-color: var(--focus); box-shadow: var(--ui-ring); }
++.empty { background: var(--surface-raised); }
++.empty h2 { color: var(--ink); }
++@media (max-width: 720px) {
++  .row { padding: 12px; gap: 12px; }
++  .rowActions, .reviewButtons { width: 100%; }
++  .reviewButtons > * { flex: 1 1 120px; min-height: 44px; }
++  .empty { padding: 26px 16px; }
++}
++@media (prefers-reduced-motion: reduce) { .row { transition: none; } }
+diff --git a/rebuild/src/modules/settings/ui/settings.module.css b/rebuild/src/modules/settings/ui/settings.module.css
+index 3134a069..886ed266 100644
+--- a/rebuild/src/modules/settings/ui/settings.module.css
++++ b/rebuild/src/modules/settings/ui/settings.module.css
+@@ -132,3 +132,40 @@
+ button.settings-row-actions__link { background: none; border: 0; padding: 0; cursor: pointer; font: inherit; font-size: 12px; font-weight: 700; }
+ button.settings-row-actions__link:disabled { cursor: progress; opacity: .6; }
+ .settings-health-list { margin: 4px 0 0; padding: 0; list-style: none; display: grid; gap: 2px; font-size: 12px; }
++
++
++/* UX polish: keyboard focus, touch targets, hover states and phone layout across Settings. */
++.settings-tabs a:focus-visible, .settings-row-actions a:focus-visible, button.settings-row-actions__link:focus-visible,
++.connection-danger-link:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: 4px; }
++.mcp-key-form button:not(:global(.ui-button)):focus-visible, .settings-panel button:not(:global(.ui-button)):focus-visible,
++.data-button:focus-visible, .data-danger-button:focus-visible, .connection-primary-button:focus-visible, .connection-danger-button:focus-visible,
++.connection-dialog footer button:focus-visible, .connection-dialog > header > button:focus-visible, .connection-toolbar > div > button:focus-visible { outline: none; box-shadow: var(--ui-ring); }
++.team-add-fields input:focus-visible, .team-add-fields select:focus-visible, .team-row-edit select:focus-visible,
++.data-delete-row input:focus-visible, .disconnect-confirm input:focus-visible, .mcp-key-token textarea:focus-visible { outline: none; border-color: var(--focus); box-shadow: var(--ui-ring); }
++.settings-tabs { scrollbar-width: thin; }
++.settings-tabs a:focus-visible { background: var(--surface-muted); }
++.settings-table tbody tr:hover td { background: var(--surface-hover); }
++.settings-table-wrap { max-width: 100%; }
++.settings-empty { border: 1px dashed var(--line-strong); border-radius: var(--radius-md); margin: 14px; background: var(--surface-raised); color: var(--ink-soft); }
++.settings-row-actions a, .settings-row-actions__link { min-height: 44px; }
++.settings-note { overflow-wrap: anywhere; }
++.settings-panel button:not(:global(.ui-button)):hover:not(:disabled), .mcp-key-form button:not(:global(.ui-button)):hover:not(:disabled) { background: var(--surface-hover); }
++.connection-source label:has(input:focus-visible), .connection-retention label:has(input:focus-visible) { outline: 2px solid var(--focus); outline-offset: 1px; border-radius: 6px; }
++.connection-source input, .connection-retention input { width: 18px; height: 18px; flex: 0 0 auto; }
++.connection-source label, .connection-retention label { min-height: 44px; }
++.connection-dialog > header > button { width: 44px; height: 44px; flex: 0 0 auto; }
++@media (max-width: 620px) {
++  .settings-heading { flex-direction: column; gap: 12px; }
++  .settings-tabs { width: 100%; }
++  .settings-panel__heading { flex-direction: column; gap: 10px; }
++  .connection-dialog { width: calc(100% - 16px); max-height: calc(100dvh - 16px); padding: 16px; }
++  .connection-dialog footer { bottom: -16px; margin: 0 -16px -16px; padding: 12px 16px calc(16px + env(safe-area-inset-bottom, 0px)); flex-wrap: wrap; }
++  .connection-dialog footer > * { flex: 1 1 140px; min-height: 44px; }
++  .data-delete-row { width: 100%; }
++  .data-delete-row input, .disconnect-confirm input { width: 100%; }
++  .data-button, .data-danger-button { width: 100%; min-height: 44px; }
++  .team-row-actions button { min-height: 44px; }
++  .team-add-form { padding: 12px; }
++  .settings-account-item { padding: 12px; }
++  .connection-toolbar > div > button { min-height: 44px; }
++}
+diff --git a/rebuild/tests/publishing-settings-ux-polish.test.ts b/rebuild/tests/publishing-settings-ux-polish.test.ts
+new file mode 100644
+index 00000000..14cd5d46
+--- /dev/null
++++ b/rebuild/tests/publishing-settings-ux-polish.test.ts
+@@ -0,0 +1,78 @@
++// @vitest-environment jsdom
++import { readFileSync } from 'node:fs';
++import { createElement } from 'react';
++import { renderToStaticMarkup } from 'react-dom/server';
++import { describe, expect, it } from 'vitest';
++import { PublishingPagination } from '../src/modules/publishing/ui/publishing-ui';
++import { EmptyState, WorkList, WorkRow } from '../src/modules/publishing/ui/worklist';
++
++const css = (path: string) => readFileSync(path, 'utf8');
++const publishing = 'src/modules/publishing/ui/';
++
++describe('Publishing markup states', () => {
++  it('marks the current page in the pagination and hides it for a single page', () => {
++    const html = renderToStaticMarkup(createElement(PublishingPagination, { path: '/publishing/queue', page: 2, pages: 3, locale: 'fr' }));
++    expect(html).toMatch(/<span aria-current="page">/);
++    expect(html).toContain('href="/publishing/queue?page=1"');
++    expect(html).toContain('href="/publishing/queue?page=3"');
++    expect(renderToStaticMarkup(createElement(PublishingPagination, { path: '/x', page: 1, pages: 1 }))).toBe('');
++  });
++  it('renders an empty work list state with a heading and explanation', () => {
++    const html = renderToStaticMarkup(createElement(EmptyState, { title: 'Nothing waiting', children: 'Posts appear here.' }));
++    expect(html).toContain('<h2>Nothing waiting</h2>');
++    expect(html).toContain('Posts appear here.');
++  });
++  it('keeps the labelled list and row actions in work rows', () => {
++    const html = renderToStaticMarkup(createElement(WorkList, { label: 'Approvals', children: createElement(WorkRow, { chip: 'Pending', when: 'Today', actions: createElement('button', null, 'Approve'), children: 'Text' }) }));
++    expect(html).toContain('aria-label="Approvals"');
++    expect(html).toContain('Approve');
++  });
++});
++
++describe('Publishing styles', () => {
++  const composer = css(`${publishing}compose/PostComposer.module.css`);
++  const page = css(`${publishing}publishing.module.css`);
++  const work = css(`${publishing}worklist.module.css`);
++  it('gives composer fields the shared themed focus ring and an invalid ring', () => {
++    expect(composer).toMatch(/\.form textarea:focus-visible[^{]*\{[^}]*var\(--ui-ring\)/);
++    expect(composer).toMatch(/\.form \[aria-invalid="true"\]:focus-visible[^{]*\{[^}]*var\(--danger\)/);
++  });
++  it('stacks date, time and destination controls on phones', () => {
++    expect(composer).toMatch(/max-width: 540px\)[^]*\.dateTime \{ grid-template-columns: minmax\(0, 1fr\)/);
++  });
++  it('gives filters, tabs and rows keyboard focus and 44px targets', () => {
++    expect(page).toMatch(/\.postFilters select:focus-visible/);
++    expect(page).toMatch(/\.tab \{ min-height: 44px/);
++    expect(work).toMatch(/\.row:focus-within/);
++    expect(work).toMatch(/\.reviewButtons > \* \{ flex: 1 1 120px; min-height: 44px/);
++  });
++  it('respects reduced motion for the added transitions', () => {
++    expect(composer).toMatch(/prefers-reduced-motion: reduce\) \{ \.chosen li \{ transition: none/);
++    expect(work).toMatch(/prefers-reduced-motion: reduce\) \{ \.row \{ transition: none/);
++  });
++  it('uses theme tokens only in the polish blocks', () => {
++    for (const source of [composer, page, work]) {
++      const block = source.slice(source.indexOf('UX polish'));
++      expect(block).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
++      expect(block).not.toMatch(/rgba?\(/);
++    }
++  });
++});
++
++describe('Settings styles', () => {
++  const settings = css('src/modules/settings/ui/settings.module.css');
++  const block = settings.slice(settings.indexOf('UX polish'));
++  it('shows keyboard focus on tabs, row actions and custom buttons', () => {
++    expect(block).toMatch(/\.settings-tabs a:focus-visible/);
++    expect(block).toMatch(/\.data-danger-button:focus-visible/);
++    expect(block).toMatch(/var\(--ui-ring\)/);
++  });
++  it('gives the connection dialog a phone layout with full-width actions and 44px targets', () => {
++    expect(block).toMatch(/@media \(max-width: 620px\)[^]*\.connection-dialog footer > \* \{ flex: 1 1 140px; min-height: 44px/);
++    expect(block).toMatch(/\.connection-dialog > header > button \{ width: 44px; height: 44px/);
++  });
++  it('turns the empty message into a dashed surface and uses tokens only', () => {
++    expect(block).toMatch(/\.settings-empty \{ border: 1px dashed var\(--line-strong\)/);
++    expect(block).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
++  });
++});

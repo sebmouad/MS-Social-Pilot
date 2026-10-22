@@ -1,0 +1,203 @@
+diff --git a/rebuild/src/modules/publishing/error-catalog.ts b/rebuild/src/modules/publishing/error-catalog.ts
+index 28a29a9b..a3044ff3 100644
+--- a/rebuild/src/modules/publishing/error-catalog.ts
++++ b/rebuild/src/modules/publishing/error-catalog.ts
+@@ -1074,7 +1074,8 @@ export const publishingErrorCopy = {
+ "read_10": {"en":"Choose valid post statuses.","fr":"Choisissez des statuts de publication valides."},
+ "read_11": {"en":"The end date must follow the start date.","fr":"La date de fin doit suivre la date de début."},
+ "read_12": {"en":"This export exceeds the synchronous limit. Narrow your filters and try again.","fr":"Cet export dépasse la limite de traitement immédiat. Affinez les filtres et réessayez."},
+-"read_13": {"en":"Choose a valid Publishing export result limit.","fr":"Choisissez une limite de résultats d’export valide."}
++"read_13": {"en":"Choose a valid Publishing export result limit.","fr":"Choisissez une limite de résultats d’export valide."},
++"read_14": {"en":"Choose a valid post origin.","fr":"Choisissez une origine de publication valide."}
+ };
+ export type PublishingErrorCopy = typeof publishingErrorCopy;
+ export type PublishingErrorKey = keyof PublishingErrorCopy;
+diff --git a/rebuild/src/modules/publishing/server/origin-source.ts b/rebuild/src/modules/publishing/server/origin-source.ts
+index 07084a9a..00826e24 100644
+--- a/rebuild/src/modules/publishing/server/origin-source.ts
++++ b/rebuild/src/modules/publishing/server/origin-source.ts
+@@ -1,4 +1,4 @@
+-import { OperationError } from '@/lib/operation-error';
++import { defaultPublishingErrorText, PublishingOperationError, type PublishingErrorText } from '../error-catalog';
+ import { INSTALLED_POST_ORIGIN_SOURCES } from '@/modules/installed-post-origins';
+ 
+ /**
+@@ -13,15 +13,15 @@ export interface PostOriginSource {
+ }
+ 
+ /** The requested origin when it names an installed source; anything else is a refused filter, never ignored. */
+-export function parsePostOrigin(value: unknown, sources: readonly PostOriginSource[] = INSTALLED_POST_ORIGIN_SOURCES): string | undefined {
++export function parsePostOrigin(value: unknown, sources: readonly PostOriginSource[] = INSTALLED_POST_ORIGIN_SOURCES, errorText: PublishingErrorText = defaultPublishingErrorText): string | undefined {
+   if (value === undefined || value === '') return undefined;
+-  if (typeof value !== 'string' || !sources.some(source => source.kind === value)) throw new OperationError('invalid_request', 'Choose a valid post origin.');
++  if (typeof value !== 'string' || !sources.some(source => source.kind === value)) throw new PublishingOperationError('invalid_request', 'read_14', {}, errorText);
+   return value;
+ }
+ 
+ /** Post-list condition for the origin, evaluated in the same query as every other filter so totals and pages are exact. */
+-export async function postOriginWhere(workspaceId: string, kind: string, sources: readonly PostOriginSource[] = INSTALLED_POST_ORIGIN_SOURCES): Promise<{ id: { in: string[] } }> {
++export async function postOriginWhere(workspaceId: string, kind: string, sources: readonly PostOriginSource[] = INSTALLED_POST_ORIGIN_SOURCES, errorText: PublishingErrorText = defaultPublishingErrorText): Promise<{ id: { in: string[] } }> {
+   const source = sources.find(candidate => candidate.kind === kind);
+-  if (!source) throw new OperationError('invalid_request', 'Choose a valid post origin.');
++  if (!source) throw new PublishingOperationError('invalid_request', 'read_14', {}, errorText);
+   return { id: { in: await source.matchingPostIds(workspaceId) } };
+ }
+diff --git a/rebuild/src/modules/publishing/server/read-query.ts b/rebuild/src/modules/publishing/server/read-query.ts
+index 90897eb2..fe3c0002 100644
+--- a/rebuild/src/modules/publishing/server/read-query.ts
++++ b/rebuild/src/modules/publishing/server/read-query.ts
+@@ -62,7 +62,7 @@ export async function publishingPostReadQuery(
+     || ![Object.prototype, null].includes(Object.getPrototypeOf(input))
+     || Object.keys(input).some(key => !['status', 'channelId', 'q', 'origin'].includes(key))) invalid(undefined, errorText);
+   const [postStatus, channelId, q] = await Promise.all([parseStatus(input.status, errorText), parseChannel(input.channelId), publishingPostSearch(input.q)]);
+-  const origin = parsePostOrigin(input.origin, originSources);
++  const origin = parsePostOrigin(input.origin, originSources, errorText);
+   const access = await authorizePublishing(actor, feature, 'read');
+   const targetIds = await selectedPublishingTargetIds(actor.workspaceId, access.entitlements, access.actor.allowedTargetIds);
+   const authorId = access.actor.allowedTargetIds === undefined ? undefined : actor.userId;
+@@ -76,7 +76,7 @@ export async function publishingPostReadQuery(
+     ...(postStatus ? [{ status: postStatus } as Prisma.PostWhereInput] : []),
+     ...(filterIds ? [{ targets: { some: { targetId: channelId?.startsWith('channel-group:') ? { in: filterIds } : channelId } } } as Prisma.PostWhereInput] : []),
+     ...(q ? [publishingPostSearchWhere(q)] : []),
+-    ...(origin ? [await postOriginWhere(actor.workspaceId, origin, originSources)] : []),
++    ...(origin ? [await postOriginWhere(actor.workspaceId, origin, originSources, errorText)] : []),
+   ] };
+   return {
+     where,
+diff --git a/rebuild/src/modules/publishing/ui/kit/copy.ts b/rebuild/src/modules/publishing/ui/kit/copy.ts
+index 2fe13162..6bdfbb34 100644
+--- a/rebuild/src/modules/publishing/ui/kit/copy.ts
++++ b/rebuild/src/modules/publishing/ui/kit/copy.ts
+@@ -58,6 +58,7 @@ export const publishingCopyDefaults = {
+ "allChannels": {"en": "All selected channels", "fr": "Tous les canaux sélectionnés"},
+ "unavailableChannelOption": {"en": "Unavailable channel", "fr": "Canal indisponible"},
+ "mediaUnavailable": {"en": "Image unavailable", "fr": "Image indisponible"},
++"openImageAttachment": {"en": "Open image attachment", "fr": "Ouvrir la pièce jointe image"},
+ "organizationTools": {"en": "Organization tools", "fr": "Outils d’organisation"},
+ "organize": {"en": "Organize", "fr": "Organiser"},
+ "organizationHelp": {"en": "Manage labels, custom fields and team notes.", "fr": "Gérez les étiquettes, champs personnalisés et notes de l’équipe."},
+@@ -568,6 +569,7 @@ export function resolvePublishingCopy(catalog: PublishingCopyCatalog) { return {
+ "allChannels":catalog["allChannels"].en,
+ "unavailableChannelOption":catalog["unavailableChannelOption"].en,
+ "mediaUnavailable":catalog["mediaUnavailable"].en,
++"openImageAttachment":catalog["openImageAttachment"].en,
+ "organizationTools":catalog["organizationTools"].en,
+ "organize":catalog["organize"].en,
+ "organizationHelp":catalog["organizationHelp"].en,
+@@ -797,6 +799,7 @@ export function resolvePublishingCopy(catalog: PublishingCopyCatalog) { return {
+ "allChannels":catalog["allChannels"].fr,
+ "unavailableChannelOption":catalog["unavailableChannelOption"].fr,
+ "mediaUnavailable":catalog["mediaUnavailable"].fr,
++"openImageAttachment":catalog["openImageAttachment"].fr,
+ "organizationTools":catalog["organizationTools"].fr,
+ "organize":catalog["organize"].fr,
+ "organizationHelp":catalog["organizationHelp"].fr,
+diff --git a/rebuild/src/modules/publishing/ui/kit/kit.tsx b/rebuild/src/modules/publishing/ui/kit/kit.tsx
+index 4d22411e..a380b632 100644
+--- a/rebuild/src/modules/publishing/ui/kit/kit.tsx
++++ b/rebuild/src/modules/publishing/ui/kit/kit.tsx
+@@ -89,7 +89,7 @@ export function PostImage({ src, alt, locale, className, linkClassName, href, ic
+   }
+   // eslint-disable-next-line @next/next/no-img-element
+   const image = <img className={className} src={src} alt={alt} loading="lazy" onError={() => setFailedSrc(src)} />;
+-  return href ? <a className={linkClassName} href={href} target="_blank" rel="noopener noreferrer" aria-label="Open image attachment">{image}</a> : image;
++  return href ? <a className={linkClassName} href={href} target="_blank" rel="noopener noreferrer" aria-label={copy.openImageAttachment}>{image}</a> : image;
+ }
+ 
+ export function MediaThumb({ url, alt, count, video, locale }: { url: string | null; alt: string; count: number; video?: boolean; locale?: KitLocale }) {
+diff --git a/rebuild/tests/ui-copy-coverage.test.ts b/rebuild/tests/ui-copy-coverage.test.ts
+index aa751f53..a0dc8107 100644
+--- a/rebuild/tests/ui-copy-coverage.test.ts
++++ b/rebuild/tests/ui-copy-coverage.test.ts
+@@ -1,5 +1,6 @@
+ import { readdirSync, readFileSync, statSync } from 'node:fs';
+ import { join } from 'node:path';
++import ts from 'typescript';
+ import { describe, expect, it } from 'vitest';
+ import { customerCopy as agencyCopy } from '../src/modules/agency/ui/copy';
+ import { customerCopy as tasksCopy } from '../src/modules/tasks/ui/copy';
+@@ -9,6 +10,8 @@ import { publicCopy, publicCopyDefaults, publicCopySchema } from '../src/modules
+ import { mediaCopy } from '../src/modules/media/copy';
+ import { feedsCopy } from '../src/modules/feeds/copy';
+ import { recipeCopy } from '../src/modules/feeds/copy-recipes';
++import { publishingErrorCopy, publishingErrorText } from '../src/modules/publishing/error-catalog';
++import { parsePostOrigin } from '../src/modules/publishing/server/origin-source';
+ import { MEDIA_CONFIG } from '../src/modules/media/config';
+ import { FEEDS_CONFIG } from '../src/modules/feeds/config';
+ import { SHARING_CONFIG } from '../src/modules/sharing/config';
+@@ -96,3 +99,75 @@ describe('media and feeds keyed catalogs cover every key their screens use', ()
+     expect(Object.keys(catalog.fr).sort()).toEqual(Object.keys(catalog.en).sort());
+   });
+ });
++
++const USER_VISIBLE_ATTRS = new Set(['aria-label', 'title', 'placeholder', 'alt', 'label', 'aria-description', 'aria-placeholder']);
++
++/** Attributes whose multi-word string values are code, not copy. */
++const TECHNICAL_ATTRS = new Set(['className', 'style', 'href', 'src', 'id', 'name', 'htmlFor', 'role', 'pattern', 'accept', 'autoComplete', 'rel', 'target', 'sizes', 'srcSet', 'viewBox', 'd', 'sandbox']);
++
++/** String literals a JSX expression can render directly: plain, conditional and logical branches. */
++function collectLiterals(expr: ts.Node | undefined, emit: (text: string) => void): void {
++  if (!expr) return;
++  if (ts.isStringLiteralLike(expr)) { if (/\p{L}{2}/u.test(expr.text)) emit(expr.text); }
++  else if (ts.isConditionalExpression(expr)) { collectLiterals(expr.whenTrue, emit); collectLiterals(expr.whenFalse, emit); }
++  else if (ts.isBinaryExpression(expr) && [ts.SyntaxKind.AmpersandAmpersandToken, ts.SyntaxKind.BarBarToken, ts.SyntaxKind.QuestionQuestionToken].includes(expr.operatorToken.kind)) { collectLiterals(expr.left, emit); collectLiterals(expr.right, emit); }
++  else if (ts.isParenthesizedExpression(expr)) collectLiterals(expr.expression, emit);
++}
++
++/** Reviewed non-copy literals that may appear in customer UI source; every entry needs a reason. */
++const LITERAL_ALLOWLIST: Array<{ file: RegExp; text: string; reason: string }> = [
++  { file: /analytics\/ui\/demographics\/DemographicsScreen\.tsx$/, text: 'UTC', reason: 'Time-standard abbreviation after a stored UTC period; identical in English and French.' },
++  { file: /feeds\/ui\/FeedManager\.tsx$/, text: 'https://example.com/feed', reason: 'Input-format example for a URL field (the reserved example.com domain); not translatable copy.' },
++  { file: /feeds\/ui\/RecipeSource\.tsx$/, text: 'https://', reason: 'URL scheme prefix used as an input-format hint; not translatable copy.' },
++  { file: /media\/ui\/MediaLibrary\.tsx$/, text: 'https://example.com/photo.jpg', reason: 'Input-format example for an image URL field (the reserved example.com domain); not translatable copy.' },
++  { file: /settings\/ui\/workspace\/policy-form\.tsx$/, text: 'America/New_York', reason: 'IANA time-zone identifier example; the identifier syntax is not localized.' },
++  { file: /sharing\/ui\/bio-settings\/BioManager\.tsx$/, text: '/bio/', reason: 'Public URL path prefix shown in front of the editable address; a route, not translatable copy.' },
++  { file: /publishing\/ui\/posts\/PostActions\.tsx$/, text: 'message,firstComment,channels', reason: 'CSV column names are the import file contract, not display text; shown in a code element.' },
++  { file: /publishing\/ui\/posts\/PostActions\.tsx$/, text: 'firstCommentDelayMinutes', reason: 'Optional CSV column name from the import file contract; shown in a code element.' },
++];
++
++/** User-visible string literals in a screen: JSX text and text-bearing attributes. Copy must come from the module catalog. */
++function uiLiterals(file: string): string[] {
++  const source = ts.createSourceFile(file, readFileSync(file, 'utf8'), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
++  const found: Array<{ text: string; entry: string }> = [];
++  const add = (node: ts.Node, text: string) => found.push({ text, entry: `${file}:${source.getLineAndCharacterOfPosition(node.getStart()).line + 1} ${JSON.stringify(text)}` });
++  const visit = (node: ts.Node): void => {
++    if (ts.isJsxText(node)) {
++      const text = node.getText().replace(/\s+/g, ' ').trim();
++      if (/\p{L}{2}/u.test(text)) add(node, text);
++    } else if (ts.isJsxExpression(node) && ts.isJsxElement(node.parent)) {
++      collectLiterals(node.expression, text => { if (/^\p{Lu}|\s/u.test(text)) add(node, text); });
++    } else if (ts.isJsxAttribute(node) && node.initializer) {
++      const attr = node.name.getText();
++      const visible = USER_VISIBLE_ATTRS.has(attr);
++      if (visible || !(TECHNICAL_ATTRS.has(attr) || attr.startsWith('data-'))) {
++        collectLiterals(ts.isJsxExpression(node.initializer) ? node.initializer.expression : node.initializer, text => { if (visible || /\s/.test(text)) add(node, text); });
++      }
++    }
++    ts.forEachChild(node, visit);
++  };
++  visit(source);
++  return found.filter(item => !LITERAL_ALLOWLIST.some(rule => rule.file.test(file) && rule.text === item.text)).map(item => item.entry);
++}
++
++describe('publishing origin filter error', () => {
++  it('comes from the publishing error catalog in both languages', () => {
++    expect(() => parsePostOrigin('unknown', [])).toThrow('Choose a valid post origin.');
++    expect(() => parsePostOrigin('unknown', [], publishingErrorText(publishingErrorCopy, 'fr'))).toThrow('Choisissez une origine de publication valide.');
++  });
++});
++
++describe('every module screen takes its visible text from the module catalog', () => {
++  const modules = readdirSync('src/modules').filter(name => statSync(join('src/modules', name)).isDirectory());
++  const screens = (name: string) => ['ui', 'components'].map(dir => join('src/modules', name, dir))
++    .filter(dir => { try { return statSync(dir).isDirectory(); } catch { return false; } })
++    .flatMap(walk).filter(file => /\.tsx$/.test(file) && !/\.test\./.test(file));
++
++  it.each(modules)('%s has no hardcoded JSX text or accessible-name literals', name => {
++    expect(screens(name).flatMap(uiLiterals)).toEqual([]);
++  });
++
++  it('keeps every allowlist entry reasoned', () => {
++    for (const rule of LITERAL_ALLOWLIST) expect(rule.reason.trim(), rule.text).not.toBe('');
++  });
++});

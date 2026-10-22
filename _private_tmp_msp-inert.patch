@@ -1,0 +1,391 @@
+diff --git a/rebuild/premium-audit.json b/rebuild/premium-audit.json
+new file mode 100644
+index 00000000..cdcad133
+--- /dev/null
++++ b/rebuild/premium-audit.json
+@@ -0,0 +1,320 @@
++{
++  "findings": [
++    {
++      "category": "violation",
++      "file": "src/components/Button.tsx",
++      "line": 11,
++      "message": "Enabled literal button has no detectable action or submit behavior.",
++      "remediation": "Connect the button to a real action, make it a submit button, or disable/remove it.",
++      "ruleId": "affordance.actionless-button",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/app/agency/AgencyFilters.tsx",
++      "line": 17,
++      "message": "Application-owned form does not declare its validation owner.",
++      "remediation": "Add noValidate/novalidate and implement the canonical validation contract.",
++      "ruleId": "form.novalidate-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/app/agency/AgencyFilters.tsx",
++      "line": 30,
++      "message": "Application-owned form does not declare its validation owner.",
++      "remediation": "Add noValidate/novalidate and implement the canonical validation contract.",
++      "ruleId": "form.novalidate-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/app/analytics/explorer/sidebar.tsx",
++      "line": 10,
++      "message": "Application-owned form does not declare its validation owner.",
++      "remediation": "Add noValidate/novalidate and implement the canonical validation contract.",
++      "ruleId": "form.novalidate-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/app/media/MediaLibrary.tsx",
++      "line": 56,
++      "message": "Application-owned form does not declare its validation owner.",
++      "remediation": "Add noValidate/novalidate and implement the canonical validation contract.",
++      "ruleId": "form.novalidate-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/app/password-recovery/recovery-form.tsx",
++      "line": 63,
++      "message": "Application-owned form does not declare its validation owner.",
++      "remediation": "Add noValidate/novalidate and implement the canonical validation contract.",
++      "ruleId": "form.novalidate-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/app/password-recovery/recovery-form.tsx",
++      "line": 69,
++      "message": "Application-owned form does not declare its validation owner.",
++      "remediation": "Add noValidate/novalidate and implement the canonical validation contract.",
++      "ruleId": "form.novalidate-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/app/publishing/collaboration/BulkLabels.tsx",
++      "line": 45,
++      "message": "Application-owned form does not declare its validation owner.",
++      "remediation": "Add noValidate/novalidate and implement the canonical validation contract.",
++      "ruleId": "form.novalidate-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/app/publishing/labels/LabelManager.tsx",
++      "line": 78,
++      "message": "Application-owned form does not declare its validation owner.",
++      "remediation": "Add noValidate/novalidate and implement the canonical validation contract.",
++      "ruleId": "form.novalidate-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/app/publishing/templates/TemplateManager.tsx",
++      "line": 72,
++      "message": "Application-owned form does not declare its validation owner.",
++      "remediation": "Add noValidate/novalidate and implement the canonical validation contract.",
++      "ruleId": "form.novalidate-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/app/root/errors/page.tsx",
++      "line": 21,
++      "message": "Application-owned form does not declare its validation owner.",
++      "remediation": "Add noValidate/novalidate and implement the canonical validation contract.",
++      "ruleId": "form.novalidate-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/app/root/privileges/page.tsx",
++      "line": 25,
++      "message": "Application-owned form does not declare its validation owner.",
++      "remediation": "Add noValidate/novalidate and implement the canonical validation contract.",
++      "ruleId": "form.novalidate-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/app/settings/api-access/connect/ConnectForm.tsx",
++      "line": 16,
++      "message": "Application-owned form does not declare its validation owner.",
++      "remediation": "Add noValidate/novalidate and implement the canonical validation contract.",
++      "ruleId": "form.novalidate-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/app/settings/bio/BioManager.tsx",
++      "line": 43,
++      "message": "Application-owned form does not declare its validation owner.",
++      "remediation": "Add noValidate/novalidate and implement the canonical validation contract.",
++      "ruleId": "form.novalidate-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/app/settings/notifications/NotificationCenter.tsx",
++      "line": 118,
++      "message": "Application-owned form does not declare its validation owner.",
++      "remediation": "Add noValidate/novalidate and implement the canonical validation contract.",
++      "ruleId": "form.novalidate-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/app/settings/sharing/LinksManager.tsx",
++      "line": 173,
++      "message": "Application-owned form does not declare its validation owner.",
++      "remediation": "Add noValidate/novalidate and implement the canonical validation contract.",
++      "ruleId": "form.novalidate-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/app/settings/workspace/policy-form.tsx",
++      "line": 16,
++      "message": "Application-owned form does not declare its validation owner.",
++      "remediation": "Add noValidate/novalidate and implement the canonical validation contract.",
++      "ruleId": "form.novalidate-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/app/share/[token]/ReviewActions.tsx",
++      "line": 24,
++      "message": "Application-owned form does not declare its validation owner.",
++      "remediation": "Add noValidate/novalidate and implement the canonical validation contract.",
++      "ruleId": "form.novalidate-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/app/tasks/TaskBoard.tsx",
++      "line": 166,
++      "message": "Application-owned form does not declare its validation owner.",
++      "remediation": "Add noValidate/novalidate and implement the canonical validation contract.",
++      "ruleId": "form.novalidate-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/app/tasks/TaskBoard.tsx",
++      "line": 193,
++      "message": "Application-owned form does not declare its validation owner.",
++      "remediation": "Add noValidate/novalidate and implement the canonical validation contract.",
++      "ruleId": "form.novalidate-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/app/tasks/TaskFilters.tsx",
++      "line": 11,
++      "message": "Application-owned form does not declare its validation owner.",
++      "remediation": "Add noValidate/novalidate and implement the canonical validation contract.",
++      "ruleId": "form.novalidate-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/app/ads/objects/ChangeHistory.tsx",
++      "line": 77,
++      "message": "Literal product textarea does not show evidence of the canonical resize-none rule.",
++      "remediation": "Use the shared Textarea owner or apply resize-none/resize: none with adequate height or auto-grow behavior.",
++      "ruleId": "form.textarea-resize-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/app/feeds/FeedManager.tsx",
++      "line": 85,
++      "message": "Literal product textarea does not show evidence of the canonical resize-none rule.",
++      "remediation": "Use the shared Textarea owner or apply resize-none/resize: none with adequate height or auto-grow behavior.",
++      "ruleId": "form.textarea-resize-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/app/publishing/templates/TemplateManager.tsx",
++      "line": 85,
++      "message": "Literal product textarea does not show evidence of the canonical resize-none rule.",
++      "remediation": "Use the shared Textarea owner or apply resize-none/resize: none with adequate height or auto-grow behavior.",
++      "ruleId": "form.textarea-resize-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/app/publishing/templates/TemplateManager.tsx",
++      "line": 86,
++      "message": "Literal product textarea does not show evidence of the canonical resize-none rule.",
++      "remediation": "Use the shared Textarea owner or apply resize-none/resize: none with adequate height or auto-grow behavior.",
++      "ruleId": "form.textarea-resize-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/app/publishing/templates/TemplateManager.tsx",
++      "line": 87,
++      "message": "Literal product textarea does not show evidence of the canonical resize-none rule.",
++      "remediation": "Use the shared Textarea owner or apply resize-none/resize: none with adequate height or auto-grow behavior.",
++      "ruleId": "form.textarea-resize-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/app/settings/sharing/LinksManager.tsx",
++      "line": 179,
++      "message": "Literal product textarea does not show evidence of the canonical resize-none rule.",
++      "remediation": "Use the shared Textarea owner or apply resize-none/resize: none with adequate height or auto-grow behavior.",
++      "ruleId": "form.textarea-resize-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/app/share/[token]/ReviewActions.tsx",
++      "line": 26,
++      "message": "Literal product textarea does not show evidence of the canonical resize-none rule.",
++      "remediation": "Use the shared Textarea owner or apply resize-none/resize: none with adequate height or auto-grow behavior.",
++      "ruleId": "form.textarea-resize-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/app/tasks/TaskBoard.tsx",
++      "line": 169,
++      "message": "Literal product textarea does not show evidence of the canonical resize-none rule.",
++      "remediation": "Use the shared Textarea owner or apply resize-none/resize: none with adequate height or auto-grow behavior.",
++      "ruleId": "form.textarea-resize-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/app/tasks/TaskBoard.tsx",
++      "line": 195,
++      "message": "Literal product textarea does not show evidence of the canonical resize-none rule.",
++      "remediation": "Use the shared Textarea owner or apply resize-none/resize: none with adequate height or auto-grow behavior.",
++      "ruleId": "form.textarea-resize-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/app/tasks/TaskBoard.tsx",
++      "line": 224,
++      "message": "Literal product textarea does not show evidence of the canonical resize-none rule.",
++      "remediation": "Use the shared Textarea owner or apply resize-none/resize: none with adequate height or auto-grow behavior.",
++      "ruleId": "form.textarea-resize-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/components/AutoTextarea.tsx",
++      "line": 42,
++      "message": "Literal product textarea does not show evidence of the canonical resize-none rule.",
++      "remediation": "Use the shared Textarea owner or apply resize-none/resize: none with adequate height or auto-grow behavior.",
++      "ruleId": "form.textarea-resize-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/modules/inbox/components/ThreadProductivity.tsx",
++      "line": 32,
++      "message": "Literal product textarea does not show evidence of the canonical resize-none rule.",
++      "remediation": "Use the shared Textarea owner or apply resize-none/resize: none with adequate height or auto-grow behavior.",
++      "ruleId": "form.textarea-resize-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/modules/inbox/components/ThreadProductivity.tsx",
++      "line": 35,
++      "message": "Literal product textarea does not show evidence of the canonical resize-none rule.",
++      "remediation": "Use the shared Textarea owner or apply resize-none/resize: none with adequate height or auto-grow behavior.",
++      "ruleId": "form.textarea-resize-missing",
++      "severity": "error"
++    }
++  ],
++  "mode": "strict",
++  "projectRoot": "/Users/mouad/Documents/ChatGPT/MS Social Pilot/app/rebuild",
++  "schemaVersion": 1,
++  "summary": {
++    "errors": 34,
++    "total": 34,
++    "unresolved": 0,
++    "violations": 34,
++    "warnings": 0
++  }
++}
+diff --git a/rebuild/tests/button-affordances.test.ts b/rebuild/tests/button-affordances.test.ts
+new file mode 100644
+index 00000000..ce68942d
+--- /dev/null
++++ b/rebuild/tests/button-affordances.test.ts
+@@ -0,0 +1,59 @@
++// @vitest-environment jsdom
++import { act, createElement as h } from 'react';
++import { createRoot } from 'react-dom/client';
++import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
++import { Button } from '../src/components/Button';
++
++let container: HTMLDivElement;
++let root: ReturnType<typeof createRoot>;
++beforeEach(() => {
++  (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
++  container = document.createElement('div');
++  document.body.append(container);
++  root = createRoot(container);
++});
++afterEach(async () => {
++  await act(async () => root.unmount());
++  container.remove();
++});
++
++// premium-audit.json flags the primitive's literal button, but actions are
++// supplied by callers through native button props. Exercise the rendered DOM.
++describe('Button action affordances', () => {
++  it('runs the supplied action without accidentally submitting its surrounding form', async () => {
++    const action = vi.fn();
++    const submit = vi.fn((event: React.FormEvent) => event.preventDefault());
++    await act(async () => root.render(h('form', { onSubmit: submit },
++      h(Button, { onClick: action }, 'Open review'))));
++
++    await act(async () => container.querySelector('button')!.click());
++
++    expect(action).toHaveBeenCalledTimes(1);
++    expect(submit).not.toHaveBeenCalled();
++  });
++
++  it('submits an explicitly associated form from a button outside the form', async () => {
++    const submit = vi.fn((event: React.FormEvent) => event.preventDefault());
++    await act(async () => root.render(h('div', null,
++      h('form', { id: 'review-form', onSubmit: submit }),
++      h(Button, { type: 'submit', form: 'review-form', name: 'intent', value: 'save' }, 'Save'))));
++
++    const button = container.querySelector('button')!;
++    await act(async () => button.click());
++
++    expect(submit).toHaveBeenCalledTimes(1);
++    expect((submit.mock.calls[0]![0].nativeEvent as SubmitEvent).submitter).toBe(button);
++  });
++
++  it.each([{ busy: true }, { disabled: true }])('blocks activation with %j', async props => {
++    const action = vi.fn();
++    const submit = vi.fn((event: React.FormEvent) => event.preventDefault());
++    await act(async () => root.render(h('form', { onSubmit: submit },
++      h(Button, { ...props, type: 'submit', onClick: action }, 'Save'))));
++
++    await act(async () => container.querySelector('button')!.click());
++
++    expect(action).not.toHaveBeenCalled();
++    expect(submit).not.toHaveBeenCalled();
++  });
++});

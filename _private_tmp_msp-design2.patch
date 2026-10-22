@@ -1,0 +1,720 @@
+diff --git a/rebuild/DESIGN.md b/rebuild/DESIGN.md
+index 1e5888a2..94ee7435 100644
+--- a/rebuild/DESIGN.md
++++ b/rebuild/DESIGN.md
+@@ -201,6 +201,19 @@ and composer. Profile labels are text beside channel names, independent of post
+ labels. English/French strings follow request language. Browser/theme/viewport
+ verification remains open; DOM interaction evidence is in CHANNEL_PROFILES.md.
+ 
++## Design pass, round 4 — 2026-10-21 (owner: "the design is ugly")
++
++Decisions, implemented as one layer at the end of `src/styles/components.css` (tokens only; four themes, light and dark unchanged):
++
++- **Card system.** One surface recipe: hairline border, 16px radius and a soft two-part lift (`--card-lift`, `--card-lift-hover`; dark mode swaps to an inset highlight). Panels, home cards, metric tiles and tables share it. A tile inside a panel sits flat on a tinted surface so cards never stack lifted cards.
++- **Color by module.** The page-header chip is a solid module color with a white icon (tinted-soft in Clean). The top bar shows a module-colored dot and name. The sidebar page icons get a faint module wash.
++- **Typography.** 14px body, 29px page title at weight 780 with −0.028em tracking, 34px metric figures, 16px card titles; table headers are sentence case 12px instead of tiny uppercase. Sidebar section labels are 11px, quieter.
++- **Chrome.** The top bar no longer repeats the page title (the page `h1` owns it), the content gutter is 36px on desktop, and the primary action in the sidebar carries a colored lift.
++- **Empty states.** A filled calm surface with a module-tinted icon replaces the dashed wireframe border.
++- **Defect fixed.** In Inbox the bulk "Select all" bar was taking the list's 1fr grid row and left a large blank gap; the list pane is now a flex column and only the list scrolls.
++
++Evidence: local production build, synthetic data, Chromium screenshots (home, publishing queue/calendar/compose, inbox, analytics, ads, settings, root) at 1440 and 390 wide in light and dark across Vivid, Meta blue, Warm and Clean. This is visual review, not a full browser matrix rerun.
++
+ ## Current language and theme evidence — 2026-10-21
+ 
+ Source checked at `6fb0e57f`: Publishing, Inbox, Analytics, Ads, Home, Tasks and
+diff --git a/rebuild/src/app/root/root-nav-icons.tsx b/rebuild/src/app/root/root-nav-icons.tsx
+new file mode 100644
+index 00000000..25f5ce65
+--- /dev/null
++++ b/rebuild/src/app/root/root-nav-icons.tsx
+@@ -0,0 +1,42 @@
++import {
++  IconActivity, IconAlertTriangle, IconApps, IconBuildingCommunity, IconServer2, IconCreditCard, IconDatabaseExport, IconKey, IconLayoutDashboard,
++  IconLock, IconMailPlus, IconPlugConnected, IconPuzzle, IconSettings2, IconShieldCheck, IconTool, IconUsers, IconWorld,
++  type Icon,
++} from '@tabler/icons-react';
++import { PAGE_ICONS } from '@/components/icons';
++
++/** Icons for Root sidebar pages. Product and platform module pages reuse their own module identity icons. */
++const ROOT_PAGE_ICONS: Record<string, Icon> = {
++  '/root': IconLayoutDashboard,
++  '/root/users': IconUsers,
++  '/root/registration': IconMailPlus,
++  '/root/workspaces': IconBuildingCommunity,
++  '/root/plans': IconCreditCard,
++  '/root/privileges': IconKey,
++  '/root/lifecycle': IconShieldCheck,
++  '/root/sessions': IconLock,
++  '/root/connections': IconPlugConnected,
++  '/root/errors': IconAlertTriangle,
++  '/root/backups': IconDatabaseExport,
++  '/root/operations': IconTool,
++  '/root/activity': IconActivity,
++  '/root/config': IconSettings2,
++  '/root/modules': IconApps,
++  '/root/platforms': IconWorld,
++};
++
++const PRODUCT_ICONS: Record<string, string> = { publishing: '/publishing/posts', inbox: '/inbox', analytics: '/analytics', ads: '/ads', home: '/home', tasks: '/tasks', agency: '/agency', settings: '/settings/connections' };
++
++export function rootPageIcon(href: string): Icon {
++  const direct = ROOT_PAGE_ICONS[href];
++  if (direct) return direct;
++  const productId = href.match(/^\/root\/modules\/([^/]+)$/)?.[1];
++  if (productId) return (productId && PAGE_ICONS[PRODUCT_ICONS[productId] ?? '']) || IconPuzzle;
++  if (href.startsWith('/root/platforms/')) return IconServer2;
++  return IconPuzzle;
++}
++
++export function RootPageGlyph({ href, size = 17 }: { href: string; size?: number }) {
++  const Glyph = rootPageIcon(href);
++  return <Glyph size={size} stroke={1.75} aria-hidden="true" />;
++}
+diff --git a/rebuild/src/app/root/root-nav.css b/rebuild/src/app/root/root-nav.css
+new file mode 100644
+index 00000000..c3acc9a5
+--- /dev/null
++++ b/rebuild/src/app/root/root-nav.css
+@@ -0,0 +1,14 @@
++/* Design round 2: Root sidebar with icon chips, grouped by owner (shared / product / platform). */
++.root-directory-nav { gap: 14px; }
++.root-directory-nav details { padding: 6px; border-radius: var(--radius-md); background: color-mix(in srgb, var(--surface-muted) 55%, transparent); }
++.root-directory-nav summary { display: flex; align-items: center; justify-content: space-between; min-height: 32px; padding: 4px 8px; font-size: 11px; letter-spacing: .04em; list-style: none; }
++.root-directory-nav summary::-webkit-details-marker { display: none; }
++.root-directory-nav summary::after { content: ""; width: 7px; height: 7px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(45deg); transition: transform .15s ease; opacity: .6; }
++.root-directory-nav details[open] > summary::after { transform: rotate(-135deg); }
++.root-directory-nav details > a { display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 6px 10px; font-size: 13.5px; font-weight: 550; transition: background .15s ease, color .15s ease; }
++.root-directory-nav details > a:hover { background: var(--surface); color: var(--ink); }
++.root-directory-nav details > a.is-active { background: var(--mod-soft, var(--accent-soft)); color: var(--mod-ink, var(--accent)); font-weight: 700; }
++.root-directory-nav a:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
++.root-nav-glyph { display: inline-grid; place-items: center; flex: 0 0 auto; width: 28px; height: 28px; border-radius: 8px; background: color-mix(in srgb, var(--mod, var(--accent)) 14%, var(--surface)); color: var(--mod, var(--accent)); }
++.root-directory-nav a.is-active .root-nav-glyph { background: var(--mod, var(--accent)); color: var(--on-accent, #fff); }
++@media (prefers-reduced-motion: reduce) { .root-directory-nav summary::after, .root-directory-nav a { transition: none; } }
+diff --git a/rebuild/src/components/charts/BarChart.tsx b/rebuild/src/components/charts/BarChart.tsx
+index 397f2292..6425ba8e 100644
+--- a/rebuild/src/components/charts/BarChart.tsx
++++ b/rebuild/src/components/charts/BarChart.tsx
+@@ -2,7 +2,7 @@
+ import { ChartShell, type ChartBaseProps, type ChartModel } from "./ChartShell";
+ import { numberFormatter, type NumberFormat } from "./format";
+ import { getMessages } from "./messages";
+-import { axisStyle, baseOption, legendStyle, tooltipStyle } from "./option-base";
++import { axisStyle, BAR_RADIUS, baseOption, legendStyle, tooltipStyle } from "./option-base";
+ import { colorAt } from "./theme";
+ 
+ export type BarSeries = { id: string; name: string; values: Array<number | null>; color?: number };
+@@ -44,8 +44,8 @@ export function buildBarModel(props: BarChartProps): ChartModel {
+         xAxis: horizontal ? value : category,
+         yAxis: horizontal ? category : value,
+         series: series.map((item, position) => ({
+-          type: "bar", id: item.id, name: item.name, data: item.values, stack: stacked ? "total" : undefined, barMaxWidth: 32,
+-          itemStyle: { color: colorAt(env.theme, item.color ?? position) }, emphasis: { focus: "series" },
++          type: "bar", id: item.id, name: item.name, data: item.values, stack: stacked ? "total" : undefined, barMaxWidth: 26,
++          itemStyle: { color: colorAt(env.theme, item.color ?? position), borderRadius: stacked ? 0 : horizontal ? [0, BAR_RADIUS, BAR_RADIUS, 0] : [BAR_RADIUS, BAR_RADIUS, 0, 0] }, emphasis: { focus: "series" },
+         })),
+       };
+     },
+diff --git a/rebuild/src/components/charts/TimeSeriesChart.tsx b/rebuild/src/components/charts/TimeSeriesChart.tsx
+index b4ba1b41..cc0ed7c2 100644
+--- a/rebuild/src/components/charts/TimeSeriesChart.tsx
++++ b/rebuild/src/components/charts/TimeSeriesChart.tsx
+@@ -3,7 +3,7 @@ import { ChartShell, type ChartBaseProps, type ChartModel } from "./ChartShell";
+ import { dateFormatters, numberFormatter, toTime, type ChartTime, type Granularity, type NumberFormat } from "./format";
+ import { getMessages } from "./messages";
+ import { axisStyle, baseOption, legendStyle, tooltipStyle } from "./option-base";
+-import { colorAt } from "./theme";
++import { colorAt, css } from "./theme";
+ 
+ export type TimeSeriesPoint = { t: ChartTime; v: number | null };
+ export type TimeSeries = {
+@@ -67,11 +67,11 @@ export function buildTimeSeriesModel(props: TimeSeriesChartProps): ChartModel {
+       const { theme } = env;
+       const lines = series.flatMap((item, position) => {
+         const color = colorAt(theme, item.color ?? position);
+-        const filled = stacked || item.area;
++        const filled = stacked || (item.area ?? series.length === 1);
+         const primary = {
+           type: "line", id: item.id, name: item.name, data: aligned[position],
+-          showSymbol: times.length <= 1, connectNulls: false, smooth: false,
+-          lineStyle: { width: 2, color }, itemStyle: { color },
++          showSymbol: times.length <= 12, symbolSize: 7, connectNulls: false, smooth: false,
++          lineStyle: { width: 2.5, color, cap: "round" }, itemStyle: { color, borderColor: css(theme.surface), borderWidth: 2 },
+           stack: stacked ? "total" : undefined,
+           areaStyle: filled ? { color, opacity: 0.16 } : undefined,
+           emphasis: { focus: "series" },
+diff --git a/rebuild/src/components/charts/option-base.ts b/rebuild/src/components/charts/option-base.ts
+index abc921f8..1dec71cb 100644
+--- a/rebuild/src/components/charts/option-base.ts
++++ b/rebuild/src/components/charts/option-base.ts
+@@ -7,28 +7,43 @@ export function baseOption({ theme, reducedMotion }: ChartEnv): ChartOption {
+     color: theme.palette.length ? theme.palette : undefined,
+     backgroundColor: "transparent",
+     animation: !reducedMotion,
+-    textStyle: { color: css(theme.text) },
++    animationDuration: 500,
++    animationEasing: "cubicOut",
++    textStyle: { color: css(theme.text), fontSize: 12 },
+     aria: { enabled: false },
+   };
+ }
+ 
++/** Floating card: theme surface, soft border and lift, readable ink, aligned numbers. */
+ export function tooltipStyle({ theme }: ChartEnv) {
+   return {
+     backgroundColor: css(theme.surface),
+     borderColor: css(theme.line),
+-    textStyle: { color: css(theme.ink) },
++    borderWidth: 1,
++    padding: [8, 12],
++    extraCssText: `border-radius:12px;box-shadow:0 10px 30px -12px color-mix(in srgb, ${theme.ink || "currentColor"} 40%, transparent);font-variant-numeric:tabular-nums;`,
++    textStyle: { color: css(theme.ink), fontSize: 12 },
++    axisPointer: { lineStyle: { color: css(theme.line), type: "dashed" }, crossStyle: { color: css(theme.line) }, shadowStyle: { color: css(theme.grid), opacity: 0.5 } },
+   };
+ }
+ 
++/** Round swatches, compact spacing; scrolls instead of wrapping. */
+ export function legendStyle({ theme }: ChartEnv) {
+-  return { top: 0, type: "scroll", textStyle: { color: css(theme.text) }, pageIconColor: css(theme.text), pageTextStyle: { color: css(theme.text) } };
++  return {
++    top: 0, type: "scroll", icon: "circle", itemWidth: 8, itemHeight: 8, itemGap: 16,
++    textStyle: { color: css(theme.text), fontSize: 12 }, pageIconColor: css(theme.text), pageTextStyle: { color: css(theme.text) },
++  };
+ }
+ 
++/** Quiet dashed gridlines on the value axis; a solid baseline on the category axis; small labels. */
+ export function axisStyle({ theme }: ChartEnv, kind: "category" | "value") {
+   return {
+     axisLine: { show: kind === "category", lineStyle: { color: css(theme.line) } },
+     axisTick: { show: false },
+-    axisLabel: { color: css(theme.text) },
+-    splitLine: { show: kind === "value", lineStyle: { color: css(theme.grid) } },
++    axisLabel: { color: css(theme.text), fontSize: 11, margin: 10 },
++    splitLine: { show: kind === "value", lineStyle: { color: css(theme.grid), type: "dashed" } },
+   };
+ }
++
++/** Shared mark shapes so bars and lines look related across screens. */
++export const BAR_RADIUS = 6;
+diff --git a/rebuild/src/modules/analytics/overview-copy.ts b/rebuild/src/modules/analytics/overview-copy.ts
+index 26b3b469..18ab6603 100644
+--- a/rebuild/src/modules/analytics/overview-copy.ts
++++ b/rebuild/src/modules/analytics/overview-copy.ts
+@@ -5,6 +5,7 @@ const en = {
+   "No match": "No match",
+   "Report filters": "Report filters",
+   "Stored calendar dates (UTC)": "Stored calendar dates (UTC)",
++  "UTC": "UTC",
+   "From": "From",
+   "To": "To",
+   "Compare with": "Compare with",
+@@ -120,6 +121,7 @@ const fr: typeof en = {
+   "No match": "Aucun résultat",
+   "Report filters": "Filtres du rapport",
+   "Stored calendar dates (UTC)": "Dates enregistrées (UTC)",
++  "UTC": "UTC",
+   "From": "Du",
+   "To": "Au",
+   "Compare with": "Comparer avec",
+diff --git a/rebuild/src/modules/analytics/ui/AnalyticsScreen.tsx b/rebuild/src/modules/analytics/ui/AnalyticsScreen.tsx
+index b3fd19e1..5bf20bd7 100644
+--- a/rebuild/src/modules/analytics/ui/AnalyticsScreen.tsx
++++ b/rebuild/src/modules/analytics/ui/AnalyticsScreen.tsx
+@@ -2,7 +2,7 @@ import { loadOverviewCopy } from '../server/overview-copy';
+ import { overviewCopyDefaults, overviewText, type OverviewCopy } from '../overview-copy';
+ import { AnalyticsFilters, MetricPicker } from './AnalyticsFilters';
+ import { EmptyState } from '@/components/EmptyState';
+-import { IconAlertTriangle, IconCalendarEvent, IconChartBar, IconPlugConnected, IconSend } from '@tabler/icons-react';
++import { IconAlertTriangle, IconArrowsDiff, IconCalendarEvent, IconChartBar, IconPlugConnected, IconSend } from '@tabler/icons-react';
+ import { MetricCard } from '@/components/MetricCard';
+ import { OverviewInsights } from './insights/OverviewInsights';
+ import { PageHeader } from '@/components/PageHeader';
+@@ -220,9 +220,10 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
+   return <PageFrame module="analytics" scopedAccess sidebar={data ? <AnalyticsSidebar copy={copy} profiles={profiles} locale={locale} data={data} query={data.query} exportHref={exportHref} explorerHref={explorerHref} connectionsHref={!data.options.channels.length ? connectionsHref : undefined} /> : failure ? <AnalyticsRecoverySidebar copy={copy} retryHref={retryHref} /> : undefined}>
+     <div className="page-stack">
+       <PageHeader module="analytics" title={t("Performance")} />
+-        {data && <><p title={t("These are inclusive stored calendar-date boundaries in UTC.")}>{t("Stored calendar dates (UTC): {start} to {end}.", { start: formatDay(data.period.start, locale), end: formatDay(data.period.end, locale) })}</p>
+-          {data.period.comparison && <p>{t("Compared with {period}: {start} to {end}.", { period: data.period.comparison.mode === "year" ? t("the same calendar dates last year") : t("the previous equal-length period"), start: formatDay(data.period.comparison.start, locale), end: formatDay(data.period.comparison.end, locale) })}</p>}
+-        </>}
++        {data && <ul className="analytics-period" aria-label={t("Report filters")}>
++          <li className="analytics-period__chip" title={t("These are inclusive stored calendar-date boundaries in UTC.")}><IconCalendarEvent size={15} stroke={1.9} aria-hidden="true" /><span>{formatDay(data.period.start, locale)} – {formatDay(data.period.end, locale)}</span><small>{t("UTC")}</small></li>
++          {data.period.comparison && <li className="analytics-period__chip" data-kind="compare"><IconArrowsDiff size={15} stroke={1.9} aria-hidden="true" /><span>{t("Compared with {period}: {start} to {end}.", { period: data.period.comparison.mode === "year" ? t("the same calendar dates last year") : t("the previous equal-length period"), start: formatDay(data.period.comparison.start, locale), end: formatDay(data.period.comparison.end, locale) })}</span></li>}
++        </ul>}
+ 
+       {failure && <section className="panel analytics-state"><EmptyState tone="error" title={t("Analytics could not be loaded")} action={<a href={retryHref}>{t("Try again with these filters")}</a>}>{failure.error} {t("Use the sidebar to retry with these filters or reset them.")}</EmptyState></section>}
+       {data && <>
+diff --git a/rebuild/src/modules/analytics/ui/analytics.css b/rebuild/src/modules/analytics/ui/analytics.css
+index 12b4cd09..a9bba675 100644
+--- a/rebuild/src/modules/analytics/ui/analytics.css
++++ b/rebuild/src/modules/analytics/ui/analytics.css
+@@ -121,4 +121,8 @@
+   .analytics-table th, .analytics-table td { padding: 10px 8px; }
+   .analytics-pager a { min-height: 44px; }
+ }
++.analytics-period { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; padding: 0; list-style: none; }
++.analytics-period__chip { display: inline-flex; align-items: center; gap: 8px; max-width: 100%; min-height: 32px; padding: 0 12px; border-radius: 999px; background: var(--mod-soft, var(--accent-soft)); color: var(--mod-ink, var(--accent)); font-size: 13px; font-weight: 650; font-variant-numeric: tabular-nums; }
++.analytics-period__chip small { padding: 1px 6px; border-radius: 6px; background: color-mix(in srgb, var(--mod, var(--accent)) 16%, var(--surface)); font-size: 10.5px; font-weight: 750; }
++.analytics-period__chip[data-kind="compare"] { background: var(--surface-muted); color: var(--ink-soft); font-weight: 550; }
+ @media (forced-colors: active) { .analytics-posts__bar > span { background: CanvasText; forced-color-adjust: none; } }
+diff --git a/rebuild/src/modules/publishing/ui/calendar/CalendarScreen.tsx b/rebuild/src/modules/publishing/ui/calendar/CalendarScreen.tsx
+index c1269548..3223b397 100644
+--- a/rebuild/src/modules/publishing/ui/calendar/CalendarScreen.tsx
++++ b/rebuild/src/modules/publishing/ui/calendar/CalendarScreen.tsx
+@@ -1,5 +1,6 @@
+ import { configOrDefault } from '@/server/config/config-or-default';
+ import { reschedulePolicySchema } from '@/lib/config/reschedule-policy';
++import { IconCalendarMonth } from '@tabler/icons-react';
+ import { pageLocale } from '../kit/locale';
+ import { loadPublishingCopy } from '../../server/customer-copy';
+ import { PublishingCopyProvider } from '../kit/CopyProvider';
+@@ -119,7 +120,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
+   return <PublishingCopyProvider catalog={catalog} locale={locale}>
+     <PageHeading title={copy.calendarTitle} description={copy.calendarDescription} />
+     {channelUnavailable ? <p role="status">{copy.unavailableChannel}</p> : null}
+-    <h2 className={styles.range} aria-live="polite">{rangeLabel}</h2>
++    <div className={styles.rangeBar}><span className={styles.rangeChip} aria-hidden="true"><IconCalendarMonth size={18} stroke={2} /></span><h2 className={styles.range} aria-live="polite">{rangeLabel}</h2></div>
+     <CalendarBoard view={view} days={days} timeZone={timeZone} nowIso={now.toISOString()} canCreate={canCreate} filterQuery={filterQuery} defaultScheduleTime={defaultScheduleTime}
+       navigation={{ previous: href(view, previous), today: href(view, today), next: href(view, next), unit }} />
+   </PublishingCopyProvider>;
+diff --git a/rebuild/src/modules/publishing/ui/calendar/calendar.module.css b/rebuild/src/modules/publishing/ui/calendar/calendar.module.css
+index 049824e4..d8648652 100644
+--- a/rebuild/src/modules/publishing/ui/calendar/calendar.module.css
++++ b/rebuild/src/modules/publishing/ui/calendar/calendar.module.css
+@@ -1,5 +1,8 @@
+-.range { margin: 0; min-width: 11ch; font-size: 17px; font-weight: 700; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+-.sidebarNav { display: grid; gap: 8px; min-width: 0; }
++.range { margin: 0; min-width: 11ch; font-size: 20px; font-weight: 760; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
++.rangeBar { display: flex; align-items: center; gap: 12px; }
++.rangeChip { display: inline-grid; place-items: center; width: 36px; height: 36px; border-radius: 11px; background: var(--mod-soft, var(--accent-soft)); color: var(--mod-ink, var(--accent)); }
++.weekdays span { color: var(--ink-soft); }
++.day:hover { background: color-mix(in srgb, var(--mod, var(--accent)) 5%, var(--surface)); }.sidebarNav { display: grid; gap: 8px; min-width: 0; }
+ .sidebarNav a { justify-content: center; width: 100%; }
+ 
+ .board { display: grid; gap: 12px; min-width: 0; }
+diff --git a/rebuild/src/modules/publishing/ui/compose/BestTimeSuggestions.tsx b/rebuild/src/modules/publishing/ui/compose/BestTimeSuggestions.tsx
+index 26a19685..e5f1bab6 100644
+--- a/rebuild/src/modules/publishing/ui/compose/BestTimeSuggestions.tsx
++++ b/rebuild/src/modules/publishing/ui/compose/BestTimeSuggestions.tsx
+@@ -1,5 +1,7 @@
+ 'use client';
+ import { useEffect, useState } from 'react';
++import { IconClockHour4 } from '@tabler/icons-react';
++import styles from './best-times.module.css';
+ import { Button } from '@/components/Button';
+ import type { BestTimeSuggestions as Suggestions } from '@/modules/publishing/server/best-time';
+ 
+@@ -30,8 +32,8 @@ export function BestTimeSuggestions({ targetIds, locale, disabled, onChoose, cop
+     return () => { current = false; controller.abort(); clearTimeout(timer); };
+   }, [key, refresh]);
+   const active = state?.key === key ? state : null;
+-  return <section aria-label={t.title} aria-live="polite">
+-    <h3>{t.title}</h3>
++  return <section className={styles.times} aria-label={t.title} aria-live="polite">
++    <h3 className={styles.timesTitle}><span className={styles.timesChip} aria-hidden="true"><IconClockHour4 size={16} stroke={2} /></span>{t.title}</h3>
+     {!targetIds.length ? <p>{t.choose}</p> : !active ? <p>{t.loading}</p> : active.status === 'error' ? <>
+       <p>{t.error}</p><Button type="button" size="sm" disabled={disabled} onClick={() => { setState(null); setRefresh(value => value + 1); }}>{t.retry}</Button>
+     </> : <>
+diff --git a/rebuild/src/modules/publishing/ui/compose/PostComposer.module.css b/rebuild/src/modules/publishing/ui/compose/PostComposer.module.css
+index b4110ce0..a113639e 100644
+--- a/rebuild/src/modules/publishing/ui/compose/PostComposer.module.css
++++ b/rebuild/src/modules/publishing/ui/compose/PostComposer.module.css
+@@ -79,7 +79,8 @@
+ .step:first-of-type { padding-top: 0; border-top: 0; }
+ .stepHead { display: flex; align-items: center; gap: 10px; }
+ .stepHead h2 { margin: 0; font-size: var(--text-lg); letter-spacing: -.01em; }
+-.stepNumber { display: inline-grid; place-items: center; flex: 0 0 auto; width: 26px; height: 26px; border-radius: 50%; background: var(--mod-soft, var(--accent-soft)); color: var(--mod-ink, var(--accent)); font-size: var(--text-sm); font-weight: 750; font-variant-numeric: tabular-nums; }
++.stepNumber { display: inline-grid; place-items: center; flex: 0 0 auto; width: 32px; height: 32px; border-radius: 10px; background: var(--mod, var(--accent)); color: var(--on-accent, #fff); box-shadow: 0 4px 10px -4px var(--mod, var(--accent)); }
++.stepCount { margin-inline-start: auto; padding: 2px 8px; border-radius: 999px; background: var(--surface-muted); color: var(--ink-soft); font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; }
+ .step > label { margin-top: 4px; color: var(--ink); font-size: var(--text-base); font-weight: 700; }
+ .step > label span { font-weight: 400; color: var(--ink-soft); }
+ .chosen { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; padding: 0; list-style: none; }
+diff --git a/rebuild/src/modules/publishing/ui/compose/PostComposer.tsx b/rebuild/src/modules/publishing/ui/compose/PostComposer.tsx
+index 836246ef..7e913626 100644
+--- a/rebuild/src/modules/publishing/ui/compose/PostComposer.tsx
++++ b/rebuild/src/modules/publishing/ui/compose/PostComposer.tsx
+@@ -1,4 +1,5 @@
+ 'use client';
++import { IconBroadcast, IconCalendarEvent, IconMessageCircle, IconPencil, IconPhoto } from '@tabler/icons-react';
+ import { BestTimeSuggestions } from './BestTimeSuggestions';
+ import { GroupShortcut } from '@/modules/settings/ui/profiles/GroupShortcut';
+ import { profileChannelName, type ProfileDirectory } from '@/modules/settings/channel-profiles/contracts';
+@@ -56,11 +57,13 @@ async function saveWithTransportRecovery(failureMessage: string, previous: Compo
+   }
+ }
+ 
++const STEP_ICONS = [IconBroadcast, IconPencil, IconPhoto, IconMessageCircle, IconCalendarEvent];
++
+ /** One numbered stage of the authoring flow: destinations, content, media, first comment, scheduling. */
+ function Step({ n, title, help, children }: { n: number; title: string; help?: string; children: ReactNode }) {
+   const id = useId();
+   return <section className={styles.step} aria-labelledby={id}>
+-    <header className={styles.stepHead}><span className={styles.stepNumber} aria-hidden="true">{n}</span><h2 id={id}>{title}</h2></header>
++    <header className={styles.stepHead}><span className={styles.stepNumber} aria-hidden="true">{(() => { const Glyph = STEP_ICONS[n - 1] ?? IconPencil; return <Glyph size={16} stroke={2} />; })()}</span><h2 id={id}>{title}</h2><span className={styles.stepCount} aria-hidden="true">{n}/{STEP_ICONS.length}</span></header>
+     {help ? <p className={styles.fieldHelp}>{help}</p> : null}
+     {children}
+   </section>;
+diff --git a/rebuild/src/modules/publishing/ui/compose/best-times.module.css b/rebuild/src/modules/publishing/ui/compose/best-times.module.css
+new file mode 100644
+index 00000000..64101015
+--- /dev/null
++++ b/rebuild/src/modules/publishing/ui/compose/best-times.module.css
+@@ -0,0 +1,5 @@
++.times { display: grid; gap: 10px; padding: 14px; border-radius: var(--radius-md); background: var(--surface-muted); }
++.times p, .times small { margin: 0; color: var(--ink-soft); font-size: 13px; line-height: 1.5; }
++.times ul { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; padding: 0; list-style: none; }
++.timesTitle { display: flex; align-items: center; gap: 10px; margin: 0; font-size: var(--text-base, 15px); }
++.timesChip { display: inline-grid; place-items: center; width: 28px; height: 28px; border-radius: 8px; background: var(--mod-soft, var(--accent-soft)); color: var(--mod-ink, var(--accent)); }
+diff --git a/rebuild/src/modules/settings/ui/connections/ConnectionsScreen.tsx b/rebuild/src/modules/settings/ui/connections/ConnectionsScreen.tsx
+index 7d563139..bdeda65e 100644
+--- a/rebuild/src/modules/settings/ui/connections/ConnectionsScreen.tsx
++++ b/rebuild/src/modules/settings/ui/connections/ConnectionsScreen.tsx
+@@ -12,8 +12,10 @@ import { ConnectionManager } from './manager';
+ import { connectablePlatforms, platformGrantHealth } from '@/server/platforms/registry';
+ import { summarizeConnectionHealth, connectionHealthText, type ConnectionHealthCopyKey } from '@/lib/connection-health';
+ import { ConnectionRowMenu } from './row-menu';
+-import { DataTable, EmptyState } from '@/components';
+-import { IconPlugConnected } from '@tabler/icons-react';
++import { Avatar, DataTable, EmptyState } from '@/components';
++import { GrantChips } from './GrantChips';
++import tableStyles from './connections.module.css';
++import { IconPlugConnected, IconVersions } from '@tabler/icons-react';
+ import { platformModule } from '@/platforms';
+ import { connectionState } from '@/lib/connection-status';
+ import { runtimeConfig } from '@/server/config/store';
+@@ -44,7 +46,7 @@ export default async function ConnectionsPage({ searchParams }: { searchParams:
+   const notice = (key: string, tone: 'status' | 'alert', message: string) => params.notice === key && <p className={styles['settings-note']} role={tone}>{message}</p>;
+ 
+   return <PageFrame module="settings"><SettingsPage copy={uiCopy} active="settings/connections" title={t.title} description={t.description} locale={locale}>
+-    <a href="/settings/profiles">{uiCopy.profiles[locale].title}</a>
++    <a className={tableStyles.profilesLink} href="/settings/profiles"><IconVersions size={16} stroke={1.9} aria-hidden="true" />{uiCopy.profiles[locale].title}</a>
+     <ConnectionManager locale={locale} statusLabels={statusLabels} sources={accounts} canManage={canManage} platforms={connectable} initiallyOpen={params.select === '1'} initialSourceId={params.source} initialAction={params.action === 'disconnect' ? 'disconnect' : params.action === 'manage' ? 'manage' : undefined} />
+     {notice('connected_partial', 'status', t.connectedPartial)}
+     {notice('connected', 'status', t.connected)}
+@@ -60,10 +62,10 @@ export default async function ConnectionsPage({ searchParams }: { searchParams:
+       {[...new Set(accounts.map(account => account.provider))].map(provider => <section key={provider} aria-label={providerName(provider)}>
+         <h3>{providerName(provider)}</h3>
+         <DataTable caption={`${t.socialPanel} · ${providerName(provider)}`} rows={accounts.filter(account => account.provider === provider)} rowKey={account => account.id} emptyMessage={t.noSocial} columns={[
+-          { key: 'account', label: t.account, render: account => <><span className={styles['connection-mark']} aria-hidden="true">{account.name.slice(0, 1)}</span><strong>{account.name}</strong><span className={styles['settings-table__secondary']}>{fill(t.added, { date: dayFormat.format(account.createdAt) })}</span></> },
++          { key: 'account', label: t.account, render: account => <div className={tableStyles.account}><Avatar name={account.name} size="md" decorative /><div className={tableStyles.accountText}><strong>{account.name}</strong><span className={tableStyles.accountMeta}>{fill(t.added, { date: dayFormat.format(account.createdAt) })}</span></div></div> },
+           { key: 'channels', label: t.channels, render: account => account.targets.length ? <><span>{fill(t.selectedOf, { enabled: account.targets.filter(target => target.enabled).length, total: account.targets.length })}</span><div className={styles['settings-inline-list']}>{account.targets.map(target => <div key={target.id} className={styles['settings-chip']} data-disabled={!target.enabled}>{target.name || target.type}{!target.enabled && t.notSelectedSuffix}</div>)}</div></> : t.noChannels },
+           { key: 'status', label: t.status, render: account => { const health = healthById.get(account.id)!; return <><Status tone={health.token === 'valid' ? 'good' : 'warning'}>{text(`token.${health.token}`)}</Status><span className={styles['settings-table__secondary']}>{account.tokenExpiresAt ? text('token.expiresOn', { date: dateFormat.format(account.tokenExpiresAt) }) : text('token.noExpiry')}</span>
+-            {health.grants.length > 0 && <ul className={styles['settings-health-list']} aria-label={text('permissions')}>{health.grants.map(group => <li key={group.id}>{group.label}: {text(group.state)}</li>)}</ul>}
++            <GrantChips grants={health.grants} locale={locale} label={text('permissions')} />
+             {health.missing.length > 0 && <span className={styles['settings-table__secondary']}>{text('missingSummary', { labels: health.missing.map(group => group.label).join(', ') })}</span>}
+             {health.grants.length > 0 && health.grants.every(group => group.state === 'unknown') && <span className={styles['settings-table__secondary']}>{text('unknownSummary')}</span>}</>; } },
+           ...(canManage ? [{ key: 'actions', label: t.actions, render: (account: (typeof accounts)[number]) => <ConnectionRowMenu id={account.id} name={account.name} platformId={account.provider} manageLabel={t.manageSelection} disconnectLabel={t.disconnect} actionsLabel={t.actions} reconnectLabel={text('reconnect')} busyLabel={text('reconnecting')} failedLabel={text('reconnectFailed')} /> }] : []),
+diff --git a/rebuild/src/modules/settings/ui/connections/GrantChips.tsx b/rebuild/src/modules/settings/ui/connections/GrantChips.tsx
+new file mode 100644
+index 00000000..a7fbb662
+--- /dev/null
++++ b/rebuild/src/modules/settings/ui/connections/GrantChips.tsx
+@@ -0,0 +1,50 @@
++import { IconAd2, IconAlertTriangle, IconCheck, IconChartBar, IconHelpCircle, IconKey, IconMessageCircle, IconSend, IconShieldCheck, IconUsers, type Icon } from '@tabler/icons-react';
++import type { GrantGroupHealth, GrantGroupState } from '@/lib/connection-health';
++import { fill } from '@/modules/settings/ui/shell-copy';
++import { grantChipCopy, type GrantChipLocale } from './grant-copy';
++import styles from './connections.module.css';
++
++/** Neutral keyword match on the module's group id; the module still owns every label. */
++const CAPABILITY_ICONS: Array<[RegExp, Icon]> = [
++  [/publish|post|content|schedul/i, IconSend],
++  [/message|inbox|comment|conversation|reply/i, IconMessageCircle],
++  [/insight|analytic|metric|report/i, IconChartBar],
++  [/ad|campaign|billing/i, IconAd2],
++  [/page|profile|account|member|audience|people|user/i, IconUsers],
++];
++const capabilityIcon = (id: string): Icon => CAPABILITY_ICONS.find(([pattern]) => pattern.test(id))?.[1] ?? IconKey;
++const STATE_ICON: Record<GrantGroupState, Icon> = { granted: IconCheck, missing: IconAlertTriangle, unknown: IconHelpCircle };
++const ORDER: GrantGroupState[] = ['missing', 'unknown', 'granted'];
++
++/**
++ * Compact permission summary for one connection: a count chip that opens the full
++ * grouped list (native disclosure, no client script).
++ */
++export function GrantChips({ grants, locale, label }: { grants: readonly GrantGroupHealth[]; locale: GrantChipLocale; label: string }) {
++  if (!grants.length) return null;
++  const t = grantChipCopy[locale];
++  const allowed = grants.filter(group => group.state === 'granted').length;
++  const worst: GrantGroupState = grants.some(group => group.state === 'missing') ? 'missing' : grants.some(group => group.state === 'unknown') ? 'unknown' : 'granted';
++  const stateLabel: Record<GrantGroupState, string> = { granted: t.allowed, missing: t.missing, unknown: t.unknown };
++  const SummaryIcon = worst === 'granted' ? IconShieldCheck : STATE_ICON[worst];
++  const summary = fill(t.summary, { allowed, total: grants.length });
++  return <details className={styles.grants} aria-label={label}>
++    <summary className={styles.grantSummary} data-state={worst} aria-label={`${summary}. ${t.details}`}>
++      <SummaryIcon size={14} stroke={2} aria-hidden="true" />{summary}
++    </summary>
++    <div className={styles.grantGroups} role="group" aria-label={t.list}>
++      {ORDER.map(state => {
++        const items = grants.filter(group => group.state === state);
++        if (!items.length) return null;
++        const Mark = STATE_ICON[state];
++        return <div key={state} className={styles.grantGroup}>
++          <p className={styles.grantGroupLabel}>{stateLabel[state]}</p>
++          <ul className={styles.grantList}>{items.map(group => {
++            const Glyph = capabilityIcon(group.id);
++            return <li key={group.id} className={styles.grantChip} data-state={state}><Glyph size={13} stroke={1.9} aria-hidden="true" />{group.label}<Mark size={12} stroke={2.4} aria-hidden="true" className={styles.grantMark} /><span className="ui-visually-hidden">: {stateLabel[state]}</span></li>;
++          })}</ul>
++        </div>;
++      })}
++    </div>
++  </details>;
++}
+diff --git a/rebuild/src/modules/settings/ui/connections/connections.module.css b/rebuild/src/modules/settings/ui/connections/connections.module.css
+new file mode 100644
+index 00000000..bd0c2647
+--- /dev/null
++++ b/rebuild/src/modules/settings/ui/connections/connections.module.css
+@@ -0,0 +1,30 @@
++/* Connections table: account identity, grouped permission chips. Theme tokens only. */
++.account { display: flex; align-items: center; gap: 12px; min-width: 0; }
++.accountText { display: grid; gap: 2px; min-width: 0; }
++.accountText strong { overflow-wrap: anywhere; }
++.accountMeta { color: var(--ink-faint); font-size: 12px; }
++
++.profilesLink { display: inline-flex; align-items: center; gap: 8px; justify-self: start; width: fit-content; min-height: 36px; padding: 0 14px; border-radius: 10px; background: var(--mod-soft, var(--accent-soft)); color: var(--mod-ink, var(--accent)); font-size: 13px; font-weight: 650; text-decoration: none; }
++.profilesLink:hover { filter: brightness(.96); }
++.profilesLink:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
++.grants { margin-top: 8px; font-size: 12px; }
++.grantSummary { display: inline-flex; align-items: center; gap: 6px; min-height: 28px; padding: 0 10px; border-radius: 999px; cursor: pointer; list-style: none; font-weight: 650; background: var(--mod-soft, var(--accent-soft)); color: var(--mod-ink, var(--accent)); }
++.grantSummary::-webkit-details-marker { display: none; }
++.grantSummary[data-state="missing"] { background: color-mix(in srgb, var(--danger) 14%, var(--surface)); color: var(--danger); }
++.grantSummary[data-state="unknown"] { background: var(--surface-muted); color: var(--ink-soft); }
++.grantSummary:hover { filter: brightness(.97); }
++.grantSummary:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
++.grants[open] > .grantSummary { margin-bottom: 8px; }
++
++.grantGroups { display: grid; gap: 10px; padding: 10px 12px; border-radius: 12px; background: var(--surface-muted); }
++.grantGroup { display: grid; gap: 6px; min-width: 0; }
++.grantGroupLabel { margin: 0; color: var(--ink-soft); font-size: 11px; font-weight: 700; }
++.grantList { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; }
++.grantChip { display: inline-flex; align-items: center; gap: 6px; min-height: 26px; padding: 0 9px; border-radius: 999px; background: var(--surface); color: var(--ink); font-size: 12px; box-shadow: inset 0 0 0 1px var(--line); }
++.grantChip[data-state="missing"] { color: var(--danger); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--danger) 40%, var(--line)); }
++.grantChip[data-state="unknown"] { color: var(--ink-soft); }
++.grantMark { color: var(--success, var(--accent)); }
++.grantChip[data-state="missing"] .grantMark { color: var(--danger); }
++.grantChip[data-state="unknown"] .grantMark { color: var(--ink-faint); }
++
++@media (max-width: 620px) { .grantGroups { padding: 8px 10px; } }
+diff --git a/rebuild/src/modules/settings/ui/connections/grant-copy.ts b/rebuild/src/modules/settings/ui/connections/grant-copy.ts
+new file mode 100644
+index 00000000..f5acefc9
+--- /dev/null
++++ b/rebuild/src/modules/settings/ui/connections/grant-copy.ts
+@@ -0,0 +1,6 @@
++/** Customer wording for the grouped permission chips; the group labels come from the platform module. */
++export const grantChipCopy = {
++  en: { summary: '{allowed} of {total} permissions', allowed: 'Allowed', missing: 'Not allowed', unknown: 'Not recorded', details: 'Show permission details', list: 'Permission details' },
++  fr: { summary: '{allowed} autorisations sur {total}', allowed: 'Autorisé', missing: 'Non autorisé', unknown: 'Non enregistré', details: 'Afficher le détail des autorisations', list: 'Détail des autorisations' },
++} as const;
++export type GrantChipLocale = keyof typeof grantChipCopy;
+diff --git a/rebuild/src/server/root/RootFrame.tsx b/rebuild/src/server/root/RootFrame.tsx
+index 8fb815c8..ddc7ea7f 100644
+--- a/rebuild/src/server/root/RootFrame.tsx
++++ b/rebuild/src/server/root/RootFrame.tsx
+@@ -7,8 +7,10 @@ import type { ReactNode } from 'react';
+ import { AppShell } from '@/components';
+ import { requireRootPage } from '@/server/config/access';
+ import { rootManifest } from '@/modules/root/manifest';
++import { RootPageGlyph } from '../../app/root/root-nav-icons';
+ import './root-directory.css';
+ import '../../app/root/root-control-center.css';
++import '../../app/root/root-nav.css';
+ import '../../app/root/config/root-config.css';
+ 
+ export async function RootFrame({ active, children, controls }: { active: string; children: ReactNode; controls?: ReactNode }) {
+@@ -18,7 +20,7 @@ export async function RootFrame({ active, children, controls }: { active: string
+   const sidebar = <nav className="root-directory-nav" aria-label="Root sections">
+     {rootManifest.sections.map(section => <details key={section.title} open={section.pages.some(page => active === page.href)}>
+       <summary>{section.title}</summary>
+-      {section.pages.map(page => <a key={page.href} href={page.href} aria-current={active === page.href ? 'page' : undefined} className={active === page.href ? 'is-active' : undefined}>{page.title}</a>)}
++      {section.pages.map(page => <a key={page.href} href={page.href} aria-current={active === page.href ? 'page' : undefined} className={active === page.href ? 'is-active' : undefined}><span className="root-nav-glyph"><RootPageGlyph href={page.href} /></span>{page.title}</a>)}
+     </details>)}
+   </nav>;
+   return <RootInterfaceProvider copy={catalog[locale]}><AppShell activeModule="settings" enabledModules={[]} enabledFeatures={[]} rootAccess installationMode userName={actor.name} workspaceName="Installation" sidebar={<>{sidebar}{controls}</>}>
+diff --git a/rebuild/src/styles/components.css b/rebuild/src/styles/components.css
+index 26b52473..163e5b0f 100644
+--- a/rebuild/src/styles/components.css
++++ b/rebuild/src/styles/components.css
+@@ -371,3 +371,96 @@ th[aria-sort="ascending"], th[aria-sort="descending"] { color: var(--ink); }
+ .ui-post-thumb__play { position: absolute; inset: 0; display: grid; place-items: center; color: #fff; background: color-mix(in srgb, #000 28%, transparent); }
+ .ui-post-thumb__count { position: absolute; right: 3px; bottom: 3px; padding: 0 5px; border-radius: 999px; background: color-mix(in srgb, var(--ink) 78%, transparent); color: var(--surface); font-size: 10px; font-weight: 750; }
+ @media (forced-colors: active) { .ui-post-thumb { border: 1px solid CanvasText; } }
++
++/* ======================================================================
++ * Design pass 2026-10-21 (round 4): one calmer, richer card system.
++ * Hierarchy: canvas < card (hairline + soft lift) < raised/hover. Module color
++ * appears as a solid icon chip and a thin accent, never as a wash. Tokens only.
++ * ====================================================================== */
++:root { --radius-lg: 16px; --radius-md: 12px; --card-lift: 0 1px 2px rgb(20 24 40 / 5%), 0 10px 28px -14px rgb(20 24 40 / 16%); --card-lift-hover: 0 1px 2px rgb(20 24 40 / 6%), 0 16px 34px -14px rgb(20 24 40 / 24%); }
++:root[data-mode="dark"] { --card-lift: 0 1px 0 rgb(255 255 255 / 4%) inset, 0 10px 28px -14px rgb(0 0 0 / 60%); --card-lift-hover: 0 1px 0 rgb(255 255 255 / 6%) inset, 0 16px 34px -14px rgb(0 0 0 / 70%); }
++@media (prefers-color-scheme: dark) { :root[data-mode="system"] { --card-lift: 0 1px 0 rgb(255 255 255 / 4%) inset, 0 10px 28px -14px rgb(0 0 0 / 60%); --card-lift-hover: 0 1px 0 rgb(255 255 255 / 6%) inset, 0 16px 34px -14px rgb(0 0 0 / 70%); } }
++:root[data-theme] { --shadow-raised: var(--card-lift); }
++
++/* Type scale: 12 / 13 / 14 body, 16 card title, 29 page title. Tighter display tracking. */
++body { font-size: 14px; line-height: 1.5; -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
++.shell-content { padding: 28px 36px 56px; max-width: 1480px; }
++.ui-page-header { margin-bottom: 26px; }
++.ui-page-header h1, .ui-page-header h2 { font-size: clamp(22px, 2.6vw, 29px); font-weight: 780; letter-spacing: -.028em; }
++.ui-page-header p { margin-top: 5px; font-size: 14px; color: var(--ink-soft); }
++.ui-page-header__chip { width: 48px; height: 48px; border-radius: 14px; background: var(--mod, var(--accent)); color: #fff; box-shadow: 0 6px 14px -6px color-mix(in srgb, var(--mod, var(--accent)) 70%, transparent); }
++:root[data-mode="dark"] .ui-page-header__chip { color: var(--canvas); }
++:root[data-theme="clean"] .ui-page-header__chip { background: var(--mod-soft, var(--surface-muted)); color: var(--mod, var(--ink)); box-shadow: none; }
++
++/* Top bar: quiet breadcrumb on the canvas; the page title lives in the page, not twice. */
++.shell-topbar { min-height: 60px; background: color-mix(in srgb, var(--canvas) 92%, var(--surface)); border-bottom: 1px solid var(--line-subtle); padding-inline: 36px; }
++.shell-topbar__user { display: none; }
++.shell-topbar__crumb { font-size: 13px; }
++.shell-topbar__crumb strong { color: var(--mod-ink, var(--ink)); font-weight: 700; }
++.shell-topbar__crumb strong::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-right: 8px; border-radius: 50%; background: var(--mod, var(--accent)); vertical-align: 1px; }
++.shell-mode-toggle { width: 38px; height: 38px; border-radius: 12px; box-shadow: var(--shadow-raised); }
++
++/* Context sidebar: calmer labels, softer links, a clearly raised primary action. */
++.shell-context-sidebar { padding: 22px 16px 14px; gap: 18px; }
++.shell-wordmark { font-size: 20px; font-weight: 800; letter-spacing: -.04em; }
++.shell-workspace-label, .shell-subnav__label, .ui-filter-panel__head h2 { font-size: 11px; letter-spacing: .06em; font-weight: 700; color: var(--ink-faint); }
++.shell-workspace-name, .shell-workspace-select { border-radius: 10px; background: var(--surface); box-shadow: var(--shadow-raised); }
++.shell-create { min-height: 42px; border-radius: 11px; font-size: 14px; box-shadow: 0 8px 18px -8px color-mix(in srgb, var(--accent) 80%, transparent), 0 1px 2px rgb(0 0 0 / 14%); }
++.shell-subnav { gap: 2px; }
++.shell-subnav__link { min-height: 38px; padding: 5px 10px 5px 6px; border-radius: 10px; font-size: 13.5px; }
++.shell-subnav__glyph { width: 28px; height: 28px; border-radius: 9px; background: color-mix(in srgb, var(--mod) 10%, transparent); }
++.shell-subnav__link.is-active { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--mod) 22%, transparent); }
++.shell-sidebar-filter, .shell-sidebar-tools:not(:empty) { border-top-color: var(--line-subtle); }
++.shell-context-footer { border-top-color: var(--line-subtle); }
++.shell-nav__link { font-size: 11.5px; }
++.shell-brand { border-radius: 14px; }
++
++/* Cards and panels, wherever a screen declares one. */
++.panel { border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface); box-shadow: var(--card-lift); padding: 22px 24px; }
++.panel h2, .panel h3 { letter-spacing: -.018em; }
++.panel h2 { font-size: 16px; font-weight: 740; }
++[class*="_card__"] { box-shadow: var(--card-lift) !important; border-top-width: 3px; }
++[class*="_card__"]:hover { box-shadow: var(--card-lift-hover) !important; }
++
++/* Metric tiles: larger figure, module-tinted chip, room to breathe. */
++.ui-metric { padding: 18px 20px; gap: 8px; border-radius: var(--radius-lg); box-shadow: var(--card-lift); }
++.ui-metric__label { font-size: 12.5px; font-weight: 650; color: var(--ink-soft); letter-spacing: 0; }
++.ui-metric__value { font-size: clamp(26px, 3vw, 34px); font-weight: 780; letter-spacing: -.035em; margin-top: 2px; }
++.ui-metric__chip { width: 38px; height: 38px; border-radius: 12px; }
++
++/* A tile inside a panel sits flat on a tinted surface instead of stacking a second lifted card. */
++.panel .ui-metric, [class*="_card__"] .ui-metric { box-shadow: none; background: color-mix(in srgb, var(--surface-muted) 60%, var(--surface)); border-color: var(--line-subtle); }
++.shell-context-content summary { cursor: pointer; padding: 8px 10px; border-radius: 10px; font-size: 11px; font-weight: 700; letter-spacing: .06em; }
++.shell-context-content summary:hover { background: var(--surface-muted); }
++
++/* Empty states: calm filled surface, no dashed wireframe border. */
++.ui-state { gap: 12px; padding: 36px 24px; border: 1px solid var(--line-subtle); border-radius: var(--radius-lg); background: color-mix(in srgb, var(--surface-muted) 55%, var(--surface)); }
++.ui-state > :is(h2, h3) { font-size: 15px; font-weight: 720; }
++.ui-state__icon { width: 48px; height: 48px; border-radius: 14px; background: var(--mod-soft, var(--accent-soft)); color: var(--mod, var(--accent)); }
++.ui-state--error { border-color: color-mix(in srgb, var(--danger) 35%, var(--line)); }
++
++/* Tables: sentence-case headers on a tinted bar, comfortable rows, quiet dividers. */
++.ui-table-wrap { border-radius: var(--radius-lg); box-shadow: var(--card-lift); border-color: var(--line); }
++.ui-table th { height: 42px; background: color-mix(in srgb, var(--surface-muted) 70%, var(--surface)); color: var(--ink-soft); font-size: 12px; letter-spacing: 0; text-transform: none; font-weight: 700; }
++.ui-table td { height: 54px; border-bottom-color: var(--line-subtle); }
++.ui-table--compact td { height: 44px; }
++
++/* Controls: one radius, one focus treatment, a tactile primary button. */
++.ui-button { border-radius: 10px; font-size: 13.5px; }
++.ui-button--primary { box-shadow: 0 1px 2px rgb(0 0 0 / 16%), inset 0 1px 0 rgb(255 255 255 / 14%); }
++.ui-button--secondary { box-shadow: 0 1px 2px rgb(20 24 40 / 6%); }
++.ui-input, .ui-select__trigger, .ui-filter select, .shell-sidebar-filter select, .shell-sidebar-filter input:not([type=checkbox]) { border-radius: 10px; border-color: var(--line-strong); }
++.ui-input:hover:not(:disabled):not([aria-invalid=true]) { border-color: var(--control-border); }
++.ui-chip, .ui-badge { font-weight: 650; }
++.ui-tabs__tab { font-size: 14px; }
++.ui-dialog { border-radius: 20px; }
++.ui-segmented { border-radius: 12px; }
++.ui-segmented__option { border-radius: 9px; }
++
++/* Inbox: the select-all bar is a second row; head, bar and list stack, and only the list scrolls. */
++section[class*="_listPane__"] { display: flex; flex-direction: column; grid-template-rows: none; }
++section[class*="_listPane__"] > ul[class*="_list__"] { flex: 1 1 auto; min-height: 0; }
++section[class*="_listPane__"] > div[class*="_bulk__"], section[class*="_listPane__"] > div[class*="_listHead__"] { flex: 0 0 auto; }
++
++@media (max-width: 1023px) { .shell-content { padding: 24px 24px 56px; } .shell-topbar { padding-inline: 20px; } }
++@media (max-width: 760px) { .shell-content { padding: 20px 16px 40px; } .panel { padding: 16px; } .ui-page-header__chip { width: 42px; height: 42px; } }
+diff --git a/rebuild/src/styles/tokens.css b/rebuild/src/styles/tokens.css
+index fa53549f..59c9efdf 100644
+--- a/rebuild/src/styles/tokens.css
++++ b/rebuild/src/styles/tokens.css
+@@ -729,7 +729,7 @@ h1, h2, h3 { text-wrap: balance; scroll-margin-top: 88px; }
+ .shell-nav__glyph { display: grid; place-items: center; width: 24px; height: 24px; }
+ .shell-nav__glyph svg { width: 23px; height: 23px; }
+ .shell-rail-utility { margin-top: 20px; min-height: 54px; }
+-.shell-rail-avatar { display: grid; place-items: center; flex: 0 0 auto; width: 32px; height: 32px; margin: 18px auto 0; border: 1px solid var(--rail-ink); border-radius: 50%; font-size: 12px; font-weight: 700; }
++.shell-rail-avatar { display: grid; place-items: center; flex: 0 0 auto; width: 36px; height: 36px; margin: 18px auto 0; border: 2px solid color-mix(in srgb, var(--rail-ink) 55%, transparent); border-radius: 50%; background: var(--rail-active-bg, color-mix(in srgb, var(--rail-ink) 18%, transparent)); color: var(--rail-active-ink, var(--rail-ink)); font-size: 13px; font-weight: 750; line-height: 1; user-select: none; }
+ .shell-context-sidebar { position: sticky; top: 0; height: 100dvh; min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 20px; padding: 25px 18px 16px; border-right: 1px solid var(--line); background: var(--surface-raised); }
+ .shell-context-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+ .shell-wordmark { color: var(--ink); font-size: 21px; font-weight: 750; letter-spacing: -.7px; }
+diff --git a/rebuild/tests/design-pass-round4.test.ts b/rebuild/tests/design-pass-round4.test.ts
+new file mode 100644
+index 00000000..9745b8ff
+--- /dev/null
++++ b/rebuild/tests/design-pass-round4.test.ts
+@@ -0,0 +1,27 @@
++import { readFileSync } from 'node:fs';
++import { describe, expect, it } from 'vitest';
++
++const css = readFileSync('src/styles/components.css', 'utf8');
++const layer = css.slice(css.indexOf('Design pass 2026-10-21 (round 4)'));
++
++describe('design pass round 4 (shared stylesheet)', () => {
++  it('keeps the layer after the component rules and uses tokens, not raw palette colors', () => {
++    expect(layer.length).toBeGreaterThan(1000);
++    expect(layer).not.toMatch(/#(?!fff\b)[0-9a-f]{3,8}\b/i);
++  });
++  it('shares one soft card lift with a dark-mode and system-mode variant', () => {
++    expect(layer).toContain('--card-lift:');
++    expect(layer).toContain(':root[data-mode="dark"] { --card-lift');
++    expect(layer).toMatch(/prefers-color-scheme: dark\) \{ :root\[data-mode="system"\] \{ --card-lift/);
++  });
++  it('gives the page-header chip the module color and uses no gradients', () => {
++    expect(layer).toMatch(/\.ui-page-header__chip \{[^}]*background: var\(--mod/);
++    expect(layer).not.toContain('gradient');
++  });
++  it('lets only the Inbox list scroll when a bulk bar is present', () => {
++    expect(layer).toMatch(/section\[class\*="_listPane__"\] \{ display: flex; flex-direction: column; grid-template-rows: none/);
++  });
++  it('replaces dashed empty states with a filled surface', () => {
++    expect(layer).toMatch(/\.ui-state \{[^}]*border: 1px solid var\(--line-subtle\)/);
++  });
++});
+diff --git a/rebuild/tests/design-round2.test.ts b/rebuild/tests/design-round2.test.ts
+new file mode 100644
+index 00000000..692d0fcb
+--- /dev/null
++++ b/rebuild/tests/design-round2.test.ts
+@@ -0,0 +1,35 @@
++import { createElement } from 'react';
++import { renderToStaticMarkup } from 'react-dom/server';
++import { describe, expect, it } from 'vitest';
++import { GrantChips } from '@/modules/settings/ui/connections/GrantChips';
++import { rootPageIcon } from '@/app/root/root-nav-icons';
++import { rootManifest } from '@/modules/root/manifest';
++import { buildBarModel } from '@/components/charts/BarChart';
++
++describe('design round 2', () => {
++  const grants = [
++    { id: 'publish', label: 'Publish posts', state: 'granted' as const },
++    { id: 'inbox', label: 'Read messages', state: 'missing' as const },
++    { id: 'misc', label: 'Other', state: 'unknown' as const },
++  ];
++
++  it('groups permission chips by state behind a disclosure, in both languages', () => {
++    const en = renderToStaticMarkup(createElement(GrantChips, { grants, locale: 'en', label: 'Permissions' }));
++    expect(en).toContain('1 of 3 permissions');
++    expect(en).toContain('<details');
++    expect(en.indexOf('Not allowed')).toBeLessThan(en.indexOf('Allowed<'));
++    const fr = renderToStaticMarkup(createElement(GrantChips, { grants, locale: 'fr', label: 'Autorisations' }));
++    expect(fr).toContain('1 autorisations sur 3');
++    expect(renderToStaticMarkup(createElement(GrantChips, { grants: [], locale: 'en', label: 'x' }))).toBe('');
++  });
++
++  it('gives every Root sidebar page an icon', () => {
++    for (const section of rootManifest.sections) for (const page of section.pages) expect(rootPageIcon(page.href)).toBeTruthy();
++  });
++
++  it('rounds bar ends on non-stacked charts', () => {
++    const model = buildBarModel({ label: 'x', categories: ['a'], series: [{ id: 's', name: 'S', values: [1] }] } as never);
++    const option = model.option({ theme: { palette: ['#111'], grid: '', text: '', surface: '', accent: '', ink: '', inkSoft: '', line: '' }, reducedMotion: true }) as { series: Array<{ itemStyle: { borderRadius: unknown } }> };
++    expect(option.series[0]!.itemStyle.borderRadius).toBeTruthy();
++  });
++});

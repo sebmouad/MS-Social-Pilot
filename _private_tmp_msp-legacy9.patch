@@ -1,0 +1,749 @@
+diff --git a/rebuild/docs/LEGACY_CAPABILITY_PARITY.md b/rebuild/docs/LEGACY_CAPABILITY_PARITY.md
+index 49e63433..a5735728 100644
+--- a/rebuild/docs/LEGACY_CAPABILITY_PARITY.md
++++ b/rebuild/docs/LEGACY_CAPABILITY_PARITY.md
+@@ -21,7 +21,7 @@ a manifest, saved setting or unit test is not complete workflow proof. See
+ | P1 | Post list filters, saved views, pagination, bulk actions, retry/duplicate, CSV export and public Posts v1 API in `src/app/(app)/posts/page.tsx` and `src/app/api/posts` | Partial: scoped lists/search/paging/views/export and bulk actions share services; key REST v1 Posts includes scheduling. Large asynchronous Posts CSV is absent (workspace ZIP is different); draft aliases and v1 create now share confirmed lifecycle boundaries (`acb56bd7`); real client outcomes remain unverified. Missing-image fallback and saved-view expired-session feedback are source/unit fixes (`36946d9e`), without browser rerun. | Full list/action/API parity with workspace authorization and large-data pagination tests. |
+ | P1 | Publishing calendar navigation and month coverage in `src/app/(app)/calendar` | Partial: Month/Week/phone agenda, workspace-day grouping, previews, saved views and drag/keyboard moves exist. Shared lifecycle supports adapter-held cancel/reschedule. Calendar editing, queue-slot presentation, high-volume months and actual drag/remote-schedule browser/provider evidence remain open. | Browser and database tests with records on timezone and month boundaries, high-volume month, permissions, drag-and-drop E2E, and edit workflows. |
+ | P1 | Inbox assignment, private notes, saved replies, moderation rules, comment deletion and full discovery in `src/lib/inbox.ts` and `src/app/api/inbox` | Partial: scoped conversations/comments/nested replies/reviews, sync/actions/recovery, assignment/notes/replies and moderation rules exist. New quick filters, stored contact/sentiment details, bulk actions, replies drawer and shortcuts have mocked/DOM tests. Contact REST and bulk UI/REST/MCP exist (`f5c21c96`). Facebook Inbox reads now fetch before the locked write phase (`e0584777`); write-time scope/binding checks remain. Complete discovery/backfill, attachments/participants and live moderation remain open. | Multi-user assignment, notes, moderation log/undo, all relevant posts/reviews, and provider/MCP tests. |
+-| P1 | Image/video media library, import, usage/quota, holder attribution and stream/raw delivery in `src/lib/media.ts` | Partial: modules/media owns images/videos/search/usage/holders/quota, guarded import and delete with UI/REST/MCP. Thumbnails/rename and real video/storage/browser workflows still need completion or proof. Reference/export completeness needs actual-data checks. | Video upload/library, imports, quotas, usage and reference display, secure retrieval/deletion tests. |
++| P1 | Image/video media library, import, usage/quota, holder attribution and stream/raw delivery in `src/lib/media.ts` | Partial: modules/media owns images/videos/search/usage/holders/quota, guarded import and delete with UI/REST/MCP. Round 9 adds confirmed database-backed asset rename via the shared service, bilingual UI/server action and MCP; the tested module HTTP handler still needs a PATCH re-export in the app route outside worker ownership. Stored images without metadata cannot be renamed. Thumbnails and real video/storage/browser workflows still need completion or proof. Reference/export completeness needs actual-data checks. | Video upload/library, imports, quotas, usage and reference display, secure retrieval/deletion tests. |
+ | P1 | Connections for Groups, Instagram and other networks, token health and lifecycle callbacks in `src/app/(app)/connections/page.tsx` and `src/app/api/facebook` | Partial: Facebook Page/ad-account discovery, selection, stored health, reconnect and retain/delete exist. OAuth startup including compatibility route shares service; batch selection UI/REST/MCP share confirmed wrapper. Single selection/disconnect confirmations differ. New Instagram/Group adapters and provider lifecycle/revocation proof remain absent. | Channel/ad-account selection, token/grant status, remote lifecycle callbacks, retain/delete semantics and complete provider discovery. |
+ | P1 | Ads comparison/trends, findings, sorting, export and freshness in `src/app/(app)/ads/page.tsx`, `src/lib/ads-analysis.ts` | Partial: comparison/trends/findings, rows/export/freshness, hierarchy/charts, directory and durable campaign/ad-set/paused-ad/creative management exist through session API/MCP and key REST v1, with a reconnect notice when the `ads_management` grant is absent (`46c6bdae`, mocked evidence). Management is off by default; the `ad.create` ledger CHECK migration (`20261031180000_rebuild_ads_ad_creation`) is authored and recorded applied in production (owner/integrator), while the Ads runtime copy locale is not yet passed by the UI/REST/MCP entry points. Live management grants, paused creation/cleanup and exhaustive reporting outcomes remain unproven. | Date/account-scoped trends, deltas, findings, CSV, coverage and live sync checks. |
+ | P0 | Root users, workspaces, plans, registration, connections, errors, worker, backups, privileges and audit console in `src/app/(root)/root` and `src/app/api/root` | Partial: grouped settings/stored health/diagnostics, users/workspaces/plans/privileges/audit/errors/sessions, lifecycle, installation transfer, registration MCP and connection refresh/disconnect-with-delete exist. All 48 private Root REST inventory exceptions are replaced by 51 mapped tools, including workspace create/rename and directory GET (`8f423ec7`); workspace, directory, configuration-save and error-resolution services now own actor checks and confirmations (`46c6bdae`, mocked evidence). Backups page is read-only. Complete operations/configuration and real installation-transfer/production-volume evidence remain open. | Role-guarded operator UI/API for each function, with change audit and isolated production-shaped checks. |
+@@ -29,7 +29,7 @@ a manifest, saved setting or unit test is not complete workflow proof. See
+ | P0 | Workspace operations settings: approvals, queue rules, hours, links, UTM, spacing, undo, audience, AI voice and moderation in `src/app/(app)/settings/page.tsx` | Partial: same workspace-operations inventory as above; best-time mode now consumes neutral stored post ranks through composer/queue services and shortening has a publisher consumer and form toggle. Remaining audience/client-approval semantics and runtime evidence are not closed. | Versioned, validated workspace configuration with runtime consumers and migration of needed legacy values. |
+ | P0 | Invitations, registration, email verification, password recovery and OAuth authorization in `src/app/(auth)`, `src/app/invite`, and `src/app/api/auth` | Partial: invitations, open registration/verification/resend, password recovery and authenticator/passkey services exist. Earlier PostgreSQL/browser/SMTP-capture checks are recorded in WAVE1_VERIFICATION. Session MCP exposes account security actions. OAuth login, complete recovery/seat policy and live mail/security/browser proof remain open. | Complete all account lifecycle capabilities with abuse controls, policy/seat handling, browser/API coverage, and production-shaped recovery/cutover evidence. |
+ | P1 | Client review/calendar/portal links and public bio pages with tracked clicks in `src/app/share`, `src/app/bio`, and `src/app/(app)/settings/sharing` | Partial: review/calendar/portal links, versioned access/rotation, feedback and public bio have shared UI/HTTP/MCP services and earlier synthetic probes (CLIENT_SHARING.md). Copy-only edits remain unconfirmed. Portal results/publish-anyway/branding/email, throttling and current key-scope/production evidence need completion. | Portal results, publish-anyway, logos/email, cross-process throttling and end-to-end manager-key channel scope remain open; production/proxy proof outstanding. |
+-| P1 | Agency views, feed ingestion, post templates and tasks in `src/app/(app)/agency`, `feeds`, `templates`, `tasks` | Partial: Agency overview/exports/clients/switching, Tasks/checklists/comments, templates and RSS/Atom/WordPress feeds exist. Overview person credentials are implemented; session Clients/switching do not expand those keys. WordPress recipe automation adds read-only mapping, image conversion, canonical first comment and distinct timezone-slot planning. Defaults remain off/paused for new installations/sources, while production has owner-recorded source/image/planning and first-day 07:00/11:00 batches, each 10/10 with comments. Article links were removed from comments on owner request. Retry/pause-cancel/pool-health and recipe origin badges/status have source/unit evidence; Feeds browser/database recovery and feed previews/reviewer notices remain open. | Full CRUD/workflow parity, workspace permissions, provider-side behavior where relevant, and MCP/API parity. |
++| P1 | Agency views, feed ingestion, post templates and tasks in `src/app/(app)/agency`, `feeds`, `templates`, `tasks` | Partial: Agency overview/exports/clients/switching, Tasks/checklists/comments, templates and RSS/Atom/WordPress feeds exist. Overview person credentials are implemented; session Clients/switching do not expand those keys. WordPress recipe automation adds read-only mapping, image conversion, canonical first comment and distinct timezone-slot planning. Defaults remain off/paused for new installations/sources, while production has owner-recorded source/image/planning and first-day 07:00/11:00 batches, each 10/10 with comments. Article links were removed from comments on owner request. Retry/pause-cancel/pool-health and recipe origin badges/status have source/unit evidence; Round 9 exposes rendered feed-entry previews in the bilingual check dialog and queues approval-request notices atomically from the shared UI/REST/MCP/worker ingest service, controlled by Root feeds.approvalNotificationsEnabled; receipt counts mean queued notifications, not email delivery. Local fake-port/jsdom evidence only; Feeds browser/database recovery, actual notice delivery and client proof remain open. | Full CRUD/workflow parity, workspace permissions, provider-side behavior where relevant, and MCP/API parity. |
+ | P1 | Notifications, webhooks, REST v1 API tokens and OAuth clients in `src/app/(app)/settings/notifications`, `webhooks`, `api` and `src/app/api/v1` | Partial: durable event notifications/sentiment input, queued mail, signed retrying webhooks/test/secrets/history, REST v1 Posts plus Analytics/Ads tool-dispatch routes and Root-gated OAuth connectors exist. Session MCP secret reveal/rotate exists; bearer tools stay secret-free. Actual delivery/OAuth/MCP client and target migration state need verification. | Delivery preferences, retries/redelivery, secret handling, scoped REST/OAuth contracts and audit tests. |
+ | P1 | Page profiles/groups/labels, media/watermark, custom fields, AI agents, history and owner export screens under `src/app/(app)/settings` | Partial: channel groups/labels, watermark application, fields/notes/history and export services have UI/API/MCP. Broader profiles/group filters, AI agents and complete export/localization remain open. Vivid/Meta blue/Warm/Clean light/dark are implemented; global shell and Settings now share account-stored theme/mode and Root-lifetime cache cookies (`2b42470b`). Browser rounds 1–4 cover scoped synthetic Chromium, Firefox and WebKit paths with themed bilingual error pages and unresolved findings (no `not-found.tsx`, soft 404s, raw module errors), not a clean full visual pass. | Working feature screens and shared services, migrated data, permission and visual checks. |
+ | P2 | Asynchronous owner ZIP export with job status and expiry in `src/app/(app)/settings/export` | Partial: durable asynchronous ZIP request/status/reuse/build/download/expiry/cleanup is implemented with prior local PostgreSQL evidence. All legacy categories/media and production-volume/export-erasure coverage remain unproven. Recent migration-table ownership and exact account appearance/safe-credential hooks are audited; supplementary purge guards remain without database proof/rehearsal integration. Partial account export is exposed (session GET route, `export_account_data` MCP tool, bilingual Account download, `46c6bdae`; mocked/DOM evidence); neither account JSON nor partial workspace JSON is the ZIP. | Large-data async export, durable status, expiry/cleanup and completeness reporting. |
+diff --git a/rebuild/src/modules/feeds/ROUND9.md b/rebuild/src/modules/feeds/ROUND9.md
+new file mode 100644
+index 00000000..0ea3777f
+--- /dev/null
++++ b/rebuild/src/modules/feeds/ROUND9.md
+@@ -0,0 +1,36 @@
++# Feed previews and reviewer notices — round 9
++
++The existing check service already returned bounded rendered post text through
++its UI, REST and MCP paths. The customer check-result dialog now exposes that
++exact text in a keyboard-operable disclosure per entry, alongside an optional
++http(s) article link. React renders text without interpreting article HTML. New
++copy is English/French in Root's existing `feeds.copy`; older saved catalogs fall
++back for added keys. Existing `feeds.maxItemsPerCheck`, message, excerpt and entry
++limits bound source/result text. No additional preview fetch or post creation is
++introduced by opening a disclosure. Empty rendered messages cannot enable the
++creation buttons by themselves.
++
++`feeds.approvalNotificationsEnabled` is a new active boolean Root setting,
++default true. Each newly created held post queues the existing Settings-owned
++`approval_request` event in the same transaction, after its destination/version
++records. The event ID is the new post ID, and the existing notification producer
++owns recipient authorization, preferences, durable delivery and duplicate guards.
++No events are emitted for preview, draft, automatically approved scheduled, or
++already-ingested items. A queue failure refuses the transaction's success; the
++feed item is not intentionally consumed independently of its post/notice. The
++worker and UI/REST/MCP manual checks all use this same ingest service. Returned
++`reviewerNotificationsQueued` counts local queued recipient notifications, not
++SMTP delivery or human review; the bilingual UI discloses that distinction.
++
++No routes outside ownership need changing for these two capabilities. The
++integrator must bump CONFIG_SCHEMA_VERSION for the new key. Architecture status,
++shared handoff and operation docs are outside this worker's owned paths; reconcile
++them with this note. Tests use fake ports and jsdom. Actual PostgreSQL atomicity,
++concurrent workers, browser themes/phone/keyboard matrix, notification delivery,
++real MCP clients and production/provider results remain unverified.
++
++Final local verification: `npx tsc --noEmit -p .` exited 0. Targeted Vitest
++(`--cache=false`, because linked node_modules cache is outside writable scope):
++94/94 tests passed across media-library-service, media-library-module,
++media-rename-entrypoints, feeds-service, feeds-mcp, feeds-polling and
++legacy-round9-ui. `git diff --check` passed. No full suite or build was run.
+diff --git a/rebuild/src/modules/feeds/config.ts b/rebuild/src/modules/feeds/config.ts
+index 961ebd16..9d94520e 100644
+--- a/rebuild/src/modules/feeds/config.ts
++++ b/rebuild/src/modules/feeds/config.ts
+@@ -31,6 +31,7 @@ const int = (range: { min: number; max: number }) => z.number().int().min(range.
+ const G = 'Content feeds';
+ 
+ export const FEEDS_CONFIG = [
++  entry({ key: 'feeds.approvalNotificationsEnabled', group: G, label: 'Notify feed post reviewers', kind: 'boolean', description: 'Queue normal approval-request notifications atomically for each new feed post held for review. Existing notification preferences and delivery policies apply.', defaultValue: true, schema: z.boolean(), consumption: 'active' }),
+   entry({ key: 'feeds.pageSize', group: G, label: 'Feed page size', kind: 'number', description: 'Feeds listed on one page.', defaultValue: FEEDS_DEFAULTS.pageSize, schema: int(FEEDS_BOUNDS.pageSize), consumption: 'active' }),
+   entry({ key: 'feeds.maxPerWorkspace', group: G, label: 'Feeds per workspace', kind: 'number', description: 'Maximum content feeds one workspace may keep.', defaultValue: FEEDS_DEFAULTS.maxPerWorkspace, schema: int(FEEDS_BOUNDS.maxPerWorkspace), consumption: 'active' }),
+   entry({ key: 'feeds.fetchTimeoutMs', group: G, label: 'Feed fetch timeout (ms)', kind: 'number', description: 'Overall time allowed to read one feed, including redirects.', defaultValue: FEEDS_DEFAULTS.fetchTimeoutMs, schema: int(FEEDS_BOUNDS.fetchTimeoutMs), consumption: 'active' }),
+diff --git a/rebuild/src/modules/feeds/copy.ts b/rebuild/src/modules/feeds/copy.ts
+index 3e9f8202..ec552fb1 100644
+--- a/rebuild/src/modules/feeds/copy.ts
++++ b/rebuild/src/modules/feeds/copy.ts
+@@ -52,6 +52,10 @@ export const feedsCopy = {
+     hashtags: 'Hashtags (optional)',
+     hashtagsHint: 'Inserted where {hashtags} appears in the post text.',
+     preview: 'Preview',
++    entryPreview: 'Post text',
++    reviewQueued: '{count} review notifications queued. Posts remain in Approvals; this does not confirm email delivery.',
++    entryLink: 'Article link',
++    reviewNotice: 'Posts awaiting approval appear in Approvals. Review notifications follow each team member’s preferences; delivery is not guaranteed.',
+     previewEmpty: 'This text produces an empty post.',
+     sampleTitle: 'An example headline',
+     sampleExcerpt: 'The first lines of the article appear here.',
+@@ -174,6 +178,10 @@ export const feedsCopy = {
+     hashtags: 'Hashtags (facultatif)',
+     hashtagsHint: 'Insérés à la place de {hashtags} dans le texte de la publication.',
+     preview: 'Aperçu',
++    entryPreview: 'Texte de la publication',
++    reviewQueued: '{count} notifications de validation mises en attente. Les publications restent dans Approbations ; cela ne confirme pas la livraison des e-mails.',
++    entryLink: 'Lien de l’article',
++    reviewNotice: 'Les publications à valider apparaissent dans Approbations. Les notifications suivent les préférences de chaque membre ; leur livraison n’est pas garantie.',
+     previewEmpty: 'Ce texte produit une publication vide.',
+     sampleTitle: 'Un exemple de titre',
+     sampleExcerpt: 'Les premières lignes de l’article apparaissent ici.',
+@@ -259,5 +267,5 @@ export type FeedsCopyCatalog = Record<FeedsLocale, Record<FeedsCopyKey, string>>
+ 
+ /** `catalog` is the Root-managed `feeds.copy` value; the shipped defaults apply when it is not supplied. */
+ export function feedsText(locale: FeedsLocale, key: FeedsCopyKey, values: Record<string, string | number> = {}, catalog: FeedsCopyCatalog = feedsCopy): string {
+-  return (catalog[locale][key] as string).replace(/\{(\w+)\}/g, (whole, name: string) => name in values ? String(values[name]) : whole);
++  return (catalog[locale]?.[key] ?? feedsCopy[locale][key]).replace(/\{(\w+)\}/g, (whole, name: string) => name in values ? String(values[name]) : whole);
+ }
+diff --git a/rebuild/src/modules/feeds/server/ingest.ts b/rebuild/src/modules/feeds/server/ingest.ts
+index b4bb9331..0681a9db 100644
+--- a/rebuild/src/modules/feeds/server/ingest.ts
++++ b/rebuild/src/modules/feeds/server/ingest.ts
+@@ -1,3 +1,5 @@
++import { runtimeConfig } from '@/server/config/store';
++import { emitWorkspaceAlert } from '@/modules/settings/notifications/producers';
+ import { randomUUID } from 'node:crypto';
+ import { OperationError } from '@/lib/operation-error';
+ import { prisma } from '@/server/data';
+@@ -49,7 +51,7 @@ export type IngestOptions = {
+   /** A worker run: audit rows carry no person, conditional requests are used, repeated failures can turn the feed off. */
+   automatic?: boolean; disableAfterFailures?: number;
+ };
+-export type IngestResult = { feedId: string; notModified: boolean; entries: Array<Omit<CheckedEntry, 'publishedAt'> & { publishedAt: string | null }>; draftsCreated: number; postsCreated: number; held: number; backlog: boolean; destinations: number };
++export type IngestResult = { feedId: string; notModified: boolean; entries: Array<Omit<CheckedEntry, 'publishedAt'> & { publishedAt: string | null }>; draftsCreated: number; postsCreated: number; held: number; reviewerNotificationsQueued: number; backlog: boolean; destinations: number };
+ 
+ type PollMark = { kind: 'ok'; validators: { etag: string | null; modified: string | null } | 'clear' | 'keep' } | { kind: 'error'; message: string };
+ /** Poll bookkeeping: conditional-request validators and a safe, non-secret last error. Returns whether the feed was turned off. */
+@@ -120,7 +122,7 @@ export async function ingestFeed(actor: FeedActor, feed: FeedRow, workspaceId: s
+     // Items older than the subscription start are never ingested; undated items are treated as current.
+     eligible: !seen.has(entry.guid) && (entry.publishedAt === null || entry.publishedAt.getTime() >= feed.ingestFrom.getTime()),
+   }));
+-  const base: IngestResult = { feedId: feed.id, notModified, entries: checked.map(c => ({ ...c, publishedAt: c.publishedAt?.toISOString() ?? null })), draftsCreated: 0, postsCreated: 0, held: 0, backlog, destinations: targetIds.length };
++  const base: IngestResult = { feedId: feed.id, notModified, entries: checked.map(c => ({ ...c, publishedAt: c.publishedAt?.toISOString() ?? null })), draftsCreated: 0, postsCreated: 0, held: 0, reviewerNotificationsQueued: 0, backlog, destinations: targetIds.length };
+ 
+   if (options.mode === 'preview') { await recordPoll(workspaceId, feed, { kind: 'ok', validators: 'keep' }, options); return base; }
+ 
+@@ -162,6 +164,8 @@ async function createPosts(actor: FeedActor, feed: FeedRow, workspaceId: string,
+     }
+   }
+   const retention = await loadVersionRetention();
++  const notifyReviewers = await runtimeConfig('feeds.approvalNotificationsEnabled');
++  if (typeof notifyReviewers !== 'boolean') throw await feedsError('unavailable', 'Content feeds are temporarily unavailable. Refresh and try again.');
+   return protect(transact(workspaceId, l, async tx => {
+     await lockActor(tx, actor, true);
+     const locked = await tx.$queryRaw<Array<{ enabled: boolean; targetIds: unknown; autoApprove: boolean; spreadMinutes: number }>>`SELECT enabled, "targetIds", "autoApprove", "spreadMinutes" FROM feed_sources WHERE id = ${feed.id} AND "workspaceId" = ${workspaceId} FOR UPDATE`;
+@@ -183,7 +187,7 @@ async function createPosts(actor: FeedActor, feed: FeedRow, workspaceId: string,
+     // or the workspace requires approval, whatever role the acting person or owner has.
+     const hold = scheduled && (!autoApprove || requiresApproval);
+ 
+-    let drafts = 0; let posts = 0; let held = 0;
++    let drafts = 0; let posts = 0; let held = 0; let reviewerNotificationsQueued = 0;
+     for (const item of items) {
+       const itemId = `fit_${randomUUID()}`;
+       // The unique (feed, guid) pair is the de-duplication guard: a concurrent or repeated read cannot double-create.
+@@ -207,6 +211,10 @@ async function createPosts(actor: FeedActor, feed: FeedRow, workspaceId: string,
+           VALUES (${postId}, ${workspaceId}, ${actor.userId}, ${item.message}, ${item.link}, ${hold ? 'pending_approval' : 'scheduled'}::"PostStatus", ${at}, ${timezone}, 'worker'::"PublishMode", ${hold ? 'pending' : 'not_required'}::"ApprovalStatus", ${hold ? actor.userId : null}, ${hold ? options.now : null}, ${itemId}, NOW(), NOW())`;
+         for (const targetId of group) await tx.$executeRaw`INSERT INTO post_targets (id, "postId", "targetId", "formatId", status, "createdAt", "updatedAt") VALUES (${randomUUID()}, ${postId}, ${targetId}, ${formats[targetId] ?? null}, 'pending'::"PostTargetStatus", NOW(), NOW())`;
+         await recordPostVersion(tx, postId, options.automatic ? null : actor.userId, retention);
++        if (hold && notifyReviewers) {
++          const receipt = await emitWorkspaceAlert(tx, { workspaceId, eventId: postId, kind: 'approval_request', postId });
++          reviewerNotificationsQueued += receipt.queued;
++        }
+         posts += 1; if (hold) held += 1;
+       }
+     }
+@@ -214,6 +222,6 @@ async function createPosts(actor: FeedActor, feed: FeedRow, workspaceId: string,
+       feedId: feed.id, ...(scheduled ? { posts, held, authorId: actor.userId, handling: autoApprove ? 'schedule' : 'review', approvalRequired: requiresApproval } : { drafts }), considered: items.length, ...(options.automatic ? { automatic: true } : {}),
+     });
+     await lockActor(tx, actor, true);
+-    return { draftsCreated: drafts, postsCreated: posts, held };
++    return { draftsCreated: drafts, postsCreated: posts, held, reviewerNotificationsQueued };
+   }));
+ }
+diff --git a/rebuild/src/modules/feeds/ui/FeedManager.tsx b/rebuild/src/modules/feeds/ui/FeedManager.tsx
+index cf13eeb2..f56317f3 100644
+--- a/rebuild/src/modules/feeds/ui/FeedManager.tsx
++++ b/rebuild/src/modules/feeds/ui/FeedManager.tsx
+@@ -11,7 +11,7 @@ import styles from './feeds.module.css';
+ type Handling = 'review' | 'schedule';
+ export type Feed = { id: string; name: string; url: string; kind: 'rss' | 'wordpress'; enabled: boolean; messageTemplate: string; hashtags: string; targetIds: string[]; handling: Handling; spreadMinutes: number; failureCount: number; lastPolledAt: string | null; lastError: string | null; createdAt: string; updatedAt: string };
+ type Limits = { maxNameCharacters: number; maxMessageCharacters: number; maxTargets: number; maxSpreadMinutes: number };
+-type Checked = { feedId: string; notModified: boolean; draftsCreated: number; postsCreated: number; held: number; backlog: boolean; destinations: number; entries: Array<{ guid: string; title: string | null; link: string | null; message: string; isNew: boolean; eligible: boolean }> };
++type Checked = { feedId: string; notModified: boolean; draftsCreated: number; postsCreated: number; held: number; reviewerNotificationsQueued?: number; backlog: boolean; destinations: number; entries: Array<{ guid: string; title: string | null; link: string | null; message: string; isNew: boolean; eligible: boolean }> };
+ type Review = { kind: 'save' | 'delete' | 'drafts' | 'posts'; feed?: Feed };
+ const blank = { name: '', url: '', kind: 'rss' as 'rss' | 'wordpress', enabled: true, messageTemplate: '{title}\n\n{link}', hashtags: '', targetIds: [] as string[], handling: 'review' as Handling, spreadMinutes: 0 };
+ const host = (url: string) => { try { return new URL(url).hostname; } catch { return url; } };
+@@ -76,13 +76,14 @@ export function FeedManager({ initialFeeds, channels, page, hasMore, canWrite =
+   }, t('unknownCheck'));
+   const toggle = (id: string) => setDraft(d => ({ ...d, targetIds: d.targetIds.includes(id) ? d.targetIds.filter(x => x !== id) : [...d.targetIds, id] }));
+   const preview = sample(draft.messageTemplate, draft.hashtags, t);
+-  const eligible = checked?.result.entries.filter(e => e.eligible).length ?? 0;
++  const eligible = checked?.result.entries.filter(e => e.eligible && e.message.trim()).length ?? 0;
+   const reviewTitle = !review ? '' : t(review.kind === 'delete' ? 'reviewDeleteTitle' : review.kind === 'drafts' ? 'reviewDraftsTitle' : review.kind === 'posts' ? 'reviewPostsTitle' : 'reviewSaveTitle');
+   const reviewText = !review ? '' : review.kind === 'delete' ? t('reviewDeleteDescription', { name: review.feed?.name ?? '' }) : review.kind === 'drafts' ? t('reviewDraftsDescription') : review.kind === 'posts' ? t('reviewPostsDescription', { handling: handlingText(review.feed!.handling) }) : t('reviewSaveDescription');
+   const reviewAction = !review ? '' : t(review.kind === 'delete' ? 'confirmDelete' : review.kind === 'drafts' ? 'confirmDrafts' : review.kind === 'posts' ? 'confirmPosts' : 'confirmSave');
+ 
+   return <div className={styles.root}>
+     {notice && !formOpen && !review && <RouteNotice error={notice.error} focusKey={`feed-notice:${notice.key}`}>{notice.text}</RouteNotice>}
++    <p className={styles.help}>{t('reviewNotice')}</p>
+     <p className={styles.help}>{automaticMinutes ? t('automatic', { minutes: automaticMinutes }) : t('manualOnly')}</p>
+     <SidebarDock><div className={styles.search}>{canWrite && <Button variant="primary" onClick={() => begin()}>{t('add')}</Button>}</div></SidebarDock>
+     {feeds.length ? <div className={styles.tableWrap}><table className={styles.table}><caption className="sr-only">{t('title')}</caption><thead><tr><th scope="col">{t('colFeed')}</th><th scope="col">{t('colChannels')}</th><th scope="col">{t('colHandling')}</th><th scope="col">{t('colChecked')}</th>{canWrite && <th scope="col">{t('colActions')}</th>}</tr></thead><tbody>
+@@ -118,7 +119,8 @@ export function FeedManager({ initialFeeds, channels, page, hasMore, canWrite =
+ 
+     <Dialog open={Boolean(checked)} title={checked ? t('resultsTitle', { name: checked.feed.name }) : ''} description={checked?.result.notModified ? t('resultsUnchanged') : t('resultsNew', { count: eligible })} onClose={() => setChecked(null)}
+       actions={<><Button data-dialog-cancel onClick={() => setChecked(null)}>{t('close')}</Button>{canWrite && checked && eligible > 0 && <><Button onClick={() => { const f = checked.feed; setChecked(null); setConfirmation(''); setReview({ kind: 'drafts', feed: f }); }}>{t('createDraftsAction')}</Button>{checked.feed.targetIds.length > 0 && <Button variant="primary" onClick={() => { const f = checked.feed; setChecked(null); setConfirmation(''); setReview({ kind: 'posts', feed: f }); }}>{t('createPostsAction')}</Button>}</>}</>}>
+-      {checked && (checked.result.entries.length ? <ul className={styles.entries}>{checked.result.entries.map(e => <li key={e.guid}><strong>{e.title ?? e.guid}</strong><span className={styles.meta}>{t(e.eligible ? 'resultNew' : e.isNew ? 'resultOlder' : 'resultSeen')}</span></li>)}</ul> : <p className={styles.empty}>{t('resultsNone')}</p>)}
++      {checked && checked.result.held > 0 && <p>{t('reviewQueued', { count: checked.result.reviewerNotificationsQueued ?? 0 })}</p>}
++      {checked && (checked.result.entries.length ? <ul className={styles.entries}>{checked.result.entries.map(e => <li key={e.guid}><strong>{e.title ?? e.guid}</strong><span className={styles.meta}>{t(e.eligible ? 'resultNew' : e.isNew ? 'resultOlder' : 'resultSeen')}</span><details><summary>{t('entryPreview')}</summary><p className={styles.reviewPreview}>{e.message || t('previewEmpty')}</p>{e.link && /^https?:\/\//i.test(e.link) && <a href={e.link} target="_blank" rel="noopener noreferrer">{t('entryLink')}</a>}</details></li>)}</ul> : <p className={styles.empty}>{t('resultsNone')}</p>)}
+       {checked?.result.backlog && <p className={styles.help}>{t('resultsBacklog')}</p>}
+       {checked && checked.result.destinations === 0 && <p className={styles.help}>{t('resultsNoChannels')} {t('resultsNoChannelsPosts')}</p>}
+     </Dialog>
+diff --git a/rebuild/src/modules/media/ROUND9.md b/rebuild/src/modules/media/ROUND9.md
+new file mode 100644
+index 00000000..8b292be4
+--- /dev/null
++++ b/rebuild/src/modules/media/ROUND9.md
+@@ -0,0 +1,43 @@
++# Media rename — round 9
++
++Database-backed image/video assets now support confirmed renaming through
++`server/library.ts:renameAsset`, the MediaLibrary dialog/server action, and the
++installed `rename_media_asset` MCP tool. The service validates the current Root
++name/identifier limits, requires all-channel write access, repeats authorization
++under the workspace operation/transaction lock, scopes every query to the current
++workspace, preserves attachment/storage identity, and audits changed asset IDs.
++An identical name is an idempotent success. No filesystem operation is needed.
++The UI preserves input on failure and accepts only the matching ID/name receipt.
++English/French labels use `media.copy`; errors use `media.messages`. New labels
++fall back to shipped catalog entries for an older saved catalog. Root's existing
++`media.assetNameMaxCharacters` also supplies the dialog's name bound.
++
++## Integrator action outside this lane
++
++The module exports a tested thin HTTP handler, but this worktree's app route is
++outside ownership. Add exactly this re-export to
++`src/app/api/media-library/[id]/route.ts`:
++
++```ts
++export { renameMediaHttp as PATCH } from '@/modules/media/server/http';
++```
++
++Until that is integrated, REST rename is **not exposed**. The customer UI works
++through the module-owned authenticated server action, independent of that route.
++Do not describe three-surface rename parity as complete.
++
++Only `source: library` rows can be renamed. Uploaded/imported stored image files
++with no media metadata row are deliberately excluded. Supporting their names
++requires a consistent metadata/storage design, usage accounting and deletion
++changes; no file is renamed or duplicated by this batch. Video thumbnails/raw
++legacy-file compatibility and broad library browser checks remain separate gaps.
++
++Checks use fake database ports and jsdom, not PostgreSQL rollback/concurrency,
++real browser themes/viewports or provider/production outcomes. No schema-version
++change, migration, commit, server, deployment or push is part of this worker.
++
++Final local verification: `npx tsc --noEmit -p .` exited 0. Targeted Vitest
++(`--cache=false`, because linked node_modules cache is outside writable scope):
++94/94 tests passed across media-library-service, media-library-module,
++media-rename-entrypoints, feeds-service, feeds-mcp, feeds-polling and
++legacy-round9-ui. `git diff --check` passed. No full suite or build was run.
+diff --git a/rebuild/src/modules/media/copy.ts b/rebuild/src/modules/media/copy.ts
+index ac1a4802..16ddfd7f 100644
+--- a/rebuild/src/modules/media/copy.ts
++++ b/rebuild/src/modules/media/copy.ts
+@@ -1,6 +1,7 @@
+ /** Media library customer copy in both shipped languages; keys mirror legacy `media.*`. */
+ export const mediaCopy = {
+   en: {
++    rename: 'Rename', renameTitle: 'Rename media', renameName: 'File name', renamed: 'Media renamed.',
+     title: 'Media library',
+     description: 'Images and videos available to your posts.',
+     privacy: 'Deleting media does not remove posts, but a post that used it may lose its attachment.',
+@@ -75,6 +76,7 @@ export const mediaCopy = {
+     unknownDate: 'Unknown',
+   },
+   fr: {
++    rename: 'Renommer', renameTitle: 'Renommer le média', renameName: 'Nom du fichier', renamed: 'Média renommé.',
+     title: 'Médiathèque',
+     description: 'Les images et vidéos disponibles pour vos publications.',
+     privacy: 'Supprimer un média ne supprime pas les publications, mais une publication qui l’utilisait peut perdre sa pièce jointe.',
+@@ -163,5 +165,5 @@ export type MediaCopyCatalog = Record<MediaLocale, Record<MediaCopyKey, string>>
+ 
+ /** `catalog` is the Root-managed `media.copy` value; the shipped defaults apply when it is not supplied. */
+ export function mediaText(locale: MediaLocale, key: MediaCopyKey, values: Record<string, string | number> = {}, catalog: MediaCopyCatalog = mediaCopy): string {
+-  return (catalog[locale][key] as string).replace(/\{(\w+)\}/g, (whole, name: string) => name in values ? String(values[name]) : whole);
++  return (catalog[locale]?.[key] ?? mediaCopy[locale][key]).replace(/\{(\w+)\}/g, (whole, name: string) => name in values ? String(values[name]) : whole);
+ }
+diff --git a/rebuild/src/modules/media/mcp.ts b/rebuild/src/modules/media/mcp.ts
+index 0fabb25b..14481dff 100644
+--- a/rebuild/src/modules/media/mcp.ts
++++ b/rebuild/src/modules/media/mcp.ts
+@@ -1,19 +1,21 @@
+ import { mediaError } from './server/messages';
+ import { auditedReceipt, pageIdsFor, type McpToolGroup } from '@/server/mcp/kit';
+-import { deleteAsset, importFromUrl, readLibrary, type MediaDeps } from './server/library';
++import { deleteAsset, importFromUrl, readLibrary, renameAsset, type MediaDeps } from './server/library';
+ import type { ToolActor } from './server/access';
+ import { MEDIA_FEATURE_ID } from './manifest';
+ import { MEDIA_BOUNDS } from './config';
+ 
+ export const mediaToolDefinitions = [
++  { name: 'rename_media_asset', description: 'Rename a database-backed library image or video without changing attachments. Requires all-channel access. Confirmation: RENAME MEDIA <id>. Stored image files without library metadata cannot be renamed.', inputSchema: { type: 'object', required: ['id', 'name', 'confirmation'], properties: { id: { type: 'string', maxLength: MEDIA_BOUNDS.identifierMaxCharacters.max }, name: { type: 'string', minLength: 1, maxLength: MEDIA_BOUNDS.assetNameMaxCharacters.max }, confirmation: { type: 'string' } }, additionalProperties: false } },
+   { name: 'list_media_library', description: 'List images and videos in the current workspace media library with storage usage against the workspace quota. Filter by kind, usage (used or unused) and literal file-name search; continue with page while hasMore is true. A member limited to some channels sees usage only as used or unused, not which posts hold an asset.', inputSchema: { type: 'object', properties: { kind: { enum: ['image', 'video'] }, q: { type: 'string', maxLength: MEDIA_BOUNDS.maxSearchCharacters.max }, usage: { enum: ['used', 'unused'] }, page: { type: 'integer', minimum: 1, maximum: MEDIA_BOUNDS.pageNumberMax.max } }, additionalProperties: false } },
+   { name: 'import_media_from_url', description: 'Import one public image or video into the workspace library. Only public https addresses are fetched; private networks are refused, and size, type and quota limits are enforced. Confirmation must exactly match IMPORT MEDIA <url>.', inputSchema: { type: 'object', required: ['url', 'confirmation'], properties: { url: { type: 'string', maxLength: MEDIA_BOUNDS.importUrlMaxCharacters.max }, name: { type: 'string', maxLength: MEDIA_BOUNDS.assetNameMaxCharacters.max }, confirmation: { type: 'string' } }, additionalProperties: false } },
+   { name: 'delete_media_asset', description: 'Delete one library asset. Refused while any post uses it unless allowInUse is true, and never while a using post is scheduled, publishing or awaiting approval. Requires access to all channels. Confirmation must exactly match DELETE MEDIA <id>, or DELETE IN-USE MEDIA <id> with allowInUse.', inputSchema: { type: 'object', required: ['id', 'confirmation'], properties: { id: { type: 'string', maxLength: MEDIA_BOUNDS.identifierMaxCharacters.max }, allowInUse: { type: 'boolean' }, confirmation: { type: 'string' } }, additionalProperties: false } },
+ ] as const;
+ export const mediaTools = new Set<string>(mediaToolDefinitions.map(tool => tool.name));
+-export const mediaWriteTools = new Set<string>(['import_media_from_url', 'delete_media_asset']);
++export const mediaWriteTools = new Set<string>(['import_media_from_url', 'delete_media_asset', 'rename_media_asset']);
+ 
+ export async function executeMediaTool(actor: ToolActor, name: string, args: unknown, deps: MediaDeps = {}) {
++  if (name === 'rename_media_asset') return renameAsset(actor, args);
+   if (name === 'list_media_library') return readLibrary(actor, args ?? {}, deps);
+   if (name === 'import_media_from_url') return importFromUrl(actor, args, deps);
+   if (name === 'delete_media_asset') return deleteAsset(actor, args, deps);
+@@ -28,7 +30,7 @@ export async function executeMediaTool(actor: ToolActor, name: string, args: unk
+ export const MEDIA_MCP: readonly McpToolGroup[] = [{
+   id: 'media-library',
+   tools: mediaToolDefinitions,
+-  features: { list_media_library: MEDIA_FEATURE_ID, import_media_from_url: MEDIA_FEATURE_ID, delete_media_asset: MEDIA_FEATURE_ID },
++  features: { rename_media_asset: MEDIA_FEATURE_ID, list_media_library: MEDIA_FEATURE_ID, import_media_from_url: MEDIA_FEATURE_ID, delete_media_asset: MEDIA_FEATURE_ID },
+   writeTools: [...mediaWriteTools],
+   selfLockedWrites: [...mediaWriteTools],
+   scope: { workspaceTools: [...mediaTools] },
+@@ -47,6 +49,7 @@ export const MEDIA_MCP: readonly McpToolGroup[] = [{
+       const imported = result as Awaited<ReturnType<typeof importFromUrl>>;
+       return auditedReceipt(viewer, name, { assetId: imported.id, kind: imported.kind, size: imported.size }, imported);
+     }
++    if (name === 'rename_media_asset') return result;
+     const removed = result as Awaited<ReturnType<typeof deleteAsset>>;
+     return auditedReceipt(viewer, name, { assetId: removed.id, affectedPosts: removed.affectedPosts }, removed);
+   },
+diff --git a/rebuild/src/modules/media/messages.ts b/rebuild/src/modules/media/messages.ts
+index e918484d..69595ada 100644
+--- a/rebuild/src/modules/media/messages.ts
++++ b/rebuild/src/modules/media/messages.ts
+@@ -12,6 +12,7 @@ export const mediaMessages = {
+   'Sign in to an authorized workspace.': row('Sign in to an authorized workspace.', 'Connectez-vous à un espace autorisé.'),
+   'This feature is unavailable in this workspace.': row('This feature is unavailable in this workspace.', 'Cette fonctionnalité n’est pas disponible dans cet espace.'),
+   'Your active workspace access changed. Sign in again to continue.': row('Your active workspace access changed. Sign in again to continue.', 'Votre accès à l’espace a changé. Reconnectez-vous pour continuer.'),
++  'Renaming media requires access to all channels.': row('Renaming media requires access to all channels.', 'Renommer un média nécessite un accès à toutes les chaînes.'),
+   'Choose a supported media action.': row('Choose a supported media action.', 'Choisissez une action média prise en charge.'),
+   'Choose valid filters.': row('Choose valid filters.', 'Choisissez des filtres valides.'),
+   'Choose valid media details and confirm the exact action.': row('Choose valid media details and confirm the exact action.', 'Indiquez des informations média valides et confirmez l’action exacte.'),
+diff --git a/rebuild/src/modules/media/server/http.ts b/rebuild/src/modules/media/server/http.ts
+index dda75161..b38ee4ff 100644
+--- a/rebuild/src/modules/media/server/http.ts
++++ b/rebuild/src/modules/media/server/http.ts
+@@ -32,3 +32,17 @@ export const strictQuery = (request: Request, allowed: readonly string[]) => {
+   if ([...params.keys()].some(key => !allowed.includes(key) || params.getAll(key).length !== 1)) throw new OperationError('invalid_request', 'Choose valid filters.');
+   return params;
+ };
++
++
++/** Integrator: export this as PATCH from /api/media-library/[id]/route.ts. */
++export async function renameMediaHttp(request: Request, context: { params: Promise<{ id: string }> }) {
++  if (!sameOrigin(request)) return reply({ code: 'forbidden' }, 403);
++  const actor = await viewerActor('publishing/media', true);
++  if (actor instanceof Response) return actor;
++  try {
++    const body = await readJson(request, 'Choose valid media details and confirm the exact action.');
++    if (!body || typeof body !== 'object' || Array.isArray(body) || Object.hasOwn(body, 'id')) throw await mediaError('invalid_request', 'Choose valid media details and confirm the exact action.');
++    const { renameAsset } = await import('./library');
++    return reply(await renameAsset(actor, { ...body, id: (await context.params).id }));
++  } catch (error) { return failure(error, 'The media operation could not be confirmed. Refresh the library before trying again.'); }
++}
+diff --git a/rebuild/src/modules/media/server/library.ts b/rebuild/src/modules/media/server/library.ts
+index 5a0bcda6..b33d72cb 100644
+--- a/rebuild/src/modules/media/server/library.ts
++++ b/rebuild/src/modules/media/server/library.ts
+@@ -115,7 +115,7 @@ export async function readLibrary(actor: ToolActor, input: unknown = {}, deps: M
+     const { byAsset, truncated } = await attribute(prisma, actor.workspaceId, scope, l.scan, l.holderExcerpt);
+     let items = scope.map(c => { const h = byAsset.get(c.id) ?? []; return { ...c.asset, inUse: h.length > 0, holderCount: h.length, holders: auth.workspaceWide ? h.slice(0, l.listLimit) : null } satisfies LibraryAsset; });
+     if (query.usage) items = items.filter(i => query.usage === 'used' ? i.inUse : !i.inUse).slice((page - 1) * l.pageSize, page * l.pageSize + 1);
+-    return { items: items.slice(0, l.pageSize), page, pageSize: l.pageSize, hasMore: items.length > l.pageSize, usage, workspaceWide: auth.workspaceWide, usageMayBeIncomplete: truncated || usage.approximate, limits: { maxSearchCharacters: l.search } };
++    return { items: items.slice(0, l.pageSize), page, pageSize: l.pageSize, hasMore: items.length > l.pageSize, usage, workspaceWide: auth.workspaceWide, usageMayBeIncomplete: truncated || usage.approximate, limits: { maxSearchCharacters: l.search, maxNameCharacters: l.nameMax } };
+   })());
+ }
+ 
+@@ -212,3 +212,26 @@ export async function deleteAsset(actor: ToolActor, input: unknown, deps: MediaD
+   }));
+ }
+ export { NetGuardError };
++
++
++/** Rename database-backed assets without changing their stable attachment identity. */
++export async function renameAsset(actor: ToolActor, input: unknown) {
++  const l = await bounds();
++  const { z } = await import('zod');
++  const data = await parse(z.object({ id: z.string().min(1).max(l.identifierMax).regex(/^[A-Za-z0-9_-]+$/), name: z.string().trim().min(1).max(l.nameMax).refine(v => !/[\u0000-\u001f\u007f\\/]/.test(v)), confirmation: z.string() }).strict(), input);
++  if (data.confirmation !== `RENAME MEDIA ${data.id}`) throw await bad();
++  const auth = await authorizeFeature(actor, FEATURE, 'write');
++  if (!auth.workspaceWide) throw await mediaError('forbidden', 'Renaming media requires access to all channels.');
++  return protect(transact(actor.workspaceId, l, async tx => {
++    const fresh = await lockActor(tx, actor, true);
++    if (!fresh.workspaceWide) throw await mediaError('forbidden', 'Renaming media requires access to all channels.');
++    const rows = await tx.$queryRaw<Array<{ filename: string }>>`SELECT filename FROM media WHERE id = ${data.id} AND "workspaceId" = ${actor.workspaceId} AND "derivedFromId" IS NULL FOR UPDATE`;
++    if (!rows[0]) throw await mediaError('not_found', 'This media is unavailable in the current workspace.');
++    if (rows[0].filename !== data.name) {
++      const changed = await tx.$executeRaw`UPDATE media SET filename = ${data.name} WHERE id = ${data.id} AND "workspaceId" = ${actor.workspaceId} AND "derivedFromId" IS NULL`;
++      if (changed !== 1) throw await unavailable();
++      await audit(tx, actor, 'media.renamed', { assetId: data.id });
++    }
++    return { id: data.id, name: data.name, renamed: true as const };
++  }));
++}
+diff --git a/rebuild/src/modules/media/ui/MediaLibrary.tsx b/rebuild/src/modules/media/ui/MediaLibrary.tsx
+index 1e456843..4ae59b60 100644
+--- a/rebuild/src/modules/media/ui/MediaLibrary.tsx
++++ b/rebuild/src/modules/media/ui/MediaLibrary.tsx
+@@ -8,6 +8,7 @@ import { RouteNotice } from '@/components/RouteNotice';
+ import { SidebarDock } from '@/components/SidebarDock';
+ import { mediaText, type MediaCopyCatalog, type MediaCopyKey, type MediaLocale } from '../copy';
+ import styles from './media.module.css';
++import { renameMediaAction } from './rename-action';
+ 
+ const PATH = '/publishing/media';
+ type Holder = { postId: string; status: string; scheduledAt: string | null; excerpt: string };
+@@ -15,9 +16,9 @@ export type Asset = { id: string; kind: 'image' | 'video'; mimeType: string; nam
+ type Usage = { usedBytes: number; quotaBytes: number; assetCount: number; approximate: boolean };
+ const size = (n: number) => n >= 1073741824 ? `${(n / 1073741824).toFixed(1)} GB` : n >= 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`;
+ 
+-export function MediaLibrary({ items, usage, page, hasMore, filters, canWrite, workspaceWide, usageMayBeIncomplete, maxSearch, locale = 'en', copy }: {
++export function MediaLibrary({ items, usage, page, hasMore, filters, canWrite, workspaceWide, usageMayBeIncomplete, maxSearch, maxName, locale = 'en', copy }: {
+   items: Asset[]; usage: Usage; page: number; hasMore: boolean; filters: { kind: string; usage: string; q: string };
+-  canWrite: boolean; workspaceWide: boolean; usageMayBeIncomplete: boolean; maxSearch: number; locale?: MediaLocale; copy?: MediaCopyCatalog;
++  canWrite: boolean; workspaceWide: boolean; usageMayBeIncomplete: boolean; maxSearch: number; maxName: number; locale?: MediaLocale; copy?: MediaCopyCatalog;
+ }) {
+   const router = useRouter();
+   const t = (key: MediaCopyKey, values?: Record<string, string | number>) => mediaText(locale, key, values, copy);
+@@ -26,6 +27,8 @@ export function MediaLibrary({ items, usage, page, hasMore, filters, canWrite, w
+   const [assets, setAssets] = useState(items);
+   const [importing, setImporting] = useState(false);
+   const [url, setUrl] = useState(''); const [name, setName] = useState('');
++  const [renaming, setRenaming] = useState<Asset | null>(null);
++  const [renameName, setRenameName] = useState('');
+   const [removing, setRemoving] = useState<Asset | null>(null);
+   const [force, setForce] = useState(false);
+   const [confirmation, setConfirmation] = useState('');
+@@ -70,8 +73,16 @@ export function MediaLibrary({ items, usage, page, hasMore, filters, canWrite, w
+     router.refresh();
+   }, t('deleteUnknown'));
+ 
++  const performRename = () => run(async () => {
++    if (!renaming) return;
++    const result = await renameMediaAction({ id: renaming.id, name: renameName.trim(), confirmation });
++    if (!('renamed' in result) || result.renamed !== true || result.id !== renaming.id || result.name !== renameName.trim()) throw new Error(errorText(result));
++    setAssets(cur => cur.map(a => a.id === result.id ? { ...a, name: result.name } : a));
++    setRenaming(null); say(t('renamed')); router.refresh();
++  }, t('unconfirmed'));
++
+   return <div className={styles.root}>
+-    {notice && !importing && !removing && <RouteNotice error={notice.error} focusKey={`media-notice:${notice.key}`}>{notice.text}</RouteNotice>}
++    {notice && !importing && !removing && !renaming && <RouteNotice error={notice.error} focusKey={`media-notice:${notice.key}`}>{notice.text}</RouteNotice>}
+     <SidebarDock><form action={PATH} method="get" className={styles.filters} role="search">
+       <label htmlFor="media-q">{t('search')}</label><input id="media-q" name="q" defaultValue={filters.q} maxLength={maxSearch} placeholder={t('searchPlaceholder')} />
+       <label htmlFor="media-kind">{t('type')}</label><select id="media-kind" name="kind" defaultValue={filters.kind}><option value="">{t('typeAll')}</option><option value="image">{t('typeImage')}</option><option value="video">{t('typeVideo')}</option></select>
+@@ -93,18 +104,25 @@ export function MediaLibrary({ items, usage, page, hasMore, filters, canWrite, w
+         <th scope="row"><span className={styles.name}>{a.name}</span><span className={styles.meta}>{a.mimeType} · {t('added', { date: day(a.createdAt) })}</span></th>
+         <td>{size(a.size)}</td>
+         <td>{a.inUse ? usedLabel(a.holderCount) : t('unused')}{a.holders && a.holders.length > 0 && <ul className={styles.holders}>{a.holders.map(h => <li key={h.postId}>{h.excerpt || t('untitled')} ({h.status.replace(/_/g, ' ')})</li>)}</ul>}</td>
+-        {canWrite && workspaceWide && <td><Button size="sm" variant="danger" disabled={busy} aria-label={`${t('delete')} ${a.name}`} onClick={() => { setNotice(null); setConfirmation(''); setForce(false); setRemoving(a); }}>{t('delete')}</Button></td>}
++        {canWrite && workspaceWide && <td>{a.source === 'library' && <Button size="sm" disabled={busy} onClick={() => { setNotice(null); setConfirmation(''); setRenameName(a.name); setRenaming(a); }}>{t('rename')}</Button>}<Button size="sm" variant="danger" disabled={busy} aria-label={`${t('delete')} ${a.name}`} onClick={() => { setNotice(null); setConfirmation(''); setForce(false); setRemoving(a); }}>{t('delete')}</Button></td>}
+       </tr>)}
+     </tbody></table></div> : <p className={styles.empty}>{filtered ? t('noMatch') : t('empty')}</p>}
+     <nav className={styles.pagination} aria-label={t('pages')}>{page > 1 && <a href={query(page - 1)}>{t('previous')}</a>}<span>{t('page', { page })}</span>{hasMore && <a href={query(page + 1)}>{t('next')}</a>}</nav>
+     {canWrite && !workspaceWide && <p className={styles.help}>{t('deleteNeedsAll')}</p>}
+ 
++    <Dialog open={Boolean(renaming)} title={t('renameTitle')} onClose={() => !busy && setRenaming(null)} busy={busy}
++      actions={<><Button data-dialog-cancel disabled={busy} onClick={() => setRenaming(null)}>{t('cancel')}</Button><Button variant="primary" disabled={busy || !renameName.trim() || confirmation !== `RENAME MEDIA ${renaming?.id}`} onClick={() => void performRename()}>{t('rename')}</Button></>}>
++      {notice?.error && <RouteNotice error focusKey={`media-rename-error:${notice.key}`}>{notice.text}</RouteNotice>}
++      <label>{t('renameName')}<input disabled={busy} maxLength={maxName} value={renameName} onChange={e => setRenameName(e.target.value)} /></label>
++      <label>{t('importConfirm', { phrase: `RENAME MEDIA ${renaming?.id ?? ''}` })}<input disabled={busy} autoComplete="off" value={confirmation} onChange={e => setConfirmation(e.target.value)} /></label>
++    </Dialog>
++
+     <Dialog open={importing} title={t('importTitle')} description={t('importDescription')} onClose={() => !busy && setImporting(false)} busy={busy}
+       actions={<><Button data-dialog-cancel disabled={busy} onClick={() => setImporting(false)}>{t('cancel')}</Button><Button variant="primary" disabled={busy || !url.trim() || confirmation !== importWord} onClick={() => void performImport()}>{busy ? t('importing') : t('importAction')}</Button></>}>
+       {notice?.error && <RouteNotice error focusKey={`media-import-error:${notice.key}`}>{notice.text}</RouteNotice>}
+       <div className={styles.form}>
+         <label>{t('importAddress')}<input disabled={busy} inputMode="url" placeholder="https://example.com/photo.jpg" value={url} onChange={e => setUrl(e.target.value)} /></label>
+-        <label>{t('importName')}<input disabled={busy} maxLength={180} value={name} onChange={e => setName(e.target.value)} /></label>
++        <label>{t('importName')}<input disabled={busy} maxLength={maxName} value={name} onChange={e => setName(e.target.value)} /></label>
+         <label className={styles.confirmLabel}>{t('importConfirm', { phrase: importWord })}<input autoComplete="off" disabled={busy} value={confirmation} onChange={e => setConfirmation(e.target.value)} /></label>
+       </div>
+     </Dialog>
+diff --git a/rebuild/src/modules/media/ui/MediaScreen.tsx b/rebuild/src/modules/media/ui/MediaScreen.tsx
+index 3f837c25..37bf3193 100644
+--- a/rebuild/src/modules/media/ui/MediaScreen.tsx
++++ b/rebuild/src/modules/media/ui/MediaScreen.tsx
+@@ -32,7 +32,7 @@ export default async function MediaScreen({ searchParams }: { searchParams: Prom
+       {heading}
+       <MediaLibrary items={result.items.map(i => ({ ...i, createdAt: i.createdAt.toISOString(), holders: i.holders?.map(h => ({ ...h, scheduledAt: h.scheduledAt?.toISOString() ?? null })) ?? null }))}
+         usage={result.usage} page={result.page} hasMore={result.hasMore} filters={{ kind: (kind as string | undefined) ?? '', usage: (usage as string | undefined) ?? '', q: typeof q === 'string' ? q : '' }}
+-        canWrite={canWrite} workspaceWide={result.workspaceWide} usageMayBeIncomplete={result.usageMayBeIncomplete} maxSearch={result.limits.maxSearchCharacters} locale={LOCALE} copy={copy} />
++        canWrite={canWrite} workspaceWide={result.workspaceWide} usageMayBeIncomplete={result.usageMayBeIncomplete} maxSearch={result.limits.maxSearchCharacters} maxName={result.limits.maxNameCharacters} locale={LOCALE} copy={copy} />
+       <p className={styles.help}>{t('privacy')}</p>
+     </>;
+   } catch (error) {
+diff --git a/rebuild/src/modules/media/ui/rename-action.ts b/rebuild/src/modules/media/ui/rename-action.ts
+new file mode 100644
+index 00000000..1693ce65
+--- /dev/null
++++ b/rebuild/src/modules/media/ui/rename-action.ts
+@@ -0,0 +1,17 @@
++'use server';
++
++import { requireViewer } from '@/server/context';
++import { renameAsset } from '../server/library';
++import { MEDIA_FEATURE_ID } from '../manifest';
++import { operationFailure } from '@/lib/operation-error';
++import { mediaMessage } from '../server/messages';
++
++export async function renameMediaAction(input: unknown) {
++  try {
++    const viewer = await requireViewer({ feature: MEDIA_FEATURE_ID, channelScoped: true, write: true });
++    return await renameAsset({ userId: viewer.user.id, workspaceId: viewer.workspaceId }, input);
++  } catch (error) {
++    const failure = operationFailure(error, 'The media operation could not be confirmed. Refresh the library before trying again.');
++    return { error: await mediaMessage(failure.error) };
++  }
++}
+diff --git a/rebuild/tests/feeds-polling.test.ts b/rebuild/tests/feeds-polling.test.ts
+index 101ae6ee..bc3a1517 100644
+--- a/rebuild/tests/feeds-polling.test.ts
++++ b/rebuild/tests/feeds-polling.test.ts
+@@ -15,6 +15,7 @@ vi.mock('../src/modules/feeds/server/access', async () => {
+   const actual = await vi.importActual<typeof import('../src/modules/feeds/server/access')>('../src/modules/feeds/server/access');
+   return { ...actual, authorizeFeeds: state.auth, authorizeFeedWrite: async (a: unknown) => state.auth(a, 'write') };
+ });
++vi.mock('@/modules/settings/notifications/producers', () => ({ emitWorkspaceAlert: vi.fn(async () => ({ queued: 1 })) }));
+ vi.mock('@/server/data-control/guard', () => ({ withWorkspaceOperation: state.workspace }));
+ vi.mock('@/modules/publishing/collaboration/server/executors', () => ({ allocateQueueTime: state.alloc }));
+ vi.mock('@/modules/publishing/collaboration/server/versions', () => ({ loadVersionRetention: async () => 10, recordPostVersion: async () => true }));
+diff --git a/rebuild/tests/feeds-service.test.ts b/rebuild/tests/feeds-service.test.ts
+index c890ba17..5c31675e 100644
+--- a/rebuild/tests/feeds-service.test.ts
++++ b/rebuild/tests/feeds-service.test.ts
+@@ -1,7 +1,7 @@
+ import { beforeEach, describe, expect, it, vi } from 'vitest';
+ 
+ const state = vi.hoisted(() => ({
+-  auth: vi.fn(), workspace: vi.fn(), alloc: vi.fn(), exec: [] as Array<{ sql: string; values: unknown[] }>, feedRows: [] as unknown[], knownGuids: [] as string[], failAudit: false,
++  notify: vi.fn(), auth: vi.fn(), workspace: vi.fn(), alloc: vi.fn(), exec: [] as Array<{ sql: string; values: unknown[] }>, feedRows: [] as unknown[], knownGuids: [] as string[], failAudit: false,
+   overrides: {} as Record<string, unknown>, inserts: [] as string[], count: 0, requiresApproval: false, autoApprove: false, spread: 0, lockedTargets: ['t1'] as string[], bookedTimes: [] as Date[],
+ }));
+ const db = vi.hoisted(() => ({ $queryRaw: vi.fn(), $queryRawUnsafe: vi.fn(), $executeRaw: vi.fn(), $transaction: vi.fn() }));
+@@ -19,6 +19,7 @@ vi.mock('../src/modules/feeds/server/access', async () => {
+     authorizeFeedWrite: async (actor: unknown) => { const r = await state.auth(actor, 'write'); if (!AUTHOR_ROLES.has(r.role)) throw new OperationError('forbidden', 'You do not have permission to manage feeds.'); return r; },
+   };
+ });
++vi.mock('@/modules/settings/notifications/producers', () => ({ emitWorkspaceAlert: state.notify }));
+ vi.mock('@/server/data-control/guard', () => ({ withWorkspaceOperation: state.workspace }));
+ vi.mock('@/modules/publishing/collaboration/server/executors', () => ({ allocateQueueTime: state.alloc }));
+ vi.mock('@/modules/publishing/collaboration/server/versions', () => ({ loadVersionRetention: async () => 10, recordPostVersion: async () => true }));
+@@ -36,7 +37,7 @@ const formats = vi.fn(async (list: Array<{ id: string }>) => Object.fromEntries(
+ const deps = { validateTargets: targets, resolveFormats: formats };
+ 
+ beforeEach(() => {
+-  vi.clearAllMocks(); state.exec = []; state.feedRows = [row()]; state.knownGuids = []; state.failAudit = false; state.overrides = {}; state.inserts = []; state.count = 0;
++  vi.clearAllMocks(); state.notify.mockReset().mockResolvedValue({ queued: 1 }); state.exec = []; state.feedRows = [row()]; state.knownGuids = []; state.failAudit = false; state.overrides = {}; state.inserts = []; state.count = 0;
+   state.requiresApproval = false; state.autoApprove = false; state.spread = 0; state.lockedTargets = ['t1']; state.bookedTimes = [];
+   state.auth.mockResolvedValue({ role: 'owner', actor, permissions: {}, entitlements: {}, workspaceWide: true });
+   state.workspace.mockImplementation((_id: string, cb: () => Promise<unknown>) => cb());
+@@ -310,3 +311,32 @@ describe('creating posts from a feed', () => {
+     expect(posts()).toHaveLength(0);
+   });
+ });
++
++
++describe('feed reviewer notifications', () => {
++  const check = () => checkFeed(actor, { id: 'feed_1', ...POSTS }, { ...deps, net: net(xml(['Hello'])), now: () => NOW });
++  it('queues one approval event for each newly held post in its transaction', async () => {
++    const result = await check();
++    expect(result.held).toBe(1);
++    expect(result.reviewerNotificationsQueued).toBe(1);
++    expect(state.notify).toHaveBeenCalledWith(db, expect.objectContaining({ workspaceId: 'w1', kind: 'approval_request', eventId: expect.any(String), postId: expect.any(String) }));
++    const event = state.notify.mock.calls[0][1];
++    expect(event.eventId).toBe(event.postId);
++  });
++  it('does not notify for scheduled, duplicate, draft or preview items', async () => {
++    state.autoApprove = true; await check(); expect(state.notify).not.toHaveBeenCalled();
++    state.autoApprove = false; state.knownGuids = ['g0']; await check(); expect(state.notify).not.toHaveBeenCalled();
++    state.knownGuids = [];
++    for (const mode of [{}, DRAFTS]) await checkFeed(actor, { id: 'feed_1', ...mode }, { ...deps, net: net(xml(['Hello'])), now: () => NOW });
++    expect(state.notify).not.toHaveBeenCalled();
++  });
++  it('obeys the Root switch while retaining approval holds', async () => {
++    state.overrides['feeds.approvalNotificationsEnabled'] = false;
++    expect((await check()).held).toBe(1); expect(state.notify).not.toHaveBeenCalled();
++  });
++  it('refuses success when notification intent cannot be queued', async () => {
++    state.notify.mockRejectedValueOnce(new Error('queue failed'));
++    await expect(check()).rejects.toBeTruthy();
++    expect(executed('activity_logs').filter(e => e.values.includes('feeds.posts_created'))).toHaveLength(0);
++  });
++});
+diff --git a/rebuild/tests/legacy-round9-ui.test.ts b/rebuild/tests/legacy-round9-ui.test.ts
+new file mode 100644
+index 00000000..902ed57f
+--- /dev/null
++++ b/rebuild/tests/legacy-round9-ui.test.ts
+@@ -0,0 +1,51 @@
++// @vitest-environment jsdom
++import { act, createElement } from 'react';
++import { createRoot } from 'react-dom/client';
++import { afterEach, beforeEach, expect, it, vi } from 'vitest';
++const state = vi.hoisted(() => ({ rename: vi.fn(), refresh: vi.fn() }));
++vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: state.refresh }) }));
++vi.mock('@/components/SidebarDock', () => ({ SidebarDock: ({ children }: { children: import('react').ReactNode }) => children }));
++vi.mock('@/modules/media/ui/rename-action', () => ({ renameMediaAction: state.rename }));
++import { FeedManager, type Feed } from '@/modules/feeds/ui/FeedManager';
++import { MediaLibrary, type Asset } from '@/modules/media/ui/MediaLibrary';
++let root: ReturnType<typeof createRoot>;
++let container: HTMLDivElement;
++beforeEach(() => {
++  (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
++  HTMLDialogElement.prototype.showModal = function () { this.open = true; };
++  HTMLDialogElement.prototype.close = function () { this.open = false; };
++  vi.clearAllMocks(); container = document.createElement('div'); document.body.append(container); root = createRoot(container);
++});
++afterEach(async () => { await act(async () => root.unmount()); container.remove(); vi.unstubAllGlobals(); });
++const click = async (node: HTMLElement) => act(async () => { node.click(); });
++const input = async (node: HTMLInputElement, value: string) => act(async () => {
++  Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(node, value);
++  node.dispatchEvent(new Event('input', { bubbles: true }));
++});
++it('shows real feed post text as plain text and a safe link in French', async () => {
++  const feed = { id: 'f1', name: 'Blog', url: 'https://example.com', kind: 'rss', enabled: true, messageTemplate: '{title}', hashtags: '', targetIds: ['t1'], handling: 'review', spreadMinutes: 0, failureCount: 0, lastPolledAt: null, lastError: null, createdAt: '', updatedAt: '' } as Feed;
++  vi.stubGlobal('fetch', vi.fn(async () => Response.json({ entries: [{ guid: 'g1', title: 'Article', message: '<script>unsafe</script>\nReal caption', link: 'https://example.com/article', isNew: true, eligible: true }], held: 0, draftsCreated: 0, postsCreated: 0 })));
++  await act(async () => root.render(createElement(FeedManager, { initialFeeds: [feed], channels: [{ id: 't1', name: 'Channel' }], page: 1, hasMore: false, limits: { maxNameCharacters: 100, maxMessageCharacters: 1000, maxTargets: 10, maxSpreadMinutes: 60 }, locale: 'fr', automaticMinutes: null })));
++  await click([...container.querySelectorAll('button')].find(b => b.textContent?.includes('Vérifier'))!);
++  expect(document.querySelector('details summary')?.textContent).toBe('Texte de la publication');
++  expect(document.querySelector('details p')?.textContent).toContain('<script>unsafe</script>');
++  expect(document.querySelector('details script')).toBeNull();
++  expect(document.querySelector('details a')?.getAttribute('rel')).toBe('noopener noreferrer');
++  expect(container.textContent).toContain('Les publications à valider');
++});
++it('preserves rename input on failure and accepts a matching receipt', async () => {
++  const asset = { id: 'med_1', kind: 'video', mimeType: 'video/mp4', name: 'clip.mp4', size: 100, createdAt: '2026-01-01', source: 'library', inUse: false, holderCount: 0, holders: [], width: null, height: null } as Asset;
++  await act(async () => root.render(createElement(MediaLibrary, { items: [asset], usage: { usedBytes: 100, quotaBytes: 1000, assetCount: 1, approximate: false }, page: 1, hasMore: false, filters: { kind: '', usage: '', q: '' }, canWrite: true, workspaceWide: true, usageMayBeIncomplete: false, maxSearch: 100, maxName: 12, locale: 'en' })));
++  await click([...container.querySelectorAll('button')].find(b => b.textContent === 'Rename')!);
++  const dialog = document.querySelector('dialog')!;
++  const inputs = dialog.querySelectorAll('input');
++  expect(inputs[0].maxLength).toBe(12);
++  await input(inputs[0], 'new.mp4'); await input(inputs[1], 'RENAME MEDIA med_1');
++  state.rename.mockResolvedValueOnce({ error: 'Try again' });
++  await click([...dialog.querySelectorAll('button')].find(b => b.textContent === 'Rename')!);
++  expect(inputs[0].value).toBe('new.mp4'); expect(document.body.textContent).toContain('Try again');
++  state.rename.mockResolvedValueOnce({ renamed: true, id: 'med_1', name: 'new.mp4' });
++  await click([...dialog.querySelectorAll('button')].find(b => b.textContent === 'Rename')!);
++  expect(document.querySelector('dialog')).toBeNull(); expect(container.textContent).toContain('Media renamed.');
++  expect(state.rename).toHaveBeenCalledWith({ id: 'med_1', name: 'new.mp4', confirmation: 'RENAME MEDIA med_1' });
++});
+diff --git a/rebuild/tests/media-library-service.test.ts b/rebuild/tests/media-library-service.test.ts
+index 2f93c29d..cf5723d9 100644
+--- a/rebuild/tests/media-library-service.test.ts
++++ b/rebuild/tests/media-library-service.test.ts
+@@ -12,7 +12,8 @@ vi.mock('../src/modules/media/server/access', () => ({ authorizeFeature: state.a
+ vi.mock('@/server/data-control/guard', () => ({ withWorkspaceOperation: state.workspace }));
+ vi.mock('../src/modules/media/server/store', () => ({ fsMediaStore: {} }));
+ 
+-import { deleteAsset, importFromUrl, readLibrary } from '../src/modules/media/server/library';
++import { executeMediaTool } from '../src/modules/media/mcp';
++import { deleteAsset, importFromUrl, readLibrary, renameAsset } from '../src/modules/media/server/library';
+ 
+ const actor = { userId: 'u1', workspaceId: 'w1' };
+ const JPEG = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(60)]);
+@@ -202,3 +203,42 @@ describe('deleting assets', () => {
+     expect(s2.removeStored).not.toHaveBeenCalled();
+   });
+ });
++
++
++describe('media rename', () => {
++  const input = { id: vrow.id, name: 'New clip.mp4', confirmation: `RENAME MEDIA ${vrow.id}` };
++  it('changes only the workspace-scoped filename and audits identity without copying names', async () => {
++    await expect(renameAsset(actor, input)).resolves.toEqual({ id: vrow.id, name: input.name, renamed: true });
++    const update = executed('UPDATE media')[0]!;
++    expect(update.values).toEqual([input.name, vrow.id, actor.workspaceId]);
++    expect(executed('activity_logs')[0]!.values).toContain('media.renamed');
++    expect(JSON.stringify(executed('activity_logs'))).not.toContain(input.name);
++  });
++  it('refuses bad confirmation, paths, controls, and Root name-limit violations before authorization', async () => {
++    for (const change of [{ confirmation: 'yes' }, { name: '../x' }, { name: 'a\\b' }, { name: 'x\u0000y' }, { name: '' }]) {
++      await expect(renameAsset(actor, { ...input, ...change })).rejects.toMatchObject({ code: 'invalid_request' });
++    }
++    state.overrides['media.assetNameMaxCharacters'] = 5;
++    await expect(renameAsset(actor, input)).rejects.toMatchObject({ code: 'invalid_request' });
++    expect(state.auth).not.toHaveBeenCalled();
++  });
++  it('refuses scoped actors, stale access and assets absent from this workspace', async () => {
++    state.auth.mockResolvedValueOnce({ workspaceWide: false });
++    await expect(renameAsset(actor, input)).rejects.toMatchObject({ code: 'forbidden' });
++    expect(db.$transaction).not.toHaveBeenCalled();
++    state.auth.mockResolvedValueOnce({ workspaceWide: true }).mockResolvedValueOnce({ workspaceWide: false });
++    await expect(renameAsset(actor, input)).rejects.toMatchObject({ code: 'forbidden' });
++    expect(executed('UPDATE media')).toHaveLength(0);
++    state.auth.mockResolvedValue({ workspaceWide: true }); state.mediaRow = null;
++    await expect(renameAsset(actor, input)).rejects.toMatchObject({ code: 'not_found' });
++  });
++  it('fails the transaction when audit fails and performs no file operations', async () => {
++    state.failAudit = true;
++    await expect(renameAsset(actor, input)).rejects.toMatchObject({ code: 'upstream_failure' });
++  });
++});
++
++it('the installed media MCP dispatcher executes the confirmed rename service', async () => {
++  await expect(executeMediaTool(actor, 'rename_media_asset', { id: vrow.id, name: 'renamed.mp4', confirmation: `RENAME MEDIA ${vrow.id}` })).resolves.toMatchObject({ renamed: true, id: vrow.id });
++  expect(executed('UPDATE media')).toHaveLength(1);
++});
+diff --git a/rebuild/tests/media-rename-entrypoints.test.ts b/rebuild/tests/media-rename-entrypoints.test.ts
+new file mode 100644
+index 00000000..de46c999
+--- /dev/null
++++ b/rebuild/tests/media-rename-entrypoints.test.ts
+@@ -0,0 +1,31 @@
++import { beforeEach, expect, it, vi } from 'vitest';
++import { OperationError, type OperationErrorCode } from '@/lib/operation-error';
++const state = vi.hoisted(() => ({ rename: vi.fn(), viewer: vi.fn() }));
++vi.mock('@/server/context', () => ({ requireViewer: state.viewer }));
++vi.mock('@/server/request-origin', () => ({ requestOrigin: () => 'https://app.example' }));
++vi.mock('@/modules/media/server/library', () => ({ renameAsset: state.rename }));
++vi.mock('@/modules/media/server/messages', () => ({ mediaMessage: async (message: string) => message, mediaError: async (code: OperationErrorCode, message: string) => new OperationError(code, message) }));
++import { renameMediaHttp } from '@/modules/media/server/http';
++import { renameMediaAction } from '@/modules/media/ui/rename-action';
++import { executeMediaTool } from '@/modules/media/mcp';
++const actor = { userId: 'u1', workspaceId: 'w1' };
++const args = { name: 'clip.mp4', confirmation: 'RENAME MEDIA m1' };
++const context = { params: Promise.resolve({ id: 'm1' }) };
++const request = (body: unknown, origin = 'https://app.example') => new Request('https://app.example/api/media-library/m1', { method: 'PATCH', headers: { origin, 'content-type': 'application/json' }, body: JSON.stringify(body) });
++beforeEach(() => { vi.clearAllMocks(); state.viewer.mockResolvedValue({ user: { id: 'u1' }, workspaceId: 'w1' }); state.rename.mockResolvedValue({ id: 'm1', name: 'clip.mp4', renamed: true }); });
++it('HTTP, server action and MCP pass the same intent to the shared service', async () => {
++  expect((await renameMediaHttp(request(args), context)).status).toBe(200);
++  await renameMediaAction({ ...args, id: 'm1' });
++  await executeMediaTool(actor, 'rename_media_asset', { ...args, id: 'm1' });
++  expect(state.rename.mock.calls).toEqual(Array.from({ length: 3 }, () => [actor, { ...args, id: 'm1' }]));
++});
++it('HTTP refuses cross-origin requests and body identity substitution', async () => {
++  expect((await renameMediaHttp(request(args, 'https://other.example'), context)).status).toBe(403);
++  expect((await renameMediaHttp(request({ ...args, id: 'other' }), context)).status).toBe(400);
++  expect(state.rename).not.toHaveBeenCalled();
++});
++it('HTTP refuses a missing session before calling the service', async () => {
++  state.viewer.mockRejectedValue(new Error('no session'));
++  expect((await renameMediaHttp(request(args), context)).status).toBe(401);
++  expect(state.rename).not.toHaveBeenCalled();
++});

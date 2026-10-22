@@ -1,0 +1,476 @@
+diff --git a/rebuild/docs/LEGACY_CAPABILITY_PARITY.md b/rebuild/docs/LEGACY_CAPABILITY_PARITY.md
+index 60ce2837..e7062383 100644
+--- a/rebuild/docs/LEGACY_CAPABILITY_PARITY.md
++++ b/rebuild/docs/LEGACY_CAPABILITY_PARITY.md
+@@ -16,7 +16,7 @@ a manifest, saved setting or unit test is not complete workflow proof. See
+ | P0 | Eleven network connectors and publishing destinations in `src/lib/networks/index.ts` and `src/lib/networks/connect.ts` | Partial: Facebook is the only installed customer platform. Instagram and the other legacy destinations lack usable rebuild adapters. Removed provider APIs cannot be restored by configuration. | Adapter-level connection, discovery, publishing/status/delete, analytics, inbox, and ads where provider supports them; scoped UI/API/MCP and live tests. |
+ | P0 | Facebook feed, photo, carousel, video, Reel, Story, Group and native scheduling in `src/lib/facebook/publish.ts` | Partial: Page feed/photo and native video/Reel/Story source, proof/recovery and app versus Meta-native scheduling exist. Per-destination choices, queue and mix/recycle share Publishing services. Private/default-off native paths and mocked tests do not establish every format live. Group publishing is not advertised. | Provider fixture and live create/status/delete tests for each supported format; visible choices limited to available capabilities. |
+ | P0 | Analytics views, comparisons, post explorer, demographics, network analysis, pinned metrics and coverage in `src/app/(app)/analytics/AnalyticsScreen.tsx` and `src/lib/analytics-views.ts` | Partial: catalog/details/explorer, posts, comparisons, pins, goals, audience history/CSV and ad-object analysis have UI/REST/MCP. Shared charts now consume actual previous-period points. Facebook post history/reactions/hierarchy collection exists; live Graph v26.0 probe verifies five current post metrics and refuses three older ones (RELEASE_GATES_PLAN); exhaustive history/collection and dynamic labels remain incomplete. Root-editable EN/FR catalogs and validated-default fallback are integrated. | Shared metric catalog feeding full UI, export, and MCP with date/channel/ad-account scope, comparison, availability, and refresh evidence. |
+-| P0 | Reports and CSV exports in `src/app/(app)/reports/page.tsx`, `src/lib/reports.ts`, and `src/lib/analytics-export.ts` | Partial: round-7 Top posts restores destination-specific saved text, ordered image/video references with Root-switchable image previews, and saved article link/title/description through the existing confirmed UI download, REST and MCP report workflow. Root `analytics.reports.topPostContent` owns ranking/content/media/URL bounds, image previews and the authenticated media path template; EN/FR artifacts disclose current saved content, expiry, workspace access and clipping. Targeted mocked/render tests and TypeScript verification are local only; PostgreSQL, actual browser/download and real-client/provider proof remain open. Existing templates/schedules/runs, CSV/JSON/printable artifacts, response time/business hours, top posts, goals, destinations/link counts and AI recap exist. Downloads/UI were refined in 0589ddd0. Round-6 Published posts adds three stored-data report views through the existing confirmed UI/REST/MCP generator: a destination-specific content log with attempt counts, daily UTC publication counts independent of log limits, and currently failed destinations last updated in the period (explicitly not historical failure attempts). EN/FR catalogs disclose excerpts, current-state semantics and clipping; Root `analytics.reports.publicationDetails` controls each log ceiling and excerpt length. Local verification: TypeScript 0 errors; 155 targeted tests across 10 files passed, including scoped SQL shapes, bilingual artifacts, row/byte limits and confirmed MCP generation/audit. PostgreSQL, browser, real-client and production evidence remain open. Response reports now include first direct replies to stored root comments, slowest calendar/business-hours first response, and business-hours resolution through the same report generator used by UI downloads, REST and MCP. Round-2 response reports retain pre-period conversation context, reconstruct recorded resolution/reopening cycles, and disclose stored-history coverage and incomplete boundary exclusions in bilingual artifacts through the existing shared generator. Round-3 reports separate comment/conversation answer shares, response and resolution durations, and member business-hours first-response medians through the shared generator. Round-5 member outcomes add slowest first replies, answered-wait resolution counts and calendar/business-hours resolution medians, with last-run first-responder attribution through the same report workflow. Per-channel reports retain member attribution and disclose source limits; complete provider history, actual mail delivery, volume and current-browser proof remain open.  Rounds 1–3 (`23b7be84`, `6ef753e4`, `b725c415`) have local arithmetic, bilingual artifact and mocked workflow tests; bounded history and concurrent-read consistency remain limits. | Complete relevant report sections and exports, schedule/template workflows, UI/API/MCP parity and provider-shaped tests. |
++| P0 | Reports and CSV exports in `src/app/(app)/reports/page.tsx`, `src/lib/reports.ts`, and `src/lib/analytics-export.ts` | Partial: Round-8 Destinations adds a scoped per-link lifetime click inventory, retained period clicks per link and daily UTC retained click counts through the existing confirmed report UI download/REST/MCP generator. Root `analytics.reports.linkDetails` bounds inventory and daily rows independently; EN/FR artifacts disclose publication-cohort scope, excluded ambiguous legacy links, retention gaps and clipping. No visitor metadata or destination URLs are projected. Local mocked/query-shape/workflow tests and TypeScript only; PostgreSQL, browser downloads and real-client proof remain open. round-7 Top posts restores destination-specific saved text, ordered image/video references with Root-switchable image previews, and saved article link/title/description through the existing confirmed UI download, REST and MCP report workflow. Root `analytics.reports.topPostContent` owns ranking/content/media/URL bounds, image previews and the authenticated media path template; EN/FR artifacts disclose current saved content, expiry, workspace access and clipping. Targeted mocked/render tests and TypeScript verification are local only; PostgreSQL, actual browser/download and real-client/provider proof remain open. Existing templates/schedules/runs, CSV/JSON/printable artifacts, response time/business hours, top posts, goals, destinations/link counts and AI recap exist. Downloads/UI were refined in 0589ddd0. Round-6 Published posts adds three stored-data report views through the existing confirmed UI/REST/MCP generator: a destination-specific content log with attempt counts, daily UTC publication counts independent of log limits, and currently failed destinations last updated in the period (explicitly not historical failure attempts). EN/FR catalogs disclose excerpts, current-state semantics and clipping; Root `analytics.reports.publicationDetails` controls each log ceiling and excerpt length. Local verification: TypeScript 0 errors; 155 targeted tests across 10 files passed, including scoped SQL shapes, bilingual artifacts, row/byte limits and confirmed MCP generation/audit. PostgreSQL, browser, real-client and production evidence remain open. Response reports now include first direct replies to stored root comments, slowest calendar/business-hours first response, and business-hours resolution through the same report generator used by UI downloads, REST and MCP. Round-2 response reports retain pre-period conversation context, reconstruct recorded resolution/reopening cycles, and disclose stored-history coverage and incomplete boundary exclusions in bilingual artifacts through the existing shared generator. Round-3 reports separate comment/conversation answer shares, response and resolution durations, and member business-hours first-response medians through the shared generator. Round-5 member outcomes add slowest first replies, answered-wait resolution counts and calendar/business-hours resolution medians, with last-run first-responder attribution through the same report workflow. Per-channel reports retain member attribution and disclose source limits; complete provider history, actual mail delivery, volume and current-browser proof remain open.  Rounds 1–3 (`23b7be84`, `6ef753e4`, `b725c415`) have local arithmetic, bilingual artifact and mocked workflow tests; bounded history and concurrent-read consistency remain limits. | Complete relevant report sections and exports, schedule/template workflows, UI/API/MCP parity and provider-shaped tests. |
+ | P1 | Composer overrides, queue slots, approvals, labels, custom fields, notes, versions, templates, first-comment retries, and UTM/link preparation in `src/lib/posts.ts` and related API routes | Partial: composer, slots/approvals/templates/labels/fields/notes/version restore, delayed comments and rejected-only retry, best times, mix/recycle, UTM and shortening are integrated. Scheduling modes are per destination. Newest scheduling/restore/comment database/browser/provider checks remain open; unknown remote attempts stay held. | Full end-to-end tests on production-shaped staging, per-target behavior, provider create/status/delete and permission verification, bulk actions, scheduling rules, plus remaining legacy workflows. |
+ | P1 | Post list filters, saved views, pagination, bulk actions, retry/duplicate, CSV export and public Posts v1 API in `src/app/(app)/posts/page.tsx` and `src/app/api/posts` | Partial: scoped lists/search/paging/views/export and bulk actions share services; key REST v1 Posts includes scheduling. Large asynchronous Posts CSV is absent (workspace ZIP is different); draft aliases and v1 create now share confirmed lifecycle boundaries (`acb56bd7`); real client outcomes remain unverified. Missing-image fallback and saved-view expired-session feedback are source/unit fixes (`36946d9e`), without browser rerun. | Full list/action/API parity with workspace authorization and large-data pagination tests. |
+ | P1 | Publishing calendar navigation and month coverage in `src/app/(app)/calendar` | Partial: Month/Week/phone agenda, workspace-day grouping, previews, saved views and drag/keyboard moves exist. Shared lifecycle supports adapter-held cancel/reschedule. Calendar editing, queue-slot presentation, high-volume months and actual drag/remote-schedule browser/provider evidence remain open. | Browser and database tests with records on timezone and month boundaries, high-volume month, permissions, drag-and-drop E2E, and edit workflows. |
+diff --git a/rebuild/src/modules/analytics/reports/LINK_REPORTS.md b/rebuild/src/modules/analytics/reports/LINK_REPORTS.md
+new file mode 100644
+index 00000000..33aac5b1
+--- /dev/null
++++ b/rebuild/src/modules/analytics/reports/LINK_REPORTS.md
+@@ -0,0 +1,66 @@
++# Short-link reporting — local parity round 8
++
++Owned source: Analytics reports only, tests and the Reports inventory status cell.
++Legacy references: `src/lib/reports.ts` lifetime click accounting and destination
++rows; `prisma/schema.prisma` ShortLink/LinkClick; legacy per-click retention semantics.
++
++Three stored-data report capabilities are added to the existing Destinations
++section: a per-link inventory with lifetime totals; retained period clicks per
++link; daily UTC retained clicks. These extend the existing report workflow and
++require no new screen, route or tool. Prepare report in the UI, session REST
++`/api/analytics/report-workflows/run`, key REST
++`/api/v1/analytics/generate_report` and MCP `generate_report` still call the shared
++confirmed/authorized/audited `runReportNow` and generator. Root's existing
++`analytics.reportDocumentCopy` catalog supplies the new English/French labels
++and coverage notes. CSV, JSON, printable HTML and text include the same views.
++
++`server/link-report.ts` is an internal read after the generator's current actor,
++feature, credential and channel authorization. A single SQL statement reads a
++consistent cohort and independent bounded views. The cohort contains short links
++on posts currently published to the selected channel during the inclusive UTC
++report period. It is not every click made in that period on all older posts.
++Links attributed to that channel qualify; legacy links without targetId qualify
++only when the post has exactly one currently published destination. Ambiguous
++shared links are excluded, never divided or attributed using another channel's
++identity. Posts, short links and targets have workspace predicates. The query
++never projects visitor metadata, destination URLs or slugs.
++
++Lifetime totals are ShortLink running counters. Period counts use retained
++LinkClick timestamps within the report period and preserve zero from the left
++join. Zero means no retained records, not no historical clicks. Historical
++retention can remove rows, so no completeness/unique-visitor claim is made.
++Daily counts use the entire eligible cohort independently of inventory clipping;
++days without retained clicks are omitted, not fabricated. Link ordering is
++lifetime descending/ID ascending; daily ordering is date ascending. One extra
++row detects clipping for each view separately.
++
++New typed Root setting `analytics.reports.linkDetails` has `links` and `days`
++limits, validated before the query and read with runtimeConfig. Existing report
++row/byte/credential bounds still apply; source and output clipping are disclosed.
++CONFIG_SCHEMA_VERSION is deliberately unchanged for the integrator.
++
++Verification from rebuild/: `npx tsc --noEmit -p .` — 0 errors.
++`npx vitest run --cache=false` with these targeted files — 10 files, 155 tests
++passed:
++
++- tests/report-link-details.test.ts
++- tests/report-link-details-workflow.test.ts
++- tests/report-document-copy.test.ts
++- tests/report-publication-details.test.ts
++- tests/analytics-parity-report-generation.test.ts
++- tests/analytics-parity-reports.test.ts
++- tests/reports82-http-host.test.ts
++- tests/reports82-mcp-host.test.ts
++- tests/reports82-ui.test.ts
++- tests/report82-engine-manual.test.ts
++
++The new tests use query-shape checks and mocked rows/workflows; they do not prove
++PostgreSQL execution, real client transport, browser downloads, performance at
++production volume, provider data completeness or production. Existing HTTP/UI
++host tests verify delegation/rendering, not a new browser session. No servers,
++whole suite, production operations, commit, push or deployment were run.
++
++Integrator edits outside ownership: bump CONFIG_SCHEMA_VERSION for the new key
++and expanded document catalog, and record this local source/test scope and the
++pending PostgreSQL/browser/client checks in ARCHITECTURE.md, DELIVERY_PLAN.md and
++AGENT_HANDOFF.md. No migration or new route registration is needed.
+diff --git a/rebuild/src/modules/analytics/reports/config.ts b/rebuild/src/modules/analytics/reports/config.ts
+index 21bd270c..08b616ae 100644
+--- a/rebuild/src/modules/analytics/reports/config.ts
++++ b/rebuild/src/modules/analytics/reports/config.ts
+@@ -3,6 +3,12 @@ import { entry } from '@/lib/config/entry';
+ 
+ export const RESPONSE_ANALYSIS_LIMITS = { messages: { default: 20000, min: 100, max: 100000 }, events: { default: 20000, min: 100, max: 100000 }, members: { default: 25, min: 1, max: 500 } } as const;
+ 
++export const LINK_REPORT_POLICY_SCHEMA = z.object({
++  links: z.number().int().min(1).max(10000),
++  days: z.number().int().min(1).max(3660),
++}).strict();
++export const LINK_REPORT_DEFAULTS = { links: 100, days: 366 };
++
+ export const PUBLICATION_REPORT_POLICY_SCHEMA = z.object({
+   publishedRows: z.number().int().min(1).max(10000),
+   failedRows: z.number().int().min(1).max(10000),
+@@ -27,6 +33,7 @@ const num = (key: string, label: string, description: string, defaultValue: numb
+ 
+ /** Root-managed bounds for report templates and schedule definitions. */
+ export const REPORT_WORKFLOW_CONFIG = [
++  entry({ key: 'analytics.reports.linkDetails', group: G, label: 'Link report details', kind: 'json', description: 'Independent per-link inventory and UTC click-day row bounds in the Destinations report section. Recorded period clicks may be incomplete after retention; daily counts are independent of inventory clipping.', defaultValue: LINK_REPORT_DEFAULTS, schema: LINK_REPORT_POLICY_SCHEMA, consumption: 'active' }),
+   entry({ key: 'analytics.reports.topPostContent', group: G, label: 'Top post content', kind: 'json', description: 'Ranked post count, destination text, attachment count, URL and article preview bounds, image preview switch and authenticated media path template. Report content is saved local state, not a remote snapshot.', defaultValue: TOP_POST_CONTENT_DEFAULTS, schema: TOP_POST_CONTENT_POLICY_SCHEMA, consumption: 'active' }),
+   entry({ key: 'analytics.reports.publicationDetails', group: G, label: 'Publication report details', kind: 'json', description: 'Maximum published and currently failed destination rows and content excerpt length in the Published posts report section. Daily UTC totals are counted independently; clipped logs are disclosed.', defaultValue: PUBLICATION_REPORT_DEFAULTS, schema: PUBLICATION_REPORT_POLICY_SCHEMA, consumption: 'active' }),
+   num('analytics.reports.responseEventLimit', 'Response analysis workflow events', 'Maximum stored resolution and reopening events examined per channel report. Truncation suppresses resolution durations and is disclosed.', RESPONSE_ANALYSIS_LIMITS.events.default, RESPONSE_ANALYSIS_LIMITS.events.min, RESPONSE_ANALYSIS_LIMITS.events.max),
+diff --git a/rebuild/src/modules/analytics/reports/generation/copy.ts b/rebuild/src/modules/analytics/reports/generation/copy.ts
+index c0b0824d..7f2d9ff3 100644
+--- a/rebuild/src/modules/analytics/reports/generation/copy.ts
++++ b/rebuild/src/modules/analytics/reports/generation/copy.ts
+@@ -1,5 +1,16 @@
+ import { z } from 'zod';
+ const en = {
++  "Short-link details": "Short-link details",
++  "Link lifetime clicks": "Link lifetime clicks",
++  "Recorded link clicks in period": "Recorded link clicks in period",
++  "Daily recorded link clicks (UTC)": "Daily recorded link clicks (UTC)",
++  "Links belong to posts published to this channel in the report period. Only channel-attributed links and legacy links with one published destination are included.": "Links belong to posts published to this channel in the report period. Only channel-attributed links and legacy links with one published destination are included.",
++  "Lifetime clicks are running totals, not period clicks. Period and daily counts use retained click records; older records may have been deleted. Zero means no retained records, not proof of no clicks.": "Lifetime clicks are running totals, not period clicks. Period and daily counts use retained click records; older records may have been deleted. Zero means no retained records, not proof of no clicks.",
++  "Daily counts cover all eligible links independently of the link list limit. Days without retained clicks are omitted.": "Daily counts cover all eligible links independently of the link list limit. Days without retained clicks are omitted.",
++  "The link inventory reached its row limit.": "The link inventory reached its row limit.",
++  "The daily click list reached its row limit.": "The daily click list reached its row limit.",
++  "No eligible stored short links for these publications.": "No eligible stored short links for these publications.",
++
+   "Locally stored media requires access to this workspace.": "Locally stored media requires access to this workspace.",
+   "Post content": "Post content",
+   "Image": "Image",
+@@ -181,6 +192,17 @@ const en = {
+   "Channel": "Channel"
+ };
+ const fr: typeof en = {
++  "Short-link details": "Détail des liens courts",
++  "Link lifetime clicks": "Clics du lien depuis sa création",
++  "Recorded link clicks in period": "Clics du lien enregistrés dans la période",
++  "Daily recorded link clicks (UTC)": "Clics quotidiens enregistrés (UTC)",
++  "Links belong to posts published to this channel in the report period. Only channel-attributed links and legacy links with one published destination are included.": "Les liens concernent les publications diffusées sur ce canal pendant la période du rapport. Seuls les liens attribués au canal et les anciens liens ayant une seule destination publiée sont inclus.",
++  "Lifetime clicks are running totals, not period clicks. Period and daily counts use retained click records; older records may have been deleted. Zero means no retained records, not proof of no clicks.": "Les clics cumulés sont des totaux depuis la création, pas des clics de la période. Les comptes de la période et par jour utilisent les clics conservés ; les anciens enregistrements peuvent avoir été supprimés. Zéro signifie aucun enregistrement conservé, sans prouver une absence de clics.",
++  "Daily counts cover all eligible links independently of the link list limit. Days without retained clicks are omitted.": "Les comptes quotidiens couvrent tous les liens admissibles indépendamment de la limite de la liste. Les jours sans clic conservé sont omis.",
++  "The link inventory reached its row limit.": "La liste des liens a atteint sa limite de lignes.",
++  "The daily click list reached its row limit.": "La liste des clics quotidiens a atteint sa limite de lignes.",
++  "No eligible stored short links for these publications.": "Aucun lien court conservé admissible pour ces publications.",
++
+   "Locally stored media requires access to this workspace.": "Les médias enregistrés localement nécessitent un accès à cet espace de travail.",
+   "Post content": "Contenu de la publication",
+   "Image": "Image",
+diff --git a/rebuild/src/modules/analytics/reports/generation/document.ts b/rebuild/src/modules/analytics/reports/generation/document.ts
+index dd94ba3d..356c7072 100644
+--- a/rebuild/src/modules/analytics/reports/generation/document.ts
++++ b/rebuild/src/modules/analytics/reports/generation/document.ts
+@@ -1,3 +1,5 @@
++import { readLinkReport, type LinkReport } from '../server/link-report';
++import { linkDetails } from './link-details';
+ import { readTopPostContent, reportUrl, type ReportTopPost } from '../server/top-post-content';
+ import { runtimeConfig } from '@/server/config/store';
+ import { TOP_POST_CONTENT_POLICY_SCHEMA } from '../config';
+@@ -20,6 +22,7 @@ import { describeBusinessHours as responseHours, formatDuration as responseDurat
+ /** One channel's per-destination summary: neutral counts plus the platform module's stored measures (null = not stored). */
+ export type DestinationSummary = {
+   name: string; type: string; posts: number;
++  links?: LinkReport;
+   /** Lifetime clicks on short links of posts that went only to this channel in the period; null when unknown. */
+   linkClicks: number | null;
+   /** Posts that also reached other destinations, whose shared short-link clicks cannot be split honestly. */
+@@ -82,7 +85,8 @@ export function renderReport(snapshot: Snapshot, input: { channelName: string; s
+   const valueText = (m: MetricView) => m.total === null ? t("Not available") : (m.displayTotal ?? String(m.total));
+   const asOf = (date: Date | null | undefined) => date ? date.toISOString().slice(0, 10) : t("unknown");
+   const publication = input.sections.includes('published') && input.publications ? publicationDetails(input.publications, copy) : null;
+-  const sourceTruncated = (publication?.truncated ?? false) || Boolean(input.sections.includes('topPosts') && input.topPosts?.some(p => p.content?.shortened));
++  const links = input.sections.includes('destinations') && input.destination?.links ? linkDetails(input.destination.links, copy) : null;
++  const sourceTruncated = (links?.truncated ?? false) || (publication?.truncated ?? false) || Boolean(input.sections.includes('topPosts') && input.topPosts?.some(p => p.content?.shortened));
+   const wanted = new Set(input.sections);
+   // The recap is included only when the run produced it or recorded that it could not; otherwise (AI off or not permitted) it is not included.
+   const included = REPORT_SECTION_IDS.filter(s => wanted.has(s) && (REPORT_SUPPORTED_SECTIONS as readonly string[]).includes(s) && (s !== 'aiRecap' || Boolean(input.recap)));
+@@ -154,7 +158,7 @@ export function renderReport(snapshot: Snapshot, input: { channelName: string; s
+ 
+   // CSV: long form, one row per summary/point/resource, cut at the row and byte limits.
+   const header = ['record_type', 'metric_key', 'metric', 'source', 'resource', 'date', 'value', 'unit', 'coverage', 'aggregation'];
+-  const rows: unknown[][] = [...(publication?.rows ?? [])];
++  const rows: unknown[][] = [...(publication?.rows ?? []), ...(links?.rows ?? [])];
+   if (recap) rows.push(['ai_recap', 'ai_recap', t("AI recap (AI-generated)"), t("AI-generated"), '', '', recap.state === 'ready' ? recap.text : '', '', '', recap.state === 'ready' ? RECAP_LABEL : RECAP_UNAVAILABLE]);
+   if (audience) for (const e of audience.entries) rows.push(['audience', e.metric, e.metricLabel, e.sourceLabel, e.name, e.asOf, e.value, 'people', t("{v0} of {v1} channels", { v0: audience.covered, v1: audience.selected }), t("Latest value per channel; not unique people")]);
+   if (response) {
+@@ -277,8 +281,11 @@ export function renderReport(snapshot: Snapshot, input: { channelName: string; s
+   // Printable HTML and plain text show the summary tier only (one row per metric).
+   const title = t("Analytics report: {v0}, {v1} to {v2}", { v0: channelName, v1: period.start, v2: period.end });
+   const audienceHtml = audience ? `<h2>${esc(t("Audience"))}</h2><p>${esc(t("{v0} of {v1} selected channels have audience data{v2}. This sum is not unique people across networks.", { v0: audience.covered, v1: audience.selected, v2: audienceAsOf ? t(", as of {v0}", { v0: asOf(audienceAsOf) }) : '' }))}</p><p><strong>${audience.covered ? esc(audience.total) : esc(t("Not available"))}</strong></p>` : '';
+-  const publicationRows = (publication?.rows ?? []).slice(0, bounds.maxRows);
+-  const publicationCut = sourceTruncated || publicationRows.length < (publication?.rows.length ?? 0);
++  const linkRows = (links?.rows ?? []).slice(0, bounds.maxRows);
++  const linkLines = linkRows.map(row => `${row[2]}: ${row[3]} · ${row[4]} · ${row[5]} · ${row[6]} ${row[7]}`);
++  const linksHtml = links ? `<h2>${esc(t('Short-link details'))}</h2>${links.notes.map(note => `<p>${esc(note)}</p>`).join('')}<ul>${linkLines.map(line => `<li>${esc(line)}</li>`).join('')}</ul>` : '';
++  const publicationRows = (publication?.rows ?? []).slice(0, Math.max(0, bounds.maxRows - linkRows.length));
++  const publicationCut = sourceTruncated || linkRows.length < (links?.rows.length ?? 0) || publicationRows.length < (publication?.rows.length ?? 0);
+   const publicationLines = publicationRows.map(row => `${row[3] || row[2]}: ${row[5] instanceof Date ? row[5].toISOString() : row[5]} · ${row[4]} · ${row[2]} · ${row[6]} ${row[7]}`);
+   const publicationHtml = publication ? `<h2>${esc(t('Publication log'))} / ${esc(t('Daily publications (UTC)'))} / ${esc(t('Currently failed destinations'))}</h2>${publication.notes.map(note => `<p>${esc(note)}</p>`).join('')}<ul>${publicationLines.map(line => `<li>${esc(line)}</li>`).join('')}</ul>` : '';
+   const htmlOf = (count: number, marked: boolean) => {
+@@ -291,13 +298,14 @@ export function renderReport(snapshot: Snapshot, input: { channelName: string; s
+       + (goals ? `<h2>${esc(t("Goals"))}</h2>${goals.goals.length ? `<p><small>${esc(t("Month {v0} to {v1} ({v2}), up to generation for the current month.", { v0: goals.month.start, v1: goals.month.end, v2: goals.month.timeZone }))}</small></p><table><thead><tr><th>${esc(t("Goal"))}</th><th>${esc(t("Target"))}</th><th>${esc(t("This month"))}</th><th>${esc(t("Progress"))}</th><th>${esc(t("Pace"))}</th></tr></thead><tbody>${goals.goals.map(g => `<tr><td>${esc(g.label)}</td><td>${esc(g.target)}</td><td>${g.actual === null ? esc(t("No data")) : esc(g.actual)}</td><td>${esc(g.percent)}%</td><td>${esc(g.paceLabel)}</td></tr>`).join('')}</tbody></table>` : `<p>${esc(t("No goals are set for this channel."))}</p>`}` : '')
+       + (included.includes('destinations') ? `<h2>${esc(t("Destinations"))}</h2>${destination ? `<p><small>${esc(destinationNote)}</small></p><table><thead><tr><th>${esc(t("Destination"))}</th><th>${esc(t("Type"))}</th><th>${esc(t("Posts"))}</th>${destination.measures.map(m => `<th>${esc(m.label)}</th>`).join('')}<th>${esc(t("Link clicks (lifetime)"))}</th></tr></thead><tbody><tr><td>${esc(destination.name)}</td><td>${esc(destination.type)}</td><td>${esc(destination.posts)}</td>${destination.measures.map(m => `<td>${esc(measureText(m))}</td>`).join('')}<td>${esc(linkClicksText)}</td></tr></tbody></table><p><small>${esc(t("Link clicks are lifetime totals for links attributed to this channel. Legacy links without a destination count only when the post has a single published destination."))}</small></p>` : `<p>${esc(t("Destination summary not available."))}</p>`}` : '')
+       + (topPosts ? `<h2>${esc(t("Top posts"))}</h2>${topPosts.length ? `<table><thead><tr><th>#</th><th>${esc(t("Post"))}</th><th>${esc(t("Published"))}</th><th>${esc(topPosts[0]!.rankLabel)}</th>${topPosts[0]!.measures.map(m => `<th>${esc(m.label)}</th>`).join('')}</tr></thead><tbody>${topPosts.map((p, i) => `<tr><td>${i + 1}</td><td>${reportUrl(p.url) ? `<a rel="noreferrer noopener" href="${esc(reportUrl(p.url))}">${esc(postTitle(p))}</a>` : esc(postTitle(p))}${contentHtml(p)}</td><td>${esc(asOf(p.publishedAt))}</td><td>${p.rankValue === null ? esc(t("Not available")) : esc(p.rankValue)}</td>${p.measures.map(m => `<td>${m.value === null ? esc(t("Not available")) : esc(m.value)}</td>`).join('')}</tr>`).join('')}</tbody></table>` : `<p>${esc(t("No published posts with stored measures in this period."))}</p>`}` : '')
++      + linksHtml
+       + publicationHtml
+       + audienceHtml
+       + (metrics.length ? `<h2>${esc(t("Metrics"))}</h2><table><thead><tr><th>${esc(t("Metric"))}</th><th>${esc(t("Source"))}</th><th>${esc(t("Value"))}</th><th>${esc(t("Basis"))}</th><th>${esc(t("Coverage"))}</th><th>${esc(t("As of"))}</th></tr></thead><tbody>${shown.map(m => `<tr><td>${esc(m.label)}</td><td>${esc(m.sourceLabel)}</td><td>${esc(valueText(m))}</td><td>${esc([m.aggregationLabel, m.aggregationNote].filter(Boolean).join('. '))}</td><td>${esc(coverageText(m))}</td><td>${esc(asOf(m.latestAt))}</td></tr>`).join('')}</tbody></table>` : '')
+       + (marked ? `<p><strong>${esc(t("This report was shortened to fit its size limit."))}</strong></p>` : '')
+       + (notIncluded.length ? `<p><small>${esc(t("Not included: {v0} (not available in this report yet).", { v0: notIncluded.join(', ') }))}</small></p>` : '') + '</body></html>';
+   };
+-  const metricCap = Math.min(metrics.length, Math.max(0, bounds.maxRows - publicationRows.length));
++  const metricCap = Math.min(metrics.length, Math.max(0, bounds.maxRows - publicationRows.length - linkRows.length));
+   const htmlCount = fit(metricCap, bounds.maxBytes, c => htmlOf(c, true));
+   let htmlTruncated = sourceTruncated || publicationCut || htmlCount < metrics.length;
+   let html = htmlOf(htmlCount, htmlTruncated);
+@@ -305,7 +313,7 @@ export function renderReport(snapshot: Snapshot, input: { channelName: string; s
+     html = cutBytes(`<!doctype html><html lang="${locale}"><body><p>${esc(clamp(title, 80))}</p><p><strong>${esc(t("This report was shortened to fit its size limit."))}</strong></p></body></html>`, bounds.maxBytes);
+     htmlTruncated = true;
+   }
+-  const baseLines = [title, ...(publication ? [...publication.notes, ...publicationLines] : []), '', ...(recap ? [t("AI recap (AI-generated; {v0})", { v0: RECAP_LABEL }), recapText, ''] : []), ...(included.includes('published') ? [t("Published {v0}, scheduled {v1}, failed {v2}.", { v0: snapshot.publishing.published, v1: snapshot.publishing.scheduled, v2: snapshot.publishing.failed })] : []),
++  const baseLines = [title, ...(links ? [t('Short-link details'), ...links.notes, ...linkLines] : []), ...(publication ? [...publication.notes, ...publicationLines] : []), '', ...(recap ? [t("AI recap (AI-generated; {v0})", { v0: RECAP_LABEL }), recapText, ''] : []), ...(included.includes('published') ? [t("Published {v0}, scheduled {v1}, failed {v2}.", { v0: snapshot.publishing.published, v1: snapshot.publishing.scheduled, v2: snapshot.publishing.failed })] : []),
+     ...(response ? [t("Response time: {v0}", { v0: responseLine }), ...responseDetails, ...memberLines.map(l => `  ${l}`), ...(resolveLine ? [resolveLine] : [])] : []),
+     ...(goals ? [t("Goals (month {v0} to {v1}):", { v0: goals.month.start, v1: goals.month.end }), ...(goals.goals.length ? goals.goals.map(goalText) : [t("No goals are set for this channel.")])] : []),
+     ...(included.includes('destinations') ? [t("Destinations:"), ...(destination ? [t("{v0} ({v1}): {v2} posts; {v3}; link clicks (lifetime) {v4}", { v0: clamp(destination.name, 200), v1: destination.type, v2: destination.posts, v3: destination.measures.map(m => `${m.label} ${measureText(m)}`).join('; '), v4: linkClicksText })] : [t("Destination summary not available.")])] : []),
+@@ -431,5 +439,5 @@ async function readDestination(workspaceId: string, channelId: string, period: {
+   const count = counts[0];
+   const analytics = await platformAnalytics(target.provider);
+   const measured = analytics?.destinationMeasures ? await analytics.destinationMeasures({ workspaceId, targetId: channelId, from, to }) : { measures: [] };
+-  return { name: clamp(target.name, 200), type: target.type, posts: Number(count?.posts ?? 0), sharedPosts: Number(count?.shared ?? 0), linkClicks: count?.clicks == null ? null : Number(count.clicks), measures: measured.measures };
++  return { name: clamp(target.name, 200), type: target.type, posts: Number(count?.posts ?? 0), sharedPosts: Number(count?.shared ?? 0), linkClicks: count?.clicks == null ? null : Number(count.clicks), links: await readLinkReport(workspaceId, channelId, period), measures: measured.measures };
+ }
+diff --git a/rebuild/src/modules/analytics/reports/generation/link-details.ts b/rebuild/src/modules/analytics/reports/generation/link-details.ts
+new file mode 100644
+index 00000000..2a031282
+--- /dev/null
++++ b/rebuild/src/modules/analytics/reports/generation/link-details.ts
+@@ -0,0 +1,23 @@
++import type { LinkReport } from '../server/link-report';
++import { documentText, type ReportDocumentCopy } from './copy';
++
++export function linkDetails(report: LinkReport, copy: ReportDocumentCopy) {
++  const t = documentText(copy);
++  const notes = [
++    t('Links belong to posts published to this channel in the report period. Only channel-attributed links and legacy links with one published destination are included.'),
++    t('Lifetime clicks are running totals, not period clicks. Period and daily counts use retained click records; older records may have been deleted. Zero means no retained records, not proof of no clicks.'),
++    t('Daily counts cover all eligible links independently of the link list limit. Days without retained clicks are omitted.'),
++    ...(report.linksTruncated ? [t('The link inventory reached its row limit.')] : []),
++    ...(report.daysTruncated ? [t('The daily click list reached its row limit.')] : []),
++    ...(!report.links.length ? [t('No eligible stored short links for these publications.')] : []),
++  ];
++  const rows: unknown[][] = [
++    ...report.links.flatMap(link => [
++      ['short_link', 'link_lifetime_clicks', t('Link lifetime clicks'), link.postId, link.id, '', link.lifetime, 'clicks', '', notes[0]],
++      ['short_link', 'link_period_clicks', t('Recorded link clicks in period'), link.postId, link.id, '', link.period, 'clicks', '', notes[1]],
++    ]),
++    ...report.days.map(day => ['short_link_day', 'link_daily_clicks', t('Daily recorded link clicks (UTC)'), '', '', day.day, day.clicks, 'clicks', '', notes[2]]),
++    ...notes.map(note => ['short_link_coverage', 'link_basis', note, '', '', '', '', '', '', '']),
++  ];
++  return { notes, rows, truncated: report.linksTruncated || report.daysTruncated };
++}
+diff --git a/rebuild/src/modules/analytics/reports/mcp.ts b/rebuild/src/modules/analytics/reports/mcp.ts
+index 68f27344..358afa54 100644
+--- a/rebuild/src/modules/analytics/reports/mcp.ts
++++ b/rebuild/src/modules/analytics/reports/mcp.ts
+@@ -17,7 +17,7 @@ export const analyticsReportToolDefinitions = [
+   { name: 'list_report_schedules', description: 'List scheduled report definitions within your channel scope. Recipient addresses are shown only to people (and keys) that can manage schedules. A key limited to selected channels cannot attach or change templates.', inputSchema: page },
+   { name: 'manage_report_schedule', description: 'Create, update or delete a weekly or monthly report schedule definition. Confirmations: CREATE REPORT SCHEDULE <channelId> <frequency>, UPDATE REPORT SCHEDULE <id>, DELETE REPORT SCHEDULE <id>. Saving a schedule does not send anything immediately.', inputSchema: { type: 'object', required: ['action', 'confirmation'], properties: { action: { type: 'string', enum: ['create', 'update', 'delete'] }, id, channelId: id, frequency: { type: 'string', enum: [...REPORT_FREQUENCIES] }, recipients: { type: 'array', items: { type: 'string' } }, templateId: { anyOf: [id, { type: 'null' }] }, confirmation: { type: 'string' } }, additionalProperties: false } },
+   { name: 'list_report_runs', description: 'List report run history (status, period, row count, per-recipient delivery status) within your channel scope.', inputSchema: page },
+-  { name: 'generate_report', description: 'Prepare a report as CSV, JSON and printable HTML for download (the result carries csv, json and html strings; older retained runs may lack json). The topPosts section includes saved destination-specific text, ordered image/video links and article title/description/link, bounded by Root policy. Local media links require workspace access; content is current saved state, not a remote publication snapshot. The published section includes a bounded content log, complete daily UTC publication counts and currently failed destinations last updated in the period, with scoped content excerpts and attempt counts. Failed rows are current state, not historical failures; provider errors are excluded. The responseTime section includes separate stored comment and conversation answer shares, median/slowest first responses and resolution times, member first-reply counts and calendar/business-hours medians split by source, member slowest replies and saved-resolution counts/medians attributed to the first responder of the last visitor run (not the resolver), period-start context, historical resolution/reopening event counts and calendar/business-hours resolution cycles split by source with stored-history coverage; absent history is excluded and unset business hours never become zero. All renderings share the same row and byte bounds and truncation marking. Nothing is emailed; the run is recorded as Prepared, never Sent, and works without email delivery. Two forms. (1) A schedule\'s most recent complete period: scheduleId, confirmation "GENERATE REPORT <scheduleId>". (2) One channel over explicit inclusive UTC dates: channelId, start and end (YYYY-MM-DD, within the Analytics range limit), optional templateId (null = default sections), confirmation "GENERATE CHANNEL REPORT <channelId>". requestId is a fresh UUID; repeating the same requestId with the same input returns the already prepared result (while still retained and authorised) instead of regenerating, and a different input with that id is refused. Returned rows are bounded by this key\'s result ceiling.', inputSchema: { type: 'object', required: ['requestId', 'confirmation'], properties: { scheduleId: id, channelId: id, templateId: { anyOf: [id, { type: 'null' }] }, start: { type: 'string', pattern: '^\\d{4}-\\d{2}-\\d{2}$' }, end: { type: 'string', pattern: '^\\d{4}-\\d{2}-\\d{2}$' }, requestId: { type: 'string', format: 'uuid' }, confirmation: { type: 'string' } }, oneOf: [{ required: ['scheduleId'] }, { required: ['channelId', 'start', 'end'] }], additionalProperties: false } },
++  { name: 'generate_report', description: 'Prepare a report as CSV, JSON and printable HTML for download (the result carries csv, json and html strings; older retained runs may lack json). The topPosts section includes saved destination-specific text, ordered image/video links and article title/description/link, bounded by Root policy. Local media links require workspace access; content is current saved state, not a remote publication snapshot. The published section includes a bounded content log, complete daily UTC publication counts and currently failed destinations last updated in the period, with scoped content excerpts and attempt counts. Failed rows are current state, not historical failures; provider errors are excluded. The destinations section includes a per-link lifetime click inventory, retained period click counts per link, and daily UTC retained click counts for links on posts published to the channel in the report period. Ambiguous unattributed shared links are excluded. Daily counts cover all eligible links independently of inventory clipping. Retention may remove click history; a zero recorded count does not prove no clicks. No visitor metadata or destination URLs are returned. The responseTime section includes separate stored comment and conversation answer shares, median/slowest first responses and resolution times, member first-reply counts and calendar/business-hours medians split by source, member slowest replies and saved-resolution counts/medians attributed to the first responder of the last visitor run (not the resolver), period-start context, historical resolution/reopening event counts and calendar/business-hours resolution cycles split by source with stored-history coverage; absent history is excluded and unset business hours never become zero. All renderings share the same row and byte bounds and truncation marking. Nothing is emailed; the run is recorded as Prepared, never Sent, and works without email delivery. Two forms. (1) A schedule\'s most recent complete period: scheduleId, confirmation "GENERATE REPORT <scheduleId>". (2) One channel over explicit inclusive UTC dates: channelId, start and end (YYYY-MM-DD, within the Analytics range limit), optional templateId (null = default sections), confirmation "GENERATE CHANNEL REPORT <channelId>". requestId is a fresh UUID; repeating the same requestId with the same input returns the already prepared result (while still retained and authorised) instead of regenerating, and a different input with that id is refused. Returned rows are bounded by this key\'s result ceiling.', inputSchema: { type: 'object', required: ['requestId', 'confirmation'], properties: { scheduleId: id, channelId: id, templateId: { anyOf: [id, { type: 'null' }] }, start: { type: 'string', pattern: '^\\d{4}-\\d{2}-\\d{2}$' }, end: { type: 'string', pattern: '^\\d{4}-\\d{2}-\\d{2}$' }, requestId: { type: 'string', format: 'uuid' }, confirmation: { type: 'string' } }, oneOf: [{ required: ['scheduleId'] }, { required: ['channelId', 'start', 'end'] }], additionalProperties: false } },
+ ] as const;
+ /** Definitions to list now: generation tools appear only when generation is registered and its history exists. */
+ export async function analyticsReportAvailableToolDefinitions() {
+diff --git a/rebuild/src/modules/analytics/reports/server/link-report.ts b/rebuild/src/modules/analytics/reports/server/link-report.ts
+new file mode 100644
+index 00000000..bdf89042
+--- /dev/null
++++ b/rebuild/src/modules/analytics/reports/server/link-report.ts
+@@ -0,0 +1,48 @@
++import { prisma } from '@/server/data';
++import { runtimeConfig } from '@/server/config/store';
++import { LINK_REPORT_POLICY_SCHEMA } from '../config';
++import type { ReportPeriod } from '../contracts';
++
++export type LinkReport = {
++  links: Array<{ id: string; postId: string; lifetime: number; period: number }>;
++  days: Array<{ day: string; clicks: number }>;
++  linksTruncated: boolean; daysTruncated: boolean;
++};
++
++/** Internal reader: the report generator authorizes the current actor/channel first.
++ * One statement provides a consistent cohort: links on posts published to this
++ * channel during the report period. Unattributed links qualify only when their
++ * post has exactly one currently published destination. No visitor metadata,
++ * destination URLs, slugs or other channels' identities are projected.
++ */
++export async function readLinkReport(workspaceId: string, channelId: string, period: ReportPeriod): Promise<LinkReport> {
++  const policy = LINK_REPORT_POLICY_SCHEMA.parse(await runtimeConfig('analytics.reports.linkDetails'));
++  const from = new Date(`${period.start}T00:00:00.000Z`);
++  const to = new Date(`${period.end}T00:00:00.000Z`); to.setUTCDate(to.getUTCDate() + 1);
++  const rows = await prisma.$queryRaw<Array<{ links: LinkReport['links']; days: LinkReport['days'] }>>`
++    WITH cohort AS (
++      SELECT sl.id, sl."postId", sl."clickCount" AS lifetime
++      FROM short_links sl JOIN posts p ON p.id = sl."postId" AND p."workspaceId" = sl."workspaceId"
++      JOIN post_targets pt ON pt."postId" = p.id AND pt."targetId" = ${channelId}
++      JOIN targets t ON t.id = pt."targetId" AND t."workspaceId" = p."workspaceId"
++      WHERE sl."workspaceId" = ${workspaceId} AND pt.status = 'published'
++        AND pt."publishedAt" >= ${from} AND pt."publishedAt" < ${to}
++        AND (sl."targetId" = ${channelId} OR (sl."targetId" IS NULL AND
++          (SELECT COUNT(DISTINCT other."targetId") FROM post_targets other
++           WHERE other."postId" = p.id AND other.status = 'published') = 1))
++    ), period_clicks AS (
++      SELECT lc."shortLinkId", lc."createdAt" FROM link_clicks lc JOIN cohort c ON c.id = lc."shortLinkId"
++      WHERE lc."createdAt" >= ${from} AND lc."createdAt" < ${to}
++    ), inventory AS (
++      SELECT c.id, c."postId", c.lifetime, COUNT(pc."shortLinkId")::integer AS period
++      FROM cohort c LEFT JOIN period_clicks pc ON pc."shortLinkId" = c.id
++      GROUP BY c.id, c."postId", c.lifetime ORDER BY c.lifetime DESC, c.id ASC LIMIT ${policy.links + 1}
++    ), daily AS (
++      SELECT to_char("createdAt", 'YYYY-MM-DD') AS day, COUNT(*)::integer AS clicks
++      FROM period_clicks GROUP BY day ORDER BY day ASC LIMIT ${policy.days + 1}
++    ) SELECT COALESCE((SELECT jsonb_agg(i ORDER BY i.lifetime DESC, i.id ASC) FROM inventory i), '[]'::jsonb) AS links,
++      COALESCE((SELECT jsonb_agg(d ORDER BY d.day ASC) FROM daily d), '[]'::jsonb) AS days`;
++  const { links = [], days = [] } = rows[0] ?? {};
++  return { links: links.slice(0, policy.links), days: days.slice(0, policy.days),
++    linksTruncated: links.length > policy.links, daysTruncated: days.length > policy.days };
++}
+diff --git a/rebuild/tests/report-link-details-workflow.test.ts b/rebuild/tests/report-link-details-workflow.test.ts
+new file mode 100644
+index 00000000..5ba803d0
+--- /dev/null
++++ b/rebuild/tests/report-link-details-workflow.test.ts
+@@ -0,0 +1,69 @@
++vi.mock('@/modules/analytics/reports/generation/copy-server', async () => ({ loadReportDocumentCopy: async () => ({ copy: (await import('@/modules/analytics/reports/generation/copy')).reportDocumentCopyDefaults.en, locale: 'en' }) }));
++import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
++const platform = vi.hoisted(() => ({ posts: vi.fn() }));
++vi.mock('@/server/platforms/registry', () => ({ platformAnalytics: async () => ({ postPerformance: platform.posts }) }));
++
++vi.mock('@/server/data', async () => ({ prisma: (await import('./report82-engine-harness')).db }));
++vi.mock('@/server/config/store', async () => { const h = await import('./report82-engine-harness'); return { runtimeConfig: async (key: string) => h.configValue(key) }; });
++vi.mock('@/server/entitlements', async () => { const h = await import('./report82-engine-harness'); return { loadEntitlements: async (_u: string, w: string) => (h.state.entitled ? { workspaceId: w } : null), canUseFeature: () => h.state.entitled, entitledPlatformIds: () => h.state.providers }; });
++vi.mock('@/server/permissions', async () => {
++  const h = await import('./report82-engine-harness');
++  return {
++    canAccessFeature: (p: { deny?: string[] }) => h.state.canAccess && !(p?.deny ?? []).includes('analytics/reports'),
++    resolvePermissions: () => ({ pageScope: h.state.freshScope ? { all: false, ids: h.state.freshScope } : { all: true, ids: [] }, deny: h.state.freshDeny }),
++  };
++});
++vi.mock('@/server/permissions/loader', async () => { const h = await import('./report82-engine-harness'); return { loadPermissions: async () => h.permissionsFor() }; });
++vi.mock('@/server/platforms/resource-visibility', async () => { const h = await import('./report82-engine-harness'); return { selectedResourceConnectionWhere: async () => ({ provider: { in: h.state.providers } }) }; });
++vi.mock('@/server/data-control/guard', async () => { const h = await import('./report82-engine-harness'); return { assertWorkspaceNotPurging: async () => { if (h.state.purge) throw Object.assign(new Error('purging'), { code: 'conflict' }); } }; });
++vi.mock('../src/modules/analytics/server/read', async () => { const h = await import('./report82-engine-harness'); return { readAnalyticsSnapshot: h.readSnapshot }; });
++
++import { db, state, reset, resetGen, snapshot, gen, execs } from './report82-engine-harness';
++import { LINK_REPORT_DEFAULTS } from '../src/modules/analytics/reports/config';
++import { createReportGenerator } from '../src/modules/analytics/reports/generation/document';
++import { registerReportGeneration, resetReportCapabilityCache, unregisterReportGeneration } from '../src/modules/analytics/reports/generation/registry';
++import { runReportNow } from '../src/modules/analytics/reports/generation/runs';
++import { executeAnalyticsReportTool } from '../src/modules/analytics/reports/mcp';
++const original = db.$queryRaw.getMockImplementation()!;
++const now = new Date('2026-10-21T10:00:00Z');
++const actor = { userId: 'u1', workspaceId: 'w1' };
++beforeEach(() => {
++  vi.clearAllMocks(); reset(); resetGen(); resetReportCapabilityCache(); vi.useFakeTimers(); vi.setSystemTime(now);
++  state.config['analytics.reports.linkDetails'] = LINK_REPORT_DEFAULTS;
++  state.config['app.publicOrigin'] = 'https://app.example'; state.templateSections = ['destinations']; state.scheduleSections = ['destinations'];
++  gen.snapshot = snapshot({ period: { start: '2026-10-01', end: '2026-10-18' } });
++  platform.posts.mockResolvedValue([{ postId: 'post1', text: 'Generic adapter text', publishedAt: new Date('2026-10-15T10:00Z'), url: 'https://social.example/post1', rankLabel: 'Engagement', rankValue: 5, measures: [], measuredAt: null }]);
++  db.$queryRaw.mockImplementation(async (sql, ...args) => {
++    const query = sql.join('?');
++    if (query.includes('SELECT t.name, t.type, a.provider')) return [{ name: 'Channel', type: 'channel', provider: 'p1' }];
++    if (query.includes('WITH mine AS')) return [{ posts: 1, shared: 0, clicks: 5 }];
++    if (query.includes('WITH cohort AS')) return [{ links: [{ id: 'link1', postId: 'post1', lifetime: 50, period: 5 }], days: [{ day: '2026-10-15', clicks: 5 }] }];
++    return original(sql, ...args);
++  });
++  registerReportGeneration({ generation: createReportGenerator({ bounds: async () => ({ maxRows: 100, maxBytes: 20000 }) }) });
++});
++afterEach(() => { db.$queryRaw.mockImplementation(original); unregisterReportGeneration(); vi.useRealTimers(); });
++describe('link details through the confirmed shared workflow', () => {
++  it.each(['service', 'mcp'] as const)('releases all three details and audited receipts through %s', async surface => {
++    const input = { channelId: 'c1', templateId: 't1', start: '2026-10-01', end: '2026-10-18', requestId: '6f1d0b6e-0f4b-4c5d-8a43-2d5b1d1f6a11', confirmation: 'GENERATE CHANNEL REPORT c1' };
++    const output = (surface === 'service' ? await runReportNow(actor, input, now) : await executeAnalyticsReportTool(actor, 'generate_report', input)) as Awaited<ReturnType<typeof runReportNow>>;
++    expect(output).toMatchObject({ ok: true, outcome: 'prepared' });
++    expect(output.html).toContain('Link lifetime clicks'); expect(output.html).toContain('Recorded link clicks in period'); expect(output.html).toContain('Daily recorded link clicks (UTC)');
++    expect(output.html).not.toContain('Generic adapter text');
++    expect(JSON.parse(output.json!).records.map((r: { record_type: string }) => r.record_type)).toEqual(expect.arrayContaining(['short_link', 'short_link_day', 'short_link_coverage']));
++    expect(execs('activity_logs').some(row => row.values.includes('analytics.report_run_finished'))).toBe(true);
++  });
++  it('refuses bad consent or lost channel scope before reading link details', async () => {
++    const input = { channelId: 'c1', templateId: 't1', start: '2026-10-01', end: '2026-10-18', requestId: '6f1d0b6e-0f4b-4c5d-8a43-2d5b1d1f6a11', confirmation: 'WRONG' };
++    await expect(executeAnalyticsReportTool(actor, 'generate_report', input)).rejects.toMatchObject({ code: 'invalid_request' });
++    state.scope = ['other'];
++    await expect(runReportNow(actor, { ...input, confirmation: 'GENERATE CHANNEL REPORT c1' }, now)).rejects.toMatchObject({ code: 'unavailable' });
++    expect(db.$queryRaw.mock.calls.some(([sql]) => sql.join('?').includes('WITH cohort AS'))).toBe(false);
++  });
++  it('honors the key result ceiling for generated link details', async () => {
++    const generator = createReportGenerator({ bounds: async () => ({ maxRows: 100, maxBytes: 20000 }) });
++    const out = await generator.generate({ actor: { ...actor, maxResultItems: 1 }, channelId: 'c1', sections: ['destinations'], period: { start: '2026-10-01', end: '2026-10-18' } });
++    expect(out.ok).toBe(true);
++    if (out.ok) expect(out.output.rowCount).toBeLessThanOrEqual(1);
++  });
++});
+diff --git a/rebuild/tests/report-link-details.test.ts b/rebuild/tests/report-link-details.test.ts
+new file mode 100644
+index 00000000..16da6324
+--- /dev/null
++++ b/rebuild/tests/report-link-details.test.ts
+@@ -0,0 +1,67 @@
++import { beforeEach, describe, expect, it, vi } from 'vitest';
++const mocks = vi.hoisted(() => ({ query: vi.fn(), config: vi.fn() }));
++vi.mock('@/server/data', () => ({ prisma: { $queryRaw: mocks.query } }));
++vi.mock('@/server/config/store', () => ({ runtimeConfig: mocks.config }));
++import { readLinkReport } from '../src/modules/analytics/reports/server/link-report';
++import { LINK_REPORT_DEFAULTS, LINK_REPORT_POLICY_SCHEMA, REPORT_WORKFLOW_CONFIG } from '../src/modules/analytics/reports/config';
++import { renderReport } from '../src/modules/analytics/reports/generation/document';
++import { reportDocumentCopyDefaults } from '../src/modules/analytics/reports/generation/copy';
++const period = { start: '2026-10-01', end: '2026-10-03' };
++const link = { id: '=unsafe<script>', postId: 'post', lifetime: 123, period: 0 };
++const report = { links: [link], days: [{ day: '2026-10-02', clicks: 300 }], linksTruncated: true, daysTruncated: false };
++const snapshot = { period, allMetrics: [], audience: null, publishing: { published: 1, scheduled: 0, failed: 0 } };
++const destination = { name: 'Channel', type: 'channel', posts: 1, sharedPosts: 0, linkClicks: 123, measures: [], links: report };
++const render = (locale: 'en' | 'fr' = 'en', maxRows = 100, maxBytes = 30000) => renderReport(snapshot as never, { channelName: 'Channel', sections: ['destinations'], destination, generatedAt: new Date(0) }, { maxRows, maxBytes }, reportDocumentCopyDefaults[locale], locale);
++beforeEach(() => { vi.clearAllMocks(); mocks.config.mockResolvedValue({ links: 1, days: 1 }); });
++describe('link report read', () => {
++  it('uses one scoped snapshot and independent deterministic bounds; excludes ambiguous legacy links and visitor data', async () => {
++    mocks.query.mockResolvedValue([{ links: [link, { ...link, id: 'omitted' }], days: report.days }]);
++    expect(await readLinkReport('workspace', 'channel', period)).toEqual(report);
++    expect(mocks.config).toHaveBeenCalledWith('analytics.reports.linkDetails');
++    expect(mocks.query).toHaveBeenCalledTimes(1);
++    const [parts, ...values] = mocks.query.mock.calls[0]; const sql = parts.join('?');
++    expect(values).toContain('workspace'); expect(values).toContain('channel');
++    expect(values).toContainEqual(new Date('2026-10-01T00:00Z'));
++    expect(values).toContainEqual(new Date('2026-10-04T00:00Z'));
++    for (const predicate of ['p."workspaceId" = sl."workspaceId"', 't."workspaceId" = p."workspaceId"', 'sl."workspaceId" =', 'sl."targetId" IS NULL', 'COUNT(DISTINCT other."targetId")', "other.status = 'published'", 'LEFT JOIN period_clicks', 'ORDER BY c.lifetime DESC, c.id ASC', 'FROM period_clicks GROUP BY day', 'to_char("createdAt",']) expect(sql).toContain(predicate);
++    for (const privateField of ['ipHash', 'userAgent', 'referer', 'country', 'targetUrl', 'slug']) expect(sql).not.toContain(privateField);
++    // Daily query uses the entire click cohort, never the clipped inventory.
++    expect(sql.split('daily AS (')[1]).not.toContain('JOIN inventory');
++  });
++  it('marks daily clipping independently and preserves honest empty reads', async () => {
++    mocks.query.mockResolvedValueOnce([{ links: [], days: [report.days[0], { day: '2026-10-03', clicks: 1 }] }]).mockResolvedValueOnce([]);
++    expect(await readLinkReport('w', 'c', period)).toMatchObject({ links: [], linksTruncated: false, daysTruncated: true, days: report.days });
++    expect(await readLinkReport('w', 'c', period)).toEqual({ links: [], days: [], linksTruncated: false, daysTruncated: false });
++  });
++  it('validates the registered Root bounds before querying', async () => {
++    expect(LINK_REPORT_POLICY_SCHEMA.parse(LINK_REPORT_DEFAULTS)).toEqual(LINK_REPORT_DEFAULTS);
++    expect(REPORT_WORKFLOW_CONFIG.find(e => e.key === 'analytics.reports.linkDetails')?.consumption).toBe('active');
++    mocks.config.mockResolvedValue({ links: 0, days: 1 });
++    await expect(readLinkReport('w', 'c', period)).rejects.toThrow(); expect(mocks.query).not.toHaveBeenCalled();
++    expect(LINK_REPORT_POLICY_SCHEMA.safeParse({ links: 1, days: 3661 }).success).toBe(false);
++  });
++});
++describe('all report artifacts', () => {
++  it.each(['en', 'fr'] as const)('includes all three capabilities and retention/attribution notes in %s', locale => {
++    const out = render(locale); const records = JSON.parse(out.json!).records;
++    expect(records).toEqual(expect.arrayContaining([
++      expect.objectContaining({ metric_key: 'link_lifetime_clicks', value: 123 }),
++      expect.objectContaining({ metric_key: 'link_period_clicks', value: 0 }),
++      expect.objectContaining({ metric_key: 'link_daily_clicks', value: 300 }),
++    ]));
++    expect(out.csv).toContain('"\'=unsafe<script>"'); expect(out.html).toContain('&lt;script&gt;'); expect(out.html).not.toContain('<script>');
++    for (const artifact of [out.csv, out.json!, out.html, out.text]) expect(artifact).toContain(locale === 'en' ? 'older records may have been deleted' : 'anciens enregistrements peuvent avoir été supprimés');
++    expect(out.html).toContain(locale === 'en' ? 'Short-link details' : 'Détail des liens courts');
++    expect(out.truncated).toBe(true); expect(JSON.parse(out.json!).truncated).toBe(true);
++  });
++  it('applies row and byte ceilings to all artifacts', () => {
++    const out = render('en', 1, 2500);
++    expect(out.rowCount).toBe(1); expect(JSON.parse(out.json!).records.length).toBe(1);
++    for (const artifact of [out.csv, out.json!, out.html, out.text]) expect(Buffer.byteLength(artifact)).toBeLessThanOrEqual(2500);
++    expect(out.truncated).toBe(true);
++  });
++  it('does not expose links when Destinations is absent', () => {
++    const out = renderReport(snapshot as never, { channelName: 'C', sections: ['published'], destination, generatedAt: new Date(0) }, { maxRows: 100, maxBytes: 30000 });
++    expect(out.csv).not.toContain('link_lifetime_clicks'); expect(out.html).not.toContain('unsafe');
++  });
++});

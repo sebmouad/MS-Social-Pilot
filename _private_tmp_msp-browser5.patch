@@ -1,0 +1,194 @@
+diff --git a/rebuild/docs/BROWSER_MATRIX_2026-10-21.md b/rebuild/docs/BROWSER_MATRIX_2026-10-21.md
+index 9e257a79..fdb2ce3e 100644
+--- a/rebuild/docs/BROWSER_MATRIX_2026-10-21.md
++++ b/rebuild/docs/BROWSER_MATRIX_2026-10-21.md
+@@ -250,3 +250,49 @@ and Posts reporting a 401 as a naming problem. No overflow, accessible-name, the
+ 
+ The global-error path (database unreachable) was not re-run; round 3 covers it with the same shared component. Client-side render throws (a component crashing on a malformed response) were not exercised, only a server-side page throw.
+ Only vivid and warm, one boundary page, one recovery check in Firefox only, no Firefox/WebKit keyboard walks or system-mode runs, no real Safari/iOS, screen readers, long content, or anything live-provider or production.
++
++# Round 5 (2026-10-21): full Chromium rerun after rounds 4-5, Feeds recipes, missing-image and saved-view fixes
++
++Same environment as before: a **local production build** of `46c6bdae` (`next build` + `next start`, :3200) against the **synthetic** preview PostgreSQL database, Chromium only. Not production, not live-provider evidence.
++The app accepts only the `localhost` origin (`app.publicOrigin`), so `BASE_URL` must be `http://localhost:3200`; `127.0.0.1` makes browser sign-in fail with a generic message (403 from the origin check).
++The preview database was brought up to date first: `20261031170000_rebuild_inbox_metadata` was applied by hand (the database has no `_prisma_migrations` table). Synthetic Feeds rows were added for the QA workspace: one recipe
++source and four plans (two planned, one failed, one uncertain), so `/publishing/feeds` renders with recipe data. They stay in the synthetic database only.
++
++Harness additions: `BROWSER_MATRIX_SCOPE=round5:fixes` (`runRound5Fixes`): on Posts, Queue, Approvals and Calendar, no visible broken-image icon (`classifyMedia`); calendar contrast; and on Posts at desktop, a saved-view save after the
++session cookie is removed must explain the ended session (`classifySavedViewFeedback`). The only POST it lets through is the refused saved-view save. Unit tests: `tests/browser-matrix-round5.test.ts`.
++
++## Results
++
++| Run | Scope | Cells | Findings |
++| --- | --- | --- | --- |
++| Full matrix | 62 customer/Root/public routes × 4 themes × light/dark × 1440/390, includes `/ads`, `/ads/campaigns`, `/ads/objects`, `/ads/compare` and `/publishing/feeds` | 992 / 992 | 162 (round 1 had 176), all explained below. Ads pages and Feeds: **0 own findings** |
++| Fixes check | 4 themes × light/dark × 1440/390; media on 4 pages, calendar contrast, saved view at desktop | 72 / 72 | 10: 8 saved-view, 2 calendar contrast. **0 broken images** |
++| Not found | unknown route, signed in and out, 4 themes × light/dark × 2 viewports | 64 / 64 | **0**, HTTP 404 |
++
++Full-matrix findings, by cause:
++
++1. **80 (40 requests + 40 console errors): seeded media with no stored file** answers 404 on `/api/media/<id>` (`/publishing/posts`, `/queue`, `/approvals`). Data, not UI: the fallback works, the fix check found no broken-image icon in any cell.
++   The browser still logs the failed request, which the gate counts.
++2. **`/join` without a token: 16 `/api/auth/invitations/preview` 404s (+10 console errors) and 6 console 429s.** Known "tokenless join" finding, unchanged; the 429s come from the rate limit on that endpoint when sixteen cells hit it in a row.
++3. **Calendar "View post" button, 4.35:1 (needs 4.5), warm light, desktop and phone.** Computed colour `rgb(189,92,57)` on `rgb(255,253,249)` is the warm accent `#B4461F` at 88 % opacity: `calendar.module.css`
++   `.post[data-status="published"] { opacity: .88 }` dims the whole card. Module-owned (Publishing); the shared tokens are correct. No other theme or mode fails, so calendar contrast now holds in seven of eight theme/mode combinations.
++
++## Fixed in my owned paths
++
++None needed in `src/styles/**` or `src/components/**`: no shared-token defect was found this round. The harness gained the `round5:fixes` scope and its tests.
++
++## Findings for module/app owners (not fixed here)
++
++| Severity | Finding | Where | Owner |
++| --- | --- | --- | --- |
++| Medium | **Saved views still report an ended session as a naming problem.** After the session cookie is removed, saving shows "The view could not be saved. Check its name and try again." (8 / 8 desktop cells). `36946d9e` did not change `SavedViews.tsx`: a 401 falls into `saved_saveFailed`. Needs a session-ended message (EN/FR) and a link to sign in | `src/modules/publishing/ui/SavedViews.tsx`, `action-catalog.ts` `saved_saveFailed` | Publishing |
++| Low | Calendar published-post opacity drops the "View post" button below 4.5:1 in warm light. Apply the dimming to the card background/text that carries no small button text, or raise the button colour | `calendar.module.css:88` | Publishing |
++| Low | Tokenless `/join` calls an invitation-preview endpoint that answers 404 and is rate limited; show the "link needed" state without a request | join screen | Auth |
++| Info | Seeded media rows have no stored file (404 in console) | preview data | n/a |
++| Open | Module findings from rounds 2 and 4 that this run did not re-test (raw server text, lost input after failed writes, soft 404 for unknown ids, hydration warnings in WebKit) remain open | see rounds 2 and 4 | Tasks, Publishing, Analytics, Auth, Inbox, Root, Sharing |
++
++## Not proven (round 5)
++
++Firefox and WebKit were not rerun. The dynamic-id, empty-workspace, system-mode, keyboard and failure-injection parts were not rerun (they need round-2 fixtures that were removed); the full matrix's own keyboard gate passed
++without findings. Saved views were checked at desktop width only (on phones the filters sit in a drawer). The Feeds page rendered with no findings but its recipe card was not inspected visually, and Ads creation/edit
++flows were not driven (the gate is read-only; spend-changing confirmations are not exercised). The 404 pages and everything else carry the earlier limits: no real Safari/iOS, screen readers, live-provider or production evidence.
+diff --git a/rebuild/scripts/verify-browser-matrix.ts b/rebuild/scripts/verify-browser-matrix.ts
+index b0a59985..db23ad30 100644
+--- a/rebuild/scripts/verify-browser-matrix.ts
++++ b/rebuild/scripts/verify-browser-matrix.ts
+@@ -1304,6 +1304,94 @@ export async function runBoundaryRecovery(env: Readonly<Record<string, string |
+   return { version: 1, startedAt, finishedAt: new Date().toISOString(), browser: engineName(env.MATRIX_BROWSER), routes: [route], expectedCells: 1, cells: [cell], fatal, failures, passed: failures === 0 };
+ }
+ 
++/** Round 5 fixes check pages that show uploaded media. A stored file that is gone must show the "Image unavailable" placeholder, never the browser's broken-image icon. */
++export const MEDIA_ROUTES = ['/publishing/posts', '/publishing/queue', '/publishing/approvals', '/publishing/calendar'] as const;
++export const SAVED_VIEW_ROUTE = '/publishing/posts';
++
++export type MediaObservation = { images: number; broken: number; placeholders: number };
++/** Pure classification: a broken image is a defect; placeholders are the expected state for missing files. */
++export function classifyMedia(observed: MediaObservation): Finding[] {
++  return observed.broken > 0 ? [{ code: 'BROKEN_IMAGE_VISIBLE', count: observed.broken }] : [];
++}
++/** An expired session is a sign-in problem, not a naming or generic save failure: the alert must offer a way to sign in again or say the session ended. */
++export function classifySavedViewFeedback(text: string | null): Finding[] {
++  if (text === null) return [{ code: 'SAVED_VIEW_NO_FEEDBACK' }];
++  return /session|sign.?in|log.?in|connexion/i.test(text) ? [] : [{ code: 'SAVED_VIEW_SESSION_NOT_EXPLAINED' }];
++}
++
++export async function runRound5Fixes(env: Readonly<Record<string, string | undefined>>): Promise<MatrixReport> {
++  const startedAt = new Date().toISOString();
++  const cells: Cell[] = [], fatal: Finding[] = [];
++  const themes = selectThemes(env.MATRIX_THEMES);
++  let browser: Awaited<ReturnType<typeof chromium.launch>> | undefined;
++  let phase = 'CONFIGURATION_FAILED';
++  const routes = [...MEDIA_ROUTES];
++  try {
++    const base = guardBaseUrl(env.BASE_URL);
++    if (!env.QA_EMAIL || !env.QA_PASSWORD) throw new Error('QA_CREDENTIALS_REQUIRED');
++    browser = await launchBrowser(env);
++    phase = 'SIGN_IN_FAILED';
++    const storage = await signIn(browser, base, env.QA_EMAIL, env.QA_PASSWORD);
++    phase = 'MATRIX_INTERRUPTED';
++    for (const theme of themes) for (const mode of ['light', 'dark'] as const) for (const viewport of VIEWPORTS) {
++      const context = await browser.newContext({ viewport, serviceWorkers: 'block', colorScheme: mode, storageState: storage });
++      try {
++        // Reads only. The saved-view POST is allowed through because the session cookie has been removed first, so the server must refuse it.
++        await context.route('**/*', route => {
++          const request = route.request();
++          const savedViewPost = request.method() === 'POST' && new URL(request.url()).pathname === '/api/publishing/saved-views';
++          return savedViewPost || allowRequest(request.url(), base, request.method(), false) ? route.continue() : route.abort('blockedbyclient');
++        });
++        await context.addInitScript('window.__name = window.__name || (f => f);');
++        await context.addCookies([{ name: THEME_COOKIE, value: theme.id, url: base, sameSite: 'Lax' }, { name: MODE_COOKIE, value: mode, url: base, sameSite: 'Lax' }]);
++        for (const route of routes) {
++          const cell: Cell = { route, theme: theme.id, viewport, findings: [], keyboard: { mainAction: 'Not available', dialog: 'Not available' } };
++          cells.push(cell);
++          const page = await context.newPage();
++          page.setDefaultTimeout(10000);
++          try {
++            await page.goto(`${base}${route}`, { waitUntil: 'load', timeout: 60000 });
++            await page.waitForTimeout(1500); // images settle and onError handlers swap in the placeholder
++            const observed = await page.evaluate(() => {
++              const images = [...document.querySelectorAll('img')].filter(img => img.getClientRects().length > 0);
++              return { images: images.length, broken: images.filter(img => img.complete && img.naturalWidth === 0).length, placeholders: document.querySelectorAll('[data-media-missing]').length };
++            });
++            cell.findings.push(...classifyMedia(observed));
++            if (route === '/publishing/calendar') {
++              const contrast = await contrastAudit(page);
++              if (contrast.failures.length) cell.findings.push({ code: 'CONTRAST_LOW', count: contrast.failures.length });
++            }
++          } catch { cell.findings.push({ code: 'ROUTE_CHECK_FAILED' }); }
++          finally { await page.close(); }
++        }
++        // Saved views: expire the session, then save. Filters live in the sidebar on desktop; phones are verified with the drawer closed (not applicable).
++        if (viewport.width >= 1024) {
++          const cell: Cell = { route: SAVED_VIEW_ROUTE, theme: theme.id, viewport, findings: [], keyboard: { mainAction: 'Not available', dialog: 'Not available' } };
++          cells.push(cell);
++          const page = await context.newPage();
++          page.setDefaultTimeout(10000);
++          try {
++            await page.goto(`${base}${SAVED_VIEW_ROUTE}?status=published`, { waitUntil: 'load', timeout: 60000 });
++            const name = page.locator('input[id$="-name"]').first();
++            await name.waitFor({ state: 'visible' });
++            await name.fill('Round five check');
++            await context.clearCookies({ name: SESSION_COOKIE });
++            await name.locator('xpath=ancestor::form').locator('button[type=submit]').click();
++            const alert = page.locator('section[aria-labelledby$="-heading"] [role=alert]').first();
++            const text = await alert.waitFor({ state: 'visible', timeout: 8000 }).then(() => alert.innerText(), () => null);
++            cell.findings.push(...classifySavedViewFeedback(text));
++          } catch { cell.findings.push({ code: 'ROUTE_CHECK_FAILED' }); }
++          finally { await page.close(); }
++        }
++      } finally { await context.close(); }
++    }
++  } catch { fatal.push({ code: phase }); }
++  finally { if (browser) await browser.close().catch(() => { fatal.push({ code: 'BROWSER_CLOSE_FAILED' }); }); }
++  const failures = fatal.length + cells.reduce((n, cell) => n + cell.findings.length, 0);
++  const expectedCells = themes.length * 2 * (routes.length * 2 + 1);
++  return { version: 1, startedAt, finishedAt: new Date().toISOString(), browser: engineName(env.MATRIX_BROWSER), routes: [...routes, SAVED_VIEW_ROUTE], excludedDynamicRoutes: [], expectedCells, cells, fatal, failures, passed: failures === 0 && cells.length === expectedCells };
++}
++
+ /** Optional: QA_CREDENTIALS_FILE points at a local JSON {email,password}, keeping secrets out of shell history. */
+ function loadCredentialsFile() {
+   const file = process.env.QA_CREDENTIALS_FILE;
+@@ -1387,6 +1475,13 @@ async function main() {
+   loadCredentialsFile();
+   const output = resolve(process.env.BROWSER_MATRIX_REPORT || '/tmp/msp-browser-matrix.json');
+   await mkdir(dirname(output), { recursive: true });
++  if (process.env.BROWSER_MATRIX_SCOPE === 'round5:fixes') {
++    const report = await runRound5Fixes(process.env);
++    await writeFile(output, `${JSON.stringify(report, null, 2)}\n`, { mode: 0o600 });
++    console.log(`Round 5 fixes: ${report.passed ? 'PASS' : 'FAIL'}; ${report.cells.length}/${report.expectedCells} cells; ${report.failures} findings. Report written.`);
++    process.exitCode = report.passed ? 0 : 1;
++    return;
++  }
+   const round4 = /^round4:(boundary|recovery)$/.exec(process.env.BROWSER_MATRIX_SCOPE || '');
+   if (round4) {
+     const only = process.env.MATRIX_ONLY?.split(',').filter(Boolean);
+diff --git a/rebuild/tests/browser-matrix-round5.test.ts b/rebuild/tests/browser-matrix-round5.test.ts
+new file mode 100644
+index 00000000..f21abed9
+--- /dev/null
++++ b/rebuild/tests/browser-matrix-round5.test.ts
+@@ -0,0 +1,21 @@
++import { describe, expect, it } from 'vitest';
++import { classifyMedia, classifySavedViewFeedback, MEDIA_ROUTES, SAVED_VIEW_ROUTE } from '../scripts/verify-browser-matrix';
++
++describe('round 5 media fallback classification', () => {
++  it('accepts placeholders for files that are gone', () => expect(classifyMedia({ images: 0, broken: 0, placeholders: 3 })).toEqual([]));
++  it('accepts pages with healthy images', () => expect(classifyMedia({ images: 4, broken: 0, placeholders: 0 })).toEqual([]));
++  it('reports a visible broken image with its count', () => expect(classifyMedia({ images: 4, broken: 2, placeholders: 1 })).toEqual([{ code: 'BROKEN_IMAGE_VISIBLE', count: 2 }]));
++  it('covers every page that lists posts with media', () => expect(MEDIA_ROUTES).toEqual(['/publishing/posts', '/publishing/queue', '/publishing/approvals', '/publishing/calendar']));
++});
++
++describe('round 5 saved-view expired-session classification', () => {
++  it('requires some visible feedback', () => expect(classifySavedViewFeedback(null)).toEqual([{ code: 'SAVED_VIEW_NO_FEEDBACK' }]));
++  it('rejects the naming message for a refused session', () => {
++    expect(classifySavedViewFeedback('The view could not be saved. Check its name and try again.')).toEqual([{ code: 'SAVED_VIEW_SESSION_NOT_EXPLAINED' }]);
++  });
++  it('accepts feedback that explains the session ended, in English and French', () => {
++    expect(classifySavedViewFeedback('Your session has ended. Sign in again to save this view.')).toEqual([]);
++    expect(classifySavedViewFeedback('Votre session a expiré. Reconnectez-vous pour enregistrer cette vue.')).toEqual([]);
++  });
++  it('targets the Posts screen', () => expect(SAVED_VIEW_ROUTE).toBe('/publishing/posts'));
++});

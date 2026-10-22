@@ -1,0 +1,380 @@
+diff --git a/rebuild/docs/LEGACY_CAPABILITY_PARITY.md b/rebuild/docs/LEGACY_CAPABILITY_PARITY.md
+index a5735728..1cb304d6 100644
+--- a/rebuild/docs/LEGACY_CAPABILITY_PARITY.md
++++ b/rebuild/docs/LEGACY_CAPABILITY_PARITY.md
+@@ -16,7 +16,7 @@ a manifest, saved setting or unit test is not complete workflow proof. See
+ | P0 | Eleven network connectors and publishing destinations in `src/lib/networks/index.ts` and `src/lib/networks/connect.ts` | Partial: Facebook is the only installed customer platform. Instagram and the other legacy destinations lack usable rebuild adapters. Removed provider APIs cannot be restored by configuration. | Adapter-level connection, discovery, publishing/status/delete, analytics, inbox, and ads where provider supports them; scoped UI/API/MCP and live tests. |
+ | P0 | Facebook feed, photo, carousel, video, Reel, Story, Group and native scheduling in `src/lib/facebook/publish.ts` | Partial: Page feed/photo and native video/Reel/Story source, proof/recovery and app versus Meta-native scheduling exist. Per-destination choices, queue and mix/recycle share Publishing services. Private/default-off native paths and mocked tests do not establish every format live. Group publishing is not advertised. | Provider fixture and live create/status/delete tests for each supported format; visible choices limited to available capabilities. |
+ | P0 | Analytics views, comparisons, post explorer, demographics, network analysis, pinned metrics and coverage in `src/app/(app)/analytics/AnalyticsScreen.tsx` and `src/lib/analytics-views.ts` | Partial: catalog/details/explorer, posts, comparisons, pins, goals, audience history/CSV and ad-object analysis have UI/REST/MCP. Shared charts now consume actual previous-period points. Facebook post history/reactions/hierarchy collection exists; live Graph v26.0 probe verifies five current post metrics and refuses three older ones (RELEASE_GATES_PLAN); exhaustive history/collection and dynamic labels remain incomplete. Root-editable EN/FR catalogs and validated-default fallback are integrated. | Shared metric catalog feeding full UI, export, and MCP with date/channel/ad-account scope, comparison, availability, and refresh evidence. |
+-| P0 | Reports and CSV exports in `src/app/(app)/reports/page.tsx`, `src/lib/reports.ts`, and `src/lib/analytics-export.ts` | Partial: Round-8 Destinations adds a scoped per-link lifetime click inventory, retained period clicks per link and daily UTC retained click counts through the existing confirmed report UI download/REST/MCP generator. Root `analytics.reports.linkDetails` bounds inventory and daily rows independently; EN/FR artifacts disclose publication-cohort scope, excluded ambiguous legacy links, retention gaps and clipping. No visitor metadata or destination URLs are projected. Local mocked/query-shape/workflow tests and TypeScript only; PostgreSQL, browser downloads and real-client proof remain open. round-7 Top posts restores destination-specific saved text, ordered image/video references with Root-switchable image previews, and saved article link/title/description through the existing confirmed UI download, REST and MCP report workflow. Root `analytics.reports.topPostContent` owns ranking/content/media/URL bounds, image previews and the authenticated media path template; EN/FR artifacts disclose current saved content, expiry, workspace access and clipping. Targeted mocked/render tests and TypeScript verification are local only; PostgreSQL, actual browser/download and real-client/provider proof remain open. Existing templates/schedules/runs, CSV/JSON/printable artifacts, response time/business hours, top posts, goals, destinations/link counts and AI recap exist. Downloads/UI were refined in 0589ddd0. Round-6 Published posts adds three stored-data report views through the existing confirmed UI/REST/MCP generator: a destination-specific content log with attempt counts, daily UTC publication counts independent of log limits, and currently failed destinations last updated in the period (explicitly not historical failure attempts). EN/FR catalogs disclose excerpts, current-state semantics and clipping; Root `analytics.reports.publicationDetails` controls each log ceiling and excerpt length. Local verification: TypeScript 0 errors; 155 targeted tests across 10 files passed, including scoped SQL shapes, bilingual artifacts, row/byte limits and confirmed MCP generation/audit. PostgreSQL, browser, real-client and production evidence remain open. Response reports now include first direct replies to stored root comments, slowest calendar/business-hours first response, and business-hours resolution through the same report generator used by UI downloads, REST and MCP. Round-2 response reports retain pre-period conversation context, reconstruct recorded resolution/reopening cycles, and disclose stored-history coverage and incomplete boundary exclusions in bilingual artifacts through the existing shared generator. Round-3 reports separate comment/conversation answer shares, response and resolution durations, and member business-hours first-response medians through the shared generator. Round-5 member outcomes add slowest first replies, answered-wait resolution counts and calendar/business-hours resolution medians, with last-run first-responder attribution through the same report workflow. Per-channel reports retain member attribution and disclose source limits; complete provider history, actual mail delivery, volume and current-browser proof remain open.  Rounds 1–3 (`23b7be84`, `6ef753e4`, `b725c415`) have local arithmetic, bilingual artifact and mocked workflow tests; bounded history and concurrent-read consistency remain limits. | Complete relevant report sections and exports, schedule/template workflows, UI/API/MCP parity and provider-shaped tests. |
++| P0 | Reports and CSV exports in `src/app/(app)/reports/page.tsx`, `src/lib/reports.ts`, and `src/lib/analytics-export.ts` | Partial: Round 10 adds stored publication counts by ISO weekday and hour (UTC), plus recorded-attempt distributions, through the existing confirmed report UI download/REST/MCP generator. The existing Root analytics.reports.publicationDetails setting now owns three switches and the final attempt bucket ceiling; the report-document catalog supplies EN/FR labels and counter/timing limitations. Counts are independent of clipped content logs, include only current published destinations in the selected channel/period, and do not claim recommended times or historical retry outcomes. Local mocked/query-shape/render/host tests only; PostgreSQL execution and actual browser/client downloads remain open. Round-8 Destinations adds a scoped per-link lifetime click inventory, retained period clicks per link and daily UTC retained click counts through the existing confirmed report UI download/REST/MCP generator. Root `analytics.reports.linkDetails` bounds inventory and daily rows independently; EN/FR artifacts disclose publication-cohort scope, excluded ambiguous legacy links, retention gaps and clipping. No visitor metadata or destination URLs are projected. Local mocked/query-shape/workflow tests and TypeScript only; PostgreSQL, browser downloads and real-client proof remain open. round-7 Top posts restores destination-specific saved text, ordered image/video references with Root-switchable image previews, and saved article link/title/description through the existing confirmed UI download, REST and MCP report workflow. Root `analytics.reports.topPostContent` owns ranking/content/media/URL bounds, image previews and the authenticated media path template; EN/FR artifacts disclose current saved content, expiry, workspace access and clipping. Targeted mocked/render tests and TypeScript verification are local only; PostgreSQL, actual browser/download and real-client/provider proof remain open. Existing templates/schedules/runs, CSV/JSON/printable artifacts, response time/business hours, top posts, goals, destinations/link counts and AI recap exist. Downloads/UI were refined in 0589ddd0. Round-6 Published posts adds three stored-data report views through the existing confirmed UI/REST/MCP generator: a destination-specific content log with attempt counts, daily UTC publication counts independent of log limits, and currently failed destinations last updated in the period (explicitly not historical failure attempts). EN/FR catalogs disclose excerpts, current-state semantics and clipping; Root `analytics.reports.publicationDetails` controls each log ceiling and excerpt length. Local verification: TypeScript 0 errors; 155 targeted tests across 10 files passed, including scoped SQL shapes, bilingual artifacts, row/byte limits and confirmed MCP generation/audit. PostgreSQL, browser, real-client and production evidence remain open. Response reports now include first direct replies to stored root comments, slowest calendar/business-hours first response, and business-hours resolution through the same report generator used by UI downloads, REST and MCP. Round-2 response reports retain pre-period conversation context, reconstruct recorded resolution/reopening cycles, and disclose stored-history coverage and incomplete boundary exclusions in bilingual artifacts through the existing shared generator. Round-3 reports separate comment/conversation answer shares, response and resolution durations, and member business-hours first-response medians through the shared generator. Round-5 member outcomes add slowest first replies, answered-wait resolution counts and calendar/business-hours resolution medians, with last-run first-responder attribution through the same report workflow. Per-channel reports retain member attribution and disclose source limits; complete provider history, actual mail delivery, volume and current-browser proof remain open.  Rounds 1–3 (`23b7be84`, `6ef753e4`, `b725c415`) have local arithmetic, bilingual artifact and mocked workflow tests; bounded history and concurrent-read consistency remain limits. | Complete relevant report sections and exports, schedule/template workflows, UI/API/MCP parity and provider-shaped tests. |
+ | P1 | Composer overrides, queue slots, approvals, labels, custom fields, notes, versions, templates, first-comment retries, and UTM/link preparation in `src/lib/posts.ts` and related API routes | Partial: composer, slots/approvals/templates/labels/fields/notes/version restore, delayed comments and rejected-only retry, best times, mix/recycle, UTM and shortening are integrated. Scheduling modes are per destination. Newest scheduling/restore/comment database/browser/provider checks remain open; unknown remote attempts stay held. | Full end-to-end tests on production-shaped staging, per-target behavior, provider create/status/delete and permission verification, bulk actions, scheduling rules, plus remaining legacy workflows. |
+ | P1 | Post list filters, saved views, pagination, bulk actions, retry/duplicate, CSV export and public Posts v1 API in `src/app/(app)/posts/page.tsx` and `src/app/api/posts` | Partial: scoped lists/search/paging/views/export and bulk actions share services; key REST v1 Posts includes scheduling. Large asynchronous Posts CSV is absent (workspace ZIP is different); draft aliases and v1 create now share confirmed lifecycle boundaries (`acb56bd7`); real client outcomes remain unverified. Missing-image fallback and saved-view expired-session feedback are source/unit fixes (`36946d9e`), without browser rerun. | Full list/action/API parity with workspace authorization and large-data pagination tests. |
+ | P1 | Publishing calendar navigation and month coverage in `src/app/(app)/calendar` | Partial: Month/Week/phone agenda, workspace-day grouping, previews, saved views and drag/keyboard moves exist. Shared lifecycle supports adapter-held cancel/reschedule. Calendar editing, queue-slot presentation, high-volume months and actual drag/remote-schedule browser/provider evidence remain open. | Browser and database tests with records on timezone and month boundaries, high-volume month, permissions, drag-and-drop E2E, and edit workflows. |
+diff --git a/rebuild/src/modules/analytics/reports/PUBLICATION_DISTRIBUTIONS.md b/rebuild/src/modules/analytics/reports/PUBLICATION_DISTRIBUTIONS.md
+new file mode 100644
+index 00000000..951da86a
+--- /dev/null
++++ b/rebuild/src/modules/analytics/reports/PUBLICATION_DISTRIBUTIONS.md
+@@ -0,0 +1,60 @@
++# Publication distributions — round 10
++
++Ownership: Analytics module, targeted tests and the Reports inventory status cell.
++This extends the legacy Reports/CSV and analytics breakdown requirements; it does
++not close the full inventory row or replace engagement-based best-time analysis.
++
++The Published posts report section now includes three saved-data views:
++
++- publication counts by ISO weekday, Monday 1 through Sunday 7;
++- publication counts by UTC hour, 0 through 23;
++- publication counts by current stored attempt counter, with a configurable final
++  bucket meaning that many attempts or more. Zero means no recorded attempt.
++
++Only currently published destinations in the authorized workspace/channel and
++inclusive UTC report period qualify. Other channels, provider errors and private
++visitor data are not projected. Negative attempt counters are excluded from that
++view. These are counts of saved publications, not engagement, recommended times,
++immutable attempt history or proof of provider delivery. Empty buckets are omitted.
++
++A single aggregate statement reads all three views consistently and independently
++of bounded content logs. Its result has finite weekday/hour domains and a Root-
++bounded attempt domain. Existing artifact row/byte and credential ceilings still
++apply. Existing logs and aggregates are separate statements, so a concurrent
++publication can produce slight differences between their snapshots.
++
++## Root configuration
++
++No new registry key. `analytics.reports.publicationDetails` gains typed fields
++`weekdayBreakdown`, `hourlyBreakdown`, `attemptBreakdown` (default true), and
++`attemptBucketCeiling` (default 10, range 1–100). Older stored objects acquire these
++validated defaults without a write. Root may disable each view; disabling all
++three avoids the aggregate query. The existing `analytics.reportDocumentCopy`
++EN/FR catalog gains view labels and an explicit scope/counter explanation.
++CONFIG_SCHEMA_VERSION is unchanged for integration.
++
++## UI / REST / MCP mapping
++
++No new route or tool. Prepare report in `/analytics/reports` with Published posts,
++session REST `/api/analytics/report-workflows/run`, key REST
++`/api/v1/analytics/generate_report` and MCP `generate_report` use `runReportNow`.
++That existing shared service owns current identity, tenant/channel/credential
++scope, feature access, exact confirmation, request reuse and audit. Its generator
++calls the internal reader after authorization and renders the same rows into
++CSV, JSON, printable HTML and text. No transport-specific product rules added.
++The existing MCP parity row remains applicable; no new tool row is needed.
++
++## Evidence and remaining work
++
++Targeted tests cover scoped/date SQL predicates, deterministic independent
++aggregation, Root switches/ceiling, English/French artifacts, output clipping,
++service/MCP confirmed generation and audit, and denial before distribution reads.
++Existing UI/HTTP/MCP host tests verify delegation and rendering. All are local
++unit/mocked/query-shape evidence. No PostgreSQL query execution, browser download,
++real-client, production-volume or provider evidence was obtained. No server,
++deployment, push or production action was performed.
++
++Integrator-owned edits needed: update ARCHITECTURE.md, GOAL.md, DELIVERY_PLAN.md
++and AGENT_HANDOFF.md with this batch and its limited evidence; apply the normal
++schema-version policy for the expanded existing JSON setting and copy catalog.
++There is no migration or app-route change to integrate.
+diff --git a/rebuild/src/modules/analytics/reports/config.ts b/rebuild/src/modules/analytics/reports/config.ts
+index 08b616ae..3b069498 100644
+--- a/rebuild/src/modules/analytics/reports/config.ts
++++ b/rebuild/src/modules/analytics/reports/config.ts
+@@ -10,11 +10,15 @@ export const LINK_REPORT_POLICY_SCHEMA = z.object({
+ export const LINK_REPORT_DEFAULTS = { links: 100, days: 366 };
+ 
+ export const PUBLICATION_REPORT_POLICY_SCHEMA = z.object({
++  weekdayBreakdown: z.boolean().default(true),
++  hourlyBreakdown: z.boolean().default(true),
++  attemptBreakdown: z.boolean().default(true),
++  attemptBucketCeiling: z.number().int().min(1).max(100).default(10),
+   publishedRows: z.number().int().min(1).max(10000),
+   failedRows: z.number().int().min(1).max(10000),
+   excerptCharacters: z.number().int().min(20).max(2000),
+ }).strict();
+-export const PUBLICATION_REPORT_DEFAULTS = { publishedRows: 100, failedRows: 100, excerptCharacters: 240 };
++export const PUBLICATION_REPORT_DEFAULTS = { weekdayBreakdown: true, hourlyBreakdown: true, attemptBreakdown: true, attemptBucketCeiling: 10, publishedRows: 100, failedRows: 100, excerptCharacters: 240 };
+ 
+ export const TOP_POST_CONTENT_POLICY_SCHEMA = z.object({
+   imagePreviews: z.boolean(),
+@@ -35,7 +39,7 @@ const num = (key: string, label: string, description: string, defaultValue: numb
+ export const REPORT_WORKFLOW_CONFIG = [
+   entry({ key: 'analytics.reports.linkDetails', group: G, label: 'Link report details', kind: 'json', description: 'Independent per-link inventory and UTC click-day row bounds in the Destinations report section. Recorded period clicks may be incomplete after retention; daily counts are independent of inventory clipping.', defaultValue: LINK_REPORT_DEFAULTS, schema: LINK_REPORT_POLICY_SCHEMA, consumption: 'active' }),
+   entry({ key: 'analytics.reports.topPostContent', group: G, label: 'Top post content', kind: 'json', description: 'Ranked post count, destination text, attachment count, URL and article preview bounds, image preview switch and authenticated media path template. Report content is saved local state, not a remote snapshot.', defaultValue: TOP_POST_CONTENT_DEFAULTS, schema: TOP_POST_CONTENT_POLICY_SCHEMA, consumption: 'active' }),
+-  entry({ key: 'analytics.reports.publicationDetails', group: G, label: 'Publication report details', kind: 'json', description: 'Maximum published and currently failed destination rows and content excerpt length in the Published posts report section. Daily UTC totals are counted independently; clipped logs are disclosed.', defaultValue: PUBLICATION_REPORT_DEFAULTS, schema: PUBLICATION_REPORT_POLICY_SCHEMA, consumption: 'active' }),
++  entry({ key: 'analytics.reports.publicationDetails', group: G, label: 'Publication report details', kind: 'json', description: 'Maximum published and currently failed destination rows and content excerpt length in the Published posts report section. Daily UTC totals and optional weekday, hourly and recorded-attempt distributions are counted independently; clipped logs are disclosed. The attempt ceiling groups all counters at or above the configured value.', defaultValue: PUBLICATION_REPORT_DEFAULTS, schema: PUBLICATION_REPORT_POLICY_SCHEMA, consumption: 'active' }),
+   num('analytics.reports.responseEventLimit', 'Response analysis workflow events', 'Maximum stored resolution and reopening events examined per channel report. Truncation suppresses resolution durations and is disclosed.', RESPONSE_ANALYSIS_LIMITS.events.default, RESPONSE_ANALYSIS_LIMITS.events.min, RESPONSE_ANALYSIS_LIMITS.events.max),
+   num('analytics.reports.responseMessageLimit', 'Response analysis records per source', 'Maximum stored messages and comments examined separately, including pre-period context. Incomplete boundary threads are excluded; truncation and stored-only coverage are disclosed.', RESPONSE_ANALYSIS_LIMITS.messages.default, RESPONSE_ANALYSIS_LIMITS.messages.min, RESPONSE_ANALYSIS_LIMITS.messages.max),
+   num('analytics.reports.responseMemberLimit', 'Response analysis member rows', 'Maximum replying members listed in each combined, comment and conversation summary of one channel report; including their slowest replies and saved-resolution outcomes; omitted members are disclosed separately.', RESPONSE_ANALYSIS_LIMITS.members.default, RESPONSE_ANALYSIS_LIMITS.members.min, RESPONSE_ANALYSIS_LIMITS.members.max),
+diff --git a/rebuild/src/modules/analytics/reports/generation/copy.ts b/rebuild/src/modules/analytics/reports/generation/copy.ts
+index 7f2d9ff3..93798bc9 100644
+--- a/rebuild/src/modules/analytics/reports/generation/copy.ts
++++ b/rebuild/src/modules/analytics/reports/generation/copy.ts
+@@ -1,5 +1,10 @@
+ import { z } from 'zod';
+ const en = {
++  "Publications by weekday (UTC)": "Publications by weekday (UTC)",
++  "Publications by hour (UTC)": "Publications by hour (UTC)",
++  "Publications by recorded attempts": "Publications by recorded attempts",
++  "Publication timing uses UTC, with Monday as weekday 1 and Sunday as 7. Counts describe saved publications, not recommended publishing times. Attempts are current stored counters; the final bucket includes that many attempts or more. Zero attempts means no recorded attempt, not proof of delivery without an attempt.": "Publication timing uses UTC, with Monday as weekday 1 and Sunday as 7. Counts describe saved publications, not recommended publishing times. Attempts are current stored counters; the final bucket includes that many attempts or more. Zero attempts means no recorded attempt, not proof of delivery without an attempt.",
++
+   "Short-link details": "Short-link details",
+   "Link lifetime clicks": "Link lifetime clicks",
+   "Recorded link clicks in period": "Recorded link clicks in period",
+@@ -192,6 +197,11 @@ const en = {
+   "Channel": "Channel"
+ };
+ const fr: typeof en = {
++  "Publications by weekday (UTC)": "Publications par jour de la semaine (UTC)",
++  "Publications by hour (UTC)": "Publications par heure (UTC)",
++  "Publications by recorded attempts": "Publications par nombre de tentatives enregistrées",
++  "Publication timing uses UTC, with Monday as weekday 1 and Sunday as 7. Counts describe saved publications, not recommended publishing times. Attempts are current stored counters; the final bucket includes that many attempts or more. Zero attempts means no recorded attempt, not proof of delivery without an attempt.": "Les horaires utilisent UTC, avec lundi comme jour 1 et dimanche comme jour 7. Les nombres décrivent les publications enregistrées, pas des horaires recommandés. Les tentatives sont les compteurs actuels enregistrés ; la dernière tranche inclut ce nombre de tentatives ou plus. Zéro tentative signifie aucune tentative enregistrée, pas une diffusion sans tentative prouvée.",
++
+   "Short-link details": "Détail des liens courts",
+   "Link lifetime clicks": "Clics du lien depuis sa création",
+   "Recorded link clicks in period": "Clics du lien enregistrés dans la période",
+diff --git a/rebuild/src/modules/analytics/reports/generation/publication-details.ts b/rebuild/src/modules/analytics/reports/generation/publication-details.ts
+index 3d478a8c..9555a1ac 100644
+--- a/rebuild/src/modules/analytics/reports/generation/publication-details.ts
++++ b/rebuild/src/modules/analytics/reports/generation/publication-details.ts
+@@ -11,7 +11,13 @@ export function publicationDetails(report: PublicationReport, copy: ReportDocume
+     ...(report.failedTruncated ? [t('The failed destination list reached its row limit.')] : []),
+     ...(!report.published.length ? [t('No stored publications in this period.')] : []),
+     ...(!report.failed.length ? [t('No currently failed destinations updated in this period.')] : [])];
++  if (report.distributions?.length) notes.push(t('Publication timing uses UTC, with Monday as weekday 1 and Sunday as 7. Counts describe saved publications, not recommended publishing times. Attempts are current stored counters; the final bucket includes that many attempts or more. Zero attempts means no recorded attempt, not proof of delivery without an attempt.'));
+   const rows: unknown[][] = [
++    ...(report.distributions ?? []).map(row => [
++      'publication_distribution', `published_by_${row.dimension}`,
++      row.dimension === 'weekday' ? t('Publications by weekday (UTC)') : row.dimension === 'hour' ? t('Publications by hour (UTC)') : t('Publications by recorded attempts'),
++      '', '', `${row.bucket}${row.ceiling ? '+' : ''}`, row.published, 'posts', '', '',
++    ]),
+     ...report.days.map(day => ['publication_day', 'published_daily', t('Daily publications (UTC)'), '', '', day.day, day.published, 'posts', '', t('Count in period')]),
+     ...report.published.map(post => ['publication_log', 'published_post', post.text || t('(no text)'), t('Publication log'), post.postId, post.at, post.attempts, t('Attempts'), '', t('Published')]),
+     ...report.failed.map(post => ['publication_failure', 'failed_destination', post.text || t('(no text)'), t('Currently failed destinations'), post.postId, post.at, post.attempts, t('Attempts'), '', t('Failures are destinations currently marked failed and last updated in this period, not a history of every failed attempt. Review the post before retrying.')]),
+diff --git a/rebuild/src/modules/analytics/reports/server/publication-report.ts b/rebuild/src/modules/analytics/reports/server/publication-report.ts
+index a62b638b..3ad1a1c2 100644
+--- a/rebuild/src/modules/analytics/reports/server/publication-report.ts
++++ b/rebuild/src/modules/analytics/reports/server/publication-report.ts
+@@ -4,7 +4,9 @@ import { PUBLICATION_REPORT_POLICY_SCHEMA } from '../config';
+ import type { ReportPeriod } from '../contracts';
+ 
+ export type PublicationRecord = { postId: string; text: string; at: Date; attempts: number };
++export type PublicationDistribution = { dimension: 'weekday' | 'hour' | 'attempts'; bucket: number; published: number; ceiling: boolean };
+ export type PublicationReport = {
++  distributions?: PublicationDistribution[];
+   published: PublicationRecord[]; failed: PublicationRecord[];
+   days: Array<{ day: string; published: number }>;
+   publishedTruncated: boolean; failedTruncated: boolean;
+@@ -21,7 +23,7 @@ export async function readPublicationReport(workspaceId: string, channelId: stri
+   const policy = PUBLICATION_REPORT_POLICY_SCHEMA.parse(await runtimeConfig('analytics.reports.publicationDetails'));
+   const from = new Date(`${period.start}T00:00:00.000Z`);
+   const to = new Date(`${period.end}T00:00:00.000Z`); to.setUTCDate(to.getUTCDate() + 1);
+-  const [published, failed, days] = await Promise.all([
++  const [published, failed, days, distributionRows] = await Promise.all([
+     prisma.$queryRaw<PublicationRecord[]>`
+       SELECT p.id AS "postId", left(COALESCE(pt."messageOverride", p.message), ${policy.excerptCharacters}) AS text,
+         pt."publishedAt" AS at, pt.attempts
+@@ -45,8 +47,29 @@ export async function readPublicationReport(workspaceId: string, channelId: stri
+       WHERE p."workspaceId" = ${workspaceId} AND pt."targetId" = ${channelId}
+         AND pt.status = 'published' AND pt."publishedAt" >= ${from} AND pt."publishedAt" < ${to}
+       GROUP BY day ORDER BY day ASC`,
++    policy.weekdayBreakdown || policy.hourlyBreakdown || policy.attemptBreakdown
++      ? prisma.$queryRaw<Array<{ dimension: PublicationDistribution['dimension']; bucket: number; published: bigint | number }>>`
++      WITH publications AS (
++        SELECT pt."publishedAt", pt.attempts
++        FROM post_targets pt JOIN posts p ON p.id = pt."postId"
++        JOIN targets t ON t.id = pt."targetId" AND t."workspaceId" = p."workspaceId"
++        WHERE p."workspaceId" = ${workspaceId} AND pt."targetId" = ${channelId}
++          AND pt.status = 'published' AND pt."publishedAt" >= ${from} AND pt."publishedAt" < ${to}
++      ), buckets AS (
++        SELECT 'weekday' AS dimension, EXTRACT(ISODOW FROM "publishedAt")::integer AS bucket
++          FROM publications WHERE ${policy.weekdayBreakdown}
++        UNION ALL
++        SELECT 'hour', EXTRACT(HOUR FROM "publishedAt")::integer FROM publications WHERE ${policy.hourlyBreakdown}
++        UNION ALL
++        SELECT 'attempts', LEAST(attempts, ${policy.attemptBucketCeiling}) FROM publications
++          WHERE ${policy.attemptBreakdown} AND attempts >= 0
++      ) SELECT dimension, bucket, COUNT(*)::bigint AS published FROM buckets
++        GROUP BY dimension, bucket ORDER BY dimension ASC, bucket ASC`
++      : Promise.resolve([]),
+   ]);
+-  return { published: published.slice(0, policy.publishedRows), failed: failed.slice(0, policy.failedRows),
++  const distributions = (distributionRows ?? []).map(row => ({ ...row, published: Number(row.published),
++    ceiling: row.dimension === 'attempts' && row.bucket === policy.attemptBucketCeiling }));
++  return { ...(distributions.length ? { distributions } : {}), published: published.slice(0, policy.publishedRows), failed: failed.slice(0, policy.failedRows),
+     days: days.map(row => ({ day: row.day, published: Number(row.published) })),
+     publishedTruncated: published.length > policy.publishedRows, failedTruncated: failed.length > policy.failedRows };
+ }
+diff --git a/rebuild/tests/report-publication-distributions-workflow.test.ts b/rebuild/tests/report-publication-distributions-workflow.test.ts
+new file mode 100644
+index 00000000..22d679df
+--- /dev/null
++++ b/rebuild/tests/report-publication-distributions-workflow.test.ts
+@@ -0,0 +1,70 @@
++vi.mock('@/modules/analytics/reports/generation/copy-server', async () => ({ loadReportDocumentCopy: async () => ({ copy: (await import('@/modules/analytics/reports/generation/copy')).reportDocumentCopyDefaults.en, locale: 'en' }) }));
++import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
++const platform = vi.hoisted(() => ({ posts: vi.fn() }));
++vi.mock('@/server/platforms/registry', () => ({ platformAnalytics: async () => ({ postPerformance: platform.posts }) }));
++
++vi.mock('@/server/data', async () => ({ prisma: (await import('./report82-engine-harness')).db }));
++vi.mock('@/server/config/store', async () => { const h = await import('./report82-engine-harness'); return { runtimeConfig: async (key: string) => h.configValue(key) }; });
++vi.mock('@/server/entitlements', async () => { const h = await import('./report82-engine-harness'); return { loadEntitlements: async (_u: string, w: string) => (h.state.entitled ? { workspaceId: w } : null), canUseFeature: () => h.state.entitled, entitledPlatformIds: () => h.state.providers }; });
++vi.mock('@/server/permissions', async () => {
++  const h = await import('./report82-engine-harness');
++  return {
++    canAccessFeature: (p: { deny?: string[] }) => h.state.canAccess && !(p?.deny ?? []).includes('analytics/reports'),
++    resolvePermissions: () => ({ pageScope: h.state.freshScope ? { all: false, ids: h.state.freshScope } : { all: true, ids: [] }, deny: h.state.freshDeny }),
++  };
++});
++vi.mock('@/server/permissions/loader', async () => { const h = await import('./report82-engine-harness'); return { loadPermissions: async () => h.permissionsFor() }; });
++vi.mock('@/server/platforms/resource-visibility', async () => { const h = await import('./report82-engine-harness'); return { selectedResourceConnectionWhere: async () => ({ provider: { in: h.state.providers } }) }; });
++vi.mock('@/server/data-control/guard', async () => { const h = await import('./report82-engine-harness'); return { assertWorkspaceNotPurging: async () => { if (h.state.purge) throw Object.assign(new Error('purging'), { code: 'conflict' }); } }; });
++vi.mock('../src/modules/analytics/server/read', async () => { const h = await import('./report82-engine-harness'); return { readAnalyticsSnapshot: h.readSnapshot }; });
++
++import { db, state, reset, resetGen, snapshot, gen, execs } from './report82-engine-harness';
++import { LINK_REPORT_DEFAULTS } from '../src/modules/analytics/reports/config';
++import { createReportGenerator } from '../src/modules/analytics/reports/generation/document';
++import { registerReportGeneration, resetReportCapabilityCache, unregisterReportGeneration } from '../src/modules/analytics/reports/generation/registry';
++import { runReportNow } from '../src/modules/analytics/reports/generation/runs';
++import { executeAnalyticsReportTool } from '../src/modules/analytics/reports/mcp';
++const original = db.$queryRaw.getMockImplementation()!;
++const now = new Date('2026-10-21T10:00:00Z');
++const actor = { userId: 'u1', workspaceId: 'w1' };
++beforeEach(() => {
++  vi.clearAllMocks(); reset(); resetGen(); resetReportCapabilityCache(); vi.useFakeTimers(); vi.setSystemTime(now);
++  state.config['analytics.reports.linkDetails'] = LINK_REPORT_DEFAULTS;
++  state.config['app.publicOrigin'] = 'https://app.example'; state.templateSections = ['published']; state.scheduleSections = ['published'];
++  gen.snapshot = snapshot({ period: { start: '2026-10-01', end: '2026-10-18' } });
++  platform.posts.mockResolvedValue([{ postId: 'post1', text: 'Generic adapter text', publishedAt: new Date('2026-10-15T10:00Z'), url: 'https://social.example/post1', rankLabel: 'Engagement', rankValue: 5, measures: [], measuredAt: null }]);
++  db.$queryRaw.mockImplementation(async (sql, ...args) => {
++    const query = sql.join('?');
++    if (query.includes('SELECT t.name, t.type, a.provider')) return [{ name: 'Channel', type: 'channel', provider: 'p1' }];
++    if (query.includes('WITH mine AS')) return [{ posts: 1, shared: 0, clicks: 5 }];
++    if (query.includes('WITH publications AS')) return [{ dimension: 'weekday', bucket: 1, published: 2 }, { dimension: 'hour', bucket: 12, published: 2 }, { dimension: 'attempts', bucket: 10, published: 2 }];
++    if (query.includes('WITH publications AS')) return [{ links: [{ id: 'link1', postId: 'post1', lifetime: 50, period: 5 }], days: [{ day: '2026-10-15', clicks: 5 }] }];
++    return original(sql, ...args);
++  });
++  registerReportGeneration({ generation: createReportGenerator({ bounds: async () => ({ maxRows: 100, maxBytes: 20000 }) }) });
++});
++afterEach(() => { db.$queryRaw.mockImplementation(original); unregisterReportGeneration(); vi.useRealTimers(); });
++describe('publication distributions through the confirmed shared workflow', () => {
++  it.each(['service', 'mcp'] as const)('releases all three details and audited receipts through %s', async surface => {
++    const input = { channelId: 'c1', templateId: 't1', start: '2026-10-01', end: '2026-10-18', requestId: '6f1d0b6e-0f4b-4c5d-8a43-2d5b1d1f6a11', confirmation: 'GENERATE CHANNEL REPORT c1' };
++    const output = (surface === 'service' ? await runReportNow(actor, input, now) : await executeAnalyticsReportTool(actor, 'generate_report', input)) as Awaited<ReturnType<typeof runReportNow>>;
++    expect(output).toMatchObject({ ok: true, outcome: 'prepared' });
++    expect(output.html).toContain('Publications by weekday (UTC)'); expect(output.html).toContain('Publications by hour (UTC)'); expect(output.html).toContain('Publications by recorded attempts');
++    expect(output.html).not.toContain('Generic adapter text');
++    expect(JSON.parse(output.json!).records.map((r: { record_type: string }) => r.record_type)).toEqual(expect.arrayContaining(['publication_distribution', 'publication_coverage']));
++    expect(execs('activity_logs').some(row => row.values.includes('analytics.report_run_finished'))).toBe(true);
++  });
++  it('refuses bad consent or lost channel scope before reading publication distributions', async () => {
++    const input = { channelId: 'c1', templateId: 't1', start: '2026-10-01', end: '2026-10-18', requestId: '6f1d0b6e-0f4b-4c5d-8a43-2d5b1d1f6a11', confirmation: 'WRONG' };
++    await expect(executeAnalyticsReportTool(actor, 'generate_report', input)).rejects.toMatchObject({ code: 'invalid_request' });
++    state.scope = ['other'];
++    await expect(runReportNow(actor, { ...input, confirmation: 'GENERATE CHANNEL REPORT c1' }, now)).rejects.toMatchObject({ code: 'unavailable' });
++    expect(db.$queryRaw.mock.calls.some(([sql]) => sql.join('?').includes('WITH publications AS'))).toBe(false);
++  });
++  it('honors the key result ceiling for generated publication distributions', async () => {
++    const generator = createReportGenerator({ bounds: async () => ({ maxRows: 100, maxBytes: 20000 }) });
++    const out = await generator.generate({ actor: { ...actor, maxResultItems: 1 }, channelId: 'c1', sections: ['published'], period: { start: '2026-10-01', end: '2026-10-18' } });
++    expect(out.ok).toBe(true);
++    if (out.ok) expect(out.output.rowCount).toBeLessThanOrEqual(1);
++  });
++});
+diff --git a/rebuild/tests/report-publication-distributions.test.ts b/rebuild/tests/report-publication-distributions.test.ts
+new file mode 100644
+index 00000000..18fe2a5e
+--- /dev/null
++++ b/rebuild/tests/report-publication-distributions.test.ts
+@@ -0,0 +1,90 @@
++import { beforeEach, describe, expect, it, vi } from 'vitest';
++const mocks = vi.hoisted(() => ({ query: vi.fn(), config: vi.fn() }));
++vi.mock('@/server/data', () => ({ prisma: { $queryRaw: mocks.query } }));
++vi.mock('@/server/config/store', () => ({ runtimeConfig: mocks.config }));
++import { readPublicationReport } from '../src/modules/analytics/reports/server/publication-report';
++import { renderReport } from '../src/modules/analytics/reports/generation/document';
++import { reportDocumentCopyDefaults } from '../src/modules/analytics/reports/generation/copy';
++import { PUBLICATION_REPORT_POLICY_SCHEMA } from '../src/modules/analytics/reports/config';
++
++const post = { postId: 'p1', text: '=SUM(1,2) <script>', at: new Date('2026-10-02T01:00Z'), attempts: 2 };
++const distributions = [{ dimension: 'weekday' as const, bucket: 7, published: 300, ceiling: false }, { dimension: 'hour' as const, bucket: 23, published: 300, ceiling: false }, { dimension: 'attempts' as const, bucket: 10, published: 300, ceiling: true }];
++const report = { distributions, published: [post], failed: [{ ...post, postId: 'p2' }], days: [{ day: '2026-10-02', published: 300 }], publishedTruncated: true, failedTruncated: false };
++const snapshot = { period: { start: '2026-10-01', end: '2026-10-03' }, allMetrics: [], audience: null, publishing: { published: 300, scheduled: 0, failed: 1 } };
++const render = (locale: 'en' | 'fr' = 'en', maxRows = 100, maxBytes = 30000) => renderReport(snapshot as never, { channelName: 'Channel', sections: ['published'], publications: report, generatedAt: new Date(0) }, { maxRows, maxBytes }, reportDocumentCopyDefaults[locale], locale);
++
++beforeEach(() => { vi.clearAllMocks(); mocks.config.mockResolvedValue({ publishedRows: 1, failedRows: 1, excerptCharacters: 100 }); });
++describe('publication detail reads', () => {
++  it('bounds each content log independently, keeps daily totals complete and tenant/channel/date predicates in all queries', async () => {
++    mocks.query.mockResolvedValueOnce([post, { ...post, postId: 'omitted' }]).mockResolvedValueOnce([post]).mockResolvedValueOnce([{ day: '2026-10-02', published: BigInt(300) }]).mockResolvedValueOnce(distributions.map(({ ceiling, ...r }) => ({ ...r, published: BigInt(r.published) })));
++    const result = await readPublicationReport('workspace', 'channel', snapshot.period);
++    expect(result).toEqual({ ...report, failed: [post] });
++    expect(mocks.config).toHaveBeenCalledWith('analytics.reports.publicationDetails');
++    for (const [parts, ...values] of mocks.query.mock.calls) {
++      const sql = parts.join('?');
++      expect(sql).toContain('p."workspaceId" ='); expect(sql).toContain('pt."targetId" =');
++      expect(sql).toContain('t."workspaceId" = p."workspaceId"');
++      expect(values).toContain('workspace'); expect(values).toContain('channel');
++      expect(values).toContainEqual(new Date('2026-10-01T00:00Z'));
++      expect(values).toContainEqual(new Date('2026-10-04T00:00Z'));
++      expect(sql).not.toContain('errorMessage'); expect(sql).not.toContain('errorCode');
++    }
++    expect(mocks.query.mock.calls[0][0].join('?')).toContain('messageOverride');
++    expect(mocks.query.mock.calls[1][0].join('?')).toContain('pt."updatedAt"');
++    expect(mocks.query.mock.calls[2][0].join('?')).toContain('to_char(pt."publishedAt",');
++    expect(mocks.query.mock.calls[2][0].join('?')).not.toContain('LIMIT');
++  });
++  it('can disable all three Root-managed views without an aggregate query', async () => {
++    mocks.config.mockResolvedValue({ publishedRows: 1, failedRows: 1, excerptCharacters: 100, weekdayBreakdown: false, hourlyBreakdown: false, attemptBreakdown: false });
++    mocks.query.mockResolvedValue([]);
++    expect((await readPublicationReport('w', 'c', snapshot.period)).distributions).toBeUndefined();
++    expect(mocks.query).toHaveBeenCalledTimes(3);
++  });
++  it('counts full publications independently of content clipping and clamps attempt buckets', async () => {
++    mocks.query.mockResolvedValue([]);
++    await readPublicationReport('w', 'c', snapshot.period);
++    const [parts, ...values] = mocks.query.mock.calls[3]; const sql = parts.join('?');
++    expect(sql).toContain('EXTRACT(ISODOW'); expect(sql).toContain('EXTRACT(HOUR'); expect(sql).toContain('LEAST(attempts,');
++    expect(sql).toContain('attempts >= 0'); expect(sql).not.toContain('LIMIT');
++    expect(sql).toContain('GROUP BY dimension, bucket ORDER BY dimension ASC, bucket ASC');
++    expect(values).toContain(10);
++    expect(PUBLICATION_REPORT_POLICY_SCHEMA.safeParse({ publishedRows: 1, failedRows: 1, excerptCharacters: 100, attemptBucketCeiling: 0 }).success).toBe(false);
++    mocks.config.mockResolvedValue({ publishedRows: 1, failedRows: 1, excerptCharacters: 100, attemptBucketCeiling: 3 });
++    mocks.query.mockResolvedValue([]);
++    await readPublicationReport('w', 'c', snapshot.period);
++    expect(mocks.query.mock.calls[7].slice(1)).toContain(3);
++  });
++  it('rejects unusable Root limits before reading content', async () => {
++    mocks.config.mockResolvedValue({ publishedRows: 0, failedRows: 1, excerptCharacters: 100 });
++    await expect(readPublicationReport('w', 'c', snapshot.period)).rejects.toThrow(); expect(mocks.query).not.toHaveBeenCalled();
++    expect(PUBLICATION_REPORT_POLICY_SCHEMA.safeParse({ publishedRows: 1, failedRows: 1, excerptCharacters: 2001 }).success).toBe(false);
++  });
++});
++describe('publication report artifacts', () => {
++  it.each(['en', 'fr'] as const)('includes all three views, precise scope notes, safe excerpts and source-limit marking in %s', locale => {
++    const output = render(locale);
++    const json = JSON.parse(output.json!);
++    expect(json.records).toEqual(expect.arrayContaining([
++      expect.objectContaining({ metric_key: 'published_by_weekday', value: 300 }),
++      expect.objectContaining({ metric_key: 'published_by_hour', value: 300 }),
++      expect.objectContaining({ metric_key: 'published_by_attempts', value: 300 }),
++    ]));
++    expect(json.records.filter((r: { record_type: string }) => r.record_type === 'publication_day')[0].value).toBe(300);
++    expect(json.records.map((r: { record_type: string }) => r.record_type)).toEqual(expect.arrayContaining(['publication_day', 'publication_log', 'publication_failure']));
++    expect(output.csv).toContain('"\'=SUM(1,2) <script>"');
++    expect(output.html).toContain('&lt;script&gt;'); expect(output.html).not.toContain('<script>');
++    expect(output.text).toContain(locale === 'fr' ? 'pas un historique' : 'not a history');
++    expect(output.html).toContain(locale === 'fr' ? 'totaux quotidiens' : 'daily totals');
++    expect(output.truncated).toBe(true); expect(json.truncated).toBe(true); expect(output.csv).toContain('"truncated","true"');
++  });
++  it('respects row and byte ceilings in every artifact', () => {
++    const output = render('en', 1, 2500);
++    expect(output.rowCount).toBe(1); expect(JSON.parse(output.json!).records.length).toBe(1);
++    for (const artifact of [output.csv, output.json!, output.html, output.text]) expect(Buffer.byteLength(artifact)).toBeLessThanOrEqual(2500);
++    expect(output.truncated).toBe(true);
++  });
++  it('does not attach content when the published section was not selected', () => {
++    const output = renderReport(snapshot as never, { channelName: 'C', sections: ['audience'], publications: report, generatedAt: new Date(0) }, { maxRows: 100, maxBytes: 30000 });
++    expect(output.csv).not.toContain('publication_log'); expect(output.html).not.toContain('SUM');
++  });
++});

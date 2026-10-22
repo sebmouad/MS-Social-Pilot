@@ -1,0 +1,894 @@
+diff --git a/rebuild/docs/LEGACY_CAPABILITY_PARITY.md b/rebuild/docs/LEGACY_CAPABILITY_PARITY.md
+index 0642cef0..d6ac4ba3 100644
+--- a/rebuild/docs/LEGACY_CAPABILITY_PARITY.md
++++ b/rebuild/docs/LEGACY_CAPABILITY_PARITY.md
+@@ -13,7 +13,7 @@ a manifest, saved setting or unit test is not complete workflow proof. See
+ 
+ | Priority | Legacy capability and source | Rebuild state | Required proof |
+ | --- | --- | --- | --- |
+-| P0 | Eleven network connectors and publishing destinations in `src/lib/networks/index.ts` and `src/lib/networks/connect.ts` | Partial: Facebook is the only installed customer platform. Instagram and the other legacy destinations lack usable rebuild adapters. Removed provider APIs cannot be restored by configuration. | Adapter-level connection, discovery, publishing/status/delete, analytics, inbox, and ads where provider supports them; scoped UI/API/MCP and live tests. |
++| P0 | Eleven network connectors and publishing destinations in `src/lib/networks/index.ts` and `src/lib/networks/connect.ts` | Partial: Facebook is the only installed customer platform. Instagram now has a staged, default-off adapter with fixture-tested image/carousel/Reel publishing, status, selected-Page discovery, comments and neutral insight collectors; its connection/persistence and shared host integration remain absent, so it is not customer activated. Other legacy destinations lack usable rebuild adapters. Removed provider APIs cannot be restored by configuration. | Adapter-level connection, discovery, publishing/status/delete, analytics, inbox, and ads where provider supports them; scoped UI/API/MCP and live tests. |
+ | P0 | Facebook feed, photo, carousel, video, Reel, Story, Group and native scheduling in `src/lib/facebook/publish.ts` | Partial: Page feed/photo and native video/Reel/Story source, proof/recovery and app versus Meta-native scheduling exist. Per-destination choices, queue and mix/recycle share Publishing services. Private/default-off native paths and mocked tests do not establish every format live. Group publishing is not advertised. | Provider fixture and live create/status/delete tests for each supported format; visible choices limited to available capabilities. |
+ | P0 | Analytics views, comparisons, post explorer, demographics, network analysis, pinned metrics and coverage in `src/app/(app)/analytics/AnalyticsScreen.tsx` and `src/lib/analytics-views.ts` | Partial: catalog/details/explorer, posts, comparisons, pins, goals, audience history/CSV and ad-object analysis have UI/REST/MCP. Shared charts now consume actual previous-period points. Facebook post history/reactions/hierarchy collection exists; live Graph v26.0 probe verifies five current post metrics and refuses three older ones (RELEASE_GATES_PLAN); exhaustive history/collection and dynamic labels remain incomplete. Root-editable EN/FR catalogs and validated-default fallback are integrated. | Shared metric catalog feeding full UI, export, and MCP with date/channel/ad-account scope, comparison, availability, and refresh evidence. |
+ | P0 | Reports and CSV exports in `src/app/(app)/reports/page.tsx`, `src/lib/reports.ts`, and `src/lib/analytics-export.ts` | Partial: Round 10 adds stored publication counts by ISO weekday and hour (UTC), plus recorded-attempt distributions, through the existing confirmed report UI download/REST/MCP generator. The existing Root analytics.reports.publicationDetails setting now owns three switches and the final attempt bucket ceiling; the report-document catalog supplies EN/FR labels and counter/timing limitations. Counts are independent of clipped content logs, include only current published destinations in the selected channel/period, and do not claim recommended times or historical retry outcomes. Local mocked/query-shape/render/host tests only; PostgreSQL execution and actual browser/client downloads remain open. Round-8 Destinations adds a scoped per-link lifetime click inventory, retained period clicks per link and daily UTC retained click counts through the existing confirmed report UI download/REST/MCP generator. Root `analytics.reports.linkDetails` bounds inventory and daily rows independently; EN/FR artifacts disclose publication-cohort scope, excluded ambiguous legacy links, retention gaps and clipping. No visitor metadata or destination URLs are projected. Local mocked/query-shape/workflow tests and TypeScript only; PostgreSQL, browser downloads and real-client proof remain open. round-7 Top posts restores destination-specific saved text, ordered image/video references with Root-switchable image previews, and saved article link/title/description through the existing confirmed UI download, REST and MCP report workflow. Root `analytics.reports.topPostContent` owns ranking/content/media/URL bounds, image previews and the authenticated media path template; EN/FR artifacts disclose current saved content, expiry, workspace access and clipping. Targeted mocked/render tests and TypeScript verification are local only; PostgreSQL, actual browser/download and real-client/provider proof remain open. Existing templates/schedules/runs, CSV/JSON/printable artifacts, response time/business hours, top posts, goals, destinations/link counts and AI recap exist. Downloads/UI were refined in 0589ddd0. Round-6 Published posts adds three stored-data report views through the existing confirmed UI/REST/MCP generator: a destination-specific content log with attempt counts, daily UTC publication counts independent of log limits, and currently failed destinations last updated in the period (explicitly not historical failure attempts). EN/FR catalogs disclose excerpts, current-state semantics and clipping; Root `analytics.reports.publicationDetails` controls each log ceiling and excerpt length. Local verification: TypeScript 0 errors; 155 targeted tests across 10 files passed, including scoped SQL shapes, bilingual artifacts, row/byte limits and confirmed MCP generation/audit. PostgreSQL, browser, real-client and production evidence remain open. Response reports now include first direct replies to stored root comments, slowest calendar/business-hours first response, and business-hours resolution through the same report generator used by UI downloads, REST and MCP. Round-2 response reports retain pre-period conversation context, reconstruct recorded resolution/reopening cycles, and disclose stored-history coverage and incomplete boundary exclusions in bilingual artifacts through the existing shared generator. Round-3 reports separate comment/conversation answer shares, response and resolution durations, and member business-hours first-response medians through the shared generator. Round-5 member outcomes add slowest first replies, answered-wait resolution counts and calendar/business-hours resolution medians, with last-run first-responder attribution through the same report workflow. Per-channel reports retain member attribution and disclose source limits; complete provider history, actual mail delivery, volume and current-browser proof remain open.  Rounds 1–3 (`23b7be84`, `6ef753e4`, `b725c415`) have local arithmetic, bilingual artifact and mocked workflow tests; bounded history and concurrent-read consistency remain limits. | Complete relevant report sections and exports, schedule/template workflows, UI/API/MCP parity and provider-shaped tests. |
+@@ -352,3 +352,43 @@ changed catalogs, and update ARCHITECTURE.md, DELIVERY_PLAN.md and AGENT_HANDOFF
+ with these measures and evidence limits. No routes or migrations need wiring.
+ Changes remain in this working tree for integration; linked Git metadata is
+ outside the worker's writable roots. Pre-existing node_modules links are untouched.
++
++
++## Instagram P0 adapter lane — 2026-10-21 (fixture evidence)
++
++Source: `src/platforms/instagram/` and Root configuration registration in
++`src/platforms/index.ts`; legacy references `src/lib/facebook/instagram.ts`,
++`src/lib/facebook/instagram-publish.ts`, `src/lib/instagram.ts`. See the module
++README for the exact activation dependencies and protocol limitations.
++
++Implemented provider ports: discovery only from supplied selected Pages;
++image/carousel/Reel container creation with bounded child/parent status polling;
++first comment; owner-matched published status; owned-media comments/replies and
++comment moderation/deletion; per-metric post/account insights with explicit
++failures, raw values, neutral non-additive series/category snapshots and current
++follower snapshots. Missing grants fail closed. Published-media deletion, native
++scheduling, Stories, direct messages and ads are not declared.
++
++This remains **partial**, not a working customer Instagram connector. Settings
++are registered and the manifest is staged, but PLATFORM_MODULES is unchanged:
++shared connection/selection persistence, host registration, storage/sync hooks,
++durable container reconciliation and actual UI/REST/MCP parity still need
++integration. No parallel interface/business service or stub OAuth flow was added.
++The adapter requires public HTTPS media URLs; signed local-media delivery needs
++integration. Comment-management permission is required beyond the three scopes
++named in this lane. Media deletion support was not established for Facebook Login.
++
++New Root keys: `platforms.instagram.enabled` (false),
++`platforms.instagram.includedByDefault` (false), `platforms.instagram.planFeatures`,
++`instagram.policy`, `instagram.appSecret`. Policy owns endpoints/version, limits,
++polling, scopes, metric queries and bilingual copy. CONFIG_SCHEMA_VERSION is left
++unchanged for the integrator. No screen changed; no browser/design claim applies.
++
++Local evidence: 36 tests passed across instagram-platform.test.ts,
++instagram-runtime.test.ts, instagram-discovery.test.ts and
++platform-analytics-metadata.test.ts; `npx tsc --noEmit -p .` passed with zero
++errors, and `git diff --check` passed. All commands ran from rebuild/. These checks
++use synthetic data and mocked transport only. No server, whole suite, live Graph,
++deployment, production action or push. Changes remain in the working tree for
++integration. Shared architecture/goal/plan/handoff files are outside this lane;
++the integrator must record this batch and its unfinished activation dependencies.
+diff --git a/rebuild/src/platforms/index.ts b/rebuild/src/platforms/index.ts
+index 785a4324..d8e4fc46 100644
+--- a/rebuild/src/platforms/index.ts
++++ b/rebuild/src/platforms/index.ts
+@@ -1,3 +1,5 @@
++import { INSTAGRAM_CONFIG } from './instagram/config';
++export { instagramModule } from './instagram/module';
+ import { FACEBOOK_ADS_CREATION_CONFIG } from './facebook/ads-ui-config';
+ import { FACEBOOK_CONFIG, facebookModule } from './facebook/module';
+ import type { PlatformModule } from './module';
+@@ -13,7 +15,7 @@ import type { PlatformModule } from './module';
+ export const PLATFORM_MODULES = [facebookModule] as const satisfies readonly PlatformModule[];
+ 
+ /** Every module's Root settings, merged into the configuration registry. */
+-export const PLATFORM_CONFIG = [...FACEBOOK_CONFIG, ...FACEBOOK_ADS_CREATION_CONFIG.map(setting => ({ ...setting, owner: { kind: 'platform' as const, id: facebookModule.id } }))] as const;
++export const PLATFORM_CONFIG = [...INSTAGRAM_CONFIG, ...FACEBOOK_CONFIG, ...FACEBOOK_ADS_CREATION_CONFIG.map(setting => ({ ...setting, owner: { kind: 'platform' as const, id: facebookModule.id } }))] as const;
+ 
+ export type PlatformId = (typeof PLATFORM_MODULES)[number]['id'];
+ 
+diff --git a/rebuild/src/platforms/instagram/README.md b/rebuild/src/platforms/instagram/README.md
+new file mode 100644
+index 00000000..0270ab37
+--- /dev/null
++++ b/rebuild/src/platforms/instagram/README.md
+@@ -0,0 +1,85 @@
++# Instagram adapter — staged, not customer activated
++
++Binding target: `../../../docs/ARCHITECTURE_CONTRACT.md`. This source batch is
++fixture evidence only. It makes no claim about live Graph permissions, remote
++outcomes, interface parity, deployed behavior or legacy parity completion.
++
++Owned implementation:
++
++- `config.ts`: typed Root policy, defaults, bilingual format/error/metric copy,
++  required grants, Graph endpoint/version, read/poll bounds and caption/carousel
++  limits. `runtime.ts` reads it with `runtimeConfig` and the signing secret with
++  `runtimeSecret`. No schema-version edit is included.
++- `discovery.ts`: `configuredInstagramDiscovery` uses the signed transport to
++  discover Business/Creator accounts linked to the selected Pages supplied by the
++  authorized connection service. It never enumerates or selects Pages itself.
++  Returned Page credentials are server-only. The earlier legacy-compatible
++  `createInstagramDiscovery` entry is retained for its existing callers/tests;
++  new integration must use the configured signed entry.
++- `publishing.ts`: explicit image, mixed carousel and Reel formats; image is the
++  default. All containers, including every child, must reach FINISHED before
++  publishing. Container PUBLISHED is an uncertain outcome, never permission to
++  repeat media_publish. Polling and Graph requests are bounded; writes are never
++  retried. A confirmed media receipt is retained if a permalink read fails; no
++  permalink is invented from a numeric media id. Provider-held schedules,
++  arbitrary links, alt text and binary uploads are refused before dispatch.
++- `inbox.ts`: owned-media comment/reply discovery, first comments, comment replies,
++  hide/unhide and comment deletion. Missing recorded comment grants fail closed.
++  Bounded/truncated reads fail explicitly instead of returning apparently complete
++  history. Direct messages and reviews are absent.
++- `insights.ts`: isolated per-metric account/media requests, raw response retention,
++  explicit failed metric names, current follower profile snapshots and neutral
++  AnalyticsMetricInput / AnalyticsAudienceEntry normalization. Day flow series can
++  sum; reach, lifetime and range totals use latest-per-channel semantics. Category
++  snapshots retain provider dimension names. Missing values are not zero. Metric
++  availability depends on account, Graph version and grants; configure the Root
++  policy accordingly. This is not a persistence/backfill worker.
++- `transport.ts`: appsecret_proof, bearer credentials, origin-contained cursor
++  pagination, sanitized EN/FR failures, bounded requests and abort propagation.
++  Protocol field/edge names, format ids, Graph status/error codes and conversion
++  from dates to Unix seconds are adapter-local protocol invariants.
++
++Instagram media deletion is not declared: this lane could not establish the
++supported deletion contract for Facebook Login. Comment deletion is separate and
++implemented. Do not infer media-deletion permission from instagram_content_publish
++or instagram_manage_comments. First comments/inbox need instagram_manage_comments
++in addition to the previously requested basic/publishing/insights grants.
++
++## Integration work outside this worker's owned paths
++
++`src/platforms/index.ts` registers settings and exports the staged manifest, but
++intentionally does not insert it in PLATFORM_MODULES. The shared host is a required
++record keyed by installed platform ids; inserting a manifest without that host
++would fail TypeScript and the Root platform-status reader. No fake host is supplied.
++
++1. Implement an authorized, audited connection/selection service path that supplies
++   only selected Pages and their credentials; persist linked professional targets
++   under provider `instagram`, encrypt Page credentials, record grants/expiry and
++   handle deselection/disconnection. Avoid giving all discovered channels access.
++   Current historical Instagram selection uses target type `instagram`, whereas
++   this staged adapter declares `professional`; reconcile at the module boundary.
++2. Implement `instagram/host.ts` assembly only after those service ports exist,
++   with shared connection start/callback behavior and module-owned Inbox/Analytics
++   storage/sync hooks. Register it in `src/server/platforms/index.ts`, then install
++   `instagramModule` in PLATFORM_MODULES. Shared code must dispatch neutrally, not
++   branch on provider or interpret IG metrics/scopes. Do not import Facebook-owned
++   workflows into shared code to achieve this.
++3. Ensure UI, REST and MCP use the same existing Publishing, Inbox, Analytics and
++   Connections services. Those services retain tenant/selection/access checks,
++   confirmations, audit, publication claims and uncertain-outcome recovery. The
++   adapter is a provider port, not an authorization boundary or an alternate API.
++4. Add durable container/attempt reconciliation before enabling production writes;
++   there is no provider idempotency guarantee or safe automatic resend after a
++   lost publish response. Supply anonymously fetchable signed HTTPS media URLs
++   through the neutral shared media pipeline; this adapter refuses local bytes.
++5. Integrator bumps CONFIG_SCHEMA_VERSION for the five new keys and updates
++   ARCHITECTURE.md, GOAL.md, DELIVERY_PLAN.md and AGENT_HANDOFF.md. Prove shared
++   UI/API/MCP permission/confirmation parity and selected-resource isolation;
++   obtain missing grants, run live provider tests with verified cleanup and
++   browser tests before activation. Keep the switch off until these gates pass.
++
++New Root keys: `platforms.instagram.enabled`,
++`platforms.instagram.includedByDefault`, `platforms.instagram.planFeatures`,
++`instagram.policy`, `instagram.appSecret`. The three installation/access keys are
++honestly marked configured pending host installation; policy/secret have active
++runtime consumers. Existing Facebook settings and CONFIG_SCHEMA_VERSION are unchanged.
+diff --git a/rebuild/src/platforms/instagram/adapter.ts b/rebuild/src/platforms/instagram/adapter.ts
+new file mode 100644
+index 00000000..c8f3dced
+--- /dev/null
++++ b/rebuild/src/platforms/instagram/adapter.ts
+@@ -0,0 +1,29 @@
++import type { PlatformAdapter } from '../types';
++import { instagramPolicySchema, type InstagramPolicy } from './config';
++import { createInstagramGraph, InstagramError } from './transport';
++import { createInstagramPublisher, hasScopes } from './publishing';
++import { createInstagramInbox } from './inbox';
++import { createInstagramInsights } from './insights';
++
++export function createInstagramAdapter(input: InstagramPolicy, options: { fetch?: typeof fetch; appSecret?: string; locale?: 'en' | 'fr'; wait?: (ms: number, signal?: AbortSignal) => Promise<void> } = {}): PlatformAdapter {
++  const policy = instagramPolicySchema.parse(input); const graph = createInstagramGraph(policy, options);
++  const publisher = createInstagramPublisher(policy, graph, options.wait);
++  const inbox = createInstagramInbox(policy, graph);
++  const media = { kinds: ['image', 'video'] as const, maxImages: policy.carouselMax, maxVideos: policy.carouselMax, mixedKinds: true, linkWithMedia: false, imageAltText: false };
++  return {
++    id: 'instagram',
++    // OAuth/linked-Page persistence and product analytics/inbox hosts are integration gaps.
++    capabilities: { connection: 'unsupported', discovery: 'unsupported', publishing: 'supported', remoteStatus: 'supported', remoteDelete: 'unsupported', inbox: 'supported', analytics: 'unsupported', ads: 'unsupported' },
++    publishingMedia: media, defaultPublishingFormatId: 'image',
++    publishingFormats: (['image', 'carousel', 'reel'] as const).map(id => ({ id, label: policy.copy[id][options.locale ?? 'en'], media: { ...media, kinds: id === 'image' ? ['image'] : id === 'reel' ? ['video'] : media.kinds, maxImages: id === 'image' ? 1 : id === 'reel' ? 0 : policy.carouselMax, maxVideos: id === 'image' ? 0 : id === 'reel' ? 1 : policy.carouselMax }, firstComment: true, remoteStatus: true, remoteDelete: false, scheduling: { application: true, native: false } })),
++    supportsTargetKind: kind => kind === 'professional',
++    canUseCredential: (credential, capability) => capability === 'remoteDelete' ? false : hasScopes(credential, capability === 'publishing' ? policy.publishScopes : capability === 'firstComment' ? policy.commentScopes : policy.readScopes),
++    classifyPublishingFailure: error => error instanceof InstagramError ? error.outcome : 'uncertain',
++    ...publisher, ...inbox,
++  };
++}
++/** Server collectors retain observations and explicit failures instead of reducing them to misleading totals. */
++export function createInstagramCollector(input: InstagramPolicy, options: Parameters<typeof createInstagramGraph>[1] = {}) {
++  const policy = instagramPolicySchema.parse(input);
++  return createInstagramInsights(policy, createInstagramGraph(policy, options));
++}
+diff --git a/rebuild/src/platforms/instagram/analytics.ts b/rebuild/src/platforms/instagram/analytics.ts
+index 6d82c960..c019f3d7 100644
+--- a/rebuild/src/platforms/instagram/analytics.ts
++++ b/rebuild/src/platforms/instagram/analytics.ts
+@@ -1,10 +1,7 @@
+-const metricNames: Record<string, string> = {
+-  views: 'Views', profile_views: 'Profile views', follower_count: 'New followers',
+-  follows_and_unfollows: 'Follows and unfollows',
+-};
++import { INSTAGRAM_POLICY_DEFAULTS, type InstagramPolicy } from './config';
+ 
+-export function instagramMetricLabel(key: string): string | undefined {
+-  return metricNames[key];
++export function instagramMetricLabel(key: string, locale: 'en' | 'fr' = 'en', labels: InstagramPolicy['labels'] = INSTAGRAM_POLICY_DEFAULTS.labels): string | undefined {
++  return labels[key]?.[locale];
+ }
+ 
+ export function instagramMetricKind(key: string): 'stock' | 'flow' | 'ratio' | 'breakdown' {
+diff --git a/rebuild/src/platforms/instagram/config.ts b/rebuild/src/platforms/instagram/config.ts
+new file mode 100644
+index 00000000..0bb4c212
+--- /dev/null
++++ b/rebuild/src/platforms/instagram/config.ts
+@@ -0,0 +1,52 @@
++import { z } from 'zod';
++import { entry } from '@/lib/config/entry';
++
++const bilingual = z.object({ en: z.string().min(1), fr: z.string().min(1) });
++const scopeList = z.array(z.string().regex(/^[a-z_]+$/)).min(1);
++const metric = z.object({ name: z.string().regex(/^[a-z_]+$/), period: z.enum(['day', 'lifetime']), metricType: z.enum(['time_series', 'total_value']), breakdown: z.string().regex(/^[a-z_,]+$/).optional() });
++const metricLabels = {
++  views: { en: 'Views', fr: 'Vues' }, reach: { en: 'People reached', fr: 'Personnes touchées' },
++  total_interactions: { en: 'Interactions', fr: 'Interactions' }, saved: { en: 'Saves', fr: 'Enregistrements' },
++  likes: { en: 'Likes', fr: 'Mentions J’aime' }, comments: { en: 'Comments', fr: 'Commentaires' },
++  shares: { en: 'Shares', fr: 'Partages' }, follower_count: { en: 'New followers', fr: 'Nouveaux abonnés' },
++  followers_count: { en: 'Followers', fr: 'Abonnés' }, profile_views: { en: 'Profile views', fr: 'Vues du profil' },
++  follows_and_unfollows: { en: 'Follows and unfollows', fr: 'Abonnements et désabonnements' },
++};
++const copy = {
++  unavailable: { en: 'Instagram could not complete this request. Please try again later.', fr: 'Instagram n’a pas pu terminer cette demande. Réessayez plus tard.' },
++  invalid: { en: 'Check the selected format, caption and media before trying again.', fr: 'Vérifiez le format, la légende et les médias avant de réessayer.' },
++  permission: { en: 'Reconnect this account to allow this action.', fr: 'Reconnectez ce compte pour autoriser cette action.' },
++  uncertain: { en: 'The publication could not be confirmed. Check the account before sending it again.', fr: 'La publication n’a pas pu être confirmée. Vérifiez le compte avant de la renvoyer.' },
++  processing: { en: 'Instagram could not prepare this media. Check the file before trying again.', fr: 'Instagram n’a pas pu préparer ce média. Vérifiez le fichier avant de réessayer.' },
++  source: { en: 'Instagram performance', fr: 'Performances Instagram' },
++  overlap: { en: 'Reach and lifetime snapshots are not additive. People may overlap across accounts.', fr: 'La portée et les instantanés cumulés ne s’additionnent pas. Les personnes peuvent figurer dans plusieurs comptes.' },
++  image: { en: 'Photo', fr: 'Photo' }, carousel: { en: 'Carousel', fr: 'Carrousel' }, reel: { en: 'Reel', fr: 'Reel' },
++};
++export const instagramPolicySchema = z.object({
++  graphBaseUrl: z.string().url().refine(value => { const u = new URL(value); return u.protocol === 'https:' && !u.username && !u.password && !u.search && !u.hash; }),
++  graphVersion: z.string().regex(/^v\d+\.\d+$/), requestTimeoutMs: z.number().int().min(1).max(120000),
++  pageSize: z.number().int().min(1).max(100), maxPages: z.number().int().min(1).max(100),
++  pollIntervalMs: z.number().int().min(1).max(60000), pollAttempts: z.number().int().min(1).max(300),
++  captionLength: z.number().int().min(1).max(2200), carouselMax: z.number().int().min(2).max(10),
++  appSecretProofEnabled: z.boolean(),
++  readScopes: scopeList, publishScopes: scopeList, commentScopes: scopeList, insightScopes: scopeList,
++  accountMetrics: z.array(metric), postMetrics: z.array(z.string().regex(/^[a-z_]+$/)),
++  labels: z.record(z.string(), bilingual), copy: z.object(Object.fromEntries(Object.keys(copy).map(key => [key, bilingual])) as { [K in keyof typeof copy]: typeof bilingual }),
++});
++export type InstagramPolicy = z.infer<typeof instagramPolicySchema>;
++export const INSTAGRAM_POLICY_DEFAULTS: InstagramPolicy = {
++  graphBaseUrl: 'https://graph.facebook.com', graphVersion: 'v26.0', requestTimeoutMs: 15000,
++  pageSize: 50, maxPages: 5, pollIntervalMs: 3000, pollAttempts: 100, captionLength: 2200, carouselMax: 10,
++  appSecretProofEnabled: true,
++  readScopes: ['instagram_basic', 'pages_read_engagement'], publishScopes: ['instagram_basic', 'instagram_content_publish', 'pages_read_engagement'],
++  commentScopes: ['instagram_basic', 'instagram_manage_comments', 'pages_read_engagement'], insightScopes: ['instagram_basic', 'instagram_manage_insights', 'pages_read_engagement'],
++  accountMetrics: [{ name: 'views', period: 'day', metricType: 'total_value' }, { name: 'reach', period: 'day', metricType: 'time_series' }],
++  postMetrics: ['views', 'reach', 'saved', 'total_interactions'], labels: metricLabels, copy,
++};
++export const INSTAGRAM_CONFIG = [
++  entry({ key: 'platforms.instagram.enabled', group: 'Instagram · Engine', label: 'Instagram enabled', kind: 'boolean', description: 'Keep off until the connection, persistence and shared host integration are verified.', defaultValue: false, schema: z.boolean(), consumption: 'configured' }),
++  entry({ key: 'platforms.instagram.includedByDefault', group: 'Instagram · Access', label: 'Included by default', kind: 'boolean', description: 'Workspace access policy after host integration.', defaultValue: false, schema: z.boolean(), consumption: 'configured' }),
++  entry({ key: 'platforms.instagram.planFeatures', group: 'Instagram · Access', label: 'Plan access keys', kind: 'json', description: 'Plan feature keys granting Instagram access after host integration.', defaultValue: ['platform_instagram'], schema: z.array(z.string().min(1)), consumption: 'configured' }),
++  entry({ key: 'instagram.policy', group: 'Instagram · API and operations', label: 'Instagram adapter policy', kind: 'json', description: 'Graph endpoint/version, bounded reads and polling, caption/media limits, required grants, metric requests and English/French copy. Does not grant provider permissions.', defaultValue: INSTAGRAM_POLICY_DEFAULTS, schema: instagramPolicySchema, consumption: 'active' }),
++  entry({ key: 'instagram.appSecret', group: 'Instagram · Credentials', label: 'Graph application secret', kind: 'secret', description: 'App secret for signing Instagram Graph requests; use the app associated with the linked Page credentials.', defaultValue: '', schema: z.string().max(2048), consumption: 'active' }),
++].map(setting => ({ ...setting, owner: { kind: 'platform' as const, id: 'instagram' } }));
+diff --git a/rebuild/src/platforms/instagram/discovery.ts b/rebuild/src/platforms/instagram/discovery.ts
+index 26f1b81e..558cfc35 100644
+--- a/rebuild/src/platforms/instagram/discovery.ts
++++ b/rebuild/src/platforms/instagram/discovery.ts
+@@ -36,3 +36,20 @@ export function createInstagramDiscovery(config: InstagramDiscoveryConfig, fetch
+     return [...accounts.values()];
+   };
+ }
++
++/** Selected Pages are supplied by the authorized connection service, never enumerated here. */
++export function createSelectedInstagramDiscovery(policy: import('./config').InstagramPolicy, options: Parameters<typeof import('./transport').createInstagramGraph>[1] = {}) {
++  return async (pages: readonly LinkedPage[], signal?: AbortSignal): Promise<LinkedInstagramAccount[]> => {
++    const { createInstagramGraph, object } = await import('./transport');
++    const graph = createInstagramGraph(policy, options);
++    const accounts = new Map<string, LinkedInstagramAccount>();
++    for (const page of pages) {
++      if (!page.id || !page.accessToken) continue;
++      const result = await graph.request(page.id, page.accessToken, { fields: LINK_FIELD }, 'GET', signal);
++      const account = object(result.instagram_business_account);
++      if (typeof account.id !== 'string' || !account.id || accounts.has(account.id)) continue;
++      accounts.set(account.id, { igUserId: account.id, username: typeof account.username === 'string' && account.username ? account.username : account.id, pageId: page.id, pageAccessToken: page.accessToken });
++    }
++    return [...accounts.values()];
++  };
++}
+diff --git a/rebuild/src/platforms/instagram/inbox.ts b/rebuild/src/platforms/instagram/inbox.ts
+new file mode 100644
+index 00000000..cbd794a4
+--- /dev/null
++++ b/rebuild/src/platforms/instagram/inbox.ts
+@@ -0,0 +1,58 @@
++import type { InboxItem, InboxCommentsRequest, InboxActionRequest, InboxRequest } from '../types';
++import type { InstagramPolicy } from './config';
++import { InstagramError, object, type InstagramGraph } from './transport';
++import { requireScopes } from './publishing';
++
++export function createInstagramInbox(policy: InstagramPolicy, graph: InstagramGraph) {
++  async function listComments(request: InboxCommentsRequest): Promise<InboxItem[]> {
++    requireScopes(graph, request.credential, policy.commentScopes);
++    // Match the media owner before traversing comments, even if a valid remote id is supplied.
++    const media = await graph.request(request.remotePostId, request.credential.accessToken, { fields: 'owner' });
++    if ((object(media.owner).id ?? media.owner) !== request.targetId) throw new InstagramError(graph.text('permission'), 'rejected');
++    const result = await graph.list(`${request.remotePostId}/comments`, request.credential.accessToken, { fields: 'id,text,timestamp,from,parent_id' });
++    const rows: InboxItem[] = [];
++    function map(row: Record<string, unknown>, parentId: string | null) {
++      const createdAt = typeof row.timestamp === 'string' ? new Date(row.timestamp) : null;
++      if (typeof row.id !== 'string' || typeof row.text !== 'string' || !createdAt || !Number.isFinite(createdAt.getTime())) return;
++      const from = object(row.from);
++      rows.push({ id: row.id, text: row.text, createdAt, targetId: request.targetId, kind: 'comment', parentId,
++        authorId: typeof from.id === 'string' ? from.id : null, authorName: typeof from.username === 'string' ? from.username : null });
++    }
++    for (const row of result.items) {
++      map(row, typeof row.parent_id === 'string' ? row.parent_id : null);
++      if (typeof row.id !== 'string') continue;
++      const replies = await graph.list(`${row.id}/replies`, request.credential.accessToken, { fields: 'id,text,timestamp,from' });
++      for (const reply of replies.items) map(reply, row.id);
++      if (replies.truncated) throw new InstagramError(graph.text('unavailable'), 'uncertain');
++    }
++    if (result.truncated) throw new InstagramError(graph.text('unavailable'), 'uncertain');
++    return rows;
++  }
++  async function listInbox(request: InboxRequest) {
++    requireScopes(graph, request.credential, policy.commentScopes);
++    const media = await graph.list(`${request.targetId}/media`, request.credential.accessToken, { fields: 'id' });
++    const rows: InboxItem[] = [];
++    for (const post of media.items) if (typeof post.id === 'string') rows.push(...await listComments({ ...request, remotePostId: post.id }));
++    if (media.truncated) throw new InstagramError(graph.text('unavailable'), 'uncertain');
++    return rows;
++  }
++  // Action target/tenant authorization belongs to the shared Inbox service; this adapter requires provider grants.
++  async function replyToInbox(request: InboxActionRequest) {
++    requireScopes(graph, request.credential, policy.commentScopes);
++    if (!request.text?.trim()) throw new InstagramError(graph.text('invalid'), 'rejected');
++    const result = await graph.request(`${request.remoteId}/replies`, request.credential.accessToken, { message: request.text }, 'POST');
++    if (typeof result.id !== 'string' || !result.id) throw new InstagramError(graph.text('uncertain'), 'uncertain');
++    return { remoteId: result.id };
++  }
++  async function hideInboxItem(request: InboxActionRequest & { hidden: boolean }) {
++    requireScopes(graph, request.credential, policy.commentScopes);
++    const result = await graph.request(request.remoteId, request.credential.accessToken, { hide: String(request.hidden) }, 'POST');
++    if (result.success !== true) throw new InstagramError(graph.text('uncertain'), 'uncertain');
++  }
++  async function deleteInboxItem(request: InboxActionRequest) {
++    requireScopes(graph, request.credential, policy.commentScopes);
++    const result = await graph.request(request.remoteId, request.credential.accessToken, {}, 'DELETE');
++    if (result.success !== true) throw new InstagramError(graph.text('uncertain'), 'uncertain');
++  }
++  return { listComments, listInbox, replyToInbox, hideInboxItem, deleteInboxItem };
++}
+diff --git a/rebuild/src/platforms/instagram/insights.ts b/rebuild/src/platforms/instagram/insights.ts
+new file mode 100644
+index 00000000..8a44e9f2
+--- /dev/null
++++ b/rebuild/src/platforms/instagram/insights.ts
+@@ -0,0 +1,94 @@
++import type { AnalyticsRequest, PlatformCredential } from '../types';
++import type { AnalyticsAudienceEntry, AnalyticsMetricInput } from '@/modules/analytics/server/catalog';
++import type { InstagramPolicy } from './config';
++import { object, type InstagramGraph } from './transport';
++import { requireScopes } from './publishing';
++
++export type InstagramInsight = { metric: string; period: string; asOf: Date; value: unknown; rangeTotal: boolean; raw: Record<string, unknown> };
++export function normalizeInstagramInsights(rows: readonly InstagramInsight[], target: { id: string; name: string }, policy: InstagramPolicy, locale: 'en' | 'fr', fetchedAt: Date): AnalyticsMetricInput[] {
++  const groups = new Map<string, AnalyticsMetricInput>();
++  for (const row of rows) {
++    if (!Number.isFinite(row.asOf.getTime()) || row.value == null) continue;
++    const numeric = typeof row.value === 'number' && Number.isFinite(row.value) ? row.value : null;
++    const breakdown = numeric === null;
++    const key = `${row.metric}::${row.period}::${row.rangeTotal ? 'range' : 'series'}`;
++    // Reach, lifetime media and range totals cannot be summed over dates.
++    const additive = !breakdown && row.period === 'day' && !row.rangeTotal && row.metric !== 'reach';
++    const kind = breakdown ? 'breakdown' : additive ? 'flow' : 'stock';
++    const metric = groups.get(key) ?? {
++      key, label: policy.labels[row.metric]?.[locale] ?? row.metric.replace(/_/g, ' '), sourceLabel: policy.copy.source[locale],
++      resourceKind: 'channel', coveredResourceIds: [target.id], kind, unit: 'count', observations: [],
++      rollup: additive ? 'sum' : 'latest-per-channel', aggregationNote: policy.copy.overlap[locale], available: 1, covered: 1,
++      latestAt: row.asOf, updatedAt: fetchedAt,
++    } satisfies AnalyticsMetricInput;
++    if (numeric !== null) metric.observations.push({ date: row.asOf, channelId: target.id, channelLabel: target.name, value: numeric });
++    else {
++      // Keep each category in its snapshot; never flatten distinct breakdowns into an invented total.
++      const categories: Array<{ label: string; value: number | null }> = [];
++      function flatten(value: unknown, prefix: string) {
++        if (typeof value === 'number' && Number.isFinite(value)) categories.push({ label: prefix, value });
++        else if (Array.isArray(value)) value.forEach((item, index) => {
++          const entry = object(item);
++          if (Array.isArray(entry.results)) {
++            const dimensions = Array.isArray(entry.dimension_keys) ? entry.dimension_keys : [];
++            for (const result of entry.results) {
++              const category = object(result);
++              const values = Array.isArray(category.dimension_values) ? category.dimension_values : [];
++              const label = values.map((item, i) => `${dimensions[i] ?? i}: ${String(item)}`).join(' · ');
++              flatten(category.value, label || `${prefix}/${index}`);
++            }
++          } else flatten(item, `${prefix}/${index}`);
++        });
++        else if (value && typeof value === 'object') for (const [key, item] of Object.entries(value)) flatten(item, prefix ? `${prefix}/${key}` : key);
++      }
++      flatten(row.value, '');
++      metric.breakdownHistory ??= [];
++      metric.breakdownHistory.push({ resourceId: target.id, resourceLabel: target.name, asOf: row.asOf, fetchedAt, rows: categories });
++    }
++    if (!metric.latestAt || row.asOf > metric.latestAt) metric.latestAt = row.asOf;
++    groups.set(key, metric);
++  }
++  return [...groups.values()].map(metric => ({ ...metric, observations: metric.observations.sort((a, b) => a.date.getTime() - b.date.getTime()) }));
++}
++/** Latest profile count is a standing audience snapshot, independent of the selected posting window. */
++export function normalizeInstagramAudience(profile: { followersCount: number | null; fetchedAt: Date }, target: { id: string; name: string }, policy: InstagramPolicy, locale: 'en' | 'fr'): AnalyticsAudienceEntry[] {
++  if (profile.followersCount === null || !Number.isFinite(profile.followersCount) || profile.followersCount < 0) return [];
++  return [{ id: target.id, name: target.name, metric: 'followers_count', metricLabel: policy.labels.followers_count?.[locale] ?? 'followers_count'.replace(/_/g, ' '), sourceLabel: policy.copy.source[locale], value: profile.followersCount, asOf: profile.fetchedAt, fetchedAt: profile.fetchedAt }];
++}
++export function createInstagramInsights(policy: InstagramPolicy, graph: InstagramGraph) {
++  async function collect(credential: PlatformCredential, id: string, queries: Array<Record<string, string>>, asOf: Date) {
++    requireScopes(graph, credential, policy.insightScopes);
++    const rows: InstagramInsight[] = []; const failures: string[] = [];
++    for (const query of queries) {
++      try {
++        const response = await graph.list(`${id}/insights`, credential.accessToken, query);
++        for (const raw of response.items) {
++          if (typeof raw.name !== 'string' || typeof raw.period !== 'string') continue;
++          if (Array.isArray(raw.values)) for (const point of raw.values) {
++            const value = object(point); const date = typeof value.end_time === 'string' ? new Date(value.end_time) : asOf;
++            rows.push({ metric: raw.name, period: raw.period, asOf: date, value: value.value, rangeTotal: false, raw });
++          }
++          if (raw.total_value !== undefined) {
++            const total = object(raw.total_value);
++            rows.push({ metric: raw.name, period: raw.period, asOf, value: total.breakdowns ?? total.value ?? raw.total_value, rangeTotal: true, raw });
++          }
++        }
++        if (response.truncated) failures.push(query.metric!);
++      } catch { failures.push(query.metric!); }
++    }
++    return { rows, failedMetrics: failures };
++  }
++  async function account(request: AnalyticsRequest) {
++    const params = { ...(request.since ? { since: String(Math.floor(request.since.getTime() / 1000)) } : {}), ...(request.until ? { until: String(Math.floor(request.until.getTime() / 1000)) } : {}) };
++    return collect(request.credential, request.targetId, policy.accountMetrics.map(metric => ({ ...params, metric: metric.name, period: metric.period, metric_type: metric.metricType, ...(metric.breakdown ? { breakdown: metric.breakdown } : {}) })), request.until ?? new Date());
++  }
++  async function post(credential: PlatformCredential, remoteId: string, asOf: Date) {
++    return collect(credential, remoteId, policy.postMetrics.map(metric => ({ metric })), asOf);
++  }
++  async function profile(credential: PlatformCredential, targetId: string) {
++    requireScopes(graph, credential, policy.readScopes);
++    const raw = await graph.request(targetId, credential.accessToken, { fields: 'id,username,name,followers_count,follows_count,media_count,profile_picture_url' });
++    return { raw, followersCount: typeof raw.followers_count === 'number' && Number.isFinite(raw.followers_count) ? raw.followers_count : null, fetchedAt: new Date() };
++  }
++  return { account, post, profile };
++}
+diff --git a/rebuild/src/platforms/instagram/module.ts b/rebuild/src/platforms/instagram/module.ts
+new file mode 100644
+index 00000000..edc4f105
+--- /dev/null
++++ b/rebuild/src/platforms/instagram/module.ts
+@@ -0,0 +1,10 @@
++import type { PlatformModule } from '../module';
++/** Staged manifest. Do not add to PLATFORM_MODULES before the shared host registration and connection persistence land. */
++export const instagramModule = {
++  id: 'instagram', name: 'Instagram', description: 'Professional accounts linked to selected Pages. Adapter fixtures only; customer activation pending.',
++  mark: { text: 'IG', color: '#c13584' }, health: { configuration: true, jobHistory: false, pendingQueues: [] },
++  capabilities: { connection: 'unsupported', discovery: 'unsupported', publishing: 'supported', remoteStatus: 'supported', remoteDelete: 'unsupported', inbox: 'supported', analytics: 'unsupported', ads: 'unsupported' },
++  channelKinds: [{ kind: 'professional', label: 'Instagram' }], enabledKey: 'platforms.instagram.enabled',
++  access: { includedByDefaultKey: 'platforms.instagram.includedByDefault', planFeaturesKey: 'platforms.instagram.planFeatures' },
++  requiredSettings: ['instagram.appSecret'], settingsGroup: 'Instagram',
++} as const satisfies PlatformModule;
+diff --git a/rebuild/src/platforms/instagram/publishing.ts b/rebuild/src/platforms/instagram/publishing.ts
+new file mode 100644
+index 00000000..2584a8e3
+--- /dev/null
++++ b/rebuild/src/platforms/instagram/publishing.ts
+@@ -0,0 +1,74 @@
++import type { FirstCommentRequest, PlatformCredential, PublishRequest, PublishResult, RemoteStatusRequest, RemoteStatus } from '../types';
++import type { InstagramPolicy } from './config';
++import { InstagramError, type InstagramGraph } from './transport';
++export const hasScopes = (credential: PlatformCredential, required: readonly string[]) => required.length > 0 && required.every(scope => credential.grantedScopes?.includes(scope));
++export function requireScopes(graph: InstagramGraph, credential: PlatformCredential, required: readonly string[]) {
++  if (!hasScopes(credential, required)) throw new InstagramError(graph.text('permission'), 'rejected');
++}
++export function createInstagramPublisher(policy: InstagramPolicy, graph: InstagramGraph, wait: (ms: number, signal?: AbortSignal) => Promise<void> = (ms, signal) => new Promise((resolve, reject) => {
++  const done = () => { signal?.removeEventListener('abort', abort); resolve(); };
++  const timer = setTimeout(done, ms);
++  const abort = () => { clearTimeout(timer); signal?.removeEventListener('abort', abort); reject(new Error('Aborted')); };
++  signal?.addEventListener('abort', abort, { once: true });
++  if (signal?.aborted) abort();
++})) {
++  function invalid(): never { throw new InstagramError(graph.text('invalid'), 'rejected'); }
++  async function ready(id: string, request: PublishRequest) {
++    for (let attempt = 0; attempt < policy.pollAttempts; attempt++) {
++      const status = await graph.request(id, request.credential.accessToken, { fields: 'status_code' }, 'GET', request.signal);
++      if (status.status_code === 'FINISHED') return;
++      if (status.status_code === 'ERROR' || status.status_code === 'EXPIRED') throw new InstagramError(graph.text('processing'), 'rejected');
++      // PUBLISHED is not permission to send media_publish again.
++      if (status.status_code !== 'IN_PROGRESS') throw new InstagramError(graph.text('uncertain'), 'uncertain');
++      if (attempt + 1 < policy.pollAttempts) await wait(policy.pollIntervalMs, request.signal);
++    }
++    throw new InstagramError(graph.text('uncertain'), 'uncertain');
++  }
++  async function publish(request: PublishRequest): Promise<PublishResult> {
++    requireScopes(graph, request.credential, policy.publishScopes);
++    const media = request.media ?? [];
++    const format = request.formatId ?? 'image';
++    if (request.target.kind !== 'professional' || request.scheduledAt || request.link || [...request.text].length > policy.captionLength || !media.length || media.length > policy.carouselMax) invalid();
++    if (!['image', 'reel', 'carousel'].includes(format) || (format === 'image' && (media.length !== 1 || media[0]?.kind !== 'image')) || (format === 'reel' && (media.length !== 1 || media[0]?.kind !== 'video')) || (format === 'carousel' && media.length < 2)) invalid();
++    for (const item of media) {
++      let url: URL; try { url = new URL(item.url); } catch { invalid(); }
++      if (url.protocol !== 'https:' || url.username || url.password || item.localFile || item.altText || !['image', 'video'].includes(item.kind)) invalid();
++    }
++    async function container(fields: Record<string, string>) {
++      const result = await graph.request(`${request.target.id}/media`, request.credential.accessToken, fields, 'POST', request.signal);
++      if (typeof result.id !== 'string' || !result.id) throw new InstagramError(graph.text('uncertain'), 'uncertain');
++      await ready(result.id, request);
++      return result.id;
++    }
++    let creationId: string;
++    if (format === 'carousel') {
++      const children: string[] = [];
++      for (const item of media) children.push(await container({ ...(item.kind === 'image' ? { image_url: item.url } : { video_url: item.url, media_type: 'VIDEO' }), is_carousel_item: 'true' }));
++      creationId = await container({ media_type: 'CAROUSEL', children: children.join(','), caption: request.text });
++    } else {
++      creationId = await container({ ...(format === 'image' ? { image_url: media[0]!.url } : { video_url: media[0]!.url, media_type: 'REELS' }), caption: request.text });
++    }
++    const result = await graph.request(`${request.target.id}/media_publish`, request.credential.accessToken, { creation_id: creationId }, 'POST', request.signal);
++    if (typeof result.id !== 'string' || !result.id) throw new InstagramError(graph.text('uncertain'), 'uncertain');
++    // A confirmed media_publish receipt survives a failed optional permalink read.
++    let url: string | null = null;
++    try { const post = await graph.request(result.id, request.credential.accessToken, { fields: 'permalink' }, 'GET', request.signal); url = typeof post.permalink === 'string' && post.permalink.startsWith('https://') ? post.permalink : null; } catch { /* confirmed receipt retained */ }
++    return { remoteId: result.id, url, state: 'published' };
++  }
++  async function publishFirstComment(request: FirstCommentRequest) {
++    requireScopes(graph, request.credential, policy.commentScopes);
++    if (!request.text.trim() || (request.formatId && !['image', 'carousel', 'reel'].includes(request.formatId))) invalid();
++    const result = await graph.request(`${request.remotePostId}/comments`, request.credential.accessToken, { message: request.text }, 'POST', request.signal);
++    if (typeof result.id !== 'string' || !result.id) throw new InstagramError(graph.text('uncertain'), 'uncertain');
++    return { remoteId: result.id };
++  }
++  async function getRemoteStatus(request: RemoteStatusRequest): Promise<RemoteStatus> {
++    requireScopes(graph, request.credential, policy.readScopes);
++    const result = await graph.request(request.remoteId, request.credential.accessToken, { fields: 'id,owner,timestamp,media_type' }, 'GET', request.signal);
++    const owner = typeof result.owner === 'object' && result.owner ? (result.owner as { id?: unknown }).id : result.owner;
++    const publishedAt = typeof result.timestamp === 'string' ? new Date(result.timestamp) : null;
++    if (result.id !== request.remoteId || owner !== request.target.id || !publishedAt || !Number.isFinite(publishedAt.getTime()) || !['IMAGE', 'VIDEO', 'CAROUSEL_ALBUM'].includes(String(result.media_type))) return { state: 'unknown' };
++    return { state: 'published', remoteId: request.remoteId, targetId: request.target.id, publishedAt };
++  }
++  return { publish, publishFirstComment, getRemoteStatus };
++}
+diff --git a/rebuild/src/platforms/instagram/runtime.ts b/rebuild/src/platforms/instagram/runtime.ts
+new file mode 100644
+index 00000000..ded46f87
+--- /dev/null
++++ b/rebuild/src/platforms/instagram/runtime.ts
+@@ -0,0 +1,21 @@
++import { runtimeConfig, runtimeSecret } from '@/server/config/store';
++import { instagramPolicySchema } from './config';
++import { createInstagramAdapter, createInstagramCollector } from './adapter';
++export async function configuredInstagramPolicy() {
++  return instagramPolicySchema.parse(await runtimeConfig('instagram.policy'));
++}
++export async function configuredInstagramAdapter(locale: 'en' | 'fr' = 'en') {
++  const [policy, appSecret] = await Promise.all([configuredInstagramPolicy(), runtimeSecret('instagram.appSecret')]);
++  return createInstagramAdapter(policy, { locale, ...(appSecret ? { appSecret } : {}) });
++}
++export async function configuredInstagramCollector() {
++  const [policy, appSecret] = await Promise.all([configuredInstagramPolicy(), runtimeSecret('instagram.appSecret')]);
++  return createInstagramCollector(policy, { ...(appSecret ? { appSecret } : {}) });
++}
++
++/** Credentials returned here are server-only and must be encrypted by connection persistence. */
++export async function configuredInstagramDiscovery() {
++  const { createSelectedInstagramDiscovery } = await import('./discovery');
++  const [policy, appSecret] = await Promise.all([configuredInstagramPolicy(), runtimeSecret('instagram.appSecret')]);
++  return createSelectedInstagramDiscovery(policy, { ...(appSecret ? { appSecret } : {}) });
++}
+diff --git a/rebuild/src/platforms/instagram/transport.ts b/rebuild/src/platforms/instagram/transport.ts
+new file mode 100644
+index 00000000..fd6eb412
+--- /dev/null
++++ b/rebuild/src/platforms/instagram/transport.ts
+@@ -0,0 +1,48 @@
++import { createHmac } from 'node:crypto';
++import { PlatformApiError } from '../errors';
++import type { InstagramPolicy } from './config';
++
++export class InstagramError extends PlatformApiError {
++  constructor(message: string, readonly outcome: 'rejected' | 'uncertain', retryable = false) { super(message, retryable); this.name = 'InstagramError'; }
++}
++export type Json = Record<string, unknown>;
++export const object = (value: unknown): Json => value && typeof value === 'object' && !Array.isArray(value) ? value as Json : {};
++export type InstagramGraph = ReturnType<typeof createInstagramGraph>;
++/** Wire fields/edges and Graph error codes are protocol invariants, isolated to this module. No mutation retries. */
++export function createInstagramGraph(policy: InstagramPolicy, options: { fetch?: typeof fetch; appSecret?: string; locale?: 'en' | 'fr' } = {}) {
++  const text = (key: keyof InstagramPolicy['copy']) => policy.copy[key][options.locale ?? 'en'];
++  async function request(path: string, token: string, params: Record<string, string> = {}, method: 'GET' | 'POST' | 'DELETE' = 'GET', signal?: AbortSignal): Promise<Json> {
++    if (!token || (policy.appSecretProofEnabled && !options.appSecret)) throw new InstagramError(text('permission'), 'rejected');
++    if (signal?.aborted) throw new InstagramError(text('unavailable'), 'rejected');
++    const url = new URL(`${policy.graphBaseUrl.replace(/\/+$/, '')}/${policy.graphVersion}/${path.split('/').map(encodeURIComponent).join('/')}`);
++    const fields = new URLSearchParams(params);
++    if (policy.appSecretProofEnabled) fields.set('appsecret_proof', createHmac('sha256', options.appSecret!).update(token).digest('hex'));
++    if (method === 'GET') url.search = fields.toString();
++    let response: Response; let raw: unknown;
++    try {
++      response = await (options.fetch ?? fetch)(url, { method, headers: { Authorization: `Bearer ${token}` }, ...(method !== 'GET' ? { body: fields } : {}), redirect: 'error', signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(policy.requestTimeoutMs)]) : AbortSignal.timeout(policy.requestTimeoutMs) });
++      raw = await response.json();
++    } catch { throw new InstagramError(text('unavailable'), 'uncertain', true); }
++    const result = object(raw); const error = object(result.error);
++    if (!response.ok || result.error) {
++      const definite = response.status >= 400 && response.status < 500 && response.status !== 429 && error.is_transient !== true && [10, 100, 190, 200].includes(Number(error.code));
++      throw new InstagramError(text('unavailable'), definite ? 'rejected' : 'uncertain', response.status >= 500 || response.status === 429 || error.is_transient === true);
++    }
++    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new InstagramError(text('unavailable'), 'uncertain');
++    return result;
++  }
++  async function list(path: string, token: string, params: Record<string, string> = {}, signal?: AbortSignal): Promise<{ items: Json[]; truncated: boolean }> {
++    const items: Json[] = []; let after: string | undefined;
++    for (let page = 0; page < policy.maxPages; page++) {
++      const result = await request(path, token, { ...params, limit: String(policy.pageSize), ...(after ? { after } : {}) }, 'GET', signal);
++      if (!Array.isArray(result.data)) throw new InstagramError(text('unavailable'), 'uncertain');
++      items.push(...result.data.map(object));
++      const paging = object(result.paging); const cursor = object(paging.cursors).after;
++      if (!paging.next) return { items, truncated: false };
++      if (typeof cursor !== 'string' || !cursor || cursor === after) return { items, truncated: true };
++      after = cursor; // Never follow provider-supplied URLs: credentials stay on the configured origin.
++    }
++    return { items, truncated: true };
++  }
++  return { request, list, text };
++}
+diff --git a/rebuild/tests/instagram-platform.test.ts b/rebuild/tests/instagram-platform.test.ts
+new file mode 100644
+index 00000000..fd3af752
+--- /dev/null
++++ b/rebuild/tests/instagram-platform.test.ts
+@@ -0,0 +1,211 @@
++import { describe, expect, it, vi } from 'vitest';
++import { createInstagramAdapter, createInstagramCollector } from '../src/platforms/instagram/adapter';
++import { INSTAGRAM_CONFIG, INSTAGRAM_POLICY_DEFAULTS, instagramPolicySchema } from '../src/platforms/instagram/config';
++import { createInstagramGraph, InstagramError } from '../src/platforms/instagram/transport';
++import { createSelectedInstagramDiscovery } from '../src/platforms/instagram/discovery';
++import { normalizeInstagramAudience, normalizeInstagramInsights, type InstagramInsight } from '../src/platforms/instagram/insights';
++import type { PublishRequest } from '../src/platforms/types';
++
++const policy = { ...INSTAGRAM_POLICY_DEFAULTS, appSecretProofEnabled: false, pollAttempts: 2 };
++const credential = { accessToken: 'fixture-token', grantedScopes: [...new Set([...policy.readScopes, ...policy.publishScopes, ...policy.commentScopes, ...policy.insightScopes])] };
++const target = { id: 'ig-one', name: 'Example studio', kind: 'professional' };
++const request: PublishRequest = { credential, target, text: 'Example caption', media: [{ kind: 'image', url: 'https://media.example.test/photo.jpg' }] };
++function fixture(responses: Array<unknown | Error>) {
++  const calls: Array<{ path: string; method: string; fields: URLSearchParams; headers: Headers }> = [];
++  const fetcher = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
++    const url = new URL(String(input));
++    calls.push({ path: url.pathname, method: init?.method ?? 'GET', fields: init?.body instanceof URLSearchParams ? init.body : url.searchParams, headers: new Headers(init?.headers) });
++    const response = responses.shift();
++    if (response instanceof Error) throw response;
++    if (response === undefined) throw new Error('Unexpected fixture request');
++    return new Response(JSON.stringify(response), { status: 200 });
++  }) as unknown as typeof fetch;
++  return { fetcher, calls };
++}
++const finished = { status_code: 'FINISHED' };
++
++describe('Instagram platform fixtures', () => {
++  it('declares Root-owned typed policy and keeps the module disabled', () => {
++    expect(instagramPolicySchema.parse(INSTAGRAM_POLICY_DEFAULTS)).toEqual(INSTAGRAM_POLICY_DEFAULTS);
++    expect(INSTAGRAM_CONFIG.find(setting => setting.key === 'platforms.instagram.enabled')?.defaultValue).toBe(false);
++    expect(INSTAGRAM_CONFIG.every(setting => setting.owner.id === 'instagram')).toBe(true);
++    expect(() => instagramPolicySchema.parse({ ...policy, graphBaseUrl: 'https://user:secret@example.test' })).toThrow();
++    expect(() => instagramPolicySchema.parse({ ...policy, carouselMax: 11 })).toThrow();
++  });
++  it('publishes an image and obtains the real permalink', async () => {
++    const f = fixture([{ id: 'container' }, finished, { id: 'published' }, { permalink: 'https://www.instagram.com/p/real-code/' }]);
++    const result = await createInstagramAdapter(policy, { fetch: f.fetcher }).publish!(request);
++    expect(result).toEqual({ remoteId: 'published', state: 'published', url: 'https://www.instagram.com/p/real-code/' });
++    expect(f.calls.map(call => call.path)).toEqual(['/v26.0/ig-one/media', '/v26.0/container', '/v26.0/ig-one/media_publish', '/v26.0/published']);
++    expect(f.calls[0]!.fields.get('image_url')).toBe(request.media![0]!.url);
++    expect(f.calls[0]!.headers.get('authorization')).toBe('Bearer fixture-token');
++  });
++  it('publishes mixed carousel children only after each is ready', async () => {
++    const f = fixture([{ id: 'image-child' }, finished, { id: 'video-child' }, finished, { id: 'parent' }, finished, { id: 'post' }, {}]);
++    await createInstagramAdapter(policy, { fetch: f.fetcher }).publish!({ ...request, formatId: 'carousel', media: [...request.media!, { kind: 'video', url: 'https://media.example.test/clip.mp4' }] });
++    expect(f.calls[0]!.fields.get('is_carousel_item')).toBe('true');
++    expect(f.calls[2]!.fields.get('media_type')).toBe('VIDEO');
++    expect(f.calls[4]!.fields.get('children')).toBe('image-child,video-child');
++    expect(f.calls[6]!.fields.get('creation_id')).toBe('parent');
++  });
++  it('uses REELS for a single video and waits through processing', async () => {
++    const f = fixture([{ id: 'reel' }, { status_code: 'IN_PROGRESS' }, finished, { id: 'post' }, new Error('optional read failed')]);
++    const wait = vi.fn(async () => {});
++    const result = await createInstagramAdapter(policy, { fetch: f.fetcher, wait }).publish!({ ...request, formatId: 'reel', media: [{ kind: 'video', url: 'https://media.example.test/clip.mp4' }] });
++    expect(f.calls[0]!.fields.get('media_type')).toBe('REELS');
++    expect(wait).toHaveBeenCalledWith(policy.pollIntervalMs, undefined);
++    expect(result).toMatchObject({ state: 'published', remoteId: 'post', url: null });
++  });
++  it.each(['ERROR', 'EXPIRED'])('never publishes a container in %s state', async status_code => {
++    const f = fixture([{ id: 'container' }, { status_code }]);
++    await expect(createInstagramAdapter(policy, { fetch: f.fetcher }).publish!(request)).rejects.toMatchObject({ outcome: 'rejected' });
++    expect(f.calls).toHaveLength(2);
++  });
++  it('holds exhausted polls and never repeats a published-container submission', async () => {
++    for (const statuses of [[{ status_code: 'IN_PROGRESS' }, { status_code: 'IN_PROGRESS' }], [{ status_code: 'PUBLISHED' }]]) {
++      const f = fixture([{ id: 'container' }, ...statuses]);
++      const adapter = createInstagramAdapter(policy, { fetch: f.fetcher, wait: async () => {} });
++      await expect(adapter.publish!(request)).rejects.toMatchObject({ outcome: 'uncertain' });
++      expect(f.calls.some(call => call.path.endsWith('media_publish'))).toBe(false);
++    }
++  });
++  it('never retries a lost media_publish response', async () => {
++    const f = fixture([{ id: 'container' }, finished, new Error('connection lost fixture-token')]);
++    const adapter = createInstagramAdapter(policy, { fetch: f.fetcher });
++    const error = await adapter.publish!(request).catch(error => error);
++    expect(error.message).not.toContain('fixture-token');
++    expect(adapter.classifyPublishingFailure!(error)).toBe('uncertain');
++    expect(f.calls.filter(call => call.path.endsWith('media_publish'))).toHaveLength(1);
++  });
++  it('refuses invalid media, formats, schedules and overlong Unicode captions before I/O', async () => {
++    const f = fixture([]); const adapter = createInstagramAdapter(policy, { fetch: f.fetcher });
++    const changes: Array<Partial<PublishRequest>> = [{ media: [] }, { formatId: 'story' }, { link: 'https://example.test' }, { scheduledAt: new Date() }, { text: '🙂'.repeat(policy.captionLength + 1) }, { media: [{ kind: 'image', url: 'http://example.test/photo.jpg' }] }, { media: [{ kind: 'image', url: 'https://example.test/photo.jpg', altText: 'Unsupported' }] }, { formatId: 'reel' }];
++    for (const change of changes) await expect(adapter.publish!({ ...request, ...change })).rejects.toMatchObject({ outcome: 'rejected' });
++    expect(f.calls).toHaveLength(0);
++  });
++  it('fails closed for missing scopes, including first comments', async () => {
++    const f = fixture([]); const adapter = createInstagramAdapter(policy, { fetch: f.fetcher });
++    expect(adapter.canUseCredential!({ accessToken: 'token' }, 'publishing')).toBe(false);
++    await expect(adapter.publish!({ ...request, credential: { accessToken: 'token' } })).rejects.toMatchObject({ outcome: 'rejected' });
++    await expect(adapter.publishFirstComment!({ credential: { ...credential, grantedScopes: policy.publishScopes }, remotePostId: 'post', text: 'First' })).rejects.toMatchObject({ outcome: 'rejected' });
++    expect(f.calls).toHaveLength(0);
++  });
++  it('requires a matching owner and final media shape for published status', async () => {
++    const data = { id: 'post', owner: { id: 'ig-one' }, timestamp: '2026-10-20T12:00:00Z', media_type: 'IMAGE' };
++    const f = fixture([data, { ...data, owner: { id: 'other' } }, { ...data, timestamp: 'invalid' }]);
++    const adapter = createInstagramAdapter(policy, { fetch: f.fetcher });
++    expect(await adapter.getRemoteStatus!({ credential, target, remoteId: 'post' })).toMatchObject({ state: 'published', targetId: target.id });
++    expect(await adapter.getRemoteStatus!({ credential, target, remoteId: 'post' })).toEqual({ state: 'unknown' });
++    expect(await adapter.getRemoteStatus!({ credential, target, remoteId: 'post' })).toEqual({ state: 'unknown' });
++  });
++  it('does not advertise unsupported deletion, OAuth, analytics host or ads', () => {
++    const adapter = createInstagramAdapter(policy);
++    expect(adapter.deleteRemote).toBeUndefined();
++    expect(adapter.capabilities).toMatchObject({ remoteDelete: 'unsupported', connection: 'unsupported', discovery: 'unsupported', analytics: 'unsupported', ads: 'unsupported' });
++    expect(adapter.publishingFormats!.every(format => !format.remoteDelete && !format.scheduling.native)).toBe(true);
++  });
++  it('discovers only provided selected Pages and deduplicates linked accounts', async () => {
++    const f = fixture([{ instagram_business_account: { id: 'ig-one', username: 'studio' } }, { instagram_business_account: { id: 'ig-one' } }, {}]);
++    const result = await createSelectedInstagramDiscovery(policy, { fetch: f.fetcher })([{ id: 'selected-one', name: 'One', accessToken: 'page-token' }, { id: 'selected-two', name: 'Two', accessToken: 'page-token' }, { id: 'selected-three', name: 'Three', accessToken: 'page-token' }]);
++    expect(result).toEqual([{ igUserId: 'ig-one', username: 'studio', pageId: 'selected-one', pageAccessToken: 'page-token' }]);
++    expect(f.calls.every(call => !call.path.includes('me/accounts'))).toBe(true);
++  });
++  it('uses signed requests and refuses missing signing secret before dispatch', async () => {
++    const f = fixture([{ id: 'post' }]);
++    await expect(createInstagramGraph(INSTAGRAM_POLICY_DEFAULTS, { fetch: f.fetcher }).request('post', 'token')).rejects.toMatchObject({ outcome: 'rejected' });
++    await createInstagramGraph(INSTAGRAM_POLICY_DEFAULTS, { fetch: f.fetcher, appSecret: 'fixture-secret' }).request('post', 'token');
++    expect(f.calls).toHaveLength(1);
++    expect(f.calls[0]!.fields.get('appsecret_proof')).toMatch(/^[a-f0-9]{64}$/);
++  });
++  it('paginates using cursors without following untrusted next URLs and discloses truncation', async () => {
++    const f = fixture([{ data: [{ id: 'a' }], paging: { next: 'https://evil.example/steal', cursors: { after: 'next' } } }, { data: [{ id: 'b' }] }]);
++    const result = await createInstagramGraph(policy, { fetch: f.fetcher }).list('post/comments', 'token');
++    expect(result).toEqual({ items: [{ id: 'a' }, { id: 'b' }], truncated: false });
++    expect(f.calls[1]!.fields.get('after')).toBe('next');
++    const clipped = fixture([{ data: [], paging: { next: 'https://evil.example' } }]);
++    expect((await createInstagramGraph(policy, { fetch: clipped.fetcher }).list('post/comments', 'token')).truncated).toBe(true);
++  });
++  it('returns root comments and replies with stable parent identities', async () => {
++    const f = fixture([{ owner: { id: target.id } }, { data: [{ id: 'comment', text: 'Question', timestamp: '2026-10-20T12:00:00Z', from: { id: 'visitor', username: 'Guest' } }] }, { data: [{ id: 'reply', text: 'Answer', timestamp: '2026-10-20T13:00:00Z' }] }]);
++    const rows = await createInstagramAdapter(policy, { fetch: f.fetcher }).listComments!({ credential, targetId: target.id, remotePostId: 'post' });
++    expect(rows).toMatchObject([{ id: 'comment', parentId: null, authorName: 'Guest' }, { id: 'reply', parentId: 'comment' }]);
++  });
++  it('refuses comments for media owned by another account', async () => {
++    const f = fixture([{ owner: { id: 'other' } }]);
++    await expect(createInstagramAdapter(policy, { fetch: f.fetcher }).listComments!({ credential, targetId: target.id, remotePostId: 'post' })).rejects.toMatchObject({ outcome: 'rejected' });
++    expect(f.calls).toHaveLength(1);
++  });
++  it('writes first comments, replies, hide and delete using their distinct protocol edges', async () => {
++    const f = fixture([{ id: 'first' }, { id: 'reply' }, { success: true }, { success: true }]); const adapter = createInstagramAdapter(policy, { fetch: f.fetcher });
++    await adapter.publishFirstComment!({ credential, remotePostId: 'post', text: 'First' });
++    await adapter.replyToInbox!({ credential, targetId: target.id, remoteId: 'comment', text: 'Reply' });
++    await adapter.hideInboxItem!({ credential, targetId: target.id, remoteId: 'comment', hidden: true });
++    await adapter.deleteInboxItem!({ credential, targetId: target.id, remoteId: 'comment' });
++    expect(f.calls.map(call => [call.path, call.method])).toEqual([['/v26.0/post/comments', 'POST'], ['/v26.0/comment/replies', 'POST'], ['/v26.0/comment', 'POST'], ['/v26.0/comment', 'DELETE']]);
++    expect(f.calls[2]!.fields.get('hide')).toBe('true');
++  });
++  it('retains partial account insights and arbitrary provider fields', async () => {
++    const raw = { name: 'views', period: 'day', total_value: { value: 12 }, future_field: { retained: true } };
++    const f = fixture([{ data: [raw] }, new Error('unsupported reach')]);
++    const collected = await createInstagramCollector(policy, { fetch: f.fetcher }).account({ credential, targetId: target.id, since: new Date('2026-10-01'), until: new Date('2026-10-21') });
++    expect(collected.failedMetrics).toEqual(['reach']);
++    expect(collected.rows[0]).toMatchObject({ metric: 'views', value: 12, rangeTotal: true, raw });
++    expect(f.calls[0]!.fields.get('metric_type')).toBe('total_value');
++    expect(f.calls[1]!.fields.get('metric_type')).toBe('time_series');
++  });
++  it('collects post insights independently and retains unsupported metrics as failures', async () => {
++    const f = fixture(policy.postMetrics.map(name => ({ data: [{ name, period: 'lifetime', values: [{ value: 4 }] }] })));
++    const result = await createInstagramCollector(policy, { fetch: f.fetcher }).post(credential, 'post', new Date('2026-10-21'));
++    expect(result.rows).toHaveLength(policy.postMetrics.length); expect(result.failedMetrics).toEqual([]);
++    expect(f.calls.every(call => call.path === '/v26.0/post/insights')).toBe(true);
++  });
++  it('normalizes flow, non-additive reach/range, zero and breakdown snapshots with French copy', () => {
++    const row = (metric: string, value: unknown, rangeTotal = false): InstagramInsight => ({ metric, value, rangeTotal, period: 'day', asOf: new Date('2026-10-21'), raw: {} });
++    const metrics = normalizeInstagramInsights([row('views', 0), row('reach', 9), row('views', 12, true), row('demographics', { age: { '18-24': 7 } })], target, policy, 'fr', new Date('2026-10-21'));
++    expect(metrics[0]).toMatchObject({ kind: 'flow', rollup: 'sum', label: 'Vues', observations: [{ value: 0 }] });
++    expect(metrics[1]).toMatchObject({ kind: 'stock', rollup: 'latest-per-channel' });
++    expect(metrics[2]).toMatchObject({ kind: 'stock', rollup: 'latest-per-channel' });
++    expect(metrics[3]).toMatchObject({ kind: 'breakdown', observations: [], breakdownHistory: [{ rows: [{ label: 'age/18-24', value: 7 }] }] });
++    expect(metrics.every(metric => metric.coveredResourceIds?.[0] === target.id)).toBe(true);
++  });
++  it('uses French safe error copy without provider response details', async () => {
++    const fetcher = vi.fn(async () => new Response(JSON.stringify({ error: { code: 190, message: 'private fixture-token' } }), { status: 400 })) as unknown as typeof fetch;
++    const error = await createInstagramGraph(policy, { fetch: fetcher, locale: 'fr' }).request('post', 'fixture-token').catch(error => error);
++    expect(error).toBeInstanceOf(InstagramError); expect(error.outcome).toBe('rejected');
++    expect(error.message).toBe(policy.copy.unavailable.fr); expect(error.message).not.toContain('fixture-token');
++  });
++  it('retains Graph demographic dimension names and never turns missing values into zero', () => {
++    const asOf = new Date('2026-10-21');
++    const rows: InstagramInsight[] = [{ metric: 'follower_demographics', period: 'lifetime', asOf, rangeTotal: true, raw: {}, value: [{ dimension_keys: ['age', 'gender'], results: [{ dimension_values: ['18-24', 'F'], value: 12 }] }] }, { metric: 'missing', period: 'day', asOf, rangeTotal: false, raw: {}, value: null }];
++    const metrics = normalizeInstagramInsights(rows, target, policy, 'en', asOf);
++    expect(metrics).toHaveLength(1);
++    expect(metrics[0]!.breakdownHistory![0]!.rows).toEqual([{ label: 'age: 18-24 · gender: F', value: 12 }]);
++    expect(metrics[0]!.observations).toEqual([]);
++  });
++  it('reads current audience counts without inventing unavailable followers', async () => {
++    const f = fixture([{ id: target.id, followers_count: 0 }, { id: target.id }]);
++    const collector = createInstagramCollector(policy, { fetch: f.fetcher });
++    const profile = await collector.profile(credential, target.id);
++    expect(profile.followersCount).toBe(0);
++    expect(normalizeInstagramAudience(profile, target, policy, 'fr')).toMatchObject([{ value: 0, metricLabel: 'Abonnés' }]);
++    expect(normalizeInstagramAudience({ ...profile, followersCount: null }, target, policy, 'en')).toEqual([]);
++    expect((await collector.profile(credential, target.id)).followersCount).toBeNull();
++  });
++  it('does not return an apparently complete Inbox after a pagination bound', async () => {
++    const f = fixture([{ owner: { id: target.id } }, { data: [], paging: { next: 'https://graph.example/next', cursors: { after: 'more' } } }]);
++    await expect(createInstagramAdapter({ ...policy, maxPages: 1 }, { fetch: f.fetcher }).listComments!({ credential, targetId: target.id, remotePostId: 'post' })).rejects.toMatchObject({ outcome: 'uncertain' });
++  });
++  it('never publishes when container creation or final receipt has no identity', async () => {
++    for (const responses of [[{}], [{ id: 'container' }, finished, {}]]) {
++      const f = fixture(responses);
++      await expect(createInstagramAdapter(policy, { fetch: f.fetcher }).publish!(request)).rejects.toMatchObject({ outcome: 'uncertain' });
++      expect(f.calls.filter(call => call.path.endsWith('media_publish')).length).toBeLessThanOrEqual(1);
++    }
++  });
++  it('does not dispatch an already cancelled request', async () => {
++    const f = fixture([]); const controller = new AbortController(); controller.abort();
++    await expect(createInstagramAdapter(policy, { fetch: f.fetcher }).publish!({ ...request, signal: controller.signal })).rejects.toMatchObject({ outcome: 'rejected' });
++    expect(f.calls).toHaveLength(0);
++  });
++
++});
+diff --git a/rebuild/tests/instagram-runtime.test.ts b/rebuild/tests/instagram-runtime.test.ts
+new file mode 100644
+index 00000000..d337ad05
+--- /dev/null
++++ b/rebuild/tests/instagram-runtime.test.ts
+@@ -0,0 +1,27 @@
++import { describe, expect, it, vi } from 'vitest';
++const settings = vi.hoisted(() => ({ runtimeConfig: vi.fn(), runtimeSecret: vi.fn() }));
++vi.mock('@/server/config/store', () => settings);
++import { INSTAGRAM_POLICY_DEFAULTS } from '../src/platforms/instagram/config';
++import { configuredInstagramAdapter, configuredInstagramCollector, configuredInstagramDiscovery } from '../src/platforms/instagram/runtime';
++import { PLATFORM_CONFIG, PLATFORM_MODULES, instagramModule } from '../src/platforms';
++
++describe('Instagram runtime integration boundary', () => {
++  it('builds from Root values and reads secrets through the secret reader', async () => {
++    settings.runtimeConfig.mockResolvedValue({ ...INSTAGRAM_POLICY_DEFAULTS, carouselMax: 3, copy: { ...INSTAGRAM_POLICY_DEFAULTS.copy, carousel: { en: 'Custom album', fr: 'Album personnalisé' } } });
++    settings.runtimeSecret.mockResolvedValue('fixture-secret');
++    const adapter = await configuredInstagramAdapter('fr');
++    expect(adapter.publishingFormats?.find(format => format.id === 'carousel')).toMatchObject({ label: 'Album personnalisé', media: { maxImages: 3 } });
++    expect(settings.runtimeConfig).toHaveBeenCalledWith('instagram.policy');
++    expect(settings.runtimeSecret).toHaveBeenCalledWith('instagram.appSecret');
++    expect(await configuredInstagramCollector()).toHaveProperty('post');
++    expect(await configuredInstagramDiscovery()).toBeTypeOf('function');
++  });
++  it('registers settings but keeps the incomplete host out of the installed customer catalog', () => {
++    expect(PLATFORM_CONFIG.some(setting => setting.key === 'instagram.policy')).toBe(true);
++    expect(PLATFORM_MODULES.some(module => String(module.id) === instagramModule.id)).toBe(false);
++  });
++  it('fails closed for invalid Root policy', async () => {
++    settings.runtimeConfig.mockResolvedValue({ ...INSTAGRAM_POLICY_DEFAULTS, pollAttempts: 0 });
++    await expect(configuredInstagramAdapter()).rejects.toThrow();
++  });
++});

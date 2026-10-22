@@ -1,0 +1,470 @@
+diff --git a/rebuild/src/modules/home/copy.ts b/rebuild/src/modules/home/copy.ts
+index 1ea37acb..4c5cdba7 100644
+--- a/rebuild/src/modules/home/copy.ts
++++ b/rebuild/src/modules/home/copy.ts
+@@ -10,16 +10,16 @@ const en = {
+   firstStep: 'First step', startTitle: 'Choose the channels you want to manage',
+   startBody: 'Connect a platform, then select the channels and ad accounts to add to this workspace. Only selected sources appear in publishing and reports.', startAction: 'Connect channels',
+   continueTitle: 'Continue your work', posts: 'Browse posts', connections: 'View connections', analytics: 'Explore analytics', ads: 'View ad accounts',
+-  greeting: 'Welcome back', period: 'Last {n} days', openModule: 'Open {name}',
++  greeting: 'Welcome back', period: 'Last {n} days (UTC; today so far)', openModule: 'Open {name}',
+   moduleNames: { publishing: 'Publishing', inbox: 'Inbox', analytics: 'Analytics', ads: 'Ads' },
+   unavailableTitle: 'Not available right now', unavailableBody: 'This figure could not be loaded. Try again in a moment.',
+-  audience: 'Audience', audienceOf: '{covered} of {selected} channels have a count', audienceAsOf: 'Latest counts, as of {date}',
++  audience: 'Audience', audienceOf: '{covered} of {selected} channels have a count', audienceAsOf: 'Most recent count: {date}; other channels may be older',
+   audienceNote: 'Added across channels; a person who follows several may be counted more than once.',
+   audienceTrend: 'Audience over the last {n} days',
+   audienceEmptyTitle: 'No audience counts yet', audienceEmptyBody: 'Counts appear once your channels have been synced.', audienceEmptyAction: 'Open analytics',
+   views: 'Views', engagements: 'Engagements', vsPrevious: 'vs the previous {n} days', noComparison: 'No comparison yet',
+   comparableNote: 'Compared over {comparable} of {covered} channels with figures in both periods.',
+-  unknownFigure: 'Not available', channelsNote: '{covered} of {channels} channels reported', truncatedNote: 'Showing the first {n} channels only.',
++  unknownFigure: 'Not available', channelsNote: 'Showing {covered} of {channels} channels', truncatedNote: 'Showing the first {n} channels only.',
+   perfEmptyTitle: 'No performance figures yet', perfEmptyBody: 'Views and engagements appear after your channels publish and sync.', perfEmptyAction: 'Open analytics',
+   topChannels: 'Top channels', topChannelsLabel: 'Engagements by channel, last {n} days', topChannelsSeries: 'Engagements',
+   topEmpty: 'No channel has engagement figures yet.',
+@@ -31,7 +31,7 @@ const en = {
+   modeApp: 'Sent by the app', modePlatform: 'Held on the platform', modeMixed: 'App and platform',
+   upcomingEmptyTitle: 'Nothing scheduled', upcomingEmptyBody: 'Schedule a post and it will appear here with the time it goes out.', upcomingEmptyAction: 'Create a post',
+   inbox: 'Inbox', inboxOpen: 'conversations waiting', inboxZero: 'You are all caught up.', inboxAction: 'Open inbox',
+-  adSpend: 'Ad spend', adSpendNote: 'Last {n} days, per currency', adSpendTrend: 'Daily ad spend, last {n} days',
++  adSpend: 'Ad spend', adSpendNote: '{from}–{to} (UTC). Stored results on {recorded} of {n} days. Latest stored day: {latest}. Missing results are not zero spend; account coverage may vary.', adSpendTrend: 'Stored daily ad spend, last {n} days',
+   adsEmptyTitle: 'No ad spend yet', adsEmptyBody: 'Spend shows here once your ad accounts have stored results.', adsEmptyAction: 'Open ads',
+ };
+ 
+@@ -42,16 +42,16 @@ const fr: typeof en = {
+   firstStep: 'Première étape', startTitle: 'Choisissez les canaux à gérer',
+   startBody: 'Connectez une plateforme, puis sélectionnez les canaux et comptes publicitaires à ajouter à cet espace. Seules les sources sélectionnées apparaissent dans la publication et les rapports.', startAction: 'Connecter des canaux',
+   continueTitle: 'Reprenez votre travail', posts: 'Parcourir les publications', connections: 'Voir les connexions', analytics: 'Explorer les statistiques', ads: 'Voir les comptes publicitaires',
+-  greeting: 'Bon retour', period: '{n} derniers jours', openModule: 'Ouvrir {name}',
++  greeting: 'Bon retour', period: '{n} derniers jours (UTC ; aujourd’hui en cours)', openModule: 'Ouvrir {name}',
+   moduleNames: { publishing: 'Publication', inbox: 'Boîte de réception', analytics: 'Statistiques', ads: 'Publicités' },
+   unavailableTitle: 'Indisponible pour le moment', unavailableBody: 'Ce chiffre n’a pas pu être chargé. Réessayez dans un instant.',
+-  audience: 'Audience', audienceOf: '{covered} canaux sur {selected} ont un chiffre', audienceAsOf: 'Derniers chiffres, au {date}',
++  audience: 'Audience', audienceOf: '{covered} canaux sur {selected} ont un chiffre', audienceAsOf: 'Chiffre le plus récent : {date} ; d’autres canaux peuvent être plus anciens',
+   audienceNote: 'Additionnée entre les canaux ; une personne qui en suit plusieurs peut être comptée plusieurs fois.',
+   audienceTrend: 'Audience sur les {n} derniers jours',
+   audienceEmptyTitle: 'Pas encore d’audience', audienceEmptyBody: 'Les chiffres apparaissent dès que vos canaux sont synchronisés.', audienceEmptyAction: 'Ouvrir les statistiques',
+   views: 'Vues', engagements: 'Interactions', vsPrevious: 'par rapport aux {n} jours précédents', noComparison: 'Pas encore de comparaison',
+   comparableNote: 'Comparé sur {comparable} canaux sur {covered} ayant des chiffres aux deux périodes.',
+-  unknownFigure: 'Non disponible', channelsNote: '{covered} canaux sur {channels} ont transmis des chiffres', truncatedNote: 'Seuls les {n} premiers canaux sont affichés.',
++  unknownFigure: 'Non disponible', channelsNote: '{covered} canaux affichés sur {channels}', truncatedNote: 'Seuls les {n} premiers canaux sont affichés.',
+   perfEmptyTitle: 'Pas encore de performances', perfEmptyBody: 'Les vues et interactions apparaissent après les publications et la synchronisation de vos canaux.', perfEmptyAction: 'Ouvrir les statistiques',
+   topChannels: 'Meilleurs canaux', topChannelsLabel: 'Interactions par canal, {n} derniers jours', topChannelsSeries: 'Interactions',
+   topEmpty: 'Aucun canal n’a encore de chiffres d’interactions.',
+@@ -63,7 +63,7 @@ const fr: typeof en = {
+   modeApp: 'Envoyée par l’application', modePlatform: 'Conservée sur la plateforme', modeMixed: 'Application et plateforme',
+   upcomingEmptyTitle: 'Rien de planifié', upcomingEmptyBody: 'Planifiez une publication : elle apparaîtra ici avec son heure d’envoi.', upcomingEmptyAction: 'Créer une publication',
+   inbox: 'Boîte de réception', inboxOpen: 'conversations en attente', inboxZero: 'Tout est à jour.', inboxAction: 'Ouvrir la boîte de réception',
+-  adSpend: 'Dépenses publicitaires', adSpendNote: '{n} derniers jours, par devise', adSpendTrend: 'Dépenses publicitaires par jour, {n} derniers jours',
++  adSpend: 'Dépenses publicitaires', adSpendNote: '{from}–{to} (UTC). Résultats enregistrés pour {recorded} jours sur {n}. Dernier jour enregistré : {latest}. Les résultats manquants ne sont pas des dépenses nulles ; la couverture des comptes peut varier.', adSpendTrend: 'Dépenses quotidiennes enregistrées, {n} derniers jours',
+   adsEmptyTitle: 'Pas encore de dépenses', adsEmptyBody: 'Les dépenses apparaissent dès que vos comptes publicitaires ont des résultats enregistrés.', adsEmptyAction: 'Ouvrir les publicités',
+ };
+ 
+diff --git a/rebuild/src/modules/home/server/README.md b/rebuild/src/modules/home/server/README.md
+new file mode 100644
+index 00000000..b34fa07f
+--- /dev/null
++++ b/rebuild/src/modules/home/server/README.md
+@@ -0,0 +1,73 @@
++# Home figures: spend review (2026-10-21)
++
++Home UI, `GET /api/home/overview` and `get_home_overview` share
++`readHomeOverview` and its authorized product reads. No provider branches,
++endpoints, Root keys or schema-version edits were added in this lane.
++
++## Spend findings and behavior
++
++The Ads reader already filters Home to account-level daily rows with inclusive
++UTC dates (exclusive next-midnight database bound) and selected authorized
++accounts. Provider decimal strings in `fields` are retained metadata, not extra
++spend. The Facebook collector converts strings to persisted Float major units.
++Valid persisted numeric rows did not reproduce concatenation, a 100x conversion
++or account-plus-campaign double counting. The exact reported production
++discrepancy remains unverified; no production/provider access was made.
++
++Home aggregation now explicitly parses decimal strings numerically, normalizes
++day/currency keys and rejects invalid/nonfinite amounts and unknown currency.
++Unknown currencies cannot safely be added together. Different currencies stay
++separate, with no conversion. Pagination must finish within `home.adsMaxPages`
++or the card remains unavailable.
++
++The service adds requested `start`/`end`, and per-currency `firstDay`, `lastDay`
++and `recordedDays`. These are observed result days, not proof of complete account
++coverage or successful sync. Missing days never imply zero. EN/FR screens show
++currency codes, requested UTC dates, observed day count and latest stored day,
++plus an account-coverage caveat. Incomplete periods have no sparkline.
++
++## Every card reviewed
++
++| Card | Calculation and findings |
++| --- | --- |
++| Audience | Analytics latest-per-channel total; overlap warning retained. Copy now identifies the most recent count date, rather than implying all channels share that freshness. Mixed metric keys suppress trends. |
++| Views / engagements | Sum finite known values; change compares only channels known in both periods with positive previous total. Fixed nonfinite values being counted as covered/comparable. Current window now starts at the same UTC first-day midnight as Ads/Analytics; today remains partial. Previous window is the preceding configured number of UTC days. KPI hints show covered/selected channels. |
++| Top channels | Finite current engagements sorted descending and Root-bounded; nonfinite engagements are now excluded consistently with totals. Copy now says displayed channels rather than falsely calling the top-list length all reporting channels. |
++| Interaction mix | Root-selected additive measure keys only. Now discloses channel truncation on this card too. Metric semantics belong to adapters. |
++| Best times | Deduplicate within channel, reject unmeasured/negative scores, divide by channel median, average channels equally; workspace weekday/hour. Existing tests cover arithmetic; no numeric fix identified. |
++| Upcoming | Authorized Publishing scheduled-match total, independent of bounded preview length. Destination states determine held location. No arithmetic fix identified. |
++| Inbox | Authorized Inbox open-match total, independent of page length; known zero stays zero. No arithmetic fix identified. |
++
++## Evidence and integration work
++
++`home-ads-production-shape.test.ts` exercises the real Ads query builder, reader,
++date parser, pagination and normalizer against fake database ports. Fixtures use
++the owner's account-id shape, provider spend strings, latest day October 16,
++out-of-period rows, unselected accounts and account/campaign/ad-set/ad levels.
++Expected USD total: 31 major units. A second fixture separates USD and EUR.
++Pure/service tests reproduce string concatenation at the aggregation boundary,
++invalid amounts, nonfinite coverage, period mismatch and stale-data metadata.
++EN/FR server-render tests verify the disclosures. This is synthetic service,
++query-shape and render evidence, not PostgreSQL/browser/provider evidence.
++
++Outside owned paths, the integrator should:
++
++- Update `docs/ARCHITECTURE.md`, `docs/AGENT_HANDOFF.md`,
++  `docs/DELIVERY_PLAN.md` and `UX-CONTRACT.md` with these changes and limits.
++- Reconcile the exact production discrepancy with an authorized separate
++  account/day read and provider receipts; keep customer records out of Git.
++- Review `platforms/facebook/jobs.ts`: invalid/missing provider spend still
++  becomes zero (`finite(row.spend) ?? 0`). Home cannot detect that loss later.
++  Rejection/provenance changes belong to the platform owner.
++- Assess historical currency: daily rows project today's account currency,
++  rather than storing per-insight currency. A guarantee needs platform/schema
++  work and a migration, outside this lane.
++- Review Analytics/platform audience trend coverage and heterogeneous
++  views/engagement meanings. Current aggregates cannot prove equal daily coverage.
++- Review saved `home.uiCopy` overrides. Existing stored default text can mask
++  updated wording. `adSpendNote` now uses `from`, `to`, `recorded`, `n`, `latest`;
++  `period`, `audienceAsOf` and `channelsNote` defaults also changed. Preserve
++  intentional translations while updating old defaults. No new Root keys.
++
++No server, whole-suite run, deployment, push, production access or commit was
++performed. Changes remain in the worktree for integration.
+diff --git a/rebuild/src/modules/home/server/overview-pure.ts b/rebuild/src/modules/home/server/overview-pure.ts
+index 02ec3992..f6966db9 100644
+--- a/rebuild/src/modules/home/server/overview-pure.ts
++++ b/rebuild/src/modules/home/server/overview-pure.ts
+@@ -13,10 +13,11 @@ export function sumKnown(values: readonly Known[]): Known {
+ /** Totals over channels, plus a change that compares only channels known in both periods (equal coverage). */
+ export function periodTotals(pairs: ReadonlyArray<{ current: Known; previous: Known }>) {
+   const current = sumKnown(pairs.map(pair => pair.current));
+-  const both = pairs.filter(pair => pair.current !== null && pair.previous !== null);
++  const finite = (value: Known) => typeof value === 'number' && Number.isFinite(value);
++  const both = pairs.filter(pair => finite(pair.current) && finite(pair.previous));
+   const comparableCurrent = sumKnown(both.map(pair => pair.current)), comparablePrevious = sumKnown(both.map(pair => pair.previous));
+   const change = comparableCurrent !== null && comparablePrevious !== null && comparablePrevious > 0 ? (comparableCurrent - comparablePrevious) / comparablePrevious : null;
+-  return { current, previous: comparablePrevious, change, covered: pairs.filter(pair => pair.current !== null).length, comparable: both.length };
++  return { current, previous: comparablePrevious, change, covered: pairs.filter(pair => finite(pair.current)).length, comparable: both.length };
+ }
+ 
+ const median = (values: number[]) => {
+@@ -79,12 +80,22 @@ export const isoDay = (date: Date) => date.toISOString().slice(0, 10);
+ export function lastDays(now: Date, days: number) { return { start: isoDay(new Date(now.getTime() - (days - 1) * DAY)), end: isoDay(now) }; }
+ 
+ /** Spend per currency; rows in different currencies are never added together. */
+-export function spendByCurrency(rows: ReadonlyArray<{ currency: string | null; spend: number; date: string }>) {
++export function spendByCurrency(rows: ReadonlyArray<{ currency: string | null; spend: number | string; date: string }>) {
+   const groups = new Map<string, { currency: string | null; total: number; byDay: Map<string, number> }>();
+   for (const row of rows) {
+-    const key = row.currency ?? '';
+-    const group = groups.get(key) ?? { currency: row.currency, total: 0, byDay: new Map<string, number>() };
+-    group.total += row.spend; group.byDay.set(row.date, (group.byDay.get(row.date) ?? 0) + row.spend);
++    // Decimal strings are amounts in major currency units, never minor units.
++    // Reject malformed input rather than silently dropping spend or counting it as zero.
++    if (typeof row.spend !== 'number' && typeof row.spend !== 'string') throw new Error('Invalid spend');
++    if (typeof row.spend === 'string' && !/^[+-]?\d+(?:\.\d+)?$/.test(row.spend.trim())) throw new Error('Invalid spend');
++    const spend = Number(row.spend);
++    if (!Number.isFinite(spend)) throw new Error('Invalid spend');
++    const date = isoDay(new Date(row.date));
++    // Unknown currencies cannot safely be added together or displayed as money.
++    const key = row.currency?.trim().toUpperCase();
++    if (!key || !/^[A-Z]{3}$/.test(key)) throw new Error('Invalid currency');
++    const group = groups.get(key) ?? { currency: key, total: 0, byDay: new Map<string, number>() };
++    group.total += spend; group.byDay.set(date, (group.byDay.get(date) ?? 0) + spend);
++    if (!Number.isFinite(group.total)) throw new Error('Invalid spend');
+     groups.set(key, group);
+   }
+   return [...groups.values()].map(group => ({ currency: group.currency, total: group.total, daily: [...group.byDay].sort(([a], [b]) => a.localeCompare(b)).map(([date, value]) => ({ date, value })) }));
+diff --git a/rebuild/src/modules/home/server/overview.ts b/rebuild/src/modules/home/server/overview.ts
+index 22222420..b6470bfb 100644
+--- a/rebuild/src/modules/home/server/overview.ts
++++ b/rebuild/src/modules/home/server/overview.ts
+@@ -32,7 +32,7 @@ export type HomeOverview = {
+   bestTimes: Section<{ cells: HeatmapCell[]; measuredPosts: number }> | null;
+   upcoming: Section<{ total: number; items: Array<{ id: string; text: string; scheduledAt: string; channels: string[]; mode: ScheduleMode }> }> | null;
+   inbox: Section<{ open: number }> | null;
+-  ads: Section<{ spend: Array<{ currency: string | null; total: number; daily: TrendPoint[] }> }> | null;
++  ads: Section<{ start: string; end: string; spend: Array<{ currency: string | null; total: number; firstDay: string; lastDay: string; recordedDays: number; daily: TrendPoint[] }> }> | null;
+ };
+ 
+ /** Payload of one card, without its state wrapper. */
+@@ -83,8 +83,8 @@ export async function readHomeOverview(actor: HomeActor, now = new Date()): Prom
+     return hosts.get(provider)!;
+   };
+ 
+-  const currentWindow = { from: new Date(now.getTime() - lookbackDays * DAY), to: now };
+-  const previousWindow = { from: new Date(now.getTime() - 2 * lookbackDays * DAY), to: currentWindow.from };
++  const currentWindow = { from: new Date(`${period.start}T00:00:00.000Z`), to: now };
++  const previousWindow = { from: new Date(currentWindow.from.getTime() - lookbackDays * DAY), to: currentWindow.from };
+ 
+   const audience = !wantsAnalytics ? null : settled<Data<'audience'>>(async () => {
+     if (!snapshot) return { state: 'unavailable' };
+@@ -115,7 +115,7 @@ export async function readHomeOverview(actor: HomeActor, now = new Date()): Prom
+     const engagements = periodTotals(rows.map(row => ({ current: row.current?.engagements ?? null, previous: row.previous?.engagements ?? null })));
+     if (views.current === null && engagements.current === null) return { state: 'empty' };
+     const topLimit = Number(config['home.topChannelsLimit']);
+-    const topChannels = rows.flatMap(row => row.current?.engagements != null ? [{ id: row.channel.id, name: row.channel.name, engagements: row.current.engagements }] : [])
++    const topChannels = rows.flatMap(row => row.current?.engagements != null && Number.isFinite(row.current.engagements) ? [{ id: row.channel.id, name: row.channel.name, engagements: row.current.engagements }] : [])
+       .sort((a, b) => b.engagements - a.engagements || a.name.localeCompare(b.name)).slice(0, topLimit);
+     const mixByKey = new Map<string, { label: string; values: Known[] }>();
+     for (const row of rows) for (const measure of row.mix) { const entry = mixByKey.get(measure.key) ?? { label: measure.label, values: [] }; entry.values.push(measure.value); mixByKey.set(measure.key, entry); }
+@@ -161,7 +161,9 @@ export async function readHomeOverview(actor: HomeActor, now = new Date()): Prom
+       rows.push(...result.rows.map(row => ({ currency: row.currency, spend: row.spend, date: row.date })));
+       if (result.nextOffset === null) {
+         if (!rows.length) return { state: 'empty' };
+-        return { state: 'ready', data: { spend: spendByCurrency(rows).map(group => ({ currency: group.currency, total: group.total, daily: group.daily.map(day => ({ t: dayKey(day.date), v: day.value })) })) } };
++        return { state: 'ready', data: { ...period, spend: spendByCurrency(rows).map(group => ({ currency: group.currency, total: group.total,
++          firstDay: group.daily[0]!.date, lastDay: group.daily[group.daily.length - 1]!.date, recordedDays: group.daily.length,
++          daily: group.daily.map(day => ({ t: dayKey(day.date), v: day.value })) })) } };
+       }
+       offset = result.nextOffset;
+     }
+diff --git a/rebuild/src/modules/home/ui/HomeScreen.tsx b/rebuild/src/modules/home/ui/HomeScreen.tsx
+index 481a12f9..8f47560a 100644
+--- a/rebuild/src/modules/home/ui/HomeScreen.tsx
++++ b/rebuild/src/modules/home/ui/HomeScreen.tsx
+@@ -67,7 +67,7 @@ function Kpi({ title, icon, totals, overview, t, locale }: { title: string; icon
+   const partial = totals.comparable > 0 && totals.comparable < totals.covered;
+   return <Tile module="analytics" span="span4" href={HREF.analytics} linkLabel={fill(t.openModule, { name: t.moduleNames.analytics })}>
+     <MetricCard module="analytics" icon={icon} label={title} value={totals.current === null ? null : number.format(totals.current)} unavailable={totals.current === null ? t.unknownFigure : undefined} delta={delta}
+-      hint={!delta ? t.noComparison : partial ? fill(t.comparableNote, { comparable: totals.comparable, covered: totals.covered }) : undefined} />
++      hint={<>{fill(t.channelsNote, { covered: totals.covered, channels: overview.channelCount })}<br />{!delta ? t.noComparison : partial ? fill(t.comparableNote, { comparable: totals.comparable, covered: totals.covered }) : undefined}</>} />
+   </Tile>;
+ }
+ 
+@@ -87,6 +87,7 @@ export default async function HomePage() {
+   const days = overview.lookbackDays;
+   const performance = overview.performance;
+   const ready = performance?.state === 'ready' ? performance.data : null;
++  const readyAds = overview.ads?.state === 'ready' ? overview.ads.data : null;
+ 
+   return <PageFrame module="home"><div className={styles.root}>
+     <PageHeader module="home" title={`${t.greeting}, ${viewer.membership.workspace.name}`} description={t.lead}
+@@ -122,6 +123,7 @@ export default async function HomePage() {
+         <Card module="analytics" icon={<IconChartDonut size={20} />} title={t.interactions} t={t} span="span6" id="home-mix">
+           {ready.interactions.length ? <DonutChart label={fill(t.interactionsLabel, { n: days })} locale={locale} totalLabel={t.interactionsTotal} slices={ready.interactions.map(item => ({ name: item.label, value: item.value }))} />
+             : <p className={styles.note}>{t.interactionsEmpty}</p>}
++          {ready.truncated && <p className={styles.note}>{fill(t.truncatedNote, { n: ready.channels })}</p>}
+         </Card>
+       </>}
+ 
+@@ -154,11 +156,13 @@ export default async function HomePage() {
+         </Tile>
+         : overview.inbox.state === 'unavailable' ? <Card module="inbox" icon={<IconInbox size={20} />} title={t.inbox} t={t} span="span4" id="home-inbox"><Unavailable t={t} /></Card> : null)}
+ 
+-      {overview.ads && (overview.ads.state === 'ready'
+-        ? overview.ads.data.spend.map((group, _index, all) => <Tile key={group.currency ?? 'none'} module="ads" span="span4" href={HREF.ads} linkLabel={fill(t.openModule, { name: t.moduleNames.ads })}>
+-          <MetricCard module="ads" icon={<IconSpeakerphone size={20} />} label={all.length > 1 && group.currency ? `${t.adSpend} · ${group.currency}` : t.adSpend}
+-            value={new Intl.NumberFormat(locale, group.currency ? { style: 'currency', currency: group.currency } : undefined).format(group.total)} hint={fill(t.adSpendNote, { n: days })}
+-            sparkline={all.length === 1 && group.daily.length > 1 ? group.daily.map(day => day.v) : undefined} sparklineLabel={fill(t.adSpendTrend, { n: days })} />
++      {overview.ads && (readyAds
++        ? readyAds.spend.map((group, _index, all) => <Tile key={group.currency ?? 'none'} module="ads" span="span4" href={HREF.ads} linkLabel={fill(t.openModule, { name: t.moduleNames.ads })}>
++          <MetricCard module="ads" icon={<IconSpeakerphone size={20} />} label={t.adSpend}
++            value={new Intl.NumberFormat(locale, group.currency ? { style: 'currency', currency: group.currency, currencyDisplay: 'code' } : undefined).format(group.total)}
++            hint={fill(t.adSpendNote, { n: days, from: dayFormat.format(new Date(readyAds.start)),
++              to: dayFormat.format(new Date(readyAds.end)), recorded: group.recordedDays, latest: dayFormat.format(new Date(group.lastDay)) })}
++            sparkline={all.length === 1 && group.recordedDays === days && group.daily.length > 1 ? group.daily.map(day => day.v) : undefined} sparklineLabel={fill(t.adSpendTrend, { n: days })} />
+         </Tile>)
+         : <Card module="ads" icon={<IconSpeakerphone size={20} />} title={t.adSpend} t={t} span="span4" id="home-ads">
+           <Body section={overview.ads} t={t} empty={<Empty title={t.adsEmptyTitle} body={t.adsEmptyBody} action={t.adsEmptyAction} href={HREF.ads} />}>{() => null}</Body>
+diff --git a/rebuild/tests/home-ads-production-shape.test.ts b/rebuild/tests/home-ads-production-shape.test.ts
+new file mode 100644
+index 00000000..7722283e
+--- /dev/null
++++ b/rebuild/tests/home-ads-production-shape.test.ts
+@@ -0,0 +1,66 @@
++import { beforeEach, describe, expect, it, vi } from 'vitest';
++
++const db = vi.hoisted(() => ({ accounts: vi.fn(), insights: vi.fn() }));
++vi.mock('@/server/data', () => ({ prisma: { adAccount: { findMany: db.accounts }, adInsight: { findMany: db.insights } } }));
++vi.mock('@/server/platforms/resource-visibility', () => ({ selectedResourceConnectionWhere: async () => ({ workspaceId: 'w', provider: { in: ['facebook'] }, invalidatedAt: null }) }));
++vi.mock('@/modules/ads/server/access', () => ({ authorizeAdsRead: async () => ({ allowedProviders: ['facebook'] }) }));
++vi.mock('@/modules/ads/server/copy', async () => {
++  const { defaultAdsCatalogs, customerText } = await import('@/modules/ads/copy');
++  return { withAdsCopySnapshot: (run: () => Promise<unknown>) => run(), adsServiceText: async (key: Parameters<typeof customerText>[2]) => customerText(defaultAdsCatalogs.customer, 'en', key) };
++});
++vi.mock('@/modules/ads/server/report-policy', () => ({ loadAdsReportPolicy: async () => ({ presets: [{ id: '28d', days: 28, label: 'Last 28 days' }], defaultPreset: '28d', maxRangeDays: 90, maxFilterCharacters: 200 }) }));
++vi.mock('@/modules/ads/server/read-policy', () => ({ loadAdsReadPolicy: async () => ({ pageSize: 2, maxRows: 100 }) }));
++vi.mock('@/modules/ads/server/output-policy', () => ({ loadAdsOutputPolicy: async () => ({ detailMaxBytes: 1048576 }) }));
++
++import { readAdsDailyRows } from '@/modules/ads/server/report-read';
++import { spendByCurrency } from '@/modules/home/server/overview-pure';
++
++const account = { id: 'selected', actId: 'act_159977536979568', name: 'Example account', currency: 'USD' };
++// The collection worker stores major-unit numeric spend and preserves provider strings in fields.
++const row = (id: string, day: string, spend: string, level = 'account', accountId = 'selected', currency = 'USD') => ({
++  id, adAccountId: accountId, level, objectId: level === 'account' ? account.actId : `${level}-1`, objectName: 'Example',
++  date: new Date(`${day}T00:00:00Z`), fetchedAt: new Date('2026-10-17T06:00:00Z'), spend: Number(spend),
++  impressions: 100, clicks: 2, reach: 50, cpc: null, cpm: null, cpp: null, ctr: null, frequency: null, actions: [],
++  fields: { spend, date_start: day, report_level: level, account_currency: currency }, adAccount: { ...account, id: accountId, currency },
++});
++const fixtures = [
++  row('first', '2026-09-24', '10.25'), row('middle', '2026-10-15', '20.10'), row('last', '2026-10-16', '0.65'),
++  row('outside-before', '2026-09-23', '1000'), row('outside-after', '2026-10-22', '1000'),
++  ...['campaign', 'adset', 'ad'].map(level => row(level, '2026-10-16', '30.00', level)),
++  row('unselected', '2026-10-16', '9999', 'account', 'other', 'EUR'),
++];
++
++describe('Home spend through the real Ads read and normalization services', () => {
++  beforeEach(() => {
++    vi.clearAllMocks();
++    db.accounts.mockResolvedValue([account]);
++    db.insights.mockImplementation(async ({ where }: { where: { adAccount: { id: { in: string[] } }; level: { in: string[] }; date: { gte: Date; lt: Date } } }) =>
++      fixtures.filter(row => where.adAccount.id.in.includes(row.adAccountId) && where.level.in.includes(row.level) && row.date >= where.date.gte && row.date < where.date.lt));
++  });
++
++  it('counts account days once, applies inclusive UTC dates, pages fully and ignores raw string fields', async () => {
++    const rows = [];
++    let offset = 0;
++    for (;;) {
++      const page = await readAdsDailyRows({ userId: 'u', workspaceId: 'w' }, { start: '2026-09-24', end: '2026-10-21', level: 'account', offset });
++      rows.push(...page.rows);
++      expect(page.range).toEqual({ from: '2026-09-24', to: '2026-10-22', endExclusive: true });
++      if (page.nextOffset === null) break;
++      offset = page.nextOffset;
++    }
++    expect(rows.map(row => row.id)).toEqual(['last', 'middle', 'first']);
++    expect(rows[0]).toMatchObject({ spend: 0.65, currency: 'USD', fields: { spend: '0.65' } });
++    const [total] = spendByCurrency(rows);
++    expect(total.currency).toBe('USD');
++    expect(total.total).toBeCloseTo(31);
++    expect(total.daily.map(day => day.date)).toEqual(['2026-09-24', '2026-10-15', '2026-10-16']);
++    expect(db.insights).toHaveBeenCalledTimes(2);
++  });
++
++  it('keeps additional selected currencies separate without converting major units', async () => {
++    db.accounts.mockResolvedValue([account, { ...account, id: 'eur', currency: 'EUR' }]);
++    db.insights.mockResolvedValue([row('usd', '2026-10-16', '12.30'), row('eur', '2026-10-16', '7.70', 'account', 'eur', 'EUR')]);
++    const page = await readAdsDailyRows({ userId: 'u', workspaceId: 'w' }, { start: '2026-10-16', end: '2026-10-16', level: 'account' });
++    expect(spendByCurrency(page.rows)).toMatchObject([{ currency: 'EUR', total: 7.7 }, { currency: 'USD', total: 12.3 }]);
++  });
++});
+diff --git a/rebuild/tests/home-inventory.test.ts b/rebuild/tests/home-inventory.test.ts
+index f7ec45e6..e714e471 100644
+--- a/rebuild/tests/home-inventory.test.ts
++++ b/rebuild/tests/home-inventory.test.ts
+@@ -29,7 +29,7 @@ const full = () => ({
+     { id: 'p1', text: 'Launch day', scheduledAt: '2026-10-21T09:00:00.000Z', channels: ['Alpha'], mode: 'platform' },
+     { id: 'p2', text: 'Recap', scheduledAt: '2026-10-22T09:00:00.000Z', channels: ['Beta'], mode: 'app' }] } },
+   inbox: { state: 'ready', data: { open: 7 } },
+-  ads: { state: 'ready', data: { spend: [{ currency: 'EUR', total: 250, daily: [{ t: '2026-10-18', v: 100 }, { t: '2026-10-19', v: 150 }] }] } },
++  ads: { state: 'ready', data: { start: '2026-09-23', end: '2026-10-20', spend: [{ currency: 'EUR', total: 250, firstDay: '2026-10-18', lastDay: '2026-10-19', recordedDays: 2, daily: [{ t: '2026-10-18', v: 100 }, { t: '2026-10-19', v: 150 }] }] } },
+ });
+ 
+ beforeEach(() => {
+@@ -65,7 +65,8 @@ describe('Home overview screen', () => {
+     expect(html).toContain('[heatmap:Typical engagement by weekday and hour]');
+     expect(html).toContain('Held on the platform');
+     expect(html).toContain('Sent by the app');
+-    expect(html).toContain('€250.00');
++    expect(html).toContain('EUR');
++    expect(html).toContain('250.00');
+     for (const href of ['/analytics', '/publishing/posts', '/inbox', '/ads']) expect(html).toContain(`href="${href}"`);
+     expect(html).toContain('Welcome back, Example workspace');
+     expect(html).toContain('Last 28 days');
+@@ -120,4 +121,16 @@ describe('Home overview screen', () => {
+     await HomePage();
+     expect(state.selectedTargets).toHaveBeenCalledWith(workspaceId, ['channel-allowed'], ['facebook']);
+   });
++
++  it.each(['en', 'fr'])('labels USD and the actual stored-data period in %s', async locale => {
++    state.locale.mockResolvedValue(locale);
++    const data = full();
++    data.ads.data.spend[0] = { currency: 'USD', total: 13, firstDay: '2026-10-15', lastDay: '2026-10-16', recordedDays: 2, daily: [] };
++    state.overview.mockResolvedValue(data);
++    const html = renderToStaticMarkup(await HomePage());
++    expect(html).toContain('USD');
++    expect(html).toContain(locale === 'en' ? 'Latest stored day: Oct 16, 2026' : 'Dernier jour enregistré : 16 oct. 2026');
++    expect(html).toContain(locale === 'en' ? '2 of 28 days' : '2 jours sur 28');
++    expect(html).toContain('UTC');
++  });
+ });
+diff --git a/rebuild/tests/home-overview-pure.test.ts b/rebuild/tests/home-overview-pure.test.ts
+index fbc974e5..f80ff510 100644
+--- a/rebuild/tests/home-overview-pure.test.ts
++++ b/rebuild/tests/home-overview-pure.test.ts
+@@ -47,6 +47,31 @@ describe('home overview arithmetic', () => {
+     expect(groups.find(group => group.currency === 'EUR')).toMatchObject({ total: 16, daily: [{ date: '2026-10-01', value: 15 }, { date: '2026-10-02', value: 1 }] });
+     expect(groups.find(group => group.currency === 'USD')?.total).toBe(7);
+   });
++
++  it('adds decimal spend strings numerically and groups ISO days', () => {
++    expect(spendByCurrency([
++      { currency: 'USD', spend: '12.30', date: '2026-10-16T00:00:00.000Z' },
++      { currency: 'USD', spend: '0.70', date: '2026-10-16' },
++    ])).toEqual([{ currency: 'USD', total: 13, daily: [{ date: '2026-10-16', value: 13 }] }]);
++  });
++
++  it.each(['', ' ', '12oops', '1,200.50', 'Infinity', 'NaN'])('withholds invalid spend rather than treating %j as zero', spend => {
++    expect(() => spendByCurrency([{ currency: 'USD', spend, date: '2026-10-16' }])).toThrow();
++  });
++
++  it('does not count nonfinite performance figures as covered or comparable', () => {
++    expect(periodTotals([{ current: 5, previous: Number.NaN }, { current: Infinity, previous: 2 }]))
++      .toEqual({ current: 5, previous: null, change: null, covered: 1, comparable: 0 });
++  });
++
++  it.each([null, '', 'DOLLARS'])('withholds spend with an unknown or malformed currency: %j', currency => {
++    expect(() => spendByCurrency([{ currency, spend: 10, date: '2026-10-16' }])).toThrow();
++  });
++
++  it('normalizes currency codes before grouping', () => {
++    expect(spendByCurrency([{ currency: ' usd ', spend: 1, date: '2026-10-16' }, { currency: 'USD', spend: 2, date: '2026-10-16' }]))
++      .toMatchObject([{ currency: 'USD', total: 3 }]);
++  });
+ });
+ 
+ describe('best-time heatmap', () => {
+diff --git a/rebuild/tests/home-overview-service.test.ts b/rebuild/tests/home-overview-service.test.ts
+index 2530947a..46a9882c 100644
+--- a/rebuild/tests/home-overview-service.test.ts
++++ b/rebuild/tests/home-overview-service.test.ts
+@@ -84,7 +84,7 @@ describe('readHomeOverview', () => {
+       expect(host.postPerformanceBatch).toHaveBeenCalledTimes(1);
+       const ids = channels.filter((_, channelIndex) => channelIndex % 2 === (index === 0 ? 1 : 0)).map(channel => channel.id);
+       expect(host.channelMeasuresBatch.mock.calls[0]![0]).toMatchObject({ workspaceId: actor.workspaceId, targetIds: ids,
+-        current: { to: now }, previous: { to: new Date(now.getTime() - 28 * 86_400_000) } });
++        current: { from: new Date('2026-09-23T00:00:00Z'), to: now }, previous: { from: new Date('2026-08-26T00:00:00Z'), to: new Date('2026-09-23T00:00:00Z') } });
+       expect(host.postPerformanceBatch).toHaveBeenCalledWith(expect.objectContaining({ workspaceId: actor.workspaceId, targetIds: ids,
+         limit: config['home.heatmapMaxPostsPerChannel'], sort: 'publishedAt', direction: 'desc', to: now }));
+       expect(host.goalMeasures).not.toHaveBeenCalled();
+@@ -159,4 +159,30 @@ describe('readHomeOverview', () => {
+     mocks.permissions.mockResolvedValue(null);
+     await expect(readHomeOverview(actor, now)).rejects.toMatchObject({ code: 'forbidden' });
+   });
++
++  it('returns the requested UTC period and actual latest spend day without inventing missing-day zeros', async () => {
++    mocks.ads.mockResolvedValue({ rows: [
++      { currency: 'USD', spend: 12.3, date: '2026-10-15T00:00:00.000Z' },
++      { currency: 'USD', spend: 0.7, date: '2026-10-16T00:00:00.000Z' },
++    ], nextOffset: null });
++    const overview = await readHomeOverview(actor, now);
++    expect(overview.ads).toMatchObject({ state: 'ready', data: { start: '2026-09-23', end: '2026-10-20', spend: [
++      { currency: 'USD', total: 13, firstDay: '2026-10-15', lastDay: '2026-10-16', recordedDays: 2 },
++    ] } });
++    expect(mocks.ads).toHaveBeenCalledWith(actor, { start: '2026-09-23', end: '2026-10-20', level: 'account', offset: 0 });
++  });
++
++  it('excludes nonfinite channel engagements from the ranking as well as totals', async () => {
++    mocks.host.mockResolvedValue({ goalMeasures: async ({ targetId }: { targetId: string }) => ({ views: 5, engagements: targetId === 'c1' ? Infinity : 10 }) });
++    expect((await readHomeOverview(actor, now)).performance).toMatchObject({ state: 'ready', data: {
++      engagements: { current: 10, covered: 1 }, topChannels: [{ id: 'c2', name: 'Beta', engagements: 10 }],
++    } });
++  });
++
++  it('isolates an unknown spend currency without hiding other cards', async () => {
++    mocks.ads.mockResolvedValue({ rows: [{ currency: null, spend: 12, date: '2026-10-16' }], nextOffset: null });
++    const overview = await readHomeOverview(actor, now);
++    expect(overview.ads).toEqual({ state: 'unavailable' });
++    expect(overview.inbox).toEqual({ state: 'ready', data: { open: 4 } });
++  });
+ });

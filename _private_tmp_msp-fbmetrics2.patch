@@ -1,0 +1,463 @@
+diff --git a/rebuild/src/platforms/facebook/analytics.ts b/rebuild/src/platforms/facebook/analytics.ts
+index 68e19902..d2be4833 100644
+--- a/rebuild/src/platforms/facebook/analytics.ts
++++ b/rebuild/src/platforms/facebook/analytics.ts
+@@ -1,3 +1,6 @@
++import { analyticsLanguage } from '@/modules/analytics/server/error-copy';
++import { runtimeConfigBatch } from '@/server/config/store';
++import { FACEBOOK_METRIC_LABEL_DEFAULTS, FACEBOOK_PAGE_ANALYTICS_COPY_DEFAULTS } from './config';
+ import { facebookInsightCategories } from './data-normalization';
+ import { prisma } from '@/server/data';
+ import { readFacebookPostPerformance } from './post-performance';
+@@ -8,19 +11,13 @@ import { safeNumber } from '@/modules/analytics/server/catalog';
+ 
+ /** Provider vocabulary and interpretation for stored Facebook Page and Meta Ads metrics. */
+ const metricNames: Record<string, string> = {
+-  page_follows: 'Followers', page_fans: 'Page likes',
+-  page_daily_follows: 'Daily follows', page_daily_follows_unique: 'New followers',
+-  page_daily_unfollows_unique: 'Lost followers', page_total_media_view_unique: 'People reached',
+-  page_impressions_unique: 'Unique impressions', page_impressions: 'Impressions',
+-  page_media_view: 'Media views', page_post_engagements: 'Post engagements',
+-  page_views_total: 'Page views', page_video_views: 'Video views',
+   spend: 'Spend', impressions: 'Impressions', clicks: 'Clicks', reach: 'Reach',
+   cpc: 'Cost per click', cpm: 'Cost per 1,000 impressions', cpp: 'Cost per person reached',
+   ctr: 'Click-through rate', frequency: 'Frequency',
+ };
+ 
+ export function facebookMetricLabel(key: string): string | undefined {
+-  return metricNames[key];
++  return metricNames[key] ?? (FACEBOOK_METRIC_LABEL_DEFAULTS as Record<string, { en: string; fr: string }>)[key]?.en;
+ }
+ 
+ function facebookLabel(key: string): string {
+@@ -47,7 +44,13 @@ const object = (value: unknown): Record<string, unknown> => value && typeof valu
+ const dayKey = (date: Date) => date.toISOString().slice(0, 10);
+ const overlappingPeopleNote = 'Counts may overlap across resources. Sums are not deduplicated people or total reach for the whole period.';
+ 
+-function pageInputs(rows: PageRow[], selected: FacebookTarget[], audienceRows: PageRow[], audienceAsOf?: Date): { metrics: AnalyticsMetricInput[]; audience: AnalyticsAudienceEntry[] } {
++type PagePresentation = { locale?: 'en' | 'fr'; metricLabels?: Record<string, { en: string; fr: string }>; pageCopy?: typeof FACEBOOK_PAGE_ANALYTICS_COPY_DEFAULTS };
++
++function pageInputs(rows: PageRow[], selected: FacebookTarget[], audienceRows: PageRow[], audienceAsOf?: Date, presentation: PagePresentation = {}): { metrics: AnalyticsMetricInput[]; audience: AnalyticsAudienceEntry[] } {
++  const locale = presentation.locale ?? 'en';
++  const copy = (presentation.pageCopy ?? FACEBOOK_PAGE_ANALYTICS_COPY_DEFAULTS)[locale];
++  const labels = { ...FACEBOOK_METRIC_LABEL_DEFAULTS, ...presentation.metricLabels } as Record<string, { en: string; fr: string }>;
++  const label = (key: string) => labels[key]?.[locale] ?? facebookLabel(key);
+   const groups = new Map<string, PageRow[]>();
+   for (const row of rows) { const key = `${row.metric}::${row.period ?? 'day'}`; const group = groups.get(key) ?? []; group.push(row); groups.set(key, group); }
+   const metrics: AnalyticsMetricInput[] = [];
+@@ -56,8 +59,8 @@ function pageInputs(rows: PageRow[], selected: FacebookTarget[], audienceRows: P
+     const numeric = group.flatMap(row => { const value = row.numeric ?? safeNumber(row.value); return value === null ? [] : [{ date: row.endTime, channelId: row.target.id, channelLabel: row.target.name, value }]; });
+     const coveredResourceIds = [...new Set(numeric.map(row => row.channelId))].sort();
+     const updatedAt = new Date(Math.max(...group.map(row => row.fetchedAt.getTime())));
+-    const baseLabel = `${facebookLabel(first.metric)}${period !== 'day' ? ` · ${period}` : ''}`;
+-    if (numeric.length) metrics.push({ key, label: kind === 'stock' ? `${baseLabel} · Latest per channel` : baseLabel, sourceLabel: 'Page performance', kind, unit: 'count', observations: numeric, ...(/unique|reach/.test(first.metric) ? { aggregationNote: overlappingPeopleNote } : {}), coveredResourceIds, ...(kind === 'stock' || period !== 'day' ? { rollup: 'latest-per-channel' as const } : {}), available: selected.length, updatedAt });
++    const baseLabel = `${label(first.metric)}${period !== 'day' ? ` · ${period}` : ''}`;
++    if (numeric.length) metrics.push({ key, label: kind === 'stock' ? `${baseLabel} · ${copy.latest}` : baseLabel, sourceLabel: copy.source, kind, unit: 'count', observations: numeric, ...(/unique|reach/.test(first.metric) ? { aggregationNote: copy.overlap } : {}), coveredResourceIds, ...(kind === 'stock' || period !== 'day' ? { rollup: 'latest-per-channel' as const } : {}), available: selected.length, updatedAt });
+     // Keep each stored resource/time snapshot. Re-fetches at the same time
+     // select the newest fetch; categories absent from a snapshot stay absent.
+     const historyRows = new Map<string, PageRow>();
+@@ -76,11 +79,11 @@ function pageInputs(rows: PageRow[], selected: FacebookTarget[], audienceRows: P
+     const values = new Map<string, number>();
+     for (const row of newest.values()) for (const { label, value } of facebookInsightCategories(row.value)) { if (value !== null) values.set(label, (values.get(label) ?? 0) + value); }
+     const latest = [...newest.values()];
+-    if (breakdownHistory.length) metrics.push({ ...(first.metric.startsWith('content:') ? { totalOverride: null } : {}), breakdownHistory, key: numeric.length ? `${key}::breakdown` : key, label: `${baseLabel} · Categories`, sourceLabel: 'Page performance', kind: 'breakdown', unit: 'count', observations: [], rows: [...values].map(([label, value]) => ({ label, value, asOf: null })), coveredResourceIds: [...newest.keys()].sort(), available: selected.length, covered: newest.size, latestAt: latest.length ? new Date(Math.max(...latest.map(row => row.endTime.getTime()))) : null, updatedAt: latest.length ? new Date(Math.max(...latest.map(row => row.fetchedAt.getTime()))) : null });
++    if (breakdownHistory.length) metrics.push({ ...(first.metric.startsWith('content:') ? { totalOverride: null } : {}), breakdownHistory, key: numeric.length ? `${key}::breakdown` : key, label: `${baseLabel} · ${copy.categories}`, sourceLabel: copy.source, kind: 'breakdown', unit: 'count', observations: [], rows: [...values].map(([label, value]) => ({ label, value, asOf: null })), coveredResourceIds: [...newest.keys()].sort(), available: selected.length, covered: newest.size, latestAt: latest.length ? new Date(Math.max(...latest.map(row => row.endTime.getTime()))) : null, updatedAt: latest.length ? new Date(Math.max(...latest.map(row => row.fetchedAt.getTime()))) : null });
+   }
+   const newest = new Map<string, PageRow>();
+   for (const row of audienceRows) { if (audienceAsOf && row.endTime > audienceAsOf) continue; const old = newest.get(row.target.id); if (!old || row.endTime > old.endTime || (row.endTime.getTime() === old.endTime.getTime() && row.metric === 'page_follows' && old.metric !== 'page_follows') || (row.endTime.getTime() === old.endTime.getTime() && row.metric === old.metric && row.fetchedAt > old.fetchedAt)) newest.set(row.target.id, row); }
+-  const audience = [...newest.values()].flatMap(row => row.numeric === null ? [] : [{ id: row.target.id, name: row.target.name, metric: row.metric, metricLabel: row.metric === 'page_fans' ? 'Page likes' : 'Followers', sourceLabel: 'Page performance', value: row.numeric, asOf: row.endTime, fetchedAt: row.fetchedAt }]);
++  const audience = [...newest.values()].flatMap(row => row.numeric === null ? [] : [{ id: row.target.id, name: row.target.name, metric: row.metric, metricLabel: label(row.metric), sourceLabel: copy.source, value: row.numeric, asOf: row.endTime, fetchedAt: row.fetchedAt }]);
+   return { metrics, audience };
+ }
+ 
+@@ -289,8 +292,8 @@ function deliveryBreakdownInputs(rows: AdRow[], selected: SelectedAdAccount[]):
+ }
+ 
+ /** Pure mapper kept at the Facebook boundary so stored-row semantics can be tested without storage. */
+-export function normalizeFacebookAnalytics(input: { pageRows: PageRow[]; audienceRows: PageRow[]; adRows: AdRow[]; selectedTargets: FacebookTarget[]; selectedAdAccounts: SelectedAdAccount[]; audienceAsOf?: Date }) {
+-  const page = pageInputs(input.pageRows, input.selectedTargets, input.audienceRows, input.audienceAsOf);
++export function normalizeFacebookAnalytics(input: { pageRows: PageRow[]; audienceRows: PageRow[]; adRows: AdRow[]; selectedTargets: FacebookTarget[]; selectedAdAccounts: SelectedAdAccount[]; audienceAsOf?: Date } & PagePresentation) {
++  const page = pageInputs(input.pageRows, input.selectedTargets, input.audienceRows, input.audienceAsOf, input);
+   return { metrics: [...page.metrics, ...adInputs(input.adRows, input.selectedAdAccounts)], audienceEntries: page.audience, audienceSelected: input.selectedTargets.length };
+ }
+ 
+@@ -326,7 +329,8 @@ export const facebookAnalyticsHost = {
+       selectedAdAccountIds.length ? prisma.adInsight.findMany({ where: { adAccount: { workspaceId: request.workspaceId, id: { in: selectedAdAccountIds }, ...(adTargetCeiling === undefined ? {} : { socialAccountId: { in: socialAccountIds } }), enabled: true, socialAccount: { is: { workspaceId: request.workspaceId, provider: 'facebook', invalidatedAt: null } } }, level: 'account', date: { gte: request.range.from, lte: request.range.to } }, orderBy: [{ date: 'asc' }], select: { date: true, spend: true, impressions: true, clicks: true, reach: true, cpc: true, cpm: true, cpp: true, ctr: true, frequency: true, actions: true, fields: true, fetchedAt: true, adAccount: { select: { id: true, name: true, currency: true } } } }) : Promise.resolve([]),
+     ]);
+     const selectedAdAccounts = adAccounts.filter(account => selectedAdAccountIds.includes(account.id));
+-    const normalized = normalizeFacebookAnalytics({ pageRows: pageRows as PageRow[], selectedTargets, audienceRows: audienceRows as PageRow[], adRows: adRows as AdRow[], selectedAdAccounts, audienceAsOf: request.range.to });
++    const [presentation, locale] = await Promise.all([runtimeConfigBatch(['meta.metricLabels', 'meta.pageAnalyticsCopy']), analyticsLanguage()]);
++    const normalized = normalizeFacebookAnalytics({ locale, metricLabels: presentation['meta.metricLabels'] as PagePresentation['metricLabels'], pageCopy: presentation['meta.pageAnalyticsCopy'] as PagePresentation['pageCopy'], pageRows: pageRows as PageRow[], selectedTargets, audienceRows: audienceRows as PageRow[], adRows: adRows as AdRow[], selectedAdAccounts, audienceAsOf: request.range.to });
+     return { targets: visible.map(({ socialAccountId: _socialAccountId, ...target }) => target), selectedTargets: selectedTargets.map(({ socialAccountId: _socialAccountId, ...target }) => target), adAccounts, selectedAdAccountIds, ...normalized };
+   },
+ };
+diff --git a/rebuild/src/platforms/facebook/config.ts b/rebuild/src/platforms/facebook/config.ts
+index 810e590a..9c8cec66 100644
+--- a/rebuild/src/platforms/facebook/config.ts
++++ b/rebuild/src/platforms/facebook/config.ts
+@@ -55,15 +55,41 @@ export const FACEBOOK_DATA_CONFIG = [
+   entry({ key: 'meta.contentInsightCollections', group: 'Facebook · Analytics collection', label: 'Content insight collections', kind: 'json', description: 'Version-verified posts, videos, Reels and Stories metrics and periods. Empty until verified against the configured Graph version. Uses existing insight read grants; does not grant permissions.', defaultValue: [], schema: facebookContentInsightsSchema, consumption: 'active' }),
+ ] as const;
+ 
++/**
++ * Legacy arrays cannot distinguish an old default snapshot from deliberate removal.
++ * Migrate them as additions, never infer exclusions from absence. Operators record
++ * removals in excludedMetrics (including future names); exclusions always win.
++ * Read-time normalization is pure. Persist the normalized policy with saveRootConfig
++ * so the existing confirmed, transactional config.changed audit accompanies it.
++ * Never write settings from a worker/read or silently manufacture an audit actor.
++ */
++// Defaults can grow beyond a previously saved list length; do not truncate choices
++// or create normalized values that cannot be parsed again on the next read/save.
++const metricListSchema = z.array(z.string().regex(/^[a-z][a-z0-9_]*$/));
++export function mergeFacebookMetrics(defaults: readonly string[], metrics: readonly string[], excludedMetrics: readonly string[]) {
++  const excluded = new Set(excludedMetrics);
++  return [...new Set([...metrics, ...defaults])].filter(metric => !excluded.has(metric));
++}
++
++// Integrator: module.ts must use this schema/default for meta.pageInsightMetrics;
++// every runtime consumer must project .metrics into FacebookConfig.pageInsightMetrics.
++export const FACEBOOK_PAGE_METRIC_DEFAULTS = ['page_follows', 'page_daily_follows', 'page_daily_follows_unique', 'page_daily_unfollows_unique', 'page_media_view', 'page_total_media_view_unique', 'page_post_engagements', 'page_views_total', 'page_video_views'];
++export const facebookPageMetricPolicySchema = z.union([
++  metricListSchema.transform(metrics => ({ metrics, excludedMetrics: [] as string[] })),
++  z.object({ metrics: metricListSchema, excludedMetrics: metricListSchema }).strict(),
++]).transform(policy => ({ metrics: mergeFacebookMetrics(FACEBOOK_PAGE_METRIC_DEFAULTS, policy.metrics, policy.excludedMetrics), excludedMetrics: [...new Set(policy.excludedMetrics)] }));
++export const FACEBOOK_POST_METRIC_DEFAULTS = ['post_media_view', 'post_total_media_view_unique', 'post_clicks', 'post_clicks_by_type', 'post_reactions_by_type_total', 'post_video_views', 'post_video_view_time'];
++
+ export const facebookHistoryPolicySchema = z.object({
+   lookbackDays: z.number().int().min(1).max(36500),
+   pageBudget: z.number().int().min(1).max(100),
+   edge: z.enum(['published_posts', 'feed']),
+   fields: z.array(z.string().min(1)).min(1).max(100),
+-  metrics: z.array(z.string().regex(/^[a-z][a-z0-9_]*$/)).max(100),
++  metrics: metricListSchema,
++  excludedMetrics: metricListSchema.optional(),
+   reactionTypes: z.array(z.string().regex(/^[A-Z_]+$/)).max(30),
+-});
+-export const FACEBOOK_HISTORY_CONFIG = [entry({ key: 'meta.postHistoryPolicy', group: 'Facebook · Analytics collection', label: 'Page post history policy', kind: 'json', description: 'Resumable Page history window, per-run feed page budget, fields, lifetime metrics and reaction types. Video metrics are requested only for positively identified video posts. Metric eligibility depends on Graph version and grants; explicitly saved metric lists replace the defaults.', defaultValue: { lookbackDays: 365, pageBudget: 2, edge: 'published_posts', fields: ['id', 'message', 'created_time', 'permalink_url', 'status_type', 'full_picture', 'shares', 'comments.limit(0).summary(true)'], metrics: ['post_media_view', 'post_total_media_view_unique', 'post_clicks', 'post_clicks_by_type', 'post_reactions_by_type_total', 'post_video_views', 'post_video_view_time'], reactionTypes: ['LIKE', 'LOVE', 'WOW', 'HAHA', 'SAD', 'ANGRY', 'CARE'] }, schema: facebookHistoryPolicySchema, consumption: 'active' })] as const;
++}).transform(policy => ({ ...policy, metrics: mergeFacebookMetrics(FACEBOOK_POST_METRIC_DEFAULTS, policy.metrics, policy.excludedMetrics ?? []), excludedMetrics: [...new Set(policy.excludedMetrics ?? [])] }));
++export const FACEBOOK_HISTORY_CONFIG = [entry({ key: 'meta.postHistoryPolicy', group: 'Facebook · Analytics collection', label: 'Page post history policy', kind: 'json', description: 'Resumable Page history window, per-run feed page budget, fields, lifetime metrics and reaction types. Video metrics are requested only for positively identified video posts. Metric eligibility depends on Graph version and grants; saved metrics are additions to shipped defaults. Record deliberate removals in excludedMetrics; exclusions win and remain saved. Legacy missing metrics are not treated as exclusions. Save through Root to audit the normalized policy.', defaultValue: { lookbackDays: 365, pageBudget: 2, edge: 'published_posts', fields: ['id', 'message', 'created_time', 'permalink_url', 'status_type', 'full_picture', 'shares', 'comments.limit(0).summary(true)'], metrics: FACEBOOK_POST_METRIC_DEFAULTS, excludedMetrics: [], reactionTypes: ['LIKE', 'LOVE', 'WOW', 'HAHA', 'SAD', 'ANGRY', 'CARE'] }, schema: facebookHistoryPolicySchema, consumption: 'active' })] as const;
+ 
+ export const facebookAdHierarchySchema = z.object({ levels: z.array(z.enum(['campaign', 'adset', 'ad'])).max(3), actionBreakdowns: z.array(z.string().regex(/^[a-z][a-z0-9_]*$/)).max(10) });
+ /** Normalized post keys and raw Page keys; saved labels override these defaults. */
+@@ -81,6 +107,9 @@ export const FACEBOOK_METRIC_LABEL_DEFAULTS = {
+   post_reactions_by_type_total: { en: 'Reactions by type', fr: 'Réactions par type' },
+   video_views: { en: 'Video views', fr: 'Vues de vidéo' },
+   video_watch_time: { en: 'Video watch time (milliseconds)', fr: 'Durée de visionnage (millisecondes)' },
++  page_fans: { en: 'Page likes', fr: 'Mentions J’aime de la Page' },
++  page_impressions: { en: 'Impressions', fr: 'Impressions' },
++  page_impressions_unique: { en: 'Unique impressions', fr: 'Impressions uniques' },
+   page_follows: { en: 'Followers', fr: 'Abonnés' },
+   page_daily_follows: { en: 'Daily follows', fr: 'Abonnements quotidiens' },
+   page_daily_follows_unique: { en: 'New followers', fr: 'Nouveaux abonnés' },
+@@ -101,11 +130,19 @@ export const FACEBOOK_METRIC_LABEL_DEFAULTS = {
+ 
+ // Runtime single/batch reads and Root reads/saves all parse the owning schema.
+ // Merge catalogs here so older stored catalogs gain newly shipped labels without
+-// overwriting custom labels or forcing removed metrics back into collection lists.
++// overwriting custom labels. Collection exclusions are a separate policy.
+ export const facebookMetricLabelsSchema = z.record(z.string(), z.object({ en: z.string().min(1), fr: z.string().min(1) }))
+   .transform(overrides => ({ ...FACEBOOK_METRIC_LABEL_DEFAULTS, ...overrides }));
+ 
++export const FACEBOOK_PAGE_ANALYTICS_COPY_DEFAULTS = {
++  en: { source: 'Page performance', latest: 'Latest per channel', categories: 'Categories', overlap: 'Counts may overlap across resources. Sums are not deduplicated people or total reach for the whole period.' },
++  fr: { source: 'Performances de la Page', latest: 'Dernière valeur par canal', categories: 'Catégories', overlap: 'Les personnes comptées peuvent figurer dans plusieurs ressources. Les sommes ne représentent pas des personnes distinctes ni la portée totale de la période.' },
++};
++const pageAnalyticsCopyLanguageSchema = z.object({ source: z.string().min(1), latest: z.string().min(1), categories: z.string().min(1), overlap: z.string().min(1) });
++export const facebookPageAnalyticsCopySchema = z.object({ en: pageAnalyticsCopyLanguageSchema, fr: pageAnalyticsCopyLanguageSchema });
++
+ export const FACEBOOK_DATA_DETAIL_CONFIG = [
++ entry({ key: 'meta.pageAnalyticsCopy', group: 'Facebook · Analytics collection', label: 'Bilingual Page analytics copy', kind: 'json', description: 'English and French Page provenance, aggregation and category labels.', defaultValue: FACEBOOK_PAGE_ANALYTICS_COPY_DEFAULTS, schema: facebookPageAnalyticsCopySchema, consumption: 'active' }),
+  entry({ key: 'meta.adHierarchyPolicy', group: 'Facebook · Analytics collection', label: 'Ads hierarchy and action dimensions', kind: 'json', description: 'Additional daily campaign, ad set and ad reports. Action dimensions apply to these reports.', defaultValue: { levels: ['campaign', 'adset', 'ad'], actionBreakdowns: ['action_type'] }, schema: facebookAdHierarchySchema, consumption: 'active' }),
+  entry({ key: 'meta.metricLabels', group: 'Facebook · Analytics collection', label: 'Bilingual metric labels', kind: 'json', description: 'English and French labels keyed by normalized metric name. Saved entries override defaults; newly shipped labels are inherited automatically.', defaultValue: FACEBOOK_METRIC_LABEL_DEFAULTS, schema: facebookMetricLabelsSchema, consumption: 'active' }),
+ ] as const;
+diff --git a/rebuild/tests/facebook-analytics-selection.test.ts b/rebuild/tests/facebook-analytics-selection.test.ts
+index 79e3cff1..1f76db9d 100644
+--- a/rebuild/tests/facebook-analytics-selection.test.ts
++++ b/rebuild/tests/facebook-analytics-selection.test.ts
+@@ -1,13 +1,15 @@
+ import { beforeEach, describe, expect, it, vi } from 'vitest';
+ 
+ const db = vi.hoisted(() => ({
+-  targets: vi.fn(), adAccounts: vi.fn(), pageInsights: vi.fn(), adInsights: vi.fn(),
++  settings: vi.fn(), targets: vi.fn(), adAccounts: vi.fn(), pageInsights: vi.fn(), adInsights: vi.fn(),
+ }));
+ vi.mock('../src/server/data', () => ({ prisma: {
+-  target: { findMany: db.targets }, adAccount: { findMany: db.adAccounts },
++  appSetting: { findMany: db.settings }, target: { findMany: db.targets }, adAccount: { findMany: db.adAccounts },
+   pageInsight: { findMany: db.pageInsights }, adInsight: { findMany: db.adInsights },
+ } }));
+ 
++vi.mock('@/modules/analytics/server/error-copy', () => ({ analyticsLanguage: async () => 'fr' }));
++
+ import { facebookAnalyticsHost } from '../src/platforms/facebook/analytics';
+ 
+ const page = (id: string, socialAccountId: string) => ({ id, name: id, type: 'page', providerId: id, socialAccountId });
+@@ -16,6 +18,7 @@ const account = { id: 'ad-a', name: 'Ad account A', currency: 'USD' };
+ describe('Facebook analytics selection reads', () => {
+   beforeEach(() => {
+     vi.clearAllMocks();
++    db.settings.mockResolvedValue([]);
+     db.targets.mockResolvedValue([page('page-a', 'source-a'), page('page-b', 'source-b')]);
+     db.adAccounts.mockResolvedValue([account]);
+     db.pageInsights.mockResolvedValue([]);
+@@ -36,3 +39,14 @@ describe('Facebook analytics selection reads', () => {
+     expect(db.adAccounts.mock.calls[0]![0].where.socialAccountId).toEqual({ in: ['source-a'] });
+   });
+ });
++
++it('loads saved Root Page labels for the request language through the host', async () => {
++  db.targets.mockResolvedValue([page('page-a', 'source-a')]);
++  db.adAccounts.mockResolvedValue([]);
++  const at = new Date('2026-10-15');
++  db.pageInsights.mockResolvedValue([{ metric: 'page_follows', period: 'day', numeric: 12, value: 12, endTime: at, fetchedAt: at, target: { id: 'page-a', name: 'Example' } }]);
++  db.settings.mockResolvedValue([{ key: 'meta.metricLabels', encrypted: false, value: { page_follows: { en: 'My followers', fr: 'Mes abonnés' } } }]);
++  const result = await facebookAnalyticsHost.load({ workspaceId: 'w', range: { from: new Date('2026-10-01'), to: new Date('2026-10-31') }, selectedTargetIds: ['page-a'], selectedAdAccountIds: [] });
++  expect(result.metrics[0]).toMatchObject({ label: 'Mes abonnés · Dernière valeur par canal', sourceLabel: 'Performances de la Page' });
++  expect(result.audienceEntries[0]?.metricLabel).toBe('Mes abonnés');
++});
+diff --git a/rebuild/tests/facebook-metric-config.test.ts b/rebuild/tests/facebook-metric-config.test.ts
+index 4124c8ff..f8eee6dc 100644
+--- a/rebuild/tests/facebook-metric-config.test.ts
++++ b/rebuild/tests/facebook-metric-config.test.ts
+@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
+ const db = vi.hoisted(() => ({ findUnique: vi.fn(), findMany: vi.fn() }));
+ vi.mock('@/server/data', () => ({ prisma: { appSetting: db } }));
+ import { FACEBOOK_CONFIG } from '../src/platforms/facebook/module';
+-import { FACEBOOK_HISTORY_CONFIG, FACEBOOK_METRIC_LABEL_DEFAULTS, facebookMetricLabelsSchema } from '../src/platforms/facebook/config';
++import { FACEBOOK_HISTORY_CONFIG, FACEBOOK_METRIC_LABEL_DEFAULTS, facebookMetricLabelsSchema, facebookPageMetricPolicySchema, FACEBOOK_PAGE_METRIC_DEFAULTS, FACEBOOK_POST_METRIC_DEFAULTS } from '../src/platforms/facebook/config';
+ import { readConfig, runtimeConfig, runtimeConfigBatch } from '../src/server/config/store';
+ 
+ beforeEach(() => vi.clearAllMocks());
+@@ -22,8 +22,9 @@ describe('Facebook metric configuration', () => {
+     expect(setting.defaultValue.metrics).toEqual(expect.arrayContaining(['post_clicks', 'post_video_views', 'post_video_view_time']));
+     const aliases: Record<string, string> = { post_clicks: 'clicks', post_video_views: 'video_views', post_video_view_time: 'video_watch_time' };
+     for (const metric of setting.defaultValue.metrics) expect(FACEBOOK_METRIC_LABEL_DEFAULTS).toHaveProperty(aliases[metric] ?? metric);
+-    expect(setting.schema.parse({ ...setting.defaultValue, metrics: [] }).metrics).toEqual([]);
+-    expect(setting.schema.parse({ ...setting.defaultValue, metrics: ['custom_metric'] }).metrics).toEqual(['custom_metric']);
++    expect(setting.schema.parse({ ...setting.defaultValue, metrics: [] }).metrics).toEqual(FACEBOOK_POST_METRIC_DEFAULTS);
++    expect(setting.schema.parse({ ...setting.defaultValue, metrics: [], excludedMetrics: FACEBOOK_POST_METRIC_DEFAULTS }).metrics).toEqual([]);
++    expect(setting.schema.parse({ ...setting.defaultValue, metrics: ['custom_metric'] }).metrics).toEqual(['custom_metric', ...FACEBOOK_POST_METRIC_DEFAULTS]);
+   });
+ 
+   it('inherits new labels through single, batch and Root reads of an older saved catalog', async () => {
+@@ -43,3 +44,42 @@ describe('Facebook metric configuration', () => {
+     expect(facebookMetricLabelsSchema.safeParse(overrides).success).toBe(false);
+   });
+ });
++
++it('migrates legacy Page arrays without guessing exclusions and retains future opt-outs', () => {
++  const legacy = ['page_follows', 'custom_metric', 'page_follows'];
++  const migrated = facebookPageMetricPolicySchema.parse(legacy);
++  expect(migrated.metrics).toEqual(['page_follows', 'custom_metric', ...FACEBOOK_PAGE_METRIC_DEFAULTS.filter(metric => metric !== 'page_follows')]);
++  expect(migrated.excludedMetrics).toEqual([]);
++  expect(legacy).toEqual(['page_follows', 'custom_metric', 'page_follows']);
++  const explicit = facebookPageMetricPolicySchema.parse({ metrics: [...legacy, 'page_video_views'], excludedMetrics: ['page_video_views', 'future_metric', 'future_metric'] });
++  expect(explicit.metrics).not.toContain('page_video_views');
++  expect(explicit.excludedMetrics).toEqual(['page_video_views', 'future_metric']);
++  expect(facebookPageMetricPolicySchema.parse(explicit)).toEqual(explicit);
++});
++
++it('applies history migration consistently through runtime single, batch and Root reads', async () => {
++  const setting = FACEBOOK_HISTORY_CONFIG[0];
++  const legacy = { ...setting.defaultValue, metrics: ['custom_metric'], excludedMetrics: ['post_video_views', 'future_metric'] };
++  const row = { key: setting.key, encrypted: false, value: legacy };
++  db.findUnique.mockResolvedValue(row); db.findMany.mockResolvedValue([row]);
++  const expected = setting.schema.parse(legacy);
++  expect(expected.metrics).toContain('custom_metric');
++  expect(expected.metrics).toContain('post_clicks');
++  expect(expected.metrics).not.toContain('post_video_views');
++  expect(await runtimeConfig(setting.key)).toEqual(expected);
++  expect((await runtimeConfigBatch([setting.key]))[setting.key]).toEqual(expected);
++  expect((await readConfig()).find(item => item.key === setting.key)?.value).toEqual(expected);
++  expect(setting.schema.parse(expected)).toEqual(expected);
++  expect(row.value.metrics).toEqual(['custom_metric']);
++});
++
++it.each([{ metrics: ['bad name'], excludedMetrics: [] }, { metrics: [], excludedMetrics: ['bad name'] }, { metrics: [] }])('rejects malformed explicit Page policies: %j', value => {
++  expect(facebookPageMetricPolicySchema.safeParse(value).success).toBe(false);
++});
++
++it('preserves large saved selections and remains valid after defaults are appended', () => {
++  const metrics = Array.from({ length: 100 }, (_, index) => `custom_${index}`);
++  const merged = facebookPageMetricPolicySchema.parse(metrics);
++  expect(merged.metrics).toHaveLength(100 + FACEBOOK_PAGE_METRIC_DEFAULTS.length);
++  expect(facebookPageMetricPolicySchema.parse(merged)).toEqual(merged);
++});
+diff --git a/rebuild/tests/facebook-page-labels.test.ts b/rebuild/tests/facebook-page-labels.test.ts
+new file mode 100644
+index 00000000..85b2688d
+--- /dev/null
++++ b/rebuild/tests/facebook-page-labels.test.ts
+@@ -0,0 +1,33 @@
++import { describe, expect, it, vi } from 'vitest';
++vi.mock('@/server/data', () => ({ prisma: {} }));
++import { normalizeFacebookAnalytics } from '../src/platforms/facebook/analytics';
++import { FACEBOOK_PAGE_ANALYTICS_COPY_DEFAULTS } from '../src/platforms/facebook/config';
++
++const target = { id: 'page', name: 'Example Page', type: 'page', socialAccountId: 'connection' };
++const date = new Date('2026-10-01T00:00:00Z');
++const row = (metric: string, value: unknown, numeric: number | null) => ({ metric, period: 'day', value, numeric, endTime: date, fetchedAt: date, target });
++
++describe('Facebook Page analytics labels', () => {
++  it.each(['en', 'fr'] as const)('uses configured %s metric, audience, category and provenance labels', locale => {
++    const copy = FACEBOOK_PAGE_ANALYTICS_COPY_DEFAULTS[locale];
++    const result = normalizeFacebookAnalytics({ locale,
++      metricLabels: { page_follows: { en: 'Custom followers', fr: 'Abonnés personnalisés' } },
++      pageRows: [row('page_follows', 7, 7), row('page_total_media_view_unique', 3, 3), row('page_daily_follows', 2, 2), row('page_clicks_by_type', { link: 4 }, null)],
++      audienceRows: [row('page_follows', 7, 7)], selectedTargets: [target], adRows: [], selectedAdAccounts: [],
++    });
++    const followers = locale === 'en' ? 'Custom followers' : 'Abonnés personnalisés';
++    expect(result.metrics.find(metric => metric.key === 'page_follows::day')).toMatchObject({ label: `${followers} · ${copy.latest}`, sourceLabel: copy.source });
++    expect(result.audienceEntries[0]).toMatchObject({ metricLabel: followers, sourceLabel: copy.source });
++    expect(result.metrics.find(metric => metric.key === 'page_total_media_view_unique::day')).toMatchObject({ label: `${locale === 'en' ? 'People who viewed media' : 'Personnes ayant vu les médias'} · ${copy.latest}`, aggregationNote: copy.overlap });
++    expect(result.metrics.find(metric => metric.key === 'page_daily_follows::day')?.label).toBe(locale === 'en' ? 'Daily follows' : 'Abonnements quotidiens');
++    expect(result.metrics.find(metric => metric.kind === 'breakdown')?.label).toContain(copy.categories);
++  });
++
++  it('keeps legacy audience labels and custom Page copy while retaining unknown metrics', () => {
++    const result = normalizeFacebookAnalytics({ locale: 'fr', pageCopy: { ...FACEBOOK_PAGE_ANALYTICS_COPY_DEFAULTS, fr: { source: 'Source choisie', latest: 'Valeur récente', categories: 'Groupes', overlap: 'Personnes en commun' } },
++      pageRows: [row('unknown_metric', 4, 4)], audienceRows: [row('page_fans', 5, 5)], selectedTargets: [target], adRows: [], selectedAdAccounts: [],
++    });
++    expect(result.audienceEntries[0]?.metricLabel).toBe('Mentions J’aime de la Page');
++    expect(result.metrics[0]).toMatchObject({ label: 'Unknown Metric · Valeur récente', sourceLabel: 'Source choisie' });
++  });
++});
+diff --git a/rebuild/tests/facebook-post-history.test.ts b/rebuild/tests/facebook-post-history.test.ts
+index afaebbb2..8caaed3d 100644
+--- a/rebuild/tests/facebook-post-history.test.ts
++++ b/rebuild/tests/facebook-post-history.test.ts
+@@ -1,9 +1,10 @@
+ import { describe, it, expect, vi } from 'vitest';
+ import { createFacebookPostHistory } from '../src/platforms/facebook/post-history';
+-import { FACEBOOK_HISTORY_CONFIG, FACEBOOK_DATA_DETAIL_CONFIG, type FacebookConfig } from '../src/platforms/facebook/config';
++import { FACEBOOK_HISTORY_CONFIG, FACEBOOK_DATA_DETAIL_CONFIG, FACEBOOK_POST_METRIC_DEFAULTS, type FacebookConfig } from '../src/platforms/facebook/config';
+ const config: FacebookConfig = { graphBaseUrl: 'https://graph.example.test', oauthBaseUrl: 'https://example.test', graphVersion: 'v25.0', requestTimeoutMs: 1000, maxPages: 3, pageSize: 2, pageInsightMetrics: [], adInsightFields: [], maxImageUploadBytes: 10, allowedImageMimeTypes: ['image/jpeg'], appSecretProofEnabled: false };
+ const now = new Date('2026-10-20T00:00:00Z');
+-const policy = { lookbackDays: 365, pageBudget: 1, edge: 'published_posts' as const, fields: ['message'], metrics: ['post_clicks'], reactionTypes: ['LIKE'] };
++const onlyMetrics = (metrics: string[]) => ({ metrics, excludedMetrics: FACEBOOK_POST_METRIC_DEFAULTS.filter(metric => !metrics.includes(metric)) });
++const policy = { lookbackDays: 365, pageBudget: 1, edge: 'published_posts' as const, fields: ['message'], ...onlyMetrics(['post_clicks']), reactionTypes: ['LIKE'] };
+ const response = (data: unknown) => new Response(JSON.stringify(data));
+ describe('v26 insight authority', () => {
+  const metrics = ['post_media_view', 'post_total_media_view_unique', 'post_reactions_by_type_total', 'post_clicks', 'post_clicks_by_type'];
+@@ -17,12 +18,12 @@ describe('v26 insight authority', () => {
+   });
+  }
+  it('prefers insights over conflicting summary and edge counts without adding sources', async () => {
+-  const result = await createFacebookPostHistory({ ...config, graphVersion: 'v26.0' }, { ...policy, metrics }, fixture({ like: 1, love: 0 })).collect('token', 'page', now);
++  const result = await createFacebookPostHistory({ ...config, graphVersion: 'v26.0' }, { ...policy, ...onlyMetrics(metrics) }, fixture({ like: 1, love: 0 })).collect('token', 'page', now);
+   expect(result.posts[0].insights).toMatchObject({ post_media_view: 3, post_total_media_view_unique: 3, clicks: 3, post_clicks_by_type: { 'link clicks': 2 }, reactions: 1, reactions_like: 1,
+    reactionProvenance: { source: 'insights', metric: 'post_reactions_by_type_total', insightTotal: 1, summaryTotal: 0, edgeTotal: 0, conflict: true, observedAt: now.toISOString() } });
+  });
+  it('preserves an authoritative insight zero against a positive summary', async () => {
+-  const result = await createFacebookPostHistory(config, { ...policy, metrics }, fixture({ like: 0 }, 4)).collect('token', 'page', now);
++  const result = await createFacebookPostHistory(config, { ...policy, ...onlyMetrics(metrics) }, fixture({ like: 0 }, 4)).collect('token', 'page', now);
+   expect(result.posts[0].insights).toMatchObject({ reactions: 0, reactionProvenance: { source: 'insights', conflict: true } });
+  });
+  it('retains authoritative reaction types even when a reaction edge fails', async () => {
+@@ -32,17 +33,17 @@ describe('v26 insight authority', () => {
+    if (url.pathname.endsWith('/reactions')) return response({ error: { code: 100 } });
+    return response({ data: [{ name: 'post_reactions_by_type_total', values: [{ value: { like: '1', care: 2 } }] }] });
+   });
+-  const result = await createFacebookPostHistory(config, { ...policy, metrics: ['post_reactions_by_type_total'] }, fetcher).collect('token', 'page', now);
++  const result = await createFacebookPostHistory(config, { ...policy, ...onlyMetrics(['post_reactions_by_type_total']) }, fetcher).collect('token', 'page', now);
+   expect(result.posts[0].insights).toMatchObject({ reactions: 3, reactions_like: 1, reactions_care: 2, collectionFailures: ['reactions_LIKE'], reactionProvenance: { source: 'insights', edgeTotal: null, edgesComplete: false } });
+  });
+  it('records an unknown total when every reaction source is missing', async () => {
+   const fetcher = vi.fn(async () => response({ data: [{ id: 'p', created_time: '2026-10-01' }] }));
+-  const result = await createFacebookPostHistory(config, { ...policy, metrics: [], reactionTypes: [] }, fetcher).collect('token', 'page', now);
++  const result = await createFacebookPostHistory(config, { ...policy, ...onlyMetrics([]), reactionTypes: [] }, fetcher).collect('token', 'page', now);
+   expect(result.posts[0].insights.reactions).toBeUndefined();
+   expect(result.posts[0].insights.reactionProvenance).toMatchObject({ source: 'unknown', insightTotal: null, summaryTotal: null, edgeTotal: null, conflict: false });
+  });
+  it.each([{}, { like: null }, { like: -1 }, { like: true }])('does not fabricate an insight total from invalid categories %j', async value => {
+-  const result = await createFacebookPostHistory(config, { ...policy, metrics, reactionTypes: [] }, fixture(value, 4)).collect('token', 'page', now);
++  const result = await createFacebookPostHistory(config, { ...policy, ...onlyMetrics(metrics), reactionTypes: [] }, fixture(value, 4)).collect('token', 'page', now);
+   expect(result.posts[0].insights).toMatchObject({ reactions: 4, reactionProvenance: { source: 'summary', insightTotal: null, edgeTotal: null } });
+  });
+  it('requests configured video metrics only for positively identified video posts', async () => {
+@@ -58,7 +59,7 @@ describe('v26 insight authority', () => {
+    requested.push(url.pathname);
+    return response({ data: [{ name: url.searchParams.get('metric'), values: [{ value: 8 }] }] });
+   });
+-  const result = await createFacebookPostHistory(config, { ...policy, metrics: FACEBOOK_HISTORY_CONFIG[0].defaultValue.metrics.filter(metric => metric.startsWith('post_video_')), reactionTypes: [] }, fetcher).collect('token', 'page', now);
++  const result = await createFacebookPostHistory(config, { ...policy, ...onlyMetrics(FACEBOOK_HISTORY_CONFIG[0].defaultValue.metrics.filter(metric => metric.startsWith('post_video_'))), reactionTypes: [] }, fetcher).collect('token', 'page', now);
+   expect(requested).toHaveLength(4);
+   expect(requested.every(path => /\/(video|attached)\/insights$/.test(path))).toBe(true);
+   expect(result.posts.map(post => post.insights.video_watch_time)).toEqual([undefined, 8, 8, undefined]);
+@@ -87,7 +88,7 @@ describe('Page history', () => {
+    const url = new URL(String(input));
+    return response(url.pathname.endsWith('/published_posts') ? { data: [{ id: 'p', created_time: '2026-10-01' }] } : { data: [{ id: 'r' }], paging: { next: 'unused', cursors: { after: 'repeated' } } });
+   });
+-  const result = await createFacebookPostHistory(config, { ...policy, metrics: [] }, fetcher).collect('secret', 'page', now);
++  const result = await createFacebookPostHistory(config, { ...policy, ...onlyMetrics([]) }, fetcher).collect('secret', 'page', now);
+   expect(result.posts[0].insights.reactions).toBeUndefined(); expect(result.failures).toContain('reactions_LIKE');
+  });
+  it('redacts provider errors', async () => {
+@@ -96,7 +97,7 @@ describe('Page history', () => {
+ });
+ 
+ describe('round 3 history evidence', () => {
+- it('uses replacement defaults and permits Root overrides', () => {
++ it('uses shipped defaults and permits Root additions', () => {
+   const defaults = FACEBOOK_HISTORY_CONFIG[0].defaultValue;
+   expect(defaults.metrics).toEqual(['post_media_view', 'post_total_media_view_unique', 'post_clicks', 'post_clicks_by_type', 'post_reactions_by_type_total', 'post_video_views', 'post_video_view_time']);
+   expect(FACEBOOK_HISTORY_CONFIG[0].schema.safeParse({ ...defaults, metrics: ['custom_metric'] }).success).toBe(true);
+@@ -113,7 +114,7 @@ describe('round 3 history evidence', () => {
+    if (metric === 'refused') return response({ error: { code: 100 } });
+    return response({ data: [{ name: metric, values: [{ value: metric === 'post_media_view' ? 9 : { link_clicks: 3 } }] }] });
+   });
+-  const result = await createFacebookPostHistory(config, { ...policy, metrics: ['post_media_view', 'refused', 'post_clicks_by_type'], reactionTypes: [] }, fetcher).collect('secret', 'page', now);
++  const result = await createFacebookPostHistory(config, { ...policy, ...onlyMetrics(['post_media_view', 'refused', 'post_clicks_by_type']), reactionTypes: [] }, fetcher).collect('secret', 'page', now);
+   expect(result.failures).toEqual(['refused']);
+   expect(result.posts[0].insights).toMatchObject({ post_media_view: 9, post_clicks_by_type: { link_clicks: 3 }, collectionFailures: ['refused'] });
+   expect(fetcher).toHaveBeenCalledTimes(4);
+@@ -129,9 +130,22 @@ describe('round 3 history evidence', () => {
+     { id: 'unknown', created_time: '2026-10-01' },
+    ] });
+   });
+-  const result = await createFacebookPostHistory(config, { ...policy, edge: 'feed', metrics: [], reactionTypes: [] }, fetcher).collect('secret', 'page', now);
++  const result = await createFacebookPostHistory(config, { ...policy, edge: 'feed', ...onlyMetrics([]), reactionTypes: [] }, fetcher).collect('secret', 'page', now);
+   expect(result.posts.map(post => post.remoteId)).toEqual(['owned']);
+   expect(result.progress.complete).toBe(true);
+   expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+ });
++
++it('collects new defaults from an old saved policy while respecting recorded exclusions', async () => {
++ const requested: string[] = [];
++ const fetcher = vi.fn(async (input: RequestInfo | URL) => {
++  const url = new URL(String(input));
++  if (url.pathname.endsWith('/published_posts')) return response({ data: [{ id: 'p', created_time: '2026-10-01', status_type: 'added_video' }] });
++  const metric = url.searchParams.get('metric')!;
++  requested.push(metric);
++  return response({ data: [{ name: metric, values: [{ value: 2 }] }] });
++ });
++ await createFacebookPostHistory(config, { ...policy, metrics: ['custom_metric'], excludedMetrics: ['post_video_views'], reactionTypes: [] }, fetcher).collect('synthetic-token', 'page', now);
++ expect(requested).toEqual(['custom_metric', ...FACEBOOK_POST_METRIC_DEFAULTS.filter(metric => metric !== 'post_video_views')]);
++});
+diff --git a/rebuild/tests/root-config-authority.test.ts b/rebuild/tests/root-config-authority.test.ts
+index fe2c0d16..a50b877e 100644
+--- a/rebuild/tests/root-config-authority.test.ts
++++ b/rebuild/tests/root-config-authority.test.ts
+@@ -40,3 +40,20 @@ it('clears a secret only with the exact clear action', async () => {
+   await saveRootConfig({ key: 'meta.appSecret', clear: true, confirmation: 'CLEAR ROOT SECRET meta.appSecret' }, 'root');
+   expect(h.clear).toHaveBeenCalledWith({ where: { key: 'meta.appSecret' } }); expect(h.audit).toHaveBeenCalledOnce();
+ });
++
++it('persists the migrated Facebook history policy and exclusions with its Root audit', async () => {
++  const { FACEBOOK_HISTORY_CONFIG } = await import('@/platforms/facebook/config');
++  const definition = FACEBOOK_HISTORY_CONFIG[0];
++  const input = { ...definition.defaultValue, metrics: ['custom_metric'], excludedMetrics: ['post_video_views', 'future_metric'] };
++  await saveRootConfig({ key: definition.key, value: input, confirmation: `SET ROOT CONFIG ${definition.key}` }, 'root');
++  const saved = h.upsert.mock.calls[0][0];
++  expect(saved.create.value.metrics).toContain('custom_metric');
++  expect(saved.create.value.metrics).toContain('post_clicks');
++  expect(saved.create.value.metrics).not.toContain('post_video_views');
++  expect(saved.create.value.excludedMetrics).toEqual(['post_video_views', 'future_metric']);
++  expect(saved.update.value).toEqual(saved.create.value);
++  expect(h.audit).toHaveBeenCalledOnce();
++  expect(h.audit.mock.calls[0][0].join('')).toContain('config.changed');
++  expect(h.audit.mock.calls[0]).toContainEqual(expect.stringContaining('"key":"meta.postHistoryPolicy"'));
++  expect(input.metrics).toEqual(['custom_metric']);
++});

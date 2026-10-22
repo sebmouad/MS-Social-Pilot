@@ -1,0 +1,235 @@
+diff --git a/rebuild/docs/AGENT_HANDOFF.md b/rebuild/docs/AGENT_HANDOFF.md
+index 5d4aca7d..40a50e98 100644
+--- a/rebuild/docs/AGENT_HANDOFF.md
++++ b/rebuild/docs/AGENT_HANDOFF.md
+@@ -1,9 +1,8 @@
+ # Shared agent handoff
+ 
+-Updated 2026-10-21 against local HEAD `46c6bdae`, reviewing
+-`git log 1240a9ce..HEAD`, the changed-file list of `46c6bdae`, dated release and
+-browser records and selected current source. This supersedes the previous `1240a9ce`
+-continuation. The binding contract is unchanged; the full goal remains active. No
++Updated 2026-10-21 against local HEAD `6d3347fb` (round 6), reviewing
++`git log 46c6bdae..HEAD`, the round 6 diff, dated release and browser records and
++selected current source. This supersedes the previous `46c6bdae` continuation. The binding contract is unchanged; the full goal remains active. No
+ fresh database, browser, provider or production observation was made by this
+ documentation worker; production facts below are owner/integrator records.
+ 
+@@ -17,7 +16,8 @@ release work; source and historical receipts do not identify current deployment.
+ 
+ ## Production record
+ 
+-Deployed release (integrator statement): `46c6bdae`. Owner cutover: 2026-10-20 22:09 CEST, release `5f1e52d7`, via
++Deployed release (integrator statement): `6d3347fb`, configuration schema **115**
++(not independently observed; confirm the applied migrations). Owner cutover: 2026-10-20 22:09 CEST, release `5f1e52d7`, via
+ `rebuild/scripts/prod-cutover.sh`, origin https://social.newsgeet.com. Rebuild
+ web/worker recorded active/enabled; legacy inactive/disabled, retained for rollback
+ at `/srv/ms-social-pilot`. Releases use `rebuild/scripts/prod-deploy.sh`; legacy
+@@ -59,7 +59,7 @@ Anthropic was blocked by account credit. Mail and live recovery remain open.
+   Sharing; last three include service/public error localization. `configOrDefault`
+   validates runtime or registry default; `configValueOrDefault` checks outer shape
+   only. Residual literals/prompts/dynamic labels and stale OAuth metadata remain
+-  in CONFIG_LITERAL_AUDIT. Schema version is now **114**, not 104–113.
++  in CONFIG_LITERAL_AUDIT. Schema version is now **115**, not 104–114.
+ - Appearance (`2b42470b`): global shell and Settings save through confirmed
+   appearance service; theme in users, mode under exact account key, transaction
+   audit, Root-lifetime cookie cache and validated-session fallback in layout.
+@@ -129,7 +129,29 @@ Anthropic was blocked by account credit. Mail and live recovery remain open.
+   queue cancel, Root activity, two-step wording, tokenless join, verify-email/
+   password-recovery text and calendar badge contrast fixes
+   (`tests/browser-findings-fixes.test.ts`, `tests/ui-copy-coverage.test.ts`).
+-  These have unit/render evidence without a browser rerun.
++  These have unit/render evidence; round 5 reran Chromium on `46c6bdae` (below).
++- Round 6 (`6d3347fb`; source and unit tests with fakes, no browser, PostgreSQL,
++  provider or production run):
++  - Ads copy: Facebook-owned `ads-copy.ts` (EN/FR labels, name validation, confirmation
++    templates) behind new Root key `meta.adsCopy` (placeholders validated); Ads
++    `copy.ts` customer strings. `ad.create` is still blocked by the missing ledger
++    CHECK migration and `ads_management` grant.
++  - Join: preview answers `{ invitation: null }` (200) for a missing/unknown token and
++    `join-form.tsx` shows "link needed" from it (no 404; a 429 from the per-token limit
++    is still possible).
++  - Queue: `cancelScheduledPostAction` throws on failure instead of redirecting, so
++    `CancelScheduleForm` keeps filters, reschedule input and its inline notice.
++  - Recipe recovery: uncertain slots reconcile by the ledger's stored post id (never
++    by channel+time; a manual post is not adopted, a cancelled post is still found,
++    unknown identity stays uncertain, settlement guarded by expected post id). A
++    refused pause-cancel is rotated behind untouched work (`deferCancellation`,
++    least-recent-attempt order), so the earlier starvation gap is closed at unit level;
++    `remaining` is no longer forced false.
++  - New tests: `feeds-recipe-recovery-verification`, `publishing-scheduling-
++    verification` (mixed native/app holds, stale due-worker claim, comment failure
++    after confirmed publish, reschedule timeout, contributor approval),
++    `facebook-ads-copy`, `browser-matrix-round5`. They are not live scheduling or
++    recipe recovery evidence.
+ 
+ ## Browser evidence, not an all-green gate
+ 
+@@ -152,14 +174,24 @@ preview PostgreSQL database; none of it is production or provider evidence.
+   recovery verified in Firefox only; Firefox/WebKit dynamic, session, empty,
+   not-found and failure parts reproduce the module findings.
+ 
+-Unresolved (per the report and the `46c6bdae` file list; not rerun): `not-found.tsx`
+-is missing, so unknown routes show Next's default page; unknown bio/share/
+-collaboration/Root ids answer HTTP 200 (soft 404); raw server text on Tasks, Labels,
+-Templates, Analytics goals and Inbox moderation; saved-view 401 wording; the error
+-boundary sits above the shell; WebKit hydration; `/join` preview 404/429 console
+-errors on repeated loads; share-media 404s from seed data. `46c6bdae` fixes queue
+-cancel, Root activity, two-step wording, tokenless join, verify-email/recovery text
+-and calendar contrast at source only. Not covered: keyboard/system-mode runs in
++- Round 5 (Chromium only, local build of `46c6bdae`, synthetic database with Feeds
++  recipe rows): full matrix 992/992 cells over 62 routes incl. Ads and Feeds, **162
++  findings** (none from Ads or Feeds); fixes check 72/72 cells (0 broken images, 10
++  findings); unknown route 64/64 with HTTP 404 and 0 findings. Causes: 80 seeded-media
++  404s (data), tokenless `/join` 404s/429s (addressed at source by round 6), warm-light
++  calendar "View post" at 4.35:1 (published-card opacity `.88`), and saved-view save
++  without a session still saying "check its name" (8/8 desktop cells; Publishing
++  `SavedViews.tsx`/`saved_saveFailed` unchanged). Firefox/WebKit and the dynamic/
++  empty/system/keyboard/failure parts were not rerun.
++
++Unresolved (not rerun after round 6): `not-found.tsx` is still missing from
++`src/app/` (round 5 saw HTTP 404 and no check findings, not a themed bilingual page);
++unknown bio/share/collaboration/Root ids answered HTTP 200 in round 4; raw server
++text on Tasks, Labels, Templates, Analytics goals and Inbox moderation; saved-view
++session wording; calendar warm-light contrast; error boundary above the shell;
++WebKit hydration; share-media 404s from seed data. Round 6 changes to `/join` and
++the queue cancel failure have unit evidence only. `46c6bdae` fixed Root activity,
++two-step wording, verify-email/recovery text at source only. Not covered: keyboard/system-mode runs in
+ Firefox/WebKit, all four themes there, real Safari/iOS, screen readers, long content,
+ client-render throws and every later merge. Read the report for exact routes/checks
+ rather than summing cells into a completion percentage. Historical production Chrome
+@@ -187,9 +219,10 @@ and WAVE1 checks retain their dates.
+ 5. App owner adds `src/app/not-found.tsx` (`'use client'`, `ErrorState kind="not-found"`
+    with `useErrorLocale`), real 404 statuses for unknown detail ids (fix the
+    `loading.tsx` streaming order) and a boundary inside the shell. Module owners
+-   remove raw server text, fix hydration formatting and the `/join` preview. Rerun
+-   the matrix in all three engines, including keyboard walks, all four themes and
+-   the round-5 fixes.
++   remove raw server text, fix hydration formatting, saved-view session wording
++   (`SavedViews.tsx`) and warm-light calendar published-card contrast. Rerun the
++   matrix in all three engines, including keyboard walks, all four themes, the
++   round 6 `/join` and queue-cancel changes and the Ads/Feeds forms.
+ 6. Integration owner tests mixed scheduling and recipe retry/pause/recovery,
+    metrics/history, live REST/MCP scope, provider outcomes/cleanup and index plans/
+    volume. Preserve unresolved photo-canary ledger/Page lock; failed Graph lookup
+diff --git a/rebuild/docs/ARCHITECTURE.md b/rebuild/docs/ARCHITECTURE.md
+index 74e92cc3..8386e3d9 100644
+--- a/rebuild/docs/ARCHITECTURE.md
++++ b/rebuild/docs/ARCHITECTURE.md
+@@ -1,6 +1,6 @@
+ # MS Social Pilot architecture
+ 
+-Updated 2026-10-21 against local HEAD `46c6bdae`; reviewed `git log 1240a9ce..HEAD`.
++Updated 2026-10-21 against local HEAD `6d3347fb` (round 6); reviewed `git log 46c6bdae..HEAD` and the round 6 file list.
+ [ARCHITECTURE_CONTRACT.md](ARCHITECTURE_CONTRACT.md) remains the binding target,
+ unchanged. This document describes implementation and gaps; deployment, source,
+ automated tests, browser checks and live-provider evidence are separate claims.
+@@ -20,12 +20,13 @@ not fresh probes by this documentation worker. That log records 34 applied
+ migrations, backup, health checks, ownership repair, owner sign-in confirmation,
+ legacy configuration import and later AI/browser checks. Cutover happened; full
+ contract completion is still unproven. The deployed release is recorded by the
+-integrator as `46c6bdae`; this review did not observe it, and application of the
++integrator as `6d3347fb`; this review did not observe it, and application of the
+ newest migrations must still be checked before claiming source live. The log also
+ records the 2026-10-21 post-cutover rollback drill (**PASS**: backup restored to a
+ scratch database, legacy and the installed rebuild started on spare ports; live
+-services unchanged) and the first full recipe day (40/40 publications with 40/40
+-first comments). The drill proves a restorable backup and startable rollback
++services unchanged) and the first full recipe day (07:00, 11:00, 15:00 and 17:00
++Europe/Paris: 40/40 publications with 40/40 first comments; the article link was
++then removed from the comments at the owner's request). The drill proves a restorable backup and startable rollback
+ artifacts, not a proxy cutback or media restoration.
+ See [CUTOVER.md](CUTOVER.md) for current status and historical migration procedures.
+ 
+@@ -59,7 +60,8 @@ moves. Registration of a module does not prove its workflows or health.
+ ## Configuration and public origin
+ 
+ `src/lib/config/registry.ts` aggregates module/platform declarations and
+-`src/lib/config/shared-config.ts`. Local HEAD has schema version **114**. Runtime
++`src/lib/config/shared-config.ts`. Local HEAD has schema version **115** (round 6 adds `meta.adsCopy`, the Facebook
++Ads action copy, owned by `src/platforms/facebook/ads-ui-config.ts`). Runtime
+ consumers use `runtimeConfig`; Root validates and transactionally audits saves,
+ encrypts secrets and groups controls under Shared, Product and Platform owners.
+ Database access and encryption trust material remain bootstrap dependencies.
+@@ -287,6 +289,49 @@ rerun). Remaining: raw server text on several module forms, boundary above the
+ shell, keyboard/system-mode in Firefox/WebKit, all four themes there, real Safari,
+ screen readers, long content, client-render throws and confirmed provider writes.
+ 
++Round 5 (Chromium only, local production build of `46c6bdae`, synthetic database
++that gained Feeds recipe rows): full matrix 992/992 cells over 62 routes including
++the Ads pages and `/publishing/feeds` (**162 findings**, none from Ads or Feeds), a
++72-cell fixes check (no broken-image icon on Posts, Queue, Approvals, Calendar; 10
++findings) and an unknown-route check (64/64, HTTP 404, 0 findings). Remaining causes:
++seeded media with no stored file (80), tokenless `/join` preview requests and 429s
++(addressed at source in round 6, below), the warm-light calendar "View post" button at
++4.35:1 (published-card opacity `.88` in `calendar.module.css`; seven of eight
++theme/mode combinations pass) and the saved-view save after the session cookie is
++removed, which still said "check its name" (8/8 desktop cells). Not proven: Firefox,
++WebKit, keyboard/system/dynamic/empty/failure parts, Ads create/edit flows driven in
++a browser, recipe card visual inspection. `not-found.tsx` remains absent from
++`src/app/`.
++
++Round 6 (`6d3347fb`; source and unit evidence, **no browser rerun**):
++
++- Ads: Facebook-owned `ads-copy.ts` holds the EN/FR action labels, name-validation
++  text and confirmation templates; Root key `meta.adsCopy` lets the operator edit
++  them with placeholders validated (every token exactly once). Ads module
++  `copy.ts` gains matching customer strings. Paused `ad.create` status is unchanged:
++  the ledger CHECK migration and the live `ads_management` grant are still missing.
++- Join: `/api/auth/invitations/preview` answers `{ invitation: null }` (HTTP 200)
++  for a missing or unknown token, and `join-form.tsx` shows the "link needed"
++  state from that body instead of a 404. The form still makes one request, so a 429
++  from the per-token rate limit is not ruled out. Tests `invitation-http`, `join-form`.
++- Queue: `cancelScheduledPostAction` no longer routes failures through the shared
++  runner's redirect; it throws so `CancelScheduleForm` keeps filters, reschedule
++  input and its localized inline notice (`post-cancel-action.test.ts`).
++- Recipe recovery (`wordpress-planner`, `-recovery`, `-store`): uncertain-slot
++  reconciliation resolves the post by the **ledger's stored post id**, not by
++  channel and scheduled time, so a manual post at the same slot is never adopted
++  and a cancelled post (time cleared) is still found; unknown identity keeps the
++  slot uncertain; settlement is conditional on the expected post id. A refused
++  pause-cancel is rotated behind untouched work by a timestamp-only write
++  (`deferCancellation`; `plannedUpcoming` orders by least recent attempt), so a
++  refused first batch no longer starves later posts and `remaining` is no longer
++  forced false.
++- New tests: `feeds-recipe-recovery-verification`, `publishing-scheduling-
++  verification` (mixed application/platform holds, stale due-worker claim, first-
++  comment failure after confirmed publication, remote reschedule timeout, contributor
++  approval), `facebook-ads-copy`, `browser-matrix-round5`. All use fakes or mocked
++  ports; no PostgreSQL, live Facebook or production run.
++
+ Historical 328/328 synthetic checks and the production Chrome sweep remain dated
+ evidence. No browser round covers every later merge, and no declaration guard
+ replaces actual MCP/provider verification. [MCP_PARITY.md](MCP_PARITY.md) records
+diff --git a/rebuild/docs/FEEDS.md b/rebuild/docs/FEEDS.md
+index f8a669e7..10e4233d 100644
+--- a/rebuild/docs/FEEDS.md
++++ b/rebuild/docs/FEEDS.md
+@@ -1,7 +1,8 @@
+ # Content feeds (legacy parity wave 3)
+ 
+ Status: **source/mock evidence plus recorded production recipe planning**.
+-Updated 2026-10-21 against local HEAD `6fb0e57f`. The rebuild is in production;
++Updated 2026-10-21 against local HEAD `6d3347fb` (deployed per the integrator;
++schema 115; round 6 recovery changes below). The rebuild is in production;
+ [RELEASE_GATES_PLAN.md](RELEASE_GATES_PLAN.md#production-log--2026-10-21) records
+ the recipe run below. Original RSS/Atom mocked tests do not establish live checks
+ of every feed kind. No fresh database, browser or provider calls in this doc pass.
+@@ -144,5 +145,16 @@ Ledger states: `planned` (post id stored), `claimed` (unfinished; older than `cl
+ - **Pool health** in `get_recipe_source`, `GET /api/feeds/wordpress` and the UI ("Recipe supply"): per channel, eligible recipes (not planned or recently posted there, and not planned elsewhere when channels must differ) and `daysLeft = floor(eligible / (posts per day x channels sharing the pool))`; `null` when the cooldown is 0 (recipes may repeat). Flagged low under `feeds.wordpress.poolWarnDays`. `complete: false` means the scan limit was reached and the counts are lower bounds. The estimate does not count recipes that return after the cooldown. It needs a full library scan, so the result is cached per source for `poolCacheSeconds` (per process) and is `null` when the library cannot be read.
+ - **Worker log.** The `feedsPoll` line now ends with `recipes: sources=.. planned=.. failed=.. uncertain=.. unfilled=..` plus `reason=` and `stops=` (budget, no_pages, error, ...) or `recipes=off`.
+ - New Root keys: `feeds.wordpress.poolWarnDays`, `poolCacheSeconds`, `pauseCancelEnabled`, `pauseCancelBatchSize`. Evidence: unit and service tests with fakes (`feeds-wordpress-planner`, `-recovery-service`, `-db-image`, `feeds-mcp`); no PostgreSQL, browser, MariaDB, Facebook or production run.
+-- Still open: with every first `pauseCancelBatchSize` posts permanently refused, later ones are not reached; the default Publishing lookup for reconciliation reads Publishing's post table from the feeds module (a Publishing-owned lookup would be cleaner).
++- Superseded by round 6 (below): reconciliation by channel and time, and the starvation of later posts behind a refused first batch.
++
++### Production record (owner-recorded, 2026-10-21)
++
++The first full recipe day ran at all four configured Europe/Paris slots (07:00, 11:00, 15:00, 17:00): **40/40 posts published with 40/40 first comments, no errors**; 70 plans remain pending on the rolling horizon. The first comments originally carried the article link (preview); the owner had it removed, and commit `2e23223a` records the audited update of 80 scheduled comments and keeps a link only when the template contains `{link}`. This is production evidence for that day and the planned/publish path only. Retry, pause-cancel and supply-exhaustion paths have not been exercised in production.
++
++### Round 6 recovery changes (`6d3347fb`, source and unit evidence)
++
++- **Identity, not time.** `postForSlot` now reads the ledger row for (workspace, channel, slot) and returns the post only when it stores exactly one `postId` that still exists in the workspace; otherwise it throws ("identity unconfirmed"). `retryRecipeSlots` therefore no longer adopts a manual post at the same channel and time, finds a recipe post even after cancellation cleared its scheduled time, and leaves the slot `uncertain` (counted `unconfirmed`) when identity is unknown or unreadable. Old interrupted claims without a stored id stay uncertain until reconciled by hand; they are never resent blindly. A claim inside its lease is never looked up or released. `settleIf` now also requires the expected post id, so a concurrent settlement is not overwritten. This replaces the earlier "any post for that channel and time" residual risk.
++- **Refused cancellations rotate.** `deferCancellation` (optional on the `RecipeStore` port) bumps only `updatedAt` of a refused `planned` row, guarded by state and post id; `plannedUpcoming` orders by least recent attempt, then slot time. A fully refused batch reports `notCancelled` and `remaining: true`, and the next request reaches untouched posts. State, receipt and reason of the refused row are unchanged.
++- Tests: `tests/feeds-recipe-recovery-verification.test.ts` (fake ports/store). No PostgreSQL, MariaDB, Facebook or production exercise; the raw `UPDATE`/ordering SQL has only text-level checks.
++- Still open: a post that the ledger never recorded (crash between create and save of the id) needs manual reconciliation; a post permanently refused by cancel keeps being retried every request, behind other work; the default Publishing lookup reads the post table from the feeds module (a Publishing-owned lookup would be cleaner). No new Root keys in round 6 for Feeds.
+ 

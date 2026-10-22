@@ -1,0 +1,209 @@
+diff --git a/rebuild/src/modules/analytics/ui/AnalyticsMetric.tsx b/rebuild/src/modules/analytics/ui/AnalyticsMetric.tsx
+index d043daed..99ed939c 100644
+--- a/rebuild/src/modules/analytics/ui/AnalyticsMetric.tsx
++++ b/rebuild/src/modules/analytics/ui/AnalyticsMetric.tsx
+@@ -76,9 +76,9 @@ export default function AnalyticsMetric({ metric, comparison, chartPoints, previ
+       <p>{metric.aggregationLabel}</p>
+       {metric.aggregationNote && <p className="analytics-aggregation-note">{metric.aggregationNote}</p>}
+       {metric.latestAt && <p>{t("Latest data {date}", { date: new Intl.DateTimeFormat(locale, { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' }).format(metric.latestAt) })}</p>}
+-      {metric.updatedAt && <p>{t("Last synced {date}", { date: new Intl.DateTimeFormat('en', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' }).format(metric.updatedAt) })}</p>}
++      {metric.updatedAt && <p>{t("Last synced {date}", { date: new Intl.DateTimeFormat(locale, { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' }).format(metric.updatedAt) })}</p>}
+     </div></div>
+-    <SeriesPreview copy={copy} metric={metric} chartPoints={chartPoints} previousPoints={previousPoints} locale={locale} />
++    <div className="analytics-chart"><SeriesPreview copy={copy} metric={metric} chartPoints={chartPoints} previousPoints={previousPoints} locale={locale} /></div>
+     {metric.coverage < metric.available && <p className="analytics-coverage">{t("Values are available for {covered} of {available} selected {resources}. Missing values are unknown, not zero.", { covered: metric.coverage, available: metric.available, resources: detailLabel })}</p>}
+     <AnalyticsMetricComparison locale={locale} copy={copy} metric={metric} comparison={comparison} />
+   </article>;
+diff --git a/rebuild/src/modules/analytics/ui/AnalyticsScreen.tsx b/rebuild/src/modules/analytics/ui/AnalyticsScreen.tsx
+index dca29c7c..6e80220b 100644
+--- a/rebuild/src/modules/analytics/ui/AnalyticsScreen.tsx
++++ b/rebuild/src/modules/analytics/ui/AnalyticsScreen.tsx
+@@ -159,7 +159,7 @@ function MetricTable({ data, copy, locale }: { data: AnalyticsReadResult; copy:
+     </header>
+     <p className="analytics-detail-coverage">{t("Coverage: {covered} of {available} selected {resources}. A missing value is unknown, not zero.", { covered: metric.coverage, available: metric.available, resources: timeLabel })}</p>
+     <AnalyticsMetricComparison locale={locale as 'en' | 'fr'} copy={copy} metric={metric} comparison={data.comparisons[metric.key]} />
+-    <div className="analytics-table-wrap">
++    <div className="analytics-table-wrap" role="region" tabIndex={0} aria-label={t("Full date and value series · {total} stored values · showing {start}–{end}", { total: detail.points.total, start: pointStart, end: pointEnd })}>
+       <table className="analytics-table">
+         <caption>{t("Full date and value series · {total} stored values · showing {start}–{end}", { total: detail.points.total, start: pointStart, end: pointEnd })}</caption>
+         <thead><tr><th scope="col">{t("Stored calendar date (UTC)")}</th><th scope="col">{t("Value")}</th></tr></thead>
+@@ -167,7 +167,7 @@ function MetricTable({ data, copy, locale }: { data: AnalyticsReadResult; copy:
+       </table>
+       {!detail.points.total && <p className="empty-note">{t("No dated values are stored for this metric.")}</p>}
+     </div>
+-    <div className="analytics-table-wrap">
++    <div className="analytics-table-wrap" role="region" tabIndex={0} aria-label={t("Resource detail · {total} stored rows · showing {start}–{end}", { total: detail.rows.total, start: rowStart, end: rowEnd })}>
+       <table className="analytics-table">
+         <caption>{t("Resource detail · {total} stored rows · showing {start}–{end}", { total: detail.rows.total, start: rowStart, end: rowEnd })}</caption>
+         <thead><tr><th scope="col">{metric.kind === 'breakdown' ? t("Category") : metric.resourceKind === 'ad-account' ? t("Ad account") : t("Channel")}</th><th scope="col">{t("Value")}</th><th scope="col">{t("Data date")}</th></tr></thead>
+diff --git a/rebuild/src/modules/analytics/ui/analytics.css b/rebuild/src/modules/analytics/ui/analytics.css
+index 4598bc59..a8d81e9e 100644
+--- a/rebuild/src/modules/analytics/ui/analytics.css
++++ b/rebuild/src/modules/analytics/ui/analytics.css
+@@ -82,3 +82,36 @@
+ .analytics-posts__value { display: inline-grid; justify-items: end; gap: 4px; min-width: 72px; }
+ .analytics-posts__bar { display: block; width: 100%; height: 4px; border-radius: 2px; background: var(--mod-soft, var(--line)); overflow: hidden; }
+ .analytics-posts__bar > span { display: block; height: 100%; background: var(--mod, var(--chart-1)); border-radius: 2px; }
++
++/* UX polish: focus, tables, long channel lists, charts and phone layout. Theme tokens only. */
++.analytics-sidebar a:focus-visible, .analytics-pager a:focus-visible, .analytics-panel-title a:focus-visible, .analytics-state a:focus-visible, .analytics-posts__text a:focus-visible, .analytics-table-wrap:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; border-radius: var(--radius-sm); }
++.analytics-sidebar-filter input:focus-visible, .analytics-sidebar-filter select:focus-visible { outline: 3px solid var(--focus); outline-offset: 1px; }
++.analytics-channel-group { max-height: 15rem; overflow-y: auto; }
++.analytics-channel-group label { padding-inline: 2px; border-radius: var(--radius-sm); }
++.analytics-channel-group label:hover { background: var(--surface-hover); }
++.analytics-pager a { display: inline-flex; align-items: center; min-height: 36px; }
++.analytics-table-wrap { border: 1px solid var(--line); border-radius: var(--radius-md); }
++.analytics-table caption { padding: 10px 12px; font-weight: 600; }
++.analytics-table thead th { color: var(--ink-soft); font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
++.analytics-table tbody tr:hover { background: var(--surface-hover); }
++.analytics-table tbody tr:last-child > * { border-bottom: 0; }
++.analytics-table th:not(:first-child), .analytics-table td:not(:first-child) { text-align: end; }
++.analytics-table-wrap .empty-note { margin: 0; padding: 14px 12px; border-top: 1px solid var(--line); }
++.analytics-metric { display: grid; align-content: start; gap: 10px; }
++.analytics-metric__heading p { overflow-wrap: anywhere; }
++.analytics-chart { min-width: 0; padding-top: 12px; border-top: 1px solid var(--line); }
++.analytics-chart > * { max-width: 100%; }
++.analytics-series-preview { margin-top: 0; }
++.analytics-series-preview__bar { fill: var(--chart-1, var(--accent)); }
++.report-row { align-items: baseline; flex-wrap: wrap; }
++.report-row > strong { min-width: 0; margin-inline-start: auto; text-align: end; font-weight: 600; }
++@media (pointer: coarse) { .analytics-sidebar-filter input[type="checkbox"] { width: 24px; height: 24px; } .analytics-channel-group label { min-height: 44px; } }
++@media (max-width: 620px) {
++  .analytics-audience__total { flex-wrap: wrap; gap: 4px 12px; }
++  .report-row { flex-direction: column; gap: 4px; }
++  .report-row > strong { margin-inline-start: 0; text-align: start; }
++  .analytics-metric { padding: 12px; }
++  .analytics-table th, .analytics-table td { padding: 10px 8px; }
++  .analytics-pager a { min-height: 44px; }
++}
++@media (forced-colors: active) { .analytics-posts__bar > span { background: CanvasText; forced-color-adjust: none; } }
+diff --git a/rebuild/src/modules/inbox/ui/inbox-round3.module.css b/rebuild/src/modules/inbox/ui/inbox-round3.module.css
+index ef9f1e90..136daaa6 100644
+--- a/rebuild/src/modules/inbox/ui/inbox-round3.module.css
++++ b/rebuild/src/modules/inbox/ui/inbox-round3.module.css
+@@ -76,3 +76,18 @@
+ .keys dl > div { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 14px; }
+ .keys dd { margin: 0; flex: 0 0 auto; }
+ .tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
++
++/* UX polish: selected rows, wrapped quick filters, focus rings and a stacking bulk bar on phones. */
++.row:has(.selectBox:checked) { background: var(--accent-soft); }
++.selectBox:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
++.quickToggle { border-radius: var(--radius-sm); white-space: normal; line-height: 1.2; padding-block: 6px; }
++.bulk { position: sticky; top: 0; z-index: 1; }
++.bulk[data-active] { border-bottom-color: var(--accent); }
++.bulkNote { overflow-wrap: anywhere; }
++@media (max-width: 900px) {
++  .bulk { position: static; }
++  .bulkActions { width: 100%; }
++  .bulkActions > button { flex: 1 1 auto; min-height: 44px; }
++  .selectAll { min-height: 44px; }
++}
++@media (forced-colors: active) { .row:has(.selectBox:checked) { outline: 2px solid Highlight; outline-offset: -2px; } }
+diff --git a/rebuild/src/modules/inbox/ui/inbox.module.css b/rebuild/src/modules/inbox/ui/inbox.module.css
+index 3c58315e..4ef73ea5 100644
+--- a/rebuild/src/modules/inbox/ui/inbox.module.css
++++ b/rebuild/src/modules/inbox/ui/inbox.module.css
+@@ -115,3 +115,28 @@
+ .pick { color: var(--ink-soft); }
+ @media (max-width: 900px) { .reply { margin: 0; position: static; box-shadow: none; } }
+ @media (forced-colors: active) { .item[aria-current="true"], .entry[data-from="channel"] { border-color: Highlight; } }
++
++/* UX polish: keyboard focus, sticky list header, phone spacing and touch targets. Theme tokens only. */
++.listHead { position: sticky; top: 0; z-index: 1; }
++.filters a:focus-visible, .pagination a:focus-visible, .back:focus-visible, .alert a:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; border-radius: var(--radius-sm); }
++.pagination span[aria-disabled="true"] { background: var(--surface-muted); cursor: not-allowed; }
++.item { transition: background-color .12s ease; }
++.item[data-attention] .preview { color: var(--ink); }
++.entry[data-reply] { background: var(--surface); }
++.alert { border-inline-start-width: 4px; }
++@media (prefers-reduced-motion: reduce) { .item { transition: none; } }
++@media (max-width: 900px) {
++  .threadPane { padding: 14px; gap: 14px; }
++  .back { position: sticky; top: 0; z-index: 1; margin: -4px 0 0; background: var(--surface); }
++  .entry, .entry[data-from="channel"] { max-width: 100%; justify-self: stretch; }
++  .replies { padding-inline-start: 10px; }
++  .item { padding: 14px; }
++  .listHead { position: static; }
++}
++@media (max-width: 900px), (pointer: coarse) {
++  .pagination a, .pagination span, .filters a { min-height: 44px; }
++}
++@media (forced-colors: active) {
++  .unreadDot { background: Highlight; forced-color-adjust: none; }
++  .item:focus-visible { outline-color: Highlight; }
++}
+diff --git a/rebuild/tests/inbox-analytics-ux-polish.test.ts b/rebuild/tests/inbox-analytics-ux-polish.test.ts
+new file mode 100644
+index 00000000..47ebb018
+--- /dev/null
++++ b/rebuild/tests/inbox-analytics-ux-polish.test.ts
+@@ -0,0 +1,68 @@
++// @vitest-environment jsdom
++import { readFileSync } from 'node:fs';
++import { createElement } from 'react';
++import { renderToStaticMarkup } from 'react-dom/server';
++import { describe, expect, it } from 'vitest';
++import AnalyticsMetric from '../src/modules/analytics/ui/AnalyticsMetric';
++import type { MetricView } from '../src/modules/analytics/server/aggregate';
++
++const read = (path: string) => readFileSync(path, 'utf8');
++const metric: MetricView = { key: 'audience', label: 'Audience', sourceLabel: 'Studio', resourceKind: 'channel', kind: 'stock', unit: 'count', aggregationLabel: 'Latest count', total: 12, coverage: 2, available: 2, latestAt: null,
++  updatedAt: new Date('2026-10-02T10:00:00Z'),
++  points: [{ date: '2026-10-01', label: 'Oct 1', value: 10 }, { date: '2026-10-02', label: 'Oct 2', value: 12 }], rows: [] } as MetricView;
++
++describe('Analytics metric card polish', () => {
++  it('wraps the chart so it has its own legible region', () => {
++    const html = renderToStaticMarkup(createElement(AnalyticsMetric, { metric, chartPoints: 2 }));
++    expect(html).toMatch(/class="analytics-chart"/);
++  });
++  it('formats the last-synced date in the viewer language', () => {
++    const fr = renderToStaticMarkup(createElement(AnalyticsMetric, { metric, chartPoints: 2, locale: 'fr' }));
++    expect(fr).toContain('oct. 2026');
++    expect(fr).not.toContain('Oct 2, 2026');
++  });
++  it('keeps an unknown aggregate unavailable rather than zero', () => {
++    const html = renderToStaticMarkup(createElement(AnalyticsMetric, { metric: { ...metric, total: null, points: [] }, chartPoints: 2 }));
++    expect(html).toContain('No aggregate value');
++    expect(html).toContain('No dated series is stored for this metric.');
++  });
++});
++
++describe('Inbox and Analytics stylesheets', () => {
++  const inbox = read('src/modules/inbox/ui/inbox.module.css');
++  const bulk = read('src/modules/inbox/ui/inbox-round3.module.css');
++  const analytics = read('src/modules/analytics/ui/analytics.css');
++  const withoutComments = (css: string) => css.replace(/\/\*[\s\S]*?\*\//g, '');
++
++  it('shows keyboard focus on every Inbox link and checkbox it styles', () => {
++    expect(inbox).toContain('.pagination a:focus-visible');
++    expect(inbox).toContain('.back:focus-visible');
++    expect(bulk).toContain('.selectBox:focus-visible');
++  });
++  it('gives phone Inbox rows, bulk actions and pagination 44px targets and a stacking bulk bar', () => {
++    expect(inbox).toMatch(/@media \(max-width: 900px\), \(pointer: coarse\) \{\s*\.pagination a[^}]*min-height: 44px/);
++    expect(bulk).toMatch(/\.bulkActions > button \{[^}]*min-height: 44px/);
++  });
++  it('marks selected Inbox rows without relying on colour alone being the only state', () => {
++    expect(bulk).toContain('.row:has(.selectBox:checked)');
++    expect(bulk).toMatch(/forced-colors: active\) \{ \.row:has/);
++  });
++  it('uses square quick-filter toggles that wrap their label instead of truncating it', () => {
++    const quick = bulk.slice(bulk.lastIndexOf('.quickToggle {'));
++    expect(quick).toContain('white-space: normal');
++    expect(quick).toContain('border-radius: var(--radius-sm)');
++  });
++  it('makes Analytics tables keyboard-scrollable, right-aligned for numbers and stacked on phones', () => {
++    expect(analytics).toContain('.analytics-table-wrap:focus-visible');
++    expect(analytics).toContain('.analytics-table td:not(:first-child)');
++    expect(analytics).toMatch(/max-width: 620px\) \{[\s\S]*\.report-row \{ flex-direction: column/);
++  });
++  it('colours chart accents from theme tokens, never raw colours', () => {
++    for (const css of [inbox, bulk, analytics]) {
++      const rules = withoutComments(css.slice(css.indexOf('UX polish')));
++      expect(rules).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
++      expect(rules).not.toMatch(/\brgba?\(/);
++    }
++    expect(analytics).toContain('fill: var(--chart-1, var(--accent))');
++  });
++});

@@ -1,0 +1,177 @@
+diff --git a/rebuild/docs/CUTOVER.md b/rebuild/docs/CUTOVER.md
+index 96ea6e91..9f29acf3 100644
+--- a/rebuild/docs/CUTOVER.md
++++ b/rebuild/docs/CUTOVER.md
+@@ -528,3 +528,69 @@ Tests: `npx vitest run tests/verify-legacy-migration*.test.ts tests/raw-sql-void
+ The real PostgreSQL test requires `REBUILD_PREVIEW_DATABASE_URL`, applies the
+ same URL guard, reads existing isolated fixtures and verifies count drift without
+ mutating records. Without that variable it explicitly skips.
++
++## Synthetic production-volume query probe (codex/volume-indexes)
++
++`rebuild/scripts/volume-probe.ts` seeds synthetic production-like volumes in an
++already migrated, disposable local database. It does not start an app server,
++call providers, apply migrations or use customer fixtures. From `rebuild/`:
++
++```sh
++DATABASE_URL='postgresql://<user>:<password>@127.0.0.1:5432/volume_rehearsal' \
++  TSX_TSCONFIG_PATH=tsconfig.json node --import tsx scripts/volume-probe.ts \
++  > volume-probe-report.json
++```
++
++Use a dedicated rehearsal database with the reviewed root migration set already
++applied. The URL must explicitly use `localhost`, `127.0.0.1` or `[::1]`, have a
++simple database name ending in `_rehearsal`, and contain no query parameters or
++fragment. Production mode is refused. Before writing, the probe also checks the
++connected database name and PostgreSQL server address. There is no fallback to a
++preview, remote host or production URL. URL/driver errors are masked.
++
++At scale 1 the fixture contains 20 workspaces, 200 selected channels, one million
++Root events, 100,000 posts (including unconnected drafts), 200,000 conversations
++and messages, about 171,430 top-level comments, 20,000 reviews, one million channel
++insights and 100,000 account/campaign insight rows. Sparse literal search matches,
++multiple statuses, a historical date spread and unrelated workspace rows exercise
++filtering and joins. `VOLUME_PROBE_SCALE` accepts 0.01–10; use 0.01 for a smoke run,
++then 1 or a larger production-matched scale for planning evidence. The JSON
++records actual inserted row counts, scale, scenario wall time, emitted SQL,
++Prisma duration and `EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON)` plans. It never prints
++bound parameters or returned records. Missing measurements are unavailable, never
++zero. Output is emitted only after the fixture transaction has rolled back.
++
++The probe installs its transaction as the read-service Prisma singleton before
++importing the services. It calls current Root activity list/search/export, Posts
++first/deep page and search, Inbox merged activity first/continuation/search, and
++Analytics snapshot services. PostgreSQL plans replay the exact SQL and bindings
++captured from these service calls, including counts and relation hydration.
++Prepared-statement inference restores explicit PostgreSQL parameter casts for
++timestamps, enums and arrays lost in Prisma query-event JSON;
++provider-owned Analytics SQL remains in its adapter. Authorization, enabled
++modules and selected resources run normally against synthetic memberships and
++policy. Nonsecret registry defaults and synthetic feature/platform availability
++are installed inside the same transaction to make the scenario repeatable;
++existing policy and all fixture rows are rolled back on success or failure.
++No new Root keys are introduced. Run only against an idle disposable database:
++`ANALYZE` and seeding take locks/resources and aborted bulk inserts may leave
++space for vacuum to reclaim. The transaction has a 30-minute total timeout,
++120-second per-statement timeout and 5-second lock timeout.
++
++Review actual scans, rows removed, sort/spill nodes, buffer reads/hits and
++execution time together; a sequential scan alone does not justify an index.
++Compare before/after on identically seeded databases and record PostgreSQL
++version, hardware, existing indexes, scale and warm/cold-cache conditions.
++Only propose additive indexes backed by those plans, in one root migration
++ordered after the current latest `20261030110000_rebuild_ads_creative_creation`.
++The probe never installs candidate indexes automatically.
++
++Evidence for this batch: guard unit tests and the raw-SQL void-select guard pass;
++TypeScript checks pass. An additional full-suite run was interrupted after it
++stopped producing output without a final summary; it is not a full-suite pass.
++The CLI refuses a missing URL before importing Prisma.
++No rehearsal URL was configured in this worktree, so database seeding, plan
++replay, timings and rollback have **not** been exercised on PostgreSQL. No index
++migration is proposed without that evidence. Production-volume verification
++remains an open Root parity/release gate; synthetic plans, when collected, will
++not establish live-provider, production or concurrent-load performance.
+diff --git a/rebuild/scripts/volume-probe.ts b/rebuild/scripts/volume-probe.ts
+index dd686777..984701da 100644
+--- a/rebuild/scripts/volume-probe.ts
++++ b/rebuild/scripts/volume-probe.ts
+@@ -1,13 +1,15 @@
+ /** Synthetic volume rehearsal. No HTTP server, provider calls or production access.
+- * Run from rebuild/: DATABASE_URL=..._rehearsal npx tsx scripts/volume-probe.ts
++ * Run from rebuild/: DATABASE_URL=..._rehearsal node --import tsx scripts/volume-probe.ts
+  */
+ import { randomUUID } from 'node:crypto';
+ import { resolve } from 'node:path';
+ import { pathToFileURL } from 'node:url';
+ import { performance } from 'node:perf_hooks';
+ 
++class ProbeFailure extends Error {}
++
+ export function guardVolumeDatabase(value: string | undefined, environment = process.env.NODE_ENV): string {
+-  const reject = () => new Error('Volume probe requires a loopback PostgreSQL database ending in _rehearsal outside production.');
++  const reject = () => new ProbeFailure('Volume probe requires a loopback PostgreSQL database ending in _rehearsal outside production.');
+   if (!value || environment === 'production') throw reject();
+   try {
+     const url = new URL(value);
+@@ -29,8 +31,8 @@ async function main() {
+   // Guard before importing application modules, constructing Prisma or connecting.
+   const url = guardVolumeDatabase(process.env.DATABASE_URL);
+   const scale = Number(process.env.VOLUME_PROBE_SCALE ?? '1');
+-  if (!Number.isFinite(scale) || scale < 0.01 || scale > 10) throw new Error('VOLUME_PROBE_SCALE must be between 0.01 and 10.');
+-  const { PrismaClient, Prisma } = await import('../generated/client');
++  if (!Number.isFinite(scale) || scale < 0.01 || scale > 10) throw new ProbeFailure('VOLUME_PROBE_SCALE must be between 0.01 and 10.');
++  const { PrismaClient } = await import('../generated/client');
+   const db = new PrismaClient({ datasources: { db: { url } }, log: [{ emit: 'event', level: 'query' }] });
+   let capture: Captured[] | null = null;
+   db.$on('query', event => { if (capture && /^\s*SELECT\b/i.test(event.query) && heavy.test(event.query)) capture.push(event); });
+@@ -70,7 +72,7 @@ async function main() {
+       for (const entry of CONFIG_REGISTRY) {
+         if (entry.kind === 'secret') continue;
+         const value = entry.key.startsWith('entitlements.') || entry.key === 'platforms.facebook.enabled' || entry.key === 'platforms.facebook.includedByDefault' ? true : entry.defaultValue;
+-        await tx.appSetting.upsert({ where: { key: entry.key }, create: { key: entry.key, value: value as import('../generated/client').Prisma.InputJsonValue, encrypted: false }, update: { value: value as import('../generated/client').Prisma.InputJsonValue, encrypted: false } });
++        await tx.appSetting.upsert({ where: { key: entry.key }, create: { key: entry.key, value: value as import('../generated/client').Prisma.InputJsonValue, encrypted: false, updatedAt: new Date() }, update: { value: value as import('../generated/client').Prisma.InputJsonValue, encrypted: false, updatedAt: new Date() } });
+       }
+       await tx.$executeRaw`INSERT INTO root_activities (id,"actorId",action,detail,"createdAt")
+         SELECT ${prefix} || '_a' || n, ${userId}, CASE WHEN n % 1000 = 0 THEN 'volume.needle' ELSE 'volume.read' END,
+@@ -93,7 +95,7 @@ async function main() {
+       await tx.$executeRaw`INSERT INTO conversation_messages (id,"conversationId","remoteId",message,"fromName","createdTime")
+         SELECT ${prefix} || '_m' || n, ${prefix} || '_c' || n, ${prefix} || n, 'Synthetic message', 'Example visitor', NOW() - n * INTERVAL '1 second'
+         FROM generate_series(1, ${volumes.conversations}::int) n`;
+-      await tx.$executeRaw`INSERT INTO post_comments (id,"postTargetId","remoteId",message,"fromName","createdTime")
++      volumes.comments = await tx.$executeRaw`INSERT INTO post_comments (id,"postTargetId","remoteId",message,"fromName","createdTime")
+         SELECT ${prefix} || '_comment' || n, ${prefix} || '_pt' || (1 + ((n - 1) % ${volumes.posts}::int)), ${prefix} || n,
+           'Synthetic comment', 'Example visitor', NOW() - n * INTERVAL '1 second'
+         FROM generate_series(1, ${volumes.comments}::int) n WHERE (1 + ((n - 1) % ${volumes.posts}::int)) % 7 <> 0`;
+@@ -132,9 +134,20 @@ async function main() {
+         // queries can have the same SQL with different scopes.
+         const unique = new Map(queries.map(query => [`${query.query}\n${query.params}`, query]));
+         const plans = [];
++        let statement = 0;
+         for (const query of unique.values()) {
+           const params: unknown[] = JSON.parse(query.params);
+-          const plan = await tx.$queryRawUnsafe(`EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON) ${query.query}`, ...params);
++          // Query events serialize Date/enum/array bindings to JSON. Ask
++          // PostgreSQL to infer the original statement's parameter types, then
++          // cast replay bindings explicitly (a JSON timestamp string is text).
++          const prepared = `volume_probe_${statement++}`;
++          await tx.$executeRawUnsafe(`PREPARE ${prepared} AS ${query.query}`);
++          const [types] = await tx.$queryRawUnsafe<Array<{ types: string[] }>>(
++            'SELECT parameter_types::text[] AS types FROM pg_prepared_statements WHERE name = $1', prepared);
++          if (!types || types.types.length !== params.length) throw new Error('Parameter type inference failed.');
++          const typedSql = query.query.replace(/\$(\d+)\b/g, (binding, index: string) => `(${binding}::${types.types[Number(index) - 1]})`);
++          await tx.$executeRawUnsafe(`DEALLOCATE ${prepared}`);
++          const plan = await tx.$queryRawUnsafe(`EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON) ${typedSql}`, ...params);
+           plans.push({ sql: query.query, prismaMs: query.duration, plan });
+         }
+         report.push({ name, elapsedMs, statements: queries.length, plans });
+@@ -145,18 +158,19 @@ async function main() {
+       if (rootCursor) await probe('Root activity continuation', () => listRootActivity(userId, { workspaceId, cursor: rootCursor }));
+       await probe('Root activity search', () => listRootActivity(userId, { workspaceId, q: 'needle' }));
+       await probe('Root activity export', () => readRootActivityForExport(userId, { workspaceId, q: 'needle' }, 100_000));
+-      await probe('Posts paging', async () => { const page = await readPublishingPostPage(actor, { page: 20 }); if (!page.posts.length) throw new Error('Empty Posts fixture scope.'); });
++      await probe('Posts paging', async () => { const page = await readPublishingPostPage(actor, { page: 1 }); if (!page.posts.length) throw new Error('Empty Posts fixture scope.'); });
++      await probe('Posts deep paging', () => readPublishingPostPage(actor, { page: 1000 }));
+       await probe('Posts search', () => readPublishingPostPage(actor, { q: 'needle' }));
+       await probe('Inbox activity paging', async () => { const page = await readInboxList(actor); if (!page.items.length) throw new Error('Empty Inbox fixture scope.'); inboxCursor = page.olderCursor; });
+       if (inboxCursor) await probe('Inbox activity continuation', () => readInboxList(actor, { cursor: inboxCursor }));
+       await probe('Inbox activity search', () => readInboxList(actor, { q: 'needle' }));
+-      await probe('Analytics snapshot reads', () => readAnalyticsSnapshot(actor, {}));
++      await probe('Analytics snapshot reads', async () => { const snapshot = await readAnalyticsSnapshot(actor, {}); if (!snapshot.allMetrics.length) throw new Error('Empty Analytics fixture scope.'); });
+       throw rollback;
+     }, { timeout: 1_800_000, maxWait: 5_000 });
+   } catch (error) {
+     if (error !== rollback) {
+       // Never serialize Prisma errors: they can include URLs, SQL or records.
+-      throw new Error(`Volume probe failed during ${stage}; fixtures rolled back. No complete timing evidence is available.`);
++      throw new ProbeFailure(`Volume probe failed during ${stage}; fixtures rolled back. No complete timing evidence is available.`);
+     }
+   } finally {
+     global.rebuildPrisma = previous;
+@@ -166,5 +180,5 @@ async function main() {
+ }
+ 
+ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
+-  main().catch(error => { console.error(error instanceof Error ? error.message : 'Volume probe failed.'); process.exitCode = 1; });
++  main().catch(error => { console.error(error instanceof ProbeFailure ? error.message : 'Volume probe failed; no complete timing evidence is available.'); process.exitCode = 1; });
+ }

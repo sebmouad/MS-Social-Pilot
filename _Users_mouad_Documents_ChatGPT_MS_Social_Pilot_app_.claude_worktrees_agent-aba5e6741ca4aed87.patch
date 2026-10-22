@@ -1,0 +1,305 @@
+diff --git a/prisma/migrations/20261025213000_workspace_setting_sections/migration.sql b/prisma/migrations/20261025213000_workspace_setting_sections/migration.sql
+new file mode 100644
+index 00000000..00b38e54
+--- /dev/null
++++ b/prisma/migrations/20261025213000_workspace_setting_sections/migration.sql
+@@ -0,0 +1,35 @@
++-- Versioned workspace operations settings (rebuild). Additive only.
++--
++-- Most operations settings already live in legacy columns and tables
++-- (workspaces.requiresApproval / undoSendSeconds / utm* / audience* / aiBrandVoice,
++-- targets.brandVoice / audience*, queue_slots, moderation_rules, moderation_actions).
++-- This table adds what they lack: a per-section version for stale-write
++-- rejection, who/when last saved, and the values that have no legacy column
++-- (posting-hours window, minimum spacing between posts to one channel).
++CREATE TABLE "workspace_setting_sections" (
++  "workspaceId" TEXT NOT NULL,
++  "section" TEXT NOT NULL,
++  "version" INTEGER NOT NULL DEFAULT 1,
++  "values" JSONB NOT NULL DEFAULT '{}',
++  "updatedById" TEXT,
++  "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
++  CONSTRAINT "workspace_setting_sections_pkey" PRIMARY KEY ("workspaceId", "section"),
++  CONSTRAINT "workspace_setting_sections_section_check" CHECK ("section" IN ('publishing', 'links', 'audience', 'voice', 'moderation')),
++  CONSTRAINT "workspace_setting_sections_version_check" CHECK ("version" >= 1)
++);
++
++CREATE INDEX "workspace_setting_sections_updatedById_idx" ON "workspace_setting_sections"("updatedById");
++
++ALTER TABLE "workspace_setting_sections" ADD CONSTRAINT "workspace_setting_sections_workspaceId_fkey"
++  FOREIGN KEY ("workspaceId") REFERENCES "workspaces"("id") ON DELETE CASCADE ON UPDATE CASCADE;
++ALTER TABLE "workspace_setting_sections" ADD CONSTRAINT "workspace_setting_sections_updatedById_fkey"
++  FOREIGN KEY ("updatedById") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
++
++-- Same write gate as every other workspace-owned table while a data erasure runs
++-- (the function exists once 20261024100000_workspace_data_purges is applied).
++DO $$
++BEGIN
++  IF to_regproc('rebuild_reject_purging_workspace_write()') IS NOT NULL THEN
++    EXECUTE 'CREATE TRIGGER rebuild_workspace_purge_write_gate BEFORE INSERT OR UPDATE ON public."workspace_setting_sections" FOR EACH ROW EXECUTE FUNCTION rebuild_reject_purging_workspace_write()';
++  END IF;
++END $$;
+diff --git a/prisma/schema.prisma b/prisma/schema.prisma
+index f3bd5124..26ea60f4 100644
+--- a/prisma/schema.prisma
++++ b/prisma/schema.prisma
+@@ -191,6 +191,7 @@ model User {
+   settingChanges       AppSetting[]
+   apiTokens            ApiToken[]
+   mcpApiKeys           McpApiKey[]
++  workspaceSettingUpdates WorkspaceSettingSection[] @relation("WorkspaceSettingUpdater")
+   savedViews           SavedView[]
+   inboxNotes           InboxNote[]
+   rootActions          RootActivity[]
+@@ -372,6 +373,7 @@ model Workspace {
+   keyDates             KeyDate[]
+   seasonalModes        SeasonalMode[]
+   moderationActions    ModerationAction[]
++  settingSections      WorkspaceSettingSection[]
+ 
+   @@map("workspaces")
+ }
+@@ -2133,6 +2135,25 @@ model ClientInvitation {
+   @@map("client_invitations")
+ }
+ 
++/// Versioned workspace operations settings (rebuild). One row per section;
++/// `values` holds what has no legacy column (posting hours, post spacing).
++model WorkspaceSettingSection {
++  workspaceId String
++  /// publishing | links | audience | voice | moderation
++  section     String
++  version     Int      @default(1)
++  values      Json     @default("{}")
++  updatedById String?
++  updatedAt   DateTime @default(now())
++
++  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
++  updatedBy User?     @relation("WorkspaceSettingUpdater", fields: [updatedById], references: [id], onDelete: SetNull)
++
++  @@id([workspaceId, section])
++  @@index([updatedById])
++  @@map("workspace_setting_sections")
++}
++
+ /// Comment moderation rule: what to look for in new comments
+ /// on a workspace's Facebook Pages, and what the worker does when it finds it.
+ model ModerationRule {
+diff --git a/rebuild/prisma/schema.prisma b/rebuild/prisma/schema.prisma
+index 2e665c8d..2cc90ba1 100644
+--- a/rebuild/prisma/schema.prisma
++++ b/rebuild/prisma/schema.prisma
+@@ -35,6 +35,13 @@ enum TargetType {
+   tiktok
+ }
+ 
++enum ApprovalStatus {
++  not_required
++  pending
++  approved
++  rejected
++}
++
+ enum PostStatus {
+   draft
+   pending_approval
+@@ -76,6 +83,7 @@ model User {
+   posts        Post[]
+   sessions     Session[]
+   mcpApiKeys   McpApiKey[]
++  workspaceSettingUpdates WorkspaceSettingSection[] @relation("WorkspaceSettingUpdater")
+ 
+   @@map("users")
+ }
+@@ -136,6 +144,16 @@ model Workspace {
+   name           String
+   slug           String          @unique
+   timezone       String
++  /// Operations settings kept in legacy columns (docs/WORKSPACE_SETTINGS.md).
++  requiresApproval Boolean @default(false)
++  undoSendSeconds  Int     @default(30)
++  utmSource           String?
++  utmMedium           String?
++  utmCampaignTemplate String?
++  audienceCountries String[] @default([])
++  audienceLanguages String[] @default([])
++  audienceTimezone  String?
++  aiBrandVoice      String?
+   createdAt      DateTime @default(now())
+   updatedAt      DateTime @updatedAt
+   memberships    Membership[]
+@@ -146,6 +164,10 @@ model Workspace {
+   instagramAccounts InstagramAccount[]
+   mcpApiKeys     McpApiKey[]
+   dataPurge      WorkspaceDataPurge?
++  queueSlots     QueueSlot[]
++  moderationRules   ModerationRule[]
++  moderationActions ModerationAction[]
++  settingSections   WorkspaceSettingSection[]
+ 
+   @@map("workspaces")
+ }
+@@ -239,6 +261,11 @@ model Target {
+   canPublish      Boolean
+   followersCount Int?
+   profileSyncedAt DateTime?
++  /// Per-channel tone text and audience (empty follows the workspace defaults).
++  brandVoice        String?
++  audienceCountries String[] @default([])
++  audienceLanguages String[] @default([])
++  audienceTimezone  String?
+   createdAt       DateTime
+   updatedAt       DateTime @updatedAt
+   workspace       Workspace      @relation(fields: [workspaceId], references: [id])
+@@ -246,6 +273,7 @@ model Target {
+   postTargets     PostTarget[]
+   insights        PageInsight[]
+   conversations   Conversation[]
++  queueSlots      QueueSlot[]
+ 
+   @@unique([workspaceId, providerId])
+   @@index([socialAccountId])
+@@ -347,6 +375,7 @@ model Post {
+   status      PostStatus
+   scheduledAt DateTime?
+   publishedAt DateTime?
++  approvalStatus ApprovalStatus @default(not_required)
+   createdAt   DateTime
+   updatedAt   DateTime
+   workspace   Workspace    @relation(fields: [workspaceId], references: [id])
+@@ -514,3 +543,87 @@ model RebuildSyncRun {
+   @@index([finishedAt])
+   @@map("rebuild_sync_runs")
+ }
++
++/// Publishing times: one channel's own, or (targetId null) every channel's.
++model QueueSlot {
++  id          String   @id
++  workspaceId String
++  targetId    String?
++  /// 0 = Sunday … 6 = Saturday, in the workspace time zone.
++  dayOfWeek   Int
++  hour        Int
++  minute      Int
++  createdAt   DateTime @default(now())
++  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
++  target      Target?   @relation(fields: [targetId], references: [id], onDelete: Cascade)
++
++  @@unique([workspaceId, targetId, dayOfWeek, hour, minute])
++  @@index([workspaceId])
++  @@index([targetId])
++  @@map("queue_slots")
++}
++
++/// Comment moderation rules; `match` is links | phones | keywords, `action` hide | alert | reply.
++model ModerationRule {
++  id          String   @id
++  workspaceId String
++  name        String
++  enabled     Boolean  @default(true)
++  targetIds   String[] @default([])
++  match       String
++  keywords    String[] @default([])
++  action      String
++  replyText   String?
++  dailyCap    Int      @default(20)
++  oncePerUser Boolean  @default(true)
++  createdAt   DateTime @default(now())
++  updatedAt   DateTime @updatedAt
++  workspace   Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
++  actions     ModerationAction[]
++
++  @@index([workspaceId])
++  @@map("moderation_rules")
++}
++
++/// What a moderation rule did, kept so it can be read and undone.
++model ModerationAction {
++  id              String    @id
++  workspaceId     String
++  ruleId          String?
++  ruleName        String
++  targetId        String
++  remoteCommentId String
++  authorId        String?
++  authorName      String?
++  message         String
++  action          String
++  replyRemoteId   String?
++  error           String?
++  undoneAt        DateTime?
++  undoneById      String?
++  createdAt       DateTime  @default(now())
++  workspace       Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
++  rule            ModerationRule? @relation(fields: [ruleId], references: [id], onDelete: SetNull)
++
++  @@unique([ruleId, remoteCommentId])
++  @@index([workspaceId, createdAt])
++  @@index([ruleId, createdAt])
++  @@map("moderation_actions")
++}
++
++/// Version, author and non-legacy values of one operations-settings section.
++/// Additive migration: prisma/migrations/20261025213000_workspace_setting_sections.
++model WorkspaceSettingSection {
++  workspaceId String
++  section     String
++  version     Int      @default(1)
++  values      Json     @default("{}")
++  updatedById String?
++  updatedAt   DateTime @default(now())
++  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
++  updatedBy   User?     @relation("WorkspaceSettingUpdater", fields: [updatedById], references: [id], onDelete: SetNull)
++
++  @@id([workspaceId, section])
++  @@index([updatedById])
++  @@map("workspace_setting_sections")
++}
+diff --git a/rebuild/src/modules/settings/manifest.ts b/rebuild/src/modules/settings/manifest.ts
+index 0046d38d..8c37b46b 100644
+--- a/rebuild/src/modules/settings/manifest.ts
++++ b/rebuild/src/modules/settings/manifest.ts
+@@ -6,6 +6,11 @@ export const settingsManifest = {
+   href: '/settings/connections',
+   pages: [
+     { id: 'settings/connections', title: 'Connections', href: '/settings/connections', description: 'Choose connected accounts and channels.' },
++    { id: 'settings/publishing-rules', title: 'Publishing rules', href: '/settings/publishing-rules', description: 'Approvals, queue times, posting hours, spacing and undo.' },
++    { id: 'settings/links', title: 'Links', href: '/settings/links', description: 'Tag links with a UTM template.' },
++    { id: 'settings/audience', title: 'Audience', href: '/settings/audience', description: 'Countries, languages and time zone for each channel.' },
++    { id: 'settings/voice', title: 'Writing voice', href: '/settings/voice', description: 'How your workspace and each channel sound.' },
++    { id: 'settings/moderation', title: 'Comment moderation', href: '/settings/moderation', description: 'Hide or flag unwanted comments automatically.' },
+     { id: 'settings/team', title: 'Team', href: '/settings/team', description: 'Manage people and access.' },
+     { id: 'settings/mcp', title: 'MCP API keys', href: '/settings/mcp', description: 'Manage scoped workspace integration keys.' },
+     { id: 'settings/account', title: 'Account', href: '/settings/account', description: 'Your profile and preferences.' },
+diff --git a/rebuild/src/server/entitlements/index.ts b/rebuild/src/server/entitlements/index.ts
+index 193489ef..a51796e1 100644
+--- a/rebuild/src/server/entitlements/index.ts
++++ b/rebuild/src/server/entitlements/index.ts
+@@ -43,6 +43,11 @@ const FEATURE_ROOT_SWITCH: Record<FeatureId, string | null> = {
+   'ads/overview': 'ads/performance',
+   'ads/campaigns': 'ads/performance',
+   'settings/connections': null,
++  'settings/publishing-rules': null,
++  'settings/links': null,
++  'settings/audience': null,
++  'settings/voice': null,
++  'settings/moderation': null,
+   'settings/team': 'settings/team',
+   'settings/mcp': 'settings/team',
+   'settings/account': null,
+diff --git a/rebuild/src/server/permissions/index.ts b/rebuild/src/server/permissions/index.ts
+index ce15bf3c..5a8790a1 100644
+--- a/rebuild/src/server/permissions/index.ts
++++ b/rebuild/src/server/permissions/index.ts
+@@ -40,6 +40,11 @@ const FEATURE_MODULE_SWITCH: Record<FeatureId, string | null> = {
+   'ads/overview': 'ads/performance',
+   'ads/campaigns': 'ads/performance',
+   'settings/connections': null,
++  'settings/publishing-rules': null,
++  'settings/links': null,
++  'settings/audience': null,
++  'settings/voice': null,
++  'settings/moderation': null,
+   'settings/team': 'settings/team',
+   'settings/mcp': 'settings/team',
+   'settings/account': null,

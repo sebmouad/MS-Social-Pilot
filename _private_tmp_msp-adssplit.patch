@@ -1,0 +1,742 @@
+diff --git a/rebuild/docs/MCP_PARITY.md b/rebuild/docs/MCP_PARITY.md
+index d0fd3cb3..bb1f2064 100644
+--- a/rebuild/docs/MCP_PARITY.md
++++ b/rebuild/docs/MCP_PARITY.md
+@@ -174,9 +174,9 @@ live catalog inside the test or add a blanket exclusion to make it pass.
+ | get_bio_page | settings/bio | read | GET /api/sharing/bio | Shared customer operation; transport arguments may differ. |
+ | save_bio_page | settings/bio | write | PUT /api/sharing/bio | Shared customer operation; transport arguments may differ. |
+ | delete_bio_page | settings/bio | write | DELETE /api/sharing/bio | Shared customer operation; transport arguments may differ. |
+-| export_analytics_report | analytics/reports | read | GET /api/reports/export | Shared customer operation; transport arguments may differ. |
++| export_analytics_report | analytics/reports | read | GET /api/reports/export | Shared channel-only overview snapshot/CSV service, with Root and credential limits. Paid exports stay in Ads reporting. |
+ | get_analytics_posts | analytics/posts | read | GET /api/analytics/posts | Shared customer operation; transport arguments may differ. |
+-| get_analytics_ad_objects | analytics/ads | read | GET /api/analytics/ad-objects | Shared customer operation; transport arguments may differ. |
++| get_analytics_ad_objects | analytics/ads | read | GET /api/analytics/ad-objects | Separate Analytics > Ads reporting experience with independent account/date filters; shared readAdObjects service. |
+ | list_report_templates | analytics/reports | read | GET /api/analytics/report-workflows/templates | Shared customer operation; transport arguments may differ. |
+ | manage_report_template | analytics/reports | write | POST /api/analytics/report-workflows/templates | Shared customer operation; transport arguments may differ. |
+ | list_report_schedules | analytics/reports | read | GET /api/analytics/report-workflows/schedules | Shared customer operation; transport arguments may differ. |
+@@ -191,9 +191,9 @@ live catalog inside the test or add a blanket exclusion to make it pass.
+ | set_analytics_goals | analytics/goals | write | POST /api/analytics/goals | Shared customer operation; transport arguments may differ. |
+ | get_analytics_demographics | analytics/demographics | read | GET /api/analytics/demographics | Shared customer operation; transport arguments may differ. |
+ | compare_analytics | analytics/compare | read | POST /api/analytics/comparison | Shared customer operation; transport arguments may differ. |
+-| get_analytics_explorer | analytics/explorer | read | GET /api/analytics/explorer | Shared customer operation; transport arguments may differ. |
+-| get_analytics_overview | analytics/overview | read | GET /api/analytics | Shared customer operation; transport arguments may differ. |
+-| get_analytics_metric_details | analytics/overview | read | GET /api/analytics | Analytics metric query selects detail; source-level capability correspondence only. |
++| get_analytics_explorer | analytics/explorer | read | GET /api/analytics/explorer | Shared channel-only read service; paid metrics remain in separate Ads reporting. |
++| get_analytics_overview | analytics/overview | read | GET /api/analytics | Shared channel-only read service, also used by UI and exports; nonempty ad-account selections are refused. |
++| get_analytics_metric_details | analytics/overview | read | GET /api/analytics | Channel metric query selects detail; paid metric keys are unavailable here. Source-level capability correspondence only. |
+ | get_appearance | settings/appearance | read | GET /api/settings/appearance | Shared customer operation; transport arguments may differ. |
+ | update_appearance | settings/appearance | write | PATCH /api/settings/appearance | Shared customer operation; transport arguments may differ. |
+ | reveal_webhook_secret | settings/webhooks | write | POST /api/webhooks/[id]/secret/reveal | Shared customer operation; transport arguments may differ. |
+diff --git a/rebuild/src/modules/analytics/REPORTING_BOUNDARY.md b/rebuild/src/modules/analytics/REPORTING_BOUNDARY.md
+new file mode 100644
+index 00000000..90743a72
+--- /dev/null
++++ b/rebuild/src/modules/analytics/REPORTING_BOUNDARY.md
+@@ -0,0 +1,31 @@
++# Channel and paid reporting boundary
++
++Owner decision: channel/Page/post reporting and Ads reporting are separate experiences.
++
++- `/analytics` and `/analytics/explorer` use the shared channel-only `server/read.ts` service. Overview, detail, comparison, pins and overview CSV exports inherit the same boundary through UI, session REST and MCP/key REST callers.
++- The service requests an empty selected ad-account list and an empty allowed-account ceiling on discovery, current and comparison reads. It also omits normalized `resourceKind: ad-account` metrics before aggregation. This uses neutral provider metadata; no provider/source-label rules are introduced.
++- Explicit nonempty legacy ad-account filters are refused rather than silently changed. Empty legacy filters remain accepted for saved channel-only queries. Response ad-account arrays remain empty for transport shape compatibility.
++- Paid account reporting stays at `/ads`, with its existing date/account filters, spend, CPC, reach, actions, daily details and export. The existing `/analytics/ads` route is the clearly named **Ads reporting** experience for campaign/ad-set/ad detail, with independent account/date filters and its existing shared `readAdObjects` UI/REST/MCP service. No routes, entitlements or tool names move in this batch.
++- Existing Root range, paging, chart, search, export and bilingual copy settings remain authoritative. No new Root keys. Catalog identities remain compatible with saved copy; shipped overview empty-state wording now refers only to channels. Root overrides can still choose custom wording.
++
++Verification is mocked service/provider-port and rendered UI evidence only; no browser, live provider or production verification. The overview headline is owned by a parallel worker and is unchanged here. Integrator should record this boundary and test receipts in `docs/ARCHITECTURE.md`, `UX-CONTRACT.md`, `docs/DELIVERY_PLAN.md` and `docs/AGENT_HANDOFF.md`, which are outside this lane's ownership.
++
++## Targeted verification
++
++From `rebuild/`:
++
++- `npx tsc --noEmit -p .`: passed, zero errors.
++- `npx vitest run --no-cache tests/analytics-read.test.ts tests/analytics-explorer.test.ts tests/analytics-explorer-page.test.ts tests/mcp-analytics-account-scope80.test.ts tests/parity-analytics-export.test.ts tests/analytics-http.test.ts tests/analytics-overview-live-defects2.test.ts tests/analytics-copy.test.ts tests/ads-module-ui.test.ts tests/ads-report-read.test.ts tests/ads-report-routes.test.ts tests/analytics-comparison.test.ts`: 12 files, 96 tests passed. Cache disabled because dependencies are symlinked outside the writable checkout.
++- `npx vitest run --no-cache --config src/modules/analytics/ad-objects/vitest.config.ts src/modules/analytics/ad-objects/surfaces.test.tsx`: 6 tests passed, covering the independent paid-reporting UI/REST/MCP surface.
++- `git diff --check`: passed.
++- Premium strict static audit: 31 existing static findings across the project; the touched explorer filter form declares `noValidate` and relies on the shared service validation. Audit JSON is local at `/private/tmp/msp-adssplit-ui-audit.json`. No full application static-audit clearance is claimed.
++
++Known integration follow-up: previously saved Root overview/records copy overrides can retain old wording. Review those configured entries before browser verification; shipped defaults are bilingual and accurate. No live settings were changed. Existing consumer tests that intentionally fake a mixed Analytics snapshot are transport fixtures, not proof that the channel service returns paid metrics.
++
++## Changed files
++
++Under `src/modules/analytics/`: `server/read.ts`, `manifest.ts`, `mcp.ts`, `explorer-mcp.ts`, `comparison/mcp.ts`, `overview-copy.ts`, `records-copy.ts`, `ui/AnalyticsScreen.tsx`, `ui/explorer/ExplorerScreen.tsx`, `ui/explorer/sidebar.tsx`, and this document.
++
++Under `tests/`: `analytics-read.test.ts`, `analytics-explorer-page.test.ts`, `mcp-analytics-account-scope80.test.ts`, `parity-analytics-export.test.ts`.
++
++Documentation: affected rows in `docs/MCP_PARITY.md`.
+diff --git a/rebuild/src/modules/analytics/comparison/mcp.ts b/rebuild/src/modules/analytics/comparison/mcp.ts
+index ba342349..557d75bf 100644
+--- a/rebuild/src/modules/analytics/comparison/mcp.ts
++++ b/rebuild/src/modules/analytics/comparison/mcp.ts
+@@ -9,7 +9,7 @@ const ids = { type: 'array', items: { type: 'string', pattern: '^[A-Za-z0-9_-]{1
+ export const analyticsComparisonToolDefinitions = [{
+   name: 'compare_analytics',
+   description: 'Compare stored Analytics either across two date ranges for the same channels (mode period) or across two disjoint groups of channels in one range (mode channels). Differences are calculated only for measures that can honestly be subtracted with matching coverage; reach, breakdowns and partially covered measures stay uncompared. Missing is unknown, not zero.',
+-  inputSchema: { type: 'object', required: ['mode'], properties: { mode: { type: 'string', enum: ['period', 'channels'] }, a: range, b: range, channel: ids, adAccount: ids, start: day, end: day, groupA: ids, groupB: ids }, additionalProperties: false },
++  inputSchema: { type: 'object', required: ['mode'], properties: { mode: { type: 'string', enum: ['period', 'channels'] }, a: range, b: range, channel: ids, start: day, end: day, groupA: ids, groupB: ids }, additionalProperties: false },
+ }] as const;
+ export async function executeAnalyticsComparisonTool(actor: Actor, args: unknown) {
+   return readAnalyticsComparison(actor, args);
+diff --git a/rebuild/src/modules/analytics/explorer-mcp.ts b/rebuild/src/modules/analytics/explorer-mcp.ts
+index d20328c4..3b605434 100644
+--- a/rebuild/src/modules/analytics/explorer-mcp.ts
++++ b/rebuild/src/modules/analytics/explorer-mcp.ts
+@@ -8,11 +8,10 @@ export const analyticsExplorerTools = new Set<string>(['get_analytics_explorer']
+ export const analyticsExplorerWriteTools = new Set<string>();
+ export const analyticsExplorerToolDefinitions = [{
+   name: 'get_analytics_explorer',
+-  description: 'Explore bounded stored Analytics metrics for selected authorized channels and ad accounts. Search metrics, filter by exact source and data kind, inspect coverage/provenance and continue metric, date-series, or resource pagination. Missing values remain unknown, not zero. No provider request is made.',
++  description: 'Explore bounded stored Analytics metrics for selected authorized channels. Paid metrics are available through Ads reporting. Search metrics, filter by exact source and data kind, inspect coverage/provenance and continue metric, date-series, or resource pagination. Missing values remain unknown, not zero. No provider request is made.',
+   inputSchema: { type: 'object', properties: {
+     start: { type: 'string', description: 'Inclusive UTC date, YYYY-MM-DD.' }, end: { type: 'string', description: 'Inclusive UTC date, YYYY-MM-DD.' },
+     compare: { type: 'string', enum: ['none', 'previous', 'year'] }, filter: { type: 'string', enum: ['1'] }, channel: { oneOf: [{ type: 'string' }, { type: 'array', items: { type: 'string' } }] },
+-    adFilter: { type: 'string', enum: ['1'] }, adAccount: { oneOf: [{ type: 'string' }, { type: 'array', items: { type: 'string' } }] },
+     search: { type: 'string' }, source: { type: 'string', maxLength: 200 }, kind: { type: 'string', enum: ['all', 'stock', 'flow', 'ratio', 'breakdown'] },
+     metric: { type: 'string' }, page: { type: 'integer', minimum: 1 }, pointPage: { type: 'integer', minimum: 1 }, rowPage: { type: 'integer', minimum: 1 },
+   }, additionalProperties: false },
+diff --git a/rebuild/src/modules/analytics/manifest.ts b/rebuild/src/modules/analytics/manifest.ts
+index f98d8c02..8592ecd8 100644
+--- a/rebuild/src/modules/analytics/manifest.ts
++++ b/rebuild/src/modules/analytics/manifest.ts
+@@ -9,11 +9,11 @@ export const analyticsManifest = {
+   title: 'Analytics',
+   href: '/analytics',
+   pages: [
+-    { id: 'analytics/overview', title: 'Analytics', href: '/analytics', description: 'Explore every available metric in one place.' },
++    { id: 'analytics/overview', title: 'Analytics', href: '/analytics', description: 'Explore channel audience, performance and post metrics.' },
+     { id: 'analytics/explorer', title: 'Metric explorer', href: '/analytics/explorer', navigation: false, description: 'Inspect every available stored metric, source and resource.' },
+     { id: 'analytics/demographics', title: 'Audience', href: '/analytics/demographics', description: 'Understand available audience breakdowns and coverage.' },
+     { id: 'analytics/compare', title: 'Compare', href: '/analytics/compare', description: 'Compare periods and selected resource groups with honest metric semantics.' },
+-    { id: 'analytics/ads', title: 'Ad objects', href: '/analytics/ads', description: 'Analyze stored campaigns, ad sets and ads with coverage and export.' },
++    { id: 'analytics/ads', title: 'Ads reporting', href: '/analytics/ads', description: 'Explore paid campaign, ad set and ad performance separately from channel analytics.' },
+     { id: 'analytics/posts', title: 'Posts', href: '/analytics/posts', description: 'Explore and export stored per-post measures.' },
+     { id: 'analytics/goals', title: 'Goals', href: '/analytics/goals', description: 'Set monthly goals per channel and track progress.' },
+     { id: 'analytics/pins', title: 'Pinned metrics', href: '/analytics/pins', description: 'Keep a personal view of available metrics.' },
+diff --git a/rebuild/src/modules/analytics/mcp.ts b/rebuild/src/modules/analytics/mcp.ts
+index 8d58bea9..5b47a125 100644
+--- a/rebuild/src/modules/analytics/mcp.ts
++++ b/rebuild/src/modules/analytics/mcp.ts
+@@ -48,7 +48,7 @@ function analyticsPageArgs(args: Record<string, unknown>, cap: number, fallback:
+ export const ANALYTICS_MCP: readonly McpToolGroup[] = [
+   {
+     id: 'analytics-report-export',
+-    tools: [{ name: 'export_analytics_report', description: 'Export the same scoped overview CSV as Analytics Reports, including metric details and comparison. Root and credential row ceilings apply; truncation is explicit.', inputSchema: { type: 'object', properties: { start: { type: 'string' }, end: { type: 'string' }, compare: { type: 'string', enum: ['none', 'previous', 'year'] }, targetIds: { type: 'array', items: { type: 'string' } }, adAccountIds: { type: 'array', items: { type: 'string' } }, search: { type: 'string' } }, additionalProperties: false } }],
++    tools: [{ name: 'export_analytics_report', description: 'Export the same channel-only overview CSV as Analytics Reports, including metric details and comparison. Root and credential row ceilings apply; truncation is explicit.', inputSchema: { type: 'object', properties: { start: { type: 'string' }, end: { type: 'string' }, compare: { type: 'string', enum: ['none', 'previous', 'year'] }, targetIds: { type: 'array', items: { type: 'string' } }, search: { type: 'string' } }, additionalProperties: false } }],
+     features: { export_analytics_report: 'analytics/reports' },
+     scope: { resourceTools: ['export_analytics_report'] },
+     execute: async (viewer, _name, args, cap) => {
+@@ -153,8 +153,8 @@ export const ANALYTICS_MCP: readonly McpToolGroup[] = [
+   {
+     id: 'analytics-overview',
+     tools: [
+-    { name: 'get_analytics_overview', description: 'Read available metrics and combined audience for selected channels and ad accounts. Metrics, audience entries, and selected channels have independent offsets; each response is bounded.', inputSchema: { type: 'object', properties: { start: { type: 'string', description: 'Start date, YYYY-MM-DD.' }, end: { type: 'string', description: 'End date, YYYY-MM-DD.' }, compare: { type: 'string', enum: ['none', 'previous', 'year'] }, targetIds: { type: 'array', items: { type: 'string' }, description: 'Selected channel IDs; omit to use every accessible channel. An empty array selects no channels.' }, adAccountIds: { type: 'array', items: { type: 'string' }, description: 'Selected ad account IDs; omit to use every accessible account. An empty array selects no ad accounts.' }, search: { type: 'string' }, offset: { type: 'integer', minimum: 0 }, limit: { type: 'integer', minimum: 1, maximum: 200 }, audienceOffset: { type: 'integer', minimum: 0 }, targetOffset: { type: 'integer', minimum: 0 } }, additionalProperties: false } },
+-    { name: 'get_analytics_metric_details', description: 'Read a bounded page of stored date points or channel/breakdown rows for one Analytics metric. Continue with nextOffset until null.', inputSchema: { type: 'object', required: ['metricKey', 'kind'], properties: { start: { type: 'string', description: 'Start date, YYYY-MM-DD.' }, end: { type: 'string', description: 'End date, YYYY-MM-DD.' }, compare: { type: 'string', enum: ['none', 'previous', 'year'] }, targetIds: { type: 'array', items: { type: 'string' }, description: 'Selected channel IDs; omit to use every accessible channel. An empty array selects no channels.' }, adAccountIds: { type: 'array', items: { type: 'string' }, description: 'Selected ad account IDs; omit to use every accessible account. An empty array selects no ad accounts.' }, search: { type: 'string' }, metricKey: { type: 'string', minLength: 1 }, kind: { type: 'string', enum: ['points', 'rows'] }, offset: { type: 'integer', minimum: 0 }, limit: { type: 'integer', minimum: 1, maximum: 200 } }, additionalProperties: false } },
++    { name: 'get_analytics_overview', description: 'Read channel metrics and combined audience for selected channels. Paid metrics are available through Ads reporting. Metrics, audience entries, and selected channels have independent offsets; each response is bounded.', inputSchema: { type: 'object', properties: { start: { type: 'string', description: 'Start date, YYYY-MM-DD.' }, end: { type: 'string', description: 'End date, YYYY-MM-DD.' }, compare: { type: 'string', enum: ['none', 'previous', 'year'] }, targetIds: { type: 'array', items: { type: 'string' }, description: 'Selected channel IDs; omit to use every accessible channel. An empty array selects no channels.' }, search: { type: 'string' }, offset: { type: 'integer', minimum: 0 }, limit: { type: 'integer', minimum: 1, maximum: 200 }, audienceOffset: { type: 'integer', minimum: 0 }, targetOffset: { type: 'integer', minimum: 0 } }, additionalProperties: false } },
++    { name: 'get_analytics_metric_details', description: 'Read a bounded page of stored date points or channel/breakdown rows for one Analytics metric. Continue with nextOffset until null.', inputSchema: { type: 'object', required: ['metricKey', 'kind'], properties: { start: { type: 'string', description: 'Start date, YYYY-MM-DD.' }, end: { type: 'string', description: 'End date, YYYY-MM-DD.' }, compare: { type: 'string', enum: ['none', 'previous', 'year'] }, targetIds: { type: 'array', items: { type: 'string' }, description: 'Selected channel IDs; omit to use every accessible channel. An empty array selects no channels.' }, search: { type: 'string' }, metricKey: { type: 'string', minLength: 1 }, kind: { type: 'string', enum: ['points', 'rows'] }, offset: { type: 'integer', minimum: 0 }, limit: { type: 'integer', minimum: 1, maximum: 200 } }, additionalProperties: false } },
+     ],
+     features: {
+       get_analytics_overview: 'analytics/overview',
+diff --git a/rebuild/src/modules/analytics/overview-copy.ts b/rebuild/src/modules/analytics/overview-copy.ts
+index 482f4780..26b3b469 100644
+--- a/rebuild/src/modules/analytics/overview-copy.ts
++++ b/rebuild/src/modules/analytics/overview-copy.ts
+@@ -53,9 +53,9 @@ const en = {
+   "Analytics could not be loaded": "Analytics could not be loaded",
+   "Use the sidebar to retry with these filters or reset them.": "Use the sidebar to retry with these filters or reset them.",
+   "No selected resources are available": "No selected resources are available",
+-  "Connect or enable a channel or ad account to see its stored metrics.": "Connect or enable a channel or ad account to see its stored metrics.",
++  "Connect or enable a channel or ad account to see its stored metrics.": "Connect or enable a channel to see its stored metrics.",
+   "No resources selected": "No resources selected",
+-  "Choose channels or ad accounts in the sidebar to see their stored metrics.": "Choose channels or ad accounts in the sidebar to see their stored metrics.",
++  "Choose channels or ad accounts in the sidebar to see their stored metrics.": "Choose channels in the sidebar to see their stored metrics.",
+   "Publishing records": "Publishing records",
+   "Matched to selected channels and dates. Published posts use publish date, scheduled posts use scheduled date, and failed posts use creation date.": "Matched to selected channels and dates. Published posts use publish date, scheduled posts use scheduled date, and failed posts use creation date.",
+   "Published": "Published",
+@@ -168,9 +168,9 @@ const fr: typeof en = {
+   "Analytics could not be loaded": "Les statistiques n’ont pas pu être chargées",
+   "Use the sidebar to retry with these filters or reset them.": "Utilisez le panneau latéral pour réessayer avec ces filtres ou les réinitialiser.",
+   "No selected resources are available": "Aucune ressource sélectionnée n’est disponible",
+-  "Connect or enable a channel or ad account to see its stored metrics.": "Connectez ou activez un canal ou un compte publicitaire pour voir ses mesures enregistrées.",
++  "Connect or enable a channel or ad account to see its stored metrics.": "Connectez ou activez un canal pour voir ses mesures enregistrées.",
+   "No resources selected": "Aucune ressource sélectionnée",
+-  "Choose channels or ad accounts in the sidebar to see their stored metrics.": "Choisissez des canaux ou des comptes publicitaires dans le panneau latéral pour voir leurs mesures enregistrées.",
++  "Choose channels or ad accounts in the sidebar to see their stored metrics.": "Choisissez des canaux dans le panneau latéral pour voir leurs mesures enregistrées.",
+   "Publishing records": "Historique des publications",
+   "Matched to selected channels and dates. Published posts use publish date, scheduled posts use scheduled date, and failed posts use creation date.": "Selon les canaux et dates sélectionnés : date de publication pour les publications publiées, date planifiée pour les publications planifiées et date de création pour les échecs.",
+   "Published": "Publiées",
+diff --git a/rebuild/src/modules/analytics/records-copy.ts b/rebuild/src/modules/analytics/records-copy.ts
+index 3cad5e01..ddf83ee5 100644
+--- a/rebuild/src/modules/analytics/records-copy.ts
++++ b/rebuild/src/modules/analytics/records-copy.ts
+@@ -116,8 +116,8 @@ export const recordsCopyDefaults = {
+     "fr": "Publicités"
+   },
+   "Ad-object analysis": {
+-    "en": "Ad-object analysis",
+-    "fr": "Analyse des objets publicitaires"
++    "en": "Ads reporting",
++    "fr": "Rapports publicitaires"
+   },
+   "Start (UTC, inclusive)": {
+     "en": "Start (UTC, inclusive)",
+diff --git a/rebuild/src/modules/analytics/server/read.ts b/rebuild/src/modules/analytics/server/read.ts
+index 6194022c..86f9fedf 100644
+--- a/rebuild/src/modules/analytics/server/read.ts
++++ b/rebuild/src/modules/analytics/server/read.ts
+@@ -14,7 +14,7 @@ import { assertWorkspaceNotPurging } from '@/server/data-control/guard';
+ import { canAccessFeature } from '@/server/permissions';
+ import { loadPermissions } from '@/server/permissions/loader';
+ import { buildAnalytics, type MetricView } from '@/modules/analytics/server/aggregate';
+-import { loadAnalytics, type AnalyticsAdScope } from '@/modules/analytics/server/data';
++import { loadAnalytics } from '@/modules/analytics/server/data';
+ import { AnalyticsComparisonError, analyticsDateRange, compareAnalytics } from './comparison';
+ import { buildPreviousPoints } from './previous-points';
+ import type { AnalyticsReadActor, AnalyticsReadConstraints, AnalyticsReadResult, AnalyticsSnapshot } from './types';
+@@ -68,6 +68,8 @@ function parseInput(input: unknown, searchMaxLength: number): ParsedInput {
+   };
+   const channels = uniqueIds(value.channel);
+   const adAccounts = uniqueIds(value.adAccount);
++  // Paid reporting has its own Ads surface; never silently reinterpret an Ads selection.
++  if (adAccounts.length) throw invalid();
+   if ((channels.length > 0 && value.filter !== '1') || (adAccounts.length > 0 && value.adFilter !== '1')) throw invalid();
+   const search = value.search?.trim();
+   if (search && search.length > searchMaxLength) throw invalid();
+@@ -139,15 +141,7 @@ async function authorizeAnalytics(actor: AnalyticsReadActor, constraints: Analyt
+   const allowedChannelIds = constraints.allowedChannelIds === undefined
+     ? granted
+     : constraints.allowedChannelIds.filter(id => granted === undefined || granted.includes(id));
+-  const scope = actor.adAccountTargetScope;
+-  const adScope: AnalyticsAdScope = {
+-    ...(actor.allowedAdAccountIds === undefined ? {} : { accountIds: [...actor.allowedAdAccountIds] }),
+-    ...(scope === undefined ? {} : {
+-      independentTargets: true,
+-      ...(scope.all ? (granted === undefined ? {} : { targetIds: [...granted] }) : { targetIds: scope.ids.filter(id => granted === undefined || granted.includes(id)) }),
+-    }),
+-  };
+-  return { allowedChannelIds, allowedProviders: entitledPlatformIds(entitlements), adScope };
++  return { allowedChannelIds, allowedProviders: entitledPlatformIds(entitlements) };
+ }
+ 
+ const runtimeLimits = cache(async () => {
+@@ -173,11 +167,11 @@ async function loadSnapshot(actor: AnalyticsReadActor, rawInput: unknown, constr
+     if (error instanceof AnalyticsComparisonError) throw invalid();
+     throw error;
+   }
+-  const initial = await loadAnalytics(actor.workspaceId, input.filter ? idList(input.channel) : [], period.range, access.allowedChannelIds, input.adFilter ? idList(input.adAccount) : undefined, access.allowedProviders, access.adScope);
++  const initial = await loadAnalytics(actor.workspaceId, input.filter ? idList(input.channel) : [], period.range, access.allowedChannelIds, [], access.allowedProviders, { accountIds: [] });
+   const channelOptions = initial.targets;
+-  const adAccountOptions = initial.adAccounts;
++  const adAccountOptions: typeof initial.adAccounts = [];
+   const requestedChannelIds = input.filter ? idList(input.channel) : channelOptions.map(item => item.id);
+-  const requestedAdIds = input.adFilter ? idList(input.adAccount) : initial.selectedAdIds;
++  const requestedAdIds: string[] = [];
+   if (!requestedChannelIds.every(id => channelOptions.some(item => item.id === id)) || !requestedAdIds.every(id => adAccountOptions.some(item => item.id === id))) throw forbiddenResource();
+   const selectedChannelIds = channelOptions.filter(item => requestedChannelIds.includes(item.id)).map(item => item.id);
+   const selectedAdIds = adAccountOptions.filter(item => requestedAdIds.includes(item.id)).map(item => item.id);
+@@ -188,19 +182,19 @@ async function loadSnapshot(actor: AnalyticsReadActor, rawInput: unknown, constr
+   // Reuse only an exact returned scope; validation above still rejects dropped or unavailable IDs.
+   const currentData = sameIds(initial.selectedTargets.map(item => item.id), selectedChannelIds) && sameIds(initial.selectedAdIds, selectedAdIds)
+     ? initial
+-    : await loadAnalytics(actor.workspaceId, selectedChannelIds, period.range, access.allowedChannelIds, selectedAdIds, access.allowedProviders, access.adScope);
++    : await loadAnalytics(actor.workspaceId, selectedChannelIds, period.range, access.allowedChannelIds, selectedAdIds, access.allowedProviders, { accountIds: [] });
+   const selectedReturnedChannels = currentData.selectedTargets.map(item => item.id);
+   if (!sameIds(selectedReturnedChannels, selectedChannelIds) || !sameIds(currentData.selectedAdIds, selectedAdIds)) throw forbiddenResource();
+   assertUniqueMetricKeys(currentData.metrics);
+   const [copy, locale] = await Promise.all([metricCopy(), analyticsLanguage()]);
+-  const view = buildAnalytics(currentData.metrics, currentData.audienceEntries, currentData.audienceSelected, copy, locale);
++  const view = buildAnalytics(currentData.metrics.filter(metric => metric.resourceKind !== 'ad-account'), currentData.audienceEntries, currentData.audienceSelected, copy, locale);
+   const allMetrics = view.metrics;
+   const comparisonData = period.comparison
+-    ? await loadAnalytics(actor.workspaceId, selectedChannelIds, period.comparison.range, access.allowedChannelIds, selectedAdIds, access.allowedProviders, access.adScope)
++    ? await loadAnalytics(actor.workspaceId, selectedChannelIds, period.comparison.range, access.allowedChannelIds, selectedAdIds, access.allowedProviders, { accountIds: [] })
+     : null;
+   if (comparisonData && (!sameIds(comparisonData.selectedTargets.map(item => item.id), selectedChannelIds) || !sameIds(comparisonData.selectedAdIds, selectedAdIds))) throw forbiddenResource();
+   if (comparisonData) assertUniqueMetricKeys(comparisonData.metrics);
+-  const comparisonMetrics = comparisonData ? buildAnalytics(comparisonData.metrics, comparisonData.audienceEntries, comparisonData.audienceSelected, copy, locale).metrics : [];
++  const comparisonMetrics = comparisonData ? buildAnalytics(comparisonData.metrics.filter(metric => metric.resourceKind !== 'ad-account'), comparisonData.audienceEntries, comparisonData.audienceSelected, copy, locale).metrics : [];
+   let comparisonMap: ReturnType<typeof compareAnalytics> | null = null;
+   try {
+     if (period.comparison) comparisonMap = compareAnalytics(allMetrics, comparisonMetrics);
+diff --git a/rebuild/src/modules/analytics/ui/AnalyticsScreen.tsx b/rebuild/src/modules/analytics/ui/AnalyticsScreen.tsx
+index 6e80220b..b3fd19e1 100644
+--- a/rebuild/src/modules/analytics/ui/AnalyticsScreen.tsx
++++ b/rebuild/src/modules/analytics/ui/AnalyticsScreen.tsx
+@@ -74,7 +74,6 @@ function AnalyticsSidebar({ data, query, exportHref, connectionsHref, explorerHr
+   const t = overviewText(copy);
+   const params = new URLSearchParams(query);
+   const selectedChannels = new Set(data.selected.channelIds);
+-  const selectedAccounts = new Set(data.selected.adAccountIds);
+   const comparison = data.period.comparison?.mode ?? 'none';
+   const selectedMetric = params.get('metric') ?? '';
+   const freshPage = (name: string) => <input type="hidden" name={name} value="1" />;
+@@ -102,13 +101,6 @@ function AnalyticsSidebar({ data, query, exportHref, connectionsHref, explorerHr
+           <span>{profiles?.channels.find(profile => profile.id === channel.id) ? profileChannelName(profiles.channels.find(profile => profile.id === channel.id)!) : channel.name}</span>
+         </label>) : <p className="small-note">{t("No channels available.")}</p>}
+       </fieldset>
+-      <fieldset className="analytics-channel-group"><legend className="shell-subnav__label">{t("Ad accounts")}</legend>
+-        {freshPage('adFilter')}
+-        {data.options.adAccounts.length ? data.options.adAccounts.map(account => <label key={account.id}>
+-          <input type="checkbox" name="adAccount" value={account.id} defaultChecked={selectedAccounts.has(account.id)} />
+-          <span>{account.name}{account.currency ? ` · ${account.currency}` : ''}</span>
+-        </label>) : <p className="small-note">{t("No ad accounts available.")}</p>}
+-      </fieldset>
+       <label className="analytics-select-filter">{t("Search metrics")}
+         <input type="search" name="search" maxLength={data.searchMaxLength} defaultValue={params.get('search') ?? ''} placeholder={t("Name or source")} />
+       </label>
+@@ -212,7 +204,7 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
+     failure = operationFailure(error, t("Analytics could not be loaded. Try again or reset the filters."));
+   }
+ 
+-  const canExport = data !== null && (data.selected.channelIds.length > 0 || data.selected.adAccountIds.length > 0)
++  const canExport = data !== null && data.selected.channelIds.length > 0
+     && canUseFeature(viewer.entitlements, 'analytics/reports') && canAccessFeature(viewer.permissions, 'analytics/reports');
+   const canManageConnections = canUseFeature(viewer.entitlements, 'settings/connections') && canAccessFeature(viewer.permissions, 'settings/connections');
+   const exportQuery = data ? new URLSearchParams(data.query) : null;
+@@ -225,7 +217,7 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
+   const retryQuery = rawQuery(params);
+   const retryHref = `/analytics${retryQuery ? `?${retryQuery}` : ''}`;
+ 
+-  return <PageFrame module="analytics" scopedAccess sidebar={data ? <AnalyticsSidebar copy={copy} profiles={profiles} locale={locale} data={data} query={data.query} exportHref={exportHref} explorerHref={explorerHref} connectionsHref={!data.options.channels.length && !data.options.adAccounts.length ? connectionsHref : undefined} /> : failure ? <AnalyticsRecoverySidebar copy={copy} retryHref={retryHref} /> : undefined}>
++  return <PageFrame module="analytics" scopedAccess sidebar={data ? <AnalyticsSidebar copy={copy} profiles={profiles} locale={locale} data={data} query={data.query} exportHref={exportHref} explorerHref={explorerHref} connectionsHref={!data.options.channels.length ? connectionsHref : undefined} /> : failure ? <AnalyticsRecoverySidebar copy={copy} retryHref={retryHref} /> : undefined}>
+     <div className="page-stack">
+       <PageHeader module="analytics" title={t("Performance")} />
+         {data && <><p title={t("These are inclusive stored calendar-date boundaries in UTC.")}>{t("Stored calendar dates (UTC): {start} to {end}.", { start: formatDay(data.period.start, locale), end: formatDay(data.period.end, locale) })}</p>
+@@ -234,9 +226,9 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
+ 
+       {failure && <section className="panel analytics-state"><EmptyState tone="error" title={t("Analytics could not be loaded")} action={<a href={retryHref}>{t("Try again with these filters")}</a>}>{failure.error} {t("Use the sidebar to retry with these filters or reset them.")}</EmptyState></section>}
+       {data && <>
+-        {!data.options.channels.length && !data.options.adAccounts.length
++        {!data.options.channels.length
+           ? <section className="panel analytics-state"><EmptyState icon={<IconPlugConnected />} title={t("No selected resources are available")} action={connectionsHref ? <a href={connectionsHref}>{t("View connections")}</a> : undefined}>{t("Connect or enable a channel or ad account to see its stored metrics.")}</EmptyState></section>
+-          : (data.options.channels.length > 0 || data.options.adAccounts.length > 0) && !data.selected.channelIds.length && !data.selected.adAccountIds.length
++          : data.options.channels.length > 0 && !data.selected.channelIds.length
+             ? <section className="panel analytics-state"><EmptyState icon={<IconChartBar />} title={t("No resources selected")}>{t("Choose channels or ad accounts in the sidebar to see their stored metrics.")}</EmptyState></section>
+             : null}
+         {audienceSection(data, copy, locale)}
+@@ -250,11 +242,10 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
+             <MetricCard module="analytics" icon={<IconAlertTriangle />} label={t("Failed or partial")} value={data.publishing.failed} />
+           </div>
+         </section>}
+-        {data.selected.adAccountIds.length > 0 && <p className="small-note analytics-ad-coverage">{t("{count} ad accounts selected. Coverage is shown for each metric.", { count: data.selected.adAccountIds.length })}</p>}
+         {data.detail ? <MetricTable copy={copy} locale={locale} data={data} /> : data.metrics.items.length ? <section className="panel">
+           <div className="analytics-panel-title"><div><h2>{t("Available metrics")}</h2><p className="small-note">{t("Stored measurements for the selected resources and range. Use the sidebar to open a metric's full series and resource detail.")}</p></div><span className="badge">{t("{count} metrics", { count: data.metrics.total })}</span></div>
+           <div className="analytics-metrics">{data.metrics.items.map(metric => <AnalyticsMetric copy={copy} key={`${metric.sourceLabel}:${metric.key}`} locale={locale} metric={metric} comparison={data.comparisons[metric.key]} previousPoints={data.previousPoints[metric.key]} chartPoints={data.chartPoints} />)}</div>
+-        </section> : data.selected.channelIds.length || data.selected.adAccountIds.length
++        </section> : data.selected.channelIds.length
+           ? <EmptyState title={t("No metrics match these filters")} icon={<IconChartBar />} action={<a href="/analytics">{t("Reset filters")}</a>}>{t("Change the date range, metric search, or resource selection in the sidebar.")}</EmptyState>
+           : null}
+       </>}
+diff --git a/rebuild/src/modules/analytics/ui/explorer/ExplorerScreen.tsx b/rebuild/src/modules/analytics/ui/explorer/ExplorerScreen.tsx
+index 55b8bcad..f253e5dd 100644
+--- a/rebuild/src/modules/analytics/ui/explorer/ExplorerScreen.tsx
++++ b/rebuild/src/modules/analytics/ui/explorer/ExplorerScreen.tsx
+@@ -56,7 +56,7 @@ export default async function AnalyticsExplorerPage({ searchParams, locale = 'en
+   return <PageFrame module="analytics" scopedAccess sidebar={sidebar}><div className={styles.root}>
+     <PageHeader module="analytics" title={t('Metric explorer')} description={<>{t("Explore stored measurements by resource, source and data type. The inclusive date range is")}{" "}{data ? `${day(data.period.start)} to ${day(data.period.end)} UTC` : t('unavailable')}.</>} />{data?.period.comparison && <p>{t("Comparison range:")}{" "}{day(data.period.comparison.start)}{" "}{t("to")}{" "}{day(data.period.comparison.end)}.</p>}
+     {failure && <section className={styles.panel} role="alert"><h2>{t("Explorer could not be loaded")}</h2><p>{failure}</p><p>{t("Use the sidebar to adjust filters or reset them.")}</p></section>}
+-    {data?.detail ? <Detail copy={copy} data={data} locale={locale} /> : data && <section className={styles.panel}><header className={styles.listHeader}><div><h2>{t("Available metrics")}</h2><p>{data.metrics.total}{" "}{t("metrics match the current filters. Choose a metric for its complete stored date series and resource values.")}</p></div><span>{data.selected.channelIds.length}{" "}{t("channels ·")}{" "}{data.selected.adAccountIds.length}{" "}{t("ad accounts")}</span></header>
++    {data?.detail ? <Detail copy={copy} data={data} locale={locale} /> : data && <section className={styles.panel}><header className={styles.listHeader}><div><h2>{t("Available metrics")}</h2><p>{data.metrics.total}{" "}{t("metrics match the current filters. Choose a metric for its complete stored date series and resource values.")}</p></div><span>{data.selected.channelIds.length}{" "}{t("Channels")}</span></header>
+       {data.metrics.items.length ? <div className={styles.metricList}>{data.metrics.items.map(metric => <article key={metric.key}><div><h3><a href={metricHref(data.query, metric.key)}>{metric.label}</a></h3><p>{metric.sourceLabel} · {metric.kind} · {metric.coverage}/{metric.available}{" "}{t("resources")}</p><p>{metric.aggregationLabel}{metric.aggregationNote ? ` · ${metric.aggregationNote}` : ''}</p>{metric.latestAt && <small>{t("Latest observation")}{" "}{day(metric.latestAt.toISOString().slice(0, 10))}</small>}</div><strong>{metric.displayTotal ?? (metric.total === null ? t('Unknown') : value(metric.total, metric.unit))}</strong></article>)}</div> : <p className={styles.empty}>{t("No stored metrics match these filters. Try a wider date range, another source, or reset filters.")}</p>}
+       <Pager t={t} query={data.query} keyName="page" page={data.metrics.page} pages={data.metrics.pages} label={t("Metrics")} />
+     </section>}
+diff --git a/rebuild/src/modules/analytics/ui/explorer/sidebar.tsx b/rebuild/src/modules/analytics/ui/explorer/sidebar.tsx
+index f317fb3d..8a44ab9a 100644
+--- a/rebuild/src/modules/analytics/ui/explorer/sidebar.tsx
++++ b/rebuild/src/modules/analytics/ui/explorer/sidebar.tsx
+@@ -8,15 +8,14 @@ import styles from './explorer.module.css';
+ export function ExplorerSidebar({ data, exportHref, summaryHref, copy = workspaceCopyDefaults, locale = 'en', overviewCopy }: { overviewCopy?: OverviewCopy; copy?: WorkspaceCopy; locale?: 'en' | 'fr'; data: AnalyticsExplorerResult; exportHref?: string; summaryHref?: string }) {
+   const t = workspaceText(copy, locale);
+   const params = new URLSearchParams(data.query);
+-  const channels = new Set(data.selected.channelIds); const accounts = new Set(data.selected.adAccountIds);
++  const channels = new Set(data.selected.channelIds);
+   return <div className={styles.sidebar}>
+     {summaryHref && <a href={summaryHref}>{t("Analytics summary")}</a>}
+-    <form action="/analytics/explorer" method="get" className={styles.filters}>
++    <form noValidate action="/analytics/explorer" method="get" className={styles.filters}>
+       <AnalyticsFilters copy={overviewCopy} locale={locale} title={t("Explore stored metrics")} path="/analytics/explorer" query={data.query}>
+       <fieldset><legend>{t("Date range (UTC)")}</legend><label>{t("From")}<input type="date" name="start" defaultValue={data.period.start} /></label><label>{t("To")}<input type="date" name="end" defaultValue={data.period.end} /></label></fieldset>
+       <label>{t("Compare with")}<select name="compare" defaultValue={params.get('compare') ?? 'none'}><option value="none">{t("No comparison")}</option><option value="previous">{t("Previous equal-length period")}</option><option value="year">{t("Same dates last year")}</option></select></label>
+       <fieldset><legend>{t("Channels")}</legend><input type="hidden" name="filter" value="1" />{data.options.channels.length ? data.options.channels.map(channel => <label className={styles.check} key={channel.id}><input type="checkbox" name="channel" value={channel.id} defaultChecked={channels.has(channel.id)} /><span>{channel.name}</span></label>) : <p>{t("No available channels.")}</p>}</fieldset>
+-      <fieldset><legend>{t("Ad accounts")}</legend><input type="hidden" name="adFilter" value="1" />{data.options.adAccounts.length ? data.options.adAccounts.map(account => <label className={styles.check} key={account.id}><input type="checkbox" name="adAccount" value={account.id} defaultChecked={accounts.has(account.id)} /><span>{account.name}{account.currency ? ` · ${account.currency}` : ''}</span></label>) : <p>{t("No available ad accounts.")}</p>}</fieldset>
+       <label>{t("Search metrics")}<input type="search" name="search" maxLength={data.searchMaxCharacters} defaultValue={data.filters.search} placeholder={t("Metric name or source")} /></label>
+       <label>{t("Source")}<select name="source" defaultValue={data.filters.source}><option value="">{t("All sources")}</option>{data.options.sources.map(source => <option key={source} value={source}>{source}</option>)}</select></label>
+       <label>{t("Measurement type")}<select name="kind" defaultValue={data.filters.kind}><option value="all">{t("All types")}</option><option value="flow">{t("Period totals")}</option><option value="stock">{t("Latest resource values")}</option><option value="ratio">{t("Ratios")}</option><option value="breakdown">{t("Category breakdowns")}</option></select></label>
+diff --git a/rebuild/tests/analytics-explorer-page.test.ts b/rebuild/tests/analytics-explorer-page.test.ts
+index 71668db1..437aa1dc 100644
+--- a/rebuild/tests/analytics-explorer-page.test.ts
++++ b/rebuild/tests/analytics-explorer-page.test.ts
+@@ -11,6 +11,8 @@ vi.mock('../src/server/PageFrame', () => ({ PageFrame: ({ sidebar, children, sco
+ vi.mock('../src/server/entitlements', () => ({ canUseFeature: () => true }));
+ vi.mock('../src/server/permissions', () => ({ canAccessFeature: () => true }));
+ 
++vi.mock('@/modules/analytics/ui/insights/OverviewInsights', () => ({ OverviewInsights: () => null }));
++
+ vi.mock('next/headers', () => ({ headers: async () => new Headers({ 'accept-language': 'en' }) }));
+ vi.mock('@/modules/settings/channel-profiles/service', () => ({ readChannelProfiles: async () => ({ channels: [], groups: [] }) }));
+ 
+@@ -18,9 +20,9 @@ import AnalyticsPage from '../src/modules/analytics/ui/AnalyticsScreen';
+ import type { AnalyticsReadResult } from '../src/modules/analytics/server/types';
+ 
+ const valueMetric = {
+-  key: 'spend-usd', label: 'Spend', sourceLabel: 'Example account', resourceKind: 'ad-account' as const,
+-  aggregationLabel: 'Total over the selected period', aggregationNote: 'Counts may overlap across resources. Sums are not deduplicated people or total reach for the whole period.', unit: 'currency' as const, kind: 'flow' as const,
+-  total: 125.5, displayTotal: 'USD 125.50', latestAt: new Date('2026-10-16T00:00:00Z'),
++  key: 'views', label: 'Views', sourceLabel: 'Example channel', resourceKind: 'channel' as const,
++  aggregationLabel: 'Total over the selected period', aggregationNote: 'Counts may overlap across resources. Sums are not deduplicated people or total reach for the whole period.', unit: 'count' as const, kind: 'flow' as const,
++  total: 125.5, displayTotal: '125.5', latestAt: new Date('2026-10-16T00:00:00Z'),
+   updatedAt: new Date('2026-10-16T02:00:00Z'), coverage: 1, available: 1,
+   points: [{ date: '2026-10-15', label: 'Oct 15', value: 50 }, { date: '2026-10-16', label: 'Oct 16', value: 75.5 }],
+   rows: [{ label: 'Example account', value: 125.5, asOf: new Date('2026-10-16T00:00:00Z') }],
+@@ -34,17 +36,17 @@ const base = (): AnalyticsReadResult => ({
+   },
+   options: {
+     channels: [{ id: 'channel-a', name: 'Example channel', type: 'page' }],
+-    adAccounts: [{ id: 'account-a', name: 'Example account', currency: 'USD' }],
+-    metrics: [{ key: 'spend-usd', label: 'Spend', sourceLabel: 'Example account' }, { key: 'views', label: 'Views', sourceLabel: 'Example channel' }],
++    adAccounts: [],
++    metrics: [{ key: 'views', label: 'Views', sourceLabel: 'Example channel' }],
+   },
+-  selected: { channelIds: [], adAccountIds: ['account-a'] },
++  selected: { channelIds: ['channel-a'], adAccountIds: [] },
+   audience: { entries: [], total: 0, covered: 0, selected: 0 },
+   publishing: { published: 0, scheduled: 0, failed: 0 },
+   metrics: { items: [valueMetric], total: 2, page: 1, pages: 2, pageSize: 1 },
+   detail: null,
+-  comparisons: { 'spend-usd': { previous: 100, delta: 25.5, percent: 25.5, status: 'comparable' as const } },
++  comparisons: { 'views': { previous: 100, delta: 25.5, percent: 25.5, status: 'comparable' as const } },
+   previousPoints: {},
+-  query: 'start=2026-10-10&end=2026-10-16&compare=previous&filter=1&channel=channel-a&adFilter=1&adAccount=account-a&search=spend&page=1&pointPage=1&rowPage=1',
++  query: 'start=2026-10-10&end=2026-10-16&compare=previous&filter=1&channel=channel-a&search=views&page=1&pointPage=1&rowPage=1',
+   chartPoints: 28,
+   searchMaxLength: 200,
+   exportRowLimit: 1000,
+@@ -79,32 +81,33 @@ describe('Analytics explorer page', () => {
+     expect(html).toContain('No combined figure');
+     expect(state.config).toHaveBeenCalledWith('analytics.overviewCopy');
+   });
+-  it('uses the scoped reader and still shows selected ad metrics with no channels selected', async () => {
+-    const html = await render({ compare: 'previous', filter: '1', channel: [], adFilter: '1', adAccount: 'account-a' });
++  it('uses the scoped reader and shows selected channel metrics', async () => {
++    const html = await render({ compare: 'previous', filter: '1', channel: ['channel-a'] });
+ 
+     expect(state.viewer).toHaveBeenCalledWith({ feature: 'analytics/overview', channelScoped: true });
+     expect(state.read).toHaveBeenCalledWith(
+       { userId: 'reader', workspaceId: 'workspace' },
+-      expect.objectContaining({ compare: 'previous', filter: '1', adFilter: '1', adAccount: 'account-a' }),
++      expect.objectContaining({ compare: 'previous', filter: '1' }),
+       { allowedChannelIds: ['channel-a'], feature: 'analytics/overview' },
+     );
+     expect(html).toContain('data-scoped-access="true"');
+-    expect(html).toContain('Spend');
++    expect(html).toContain('Views');
+     expect(html).toContain('Latest 2 of 2 stored dates shown');
+     expect(html).toContain('Counts may overlap across resources');
+-    expect(html).not.toContain('Selected channel audience');
++    expect(html).toContain('Selected channel audience');
+     expect(html).not.toContain('No channels selected');
+     expect(html).toContain('Stored calendar dates (UTC)');
+   });
+ 
+   it('puts all resource, date, comparison, metric, search, and page controls in the sidebar and preserves the full query', async () => {
+-    const html = await render({ start: '2026-10-10', end: '2026-10-16', compare: 'previous', filter: '1', channel: 'channel-a', adFilter: '1', adAccount: 'account-a', search: 'spend', page: '1' });
++    const html = await render({ start: '2026-10-10', end: '2026-10-16', compare: 'previous', filter: '1', channel: 'channel-a', search: 'views', page: '1' });
+     const sidebar = html.slice(html.indexOf('<aside'), html.indexOf('</aside>'));
+     expect(sidebar).toContain('name="start"');
+     expect(sidebar).toContain('name="end"');
+     expect(sidebar).toContain('name="compare"');
+     expect(sidebar).toContain('name="channel"');
+-    expect(sidebar).toContain('name="adAccount"');
++    expect(sidebar).not.toContain('name="adAccount"');
++    expect(sidebar).not.toContain('name="adFilter"');
+     expect(sidebar).toContain('name="search"');
+     expect(sidebar).toContain('name="metric"');
+     expect(sidebar).toContain('name="page"');
+@@ -112,8 +115,8 @@ describe('Analytics explorer page', () => {
+     expect(sidebar).toContain('Export CSV');
+     expect(sidebar).toContain('Exports include up to 1000 data rows');
+     const exportLink = links(html).find(url => url.pathname === '/api/reports/export');
+-    expect(exportLink?.searchParams.get('adAccount')).toBe('account-a');
+-    expect(exportLink?.searchParams.get('search')).toBe('spend');
++    expect(exportLink?.searchParams.get('adAccount')).toBeNull();
++    expect(exportLink?.searchParams.get('search')).toBe('views');
+     expect(exportLink?.searchParams.has('page')).toBe(false);
+     expect(html).not.toContain('View full series and resource details');
+     expect(html.slice(html.indexOf('</aside>'))).not.toContain('href="/analytics?');
+@@ -121,8 +124,8 @@ describe('Analytics explorer page', () => {
+     const pageLink = links(html).find(url => url.searchParams.get('page') === '2');
+     expect(pageLink?.searchParams.get('compare')).toBe('previous');
+     expect(pageLink?.searchParams.get('channel')).toBe('channel-a');
+-    expect(pageLink?.searchParams.get('adAccount')).toBe('account-a');
+-    expect(pageLink?.searchParams.get('search')).toBe('spend');
++    expect(pageLink?.searchParams.get('adAccount')).toBeNull();
++    expect(pageLink?.searchParams.get('search')).toBe('views');
+   });
+ 
+   it('renders paginated full metric details, keeps pagination context, and masks service failures', async () => {
+@@ -132,17 +135,17 @@ describe('Analytics explorer page', () => {
+       points: { items: valueMetric.points, total: 31, page: 1, pages: 2, pageSize: 25 },
+       rows: { items: valueMetric.rows, total: 31, page: 1, pages: 2, pageSize: 25 },
+     };
+-    result.query = 'start=2026-10-10&end=2026-10-16&compare=previous&filter=1&channel=channel-a&adFilter=1&adAccount=account-a&search=spend&metric=spend-usd&pointPage=1&rowPage=1';
++    result.query = 'start=2026-10-10&end=2026-10-16&compare=previous&filter=1&channel=channel-a&search=views&metric=views&pointPage=1&rowPage=1';
+     state.read.mockResolvedValueOnce(result);
+-    const html = await render({ metric: 'spend-usd', pointPage: '1', rowPage: '1', search: 'spend', adFilter: '1', adAccount: 'account-a' });
++    const html = await render({ metric: 'views', pointPage: '1', rowPage: '1', search: 'views' });
+     expect(html).toContain('Oct 15');
+     expect(html).toContain('Full date and value series');
+     expect(html).toContain('Counts may overlap across resources');
+     expect(html).toContain('31 stored rows');
+     const pointLink = links(html).find(url => url.searchParams.get('pointPage') === '2');
+-    expect(pointLink?.searchParams.get('metric')).toBe('spend-usd');
++    expect(pointLink?.searchParams.get('metric')).toBe('views');
+     expect(pointLink?.searchParams.get('rowPage')).toBe('1');
+-    expect(pointLink?.searchParams.get('adAccount')).toBe('account-a');
++    expect(pointLink?.searchParams.get('adAccount')).toBeNull();
+     const detailSidebar = html.slice(html.indexOf('<aside'), html.indexOf('</aside>'));
+     expect(detailSidebar).toContain('Back to all metric cards');
+     expect(detailSidebar).not.toContain('Next metrics');
+diff --git a/rebuild/tests/analytics-read.test.ts b/rebuild/tests/analytics-read.test.ts
+index cff93016..78cdae42 100644
+--- a/rebuild/tests/analytics-read.test.ts
++++ b/rebuild/tests/analytics-read.test.ts
+@@ -85,13 +85,34 @@ describe('shared Analytics read service', () => {
+     expect(state.load).toHaveBeenCalledOnce();
+   });
+ 
+-  it('uses explicit empty channel filters while allowing ad-account-only reports', async () => {
+-    const result = await readAnalytics(actor, { filter: '1', channel: [], adFilter: '1', adAccount: ['ad-2'] });
+-    expect(result.selected).toEqual({ channelIds: [], adAccountIds: ['ad-2'] });
+-    expect(result.metrics.items.map(item => item.key)).toEqual(['spend::USD']);
+-    expect(result.audience).toMatchObject({ total: 0, covered: 0, selected: 0 });
+-    expect(state.groupBy).not.toHaveBeenCalled();
+-    expect(state.load.mock.calls.map(call => [call[1], call[4]])).toEqual([[[], ['ad-2']]]);
++  it('refuses ad-account selections instead of mixing paid reporting into channels', async () => {
++    await expect(readAnalytics(actor, { filter: '1', channel: [], adFilter: '1', adAccount: ['ad-2'] })).rejects.toMatchObject({ code: 'invalid_request' });
++    expect(state.load).not.toHaveBeenCalled();
++  });
++
++  it('defaults to channel-only reporting and never exposes ad account options', async () => {
++    const result = await readAnalyticsSnapshot(actor, { start: '2026-10-10', end: '2026-10-12', compare: 'previous' });
++    expect(result.selected).toEqual({ channelIds: ['channel-1', 'channel-2'], adAccountIds: [] });
++    expect(result.options.adAccounts).toEqual([]);
++    expect(result.allMetrics.map(metric => metric.key).sort()).toEqual(['followers', 'views']);
++    for (const call of state.load.mock.calls) {
++      expect(call[4]).toEqual([]);
++      expect(call[6]).toEqual({ accountIds: [] });
++    }
++  });
++
++  it('excludes paid resource metadata from metrics, catalog, search and comparisons', async () => {
++    const load = state.load.getMockImplementation()!;
++    state.load.mockImplementation(async (...args: unknown[]) => {
++      const result = await load(...args);
++      return { ...result, metrics: [...result.metrics, { key: 'paid-reach', label: 'Paid reach', sourceLabel: 'Any localized source', resourceKind: 'ad-account', kind: 'flow', unit: 'count', available: 1, observations: [{ date: day('2026-10-12'), channelId: 'ad-1', channelLabel: 'Account One', value: 40 }] }] };
++    });
++    const snapshot = await readAnalyticsSnapshot(actor, { start: '2026-10-10', end: '2026-10-12', compare: 'previous' });
++    expect(snapshot.options.metrics.map(metric => metric.key)).not.toContain('paid-reach');
++    expect(snapshot.allMetrics.map(metric => metric.key)).not.toContain('paid-reach');
++    expect(snapshot.comparisons).not.toHaveProperty('paid-reach');
++    await expect(readAnalytics(actor, { metric: 'paid-reach' })).rejects.toMatchObject({ code: 'forbidden' });
++    expect((await readAnalyticsSnapshot(actor, { search: 'paid' })).allMetrics).toEqual([]);
+   });
+ 
+   it('loads explicit selections once, including explicitly empty filters', async () => {
+@@ -106,12 +127,12 @@ describe('shared Analytics read service', () => {
+   });
+ 
+   it('returns canonical UTC periods, same-scope previous comparisons, and publishing counts', async () => {
+-    const result = await readAnalytics(actor, { start: '2026-10-10', end: '2026-10-12', compare: 'previous', filter: '1', channel: 'channel-1', adFilter: '1', adAccount: 'ad-2' });
++    const result = await readAnalytics(actor, { start: '2026-10-10', end: '2026-10-12', compare: 'previous', filter: '1', channel: 'channel-1', adFilter: '1', adAccount: [] });
+     expect(result.period).toMatchObject({ start: '2026-10-10', end: '2026-10-12', comparison: { mode: 'previous', start: '2026-10-07', end: '2026-10-09' } });
+-    expect(result.selected).toEqual({ channelIds: ['channel-1'], adAccountIds: ['ad-2'] });
++    expect(result.selected).toEqual({ channelIds: ['channel-1'], adAccountIds: [] });
+     expect(result.publishing).toEqual({ published: 3, scheduled: 2, failed: 5 });
+     expect(result.comparisons.views).toMatchObject({ previous: 6, delta: 3, status: 'comparable' });
+-    expect(state.load.mock.calls.map(call => [call[1], call[4]])).toEqual([[['channel-1'], ['ad-2']], [['channel-1'], ['ad-2']]]);
++    expect(state.load.mock.calls.map(call => [call[1], call[4]])).toEqual([[['channel-1'], []], [['channel-1'], []]]);
+     expect(result.query).toContain('filter=1'); expect(result.query).toContain('adFilter=1');
+   });
+ 
+@@ -136,9 +157,9 @@ describe('shared Analytics read service', () => {
+   });
+ 
+   it('applies metric search to export snapshots while keeping the full metric catalog available', async () => {
+-    const snapshot = await readAnalyticsSnapshot(actor, { search: 'spend', page: '3', pointPage: '2' });
+-    expect(snapshot.allMetrics.map(metric => metric.key)).toEqual(['spend::USD']);
+-    expect(snapshot.options.metrics.map(metric => metric.key)).toEqual(['spend::USD', 'followers', 'views']);
++    const snapshot = await readAnalyticsSnapshot(actor, { search: 'views', page: '3', pointPage: '2' });
++    expect(snapshot.allMetrics.map(metric => metric.key)).toEqual(['views']);
++    expect(snapshot.options.metrics.map(metric => metric.key)).toEqual(['followers', 'views']);
+     const query = new URLSearchParams(snapshot.query);
+     expect(query.get('page')).toBe('3'); expect(query.get('pointPage')).toBe('2');
+   });
+diff --git a/rebuild/tests/mcp-analytics-account-scope80.test.ts b/rebuild/tests/mcp-analytics-account-scope80.test.ts
+index a6ef8c60..789d7a7d 100644
+--- a/rebuild/tests/mcp-analytics-account-scope80.test.ts
++++ b/rebuild/tests/mcp-analytics-account-scope80.test.ts
+@@ -45,8 +45,6 @@ const adRow = (account: (typeof accounts)[number], day: string) => ({
+ 
+ const base = { userId: 'key-user', workspaceId: 'w' };
+ const range = { start: '2026-10-01', end: '2026-10-07' };
+-const adIds = (result: { options: { adAccounts: Array<{ id: string }> } }) => result.options.adAccounts.map(item => item.id);
+-const loadedAdRequests = () => state.adAccounts.mock.calls.map(call => call[0].where);
+ 
+ beforeEach(() => {
+   vi.clearAllMocks();
+@@ -66,95 +64,44 @@ beforeEach(() => {
+   state.adInsights.mockImplementation(async ({ where }: { where: Where }) => accounts.filter(account => matchesAccount(account, where.adAccount)).map(account => adRow(account, '2026-10-03')));
+ });
+ 
+-describe('Analytics independent ad-account ceiling', () => {
+-  it('keeps old behavior when neither ceiling field is supplied', async () => {
+-    const result = await readAnalytics(base, range);
+-    expect(adIds(result)).toEqual(['ad-1', 'ad-2', 'ad-3']);
+-    expect(result.metrics.items.some(item => item.sourceLabel === 'Advertising')).toBe(true);
+-  });
+-
+-  it('empty [] shows no ad accounts, metrics, options or detail, while undefined shows them', async () => {
+-    const none = await readAnalytics({ ...base, allowedAdAccountIds: [] }, range);
+-    expect(none.options.adAccounts).toEqual([]);
+-    expect(none.selected.adAccountIds).toEqual([]);
+-    expect(none.metrics.items.filter(item => item.sourceLabel === 'Advertising')).toEqual([]);
+-    expect(none.options.metrics.filter(item => item.sourceLabel === 'Advertising')).toEqual([]);
+-    expect(state.adInsights).not.toHaveBeenCalled();
++describe('channel Analytics stays separate from Ads regardless of credential account grants', () => {
++  it.each([undefined, [], ['ad-1'], ['ad-1', 'ad-2', 'ad-3']])('excludes paid reads with account ceiling %j', async allowedAdAccountIds => {
++    const actor = { ...base, allowedAdAccountIds, adAccountTargetScope: { all: true as const } };
++    const result = await readAnalytics(actor, { ...range, compare: 'previous' });
++    expect(result.options.adAccounts).toEqual([]);
++    expect(result.selected.adAccountIds).toEqual([]);
++    expect(result.metrics.items.some(metric => metric.resourceKind === 'ad-account')).toBe(false);
+     expect(state.adAccounts).not.toHaveBeenCalled();
+-    const open = await readAnalytics({ ...base, allowedAdAccountIds: undefined }, range);
+-    expect(adIds(open)).toEqual(['ad-1', 'ad-2', 'ad-3']);
+-    const adKey = open.options.metrics.find(item => item.sourceLabel === 'Advertising')!.key;
+-    // Metric detail for an Ads metric is refused when nothing in Ads is readable.
+-    await expect(readAnalytics({ ...base, allowedAdAccountIds: [] }, { ...range, metric: adKey })).rejects.toMatchObject({ code: 'forbidden' });
+-  });
+-
+-  it('explicit account ceiling excludes sibling accounts on the same connection and refuses an out-of-scope query', async () => {
+-    const actor = { ...base, allowedAdAccountIds: ['ad-1'] };
+-    const result = await readAnalytics(actor, range);
+-    expect(adIds(result)).toEqual(['ad-1']);
+-    expect(result.selected.adAccountIds).toEqual(['ad-1']);
+-    expect(state.adInsights.mock.calls.every(call => call[0].where.adAccount.id.in.join() === 'ad-1')).toBe(true);
+-    for (const outside of ['ad-2', 'ad-3']) {
+-      await expect(readAnalytics(actor, { ...range, adFilter: '1', adAccount: outside })).rejects.toMatchObject({ code: 'forbidden' });
+-    }
+-    await expect(readAnalytics(actor, { ...range, adFilter: '1', adAccount: ['ad-1', 'ad-2'] })).rejects.toMatchObject({ code: 'forbidden' });
++    expect(state.adInsights).not.toHaveBeenCalled();
+   });
+ 
+-  it('account-only key with no channels reads its account through independent membership grants', async () => {
+-    state.permissions.mockResolvedValue({ pageScope: { all: false, ids: ['page-1', 'page-2'] } });
+-    const actor = { ...base, allowedAdAccountIds: ['ad-1'], adAccountTargetScope: { all: false as const, ids: ['page-1', 'page-2'] } };
++  it('an account-only key has no channel metrics and cannot import its paid scope', async () => {
++    const actor = { ...base, allowedAdAccountIds: ['ad-1'], adAccountTargetScope: { all: true as const } };
+     const result = await readAnalytics(actor, range, { allowedChannelIds: [] });
+     expect(result.options.channels).toEqual([]);
+-    expect(adIds(result)).toEqual(['ad-1']);
+-    expect(result.metrics.items.some(item => item.sourceLabel === 'Advertising')).toBe(true);
+-    // Without the independent scope the empty channel ceiling still erases Ads, as before.
+-    const legacy = await readAnalytics({ ...base, allowedAdAccountIds: ['ad-1'] }, range, { allowedChannelIds: [] });
+-    expect(legacy.options.adAccounts).toEqual([]);
+-  });
+-
+-  it('the key\'s selected channels do not grant sibling accounts or accounts on other connections', async () => {
+-    state.permissions.mockResolvedValue({ pageScope: { all: false, ids: ['page-1'] } });
+-    // Membership covers only page-1 (connection sa-1); the key selected page-3 (connection sa-2) as a channel.
+-    const actor = { ...base, allowedAdAccountIds: ['ad-1', 'ad-3'], adAccountTargetScope: { all: false as const, ids: ['page-1'] } };
+-    const result = await readAnalytics(actor, range, { allowedChannelIds: ['page-3'] });
+-    expect(result.options.channels).toEqual([]);
+-    expect(adIds(result)).toEqual(['ad-1']);
+-    await expect(readAnalytics(actor, { ...range, adFilter: '1', adAccount: 'ad-3' }, { allowedChannelIds: ['page-3'] })).rejects.toMatchObject({ code: 'forbidden' });
+-  });
+-
+-  it('membership grants are intersected fresh: revoked or foreign grant ids add nothing', async () => {
+-    state.permissions.mockResolvedValue({ pageScope: { all: false, ids: ['page-3'] } });
+-    const actor = { ...base, adAccountTargetScope: { all: false as const, ids: ['page-1', 'page-2'] } };
+-    const result = await readAnalytics(actor, range);
++    expect(result.metrics.items).toEqual([]);
+     expect(result.options.adAccounts).toEqual([]);
+-    state.permissions.mockResolvedValue({ pageScope: { all: false, ids: ['page-1'] } });
+-    expect(adIds(await readAnalytics({ ...base, adAccountTargetScope: { all: true } }, range))).toEqual(['ad-1', 'ad-2']);
+-    expect(adIds(await readAnalytics({ ...base, adAccountTargetScope: { all: true }, allowedAdAccountIds: ['ad-2'] }, range))).toEqual(['ad-2']);
++    expect(state.adAccounts).not.toHaveBeenCalled();
+   });
+ 
+-  it('applies the same ceiling to the initial, current and comparison loads', async () => {
+-    const actor = { ...base, allowedAdAccountIds: ['ad-2'], adAccountTargetScope: { all: true as const } };
+-    const result = await readAnalytics(actor, { ...range, compare: 'previous' });
+-    expect(adIds(result)).toEqual(['ad-2']);
+-    expect(state.adAccounts.mock.calls.length).toBeGreaterThanOrEqual(3);
+-    for (const where of loadedAdRequests()) expect(where.id).toEqual({ in: ['ad-2'] });
+-    for (const call of state.adInsights.mock.calls) expect(call[0].where.adAccount.id).toEqual({ in: ['ad-2'] });
++  it('refuses explicit paid filters on overview, export snapshots, explorer and comparison', async () => {
++    const actor = { ...base, allowedAdAccountIds: ['ad-1'] };
++    const paidInput = { ...range, adFilter: '1', adAccount: 'ad-1' };
++    for (const read of [readAnalytics, readAnalyticsSnapshot, readAnalyticsExplorer]) {
++      await expect(read(actor, paidInput)).rejects.toMatchObject({ code: 'invalid_request' });
++    }
++    await expect(readAnalyticsComparison(actor, { mode: 'period', adAccount: ['ad-1'], a: { start: '2026-10-01', end: '2026-10-03' }, b: { start: '2026-10-04', end: '2026-10-07' } })).rejects.toMatchObject({ code: 'invalid_request' });
++    expect(state.adAccounts).not.toHaveBeenCalled();
++    expect(state.adInsights).not.toHaveBeenCalled();
+   });
+ 
+-  it('comparison and explorer details cannot escape the account ceiling', async () => {
+-    const actor = { ...base, allowedAdAccountIds: ['ad-1'], adAccountTargetScope: { all: true as const } };
+-    const compared = await readAnalyticsComparison(actor, { mode: 'period', a: { start: '2026-10-01', end: '2026-10-03' }, b: { start: '2026-10-04', end: '2026-10-07' } });
+-    expect(JSON.stringify(compared)).not.toMatch(/ad-2|ad-3|Ads Two|Ads Three/);
+-    await expect(readAnalyticsComparison(actor, { mode: 'period', adAccount: ['ad-2'], a: { start: '2026-10-01', end: '2026-10-03' }, b: { start: '2026-10-04', end: '2026-10-07' } })).rejects.toMatchObject({ code: 'forbidden' });
+-    const snapshot = await readAnalyticsSnapshot(actor, range);
+-    const adMetric = snapshot.allMetrics.find(metric => metric.sourceLabel === 'Advertising')!;
+-    const detail = await readAnalyticsExplorer(actor, { ...range, metric: adMetric.key });
+-    expect(JSON.stringify(detail)).not.toMatch(/ad-2|ad-3|Ads Two|Ads Three/);
+-    await expect(readAnalyticsExplorer(actor, { ...range, adFilter: '1', adAccount: 'ad-3' })).rejects.toMatchObject({ code: 'forbidden' });
+-    const none = { ...actor, allowedAdAccountIds: [] as string[] };
+-    const emptyCompare = await readAnalyticsComparison(none, { mode: 'period', a: { start: '2026-10-01', end: '2026-10-03' }, b: { start: '2026-10-04', end: '2026-10-07' } });
+-    expect(JSON.stringify(emptyCompare)).not.toMatch(/Advertising|Ads One|ad-1/);
+-    const emptyExplorer = await readAnalyticsExplorer(none, range);
+-    expect(JSON.stringify(emptyExplorer)).not.toMatch(/Advertising|Ads One|ad-1/);
++  it('refuses paid metric detail keys and keeps explorer and comparisons channel-only', async () => {
++    await expect(readAnalytics(base, { ...range, metric: 'facebook:spend::USD' })).rejects.toMatchObject({ code: 'forbidden' });
++    const explorer = await readAnalyticsExplorer(base, range);
++    expect(explorer.options.adAccounts).toEqual([]);
++    const compared = await readAnalyticsComparison(base, { mode: 'period', a: { start: '2026-10-01', end: '2026-10-03' }, b: { start: '2026-10-04', end: '2026-10-07' } });
++    expect(JSON.stringify(compared)).not.toMatch(/Advertising|Ads One|ad-1/);
++    expect(state.adAccounts).not.toHaveBeenCalled();
++    expect(state.adInsights).not.toHaveBeenCalled();
+   });
+ });
+diff --git a/rebuild/tests/parity-analytics-export.test.ts b/rebuild/tests/parity-analytics-export.test.ts
+index 6c06b475..80dbeb56 100644
+--- a/rebuild/tests/parity-analytics-export.test.ts
++++ b/rebuild/tests/parity-analytics-export.test.ts
+@@ -19,11 +19,11 @@ import { ANALYTICS_MCP } from '@/modules/analytics/mcp';
+ const group = ANALYTICS_MCP.find(g => g.id === 'analytics-report-export')!;
+ const viewer = { userId: 'user', workspaceId: 'workspace', allowedAdAccountIds: ['account-a'], adAccountTargetScope: { all: false, ids: ['channel-b'] } } as unknown as McpViewer;
+ beforeEach(() => { vi.clearAllMocks(); m.config.mockResolvedValue(100); m.read.mockResolvedValue({ period: { start: '2026-10-01', end: '2026-10-02' } }); m.csv.mockReturnValue({ csv: 'sample\r\n', rowCount: 1, truncated: true }); });
+-it('uses the same Analytics Reports snapshot/CSV core with independent resource ceilings', async () => {
+-  const args = { targetIds: ['channel-a'], adAccountIds: ['account-a'], start: '2026-10-01', end: '2026-10-02', compare: 'previous' };
++it('uses the same Analytics Reports snapshot/CSV core with channel selection and credential ceilings', async () => {
++  const args = { targetIds: ['channel-a'], start: '2026-10-01', end: '2026-10-02', compare: 'previous' };
+   const result = await group.execute(viewer, 'export_analytics_report', args, 2);
+   expect(group.features.export_analytics_report).toBe('analytics/reports');
+-  expect(m.read).toHaveBeenCalledWith(viewer, { filter: '1', channel: ['channel-a'], adFilter: '1', adAccount: ['account-a'], start: '2026-10-01', end: '2026-10-02', compare: 'previous' }, { allowedChannelIds: ['channel-a'], feature: 'analytics/reports' });
++  expect(m.read).toHaveBeenCalledWith(viewer, { filter: '1', channel: ['channel-a'], start: '2026-10-01', end: '2026-10-02', compare: 'previous' }, { allowedChannelIds: ['channel-a'], feature: 'analytics/reports' });
+   expect(m.csv).toHaveBeenCalledWith(expect.anything(), 2);
+   expect(result).toMatchObject({ fileName: 'report-2026-10-01-2026-10-02.csv', byteLength: 8, truncated: true });
+ });
+@@ -38,3 +38,12 @@ it('does not widen a service refusal or overlong credential selection', async ()
+   await expect(group.execute({ ...viewer, maxResultItems: 1 }, 'export_analytics_report', { targetIds: ['a', 'b'] }, 1)).rejects.toMatchObject({ code: 'invalid_request' });
+   expect(m.csv).not.toHaveBeenCalled();
+ });
++
++it('advertises channel-only overview, metric details and export filters', () => {
++  const tools = ANALYTICS_MCP.flatMap(group => group.tools ?? []);
++  for (const name of ['get_analytics_overview', 'get_analytics_metric_details', 'export_analytics_report']) {
++    const schema = tools.find(tool => tool.name === name)!.inputSchema as { properties: Record<string, unknown> };
++    expect(schema.properties).toHaveProperty('targetIds');
++    expect(schema.properties).not.toHaveProperty('adAccountIds');
++  }
++});

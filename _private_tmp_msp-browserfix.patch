@@ -1,0 +1,346 @@
+diff --git a/rebuild/src/app/join/join-form.tsx b/rebuild/src/app/join/join-form.tsx
+index e1af09e3..40e22400 100644
+--- a/rebuild/src/app/join/join-form.tsx
++++ b/rebuild/src/app/join/join-form.tsx
+@@ -34,7 +34,7 @@ export function JoinForm({ passwordPolicy, locale = 'en' }: { passwordPolicy: Ac
+     if (window.location.hash) window.history.replaceState(window.history.state, '', window.location.pathname);
+     const token = fragment.current;
+     void fetch('/api/auth/invitations/preview', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(token ? { token } : {}), signal: controller.signal })
+-      .then(async response => { const body: unknown = await response.json(); if (!response.ok) throw new Error(typeof (body as { error?: unknown })?.error === 'string' ? (body as {error:string}).error : t.openFailed); if (!validPreview(body)) throw new Error(t.unconfirmed); if (!controller.signal.aborted) { setInvitation(body); fragment.current = ''; } })
++      .then(async response => { const body: unknown = await response.json().catch(() => null); if (!response.ok) throw new Error(!token ? t.missingLink : response.status < 500 && typeof (body as { error?: unknown })?.error === 'string' ? (body as {error:string}).error : t.openFailed); if (!validPreview(body)) throw new Error(t.unconfirmed); if (!controller.signal.aborted) { setInvitation(body); fragment.current = ''; } })
+       .catch(error => { if (!controller.signal.aborted) setMessage(error instanceof Error ? error.message : t.loadFailed); })
+       .finally(() => { if (!controller.signal.aborted) setLoading(false); });
+     return () => { controller.abort(); pending.current?.abort(); };
+@@ -48,10 +48,10 @@ export function JoinForm({ passwordPolicy, locale = 'en' }: { passwordPolicy: Ac
+     setBusy(true); setMessage('');
+     try {
+       const response = await fetch(`/api/auth/invitations/${action}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body), signal: controller.signal });
+-      const result: unknown = await response.json();
++      const result: unknown = await response.json().catch(() => null);
+       if (controller.signal.aborted) return;
+       const data = result && typeof result === 'object' ? result as Record<string, unknown> : {};
+-      if (!response.ok) throw new Error(typeof data.error === 'string' ? data.error : t.unconfirmedAction);
++      if (!response.ok) throw new Error(response.status < 500 && typeof data.error === 'string' ? data.error : t.unconfirmedAction);
+       if (data.ok !== true || (action === 'accept' && data.joined !== true) || (action === 'register' && data.created !== true) || (action === 'enroll' && data.next !== '/two-step/enroll')) throw new Error(t.unconfirmedAction);
+       if (action === 'register') { setPassword(''); setCreated(true); }
+       else window.location.assign(action === 'enroll' ? '/two-step/enroll' : '/home');
+diff --git a/rebuild/src/app/password-recovery/recovery-form.tsx b/rebuild/src/app/password-recovery/recovery-form.tsx
+index 4620cae9..59e602e3 100644
+--- a/rebuild/src/app/password-recovery/recovery-form.tsx
++++ b/rebuild/src/app/password-recovery/recovery-form.tsx
+@@ -37,7 +37,7 @@ export function PasswordRecoveryForm({ locale = 'en' }: { locale?: AuthLocale })
+     setReady(true);
+   }, []);
+ 
+-  const failure = (result: Result, fallback: string) => result.status === 429 ? copy.tooMany : result.status === undefined ? copy.offline : result.error ?? fallback;
++  const failure = (result: Result, fallback: string) => result.status === 429 ? copy.tooMany : result.status === undefined ? copy.offline : ((result.status ?? 0) < 500 ?result.error : undefined) ?? fallback;
+ 
+   async function requestLink(event: FormEvent<HTMLFormElement>) {
+     event.preventDefault(); setError(null);
+diff --git a/rebuild/src/app/root/activity/AuditControls.tsx b/rebuild/src/app/root/activity/AuditControls.tsx
+index 990c94ba..e0239d88 100644
+--- a/rebuild/src/app/root/activity/AuditControls.tsx
++++ b/rebuild/src/app/root/activity/AuditControls.tsx
+@@ -1,7 +1,7 @@
+ 'use client';
+ import { ROOT_AUDIT_BOUNDS, ROOT_AUDIT_CONTROLS_COPY, ROOT_AUDIT_DOWNLOAD, auditControlsText, type RootAuditControlsCopy, type RootAuditDownloadPolicy } from '@/lib/config/root-audit-controls';
+ import { Button } from '@/components/Button';
+-import { useActionState, useRef, useState } from 'react';
++import { useActionState, useRef, useState, type ChangeEvent } from 'react';
+ 
+ export function AuditExport({ href, limit, copy = ROOT_AUDIT_CONTROLS_COPY, downloadPolicy = ROOT_AUDIT_DOWNLOAD }: { href: string; limit: number; copy?: RootAuditControlsCopy; downloadPolicy?: RootAuditDownloadPolicy }) {
+   const [pending, setPending] = useState(false);
+@@ -12,10 +12,8 @@ export function AuditExport({ href, limit, copy = ROOT_AUDIT_CONTROLS_COPY, down
+     busy.current = true; setPending(true); setMessage('');
+     try {
+       const response = await fetch(href, { cache: 'no-store' });
+-      if (!response.ok) {
+-        const result = await response.json();
+-        throw new Error(typeof result.error === 'string' ? result.error : copy.exportFailure);
+-      }
++      // Server text is never shown: any refused or failed export maps to the catalog sentence.
++      if (!response.ok) throw new Error(copy.exportFailure);
+       if (!response.headers.get('content-type')?.startsWith('text/csv')) throw new Error(copy.invalidResponse);
+       const url = URL.createObjectURL(await response.blob());
+       const link = document.createElement('a'); link.href = url; link.download = downloadPolicy.filename;
+@@ -28,6 +26,12 @@ export function AuditExport({ href, limit, copy = ROOT_AUDIT_CONTROLS_COPY, down
+   return <div><Button type="button" disabled={pending} onClick={download}>{pending ? copy.preparing : copy.export}</Button><p>{auditControlsText(copy.coverage, { limit })}</p><p role="status">{message}</p></div>;
+ }
+ export function AuditRetention({ days, exportRows, batchSize, save, copy = ROOT_AUDIT_CONTROLS_COPY }: { days: number; exportRows: number; batchSize: number; copy?: RootAuditControlsCopy; save: (previous: string, data: FormData) => Promise<string> }) {
+-  const [message, action, pending] = useActionState(save, '');
+-  return <form action={action}><label>{copy.retention} <input name="days" type="number" min={ROOT_AUDIT_BOUNDS.retentionDays.min} max={ROOT_AUDIT_BOUNDS.retentionDays.max} required defaultValue={days} /></label><label>{copy.exportRows} <input name="exportRows" type="number" min={ROOT_AUDIT_BOUNDS.exportRows.min} max={ROOT_AUDIT_BOUNDS.exportRows.max} required defaultValue={exportRows} /></label><label>{copy.batchSize} <input name="batchSize" type="number" min={ROOT_AUDIT_BOUNDS.batchSize.min} max={ROOT_AUDIT_BOUNDS.batchSize.max} required defaultValue={batchSize} /></label><p>{copy.warning}</p><Button type="submit" disabled={pending}>{pending ? copy.saving : copy.save}</Button><p role="status">{message}</p></form>;
++  // Controlled values: React resets an uncontrolled form after its action, which would discard typed input when saving fails.
++  const [values, setValues] = useState({ days: String(days), exportRows: String(exportRows), batchSize: String(batchSize) });
++  const [message, action, pending] = useActionState(async (previous: string, data: FormData) => {
++    // A failed request (expired session, server error) keeps the page and the typed values instead of reaching the error boundary.
++    try { return await save(previous, data); } catch { return copy.saveFailure; }
++  }, '');
++  const change = (name: keyof typeof values) => (event: ChangeEvent<HTMLInputElement>) => setValues(current => ({ ...current, [name]: event.currentTarget.value }));
++  return <form action={action}><label>{copy.retention} <input name="days" type="number" min={ROOT_AUDIT_BOUNDS.retentionDays.min} max={ROOT_AUDIT_BOUNDS.retentionDays.max} required value={values.days} onChange={change('days')} /></label><label>{copy.exportRows} <input name="exportRows" type="number" min={ROOT_AUDIT_BOUNDS.exportRows.min} max={ROOT_AUDIT_BOUNDS.exportRows.max} required value={values.exportRows} onChange={change('exportRows')} /></label><label>{copy.batchSize} <input name="batchSize" type="number" min={ROOT_AUDIT_BOUNDS.batchSize.min} max={ROOT_AUDIT_BOUNDS.batchSize.max} required value={values.batchSize} onChange={change('batchSize')} /></label><p>{copy.warning}</p><Button type="submit" disabled={pending}>{pending ? copy.saving : copy.save}</Button><p role="status">{message}</p></form>;
+ }
+diff --git a/rebuild/src/app/two-step/verify-form.tsx b/rebuild/src/app/two-step/verify-form.tsx
+index fcf0cd65..b19d23c2 100644
+--- a/rebuild/src/app/two-step/verify-form.tsx
++++ b/rebuild/src/app/two-step/verify-form.tsx
+@@ -28,7 +28,9 @@ export function VerifyForm({ hasPasskey, locale = 'en' }: { hasPasskey: boolean;
+         window.location.assign(result.nextUrl === '/join' ? '/join' : '/home');
+         return;
+       }
+-      setError(response.status === 429 ? copy.tooMany : t.rejected);
++      // Only a real rejection (401 with the verification code) means the code was wrong; other failures are not about the code.
++      const body = await response.json().catch(() => null) as { code?: unknown } | null;
++      setError(response.status === 429 ? copy.tooMany : response.status === 401 && body?.code === 'VERIFICATION_FAILED' ? t.rejected : t.unavailable);
+     } catch { setError(t.unavailable); }
+     setBusy(null);
+   }
+diff --git a/rebuild/src/app/verify-email/verify-form.tsx b/rebuild/src/app/verify-email/verify-form.tsx
+index e46be51c..26750318 100644
+--- a/rebuild/src/app/verify-email/verify-form.tsx
++++ b/rebuild/src/app/verify-email/verify-form.tsx
+@@ -28,7 +28,7 @@ export function VerifyEmailForm({ locale = 'en' }: { locale?: AuthLocale }) {
+       try {
+         const response = await fetch('/api/auth/verify-email', { method: 'POST', headers: { 'content-type': 'application/json' }, cache: 'no-store', body: JSON.stringify({ token }) });
+         const body = await response.json().catch(() => ({})) as { error?: string };
+-        if (!response.ok) { setError(response.status === 429 ? copy.tooMany : body.error ?? t.linkInvalid); setState('failed'); return; }
++        if (!response.ok) { setError(response.status === 429 ? copy.tooMany : (response.status < 500 ? body.error : undefined) ?? t.linkInvalid); setState('failed'); return; }
+         setState('confirmed');
+       } catch { setError(copy.offline); setState('failed'); }
+     })();
+@@ -44,7 +44,7 @@ export function VerifyEmailForm({ locale = 'en' }: { locale?: AuthLocale }) {
+     try {
+       const response = await fetch('/api/auth/verify-email/resend', { method: 'POST', headers: { 'content-type': 'application/json' }, cache: 'no-store', body: JSON.stringify({ email: String(new FormData(event.currentTarget).get('email') ?? '') }) });
+       const body = await response.json().catch(() => ({})) as { error?: string };
+-      if (!response.ok) { setError(response.status === 429 ? copy.tooMany : body.error ?? t.sendFailed); return; }
++      if (!response.ok) { setError(response.status === 429 ? copy.tooMany : (response.status < 500 ? body.error : undefined) ?? t.sendFailed); return; }
+       setState('resent');
+     } catch { setError(copy.offline); }
+     finally { setPending(false); }
+diff --git a/rebuild/src/modules/home/auth/copy.ts b/rebuild/src/modules/home/auth/copy.ts
+index 5e070fa4..4319b867 100644
+--- a/rebuild/src/modules/home/auth/copy.ts
++++ b/rebuild/src/modules/home/auth/copy.ts
+@@ -55,6 +55,7 @@ const en = {
+   join: {
+     title: 'Join a workspace', createdTitle: 'Your account is ready', opening: 'Opening your invitation…',
+     openFailed: 'This invitation could not be opened. Ask for a new invitation.', unconfirmed: 'This invitation could not be confirmed. Open the email link again.', loadFailed: 'The invitation could not be loaded. Open the email link again.',
++    missingLink: 'There is no invitation to open here. Use the link from your invitation email, or ask the person who invited you to send a new one.',
+     unconfirmedAction: 'The operation could not be confirmed. Check your account before trying again.',
+     switchFailed: 'Sign-out could not be confirmed. Try again before switching accounts.',
+     createdBody: 'Your account and workspace membership were created. Sign in to complete any required verification.', signIn: 'Sign in',
+@@ -130,6 +131,7 @@ const fr: CatalogLocale = {
+   join: {
+     title: 'Rejoindre un espace', createdTitle: 'Votre compte est prêt', opening: 'Ouverture de votre invitation…',
+     openFailed: 'Cette invitation n’a pas pu être ouverte. Demandez-en une nouvelle.', unconfirmed: 'Cette invitation n’a pas pu être confirmée. Ouvrez de nouveau le lien reçu par e-mail.', loadFailed: 'L’invitation n’a pas pu être chargée. Ouvrez de nouveau le lien reçu par e-mail.',
++    missingLink: 'Il n’y a aucune invitation à ouvrir ici. Utilisez le lien de votre e-mail d’invitation, ou demandez à la personne qui vous a invité de vous en renvoyer un.',
+     unconfirmedAction: 'L’opération n’a pas pu être confirmée. Vérifiez votre compte avant de réessayer.',
+     switchFailed: 'La déconnexion n’a pas pu être confirmée. Réessayez avant de changer de compte.',
+     createdBody: 'Votre compte et votre appartenance à l’espace ont été créés. Connectez-vous pour terminer la vérification éventuellement requise.', signIn: 'Se connecter',
+diff --git a/rebuild/src/modules/publishing/action-catalog.ts b/rebuild/src/modules/publishing/action-catalog.ts
+index c3a86461..78b062d6 100644
+--- a/rebuild/src/modules/publishing/action-catalog.ts
++++ b/rebuild/src/modules/publishing/action-catalog.ts
+@@ -935,6 +935,10 @@ export const publishingActionCopy = {
+     "en": "Cancelling…",
+     "fr": "Annulation…"
+   },
++  "workflow_cancelFailed": {
++    "en": "The schedule could not be cancelled. Check your connection and try again; the post is unchanged until it is confirmed.",
++    "fr": "La programmation n’a pas pu être annulée. Vérifiez votre connexion et réessayez ; la publication reste inchangée tant que ce n’est pas confirmé."
++  },
+   "comment_not_requested": { "en": "No first comment requested", "fr": "Aucun premier commentaire demandé" },
+   "comment_awaiting_post": { "en": "First comment awaits publication", "fr": "Le premier commentaire attend la publication" },
+   "comment_ready": { "en": "First comment has not been sent", "fr": "Le premier commentaire n’a pas été envoyé" },
+diff --git a/rebuild/src/modules/publishing/ui/calendar/calendar.module.css b/rebuild/src/modules/publishing/ui/calendar/calendar.module.css
+index 378ed1e0..831660dd 100644
+--- a/rebuild/src/modules/publishing/ui/calendar/calendar.module.css
++++ b/rebuild/src/modules/publishing/ui/calendar/calendar.module.css
+@@ -87,9 +87,10 @@
+ .post:hover { box-shadow: 0 3px 10px color-mix(in srgb, var(--ink) 14%, transparent); }
+ .post[data-status="published"] { opacity: .88; }
+ .day[data-today] { background: var(--mod-soft, var(--accent-soft)); box-shadow: inset 0 3px 0 var(--mod, var(--accent)); }
+-.day[data-today] .dayHead time { display: inline-grid; place-items: center; min-width: 24px; height: 24px; border-radius: 50%; background: color-mix(in srgb, var(--mod, var(--accent)) 72%, black); color: #fff; }
++.day[data-today] .dayHead time { display: inline-grid; place-items: center; min-width: 24px; height: 24px; border-radius: 50%; background: color-mix(in srgb, var(--mod, var(--accent)) 45%, black); color: #fff; }
+ .weekHead[data-today] { background: var(--mod-soft, var(--accent-soft)); box-shadow: inset 0 3px 0 var(--mod, var(--accent)); }
+-.todayTag { background: color-mix(in srgb, var(--mod, var(--accent)) 72%, black); color: #fff; }
++/* Even a white accent mixed 45% with black is rgb(115 115 115): white text keeps at least 4.5:1 in every theme and mode. */
++.todayTag { background: color-mix(in srgb, var(--mod, var(--accent)) 45%, black); color: #fff; }
+ .day:hover .add { color: var(--mod-ink, var(--accent)); }
+ .empty { border-color: var(--mod, var(--line-strong)); background: var(--mod-soft, transparent); }
+ @media (prefers-reduced-motion: reduce) { .post { transition: none; } }
+diff --git a/rebuild/src/modules/publishing/ui/queue/CancelScheduleForm.tsx b/rebuild/src/modules/publishing/ui/queue/CancelScheduleForm.tsx
+new file mode 100644
+index 00000000..cc10b69e
+--- /dev/null
++++ b/rebuild/src/modules/publishing/ui/queue/CancelScheduleForm.tsx
+@@ -0,0 +1,24 @@
++'use client';
++
++import { useState, useTransition } from 'react';
++import { usePublishingActionText } from '../WorkflowSubmitButtons';
++
++/**
++ * Cancels a scheduled post through the shared server action. A failed request (expired session, server error, offline) is
++ * reported beside the post instead of replacing the page with the error boundary, so other typed input on the page survives.
++ */
++export function CancelScheduleForm({ postId, action, locale }: { postId: string; action: (data: FormData) => Promise<void>; locale?: 'en' | 'fr' }) {
++  const t = usePublishingActionText(locale);
++  const [pending, start] = useTransition();
++  const [failed, setFailed] = useState(false);
++  return <form noValidate onSubmit={event => {
++    event.preventDefault();
++    const data = new FormData(event.currentTarget);
++    setFailed(false);
++    start(async () => { try { await action(data); } catch { setFailed(true); } });
++  }}>
++    <input type="hidden" name="postId" value={postId} />
++    <button className="ui-button ui-button--secondary ui-button--sm" type="submit" disabled={pending} aria-disabled={pending}>{pending ? t('workflow_cancelling') : t('cancelSchedule')}</button>
++    {failed && <p role="alert" className="ui-error">{t('workflow_cancelFailed')}</p>}
++  </form>;
++}
+diff --git a/rebuild/src/modules/publishing/ui/queue/QueueScreen.tsx b/rebuild/src/modules/publishing/ui/queue/QueueScreen.tsx
+index 1edf58a4..a1c5213a 100644
+--- a/rebuild/src/modules/publishing/ui/queue/QueueScreen.tsx
++++ b/rebuild/src/modules/publishing/ui/queue/QueueScreen.tsx
+@@ -14,7 +14,7 @@ import { PageHeading, PublishingPagination } from "@/modules/publishing/ui/publi
+ import { EmptyPanel } from "../kit/kit";
+ import { pageLocale } from "../kit/locale";
+ import workflow from "@/modules/publishing/ui/workflow.module.css";
+-import { CancelScheduleButton } from "@/modules/publishing/ui/WorkflowSubmitButtons";
++import { CancelScheduleForm } from "./CancelScheduleForm";
+ import { canCancelQueuedPost } from "@/modules/publishing/ui/workflow-access";
+ import { cancelScheduledPostAction } from "@/modules/publishing/ui/posts/actions";
+ 
+@@ -56,7 +56,7 @@ export default async function QueuePage({ searchParams }: { searchParams: Promis
+         const mayMove = mayCancel && post.scheduledAt && post.targets.every(target => target.status === "pending" && !target.remotePostId);
+         const wall = post.scheduledAt ? instantToWall(post.scheduledAt, timeZone) : null;
+         const actions = <div className={workflow.actions}>
+-          {mayCancel ? <><form noValidate action={cancelScheduledPostAction}><input type="hidden" name="postId" value={post.id} /><CancelScheduleButton locale={locale} /></form><p className={workflow.help}>{copy.queueCancelHelp}</p></>
++          {mayCancel ? <><CancelScheduleForm postId={post.id} action={cancelScheduledPostAction} locale={locale} /><p className={workflow.help}>{copy.queueCancelHelp}</p></>
+             : <p className={workflow.help}>{viewer.permissions.features["publishing/posts"].write ? copy.queueCancelOnly : copy.queueViewOnly}</p>}
+           {mayMove && wall ? <RescheduleQueuedPost postId={post.id} date={wall.date} time={wall.time} timeZone={timeZone} text={post.message} /> : null}
+           {due ? <p className={workflow.help} role="status">{copy.queueDue}</p> : null}
+diff --git a/rebuild/tests/browser-findings-fixes.test.ts b/rebuild/tests/browser-findings-fixes.test.ts
+new file mode 100644
+index 00000000..2a7b6b41
+--- /dev/null
++++ b/rebuild/tests/browser-findings-fixes.test.ts
+@@ -0,0 +1,119 @@
++// @vitest-environment jsdom
++import { readFileSync } from 'node:fs';
++import { act, createElement } from 'react';
++import { createRoot } from 'react-dom/client';
++import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
++import { CancelScheduleForm } from '@/modules/publishing/ui/queue/CancelScheduleForm';
++import { AuditExport, AuditRetention } from '@/app/root/activity/AuditControls';
++import { ROOT_AUDIT_CONTROLS_COPY } from '@/lib/config/root-audit-controls';
++import { VerifyForm } from '@/app/two-step/verify-form';
++import { JoinForm } from '@/app/join/join-form';
++
++let root: ReturnType<typeof createRoot>;
++let container: HTMLDivElement;
++beforeEach(() => {
++  (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
++  container = document.createElement('div'); document.body.append(container); root = createRoot(container);
++});
++afterEach(async () => { await act(async () => root.unmount()); container.remove(); vi.unstubAllGlobals(); window.history.replaceState(null, '', '/'); });
++const render = (element: Parameters<typeof root.render>[0]) => act(async () => { root.render(element); });
++const flush = () => act(async () => { await new Promise(resolve => setTimeout(resolve, 0)); });
++async function fill(input: HTMLInputElement, value: string) {
++  const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!;
++  await act(async () => { setter.call(input, value); input.dispatchEvent(new Event('input', { bubbles: true })); });
++}
++const submit = (form: HTMLFormElement) => act(async () => { form.requestSubmit(); });
++
++describe('queue cancel failure', () => {
++  it('shows a catalog sentence beside the post and re-enables the button when the request fails', async () => {
++    const action = vi.fn(async () => { throw new Error('500 Internal Server Error: stack trace'); });
++    await render(createElement(CancelScheduleForm, { postId: 'post-1', action, locale: 'en' }));
++    await submit(container.querySelector('form')!);
++    await flush();
++    expect(action).toHaveBeenCalledOnce();
++    expect([...action.mock.calls[0] as unknown as [FormData]][0].get('postId')).toBe('post-1');
++    const alert = container.querySelector('[role="alert"]')!;
++    expect(alert.textContent).toContain('could not be cancelled');
++    expect(alert.textContent).not.toContain('stack trace');
++    expect(container.querySelector('button')!.disabled).toBe(false);
++  });
++  it('answers in French', async () => {
++    await render(createElement(CancelScheduleForm, { postId: 'post-1', action: async () => { throw new Error('x'); }, locale: 'fr' }));
++    await submit(container.querySelector('form')!);
++    await flush();
++    expect(container.querySelector('[role="alert"]')!.textContent).toContain('n’a pas pu être annulée');
++  });
++});
++
++describe('Root activity controls', () => {
++  it('keeps typed retention values and shows the catalog failure when the save request throws', async () => {
++    const save = vi.fn(async () => { throw new Error('raw database failure'); });
++    await render(createElement(AuditRetention, { days: 30, exportRows: 100, batchSize: 10, save }));
++    const days = container.querySelector<HTMLInputElement>('input[name="days"]')!;
++    await fill(days, '45');
++    await submit(container.querySelector('form')!);
++    await flush();
++    expect(save).toHaveBeenCalledOnce();
++    expect(container.querySelector<HTMLInputElement>('input[name="days"]')!.value).toBe('45');
++    expect(container.querySelector('[role="status"]')!.textContent).toBe(ROOT_AUDIT_CONTROLS_COPY.saveFailure);
++  });
++  it('maps a failed export to the catalog sentence, never the response body', async () => {
++    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: false, status: 500, headers: new Headers(), json: async () => ({ error: 'ECONNREFUSED 10.0.0.5:5432' }) })));
++    await render(createElement(AuditExport, { href: '/api/root/activity/export', limit: 100 }));
++    await act(async () => container.querySelector('button')!.click());
++    await flush();
++    expect(container.querySelector('[role="status"]')!.textContent).toBe(ROOT_AUDIT_CONTROLS_COPY.exportFailure);
++  });
++});
++
++describe('two-step failure messages', () => {
++  async function verifyWith(response: { status: number; body?: unknown } | 'offline') {
++    vi.stubGlobal('fetch', vi.fn(async () => {
++      if (response === 'offline') throw new TypeError('network');
++      return { ok: false, status: response.status, json: async () => response.body ?? {} };
++    }));
++    await render(createElement(VerifyForm, { hasPasskey: false }));
++    await fill(container.querySelector<HTMLInputElement>('input[name="code"]')!, '123456');
++    await submit(container.querySelector('form')!);
++    await flush();
++    return container.textContent ?? '';
++  }
++  it('says the code was not accepted only for a real rejection', async () => {
++    expect(await verifyWith({ status: 401, body: { code: 'VERIFICATION_FAILED' } })).toContain('The code was not accepted');
++  });
++  it.each([[{ status: 500 }], [{ status: 502 }], [{ status: 401 }], ['offline' as const]])('reports %j as temporarily unavailable', async failure => {
++    const text = await verifyWith(failure);
++    expect(text).toContain('temporarily unavailable');
++    expect(text).not.toContain('was not accepted');
++  });
++});
++
++describe('tokenless join page', () => {
++  it('shows a clear themed message instead of a raw server error', async () => {
++    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: false, status: 404, json: async () => ({ error: 'Not found' }) })));
++    await render(createElement(JoinForm, { passwordPolicy: { minLength: 8, maxBytes: 800 } }));
++    await flush();
++    expect(container.textContent).toContain('There is no invitation to open here');
++    expect(container.textContent).not.toContain('Not found');
++    expect(container.querySelector('[role="alert"], [role="status"]')).not.toBeNull();
++  });
++  it('does not show a server error body for a failed preview that had a token', async () => {
++    window.history.replaceState(null, '', '/#abc');
++    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: false, status: 500, json: async () => ({ error: 'TypeError at db.ts:42' }) })));
++    await render(createElement(JoinForm, { passwordPolicy: { minLength: 8, maxBytes: 800 } }));
++    await flush();
++    expect(container.textContent).toContain('could not be opened');
++    expect(container.textContent).not.toContain('db.ts');
++  });
++});
++
++describe('calendar today badge contrast', () => {
++  const luminance = (channel: number) => { const c = channel / 255; return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; };
++  const contrastWithWhite = (grey: number) => 1.05 / (0.2126 * luminance(grey) + 0.7152 * luminance(grey) + 0.0722 * luminance(grey) + 0.05);
++  it('darkens the accent enough that white text passes AA for any accent, including white', () => {
++    const css = readFileSync('src/modules/publishing/ui/calendar/calendar.module.css', 'utf8');
++    const mixes = [...css.matchAll(/background: color-mix\(in srgb, var\(--mod, var\(--accent\)\) (\d+)%, black\); color: #fff/g)].map(match => Number(match[1]));
++    expect(mixes.length).toBe(2);
++    for (const percent of mixes) expect(contrastWithWhite(255 * percent / 100)).toBeGreaterThanOrEqual(4.5);
++  });
++});

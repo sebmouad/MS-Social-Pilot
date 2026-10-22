@@ -1,0 +1,826 @@
+diff --git a/rebuild/premium-audit.json b/rebuild/premium-audit.json
+new file mode 100644
+index 00000000..cdcad133
+--- /dev/null
++++ b/rebuild/premium-audit.json
+@@ -0,0 +1,320 @@
++{
++  "findings": [
++    {
++      "category": "violation",
++      "file": "src/components/Button.tsx",
++      "line": 11,
++      "message": "Enabled literal button has no detectable action or submit behavior.",
++      "remediation": "Connect the button to a real action, make it a submit button, or disable/remove it.",
++      "ruleId": "affordance.actionless-button",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/app/agency/AgencyFilters.tsx",
++      "line": 17,
++      "message": "Application-owned form does not declare its validation owner.",
++      "remediation": "Add noValidate/novalidate and implement the canonical validation contract.",
++      "ruleId": "form.novalidate-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/app/agency/AgencyFilters.tsx",
++      "line": 30,
++      "message": "Application-owned form does not declare its validation owner.",
++      "remediation": "Add noValidate/novalidate and implement the canonical validation contract.",
++      "ruleId": "form.novalidate-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/app/analytics/explorer/sidebar.tsx",
++      "line": 10,
++      "message": "Application-owned form does not declare its validation owner.",
++      "remediation": "Add noValidate/novalidate and implement the canonical validation contract.",
++      "ruleId": "form.novalidate-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/app/media/MediaLibrary.tsx",
++      "line": 56,
++      "message": "Application-owned form does not declare its validation owner.",
++      "remediation": "Add noValidate/novalidate and implement the canonical validation contract.",
++      "ruleId": "form.novalidate-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/app/password-recovery/recovery-form.tsx",
++      "line": 63,
++      "message": "Application-owned form does not declare its validation owner.",
++      "remediation": "Add noValidate/novalidate and implement the canonical validation contract.",
++      "ruleId": "form.novalidate-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/app/password-recovery/recovery-form.tsx",
++      "line": 69,
++      "message": "Application-owned form does not declare its validation owner.",
++      "remediation": "Add noValidate/novalidate and implement the canonical validation contract.",
++      "ruleId": "form.novalidate-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/app/publishing/collaboration/BulkLabels.tsx",
++      "line": 45,
++      "message": "Application-owned form does not declare its validation owner.",
++      "remediation": "Add noValidate/novalidate and implement the canonical validation contract.",
++      "ruleId": "form.novalidate-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/app/publishing/labels/LabelManager.tsx",
++      "line": 78,
++      "message": "Application-owned form does not declare its validation owner.",
++      "remediation": "Add noValidate/novalidate and implement the canonical validation contract.",
++      "ruleId": "form.novalidate-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/app/publishing/templates/TemplateManager.tsx",
++      "line": 72,
++      "message": "Application-owned form does not declare its validation owner.",
++      "remediation": "Add noValidate/novalidate and implement the canonical validation contract.",
++      "ruleId": "form.novalidate-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/app/root/errors/page.tsx",
++      "line": 21,
++      "message": "Application-owned form does not declare its validation owner.",
++      "remediation": "Add noValidate/novalidate and implement the canonical validation contract.",
++      "ruleId": "form.novalidate-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/app/root/privileges/page.tsx",
++      "line": 25,
++      "message": "Application-owned form does not declare its validation owner.",
++      "remediation": "Add noValidate/novalidate and implement the canonical validation contract.",
++      "ruleId": "form.novalidate-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/app/settings/api-access/connect/ConnectForm.tsx",
++      "line": 16,
++      "message": "Application-owned form does not declare its validation owner.",
++      "remediation": "Add noValidate/novalidate and implement the canonical validation contract.",
++      "ruleId": "form.novalidate-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/app/settings/bio/BioManager.tsx",
++      "line": 43,
++      "message": "Application-owned form does not declare its validation owner.",
++      "remediation": "Add noValidate/novalidate and implement the canonical validation contract.",
++      "ruleId": "form.novalidate-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/app/settings/notifications/NotificationCenter.tsx",
++      "line": 118,
++      "message": "Application-owned form does not declare its validation owner.",
++      "remediation": "Add noValidate/novalidate and implement the canonical validation contract.",
++      "ruleId": "form.novalidate-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/app/settings/sharing/LinksManager.tsx",
++      "line": 173,
++      "message": "Application-owned form does not declare its validation owner.",
++      "remediation": "Add noValidate/novalidate and implement the canonical validation contract.",
++      "ruleId": "form.novalidate-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/app/settings/workspace/policy-form.tsx",
++      "line": 16,
++      "message": "Application-owned form does not declare its validation owner.",
++      "remediation": "Add noValidate/novalidate and implement the canonical validation contract.",
++      "ruleId": "form.novalidate-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/app/share/[token]/ReviewActions.tsx",
++      "line": 24,
++      "message": "Application-owned form does not declare its validation owner.",
++      "remediation": "Add noValidate/novalidate and implement the canonical validation contract.",
++      "ruleId": "form.novalidate-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/app/tasks/TaskBoard.tsx",
++      "line": 166,
++      "message": "Application-owned form does not declare its validation owner.",
++      "remediation": "Add noValidate/novalidate and implement the canonical validation contract.",
++      "ruleId": "form.novalidate-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/app/tasks/TaskBoard.tsx",
++      "line": 193,
++      "message": "Application-owned form does not declare its validation owner.",
++      "remediation": "Add noValidate/novalidate and implement the canonical validation contract.",
++      "ruleId": "form.novalidate-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/app/tasks/TaskFilters.tsx",
++      "line": 11,
++      "message": "Application-owned form does not declare its validation owner.",
++      "remediation": "Add noValidate/novalidate and implement the canonical validation contract.",
++      "ruleId": "form.novalidate-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/app/ads/objects/ChangeHistory.tsx",
++      "line": 77,
++      "message": "Literal product textarea does not show evidence of the canonical resize-none rule.",
++      "remediation": "Use the shared Textarea owner or apply resize-none/resize: none with adequate height or auto-grow behavior.",
++      "ruleId": "form.textarea-resize-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/app/feeds/FeedManager.tsx",
++      "line": 85,
++      "message": "Literal product textarea does not show evidence of the canonical resize-none rule.",
++      "remediation": "Use the shared Textarea owner or apply resize-none/resize: none with adequate height or auto-grow behavior.",
++      "ruleId": "form.textarea-resize-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/app/publishing/templates/TemplateManager.tsx",
++      "line": 85,
++      "message": "Literal product textarea does not show evidence of the canonical resize-none rule.",
++      "remediation": "Use the shared Textarea owner or apply resize-none/resize: none with adequate height or auto-grow behavior.",
++      "ruleId": "form.textarea-resize-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/app/publishing/templates/TemplateManager.tsx",
++      "line": 86,
++      "message": "Literal product textarea does not show evidence of the canonical resize-none rule.",
++      "remediation": "Use the shared Textarea owner or apply resize-none/resize: none with adequate height or auto-grow behavior.",
++      "ruleId": "form.textarea-resize-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/app/publishing/templates/TemplateManager.tsx",
++      "line": 87,
++      "message": "Literal product textarea does not show evidence of the canonical resize-none rule.",
++      "remediation": "Use the shared Textarea owner or apply resize-none/resize: none with adequate height or auto-grow behavior.",
++      "ruleId": "form.textarea-resize-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/app/settings/sharing/LinksManager.tsx",
++      "line": 179,
++      "message": "Literal product textarea does not show evidence of the canonical resize-none rule.",
++      "remediation": "Use the shared Textarea owner or apply resize-none/resize: none with adequate height or auto-grow behavior.",
++      "ruleId": "form.textarea-resize-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/app/share/[token]/ReviewActions.tsx",
++      "line": 26,
++      "message": "Literal product textarea does not show evidence of the canonical resize-none rule.",
++      "remediation": "Use the shared Textarea owner or apply resize-none/resize: none with adequate height or auto-grow behavior.",
++      "ruleId": "form.textarea-resize-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/app/tasks/TaskBoard.tsx",
++      "line": 169,
++      "message": "Literal product textarea does not show evidence of the canonical resize-none rule.",
++      "remediation": "Use the shared Textarea owner or apply resize-none/resize: none with adequate height or auto-grow behavior.",
++      "ruleId": "form.textarea-resize-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/app/tasks/TaskBoard.tsx",
++      "line": 195,
++      "message": "Literal product textarea does not show evidence of the canonical resize-none rule.",
++      "remediation": "Use the shared Textarea owner or apply resize-none/resize: none with adequate height or auto-grow behavior.",
++      "ruleId": "form.textarea-resize-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/app/tasks/TaskBoard.tsx",
++      "line": 224,
++      "message": "Literal product textarea does not show evidence of the canonical resize-none rule.",
++      "remediation": "Use the shared Textarea owner or apply resize-none/resize: none with adequate height or auto-grow behavior.",
++      "ruleId": "form.textarea-resize-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/components/AutoTextarea.tsx",
++      "line": 42,
++      "message": "Literal product textarea does not show evidence of the canonical resize-none rule.",
++      "remediation": "Use the shared Textarea owner or apply resize-none/resize: none with adequate height or auto-grow behavior.",
++      "ruleId": "form.textarea-resize-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/modules/inbox/components/ThreadProductivity.tsx",
++      "line": 32,
++      "message": "Literal product textarea does not show evidence of the canonical resize-none rule.",
++      "remediation": "Use the shared Textarea owner or apply resize-none/resize: none with adequate height or auto-grow behavior.",
++      "ruleId": "form.textarea-resize-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/modules/inbox/components/ThreadProductivity.tsx",
++      "line": 35,
++      "message": "Literal product textarea does not show evidence of the canonical resize-none rule.",
++      "remediation": "Use the shared Textarea owner or apply resize-none/resize: none with adequate height or auto-grow behavior.",
++      "ruleId": "form.textarea-resize-missing",
++      "severity": "error"
++    }
++  ],
++  "mode": "strict",
++  "projectRoot": "/Users/mouad/Documents/ChatGPT/MS Social Pilot/app/rebuild",
++  "schemaVersion": 1,
++  "summary": {
++    "errors": 34,
++    "total": 34,
++    "unresolved": 0,
++    "violations": 34,
++    "warnings": 0
++  }
++}
+diff --git a/rebuild/src/modules/analytics/explorer-posts/Screen.tsx b/rebuild/src/modules/analytics/explorer-posts/Screen.tsx
+index 89fbb822..38525431 100644
+--- a/rebuild/src/modules/analytics/explorer-posts/Screen.tsx
++++ b/rebuild/src/modules/analytics/explorer-posts/Screen.tsx
+@@ -30,7 +30,7 @@ export default async function PostsScreen({ searchParams }: { searchParams: Prom
+     <label>{t("End (UTC)")}<input type="date" name="end" defaultValue={d.period.end} required /></label>
+     <input type="hidden" name="filter" value="1" />
+     <fieldset><legend>{t("Channels")}</legend>{d.options.map(c => <label key={c.id} className={styles.check}><input type="checkbox" name="channel" value={c.id} defaultChecked={d.selectedIds.includes(c.id)} />{c.name}</label>)}</fieldset>
+-    <label>{t("Sort by")}<select name="sort" defaultValue={d.input.sort}><option value="publishedAt">{t("Publication date")}</option>{d.measures.map(m => <option key={m.key} value={m.key}>{measureLabel(m)}</option>)}</select></label>
++    <label>{t("Sort by")}<select name="sort" defaultValue={d.input.sort}><option value="publishedAt">{t("Publication date")}</option>{d.populatedMeasures.concat(d.measures.filter(m => m.key === d.input.sort && !d.populatedMeasures.some(p => p.key === m.key))).map(m => <option key={m.key} value={m.key}>{measureLabel(m)}</option>)}</select></label>
+     <label>{t("Order")}<select name="direction" defaultValue={d.input.direction}><option value="desc">{t("Descending")}</option><option value="asc">{t("Ascending")}</option></select></label>
+     <Button type="submit" variant="primary">{t("Apply")}</Button>
+     <a href={`/api/analytics/posts?${query({ format: 'csv' })}`}>{t("Export selection (CSV)")}</a>
+diff --git a/rebuild/src/modules/analytics/explorer-posts/service.ts b/rebuild/src/modules/analytics/explorer-posts/service.ts
+index dee968d1..0508daef 100644
+--- a/rebuild/src/modules/analytics/explorer-posts/service.ts
++++ b/rebuild/src/modules/analytics/explorer-posts/service.ts
+@@ -60,7 +60,9 @@ export async function readPosts(actor: Actor, raw: unknown, cap?: number, export
+   rows.sort(comparePosts(input.sort, input.direction));
+   const measures = [...new Map(rows.flatMap(row => row.measures.map(m => [m.key, { key: m.key, label: m.label, labelFr: m.labelFr }] as const))).values()];
+   const items = rows.slice(offset, offset + pageSize);
+-  return { input, period, options, selectedIds: selected.map(c => c.id), measures, items, pageSize, nextPage: rows.length > offset + pageSize ? input.page + 1 : null };
++  // Sorting by a measure no listed post has stored would order nothing, so only measures with a value are offered (the exported CSV keeps every measure).
++  const populatedMeasures = measures.filter(m => rows.some(row => row.measures.some(x => x.key === m.key && typeof x.value === 'number')));
++  return { input, period, options, selectedIds: selected.map(c => c.id), measures, populatedMeasures, items, pageSize, nextPage: rows.length > offset + pageSize ? input.page + 1 : null };
+ 
+   } catch (error) { throw await localizeAnalyticsError(error); }
+ }
+diff --git a/rebuild/src/modules/analytics/records-copy.ts b/rebuild/src/modules/analytics/records-copy.ts
+index 826deeb2..3cad5e01 100644
+--- a/rebuild/src/modules/analytics/records-copy.ts
++++ b/rebuild/src/modules/analytics/records-copy.ts
+@@ -375,6 +375,10 @@ export const recordsCopyDefaults = {
+     "en": "URL",
+     "fr": "URL"
+   },
++  "Columns": {
++    "en": "Columns",
++    "fr": "Colonnes"
++  },
+   "First metric": {
+     "en": "First metric",
+     "fr": "Première mesure"
+diff --git a/rebuild/src/modules/analytics/ui/analytics.css b/rebuild/src/modules/analytics/ui/analytics.css
+index a8d81e9e..5439339c 100644
+--- a/rebuild/src/modules/analytics/ui/analytics.css
++++ b/rebuild/src/modules/analytics/ui/analytics.css
+@@ -73,7 +73,11 @@
+ .analytics-insights { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr)); gap: 16px; }
+ 
+ /* Post explorer table. */
+-.analytics-posts__controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); gap: 12px; margin-bottom: 12px; }
++.analytics-posts__columns { margin-bottom: 12px; }
++.analytics-posts__columns summary { cursor: pointer; font-weight: 600; min-height: 44px; display: flex; align-items: center; }
++.analytics-posts__columns summary:focus-visible { outline: 2px solid var(--focus-ring, currentColor); outline-offset: 2px; }
++.analytics-posts__columns fieldset { border: 0; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr)); gap: 4px 12px; }
++.analytics-posts__column-option { display: flex; align-items: center; gap: 8px; min-height: 36px; }
+ .analytics-posts__post { display: flex; align-items: center; gap: 10px; min-width: 0; }
+ .analytics-posts__text { display: grid; min-width: 0; }
+ .analytics-posts__text a, .analytics-posts__text > span { overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow-wrap: anywhere; }
+diff --git a/rebuild/src/modules/analytics/ui/posts/PostsTable.tsx b/rebuild/src/modules/analytics/ui/posts/PostsTable.tsx
+index 2cc4675f..07989a4b 100644
+--- a/rebuild/src/modules/analytics/ui/posts/PostsTable.tsx
++++ b/rebuild/src/modules/analytics/ui/posts/PostsTable.tsx
+@@ -4,7 +4,6 @@ import { useMemo, useState } from 'react';
+ import { IconChartBar, IconExternalLink } from '@tabler/icons-react';
+ import { Avatar } from '@/components/Avatar';
+ import { DataTable } from '@/components/DataTable';
+-import { Select } from '@/components/Select';
+ import '../analytics.css';
+ 
+ export type PostsTableRow = {
+@@ -15,7 +14,7 @@ export type PostsTableRow = {
+ };
+ export type PostsTableMeasure = { key: string; label: string };
+ 
+-const NONE = '__none__';
++const DEFAULT_COLUMNS = 2; // Initial metric columns before the viewer chooses; a presentation default, not a data limit.
+ 
+ /**
+  * Post explorer table: channel avatar beside each post, two metric columns the viewer picks from the
+@@ -30,29 +29,28 @@ export function PostsTable({ rows, measures: allMeasures, locale, emptyAction, c
+   const unavailable = t("Not available");
+   // A measure with no stored value on this page is not offered: it would only add a column of dashes.
+   const measures = useMemo(() => allMeasures.filter(measure => rows.some(row => typeof row.measures[measure.key] === 'number')), [allMeasures, rows]);
+-  const [picked, setPicked] = useState<{ first?: string; second?: string }>({});
+-  const offered = (key: string | undefined, fallback: string) => key !== undefined && (key === NONE || measures.some(measure => measure.key === key)) ? key : fallback;
+-  const first = offered(picked.first, measures[0]?.key ?? NONE);
+-  const second = offered(picked.second, measures[1]?.key ?? NONE);
+-  const setFirst = (key: string) => setPicked(current => ({ ...current, first: key }));
+-  const setSecond = (key: string) => setPicked(current => ({ ...current, second: key }));
++  // null = the default columns (the first two offered measures); once the viewer chooses, their list wins.
++  const [picked, setPicked] = useState<string[] | null>(null);
++  const shownKeys = (picked ?? measures.slice(0, DEFAULT_COLUMNS).map(measure => measure.key)).filter(key => measures.some(measure => measure.key === key));
++  const toggle = (key: string) => setPicked(() => { const current = new Set(shownKeys); if (current.has(key)) current.delete(key); else current.add(key); return measures.filter(measure => current.has(measure.key)).map(measure => measure.key); });
+   const number = useMemo(() => new Intl.NumberFormat(locale), [locale]);
+   // Viewer's own timezone; the server render may differ from the browser, so the <time> text may update on hydration.
+   const date = useMemo(() => new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' }), [locale]);
+   const when = (value: string | null) => value ? <time dateTime={value} suppressHydrationWarning>{date.format(new Date(value))}</time> : unavailable;
+-  const options = measures.map(measure => ({ value: measure.key, label: measure.label }));
+-  const chosen = [first, second].filter((key, index, all) => key !== NONE && all.indexOf(key) === index).map(key => measures.find(measure => measure.key === key)).filter((measure): measure is PostsTableMeasure => Boolean(measure));
++  const chosen = measures.filter(measure => shownKeys.includes(measure.key));
+   const peak = (key: string) => Math.max(0, ...rows.map(row => row.measures[key]).filter((value): value is number => typeof value === 'number' && Number.isFinite(value)));
+ 
+   return <div className="analytics-posts">
+-    {measures.length > 0 && <div className="analytics-posts__controls">
+-      <label className="ui-field">{t("First metric")}
+-        <Select aria-label={t("First metric")} value={first} onChange={setFirst} options={options} searchable={options.length > 8} />
+-      </label>
+-      <label className="ui-field">{t("Second metric")}
+-        <Select aria-label={t("Second metric")} value={second} onChange={setSecond} options={[{ value: NONE, label: t("None") }, ...options]} searchable={options.length > 8} />
+-      </label>
+-    </div>}
++    {measures.length > 0 && <details className="analytics-posts__columns">
++      <summary>{t("Columns")} · {chosen.length}/{measures.length}</summary>
++      <fieldset>
++        <legend className="ui-visually-hidden">{t("Columns")}</legend>
++        {measures.map(measure => <label key={measure.key} className="analytics-posts__column-option">
++          <input type="checkbox" checked={shownKeys.includes(measure.key)} onChange={() => toggle(measure.key)} />
++          <span>{measure.label}</span>
++        </label>)}
++      </fieldset>
++    </details>}
+     <DataTable caption={t("Published posts")} rows={rows} rowKey={row => row.key} density="compact"
+       emptyIcon={<IconChartBar />} emptyMessage={t("No published posts for this selection and period.")} emptyAction={emptyAction}
+       columns={[
+diff --git a/rebuild/src/platforms/facebook/analytics.ts b/rebuild/src/platforms/facebook/analytics.ts
+index 212ef412..a03e0ca6 100644
+--- a/rebuild/src/platforms/facebook/analytics.ts
++++ b/rebuild/src/platforms/facebook/analytics.ts
+@@ -5,6 +5,7 @@ import { runtimeConfigBatch } from '@/server/config/store';
+ import { FACEBOOK_METRIC_LABEL_DEFAULTS, FACEBOOK_PAGE_ANALYTICS_COPY_DEFAULTS } from './config';
+ import { facebookInsightCategories } from './data-normalization';
+ import { prisma } from '@/server/data';
++import { Prisma } from '../../../generated/client';
+ import { readFacebookPostPerformance } from './post-performance';
+ import { readFacebookGoalMeasures } from './goals';
+ import { readFacebookDestinationMeasures } from './destination-measures';
+@@ -22,8 +23,31 @@ export function facebookMetricLabel(key: string): string | undefined {
+   return metricNames[key] ?? (FACEBOOK_METRIC_LABEL_DEFAULTS as Record<string, { en: string; fr: string }>)[key]?.en;
+ }
+ 
++const sentence = (text: string) => text.replace(/[._]+/g, ' ').trim().replace(/^\w/, c => c.toUpperCase());
++
++type LabelCatalog = Record<string, { en: string; fr: string }>;
++
++/**
++ * Readable name for a stored key: an Ads action (`actions:onsite_conversion.post_net_like`,
++ * `cost_per_action_type:link_click`) or a plain field. Catalog entries (shipped, then Root-saved)
++ * win; action types use `action:<type>` entries; unknown types fall back to a sentence-cased name.
++ */
++export function facebookAdLabel(key: string, catalog: LabelCatalog = FACEBOOK_METRIC_LABEL_DEFAULTS, locale: 'en' | 'fr' = 'en'): string {
++  const known = (name: string) => catalog[name]?.[locale] ?? (locale === 'en' ? metricNames[name] : undefined);
++  const exact = known(key);
++  if (exact) return exact;
++  const cut = key.indexOf(':');
++  if (cut > 0) {
++    const head = key.slice(0, cut), tail = key.slice(cut + 1);
++    const action = tail.split(':').map(part => known(`action:${part}`) ?? known(part) ?? sentence(part.replace(/^(onsite_conversion|offsite_conversion)\./, ''))).join(' · ');
++    const prefix = head === 'actions' ? undefined : known(head) ?? sentence(head);
++    return prefix ? `${action} · ${prefix}` : action;
++  }
++  return sentence(key.replace(/^page_/, ''));
++}
++
+ function facebookLabel(key: string): string {
+-  return facebookMetricLabel(key) ?? key.replace(/^page_/, '').replace(/[:_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
++  return facebookAdLabel(key);
+ }
+ 
+ export function facebookPageMetricKind(key: string): AnalyticsKind {
+@@ -51,13 +75,13 @@ const object = (value: unknown): Record<string, unknown> => value && typeof valu
+ const dayKey = (date: Date) => date.toISOString().slice(0, 10);
+ const overlappingPeopleNote = 'Counts may overlap across resources. Sums are not deduplicated people or total reach for the whole period.';
+ 
+-type PagePresentation = { locale?: 'en' | 'fr'; metricLabels?: Record<string, { en: string; fr: string }>; pageCopy?: typeof FACEBOOK_PAGE_ANALYTICS_COPY_DEFAULTS };
++type PagePresentation = { locale?: 'en' | 'fr'; metricLabels?: Record<string, { en: string; fr: string }>; pageCopy?: Record<'en' | 'fr', Omit<(typeof FACEBOOK_PAGE_ANALYTICS_COPY_DEFAULTS)['en'], 'postSeries' | 'postSeriesNote'> & { postSeries?: string; postSeriesNote?: string }> };
+ 
+ function pageInputs(rows: PageRow[], selected: FacebookTarget[], audienceRows: PageRow[], audienceAsOf?: Date, presentation: PagePresentation = {}): { metrics: AnalyticsMetricInput[]; audience: AnalyticsAudienceEntry[] } {
+   const locale = presentation.locale ?? 'en';
+   const copy = (presentation.pageCopy ?? FACEBOOK_PAGE_ANALYTICS_COPY_DEFAULTS)[locale];
+   const labels = { ...FACEBOOK_METRIC_LABEL_DEFAULTS, ...presentation.metricLabels } as Record<string, { en: string; fr: string }>;
+-  const label = (key: string) => labels[key]?.[locale] ?? facebookLabel(key);
++  const label = (key: string) => labels[key]?.[locale] ?? facebookMetricLabel(key) ?? key.replace(/^page_/, '').replace(/[:_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+   const groups = new Map<string, PageRow[]>();
+   for (const row of rows) { const key = `${row.metric}::${row.period ?? 'day'}`; const group = groups.get(key) ?? []; group.push(row); groups.set(key, group); }
+   const metrics: AnalyticsMetricInput[] = [];
+@@ -94,16 +118,54 @@ function pageInputs(rows: PageRow[], selected: FacebookTarget[], audienceRows: P
+   return { metrics, audience };
+ }
+ 
++type PostRow = { createdTime: Date; insights: unknown; insightsSyncedAt: Date | null; target: { id: string; name: string } };
++
++/**
++ * Page-level series built from synced post insights, for Pages whose own Page insights are missing or sparse.
++ * A post's insight is a lifetime total as of its last sync, so each value is attributed to the day the post was
++ * published ("posts published that day"), never to the day the views happened. Posts without a stored value
++ * stay unknown. Non-additive measures (people reached/viewed) carry the overlap note.
++ */
++function postInputs(rows: PostRow[], selected: FacebookTarget[], presentation: PagePresentation = {}): AnalyticsMetricInput[] {
++  const locale = presentation.locale ?? 'en';
++  const copy = { ...FACEBOOK_PAGE_ANALYTICS_COPY_DEFAULTS[locale], ...(presentation.pageCopy?.[locale] ?? {}) };
++  const labels = { ...FACEBOOK_METRIC_LABEL_DEFAULTS, ...presentation.metricLabels } as LabelCatalog;
++  const series = new Map<string, { observations: AnalyticsObservation[]; syncedAt: Date }>();
++  for (const row of rows) {
++    const insights = object(row.insights);
++    for (const [key, raw] of Object.entries(insights)) {
++      const value = typeof raw === 'number' && Number.isFinite(raw) && raw >= 0 ? raw : null;
++      if (value === null || facebookIdentifierField(key)) continue;
++      const entry = series.get(key) ?? { observations: [], syncedAt: new Date(0) };
++      entry.observations.push({ date: new Date(`${dayKey(row.createdTime)}T00:00:00Z`), channelId: row.target.id, channelLabel: row.target.name, value });
++      if (row.insightsSyncedAt && row.insightsSyncedAt > entry.syncedAt) entry.syncedAt = row.insightsSyncedAt;
++      series.set(key, entry);
++    }
++  }
++  return [...series].map(([key, { observations, syncedAt }]) => {
++    const covered = [...new Set(observations.map(item => item.channelId))].sort();
++    const overlapping = /unique|reach/.test(key);
++    return {
++      key: `post:${key}`, label: `${labels[key]?.[locale] ?? facebookAdLabel(key, labels, locale)} · ${copy.postSeries}`, sourceLabel: copy.source, kind: 'flow', unit: 'count', observations,
++      aggregationNote: overlapping ? `${copy.postSeriesNote} ${copy.overlap}` : copy.postSeriesNote,
++      coveredResourceIds: covered, available: selected.length, covered: covered.length, updatedAt: syncedAt, latestAt: new Date(Math.max(...observations.map(item => item.date.getTime()))),
++    } satisfies AnalyticsMetricInput;
++  });
++}
++
+ type SelectedAdAccount = AnalyticsAdAccount;
+ type ExtraValue = { observation: AnalyticsObservation; sourcePriority: number };
+ 
+-function adInputs(rows: AdRow[], selectedAdAccounts: SelectedAdAccount[]): AnalyticsMetricInput[] {
++function adInputs(rows: AdRow[], selectedAdAccounts: SelectedAdAccount[], presentation: PagePresentation = {}): AnalyticsMetricInput[] {
++  const adCatalog = { ...FACEBOOK_METRIC_LABEL_DEFAULTS, ...presentation.metricLabels } as LabelCatalog;
++  const facebookLabel = (key: string) => facebookAdLabel(key, adCatalog, presentation.locale ?? 'en');
++  const facebookMetricLabel = facebookLabel;
+   const metrics: AnalyticsMetricInput[] = [];
+   const byCurrency = new Map<string, AdRow[]>();
+   for (const row of rows) { const currency = row.adAccount.currency ?? ''; const group = byCurrency.get(currency) ?? []; group.push(row); byCurrency.set(currency, group); }
+   const availableForCurrency = (currency: string) => selectedAdAccounts.filter(account => (account.currency ?? '') === currency).length;
+   const currencyKey = (key: string, currency: string, unit: AnalyticsMetricInput['unit']) => unit === 'currency' ? `${key}::${currency || 'unknown-currency'}` : key;
+-  const currencyLabel = (key: string, currency: string, unit: AnalyticsMetricInput['unit']) => `${facebookMetricLabel(key) ?? facebookLabel(key)}${unit === 'currency' ? ` · ${currency || 'Unknown currency'}` : ''}`;
++  const currencyLabel = (key: string, currency: string, unit: AnalyticsMetricInput['unit']) => `${facebookLabel(key)}${unit === 'currency' ? ` · ${currency || 'Unknown currency'}` : ''}`;
+   const latestSync = (source: AdRow[]) => source.length ? new Date(Math.max(...source.map(row => row.fetchedAt.getTime()))) : null;
+   const extraUnit = (key: string, currency: string): AnalyticsMetricInput['unit'] => {
+     const known = facebookAdMetricUnit(key, currency || null);
+@@ -245,11 +307,11 @@ function adInputs(rows: AdRow[], selectedAdAccounts: SelectedAdAccount[]): Analy
+     const latest = [...accounts.values()];
+     if (values.size) metrics.push({ key: extras.has(key) ? `${key}::breakdown` : key, label: `${facebookLabel(key)} · Categories`, sourceLabel: 'Advertising', kind: 'breakdown', unit: 'count', observations: [], rows: [...values].map(([label, value]) => ({ label, value, asOf: null })), coveredResourceIds: [...accounts.keys()].sort(), available: selectedAdAccounts.length, covered: accounts.size, latestAt: new Date(Math.max(...latest.map(item => item.date.getTime()))), updatedAt: new Date(Math.max(...latest.map(item => item.fetchedAt.getTime()))) });
+   }
+-  return [...metrics, ...deliveryBreakdownInputs(rows, selectedAdAccounts)].map(metric => ({ ...metric, resourceKind: 'ad-account' }));
++  return [...metrics, ...deliveryBreakdownInputs(rows, selectedAdAccounts, facebookLabel)].map(metric => ({ ...metric, resourceKind: 'ad-account' }));
+ }
+ 
+ /** Delivery dimensions retain daily/account/currency identity and never enter account totals. */
+-function deliveryBreakdownInputs(rows: AdRow[], selected: SelectedAdAccount[]): AnalyticsMetricInput[] {
++function deliveryBreakdownInputs(rows: AdRow[], selected: SelectedAdAccount[], facebookLabel: (key: string) => string): AnalyticsMetricInput[] {
+   const groups = new Map<string, { field: string; currency: string; history: NonNullable<AnalyticsMetricInput['breakdownHistory']> }>();
+   for (const row of rows) {
+     const payload = object(row.fields).delivery_breakdowns;
+@@ -300,9 +362,9 @@ function deliveryBreakdownInputs(rows: AdRow[], selected: SelectedAdAccount[]):
+ }
+ 
+ /** Pure mapper kept at the Facebook boundary so stored-row semantics can be tested without storage. */
+-export function normalizeFacebookAnalytics(input: { pageRows: PageRow[]; audienceRows: PageRow[]; adRows: AdRow[]; selectedTargets: FacebookTarget[]; selectedAdAccounts: SelectedAdAccount[]; audienceAsOf?: Date } & PagePresentation) {
++export function normalizeFacebookAnalytics(input: { pageRows: PageRow[]; audienceRows: PageRow[]; adRows: AdRow[]; postRows?: PostRow[]; selectedTargets: FacebookTarget[]; selectedAdAccounts: SelectedAdAccount[]; audienceAsOf?: Date } & PagePresentation) {
+   const page = pageInputs(input.pageRows, input.selectedTargets, input.audienceRows, input.audienceAsOf, input);
+-  return { metrics: [...page.metrics, ...adInputs(input.adRows, input.selectedAdAccounts)], audienceEntries: page.audience, audienceSelected: input.selectedTargets.length };
++  return { metrics: [...page.metrics, ...postInputs(input.postRows ?? [], input.selectedTargets, input), ...adInputs(input.adRows, input.selectedAdAccounts, input)], audienceEntries: page.audience, audienceSelected: input.selectedTargets.length };
+ }
+ 
+ /** Facebook-only adapter from the legacy Page and Ads tables to provider-neutral analytics inputs. */
+@@ -337,8 +399,18 @@ export const facebookAnalyticsHost = {
+       selectedAdAccountIds.length ? prisma.adInsight.findMany({ where: { adAccount: { workspaceId: request.workspaceId, id: { in: selectedAdAccountIds }, ...(adTargetCeiling === undefined ? {} : { socialAccountId: { in: socialAccountIds } }), enabled: true, socialAccount: { is: { workspaceId: request.workspaceId, provider: 'facebook', invalidatedAt: null } } }, level: 'account', date: { gte: request.range.from, lte: request.range.to } }, orderBy: [{ date: 'asc' }], select: { date: true, spend: true, impressions: true, clicks: true, reach: true, cpc: true, cpm: true, cpp: true, ctr: true, frequency: true, actions: true, fields: true, fetchedAt: true, adAccount: { select: { id: true, name: true, currency: true } } } }) : Promise.resolve([]),
+     ]);
+     const selectedAdAccounts = adAccounts.filter(account => selectedAdAccountIds.includes(account.id));
+-    const [presentation, locale] = await Promise.all([runtimeConfigBatch(['meta.metricLabels', 'meta.pageAnalyticsCopy']), analyticsLanguage()]);
+-    const normalized = normalizeFacebookAnalytics({ locale, metricLabels: presentation['meta.metricLabels'] as PagePresentation['metricLabels'], pageCopy: presentation['meta.pageAnalyticsCopy'] as PagePresentation['pageCopy'], pageRows: pageRows as PageRow[], selectedTargets, audienceRows: audienceRows as PageRow[], adRows: adRows as AdRow[], selectedAdAccounts, audienceAsOf: request.range.to });
++    const [presentation, locale] = await Promise.all([runtimeConfigBatch(['meta.metricLabels', 'meta.pageAnalyticsCopy', 'meta.postSeriesMaxPosts']), analyticsLanguage()]);
++    // Synced post insights give a Page-level series when Page insights are missing or sparse; same workspace, selection and date bounds.
++    const postRows = targetIds.length ? (await prisma.$queryRaw<Array<{ targetId: string; targetName: string; createdTime: Date; insights: unknown; insightsSyncedAt: Date }>>(Prisma.sql`
++      SELECT ep."targetId", t.name AS "targetName", ep."createdTime", ep.insights, ep."insightsSyncedAt"
++      FROM external_posts ep JOIN targets t ON t.id = ep."targetId"
++      JOIN social_accounts sa ON sa.id = t."socialAccountId"
++      WHERE ep."targetId" IN (${Prisma.join(targetIds)}) AND t."workspaceId" = ${request.workspaceId} AND t.type = 'page'
++        AND sa."workspaceId" = ${request.workspaceId} AND sa.provider = 'facebook' AND sa."invalidatedAt" IS NULL
++        AND ep."createdTime" >= ${request.range.from} AND ep."createdTime" <= ${request.range.to} AND ep."insightsSyncedAt" IS NOT NULL
++      ORDER BY ep."createdTime" DESC LIMIT ${presentation['meta.postSeriesMaxPosts'] as number}`))
++      .map(row => ({ createdTime: row.createdTime, insights: row.insights, insightsSyncedAt: row.insightsSyncedAt, target: { id: row.targetId, name: row.targetName } }) satisfies PostRow) : [];
++    const normalized = normalizeFacebookAnalytics({ locale, postRows: postRows as PostRow[], metricLabels: presentation['meta.metricLabels'] as PagePresentation['metricLabels'], pageCopy: presentation['meta.pageAnalyticsCopy'] as PagePresentation['pageCopy'], pageRows: pageRows as PageRow[], selectedTargets, audienceRows: audienceRows as PageRow[], adRows: adRows as AdRow[], selectedAdAccounts, audienceAsOf: request.range.to });
+     return { targets: visible.map(({ socialAccountId: _socialAccountId, providerId: _pageId, ...target }) => ({ ...target, providerId: FACEBOOK_PLATFORM_ID })), selectedTargets: selectedTargets.map(({ socialAccountId: _socialAccountId, providerId: _pageId, ...target }) => ({ ...target, providerId: FACEBOOK_PLATFORM_ID })), adAccounts, selectedAdAccountIds, ...normalized };
+   },
+ };
+diff --git a/rebuild/src/platforms/facebook/config.ts b/rebuild/src/platforms/facebook/config.ts
+index 9c8cec66..f79b7e2b 100644
+--- a/rebuild/src/platforms/facebook/config.ts
++++ b/rebuild/src/platforms/facebook/config.ts
+@@ -119,6 +119,47 @@ export const FACEBOOK_METRIC_LABEL_DEFAULTS = {
+   page_post_engagements: { en: 'Post engagements', fr: 'Interactions avec les publications' },
+   page_views_total: { en: 'Page views', fr: 'Vues de la Page' },
+   page_video_views: { en: 'Video views', fr: 'Vues de vidéo' },
++  spend: { en: 'Spend', fr: 'Dépenses' },
++  cpc: { en: 'Cost per click', fr: 'Coût par clic' },
++  cpm: { en: 'Cost per 1,000 impressions', fr: 'Coût pour 1 000 impressions' },
++  cpp: { en: 'Cost per person reached', fr: 'Coût par personne touchée' },
++  ctr: { en: 'Click-through rate', fr: 'Taux de clics' },
++  frequency: { en: 'Frequency', fr: 'Fréquence' },
++  actions: { en: 'Actions', fr: 'Actions' },
++  unique_actions: { en: 'Unique actions', fr: 'Actions uniques' },
++  action_values: { en: 'Action value', fr: 'Valeur des actions' },
++  cost_per_action_type: { en: 'Cost per action', fr: 'Coût par action' },
++  cost_per_unique_action_type: { en: 'Cost per unique action', fr: 'Coût par action unique' },
++  purchase_roas: { en: 'Purchase return on ad spend', fr: 'Retour sur dépenses publicitaires (achats)' },
++  website_ctr: { en: 'Website click-through rate', fr: 'Taux de clics vers le site' },
++  inline_link_clicks: { en: 'Link clicks', fr: 'Clics sur lien' },
++  outbound_clicks: { en: 'Outbound clicks', fr: 'Clics sortants' },
++  video_play_actions: { en: 'Video plays', fr: 'Lectures de vidéo' },
++  video_p25_watched_actions: { en: 'Video watched to 25%', fr: 'Vidéo regardée à 25 %' },
++  video_p50_watched_actions: { en: 'Video watched to 50%', fr: 'Vidéo regardée à 50 %' },
++  video_p75_watched_actions: { en: 'Video watched to 75%', fr: 'Vidéo regardée à 75 %' },
++  video_p95_watched_actions: { en: 'Video watched to 95%', fr: 'Vidéo regardée à 95 %' },
++  video_p100_watched_actions: { en: 'Video watched to 100%', fr: 'Vidéo regardée en entier' },
++  video_thruplay_watched_actions: { en: 'ThruPlays', fr: 'ThruPlays' },
++  'action:post_engagement': { en: 'Post engagements', fr: 'Interactions avec les publications' },
++  'action:page_engagement': { en: 'Page engagements', fr: 'Interactions avec la Page' },
++  'action:post_reaction': { en: 'Post reactions', fr: 'Réactions aux publications' },
++  'action:post': { en: 'Post shares', fr: 'Partages de publications' },
++  'action:comment': { en: 'Comments', fr: 'Commentaires' },
++  'action:like': { en: 'Page likes', fr: 'Mentions J’aime de la Page' },
++  'action:link_click': { en: 'Link clicks', fr: 'Clics sur lien' },
++  'action:landing_page_view': { en: 'Landing page views', fr: 'Vues de la page de destination' },
++  'action:video_view': { en: 'Video views', fr: 'Vues de vidéo' },
++  'action:photo_view': { en: 'Photo views', fr: 'Vues de photo' },
++  'action:purchase': { en: 'Purchases', fr: 'Achats' },
++  'action:lead': { en: 'Leads', fr: 'Prospects' },
++  'action:onsite_conversion.post_net_like': { en: 'Net post likes', fr: 'J’aime nets sur publications' },
++  'action:onsite_conversion.post_net_save': { en: 'Net post saves', fr: 'Enregistrements nets de publications' },
++  'action:onsite_conversion.post_save': { en: 'Post saves', fr: 'Enregistrements de publications' },
++  'action:onsite_conversion.messaging_conversation_started_7d': { en: 'Conversations started (7 days)', fr: 'Conversations commencées (7 jours)' },
++  'action:onsite_conversion.messaging_first_reply': { en: 'First message replies', fr: 'Premières réponses aux messages' },
++  'action:onsite_conversion.lead_grouped': { en: 'On-Facebook leads', fr: 'Prospects sur Facebook' },
++  'action:omni_purchase': { en: 'Purchases (all channels)', fr: 'Achats (tous canaux)' },
+   reactions_like: { en: 'Likes', fr: 'Mentions J’aime' },
+   reactions_love: { en: 'Love reactions', fr: 'Réactions J’adore' },
+   reactions_wow: { en: 'Wow reactions', fr: 'Réactions Wouah' },
+@@ -135,14 +176,15 @@ export const facebookMetricLabelsSchema = z.record(z.string(), z.object({ en: z.
+   .transform(overrides => ({ ...FACEBOOK_METRIC_LABEL_DEFAULTS, ...overrides }));
+ 
+ export const FACEBOOK_PAGE_ANALYTICS_COPY_DEFAULTS = {
+-  en: { source: 'Page performance', latest: 'Latest per channel', categories: 'Categories', overlap: 'Counts may overlap across resources. Sums are not deduplicated people or total reach for the whole period.' },
+-  fr: { source: 'Performances de la Page', latest: 'Dernière valeur par canal', categories: 'Catégories', overlap: 'Les personnes comptées peuvent figurer dans plusieurs ressources. Les sommes ne représentent pas des personnes distinctes ni la portée totale de la période.' },
++  en: { source: 'Page performance', latest: 'Latest per channel', categories: 'Categories', overlap: 'Counts may overlap across resources. Sums are not deduplicated people or total reach for the whole period.', postSeries: 'Posts published', postSeriesNote: 'Lifetime totals of the posts published on each date, as of their last sync. They are not views or reactions that happened on that date.' },
++  fr: { source: 'Performances de la Page', latest: 'Dernière valeur par canal', categories: 'Catégories', overlap: 'Les personnes comptées peuvent figurer dans plusieurs ressources. Les sommes ne représentent pas des personnes distinctes ni la portée totale de la période.', postSeries: 'Publications du jour', postSeriesNote: 'Totaux cumulés des publications parues à chaque date, à leur dernière synchronisation. Ce ne sont pas les vues ou réactions survenues ce jour-là.' },
+ };
+-const pageAnalyticsCopyLanguageSchema = z.object({ source: z.string().min(1), latest: z.string().min(1), categories: z.string().min(1), overlap: z.string().min(1) });
++const pageAnalyticsCopyLanguageSchema = z.object({ source: z.string().min(1), latest: z.string().min(1), categories: z.string().min(1), overlap: z.string().min(1), postSeries: z.string().min(1).optional(), postSeriesNote: z.string().min(1).optional() });
+ export const facebookPageAnalyticsCopySchema = z.object({ en: pageAnalyticsCopyLanguageSchema, fr: pageAnalyticsCopyLanguageSchema });
+ 
+ export const FACEBOOK_DATA_DETAIL_CONFIG = [
+  entry({ key: 'meta.pageAnalyticsCopy', group: 'Facebook · Analytics collection', label: 'Bilingual Page analytics copy', kind: 'json', description: 'English and French Page provenance, aggregation and category labels.', defaultValue: FACEBOOK_PAGE_ANALYTICS_COPY_DEFAULTS, schema: facebookPageAnalyticsCopySchema, consumption: 'active' }),
+  entry({ key: 'meta.adHierarchyPolicy', group: 'Facebook · Analytics collection', label: 'Ads hierarchy and action dimensions', kind: 'json', description: 'Additional daily campaign, ad set and ad reports. Action dimensions apply to these reports.', defaultValue: { levels: ['campaign', 'adset', 'ad'], actionBreakdowns: ['action_type'] }, schema: facebookAdHierarchySchema, consumption: 'active' }),
++ entry({ key: 'meta.postSeriesMaxPosts', group: 'Facebook · Analytics collection', label: 'Post-based series: posts read per request', kind: 'number', description: 'Most synced posts read to build Page-level series from post insights for the selected dates.', defaultValue: 5000, schema: z.number().int().min(1).max(100000), consumption: 'active' }),
+  entry({ key: 'meta.metricLabels', group: 'Facebook · Analytics collection', label: 'Bilingual metric labels', kind: 'json', description: 'English and French labels keyed by normalized metric name. Saved entries override defaults; newly shipped labels are inherited automatically.', defaultValue: FACEBOOK_METRIC_LABEL_DEFAULTS, schema: facebookMetricLabelsSchema, consumption: 'active' }),
+ ] as const;
+diff --git a/rebuild/tests/analytics-overview-live-defects2.test.ts b/rebuild/tests/analytics-overview-live-defects2.test.ts
+new file mode 100644
+index 00000000..69d6748c
+--- /dev/null
++++ b/rebuild/tests/analytics-overview-live-defects2.test.ts
+@@ -0,0 +1,92 @@
++import { describe, expect, it, vi } from 'vitest';
++import { createElement } from 'react';
++import { renderToStaticMarkup } from 'react-dom/server';
++
++vi.mock('../src/server/data', () => ({ prisma: {} }));
++vi.mock('@/modules/analytics/server/error-copy', () => ({ analyticsLanguage: async () => 'en' }));
++vi.mock('@/server/config/store', () => ({ runtimeConfig: async () => ({}), runtimeConfigBatch: async () => ({}) }));
++
++import { facebookAdLabel, normalizeFacebookAnalytics } from '../src/platforms/facebook/analytics';
++import { FACEBOOK_METRIC_LABEL_DEFAULTS, facebookMetricLabelsSchema } from '../src/platforms/facebook/config';
++import { PostsTable } from '../src/modules/analytics/ui/posts/PostsTable';
++
++const account = { id: 'ad-a', name: 'Ad account A', currency: 'USD' };
++const target = { id: 'page-a', name: 'Page A', type: 'page', providerId: 'facebook', socialAccountId: 's' } as never;
++const adRow = (actions: unknown) => ({ date: new Date('2026-10-10'), spend: 5, impressions: 100, clicks: 4, reach: 80, cpc: 1.25, cpm: 50, cpp: 0.06, ctr: 4, frequency: 1.25, actions, fields: {}, fetchedAt: new Date('2026-10-11'), adAccount: account });
++
++describe('ads action metrics have readable names', () => {
++  it('names the live defect in English and French', () => {
++    expect(facebookAdLabel('actions:onsite_conversion.post_net_like')).toBe('Net post likes');
++    expect(facebookAdLabel('actions:onsite_conversion.post_net_like', FACEBOOK_METRIC_LABEL_DEFAULTS, 'fr')).toBe('J’aime nets sur publications');
++    expect(facebookAdLabel('cost_per_action_type:link_click')).toBe('Link clicks · Cost per action');
++    expect(facebookAdLabel('video_p25_watched_actions:video_view')).toBe('Video views · Video watched to 25%');
++  });
++  it('falls back to a sentence for unknown action types, never the raw key', () => {
++    const label = facebookAdLabel('actions:onsite_conversion.some_new_thing');
++    expect(label).toBe('Some new thing');
++    expect(label).not.toMatch(/Actions|\.|_/);
++  });
++  it('lets a saved Root label win and keeps shipped labels for older saved catalogs', () => {
++    const saved = facebookMetricLabelsSchema.parse({ 'action:link_click': { en: 'Clicks on links', fr: 'Clics' } });
++    expect(facebookAdLabel('actions:link_click', saved)).toBe('Clicks on links');
++    expect(facebookAdLabel('actions:comment', saved)).toBe('Comments');
++  });
++  it('labels normalized ad metrics in the viewer language', () => {
++    const rows = [adRow([{ action_type: 'onsite_conversion.post_net_like', value: '3' }])];
++    for (const [locale, expected] of [['en', 'Net post likes'], ['fr', 'J’aime nets sur publications']] as const) {
++      const { metrics } = normalizeFacebookAnalytics({ locale, pageRows: [], audienceRows: [], selectedTargets: [], selectedAdAccounts: [account], adRows: rows as never });
++      const action = metrics.find(metric => metric.key.startsWith('actions:onsite_conversion.post_net_like'));
++      expect(action?.label, locale).toContain(expected);
++      expect(metrics.some(metric => /Actions Onsite/i.test(metric.label))).toBe(false);
++    }
++  });
++});
++
++describe('Page-level series from synced post insights', () => {
++  const post = (day: string, insights: unknown, name = 'Page A', id = 'page-a') => ({ createdTime: new Date(`${day}T15:30:00Z`), insights, insightsSyncedAt: new Date('2026-10-12T00:00:00Z'), target: { id, name } });
++  const build = (postRows: ReturnType<typeof post>[], locale: 'en' | 'fr' = 'en') => normalizeFacebookAnalytics({ locale, pageRows: [], audienceRows: [], adRows: [], postRows, selectedTargets: [target], selectedAdAccounts: [] });
++
++  it('adds a flow series per publish date with honest wording and no Page rows required', () => {
++    const { metrics } = build([post('2026-10-10', { post_media_view: 10, reactions: 2 }), post('2026-10-10', { post_media_view: 5 }), post('2026-10-11', { post_media_view: 7, comments: 1 })]);
++    const views = metrics.find(metric => metric.key === 'post:post_media_view')!;
++    expect(views.label).toBe('Media views · Posts published');
++    expect(views.kind).toBe('flow');
++    expect(views.sourceLabel).toBe('Page performance');
++    expect(views.observations.map(item => item.value)).toEqual([10, 5, 7]);
++    expect(views.aggregationNote).toMatch(/not views or reactions that happened on that date/);
++    expect(views.coveredResourceIds).toEqual(['page-a']);
++    expect(metrics.map(metric => metric.key)).toEqual(expect.arrayContaining(['post:reactions', 'post:comments']));
++  });
++  it('keeps unknown unknown: a post without a value adds no observation', () => {
++    const { metrics } = build([post('2026-10-10', { reactions: 2 }), post('2026-10-11', { post_media_view: null, reactions: 3 })]);
++    expect(metrics.find(metric => metric.key === 'post:post_media_view')).toBeUndefined();
++    expect(metrics.find(metric => metric.key === 'post:reactions')!.observations).toHaveLength(2);
++  });
++  it('flags people-based measures as non-additive and localizes labels', () => {
++    const { metrics } = build([post('2026-10-10', { post_total_media_view_unique: 4 })], 'fr');
++    const unique = metrics.find(metric => metric.key === 'post:post_total_media_view_unique')!;
++    expect(unique.label).toBe('Personnes ayant vu les médias · Publications du jour');
++    expect(unique.aggregationNote).toMatch(/distinctes/);
++  });
++  it('ignores object breakdowns and negative or non-finite values', () => {
++    const { metrics } = build([post('2026-10-10', { post_clicks_by_type: { link: 3 }, reactions: -1, comments: Number.NaN, shares: 4 })]);
++    expect(metrics.filter(metric => metric.key.startsWith('post:')).map(metric => metric.key)).toEqual(['post:shares']);
++  });
++});
++
++describe('post explorer Columns chooser', () => {
++  const measures = [{ key: 'reach', label: 'People reached' }, { key: 'likes', label: 'Likes' }, { key: 'shares', label: 'Shares' }, { key: 'empty', label: 'Empty' }];
++  const rows = [{ key: 'a:1', text: 'Launch', url: null, channelName: 'Page A', publishedAt: null, measuredAt: null, measures: { reach: 9, likes: 3, shares: 1, empty: null } }];
++  const html = renderToStaticMarkup(createElement(PostsTable, { rows, measures, locale: 'en' }));
++  it('offers a checkbox per populated measure, defaulting to the first two, and omits empty ones', () => {
++    expect(html).toContain('Columns');
++    expect((html.match(/type="checkbox"/g) ?? []).length).toBe(3);
++    expect((html.match(/type="checkbox"[^>]*checked/g) ?? []).length).toBe(2);
++    expect(html).not.toContain('>Empty<');
++    expect(html).toContain('People reached</th>'); expect(html).not.toContain('Shares</th>');
++  });
++  it('renders French copy for the chooser', () => {
++    const fr = renderToStaticMarkup(createElement(PostsTable, { rows, measures, locale: 'fr' }));
++    expect(fr).toContain('Colonnes');
++  });
++});
+diff --git a/rebuild/tests/facebook-analytics-live-defects.test.ts b/rebuild/tests/facebook-analytics-live-defects.test.ts
+index 19abf7b8..2e038971 100644
+--- a/rebuild/tests/facebook-analytics-live-defects.test.ts
++++ b/rebuild/tests/facebook-analytics-live-defects.test.ts
+@@ -43,7 +43,7 @@ describe('page metrics are emitted alongside ad metrics', () => {
+ describe('Facebook analytics targets report the platform id', () => {
+   beforeEach(() => {
+     vi.clearAllMocks();
+-    db.settings.mockResolvedValue([]); db.adAccounts.mockResolvedValue([]); db.pageInsights.mockResolvedValue([]); db.adInsights.mockResolvedValue([]);
++    db.settings.mockResolvedValue([]); db.adAccounts.mockResolvedValue([]); db.pageInsights.mockResolvedValue([]); db.adInsights.mockResolvedValue([]); db.query.mockResolvedValue([]);
+     db.targets.mockResolvedValue([{ id: 'page-a', name: 'Page A', type: 'page', providerId: '1029384756', socialAccountId: 'src' }]);
+   });
+   it('maps providerId to "facebook", never the remote Page id, for visible and selected targets', async () => {
+@@ -59,7 +59,7 @@ describe('app-published posts read insights from the matching external post', ()
+   it('joins external_posts on target and remote id, preferring its snapshot only when the post target has none', async () => {
+     db.query.mockResolvedValue([]);
+     await facebookAnalyticsHost.postPerformance(request);
+-    const query = db.query.mock.calls[0]![0] as { text: string; values: unknown[] };
++    const query = db.query.mock.calls.at(-1)![0] as { text: string; values: unknown[] };
+     expect(query.text).toMatch(/LEFT JOIN external_posts ep ON ep\."targetId" = pt\."targetId" AND ep\."remoteId" = pt\."remotePostId"/);
+     expect(query.text).toMatch(/CASE WHEN pt\."insightsSyncedAt" IS NULL AND ep\."insightsSyncedAt" IS NOT NULL THEN ep\.insights ELSE pt\.insights END/);
+     expect(query.text).toMatch(/COALESCE\(pt\."insightsSyncedAt", ep\."insightsSyncedAt"\)/);
+diff --git a/rebuild/tests/facebook-analytics-selection.test.ts b/rebuild/tests/facebook-analytics-selection.test.ts
+index 1f76db9d..f872e93c 100644
+--- a/rebuild/tests/facebook-analytics-selection.test.ts
++++ b/rebuild/tests/facebook-analytics-selection.test.ts
+@@ -1,11 +1,11 @@
+ import { beforeEach, describe, expect, it, vi } from 'vitest';
+ 
+ const db = vi.hoisted(() => ({
+-  settings: vi.fn(), targets: vi.fn(), adAccounts: vi.fn(), pageInsights: vi.fn(), adInsights: vi.fn(),
++  settings: vi.fn(), targets: vi.fn(), adAccounts: vi.fn(), pageInsights: vi.fn(), adInsights: vi.fn(), query: vi.fn(async () => []),
+ }));
+ vi.mock('../src/server/data', () => ({ prisma: {
+   appSetting: { findMany: db.settings }, target: { findMany: db.targets }, adAccount: { findMany: db.adAccounts },
+-  pageInsight: { findMany: db.pageInsights }, adInsight: { findMany: db.adInsights },
++  pageInsight: { findMany: db.pageInsights }, adInsight: { findMany: db.adInsights }, $queryRaw: db.query,
+ } }));
+ 
+ vi.mock('@/modules/analytics/server/error-copy', () => ({ analyticsLanguage: async () => 'fr' }));

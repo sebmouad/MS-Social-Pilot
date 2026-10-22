@@ -1,0 +1,260 @@
+diff --git a/rebuild/src/app/join/join-form.tsx b/rebuild/src/app/join/join-form.tsx
+index 40e22400..d75341c5 100644
+--- a/rebuild/src/app/join/join-form.tsx
++++ b/rebuild/src/app/join/join-form.tsx
+@@ -34,7 +34,16 @@ export function JoinForm({ passwordPolicy, locale = 'en' }: { passwordPolicy: Ac
+     if (window.location.hash) window.history.replaceState(window.history.state, '', window.location.pathname);
+     const token = fragment.current;
+     void fetch('/api/auth/invitations/preview', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(token ? { token } : {}), signal: controller.signal })
+-      .then(async response => { const body: unknown = await response.json().catch(() => null); if (!response.ok) throw new Error(!token ? t.missingLink : response.status < 500 && typeof (body as { error?: unknown })?.error === 'string' ? (body as {error:string}).error : t.openFailed); if (!validPreview(body)) throw new Error(t.unconfirmed); if (!controller.signal.aborted) { setInvitation(body); fragment.current = ''; } })
++      .then(async response => {
++        const body: unknown = await response.json().catch(() => null);
++        if (!response.ok) throw new Error(t.openFailed);
++        if (body && typeof body === 'object' && 'invitation' in body && body.invitation === null) {
++          if (!controller.signal.aborted) { setInvitation(null); setMessage(t.missingLink); fragment.current = ''; }
++          return;
++        }
++        if (!validPreview(body)) throw new Error(t.unconfirmed);
++        if (!controller.signal.aborted) { setInvitation(body); fragment.current = ''; }
++      })
+       .catch(error => { if (!controller.signal.aborted) setMessage(error instanceof Error ? error.message : t.loadFailed); })
+       .finally(() => { if (!controller.signal.aborted) setLoading(false); });
+     return () => { controller.abort(); pending.current?.abort(); };
+diff --git a/rebuild/src/modules/publishing/ui/posts/actions.ts b/rebuild/src/modules/publishing/ui/posts/actions.ts
+index e5d2be64..29f972e0 100644
+--- a/rebuild/src/modules/publishing/ui/posts/actions.ts
++++ b/rebuild/src/modules/publishing/ui/posts/actions.ts
+@@ -281,7 +281,15 @@ export async function schedulePostAction(data: FormData) {
+ }
+ 
+ export async function cancelScheduledPostAction(data: FormData) {
+-  await run(async viewer => { await cancelScheduledPost(actor(viewer), stringField(data, 'postId')); return 'cancelled'; });
++  const viewer = await requireViewer({ feature: 'publishing/posts', channelScoped: true, write: true });
++  if (!canAccessFeature(viewer.permissions, 'publishing/posts', 'write')) throw new Error('You cannot manage posts.');
++  // The queue form owns failure feedback. Reject without navigation so its
++  // filters, reschedule input and localized inline notice remain available.
++  await cancelScheduledPost(actor(viewer), stringField(data, 'postId'));
++  revalidatePath(PATH);
++  revalidatePath('/publishing/queue');
++  revalidatePath('/publishing/approvals');
++  redirect(`${PATH}?notice=cancelled`);
+ }
+ 
+ export async function reviewPostAction(data: FormData) {
+diff --git a/rebuild/src/server/invitation-http.ts b/rebuild/src/server/invitation-http.ts
+index 9310fca4..215f912c 100644
+--- a/rebuild/src/server/invitation-http.ts
++++ b/rebuild/src/server/invitation-http.ts
+@@ -32,7 +32,10 @@ export async function handleInvitationHttp(request: Request, action: InvitationH
+     if (!checked.success) throw new OperationError('invalid_request', 'Check the invitation details and try again.');
+     const supplied = action === 'preview' ? (checked.data as { token?: string }).token : undefined;
+     const token = supplied ?? await readInvitationToken();
+-    if (!token) throw new OperationError('not_found', 'Open the invitation link from your email to continue.');
++    if (!token) {
++      if (action === 'preview') return reply({ invitation: null });
++      throw new OperationError('not_found', 'Open the invitation link from your email to continue.');
++    }
+     if (!hit(`rebuild-invitation-token:${action}:${createHash('sha256').update(token).digest('hex')}`, limits).allowed) return reply({ error: 'Too many attempts. Try again later.', code: 'rate_limited' }, 429);
+     const invitation = await previewTeamInvitation(token);
+     if (action === 'register') {
+@@ -61,6 +64,7 @@ export async function handleInvitationHttp(request: Request, action: InvitationH
+     return reply({ ok: true, ...result, next: '/home' });
+   } catch (error) {
+     const safe = operationFailure(error, 'The invitation operation could not be confirmed. Check your account before trying again.');
++    if (action === 'preview' && safe.code === 'not_found') return reply({ invitation: null });
+     return reply({ error: safe.error, code: safe.code }, safe.status);
+   }
+ }
+diff --git a/rebuild/tests/browser-findings-fixes.test.ts b/rebuild/tests/browser-findings-fixes.test.ts
+index 2a7b6b41..18237dbf 100644
+--- a/rebuild/tests/browser-findings-fixes.test.ts
++++ b/rebuild/tests/browser-findings-fixes.test.ts
+@@ -27,7 +27,11 @@ const submit = (form: HTMLFormElement) => act(async () => { form.requestSubmit()
+ describe('queue cancel failure', () => {
+   it('shows a catalog sentence beside the post and re-enables the button when the request fails', async () => {
+     const action = vi.fn(async () => { throw new Error('500 Internal Server Error: stack trace'); });
+-    await render(createElement(CancelScheduleForm, { postId: 'post-1', action, locale: 'en' }));
++    window.history.replaceState(null, '', '/publishing/queue?page=2&channel=selected');
++    await render(createElement('div', null,
++      createElement('input', { name: 'scheduleTime', defaultValue: '10:00', 'aria-label': 'Reschedule time' }),
++      createElement(CancelScheduleForm, { postId: 'post-1', action, locale: 'en' })));
++    await fill(container.querySelector<HTMLInputElement>('[name="scheduleTime"]')!, '14:30');
+     await submit(container.querySelector('form')!);
+     await flush();
+     expect(action).toHaveBeenCalledOnce();
+@@ -36,6 +40,8 @@ describe('queue cancel failure', () => {
+     expect(alert.textContent).toContain('could not be cancelled');
+     expect(alert.textContent).not.toContain('stack trace');
+     expect(container.querySelector('button')!.disabled).toBe(false);
++    expect(window.location.pathname + window.location.search).toBe('/publishing/queue?page=2&channel=selected');
++    expect(container.querySelector<HTMLInputElement>('[name="scheduleTime"]')!.value).toBe('14:30');
+   });
+   it('answers in French', async () => {
+     await render(createElement(CancelScheduleForm, { postId: 'post-1', action: async () => { throw new Error('x'); }, locale: 'fr' }));
+@@ -90,7 +96,7 @@ describe('two-step failure messages', () => {
+ 
+ describe('tokenless join page', () => {
+   it('shows a clear themed message instead of a raw server error', async () => {
+-    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: false, status: 404, json: async () => ({ error: 'Not found' }) })));
++    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, status: 200, json: async () => ({ invitation: null }) })));
+     await render(createElement(JoinForm, { passwordPolicy: { minLength: 8, maxBytes: 800 } }));
+     await flush();
+     expect(container.textContent).toContain('There is no invitation to open here');
+diff --git a/rebuild/tests/invitation-http.test.ts b/rebuild/tests/invitation-http.test.ts
+index 22419af5..a6b28ac7 100644
+--- a/rebuild/tests/invitation-http.test.ts
++++ b/rebuild/tests/invitation-http.test.ts
+@@ -14,6 +14,7 @@ vi.mock('@/server/rate-limit', () => ({ hit: () => ({ allowed: true }) }));
+ vi.mock('@/server/client-ip', () => ({ clientIp: () => '127.0.0.1' }));
+ 
+ import { handleInvitationHttp } from '@/server/invitation-http';
++import { OperationError } from '@/lib/operation-error';
+ 
+ const origin = 'https://social.example';
+ const token = Buffer.alloc(32, 3).toString('base64url');
+@@ -34,6 +35,43 @@ beforeEach(() => {
+ });
+ 
+ describe('invitation HTTP continuation', () => {
++  it('returns an empty no-store preview when neither a fragment nor continuation token exists', async () => {
++    state.readToken.mockResolvedValue(null);
++    const response = await handleInvitationHttp(request('preview', {}), 'preview');
++    expect(response.status).toBe(200);
++    expect(await response.json()).toEqual({ invitation: null });
++    expect(response.headers.get('cache-control')).toBe('no-store');
++    expect(response.headers.get('referrer-policy')).toBe('no-referrer');
++    expect(state.preview).not.toHaveBeenCalled();
++    expect(state.account).not.toHaveBeenCalled();
++    expect(state.rememberToken).not.toHaveBeenCalled();
++  });
++
++  it('normalizes a missing preview without changing unavailable or forbidden invitation responses', async () => {
++    state.preview.mockRejectedValueOnce(new OperationError('not_found', 'Unavailable'));
++    const missing = await handleInvitationHttp(request('preview', { token }), 'preview');
++    expect(missing.status).toBe(200);
++    expect(await missing.json()).toEqual({ invitation: null });
++    for (const [code, status] of [['conflict', 409], ['forbidden', 403]] as const) {
++      state.preview.mockRejectedValueOnce(new OperationError(code, 'Unavailable'));
++      expect((await handleInvitationHttp(request('preview', { token }), 'preview')).status).toBe(status);
++    }
++    expect(state.rememberToken).not.toHaveBeenCalled();
++  });
++
++  it('keeps tokenless writes rejected and malformed previews invalid', async () => {
++    state.readToken.mockResolvedValue(null);
++    for (const action of ['accept', 'enroll', 'register'] as const) {
++      const body = action === 'register' ? { name: 'Member', password: 'long-password', confirmation: 'CREATE ACCOUNT AND JOIN invite-1' } : { confirmation: 'CONFIRM' };
++      expect((await handleInvitationHttp(request(action, body), action)).status).toBe(404);
++    }
++    expect((await handleInvitationHttp(request('preview', { token: 'bad-token' }), 'preview')).status).toBe(400);
++    expect(state.preview).not.toHaveBeenCalled();
++    expect(state.accept).not.toHaveBeenCalled();
++    expect(state.register).not.toHaveBeenCalled();
++    expect(state.beginEnrollment).not.toHaveBeenCalled();
++  });
++
+   it('requires same-origin requests before preview or token work', async () => {
+     const response = await handleInvitationHttp(request('preview', { token }, { origin: 'https://attacker.example' }), 'preview');
+     expect(response.status).toBe(403);
+diff --git a/rebuild/tests/join-form.test.ts b/rebuild/tests/join-form.test.ts
+index aa5ffb2b..eb8050df 100644
+--- a/rebuild/tests/join-form.test.ts
++++ b/rebuild/tests/join-form.test.ts
+@@ -22,8 +22,8 @@ afterEach(async () => {
+   window.history.replaceState(null, '', '/');
+ });
+ 
+-async function render() {
+-  await act(async () => root.render(createElement(JoinForm, { passwordPolicy: { minLength: 8, maxBytes: 800 } })));
++async function render(locale: 'en' | 'fr' = 'en') {
++  await act(async () => root.render(createElement(JoinForm, { passwordPolicy: { minLength: 8, maxBytes: 800 }, locale })));
+   await act(async () => { await new Promise(resolve => setTimeout(resolve, 0)); });
+ }
+ function button(text: string) {
+@@ -37,6 +37,33 @@ async function fill(input: HTMLInputElement, value: string) {
+ }
+ 
+ describe('join invitation form', () => {
++  it.each(['en', 'fr'] as const)('shows a focused localized empty state for a tokenless %s visit', async locale => {
++    window.history.replaceState(null, '', '/join');
++    vi.stubGlobal('fetch', vi.fn(async () => respond({ invitation: null })));
++    await render(locale);
++    const notice = container.querySelector('[role="alert"]');
++    expect(notice?.textContent).toContain(locale === 'en' ? 'Use the link from your invitation email' : 'Utilisez le lien de votre e-mail');
++    expect(document.activeElement).toBe(notice);
++    expect(JSON.parse(String(vi.mocked(fetch).mock.calls[0][1]?.body))).toEqual({});
++    expect(container.querySelector('a[href="/sign-in"]')).not.toBeNull();
++    expect(container.querySelector('form')).toBeNull();
++  });
++
++  it('continues an invitation from the cookie when the URL has no fragment', async () => {
++    window.history.replaceState(null, '', '/join');
++    vi.stubGlobal('fetch', vi.fn(async () => respond(preview)));
++    await render();
++    expect(container.textContent).toContain(preview.workspaceName);
++    expect(container.querySelector('[name="name"]')).not.toBeNull();
++  });
++
++  it('does not mistake lookup failure for an empty invitation', async () => {
++    vi.stubGlobal('fetch', vi.fn(async () => respond({ error: 'private upstream detail' }, false, 500)));
++    await render('fr');
++    expect(container.querySelector('[role="alert"]')?.textContent).toContain('ouverte');
++    expect(container.textContent).not.toContain('private upstream detail');
++  });
++
+   it('removes the fragment before fetching and carries the token only in the preview request body', async () => {
+     vi.stubGlobal('fetch', vi.fn(async () => respond(preview)));
+     await render();
+diff --git a/rebuild/tests/post-cancel-action.test.ts b/rebuild/tests/post-cancel-action.test.ts
+new file mode 100644
+index 00000000..65ee0beb
+--- /dev/null
++++ b/rebuild/tests/post-cancel-action.test.ts
+@@ -0,0 +1,47 @@
++import { beforeEach, expect, it, vi } from 'vitest';
++
++const state = vi.hoisted(() => ({ viewer: vi.fn(), allowed: vi.fn(), cancel: vi.fn(), refresh: vi.fn(), redirect: vi.fn() }));
++vi.mock('@/server/context', () => ({ requireViewer: state.viewer }));
++vi.mock('@/server/permissions', () => ({ canAccessFeature: state.allowed }));
++vi.mock('@/modules/publishing/server/lifecycle', () => ({ cancelScheduledPost: state.cancel }));
++vi.mock('next/cache', () => ({ revalidatePath: state.refresh }));
++vi.mock('next/navigation', () => ({ redirect: state.redirect }));
++import { cancelScheduledPostAction } from '@/modules/publishing/ui/posts/actions';
++
++beforeEach(() => {
++  vi.resetAllMocks();
++  state.viewer.mockResolvedValue({ user: { id: 'u' }, workspaceId: 'w', permissions: { pageScope: { all: false, ids: ['channel'] } } });
++  state.allowed.mockReturnValue(true);
++  state.redirect.mockImplementation((url: string) => { throw Object.assign(new Error('redirect'), { digest: `NEXT_REDIRECT;${url}` }); });
++});
++function form() { const data = new FormData(); data.set('postId', 'post'); return data; }
++
++it('rejects failed cancellation for the queue form without redirecting or refreshing away input', async () => {
++  const failure = new Error('Cancellation refused');
++  state.cancel.mockRejectedValue(failure);
++  await expect(cancelScheduledPostAction(form())).rejects.toBe(failure);
++  expect(state.cancel).toHaveBeenCalledWith({ userId: 'u', workspaceId: 'w', allowedTargetIds: ['channel'] }, 'post');
++  expect(state.refresh).not.toHaveBeenCalled();
++  expect(state.redirect).not.toHaveBeenCalled();
++});
++
++it('retains write authorization and refuses cancellation for a denied viewer', async () => {
++  state.allowed.mockReturnValue(false);
++  await expect(cancelScheduledPostAction(form())).rejects.toThrow('cannot manage posts');
++  expect(state.viewer).toHaveBeenCalledWith({ feature: 'publishing/posts', channelScoped: true, write: true });
++  expect(state.cancel).not.toHaveBeenCalled();
++  expect(state.redirect).not.toHaveBeenCalled();
++});
++
++it('retains authentication redirects', async () => {
++  const failure = Object.assign(new Error('sign in'), { digest: 'NEXT_REDIRECT;/sign-in' });
++  state.viewer.mockRejectedValue(failure);
++  await expect(cancelScheduledPostAction(form())).rejects.toBe(failure);
++  expect(state.cancel).not.toHaveBeenCalled();
++});
++
++it('retains the successful cancellation destination and invalidates the existing views', async () => {
++  state.cancel.mockResolvedValue(undefined);
++  await expect(cancelScheduledPostAction(form())).rejects.toMatchObject({ digest: 'NEXT_REDIRECT;/publishing/posts?notice=cancelled' });
++  expect(state.refresh.mock.calls).toEqual([['/publishing/posts'], ['/publishing/queue'], ['/publishing/approvals']]);
++});

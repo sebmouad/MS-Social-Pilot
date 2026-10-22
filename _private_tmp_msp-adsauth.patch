@@ -1,0 +1,193 @@
+diff --git a/rebuild/src/modules/ads/management/server.ts b/rebuild/src/modules/ads/management/server.ts
+index 42b9d3c1..b68a21f6 100644
+--- a/rebuild/src/modules/ads/management/server.ts
++++ b/rebuild/src/modules/ads/management/server.ts
+@@ -523,18 +523,21 @@ export async function resolveAdsOperation(actor: AdsManageActor, input: { operat
+     FROM ads_management_operations WHERE id = ${input.operationId} AND "workspaceId" = ${actor.workspaceId}`;
+   const row = rows[0];
+   if (!row) throw new OperationError('not_found', await adsServiceText('service065'));
+-  const targetIds = allowedTargets(actor, access.permissions.pageScope);
+-  if (row.operationType === 'creative.create' && targetIds !== null && !targetIds.includes((row.params as { targetId: string })?.targetId)) throw new OperationError('not_found', await adsServiceText('service065'));
++  // Recovery must use the same account/channel ceilings as management and history.
++  // Retained accounts need no active connection or provider grant: this only records an attestation.
++  const assertVisible = async (currentAccess: typeof access, accounts = prisma.adAccount) => {
++    const targetIds = allowedTargets(actor, currentAccess.permissions.pageScope);
++    if (row.operationType === 'creative.create' && targetIds !== null && !targetIds.includes((row.params as { targetId: string })?.targetId)) throw new OperationError('not_found', await adsServiceText('service065'));
++    const visible = await accounts.findFirst({
++      where: { id: row.adAccountId, ...accountIdCeiling(actor), workspaceId: actor.workspaceId, socialAccount: { is: { workspaceId: actor.workspaceId, ...accountTargetScope(actor, currentAccess.permissions.pageScope) } } },
++      select: { id: true },
++    });
++    if (!visible) throw new OperationError('not_found', await adsServiceText('service065'));
++  };
++  await assertVisible(access);
+   if (row.status !== 'pending' && row.status !== 'uncertain') throw new OperationError('conflict', await adsServiceText('service066'));
+   const expected = row.status === 'pending' ? pendingRecoveryConfirmation(input.operationId, input.resolution) : resolutionConfirmation(input.operationId, input.resolution);
+   if (input.confirmation !== expected) throw new OperationError('invalid_request', `Confirmation required. Repeat with confirmation exactly: ${expected}`);
+-  // Current workspace, module, role and key ceilings apply; retained disabled accounts remain visible for history recovery.
+-  const pageScope = access.permissions.pageScope;
+-  const visible = await prisma.adAccount.findFirst({
+-    where: { id: row.adAccountId, ...accountIdCeiling(actor), workspaceId: actor.workspaceId, socialAccount: { is: { workspaceId: actor.workspaceId, ...accountTargetScope(actor, pageScope) } } },
+-    select: { id: true },
+-  });
+-  if (!visible) throw new OperationError('not_found', await adsServiceText('service065'));
+   const next = input.resolution === 'applied' ? 'resolved_applied' : 'resolved_not_applied';
+   let settled: boolean;
+   try {
+@@ -542,6 +545,9 @@ export async function resolveAdsOperation(actor: AdsManageActor, input: { operat
+       signal.throwIfAborted();
+       const [current] = await tx.$queryRaw<Array<{ status: string }>>`SELECT status FROM ads_management_operations WHERE id = ${row.id} AND "workspaceId" = ${actor.workspaceId} FOR UPDATE`;
+       if (!current || current.status !== row.status) return false;
++      // Authority can change after preflight; check again while holding the account/ledger locks.
++      await assertVisible(await authorizeManager(actor, 'write'), tx.adAccount);
++      signal.throwIfAborted();
+       const changed = Number(await tx.$executeRaw`UPDATE ads_management_operations SET status = ${next}, "resolvedBy" = ${actor.userId}, "resolvedAt" = NOW(), "resolutionNote" = ${input.note ?? null}, "updatedAt" = NOW()
+         WHERE id = ${row.id} AND "workspaceId" = ${actor.workspaceId} AND status = ${row.status}`);
+       if (changed !== 1) return false;
+diff --git a/rebuild/tests/ads-parity-management.test.ts b/rebuild/tests/ads-parity-management.test.ts
+index 1fa4c643..34d90851 100644
+--- a/rebuild/tests/ads-parity-management.test.ts
++++ b/rebuild/tests/ads-parity-management.test.ts
+@@ -17,7 +17,9 @@ vi.mock('../src/server/secret-crypto', () => ({ decryptSecret: state.decrypt }))
+ vi.mock('../src/server/entitlements', () => ({ loadEntitlements: state.entitlements, canUseFeature: state.canUse, hasPlatformCapability: state.hasPlatform }));
+ vi.mock('../src/server/permissions', () => ({ canAccessFeature: state.canAccess }));
+ vi.mock('../src/server/permissions/loader', () => ({ loadPermissions: state.permissions }));
+-vi.mock('../src/server/data-control/guard', () => ({ assertWorkspaceNotPurging: state.purge }));
++vi.mock('../src/server/data-control/guard', () => ({ assertWorkspaceNotPurging: state.purge, withWorkspaceOperation: (_id: string, run: () => Promise<unknown>) => run() }));
++vi.mock('../src/server/context', () => ({ requireViewer: async () => ({ user: { id: 'u1' }, workspaceId: 'w1' }) }));
++vi.mock('../src/server/request-origin', () => ({ requestOrigin: (request: Request) => new URL(request.url).origin }));
+ vi.mock('../src/server/config/store', () => ({ runtimeConfig: state.config }));
+ vi.mock('../src/server/platforms/registry', () => ({ platformAds: state.platformAds }));
+ vi.mock('../src/server/platforms/resource-lock', () => ({ lockSelectedResources: state.selectedLock, withSelectedResourceOperation: state.selectedOperation }));
+@@ -25,6 +27,7 @@ vi.mock('../src/server/platforms/resource-lock', () => ({ lockSelectedResources:
+ import { clearAdsOpsHosts, registerAdsOpsHost } from '../src/modules/ads/management/registry';
+ import { ADS_MANAGEMENT_DEFAULT_POLICY } from '../src/modules/ads/management/config';
+ import { describeAdsManagement, listAdsCreatives, listAdsOperations, parseNeutralOperation, performAdsManagement as performAdsManagementService, pendingRecoveryConfirmation, listAdsCreativeSources, previewAdsManagement, resolveAdsOperation, resolutionConfirmation } from '../src/modules/ads/management/server';
++import { POST as managementPost } from '../src/app/api/ads/management/route';
+ import { executeAdsManagementTool } from '../src/modules/ads/management/mcp';
+ import type { AdsNeutralOperation, AdsOpsHost } from '../src/modules/ads/management/types';
+ import { OperationError } from '../src/lib/operation-error';
+@@ -693,3 +696,124 @@ describe('neutral stored-media creative creation', () => {
+     expect(execute).toHaveBeenCalledTimes(1);
+   });
+ });
++
++// The UI submits these actions to the session REST endpoint. Exercise the real
++// endpoint and MCP handler against the real service, mocking only infrastructure.
++describe.each(['service', 'UI/REST', 'MCP'] as const)('Ads authorization via %s', surface => {
++  const kinds = ['create', 'edit', 'delete', 'recover', 'reconcile'] as const;
++  type Kind = typeof kinds[number];
++  const row = (kind: Kind) => ({ id: 'op1', adAccountId: 'acc1', operationType: 'status.set', params: pause, status: kind === 'recover' ? 'pending' : 'uncertain' });
++  async function invoke(kind: Kind) {
++    const recovering = kind === 'recover' || kind === 'reconcile';
++    const operation: AdsNeutralOperation = kind === 'create'
++      ? { type: 'campaign.create', objectType: 'campaign', name: 'Scoped campaign', objective: 'traffic' }
++      : kind === 'edit' ? { type: 'rename', objectType: 'campaign', objectId: 'c1', name: 'Updated campaign' }
++      : { type: 'delete', objectType: 'campaign', objectId: 'c1' };
++    const input = recovering
++      ? { operationId: 'op1', resolution: 'not_applied' as const, confirmation: kind === 'recover' ? pendingRecoveryConfirmation('op1', 'not_applied') : resolutionConfirmation('op1', 'not_applied') }
++      : { adAccountId: 'acc1', operation, confirmation: host.confirmation(operation, { adAccountId: 'acc1', currency: 'USD' }), requestId: 'authorization-request-001' };
++    if (surface === 'MCP') return executeAdsManagementTool(actor, recovering ? 'resolve_ads_change' : 'apply_ads_change', input);
++    if (surface === 'UI/REST') {
++      const response = await managementPost(new Request('http://localhost/api/ads/management', {
++        method: 'POST', headers: { origin: 'http://localhost', 'content-type': 'application/json' },
++        body: JSON.stringify({ action: recovering ? 'resolve' : 'apply', ...input }),
++      }));
++      const result = await response.json();
++      if (!response.ok) throw Object.assign(new Error(result.error), { code: result.code });
++      return result;
++    }
++    return recovering ? resolveAdsOperation(actor, input as Parameters<typeof resolveAdsOperation>[1]) : performAdsManagementService(actor, input as Parameters<typeof performAdsManagementService>[1]);
++  }
++  beforeEach(() => {
++    clearAdsOpsHosts();
++    registerAdsOpsHost({ ...host, operations: [...host.operations, { id: 'delete', objectTypes: ['campaign'], spendChanging: false, irreversible: true, label: 'Delete' }] });
++  });
++  const noWrites = () => {
++    expect(execute).not.toHaveBeenCalled();
++    expect(state.prisma.$executeRaw).not.toHaveBeenCalled();
++  };
++  it.each(kinds)('refuses viewer %s before any writes', async kind => {
++    state.prisma.membership.findUnique.mockResolvedValue({ role: 'viewer' });
++    await expect(invoke(kind)).rejects.toMatchObject({ code: 'forbidden' });
++    noWrites();
++    expect(state.selectedOperation).not.toHaveBeenCalled();
++  });
++  it.each(kinds)('refuses %s outside current channel scope', async kind => {
++    state.permissions.mockResolvedValue({ pageScope: { all: false, ids: ['allowed-channel'] } });
++    state.prisma.adAccount.findFirst.mockResolvedValue(null);
++    state.prisma.$queryRaw.mockResolvedValue([row(kind)]);
++    await expect(invoke(kind)).rejects.toMatchObject({ code: kind === 'recover' || kind === 'reconcile' ? 'not_found' : 'reconnect_required' });
++    expect(state.prisma.adAccount.findFirst.mock.calls[0]![0].where).toMatchObject({
++      id: 'acc1', workspaceId: 'w1', socialAccount: { is: { workspaceId: 'w1', targets: { some: { workspaceId: 'w1', id: { in: ['allowed-channel'] } } } } },
++    });
++    noWrites();
++    expect(state.selectedOperation).not.toHaveBeenCalled();
++  });
++  it.each(kinds)('allows authorized administrator %s', async kind => {
++    const recovering = kind === 'recover' || kind === 'reconcile';
++    if (recovering) state.prisma.$queryRaw.mockResolvedValue([row(kind)]);
++    expect(await invoke(kind)).toMatchObject(recovering ? { status: 'resolved_not_applied' } : { outcome: 'succeeded' });
++    expect(state.prisma.$executeRaw.mock.calls.some(([sql]) => /INSERT INTO root_activities/.test(sqlOf(sql)))).toBe(true);
++    expect(execute).toHaveBeenCalledTimes(recovering ? 0 : 1);
++  });
++  it.each(kinds)('allows %s within a limited administrator channel scope', async kind => {
++    state.permissions.mockResolvedValue({ pageScope: { all: false, ids: ['allowed-channel'] } });
++    const recovering = kind === 'recover' || kind === 'reconcile';
++    if (recovering) state.prisma.$queryRaw.mockResolvedValue([row(kind)]);
++    expect(await invoke(kind)).toMatchObject(recovering ? { status: 'resolved_not_applied' } : { outcome: 'succeeded' });
++    // The retained-account and current-authority checks must both carry the scope.
++    const lookups = state.prisma.adAccount.findFirst.mock.calls.filter(([args]) => args.where.socialAccount);
++    expect(lookups.length).toBe(2);
++    for (const [args] of lookups) expect(args.where.socialAccount.is.targets.some.id.in).toEqual(['allowed-channel']);
++  });
++  it.each(['recover', 'reconcile'] as const)('rechecks channel scope under the lock for %s', async kind => {
++    state.prisma.$queryRaw.mockResolvedValue([row(kind)]);
++    state.permissions.mockResolvedValueOnce({ pageScope: { all: true } }).mockResolvedValue({ pageScope: { all: false, ids: [] } });
++    state.prisma.adAccount.findFirst.mockResolvedValueOnce({ id: 'acc1' }).mockResolvedValue(null);
++    await expect(invoke(kind)).rejects.toMatchObject({ code: 'not_found' });
++    expect(state.prisma.adAccount.findFirst.mock.calls.at(-1)![0].where.socialAccount.is.targets.some.id.in).toEqual([]);
++    expect(state.selectedOperation).toHaveBeenCalledOnce();
++    noWrites();
++  });
++  it.each(['recover', 'reconcile'] as const)('refuses role revoked under the lock for %s', async kind => {
++    state.prisma.$queryRaw.mockResolvedValue([row(kind)]);
++    state.prisma.membership.findUnique.mockResolvedValueOnce({ role: 'admin' }).mockResolvedValue({ role: 'viewer' });
++    await expect(invoke(kind)).rejects.toMatchObject({ code: 'forbidden' });
++    expect(state.selectedOperation).toHaveBeenCalledOnce();
++    noWrites();
++  });
++});
++
++
++describe('Ads recovery independent credential ceilings', () => {
++  it.each(['pending', 'uncertain'] as const)('intersects membership and key targets for %s recovery', async status => {
++    state.permissions.mockResolvedValue({ pageScope: { all: false, ids: ['shared', 'member-only'] } });
++    state.prisma.$queryRaw.mockResolvedValue([{ id: 'op1', adAccountId: 'acc1', operationType: 'status.set', params: pause, status }]);
++    const confirmation = status === 'pending' ? pendingRecoveryConfirmation('op1', 'not_applied') : resolutionConfirmation('op1', 'not_applied');
++    await resolveAdsOperation({ ...actor, allowedTargetIds: ['shared', 'key-only'], allowedAdAccountIds: ['acc1'] }, { operationId: 'op1', resolution: 'not_applied', confirmation });
++    expect(state.prisma.adAccount.findFirst).toHaveBeenCalledTimes(2);
++    for (const [args] of state.prisma.adAccount.findFirst.mock.calls) {
++      expect(args.where).toMatchObject({ id: 'acc1', workspaceId: 'w1', AND: [{ id: { in: ['acc1'] } }], socialAccount: { is: { workspaceId: 'w1', targets: { some: { id: { in: ['shared'] } } } } } });
++      expect(args.where).not.toHaveProperty('enabled');
++    }
++    expect(execute).not.toHaveBeenCalled();
++  });
++  it.each([
++    { allowedAdAccountIds: [] }, { allowedTargetIds: [] },
++  ])('refuses recovery with empty ceiling %j', async ceiling => {
++    state.prisma.$queryRaw.mockResolvedValue([{ id: 'op1', adAccountId: 'acc1', operationType: 'status.set', params: pause, status: 'pending' }]);
++    state.prisma.adAccount.findFirst.mockResolvedValue(null);
++    await expect(resolveAdsOperation({ ...actor, ...ceiling }, { operationId: 'op1', resolution: 'not_applied', confirmation: pendingRecoveryConfirmation('op1', 'not_applied') })).rejects.toMatchObject({ code: 'not_found' });
++    const where = state.prisma.adAccount.findFirst.mock.calls[0]![0].where;
++    if ('allowedAdAccountIds' in ceiling) expect(where.AND).toEqual([{ id: { in: [] } }]);
++    else expect(where.socialAccount.is.targets.some.id.in).toEqual([]);
++    expect(state.prisma.$executeRaw).not.toHaveBeenCalled();
++    expect(execute).not.toHaveBeenCalled();
++  });
++  it('does not disclose recovery state or confirmation for an invisible account', async () => {
++    state.prisma.$queryRaw.mockResolvedValue([{ id: 'op1', adAccountId: 'acc1', operationType: 'status.set', params: pause, status: 'pending' }]);
++    state.prisma.adAccount.findFirst.mockResolvedValue(null);
++    await expect(resolveAdsOperation(actor, { operationId: 'op1', resolution: 'not_applied', confirmation: 'wrong' })).rejects.toMatchObject({ code: 'not_found' });
++    expect(state.prisma.$executeRaw).not.toHaveBeenCalled();
++  });
++});

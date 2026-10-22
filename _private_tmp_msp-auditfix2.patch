@@ -1,0 +1,1370 @@
+diff --git a/rebuild/docs/CONTRACT_AUDIT_2026-10-21.md b/rebuild/docs/CONTRACT_AUDIT_2026-10-21.md
+index 426ce727..df0bc3eb 100644
+--- a/rebuild/docs/CONTRACT_AUDIT_2026-10-21.md
++++ b/rebuild/docs/CONTRACT_AUDIT_2026-10-21.md
+@@ -2,7 +2,7 @@
+ 
+ Audited source baseline: `24a28eecfd9316d8c63b28b39356488ae6fdf214`.
+ Scope: static review of the whole `rebuild/src` tree against
+-`ARCHITECTURE_CONTRACT.md` and the lane owner's rules. Only this report is edited.
++`ARCHITECTURE_CONTRACT.md` and the lane owner's rules. The original audit edited only this report; the bounded implementation follow-up below records later source changes.
+ The architecture, design, UX contract, goal, delivery plan and handoff informed
+ the review; their historical deployment statements were not independently verified.
+ 
+@@ -29,16 +29,16 @@ Paths and line numbers below are relative to `rebuild/` at the baseline.
+ 
+ | File:line | Rule violated and source evidence | Severity | Suggested fix | Owner module |
+ | --- | --- | --- | --- | --- |
+-| `src/modules/agency/server/workspace-selection.ts:27`; `src/modules/agency/mcp.ts:61`; `src/app/api/workspaces/select/route.ts:22` | Same confirmation policy in the service (§4/§9): service accepts omitted confirmation, REST forwards that input, MCP separately requires it. The service comment explicitly describes this interface difference. Membership checks exist; this is consent-policy parity, not a membership bypass. | High | Make the service require the same exact confirmation for every caller; remove the independent MCP presence rule after updating browser submission. If the product intends no confirmation, obtain an explicit common policy decision and change every surface consistently. | Agency |
+-| `src/lib/ui/form-validation.ts:33`; `src/lib/ui/form-validation.ts:42` | Customer EN/FR and Root copy (§6/§8): shared native-constraint feedback is authored in English, including “Choose an option”, email/URL errors and interpolated length/range errors. No locale/catalog parameter exists. This is application feedback, not browser-owned native popup text. | High | Define typed shared bilingual validation copy in shared configuration; serialize the selected catalog into `FormValidation` and pass it to these helpers. Keep native validity checks unchanged. | Shared UI/config infrastructure |
+-| `src/server/connection-mutations.ts:18`; `src/server/connection-mutations.ts:77` | Product encapsulation (§2/§4): the shared server file implements connection selection and disconnect-related product queries, role checks, persistence and resource policy, rather than just infrastructure or re-exports. Its imported product guards do not make the implementation module-owned. | Medium | Move connection lifecycle/selection logic into Settings `server/`; retain a temporary re-export if needed and update callers together. Keep genuine generic locking infrastructure shared. | Settings / Connections |
+-| `src/server/post-mutations.ts:15`; `src/server/post-mutations.ts:46`; `src/server/post-mutations.ts:81` | Product encapsulation (§2): actual draft create/edit/delete implementation, role policy, version recording and audit remain outside Publishing. A source-reference search found definitions but no current call sites, so this is residual implementation ownership, not proof of an exposed duplicate endpoint. | Medium | Establish whether these helpers are obsolete; remove after verifying consumers, or move to Publishing and consolidate with canonical draft services. Do not wire them into new routes as a shortcut. | Publishing |
+-| `src/server/account-settings.ts:7`; `src/server/account-settings.ts:16`; `src/server/account-settings.ts:22` | Product encapsulation (§2): account password policy and profile-name/password validation are Settings product helpers in shared server code. Shared audit primitives in the same file are a separate responsibility. | Medium | Move account validation/policy to Settings `server/`; separate reusable audit infrastructure and update imports. Existing runtime limits should be preserved, not replaced. | Settings / Account |
++| **Service fixed; AppShell integration pending** `src/modules/agency/server/workspace-selection.ts:27`; `src/modules/agency/mcp.ts:61`; `src/app/api/workspaces/select/route.ts:22` | Same confirmation policy in the service (§4/§9): service accepts omitted confirmation, REST forwards that input, MCP separately requires it. The service comment explicitly describes this interface difference. Membership checks exist; this is consent-policy parity, not a membership bypass. | High | Make the service require the same exact confirmation for every caller; remove the independent MCP presence rule after updating browser submission. If the product intends no confirmation, obtain an explicit common policy decision and change every surface consistently. | Agency |
++| **Partial — EN/FR helper fixed; Root delivery pending** `src/lib/ui/form-validation.ts:33`; `src/lib/ui/form-validation.ts:42` | Customer EN/FR and Root copy (§6/§8): shared native-constraint feedback is authored in English, including “Choose an option”, email/URL errors and interpolated length/range errors. No locale/catalog parameter exists. This is application feedback, not browser-owned native popup text. | High | Define typed shared bilingual validation copy in shared configuration; serialize the selected catalog into `FormValidation` and pass it to these helpers. Keep native validity checks unchanged. | Shared UI/config infrastructure |
++| **Fixed (source/unit, this lane)** `src/server/connection-mutations.ts:18`; `src/server/connection-mutations.ts:77` | Product encapsulation (§2/§4): the shared server file implements connection selection and disconnect-related product queries, role checks, persistence and resource policy, rather than just infrastructure or re-exports. Its imported product guards do not make the implementation module-owned. | Medium | Move connection lifecycle/selection logic into Settings `server/`; retain a temporary re-export if needed and update callers together. Keep genuine generic locking infrastructure shared. | Settings / Connections |
++| **Fixed (source/unit, this lane)** `src/server/post-mutations.ts:15`; `src/server/post-mutations.ts:46`; `src/server/post-mutations.ts:81` | Product encapsulation (§2): actual draft create/edit/delete implementation, role policy, version recording and audit remain outside Publishing. A source-reference search found definitions but no current call sites, so this is residual implementation ownership, not proof of an exposed duplicate endpoint. | Medium | Establish whether these helpers are obsolete; remove after verifying consumers, or move to Publishing and consolidate with canonical draft services. Do not wire them into new routes as a shortcut. | Publishing |
++| **Fixed (source/unit, this lane)** `src/server/account-settings.ts:7`; `src/server/account-settings.ts:16`; `src/server/account-settings.ts:22` | Product encapsulation (§2): account password policy and profile-name/password validation are Settings product helpers in shared server code. Shared audit primitives in the same file are a separate responsibility. | Medium | Move account validation/policy to Settings `server/`; separate reusable audit infrastructure and update imports. Existing runtime limits should be preserved, not replaced. | Settings / Account |
+ | `src/modules/ads/management/server.ts:520`; `src/modules/ads/ui/objects/ChangeHistory.tsx:83` | Root-managed operational limits (§8): recovery-note length is independently fixed to 500 in service and textarea. `ads.managementPolicy` declares history/creative page limits, name length and budget ceiling, not this note limit. | Medium | Add a typed recovery-note limit to Ads config; read it in the service and return it to the UI. Test a non-default value through both callers. | Ads |
+ | `src/modules/ads/ui/CreativeCreateForm.tsx:125`; `src/modules/ads/ui/CreativeCreateForm.tsx:126` | Root-managed UI limits (§8): message/title/link URL ceilings are fixed at 5000/200/2048. The form receives runtime name limits but these fields ignore configurable descriptors. Even a provider protocol ceiling needs platform-owned metadata rather than a shared UI literal. | Medium | Expose effective field limits from Ads service/platform creative descriptors, bounded by documented adapter protocol invariants and Root policy. Use the same limits in validation and UI. | Ads + Facebook creative adapter |
+ | `src/modules/ads/ui/objects/ObjectsScreen.tsx:47` | Root-managed limits (§8): parent-ID input hardcodes `maxLength={100}`, while the adjacent search input uses `policy.maxFilterCharacters`. | Medium | Supply an identifier ceiling from the owning validated policy; align UI, REST/MCP and service validation. | Ads |
+-| `src/modules/publishing/server/media/storage.ts:23`; `src/modules/publishing/server/media/storage.ts:159` | Root-managed result bounds (§8): `HOLDERS_PER_IMAGE = 5` limits the visible usage-holder list independently of runtime configuration. The total count is separate, so this is an unconfigurable display bound, not a false total allegation. | Medium | Declare an owning media usage-preview bound in Publishing/Media config and consume it when projecting holders. Preserve visibility filtering and total counts. | Publishing media / Media |
+-| `src/modules/publishing/server/media/storage.ts:40`; `src/modules/publishing/server/media/storage.ts:143` | Root-managed presentation/storage policy (§8): sanitized filenames truncate at 180 and usage preview text at 80/79. Runtime configuration in the file covers storage root, MIME/bytes and orphan retention, not these lengths. | Medium | Declare typed filename/usage-preview limits in owning config; retain safety sanitization and filesystem-safe upper bounds as documented invariants. | Publishing media / Media |
++| **Partial — consumer fixed; Root registration pending** `src/modules/publishing/server/media/storage.ts:23`; `src/modules/publishing/server/media/storage.ts:159` | Root-managed result bounds (§8): `HOLDERS_PER_IMAGE = 5` limits the visible usage-holder list independently of runtime configuration. The total count is separate, so this is an unconfigurable display bound, not a false total allegation. | Medium | Declare an owning media usage-preview bound in Publishing/Media config and consume it when projecting holders. Preserve visibility filtering and total counts. | Publishing media / Media |
++| **Partial — consumer fixed; Root registration pending** `src/modules/publishing/server/media/storage.ts:40`; `src/modules/publishing/server/media/storage.ts:143` | Root-managed presentation/storage policy (§8): sanitized filenames truncate at 180 and usage preview text at 80/79. Runtime configuration in the file covers storage root, MIME/bytes and orphan retention, not these lengths. | Medium | Declare typed filename/usage-preview limits in owning config; retain safety sanitization and filesystem-safe upper bounds as documented invariants. | Publishing media / Media |
+ | `src/platforms/facebook/analytics.ts:178`; `src/platforms/facebook/analytics.ts:224`; `src/platforms/facebook/analytics.ts:301` | Root copy and EN/FR (§6/§8): normalized Ads measures embed English `Advertising`, `Reach · Latest per ad account`, ratio explanations, `Per-account values` and `Stored values`, despite an available presentation locale/catalog. Source line 402 reads Root metric/Page catalogs but these branches use literals. | Medium | Extend Facebook-owned bilingual presentation copy, reuse metric labels consistently, and localize every emitted customer label/note. Verify French normalized output and non-default Root labels. | Facebook analytics |
+ | `src/modules/ads/management/server.ts:146`; `src/modules/ads/ui/campaigns/CampaignsScreen.tsx:76` | EN/FR runtime integration (§6): calls to `platformAds` omit customer locale. Registry line 42 defaults to ambient `platformAdsLocale()`. These paths do not establish that scope; the screen computes `locale` at line 39 but does not pass it. Thus the configured host can resolve English copy for French customers. | Medium | Carry validated locale through the shared service context and host lookup for UI/REST/MCP, or establish the neutral host locale scope once at the service boundary. Test the real caller path, not just the host factory. | Ads / neutral platform host |
+ | `src/app/api/ads/management/route.ts:28`; `src/app/api/ads/management/route.ts:45` | Root copy and EN/FR (§6/§8): route-authored invalid-view/request and fallback failure messages are fixed English; no locale/catalog read exists in this entry point. Domain service copy extraction does not cover these transport branches. | Medium | Map stable transport issue codes through the owning bilingual Ads catalog; keep domain validation and consent in services. | Ads |
+@@ -101,9 +101,75 @@ remain context, not fresh execution evidence.
+ - New Root keys: **none**. Suggested policy/catalog additions above are proposals,
+   not registered keys; `CONFIG_SCHEMA_VERSION` is untouched.
+ - No safe source fix is possible within this lane: every source path is read-only.
+-  All rows remain open; recommended edits belong to their listed owners.
++  At the original audit baseline all rows remained open; the implementation follow-up below supersedes that status for this lane.
+ - Integrator should add the prioritized residuals and this report link to
+   `ARCHITECTURE.md`, `DELIVERY_PLAN.md` and `AGENT_HANDOFF.md`, then assign bounded
+   implementation batches. Those documents are outside this lane's ownership.
+ - Changes remain uncommitted for integration under the explicit worker no-push
+   instruction. Pre-existing untracked node_modules links are untouched.
++
++
++## Encapsulation/forms/media/agency implementation follow-up
++
++Source and targeted unit/mocked evidence only. No browser, database, provider,
++server, deployment, push or production verification. The source baseline row
++numbers above are retained; status annotations identify the subsequent changes.
++
++- Settings owns connection lifecycle/selection in
++  `src/modules/settings/server/connection-mutations.ts`; the old shared path is
++  a re-export. Existing legacy storage compatibility and generic shared locks
++  are preserved.
++- Publishing owns the residual draft helpers in
++  `src/modules/publishing/server/post-mutations.ts`; the shared path is a
++  re-export. These are retained for compatibility/tests, not connected to new
++  entry points or claimed as canonical authoring parity.
++- Settings owns account validation/password policy in
++  `src/modules/settings/server/account-policy.ts`. The shared account file
++  retains reusable audit primitives and re-exports account policy. Runtime and
++  synchronous-policy limits are preserved.
++- Form validation has a typed EN/FR catalog and schema in its owned helper;
++  `collectFormErrors(form, customErrors, selectedCopy)` accepts serialized Root
++  copy. Existing callers select defaults using the form/document language.
++  Native validity, disabled fields, password whitespace and custom-error priority
++  are unchanged. Root registration/delivery is still incomplete.
++- Agency's service requires exact `SELECT WORKSPACE <id>` before membership
++  lookup, persistence, audit or cookie mutation. MCP delegates the same rule.
++  Agency `WorkspaceAction` sends that confirmation. The shared AppShell picker
++  remains an integration dependency and will receive a refusal until updated.
++- Media storage consumes a validated `storage.mediaPresentationPolicy` through
++  `runtimeConfig`: `holdersPerImage`, `fileNameMaxCharacters`,
++  `usagePreviewMaxCharacters`, `fallbackFileName`. Non-default tests retain total
++  counts, apply visibility before the holder bound and preserve sanitization.
++  Display names never become storage paths: the existing validated UUID path
++  invariant remains. If configuration cannot load, shipped defaults preserve
++  availability; Root registration is still incomplete. The definition is staged
++  in owned `server/media/config.ts`, separate from its runtime reader.
++
++Required integration edits outside this lane's ownership:
++
++1. `src/modules/publishing/config.ts`: import `MEDIA_PRESENTATION_CONFIG` from
++   `./server/media/config` and spread it into `PUBLISHING_CONFIG`. This registers
++   `storage.mediaPresentationPolicy`; until then only its shipped defaults apply.
++2. `src/lib/config/shared-config.ts`: register proposed JSON key
++   `shared.formValidationCopy`, with `formValidationCopy` as default and
++   `formValidationCopySchema` as schema, exported from
++   `@/lib/ui/form-validation`. Root registration has not been made by this lane.
++3. Shared server layouts must load that catalog with `runtimeConfig`, select the
++   validated customer locale and serialize it through a client validation-copy
++   context. `src/components/FormValidation.tsx` must read that context and pass
++   its messages as the third `collectFormErrors` argument. Include public auth
++   layouts as well as authenticated/Root layouts; document language is only the
++   shipped-default fallback, not proof of Root copy delivery.
++4. `src/components/AppShell.tsx`: change the existing workspace POST body to
++   `JSON.stringify({ workspaceId: nextId, confirmation: `SELECT WORKSPACE ${nextId}` })`.
++   Retain existing explicit selection, pending and error behavior. Do this before
++   releasing the Agency service change.
++5. Architecture/delivery/handoff owners should record these three closed
++   encapsulation findings and the pending integration dependencies. The
++   integrator owns any `CONFIG_SCHEMA_VERSION` bump; this lane leaves it intact.
++
++Validation: `npx tsc --noEmit -p .` passed with zero errors. Targeted Vitest
++checks pass with caching disabled (`--no-cache`): 102 tests across 13 files
++(95 service/validation/media/policy assertions and 7 Agency UI assertions).
++The initial run could not write its symlinked external cache (EPERM); disabling
++that cache avoids writing outside this worktree. The full suite was not run.
+diff --git a/rebuild/src/lib/ui/form-validation.ts b/rebuild/src/lib/ui/form-validation.ts
+index 90014f92..2264b76e 100644
+--- a/rebuild/src/lib/ui/form-validation.ts
++++ b/rebuild/src/lib/ui/form-validation.ts
+@@ -1,3 +1,40 @@
++import { z } from 'zod';
++
++export const formValidationMessageSchema = z.object({
++  choose: z.string().min(1), select: z.string().min(1), required: z.string().min(1),
++  email: z.string().min(1), url: z.string().min(1), invalid: z.string().min(1),
++  minimum: z.string().min(1), maximum: z.string().min(1), step: z.string().min(1),
++  pattern: z.string().min(1), tooShort: z.string().min(1), tooLong: z.string().min(1),
++  check: z.string().min(1),
++}).strict();
++export type FormValidationMessages = z.infer<typeof formValidationMessageSchema>;
++export const formValidationCopySchema = z.object({ en: formValidationMessageSchema, fr: formValidationMessageSchema }).strict();
++export const formValidationCopy = {
++  en: {
++    choose: 'Choose an option.', select: 'Select an option to continue.', required: 'Enter a value.',
++    email: 'Enter a valid email address.', url: 'Enter a complete URL.', invalid: 'Enter a valid value.',
++    minimum: 'Enter a value of at least {value}.', maximum: 'Enter a value no greater than {value}.',
++    step: 'Enter a value using the allowed increment.', pattern: 'Use the requested format.',
++    tooShort: 'Use at least {value} characters.', tooLong: 'Use no more than {value} characters.', check: 'Check this value.',
++  },
++  fr: {
++    choose: 'Choisissez une option.', select: 'Sélectionnez une option pour continuer.', required: 'Saisissez une valeur.',
++    email: 'Saisissez une adresse e-mail valide.', url: 'Saisissez une URL complète.', invalid: 'Saisissez une valeur valide.',
++    minimum: 'Saisissez une valeur supérieure ou égale à {value}.', maximum: 'Saisissez une valeur inférieure ou égale à {value}.',
++    step: 'Saisissez une valeur respectant le pas autorisé.', pattern: 'Utilisez le format demandé.',
++    tooShort: 'Utilisez au moins {value} caractères.', tooLong: 'Utilisez au maximum {value} caractères.', check: 'Vérifiez cette valeur.',
++  },
++} satisfies z.infer<typeof formValidationCopySchema>;
++
++const interpolate = (template: string, value: string | number) => template.replaceAll('{value}', String(value));
++
++/** Explicit server-selected Root copy takes precedence; document language supports existing callers. */
++function messagesFor(form: HTMLFormElement, copy?: FormValidationMessages): FormValidationMessages {
++  if (copy) return copy;
++  const language = form.closest('[lang]')?.getAttribute('lang') ?? form.ownerDocument.documentElement.lang;
++  return formValidationCopy[language?.toLowerCase().split('-')[0] === 'fr' ? 'fr' : 'en'];
++}
++
+ export type FieldMessages = { empty?: string; invalid?: string; tooShort?: string };
+ 
+ export function validateFields(form: HTMLFormElement, messages: Record<string, FieldMessages>) {
+@@ -21,34 +58,35 @@ export function validateFields(form: HTMLFormElement, messages: Record<string, F
+ }
+ 
+ /** Native constraints without browser bubbles; domain/server checks remain authoritative. */
+-export function collectFormErrors(form: HTMLFormElement, customErrors: Record<string, string> = {}): Record<string, string> {
++export function collectFormErrors(form: HTMLFormElement, customErrors: Record<string, string> = {}, messages?: FormValidationMessages): Record<string, string> {
++  const copy = messagesFor(form, messages);
+   const errors: Record<string, string> = {};
+   for (const element of Array.from(form.elements)) {
+     if (!(element instanceof HTMLInputElement || element instanceof HTMLSelectElement || element instanceof HTMLTextAreaElement)) continue;
+     if (!element.name || !element.willValidate) continue;
+     const value = element.value;
+-    if (!element.validity.valid) errors[element.name] ??= constraintMessage(element);
++    if (!element.validity.valid) errors[element.name] ??= constraintMessage(element, copy);
+     // Browsers do not consistently enforce length after a programmatic value change.
+     if ((element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) && value) {
+-      if (element.minLength > 0 && value.length < element.minLength) errors[element.name] ??= `Use at least ${element.minLength} characters.`;
+-      if (element.maxLength >= 0 && value.length > element.maxLength) errors[element.name] ??= `Use no more than ${element.maxLength} characters.`;
++      if (element.minLength > 0 && value.length < element.minLength) errors[element.name] ??= interpolate(copy.tooShort, element.minLength);
++      if (element.maxLength >= 0 && value.length > element.maxLength) errors[element.name] ??= interpolate(copy.tooLong, element.maxLength);
+     }
+   }
+   for (const [name, message] of Object.entries(customErrors)) if (message) errors[name] = message;
+   return errors;
+ }
+ 
+-/** Current product locale is English; browser-owned validation strings can use another locale. */
+-function constraintMessage(field: HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement): string {
++/** Native validity is unchanged; only application-authored feedback is localized. */
++function constraintMessage(field: HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement, copy: FormValidationMessages): string {
+   const validity = field.validity;
+-  if (validity.valueMissing) return field instanceof HTMLSelectElement ? 'Choose an option.' : field instanceof HTMLInputElement && ['checkbox', 'radio'].includes(field.type) ? 'Select an option to continue.' : 'Enter a value.';
+-  if (validity.typeMismatch) return field instanceof HTMLInputElement && field.type === 'email' ? 'Enter a valid email address.' : 'Enter a complete URL.';
+-  if (validity.badInput) return 'Enter a valid value.';
+-  if (validity.rangeUnderflow && field instanceof HTMLInputElement) return `Enter a value of at least ${field.min}.`;
+-  if (validity.rangeOverflow && field instanceof HTMLInputElement) return `Enter a value no greater than ${field.max}.`;
+-  if (validity.stepMismatch) return 'Enter a value using the allowed increment.';
+-  if (validity.patternMismatch) return 'Use the requested format.';
+-  if (validity.tooShort && !(field instanceof HTMLSelectElement)) return `Use at least ${field.minLength} characters.`;
+-  if (validity.tooLong && !(field instanceof HTMLSelectElement)) return `Use no more than ${field.maxLength} characters.`;
+-  return 'Check this value.';
++  if (validity.valueMissing) return field instanceof HTMLSelectElement ? copy.choose : field instanceof HTMLInputElement && ['checkbox', 'radio'].includes(field.type) ? copy.select : copy.required;
++  if (validity.typeMismatch) return field instanceof HTMLInputElement && field.type === 'email' ? copy.email : copy.url;
++  if (validity.badInput) return copy.invalid;
++  if (validity.rangeUnderflow && field instanceof HTMLInputElement) return interpolate(copy.minimum, field.min);
++  if (validity.rangeOverflow && field instanceof HTMLInputElement) return interpolate(copy.maximum, field.max);
++  if (validity.stepMismatch) return copy.step;
++  if (validity.patternMismatch) return copy.pattern;
++  if (validity.tooShort && !(field instanceof HTMLSelectElement)) return interpolate(copy.tooShort, field.minLength);
++  if (validity.tooLong && !(field instanceof HTMLSelectElement)) return interpolate(copy.tooLong, field.maxLength);
++  return copy.check;
+ }
+diff --git a/rebuild/src/modules/agency/mcp.ts b/rebuild/src/modules/agency/mcp.ts
+index cd8b7d27..53d23315 100644
+--- a/rebuild/src/modules/agency/mcp.ts
++++ b/rebuild/src/modules/agency/mcp.ts
+@@ -57,8 +57,6 @@ export const AGENCY_SESSION_MCP: McpToolGroup = {
+     await assertAgencySession(actor);
+     if (name === 'list_agency_clients') return listAgencyClients({ userId: actor.userId }, args);
+     if (name === 'select_workspace') {
+-      // The service enforces a supplied confirmation; tools also require its presence.
+-      if (typeof args.confirmation !== 'string') throw copyError('invalid_request', 'Confirm the workspace selection.');
+       return selectWorkspace(actor, args);
+     }
+     throw copyError('invalid_request', 'Unknown agency session tool.');
+diff --git a/rebuild/src/modules/agency/server/workspace-selection.ts b/rebuild/src/modules/agency/server/workspace-selection.ts
+index cd2c7670..9aea84da 100644
+--- a/rebuild/src/modules/agency/server/workspace-selection.ts
++++ b/rebuild/src/modules/agency/server/workspace-selection.ts
+@@ -16,16 +16,12 @@ async function assertAgencySessionImpl(actor: AccountActor): Promise<void> {
+   if (!isUsableLegacySession(await getSessionByTokenHash(actor.sessionTokenHash), actor.userId)) throw copyError('unauthorized', 'Sign in to continue.');
+ }
+ 
+-/**
+- * Shared browser/MCP selection. Selecting a preference has no destructive consequence, so the
+- * existing browser's explicit workspace selection is sufficient consent. If a confirmation is
+- * supplied it must match exactly; MCP advertises it as required. This never grants membership.
+- */
++/** Every entry point requires the same exact selection consent before membership lookup. */
+ async function selectWorkspaceImpl(actor: AccountActor, input: unknown) {
+   await assertAgencySession(actor);
+   const maxLength = await runtimeConfig('agency.workspaceIdMaxLength');
+-  const parsed = z.object({ workspaceId: z.string().min(1).max(maxLength), confirmation: z.string().optional() }).strict().safeParse(input);
+-  if (!parsed.success || (parsed.data.confirmation !== undefined && parsed.data.confirmation !== workspaceSelectionConfirmation(parsed.data.workspaceId))) throw copyError('invalid_request', 'Choose a valid workspace and matching confirmation.');
++  const parsed = z.object({ workspaceId: z.string().min(1).max(maxLength), confirmation: z.string() }).strict().safeParse(input);
++  if (!parsed.success || parsed.data.confirmation !== workspaceSelectionConfirmation(parsed.data.workspaceId)) throw copyError('invalid_request', 'Choose a valid workspace and matching confirmation.');
+   const { workspaceId } = parsed.data;
+   // Check membership before the workspace guard, so unrelated workspace status stays private.
+   const membership = await prisma.membership.findUnique({ where: { userId_workspaceId: { userId: actor.userId, workspaceId } }, select: { id: true } });
+diff --git a/rebuild/src/modules/agency/ui/WorkspaceAction.tsx b/rebuild/src/modules/agency/ui/WorkspaceAction.tsx
+index e18b7ed2..5d94ed46 100644
+--- a/rebuild/src/modules/agency/ui/WorkspaceAction.tsx
++++ b/rebuild/src/modules/agency/ui/WorkspaceAction.tsx
+@@ -15,7 +15,7 @@ export function WorkspaceAction({ workspaceId, workspaceName, href, label, varia
+     if (pending) return;
+     setPending(true); setError('');
+     try {
+-      const response = await fetch('/api/workspaces/select', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ workspaceId }) });
++      const response = await fetch('/api/workspaces/select', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ workspaceId, confirmation: `SELECT WORKSPACE ${workspaceId}` }) });
+       if (!response.ok) throw new Error('select');
+       toast.notify({ title: `${label}: ${workspaceName}` });
+       window.location.assign(href);
+diff --git a/rebuild/src/modules/publishing/server/media/config.ts b/rebuild/src/modules/publishing/server/media/config.ts
+new file mode 100644
+index 00000000..fe803b1c
+--- /dev/null
++++ b/rebuild/src/modules/publishing/server/media/config.ts
+@@ -0,0 +1,21 @@
++import { z } from 'zod';
++import { entry } from '@/lib/config/entry';
++
++export const mediaPresentationPolicySchema = z.object({
++  holdersPerImage: z.number().int().min(1).max(100),
++  fileNameMaxCharacters: z.number().int().min(1).max(255),
++  usagePreviewMaxCharacters: z.number().int().min(1).max(10000),
++  fallbackFileName: z.string().trim().min(1).max(255).regex(/^[^/\\\u0000-\u001f\u007f]+$/),
++}).strict();
++export type MediaPresentationPolicy = z.infer<typeof mediaPresentationPolicySchema>;
++export const mediaPresentationPolicy: MediaPresentationPolicy = {
++  holdersPerImage: 5, fileNameMaxCharacters: 180, usagePreviewMaxCharacters: 80, fallbackFileName: 'image',
++};
++
++/** Integration: spread MEDIA_PRESENTATION_CONFIG into Publishing's owning config.ts. */
++export const MEDIA_PRESENTATION_CONFIG = [entry({
++  key: 'storage.mediaPresentationPolicy', group: 'Publishing · Media', label: 'Media usage and filename bounds',
++  kind: 'json', description: 'Visible usage holders, preview text and display filename limits. Stored files always use validated UUIDs, never display names.',
++  defaultValue: mediaPresentationPolicy, schema: mediaPresentationPolicySchema, consumption: 'active',
++})] as const;
++
+diff --git a/rebuild/src/modules/publishing/server/media/policy.ts b/rebuild/src/modules/publishing/server/media/policy.ts
+new file mode 100644
+index 00000000..692fde92
+--- /dev/null
++++ b/rebuild/src/modules/publishing/server/media/policy.ts
+@@ -0,0 +1,10 @@
++import { runtimeConfig } from '@/server/config/store';
++import { mediaPresentationPolicy, mediaPresentationPolicySchema, type MediaPresentationPolicy } from './config';
++
++/** Safe shipped defaults keep storage usable until the owning config import is integrated. */
++export async function loadMediaPresentationPolicy(): Promise<MediaPresentationPolicy> {
++  let value: unknown;
++  try { value = await runtimeConfig('storage.mediaPresentationPolicy'); }
++  catch { return mediaPresentationPolicy; }
++  return mediaPresentationPolicySchema.default(mediaPresentationPolicy).parse(value);
++}
+diff --git a/rebuild/src/modules/publishing/server/media/storage.ts b/rebuild/src/modules/publishing/server/media/storage.ts
+index 92a18c2b..8df28924 100644
+--- a/rebuild/src/modules/publishing/server/media/storage.ts
++++ b/rebuild/src/modules/publishing/server/media/storage.ts
+@@ -1,3 +1,5 @@
++import { loadMediaPresentationPolicy } from './policy';
++import type { MediaPresentationPolicy } from './config';
+ import { loadPublishingErrorText } from '../error-copy';
+ import { randomUUID } from 'node:crypto';
+ import { constants } from 'node:fs';
+@@ -20,7 +22,6 @@ export type WorkspaceImageListing = { id: string; mimeType: string; size: number
+ export type WorkspaceImageUsage = { files: number; bytes: number; unusedFiles: number; unusedBytes: number };
+ /** Posts still headed for publication; deleting their image would break a later send or retry. */
+ const PENDING_STATUSES = new Set(['draft', 'pending_approval', 'rejected', 'scheduled', 'publishing', 'partially_failed', 'failed']);
+-const HOLDERS_PER_IMAGE = 5;
+ export type OrphanCleanupResult = { removed: number; bytes: number; errors: number };
+ const IMAGE_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+ 
+@@ -36,9 +37,9 @@ const allowedSignatures: Record<string, (bytes: Buffer) => boolean> = {
+   'image/gif': bytes => bytes.length >= 6 && ['GIF87a', 'GIF89a'].includes(bytes.toString('ascii', 0, 6)),
+ };
+ 
+-function safeName(name: string): string {
+-  const cleaned = path.basename(name).replace(/[\u0000-\u001f\u007f]/g, '').trim().slice(0, 180);
+-  return cleaned || 'image';
++function safeName(name: string, policy: MediaPresentationPolicy): string {
++  const cleaned = path.basename(name).replace(/[\u0000-\u001f\u007f]/g, '').trim().slice(0, policy.fileNameMaxCharacters);
++  return cleaned || policy.fallbackFileName.slice(0, policy.fileNameMaxCharacters);
+ }
+ 
+ async function ensureRealDirectory(dir: string, parent: string, create: boolean): Promise<void> {
+@@ -76,6 +77,7 @@ export async function uploadWorkspaceImage(actor: MediaActor, file: File): Promi
+   if (file.size < 1 || file.size > maxBytes) throw new MediaValidationError('too_large', errorText);
+   const mimeType = file.type.toLowerCase();
+   if (!allowed.includes(mimeType) || !allowedSignatures[mimeType]) throw new MediaValidationError('invalid_type', errorText);
++  const policy = await loadMediaPresentationPolicy();
+   const bytes = Buffer.from(await file.arrayBuffer());
+   if (!bytes.length || bytes.length > maxBytes || !allowedSignatures[mimeType]!(bytes)) throw new MediaValidationError('invalid_content', errorText);
+   const id = randomUUID();
+@@ -89,7 +91,7 @@ export async function uploadWorkspaceImage(actor: MediaActor, file: File): Promi
+     throw error;
+   }
+   await handle.close();
+-  return { id, mimeType, fileName: safeName(file.name) };
++  return { id, mimeType, fileName: safeName(file.name, policy) };
+ }
+ 
+ export async function readWorkspaceImage(workspaceId: string, id: string): Promise<WorkspaceImageBytes> {
+@@ -127,20 +129,21 @@ async function referenceSet(workspaceId: string): Promise<Set<string>> {
+ }
+ 
+ /** image id → posts referencing it, pending posts first. Tenant-scoped; one query per call. */
+-async function referenceMap(workspaceId: string): Promise<Map<string, ImageHolder[]>> {
++async function referenceMap(workspaceId: string, policy?: MediaPresentationPolicy): Promise<Map<string, ImageHolder[]>> {
++  policy ??= await loadMediaPresentationPolicy();
+   const posts = await prisma.post.findMany({ where: { workspaceId }, select: { id: true, status: true, message: true, media: true } });
+   const map = new Map<string, ImageHolder[]>();
+   for (const post of posts) {
+-    const holder: ImageHolder = { id: String(post.id ?? ''), status: String(post.status ?? ''), excerpt: excerpt(post.message), pending: PENDING_STATUSES.has(String(post.status)) };
++    const holder: ImageHolder = { id: String(post.id ?? ''), status: String(post.status ?? ''), excerpt: excerpt(post.message, policy.usagePreviewMaxCharacters), pending: PENDING_STATUSES.has(String(post.status)) };
+     for (const id of mediaReferences(post.media)) map.set(id, [...(map.get(id) ?? []), holder]);
+   }
+   for (const holders of map.values()) holders.sort((a, b) => Number(b.pending) - Number(a.pending) || a.id.localeCompare(b.id));
+   return map;
+ }
+ 
+-function excerpt(message: unknown): string {
++function excerpt(message: unknown, limit: number): string {
+   const text = typeof message === 'string' ? message.replace(/\s+/g, ' ').trim() : '';
+-  return text.length > 80 ? `${text.slice(0, 79)}…` : text;
++  return text.length > limit ? `${text.slice(0, limit - 1)}…` : text;
+ }
+ 
+ /** Holder visibility: null (the default) names no posts; counts are still reported. */
+@@ -154,9 +157,9 @@ async function visibleHolderIds(refs: Map<string, ImageHolder[]>, imageIds: read
+   return new Set(rows.map(row => String(row.id)));
+ }
+ 
+-function listingFor(refs: Map<string, ImageHolder[]>, visible: ReadonlySet<string>, id: string, base: { mimeType: string; size: number; createdAt: Date }): WorkspaceImageListing {
++function listingFor(refs: Map<string, ImageHolder[]>, visible: ReadonlySet<string>, id: string, base: { mimeType: string; size: number; createdAt: Date }, holdersPerImage: number): WorkspaceImageListing {
+   const holders = refs.get(id.toLowerCase()) ?? [];
+-  return { id, ...base, inUse: holders.length > 0, usedBy: holders.length, heldBy: holders.filter(holder => visible.has(holder.id)).slice(0, HOLDERS_PER_IMAGE) };
++  return { id, ...base, inUse: holders.length > 0, usedBy: holders.length, heldBy: holders.filter(holder => visible.has(holder.id)).slice(0, holdersPerImage) };
+ }
+ 
+ function detectedImageMime(bytes: Buffer): string | undefined {
+@@ -191,7 +194,8 @@ export async function listWorkspaceImages(workspaceId: string, options: { limit:
+     files.push({ id: entry.name, size: info.size, modifiedAt: info.mtime, mtimeMs: info.mtimeMs });
+   }
+   files.sort((a, b) => b.mtimeMs - a.mtimeMs || a.id.localeCompare(b.id));
+-  const refs = await referenceMap(workspaceId);
++  const policy = await loadMediaPresentationPolicy();
++  const refs = await referenceMap(workspaceId, policy);
+   const usage: WorkspaceImageUsage = { files: files.length, bytes: 0, unusedFiles: 0, unusedBytes: 0 };
+   for (const file of files) {
+     usage.bytes += file.size;
+@@ -214,7 +218,7 @@ export async function listWorkspaceImages(workspaceId: string, options: { limit:
+   }));
+   const found = checked.filter((item): item is { id: string; mimeType: string; size: number; createdAt: Date } => item !== null);
+   const visible = await visibleHolderIds(refs, found.map(item => item.id), options.holderVisibility ?? null);
+-  const items = found.map(({ id, ...base }) => listingFor(refs, visible, id, base));
++  const items = found.map(({ id, ...base }) => listingFor(refs, visible, id, base, policy.holdersPerImage));
+   return {
+     items,
+     usage,
+@@ -225,9 +229,10 @@ export async function listWorkspaceImages(workspaceId: string, options: { limit:
+ export async function getWorkspaceImageMetadata(workspaceId: string, id: string, holderVisibility: HolderVisibility = null): Promise<WorkspaceImageListing> {
+   const file = await safeImageFile(workspaceId, id);
+   if (!file) throw new Error('Image not found.');
+-  const [image, refs, info] = await Promise.all([readWorkspaceImage(workspaceId, id), referenceMap(workspaceId), lstat(file.path)]);
++  const policy = await loadMediaPresentationPolicy();
++  const [image, refs, info] = await Promise.all([readWorkspaceImage(workspaceId, id), referenceMap(workspaceId, policy), lstat(file.path)]);
+   const visible = await visibleHolderIds(refs, [id], holderVisibility);
+-  return listingFor(refs, visible, id, { mimeType: image.mimeType, size: info.size, createdAt: info.mtime });
++  return listingFor(refs, visible, id, { mimeType: image.mimeType, size: info.size, createdAt: info.mtime }, policy.holdersPerImage);
+ }
+ 
+ async function safeImageFile(workspaceId: string, id: string): Promise<{ path: string; size: number } | null> {
+diff --git a/rebuild/src/modules/publishing/server/post-mutations.ts b/rebuild/src/modules/publishing/server/post-mutations.ts
+new file mode 100644
+index 00000000..d0bb0aeb
+--- /dev/null
++++ b/rebuild/src/modules/publishing/server/post-mutations.ts
+@@ -0,0 +1,116 @@
++import { withPublishingOperation, withPublishingTransaction } from '@/modules/publishing/server/guard';
++import { randomUUID } from "node:crypto";
++import { OperationError } from "@/lib/operation-error";
++import { prisma } from "@/server/data";
++import { loadVersionRetention, recordPostVersion } from '@/modules/publishing/collaboration/server/versions';
++
++const AUTHOR_ROLES = new Set(["owner", "admin", "editor", "contributor"]);
++
++export type PostMutationActor = { userId: string; workspaceId: string };
++
++/**
++ * Create a local draft. This intentionally does not create destination rows,
++ * schedule delivery, or call a social provider.
++ */
++export async function createLocalDraft(actor: PostMutationActor, message: string) {
++  return withPublishingOperation(actor, {}, async ({ actor, signal }) => {
++    signal.throwIfAborted();
++    const membership = await getCurrentMembership(actor);
++    if (!AUTHOR_ROLES.has(membership.role)) throw new OperationError('forbidden', "You do not have permission to create drafts.");
++    const retention = await loadVersionRetention();
++
++    const now = new Date();
++    return withPublishingTransaction(signal, async tx => {
++      const created = await tx.post.create({
++        data: {
++          id: randomUUID(),
++          workspaceId: actor.workspaceId,
++          authorId: actor.userId,
++          message,
++          status: "draft",
++          scheduledAt: null,
++          publishedAt: null,
++          createdAt: now,
++          updatedAt: now,
++        },
++        select: { id: true },
++      });
++      await recordPostVersion(tx, created.id, actor.userId, retention);
++      await auditDraft(tx, actor, 'publishing.post_created', created.id);
++      return created;
++    });
++  });
++}
++
++/** Edit only an unconnected, unpublished draft in the actor's current workspace. */
++export async function updateLocalDraft(actor: PostMutationActor, postId: string, message: string) {
++  return withPublishingOperation(actor, { postId }, async ({ actor, signal }) => {
++    signal.throwIfAborted();
++    const membership = await getCurrentMembership(actor);
++    if (!AUTHOR_ROLES.has(membership.role)) throw new OperationError('forbidden', "You do not have permission to edit drafts.");
++    const retention = await loadVersionRetention();
++
++    const ownsPost = membership.role === "contributor";
++    await withPublishingTransaction(signal, async tx => {
++      const where = {
++        id: postId,
++        workspaceId: actor.workspaceId,
++        status: "draft" as const,
++        publishedAt: null,
++        ...(ownsPost ? { authorId: actor.userId } : {}),
++        targets: { none: {} },
++      };
++      const current = await tx.post.findFirst({ where, select: { id: true } });
++      if (!current) throw new OperationError('conflict', "This draft is unavailable or can no longer be edited.");
++      await recordPostVersion(tx, current.id, actor.userId, retention);
++      const result = await tx.post.updateMany({
++        where,
++        data: { message, updatedAt: new Date() },
++      });
++      if (result.count !== 1) throw new OperationError('conflict', "This draft is unavailable or can no longer be edited.");
++      await recordPostVersion(tx, current.id, actor.userId, retention);
++      await auditDraft(tx, actor, 'publishing.post_updated', postId);
++    });
++  });
++}
++
++/**
++ * Permanently remove only an unpublished draft with no destination rows.
++ * The UI must ask for confirmation; this operation never contacts providers.
++ */
++export async function deleteLocalDraft(actor: PostMutationActor, postId: string) {
++  return withPublishingOperation(actor, { postId }, async ({ actor, signal }) => {
++    signal.throwIfAborted();
++    const membership = await getCurrentMembership(actor);
++    if (!AUTHOR_ROLES.has(membership.role)) throw new OperationError('forbidden', "You do not have permission to delete drafts.");
++
++    const ownsPost = membership.role === "contributor";
++    await withPublishingTransaction(signal, async tx => {
++      const result = await tx.post.deleteMany({
++        where: {
++          id: postId,
++          workspaceId: actor.workspaceId,
++          status: "draft",
++          publishedAt: null,
++          ...(ownsPost ? { authorId: actor.userId } : {}),
++          targets: { none: {} },
++        },
++      });
++      if (result.count !== 1) throw new OperationError('conflict', "This draft is unavailable or can no longer be deleted.");
++      await auditDraft(tx, actor, 'publishing.post_deleted', postId);
++    });
++  });
++}
++
++async function getCurrentMembership(actor: PostMutationActor) {
++  const membership = await prisma.membership.findUnique({
++    where: { userId_workspaceId: { userId: actor.userId, workspaceId: actor.workspaceId } },
++    select: { role: true },
++  });
++  if (!membership) throw new OperationError('unauthorized', "You are no longer a member of this workspace.");
++  return membership;
++}
++
++async function auditDraft(tx: import('../../../../generated/client').Prisma.TransactionClient, actor: PostMutationActor, action: string, postId: string) {
++  await tx.$executeRaw`INSERT INTO root_activities (id, "actorId", action, detail, "createdAt") VALUES (${randomUUID()}, ${actor.userId}, ${action}, ${JSON.stringify({ workspaceId: actor.workspaceId, postId, localDraft: true })}::jsonb, NOW())`;
++}
+diff --git a/rebuild/src/modules/settings/server/account-policy.ts b/rebuild/src/modules/settings/server/account-policy.ts
+new file mode 100644
+index 00000000..daf9bbf8
+--- /dev/null
++++ b/rebuild/src/modules/settings/server/account-policy.ts
+@@ -0,0 +1,24 @@
++import { synchronousPolicy } from '@/server/synchronous-policy';
++import { runtimeConfig } from '@/server/config/store';
++
++export type AccountPasswordPolicy = { minLength: number; maxBytes: number };
++
++export async function accountPasswordPolicy(): Promise<AccountPasswordPolicy> {
++  const [minLength, maxBytes] = await Promise.all([
++    runtimeConfig('auth.passwordMinLength'),
++    runtimeConfig('auth.passwordMaxBytes'),
++  ]);
++  return { minLength, maxBytes };
++}
++
++export function validateProfileName(value: unknown) {
++  if (typeof value !== 'string') return null;
++  const name = value.trim();
++  return name.length >= 1 && name.length <= synchronousPolicy('settings.accountNameMaxLength') ? name : null;
++}
++
++export function validateNewPassword(value: unknown, policy: AccountPasswordPolicy) {
++  if (typeof value !== 'string' || value.length < policy.minLength || Buffer.byteLength(value, 'utf8') > policy.maxBytes) return false;
++  return true;
++}
++
+diff --git a/rebuild/src/modules/settings/server/connection-mutations.ts b/rebuild/src/modules/settings/server/connection-mutations.ts
+new file mode 100644
+index 00000000..43eea72b
+--- /dev/null
++++ b/rebuild/src/modules/settings/server/connection-mutations.ts
+@@ -0,0 +1,191 @@
++import { assertAdsOperationsSettled } from '@/modules/ads/management/retention';
++import { assertPublishingTargetsSettled, lockPublishingTargets } from '@/modules/publishing/server/guard';
++import { assertInboxDeletionsSettled, lockInboxChannel } from '@/modules/inbox/server/comment-guard';
++import { OperationError } from '@/lib/operation-error';
++import { prisma } from "@/server/data";
++import { connectionState } from '@/lib/connection-status';
++import { isPlatformEnabled } from '@/server/platforms/registry';
++import { canUseFeature, hasPlatformCapability, loadEntitlements, type Entitlements } from '@/server/entitlements';
++import { randomBytes } from "node:crypto";
++import { lockSelectedResources } from '@/server/platforms/resource-lock';
++
++const MANAGER_ROLES = new Set(["owner", "admin"]);
++export type ConnectionMutationActor = { userId: string; workspaceId: string };
++
++export type ConnectionSelection = { kind: 'target' | 'adAccount'; id: string; enabled: boolean };
++
++/** Read-only estimate of the local rows removed by disconnect delete mode. */
++export async function previewSocialAccountDeletion(actor: ConnectionMutationActor, socialAccountId: string) {
++  const membership = await currentMembership(actor);
++  if (!MANAGER_ROLES.has(membership.role)) throw new OperationError('forbidden', 'Only workspace owners and admins can change connections.');
++  const account = await prisma.socialAccount.findFirst({ where: { id: socialAccountId, workspaceId: actor.workspaceId }, select: { id: true, targets: { select: { id: true } }, adAccounts: { select: { id: true } } } });
++  if (!account) throw new OperationError('unavailable', 'This source is unavailable in the current workspace.');
++  return countDisconnectRows(prisma, actor.workspaceId, account);
++}
++
++/** Installation-owner estimate of the rows delete mode removes; the caller must already have checked Root. */
++export async function previewSocialAccountDeletionAsRoot(socialAccountId: string) {
++  const account = await prisma.socialAccount.findUnique({ where: { id: socialAccountId }, select: { id: true, workspaceId: true, targets: { select: { id: true } }, adAccounts: { select: { id: true } } } });
++  if (!account) throw new OperationError('not_found', 'Connection not found.');
++  return { workspaceId: account.workspaceId, counts: await countDisconnectRows(prisma, account.workspaceId, account) };
++}
++
++async function countDisconnectRows(tx: typeof prisma | import('../../../../generated/client').Prisma.TransactionClient, workspaceId: string, account: { id: string; targets: Array<{ id: string }>; adAccounts: Array<{ id: string }> }) {
++  const targetIds = account.targets.map(item => item.id);
++  const adAccountIds = account.adAccounts.map(item => item.id);
++  const instagramAccounts = await linkedInstagramAccounts(tx, workspaceId, account.id, targetIds);
++  const instagramAccountIds = instagramAccounts.map(item => item.id);
++  const targetLinks = targetIds.length ? await tx.postTarget.findMany({ where: { targetId: { in: targetIds } }, select: { id: true, postId: true } }) : [];
++  const postTargetIds = targetLinks.map(row => row.id);
++  const affectedPostIds = [...new Set(targetLinks.map(row => row.postId))];
++  const conversations = targetIds.length ? await tx.conversation.findMany({ where: { targetId: { in: targetIds } }, select: { id: true } }) : [];
++  const conversationIds = conversations.map(row => row.id);
++  const orphanPosts = affectedPostIds.length ? await tx.post.findMany({
++    where: { id: { in: affectedPostIds }, workspaceId, targets: { every: { targetId: { in: targetIds } } } }, select: { id: true },
++  }) : [];
++  const [comments, conversationMessages, pageInsights, adInsights, scheduledRemote, instagramInsights, instagramMedia] = await Promise.all([
++    postTargetIds.length ? tx.postComment.count({ where: { postTargetId: { in: postTargetIds } } }) : 0,
++    conversationIds.length ? tx.conversationMessage.count({ where: { conversationId: { in: conversationIds } } }) : 0,
++    targetIds.length ? tx.pageInsight.count({ where: { targetId: { in: targetIds } } }) : 0,
++    adAccountIds.length ? tx.adInsight.count({ where: { adAccountId: { in: adAccountIds } } }) : 0,
++    postTargetIds.length ? tx.postTarget.count({ where: { id: { in: postTargetIds }, status: 'scheduled_remote' } }) : 0,
++    instagramAccountIds.length ? tx.instagramInsight.count({ where: { accountId: { in: instagramAccountIds } } }) : 0,
++    instagramAccountIds.length ? tx.instagramMedia.count({ where: { accountId: { in: instagramAccountIds } } }) : 0,
++  ]);
++  return {
++    channels: targetIds.length, adAccounts: adAccountIds.length, postTargets: targetLinks.length,
++    orphanPosts: orphanPosts.length, comments, conversations: conversations.length,
++    conversationMessages, pageInsights, adInsights, scheduledRemote,
++    instagramAccounts: instagramAccountIds.length, instagramInsights, instagramMedia,
++  };
++}
++
++function linkedInstagramAccounts(tx: typeof prisma | import('../../../../generated/client').Prisma.TransactionClient, workspaceId: string, socialAccountId: string, targetIds: string[]) {
++  return tx.instagramAccount.findMany({ where: { workspaceId, OR: [{ socialAccountId }, ...(targetIds.length ? [{ socialAccountId: null, targetId: { in: targetIds } }] : [])] }, select: { id: true } });
++}
++
++async function requireSelectableSource(tx: import('../../../../generated/client').Prisma.TransactionClient, workspaceId: string, socialAccountId: string | null, entitlements: Entitlements | null) {
++  const source = socialAccountId ? await tx.socialAccount.findFirst({
++    where: { id: socialAccountId, workspaceId },
++    select: { id: true, provider: true, invalidatedAt: true, tokenExpiresAt: true },
++  }) : null;
++  if (!source || connectionState(source) !== 'connected') throw new OperationError('reconnect_required', 'Reconnect this source before selecting it.');
++  if (!entitlements || !hasPlatformCapability(entitlements, source.provider) || !await isPlatformEnabled(source.provider)) throw new OperationError('unavailable', 'This connection is unavailable in the current workspace.');
++}
++
++/** Apply a confirmed set of channel and ad account choices atomically. */
++export async function setConnectionSelections(actor: ConnectionMutationActor, items: ConnectionSelection[]) {
++  const membership = await currentMembership(actor);
++  if (!MANAGER_ROLES.has(membership.role)) throw new OperationError('forbidden', 'Only workspace owners and admins can change connections.');
++  const { runtimeConfig } = await import('@/server/config/store');
++  if (items.length > await runtimeConfig('data.connectionSelectionMaxItems') || new Set(items.map(item => `${item.kind}:${item.id}`)).size !== items.length) throw new OperationError('invalid_request', 'Invalid selection list.');
++  const entitlements = items.some(item => item.enabled) ? await loadEntitlements(actor.userId, actor.workspaceId, { allowInstallationInspection: false }) : null;
++  if (items.some(item => item.enabled) && (!entitlements || !canUseFeature(entitlements, 'settings/connections'))) throw new OperationError('forbidden', 'Connection selection is unavailable in this workspace.');
++  await prisma.$transaction(async tx => {
++    await lockSelectedResources(tx, actor.workspaceId, items.map(item => ({ kind: item.kind, id: item.id })));
++    for (const item of items) {
++      if (item.kind === 'target') {
++        const target = await tx.target.findFirst({ where: { id: item.id, workspaceId: actor.workspaceId }, select: { id: true, type: true, providerId: true, socialAccountId: true } });
++        if (!target) throw new OperationError('unavailable', 'This channel is unavailable in the current workspace.');
++        if (item.enabled) {
++          await requireSelectableSource(tx, actor.workspaceId, target.socialAccountId, entitlements);
++        } else {
++          await lockPublishingTargets(tx, actor.workspaceId, [target.id]);
++          await assertPublishingTargetsSettled(tx, actor.workspaceId, [target.id]);
++          await lockInboxChannel(tx, actor.workspaceId, target.id);
++          await assertInboxDeletionsSettled(tx, actor.workspaceId, [target.id]);
++        }
++        await tx.target.updateMany({ where: { id: target.id, workspaceId: actor.workspaceId }, data: { enabled: item.enabled } });
++        if (target.type === 'instagram') await tx.instagramAccount.updateMany({ where: { workspaceId: actor.workspaceId, igUserId: target.providerId }, data: { enabled: item.enabled } });
++      } else {
++        const account = await tx.adAccount.findFirst({ where: { id: item.id, workspaceId: actor.workspaceId }, select: { id: true, socialAccountId: true } });
++        if (!account) throw new OperationError('unavailable', 'This advertising account is unavailable in the current workspace.');
++        if (item.enabled) {
++          await requireSelectableSource(tx, actor.workspaceId, account.socialAccountId, entitlements);
++        }
++        await tx.adAccount.updateMany({ where: { id: account.id, workspaceId: actor.workspaceId }, data: { enabled: item.enabled } });
++      }
++      await auditConnectionEvent(tx, actor, 'connection.selection_changed', { kind: item.kind, id: item.id, enabled: item.enabled });
++    }
++  });
++}
++
++async function currentMembership(actor: ConnectionMutationActor) {
++  const membership = await prisma.membership.findUnique({
++    where: { userId_workspaceId: { userId: actor.userId, workspaceId: actor.workspaceId } },
++    select: { role: true },
++  });
++  if (!membership) throw new OperationError('forbidden', 'You are no longer a member of this workspace.');
++  return membership;
++}
++
++
++/** Locally disconnect a source while retaining its discovered records and history. */
++type DisconnectAuthorize = (tx: import('../../../../generated/client').Prisma.TransactionClient) => Promise<void>;
++const workspaceManager = (actor: ConnectionMutationActor): DisconnectAuthorize => async tx => {
++  const membership = await tx.membership.findUnique({ where: { userId_workspaceId: { userId: actor.userId, workspaceId: actor.workspaceId } }, select: { role: true } });
++  if (!membership) throw new OperationError('forbidden', 'You are no longer a member of this workspace.');
++  if (!MANAGER_ROLES.has(membership.role)) throw new OperationError('forbidden', 'Only workspace owners and admins can change connections.');
++};
++
++/** `authorize` runs first inside the transaction; Root passes an installation-owner check instead of workspace membership. */
++export async function disconnectSocialAccount(actor: ConnectionMutationActor, socialAccountId: string, mode: 'retain' | 'delete' = 'retain', confirmation?: string, authorize: DisconnectAuthorize = workspaceManager(actor)) {
++  return prisma.$transaction(async tx => {
++    await authorize(tx);
++    if (mode === 'delete' && confirmation !== 'DELETE') throw new OperationError('invalid_request', 'Type DELETE to confirm related data removal.');
++    const account = await tx.socialAccount.findFirst({ where: { id: socialAccountId, workspaceId: actor.workspaceId }, select: { id: true, targets: { select: { id: true } }, adAccounts: { select: { id: true } } } });
++    if (!account) throw new OperationError('unavailable', 'This source is unavailable in the current workspace.');
++    const targetIds = account.targets.map(item => item.id);
++    await lockSelectedResources(tx, actor.workspaceId, [
++      ...targetIds.map(id => ({ kind: 'target' as const, id })),
++      ...account.adAccounts.map(item => ({ kind: 'adAccount' as const, id: item.id })),
++    ]);
++    await lockPublishingTargets(tx, actor.workspaceId, targetIds);
++    await assertPublishingTargetsSettled(tx, actor.workspaceId, targetIds);
++    for (const targetId of [...targetIds].sort()) await lockInboxChannel(tx, actor.workspaceId, targetId);
++    await assertInboxDeletionsSettled(tx, actor.workspaceId, targetIds);
++    const adAccountIds = account.adAccounts.map(item => item.id);
++    const stillScheduled = targetIds.length ? await tx.postTarget.count({ where: { targetId: { in: targetIds }, status: 'scheduled_remote' } }) : 0;
++
++    if (mode === 'retain') {
++      await tx.target.updateMany({ where: { workspaceId: actor.workspaceId, id: { in: targetIds } }, data: { enabled: false } });
++      await tx.adAccount.updateMany({ where: { workspaceId: actor.workspaceId, id: { in: adAccountIds } }, data: { enabled: false } });
++      const instagramAccounts = await linkedInstagramAccounts(tx, actor.workspaceId, account.id, targetIds);
++      await tx.instagramAccount.updateMany({ where: { workspaceId: actor.workspaceId, id: { in: instagramAccounts.map(item => item.id) } }, data: { enabled: false } });
++      await tx.socialAccount.updateMany({ where: { id: account.id, workspaceId: actor.workspaceId }, data: { invalidatedAt: new Date() } });
++      await auditConnectionEvent(tx, actor, 'connection.local_disconnected', { socialAccountId: account.id, channels: targetIds.length, adAccounts: adAccountIds.length, instagramAccounts: instagramAccounts.length, retained: true, stillScheduled });
++      return { mode, stillScheduled, retained: { channels: targetIds.length, adAccounts: adAccountIds.length, instagramAccounts: instagramAccounts.length } };
++    }
++
++    await assertAdsOperationsSettled(tx, actor.workspaceId, adAccountIds);
++    if (stillScheduled > 0) throw new OperationError('conflict', 'This source has posts still scheduled at the provider. Cancel or reconcile those posts before deleting its local records.');
++
++    const targetLinks = targetIds.length ? await tx.postTarget.findMany({ where: { targetId: { in: targetIds } }, select: { id: true, postId: true } }) : [];
++    const instagramAccounts = await linkedInstagramAccounts(tx, actor.workspaceId, account.id, targetIds);
++    const instagramAccountIds = instagramAccounts.map(item => item.id);
++    const targetLinkIds = targetLinks.map(row => row.id);
++    const affectedPostIds = [...new Set(targetLinks.map(row => row.postId))];
++    const conversations = targetIds.length ? await tx.conversation.findMany({ where: { targetId: { in: targetIds } }, select: { id: true } }) : [];
++    const conversationIds = conversations.map(row => row.id);
++    const comments = targetLinkIds.length ? await tx.postComment.deleteMany({ where: { postTargetId: { in: targetLinkIds } } }) : { count: 0 };
++    if (targetLinkIds.length) await tx.postTarget.deleteMany({ where: { id: { in: targetLinkIds } } });
++    const orphanPosts = affectedPostIds.length ? await tx.post.deleteMany({ where: { id: { in: affectedPostIds }, workspaceId: actor.workspaceId, targets: { none: {} } } }) : { count: 0 };
++    const conversationMessages = conversationIds.length ? await tx.conversationMessage.deleteMany({ where: { conversationId: { in: conversationIds } } }) : { count: 0 };
++    const deletedConversations = conversationIds.length ? await tx.conversation.deleteMany({ where: { id: { in: conversationIds } } }) : { count: 0 };
++    const insights = targetIds.length ? await tx.pageInsight.deleteMany({ where: { targetId: { in: targetIds } } }) : { count: 0 };
++    const adInsights = adAccountIds.length ? await tx.adInsight.deleteMany({ where: { adAccountId: { in: adAccountIds } } }) : { count: 0 };
++    const instagramMedia = instagramAccountIds.length ? await tx.instagramMedia.deleteMany({ where: { accountId: { in: instagramAccountIds } } }) : { count: 0 };
++    const instagramInsights = instagramAccountIds.length ? await tx.instagramInsight.deleteMany({ where: { accountId: { in: instagramAccountIds } } }) : { count: 0 };
++    const deletedInstagramAccounts = instagramAccountIds.length ? await tx.instagramAccount.deleteMany({ where: { workspaceId: actor.workspaceId, id: { in: instagramAccountIds } } }) : { count: 0 };
++    await tx.target.deleteMany({ where: { workspaceId: actor.workspaceId, id: { in: targetIds } } });
++    await tx.adAccount.deleteMany({ where: { workspaceId: actor.workspaceId, id: { in: adAccountIds } } });
++    await tx.socialAccount.deleteMany({ where: { id: account.id, workspaceId: actor.workspaceId } });
++    const counts = { channels: targetIds.length, adAccounts: adAccountIds.length, postTargets: targetLinks.length, orphanPosts: orphanPosts.count, comments: comments.count, conversations: deletedConversations.count, conversationMessages: conversationMessages.count, pageInsights: insights.count, adInsights: adInsights.count, instagramAccounts: deletedInstagramAccounts.count, instagramInsights: instagramInsights.count, instagramMedia: instagramMedia.count, scheduledRemote: stillScheduled };
++    await auditConnectionEvent(tx, actor, 'connection.local_disconnected', { socialAccountId: account.id, retained: false, counts });
++    return { mode, deleted: counts, stillScheduled };
++  });
++}
++
++export async function auditConnectionEvent(tx: import('../../../../generated/client').Prisma.TransactionClient, actor: ConnectionMutationActor, action: string, detail: Record<string, unknown>) {
++  await tx.$executeRaw`INSERT INTO root_activities (id, "actorId", action, detail, "createdAt") VALUES (${`conn_${randomBytes(12).toString('hex')}`}, ${actor.userId}, ${action}, ${JSON.stringify({ workspaceId: actor.workspaceId, ...detail })}::jsonb, NOW())`;
++}
+diff --git a/rebuild/src/server/account-settings.ts b/rebuild/src/server/account-settings.ts
+index bf5c2574..9dbf1371 100644
+--- a/rebuild/src/server/account-settings.ts
++++ b/rebuild/src/server/account-settings.ts
+@@ -1,28 +1,8 @@
+-import { synchronousPolicy } from './synchronous-policy';
+ import { randomBytes } from 'node:crypto';
+ import type { Prisma } from '../../generated/client';
+-import { runtimeConfig } from '@/server/config/store';
+ 
+-export type AccountPasswordPolicy = { minLength: number; maxBytes: number };
+-
+-export async function accountPasswordPolicy(): Promise<AccountPasswordPolicy> {
+-  const [minLength, maxBytes] = await Promise.all([
+-    runtimeConfig('auth.passwordMinLength'),
+-    runtimeConfig('auth.passwordMaxBytes'),
+-  ]);
+-  return { minLength, maxBytes };
+-}
+-
+-export function validateProfileName(value: unknown) {
+-  if (typeof value !== 'string') return null;
+-  const name = value.trim();
+-  return name.length >= 1 && name.length <= synchronousPolicy('settings.accountNameMaxLength') ? name : null;
+-}
+-
+-export function validateNewPassword(value: unknown, policy: AccountPasswordPolicy) {
+-  if (typeof value !== 'string' || value.length < policy.minLength || Buffer.byteLength(value, 'utf8') > policy.maxBytes) return false;
+-  return true;
+-}
++/** Compatibility exports; account validation belongs to Settings. */
++export { accountPasswordPolicy, validateProfileName, validateNewPassword, type AccountPasswordPolicy } from '@/modules/settings/server/account-policy';
+ 
+ export function accountAuditId() {
+   return `account_${randomBytes(12).toString('hex')}`;
+diff --git a/rebuild/src/server/connection-mutations.ts b/rebuild/src/server/connection-mutations.ts
+index 1ee64fe1..b8d3a7cc 100644
+--- a/rebuild/src/server/connection-mutations.ts
++++ b/rebuild/src/server/connection-mutations.ts
+@@ -1,191 +1,2 @@
+-import { assertAdsOperationsSettled } from '@/modules/ads/management/retention';
+-import { assertPublishingTargetsSettled, lockPublishingTargets } from '@/modules/publishing/server/guard';
+-import { assertInboxDeletionsSettled, lockInboxChannel } from '@/modules/inbox/server/comment-guard';
+-import { OperationError } from '@/lib/operation-error';
+-import { prisma } from "./data";
+-import { connectionState } from '@/lib/connection-status';
+-import { isPlatformEnabled } from '@/server/platforms/registry';
+-import { canUseFeature, hasPlatformCapability, loadEntitlements, type Entitlements } from '@/server/entitlements';
+-import { randomBytes } from "node:crypto";
+-import { lockSelectedResources } from '@/server/platforms/resource-lock';
+-
+-const MANAGER_ROLES = new Set(["owner", "admin"]);
+-export type ConnectionMutationActor = { userId: string; workspaceId: string };
+-
+-export type ConnectionSelection = { kind: 'target' | 'adAccount'; id: string; enabled: boolean };
+-
+-/** Read-only estimate of the local rows removed by disconnect delete mode. */
+-export async function previewSocialAccountDeletion(actor: ConnectionMutationActor, socialAccountId: string) {
+-  const membership = await currentMembership(actor);
+-  if (!MANAGER_ROLES.has(membership.role)) throw new OperationError('forbidden', 'Only workspace owners and admins can change connections.');
+-  const account = await prisma.socialAccount.findFirst({ where: { id: socialAccountId, workspaceId: actor.workspaceId }, select: { id: true, targets: { select: { id: true } }, adAccounts: { select: { id: true } } } });
+-  if (!account) throw new OperationError('unavailable', 'This source is unavailable in the current workspace.');
+-  return countDisconnectRows(prisma, actor.workspaceId, account);
+-}
+-
+-/** Installation-owner estimate of the rows delete mode removes; the caller must already have checked Root. */
+-export async function previewSocialAccountDeletionAsRoot(socialAccountId: string) {
+-  const account = await prisma.socialAccount.findUnique({ where: { id: socialAccountId }, select: { id: true, workspaceId: true, targets: { select: { id: true } }, adAccounts: { select: { id: true } } } });
+-  if (!account) throw new OperationError('not_found', 'Connection not found.');
+-  return { workspaceId: account.workspaceId, counts: await countDisconnectRows(prisma, account.workspaceId, account) };
+-}
+-
+-async function countDisconnectRows(tx: typeof prisma | import('../../generated/client').Prisma.TransactionClient, workspaceId: string, account: { id: string; targets: Array<{ id: string }>; adAccounts: Array<{ id: string }> }) {
+-  const targetIds = account.targets.map(item => item.id);
+-  const adAccountIds = account.adAccounts.map(item => item.id);
+-  const instagramAccounts = await linkedInstagramAccounts(tx, workspaceId, account.id, targetIds);
+-  const instagramAccountIds = instagramAccounts.map(item => item.id);
+-  const targetLinks = targetIds.length ? await tx.postTarget.findMany({ where: { targetId: { in: targetIds } }, select: { id: true, postId: true } }) : [];
+-  const postTargetIds = targetLinks.map(row => row.id);
+-  const affectedPostIds = [...new Set(targetLinks.map(row => row.postId))];
+-  const conversations = targetIds.length ? await tx.conversation.findMany({ where: { targetId: { in: targetIds } }, select: { id: true } }) : [];
+-  const conversationIds = conversations.map(row => row.id);
+-  const orphanPosts = affectedPostIds.length ? await tx.post.findMany({
+-    where: { id: { in: affectedPostIds }, workspaceId, targets: { every: { targetId: { in: targetIds } } } }, select: { id: true },
+-  }) : [];
+-  const [comments, conversationMessages, pageInsights, adInsights, scheduledRemote, instagramInsights, instagramMedia] = await Promise.all([
+-    postTargetIds.length ? tx.postComment.count({ where: { postTargetId: { in: postTargetIds } } }) : 0,
+-    conversationIds.length ? tx.conversationMessage.count({ where: { conversationId: { in: conversationIds } } }) : 0,
+-    targetIds.length ? tx.pageInsight.count({ where: { targetId: { in: targetIds } } }) : 0,
+-    adAccountIds.length ? tx.adInsight.count({ where: { adAccountId: { in: adAccountIds } } }) : 0,
+-    postTargetIds.length ? tx.postTarget.count({ where: { id: { in: postTargetIds }, status: 'scheduled_remote' } }) : 0,
+-    instagramAccountIds.length ? tx.instagramInsight.count({ where: { accountId: { in: instagramAccountIds } } }) : 0,
+-    instagramAccountIds.length ? tx.instagramMedia.count({ where: { accountId: { in: instagramAccountIds } } }) : 0,
+-  ]);
+-  return {
+-    channels: targetIds.length, adAccounts: adAccountIds.length, postTargets: targetLinks.length,
+-    orphanPosts: orphanPosts.length, comments, conversations: conversations.length,
+-    conversationMessages, pageInsights, adInsights, scheduledRemote,
+-    instagramAccounts: instagramAccountIds.length, instagramInsights, instagramMedia,
+-  };
+-}
+-
+-function linkedInstagramAccounts(tx: typeof prisma | import('../../generated/client').Prisma.TransactionClient, workspaceId: string, socialAccountId: string, targetIds: string[]) {
+-  return tx.instagramAccount.findMany({ where: { workspaceId, OR: [{ socialAccountId }, ...(targetIds.length ? [{ socialAccountId: null, targetId: { in: targetIds } }] : [])] }, select: { id: true } });
+-}
+-
+-async function requireSelectableSource(tx: import('../../generated/client').Prisma.TransactionClient, workspaceId: string, socialAccountId: string | null, entitlements: Entitlements | null) {
+-  const source = socialAccountId ? await tx.socialAccount.findFirst({
+-    where: { id: socialAccountId, workspaceId },
+-    select: { id: true, provider: true, invalidatedAt: true, tokenExpiresAt: true },
+-  }) : null;
+-  if (!source || connectionState(source) !== 'connected') throw new OperationError('reconnect_required', 'Reconnect this source before selecting it.');
+-  if (!entitlements || !hasPlatformCapability(entitlements, source.provider) || !await isPlatformEnabled(source.provider)) throw new OperationError('unavailable', 'This connection is unavailable in the current workspace.');
+-}
+-
+-/** Apply a confirmed set of channel and ad account choices atomically. */
+-export async function setConnectionSelections(actor: ConnectionMutationActor, items: ConnectionSelection[]) {
+-  const membership = await currentMembership(actor);
+-  if (!MANAGER_ROLES.has(membership.role)) throw new OperationError('forbidden', 'Only workspace owners and admins can change connections.');
+-  const { runtimeConfig } = await import('@/server/config/store');
+-  if (items.length > await runtimeConfig('data.connectionSelectionMaxItems') || new Set(items.map(item => `${item.kind}:${item.id}`)).size !== items.length) throw new OperationError('invalid_request', 'Invalid selection list.');
+-  const entitlements = items.some(item => item.enabled) ? await loadEntitlements(actor.userId, actor.workspaceId, { allowInstallationInspection: false }) : null;
+-  if (items.some(item => item.enabled) && (!entitlements || !canUseFeature(entitlements, 'settings/connections'))) throw new OperationError('forbidden', 'Connection selection is unavailable in this workspace.');
+-  await prisma.$transaction(async tx => {
+-    await lockSelectedResources(tx, actor.workspaceId, items.map(item => ({ kind: item.kind, id: item.id })));
+-    for (const item of items) {
+-      if (item.kind === 'target') {
+-        const target = await tx.target.findFirst({ where: { id: item.id, workspaceId: actor.workspaceId }, select: { id: true, type: true, providerId: true, socialAccountId: true } });
+-        if (!target) throw new OperationError('unavailable', 'This channel is unavailable in the current workspace.');
+-        if (item.enabled) {
+-          await requireSelectableSource(tx, actor.workspaceId, target.socialAccountId, entitlements);
+-        } else {
+-          await lockPublishingTargets(tx, actor.workspaceId, [target.id]);
+-          await assertPublishingTargetsSettled(tx, actor.workspaceId, [target.id]);
+-          await lockInboxChannel(tx, actor.workspaceId, target.id);
+-          await assertInboxDeletionsSettled(tx, actor.workspaceId, [target.id]);
+-        }
+-        await tx.target.updateMany({ where: { id: target.id, workspaceId: actor.workspaceId }, data: { enabled: item.enabled } });
+-        if (target.type === 'instagram') await tx.instagramAccount.updateMany({ where: { workspaceId: actor.workspaceId, igUserId: target.providerId }, data: { enabled: item.enabled } });
+-      } else {
+-        const account = await tx.adAccount.findFirst({ where: { id: item.id, workspaceId: actor.workspaceId }, select: { id: true, socialAccountId: true } });
+-        if (!account) throw new OperationError('unavailable', 'This advertising account is unavailable in the current workspace.');
+-        if (item.enabled) {
+-          await requireSelectableSource(tx, actor.workspaceId, account.socialAccountId, entitlements);
+-        }
+-        await tx.adAccount.updateMany({ where: { id: account.id, workspaceId: actor.workspaceId }, data: { enabled: item.enabled } });
+-      }
+-      await auditConnectionEvent(tx, actor, 'connection.selection_changed', { kind: item.kind, id: item.id, enabled: item.enabled });
+-    }
+-  });
+-}
+-
+-async function currentMembership(actor: ConnectionMutationActor) {
+-  const membership = await prisma.membership.findUnique({
+-    where: { userId_workspaceId: { userId: actor.userId, workspaceId: actor.workspaceId } },
+-    select: { role: true },
+-  });
+-  if (!membership) throw new OperationError('forbidden', 'You are no longer a member of this workspace.');
+-  return membership;
+-}
+-
+-
+-/** Locally disconnect a source while retaining its discovered records and history. */
+-type DisconnectAuthorize = (tx: import('../../generated/client').Prisma.TransactionClient) => Promise<void>;
+-const workspaceManager = (actor: ConnectionMutationActor): DisconnectAuthorize => async tx => {
+-  const membership = await tx.membership.findUnique({ where: { userId_workspaceId: { userId: actor.userId, workspaceId: actor.workspaceId } }, select: { role: true } });
+-  if (!membership) throw new OperationError('forbidden', 'You are no longer a member of this workspace.');
+-  if (!MANAGER_ROLES.has(membership.role)) throw new OperationError('forbidden', 'Only workspace owners and admins can change connections.');
+-};
+-
+-/** `authorize` runs first inside the transaction; Root passes an installation-owner check instead of workspace membership. */
+-export async function disconnectSocialAccount(actor: ConnectionMutationActor, socialAccountId: string, mode: 'retain' | 'delete' = 'retain', confirmation?: string, authorize: DisconnectAuthorize = workspaceManager(actor)) {
+-  return prisma.$transaction(async tx => {
+-    await authorize(tx);
+-    if (mode === 'delete' && confirmation !== 'DELETE') throw new OperationError('invalid_request', 'Type DELETE to confirm related data removal.');
+-    const account = await tx.socialAccount.findFirst({ where: { id: socialAccountId, workspaceId: actor.workspaceId }, select: { id: true, targets: { select: { id: true } }, adAccounts: { select: { id: true } } } });
+-    if (!account) throw new OperationError('unavailable', 'This source is unavailable in the current workspace.');
+-    const targetIds = account.targets.map(item => item.id);
+-    await lockSelectedResources(tx, actor.workspaceId, [
+-      ...targetIds.map(id => ({ kind: 'target' as const, id })),
+-      ...account.adAccounts.map(item => ({ kind: 'adAccount' as const, id: item.id })),
+-    ]);
+-    await lockPublishingTargets(tx, actor.workspaceId, targetIds);
+-    await assertPublishingTargetsSettled(tx, actor.workspaceId, targetIds);
+-    for (const targetId of [...targetIds].sort()) await lockInboxChannel(tx, actor.workspaceId, targetId);
+-    await assertInboxDeletionsSettled(tx, actor.workspaceId, targetIds);
+-    const adAccountIds = account.adAccounts.map(item => item.id);
+-    const stillScheduled = targetIds.length ? await tx.postTarget.count({ where: { targetId: { in: targetIds }, status: 'scheduled_remote' } }) : 0;
+-
+-    if (mode === 'retain') {
+-      await tx.target.updateMany({ where: { workspaceId: actor.workspaceId, id: { in: targetIds } }, data: { enabled: false } });
+-      await tx.adAccount.updateMany({ where: { workspaceId: actor.workspaceId, id: { in: adAccountIds } }, data: { enabled: false } });
+-      const instagramAccounts = await linkedInstagramAccounts(tx, actor.workspaceId, account.id, targetIds);
+-      await tx.instagramAccount.updateMany({ where: { workspaceId: actor.workspaceId, id: { in: instagramAccounts.map(item => item.id) } }, data: { enabled: false } });
+-      await tx.socialAccount.updateMany({ where: { id: account.id, workspaceId: actor.workspaceId }, data: { invalidatedAt: new Date() } });
+-      await auditConnectionEvent(tx, actor, 'connection.local_disconnected', { socialAccountId: account.id, channels: targetIds.length, adAccounts: adAccountIds.length, instagramAccounts: instagramAccounts.length, retained: true, stillScheduled });
+-      return { mode, stillScheduled, retained: { channels: targetIds.length, adAccounts: adAccountIds.length, instagramAccounts: instagramAccounts.length } };
+-    }
+-
+-    await assertAdsOperationsSettled(tx, actor.workspaceId, adAccountIds);
+-    if (stillScheduled > 0) throw new OperationError('conflict', 'This source has posts still scheduled at the provider. Cancel or reconcile those posts before deleting its local records.');
+-
+-    const targetLinks = targetIds.length ? await tx.postTarget.findMany({ where: { targetId: { in: targetIds } }, select: { id: true, postId: true } }) : [];
+-    const instagramAccounts = await linkedInstagramAccounts(tx, actor.workspaceId, account.id, targetIds);
+-    const instagramAccountIds = instagramAccounts.map(item => item.id);
+-    const targetLinkIds = targetLinks.map(row => row.id);
+-    const affectedPostIds = [...new Set(targetLinks.map(row => row.postId))];
+-    const conversations = targetIds.length ? await tx.conversation.findMany({ where: { targetId: { in: targetIds } }, select: { id: true } }) : [];
+-    const conversationIds = conversations.map(row => row.id);
+-    const comments = targetLinkIds.length ? await tx.postComment.deleteMany({ where: { postTargetId: { in: targetLinkIds } } }) : { count: 0 };
+-    if (targetLinkIds.length) await tx.postTarget.deleteMany({ where: { id: { in: targetLinkIds } } });
+-    const orphanPosts = affectedPostIds.length ? await tx.post.deleteMany({ where: { id: { in: affectedPostIds }, workspaceId: actor.workspaceId, targets: { none: {} } } }) : { count: 0 };
+-    const conversationMessages = conversationIds.length ? await tx.conversationMessage.deleteMany({ where: { conversationId: { in: conversationIds } } }) : { count: 0 };
+-    const deletedConversations = conversationIds.length ? await tx.conversation.deleteMany({ where: { id: { in: conversationIds } } }) : { count: 0 };
+-    const insights = targetIds.length ? await tx.pageInsight.deleteMany({ where: { targetId: { in: targetIds } } }) : { count: 0 };
+-    const adInsights = adAccountIds.length ? await tx.adInsight.deleteMany({ where: { adAccountId: { in: adAccountIds } } }) : { count: 0 };
+-    const instagramMedia = instagramAccountIds.length ? await tx.instagramMedia.deleteMany({ where: { accountId: { in: instagramAccountIds } } }) : { count: 0 };
+-    const instagramInsights = instagramAccountIds.length ? await tx.instagramInsight.deleteMany({ where: { accountId: { in: instagramAccountIds } } }) : { count: 0 };
+-    const deletedInstagramAccounts = instagramAccountIds.length ? await tx.instagramAccount.deleteMany({ where: { workspaceId: actor.workspaceId, id: { in: instagramAccountIds } } }) : { count: 0 };
+-    await tx.target.deleteMany({ where: { workspaceId: actor.workspaceId, id: { in: targetIds } } });
+-    await tx.adAccount.deleteMany({ where: { workspaceId: actor.workspaceId, id: { in: adAccountIds } } });
+-    await tx.socialAccount.deleteMany({ where: { id: account.id, workspaceId: actor.workspaceId } });
+-    const counts = { channels: targetIds.length, adAccounts: adAccountIds.length, postTargets: targetLinks.length, orphanPosts: orphanPosts.count, comments: comments.count, conversations: deletedConversations.count, conversationMessages: conversationMessages.count, pageInsights: insights.count, adInsights: adInsights.count, instagramAccounts: deletedInstagramAccounts.count, instagramInsights: instagramInsights.count, instagramMedia: instagramMedia.count, scheduledRemote: stillScheduled };
+-    await auditConnectionEvent(tx, actor, 'connection.local_disconnected', { socialAccountId: account.id, retained: false, counts });
+-    return { mode, deleted: counts, stillScheduled };
+-  });
+-}
+-
+-export async function auditConnectionEvent(tx: import('../../generated/client').Prisma.TransactionClient, actor: ConnectionMutationActor, action: string, detail: Record<string, unknown>) {
+-  await tx.$executeRaw`INSERT INTO root_activities (id, "actorId", action, detail, "createdAt") VALUES (${`conn_${randomBytes(12).toString('hex')}`}, ${actor.userId}, ${action}, ${JSON.stringify({ workspaceId: actor.workspaceId, ...detail })}::jsonb, NOW())`;
+-}
++/** Compatibility import; product behavior is owned by Settings. */
++export * from '@/modules/settings/server/connection-mutations';
+diff --git a/rebuild/src/server/post-mutations.ts b/rebuild/src/server/post-mutations.ts
+index 489d51b2..ee912d13 100644
+--- a/rebuild/src/server/post-mutations.ts
++++ b/rebuild/src/server/post-mutations.ts
+@@ -1,116 +1,2 @@
+-import { withPublishingOperation, withPublishingTransaction } from '@/modules/publishing/server/guard';
+-import { randomUUID } from "node:crypto";
+-import { OperationError } from "@/lib/operation-error";
+-import { prisma } from "./data";
+-import { loadVersionRetention, recordPostVersion } from '@/modules/publishing/collaboration/server/versions';
+-
+-const AUTHOR_ROLES = new Set(["owner", "admin", "editor", "contributor"]);
+-
+-export type PostMutationActor = { userId: string; workspaceId: string };
+-
+-/**
+- * Create a local draft. This intentionally does not create destination rows,
+- * schedule delivery, or call a social provider.
+- */
+-export async function createLocalDraft(actor: PostMutationActor, message: string) {
+-  return withPublishingOperation(actor, {}, async ({ actor, signal }) => {
+-    signal.throwIfAborted();
+-    const membership = await getCurrentMembership(actor);
+-    if (!AUTHOR_ROLES.has(membership.role)) throw new OperationError('forbidden', "You do not have permission to create drafts.");
+-    const retention = await loadVersionRetention();
+-
+-    const now = new Date();
+-    return withPublishingTransaction(signal, async tx => {
+-      const created = await tx.post.create({
+-        data: {
+-          id: randomUUID(),
+-          workspaceId: actor.workspaceId,
+-          authorId: actor.userId,
+-          message,
+-          status: "draft",
+-          scheduledAt: null,
+-          publishedAt: null,
+-          createdAt: now,
+-          updatedAt: now,
+-        },
+-        select: { id: true },
+-      });
+-      await recordPostVersion(tx, created.id, actor.userId, retention);
+-      await auditDraft(tx, actor, 'publishing.post_created', created.id);
+-      return created;
+-    });
+-  });
+-}
+-
+-/** Edit only an unconnected, unpublished draft in the actor's current workspace. */
+-export async function updateLocalDraft(actor: PostMutationActor, postId: string, message: string) {
+-  return withPublishingOperation(actor, { postId }, async ({ actor, signal }) => {
+-    signal.throwIfAborted();
+-    const membership = await getCurrentMembership(actor);
+-    if (!AUTHOR_ROLES.has(membership.role)) throw new OperationError('forbidden', "You do not have permission to edit drafts.");
+-    const retention = await loadVersionRetention();
+-
+-    const ownsPost = membership.role === "contributor";
+-    await withPublishingTransaction(signal, async tx => {
+-      const where = {
+-        id: postId,
+-        workspaceId: actor.workspaceId,
+-        status: "draft" as const,
+-        publishedAt: null,
+-        ...(ownsPost ? { authorId: actor.userId } : {}),
+-        targets: { none: {} },
+-      };
+-      const current = await tx.post.findFirst({ where, select: { id: true } });
+-      if (!current) throw new OperationError('conflict', "This draft is unavailable or can no longer be edited.");
+-      await recordPostVersion(tx, current.id, actor.userId, retention);
+-      const result = await tx.post.updateMany({
+-        where,
+-        data: { message, updatedAt: new Date() },
+-      });
+-      if (result.count !== 1) throw new OperationError('conflict', "This draft is unavailable or can no longer be edited.");
+-      await recordPostVersion(tx, current.id, actor.userId, retention);
+-      await auditDraft(tx, actor, 'publishing.post_updated', postId);
+-    });
+-  });
+-}
+-
+-/**
+- * Permanently remove only an unpublished draft with no destination rows.
+- * The UI must ask for confirmation; this operation never contacts providers.
+- */
+-export async function deleteLocalDraft(actor: PostMutationActor, postId: string) {
+-  return withPublishingOperation(actor, { postId }, async ({ actor, signal }) => {
+-    signal.throwIfAborted();
+-    const membership = await getCurrentMembership(actor);
+-    if (!AUTHOR_ROLES.has(membership.role)) throw new OperationError('forbidden', "You do not have permission to delete drafts.");
+-
+-    const ownsPost = membership.role === "contributor";
+-    await withPublishingTransaction(signal, async tx => {
+-      const result = await tx.post.deleteMany({
+-        where: {
+-          id: postId,
+-          workspaceId: actor.workspaceId,
+-          status: "draft",
+-          publishedAt: null,
+-          ...(ownsPost ? { authorId: actor.userId } : {}),
+-          targets: { none: {} },
+-        },
+-      });
+-      if (result.count !== 1) throw new OperationError('conflict', "This draft is unavailable or can no longer be deleted.");
+-      await auditDraft(tx, actor, 'publishing.post_deleted', postId);
+-    });
+-  });
+-}
+-
+-async function getCurrentMembership(actor: PostMutationActor) {
+-  const membership = await prisma.membership.findUnique({
+-    where: { userId_workspaceId: { userId: actor.userId, workspaceId: actor.workspaceId } },
+-    select: { role: true },
+-  });
+-  if (!membership) throw new OperationError('unauthorized', "You are no longer a member of this workspace.");
+-  return membership;
+-}
+-
+-async function auditDraft(tx: import('../../generated/client').Prisma.TransactionClient, actor: PostMutationActor, action: string, postId: string) {
+-  await tx.$executeRaw`INSERT INTO root_activities (id, "actorId", action, detail, "createdAt") VALUES (${randomUUID()}, ${actor.userId}, ${action}, ${JSON.stringify({ workspaceId: actor.workspaceId, postId, localDraft: true })}::jsonb, NOW())`;
+-}
++/** Compatibility import; product behavior is owned by Publishing. */
++export * from '@/modules/publishing/server/post-mutations';
+diff --git a/rebuild/tests/agency-ui.test.ts b/rebuild/tests/agency-ui.test.ts
+index 0e46eeec..f74d7793 100644
+--- a/rebuild/tests/agency-ui.test.ts
++++ b/rebuild/tests/agency-ui.test.ts
+@@ -32,7 +32,7 @@ describe('Agency workspace action', () => {
+     const [url, init] = vi.mocked(fetch).mock.calls[0]!;
+     expect(url).toBe('/api/workspaces/select');
+     expect(init?.method).toBe('POST');
+-    expect(JSON.parse(String(init?.body))).toEqual({ workspaceId: 'w2' });
++    expect(JSON.parse(String(init?.body))).toEqual({ workspaceId: 'w2', confirmation: 'SELECT WORKSPACE w2' });
+     expect(assign).toHaveBeenCalledWith('/settings/connections');
+   });
+ 
+@@ -101,6 +101,6 @@ it('quick-switches only to an explicitly selected workspace from the scoped list
+   const choice = [...dock.querySelectorAll<HTMLElement>('[role="option"]')].find(item => item.textContent === 'Acme')!;
+   await click(choice);
+   await click(dock.querySelector<HTMLElement>('button[aria-label="Ouvrir l’espace: Acme"]')!);
+-  expect(JSON.parse(String(vi.mocked(fetch).mock.calls[0][1]?.body))).toEqual({ workspaceId: 'w2' });
++  expect(JSON.parse(String(vi.mocked(fetch).mock.calls[0][1]?.body))).toEqual({ workspaceId: 'w2', confirmation: 'SELECT WORKSPACE w2' });
+   expect(assign).toHaveBeenCalledWith('/home');
+ });
+diff --git a/rebuild/tests/form-validation-copy.test.ts b/rebuild/tests/form-validation-copy.test.ts
+new file mode 100644
+index 00000000..cc8568bb
+--- /dev/null
++++ b/rebuild/tests/form-validation-copy.test.ts
+@@ -0,0 +1,26 @@
++// @vitest-environment jsdom
++import { afterEach, describe, expect, it } from 'vitest';
++import { collectFormErrors, formValidationCopy, formValidationCopySchema } from '@/lib/ui/form-validation';
++
++afterEach(() => { document.body.innerHTML = ''; document.documentElement.lang = ''; });
++function form() {
++  document.body.innerHTML = '<form><select name="choice" required><option value="">—</option></select><input name="email" type="email" value="bad"><input name="short" minlength="4" value="ab"><input name="long" maxlength="3" value="four"><input name="minimum" type="number" min="2" value="1"><input name="maximum" type="number" max="5" value="6"><input name="password" type="password" minlength="3" value="   "><input name="disabled" required disabled></form>';
++  return document.querySelector('form')!;
++}
++describe('shared bilingual validation catalog', () => {
++  it('validates both complete catalogs and refuses partial catalogs', () => {
++    expect(formValidationCopySchema.safeParse(formValidationCopy).success).toBe(true);
++    expect(formValidationCopySchema.safeParse({ en: formValidationCopy.en, fr: {} }).success).toBe(false);
++  });
++  it('uses French document language including regional variants and preserves constraints', () => {
++    const element = form(); document.documentElement.lang = 'fr-CA';
++    expect(collectFormErrors(element)).toEqual({ choice: 'Choisissez une option.', email: 'Saisissez une adresse e-mail valide.', short: 'Utilisez au moins 4 caractères.', long: 'Utilisez au maximum 3 caractères.', minimum: 'Saisissez une valeur supérieure ou égale à 2.', maximum: 'Saisissez une valeur inférieure ou égale à 5.' });
++    expect(element.querySelector<HTMLInputElement>('[name=password]')!.value).toBe('   ');
++  });
++  it('accepts serialized Root overrides and preserves domain-error priority', () => {
++    const element = form(); element.lang = 'fr';
++    const copy = { ...formValidationCopy.en, tooShort: 'Minimum: {value}; expected {value}.', email: 'Configured email guidance' };
++    expect(collectFormErrors(element, {}, copy)).toMatchObject({ email: copy.email, short: 'Minimum: 4; expected 4.' });
++    expect(collectFormErrors(element, { email: 'Domain feedback' }, copy).email).toBe('Domain feedback');
++  });
++});
+diff --git a/rebuild/tests/media-presentation-policy.test.ts b/rebuild/tests/media-presentation-policy.test.ts
+new file mode 100644
+index 00000000..cb814011
+--- /dev/null
++++ b/rebuild/tests/media-presentation-policy.test.ts
+@@ -0,0 +1,28 @@
++import { beforeEach, describe, expect, it, vi } from 'vitest';
++const config = vi.hoisted(() => vi.fn());
++vi.mock('@/server/config/store', () => ({ runtimeConfig: config }));
++import { loadMediaPresentationPolicy } from '@/modules/publishing/server/media/policy';
++import { mediaPresentationPolicy, mediaPresentationPolicySchema } from '@/modules/publishing/server/media/config';
++
++beforeEach(() => { config.mockReset(); });
++describe('media presentation Root policy', () => {
++  it('uses runtimeConfig and validates non-default policy', async () => {
++    const changed = { holdersPerImage: 2, fileNameMaxCharacters: 12, usagePreviewMaxCharacters: 1, fallbackFileName: 'photo' };
++    config.mockResolvedValue(changed);
++    await expect(loadMediaPresentationPolicy()).resolves.toEqual(changed);
++    expect(config).toHaveBeenCalledWith('storage.mediaPresentationPolicy');
++  });
++  it('keeps shipped bounds when configuration cannot yet load', async () => {
++    config.mockRejectedValue(new Error('Unknown non-secret configuration key.'));
++    await expect(loadMediaPresentationPolicy()).resolves.toEqual(mediaPresentationPolicy);
++  });
++  it.each([
++    { holdersPerImage: 0 }, { holdersPerImage: 101 }, { fileNameMaxCharacters: 256 },
++    { usagePreviewMaxCharacters: 0 }, { fallbackFileName: '../image' }, { fallbackFileName: 'a\u0000b' },
++  ])('rejects invalid bounds or unsafe fallback names: %j', async override => {
++    const value = { ...mediaPresentationPolicy, ...override };
++    expect(mediaPresentationPolicySchema.safeParse(value).success).toBe(false);
++    config.mockResolvedValue(value);
++    await expect(loadMediaPresentationPolicy()).rejects.toThrow();
++  });
++});
+diff --git a/rebuild/tests/media-storage.test.ts b/rebuild/tests/media-storage.test.ts
+index 9e89b981..4800afe1 100644
+--- a/rebuild/tests/media-storage.test.ts
++++ b/rebuild/tests/media-storage.test.ts
+@@ -3,8 +3,8 @@ import { mkdtemp, mkdir, rm, symlink, utimes, writeFile } from 'node:fs/promises
+ import os from 'node:os';
+ import path from 'node:path';
+ 
+-const config = vi.hoisted(() => ({ root: '', maxBytes: 1024, allowed: ['image/jpeg', 'image/png'] as string[] }));
+-vi.mock('../src/server/config/store', () => ({ runtimeConfig: vi.fn(async (key: string) => key === 'storage.mediaRoot' ? config.root : key === 'publishing.maxImageUploadBytes' ? config.maxBytes : key === 'publishing.allowedImageMimeTypes' ? config.allowed : undefined) }));
++const config = vi.hoisted(() => ({ root: '', maxBytes: 1024, allowed: ['image/jpeg', 'image/png'] as string[], presentation: { holdersPerImage: 5, fileNameMaxCharacters: 180, usagePreviewMaxCharacters: 80, fallbackFileName: 'image' } }));
++vi.mock('../src/server/config/store', () => ({ runtimeConfig: vi.fn(async (key: string) => key === 'storage.mediaPresentationPolicy' ? config.presentation : key === 'storage.mediaRoot' ? config.root : key === 'publishing.maxImageUploadBytes' ? config.maxBytes : key === 'publishing.allowedImageMimeTypes' ? config.allowed : undefined) }));
+ const db = vi.hoisted(() => ({ post: { findMany: vi.fn(async (): Promise<Array<{ media: unknown }>> => []) } }));
+ vi.mock('../src/server/data', () => ({ prisma: db }));
+ 
+@@ -94,6 +94,23 @@ describe('workspace image storage', () => {
+     db.post.findMany.mockResolvedValue([]);
+   });
+ 
++  it('applies non-default Root bounds after holder visibility while preserving total counts', async () => {
++    tempRoot = await mkdtemp(path.join(os.tmpdir(), 'media-store-test-'));
++    config.root = path.join(tempRoot, 'root'); await mkdir(config.root);
++    const previous = config.presentation;
++    config.presentation = { holdersPerImage: 1, fileNameMaxCharacters: 4, usagePreviewMaxCharacters: 5, fallbackFileName: 'photo' };
++    try {
++      const image = await uploadWorkspaceImage({ userId: 'u1', workspaceId: 'workspace-a' }, new File([Buffer.from([0xff, 0xd8, 0xff])], '../abcdef.jpg', { type: 'image/jpeg' }));
++      expect(image.fileName).toBe('abcd');
++      db.post.findMany.mockImplementation((async (args: { where: { AND?: unknown } }) => args.where.AND
++        ? [{ id: 'visible-a' }, { id: 'visible-b' }]
++        : ['hidden', 'visible-a', 'visible-b'].map(id => ({ id, status: 'draft', message: 'Long preview text', media: [{ url: `media:${image.id}` }] }))) as never);
++      const result = await listWorkspaceImages('workspace-a', { limit: 10, holderVisibility: { workspaceId: 'workspace-a' } });
++      expect(result.items[0]).toMatchObject({ usedBy: 3, heldBy: [{ id: 'visible-a', excerpt: 'Long…' }] });
++      expect(result.items[0]!.heldBy).toHaveLength(1);
++    } finally { config.presentation = previous; db.post.findMany.mockReset(); db.post.findMany.mockResolvedValue([]); }
++  });
++
+   it('rejects mismatched content, over-limit input, and workspace symlinks', async () => {
+     tempRoot = await mkdtemp(path.join(os.tmpdir(), 'media-store-test-'));
+     config.root = path.join(tempRoot, 'root');
+diff --git a/rebuild/tests/parity-agency-round2.test.ts b/rebuild/tests/parity-agency-round2.test.ts
+index 70d19a1d..f12b3521 100644
+--- a/rebuild/tests/parity-agency-round2.test.ts
++++ b/rebuild/tests/parity-agency-round2.test.ts
+@@ -22,7 +22,7 @@ describe('Agency browser session parity', () => {
+     state.guard.mockImplementation(async (_id, run) => run()); state.audit.mockResolvedValue(undefined); state.actor.mockResolvedValue(actor); state.clients.mockResolvedValue({ ok: true, workspaces: [] });
+   });
+   it('shares selection, audit and cookie without exposing credentials', async () => {
+-    expect(await selectWorkspace(actor, { workspaceId: 'next' })).toEqual({ ok: true });
++    expect(await selectWorkspace(actor, { workspaceId: 'next', confirmation: 'SELECT WORKSPACE next' })).toEqual({ ok: true });
+     expect(state.guard).toHaveBeenCalledWith('next', expect.any(Function));
+     expect(state.audit).toHaveBeenCalledWith(expect.anything(), 'user', 'account.workspace_selected', { workspaceId: 'next' });
+     expect(state.set).toHaveBeenCalledWith('sp_workspace', 'next', expect.objectContaining({ httpOnly: true, sameSite: 'lax' }));
+@@ -34,30 +34,30 @@ describe('Agency browser session parity', () => {
+   });
+   it('requires current membership before inspecting target status', async () => {
+     state.membership.mockResolvedValue(null);
+-    await expect(selectWorkspace(actor, { workspaceId: 'other' })).rejects.toMatchObject({ code: 'not_found' });
++    await expect(selectWorkspace(actor, { workspaceId: 'other', confirmation: 'SELECT WORKSPACE other' })).rejects.toMatchObject({ code: 'not_found' });
+     expect(state.guard).not.toHaveBeenCalled(); expect(state.set).not.toHaveBeenCalled();
+   });
+   it.each(['suspended', 'purging'])('refuses %s targets through workspace guard', async status => {
+     state.guard.mockRejectedValue(new OperationError('forbidden', status));
+-    await expect(selectWorkspace(actor, { workspaceId: 'next' })).rejects.toMatchObject({ code: 'forbidden' });
++    await expect(selectWorkspace(actor, { workspaceId: 'next', confirmation: 'SELECT WORKSPACE next' })).rejects.toMatchObject({ code: 'forbidden' });
+     expect(state.audit).not.toHaveBeenCalled(); expect(state.set).not.toHaveBeenCalled();
+   });
+   it('refuses membership removed before locked authorization', async () => {
+     state.lockedMembership.mockResolvedValue([]);
+-    await expect(selectWorkspace(actor, { workspaceId: 'next' })).rejects.toMatchObject({ code: 'not_found' });
++    await expect(selectWorkspace(actor, { workspaceId: 'next', confirmation: 'SELECT WORKSPACE next' })).rejects.toMatchObject({ code: 'not_found' });
+     expect(state.audit).not.toHaveBeenCalled(); expect(state.set).not.toHaveBeenCalled();
+   });
+   it('refuses preference mutation when durable audit fails', async () => {
+     state.audit.mockRejectedValue(new Error('audit unavailable'));
+-    await expect(selectWorkspace(actor, { workspaceId: 'next' })).rejects.toThrow('audit unavailable'); expect(state.set).not.toHaveBeenCalled();
++    await expect(selectWorkspace(actor, { workspaceId: 'next', confirmation: 'SELECT WORKSPACE next' })).rejects.toThrow('audit unavailable'); expect(state.set).not.toHaveBeenCalled();
+   });
+   it.each([{ pending: 'totp' }, { expiresAt: new Date(0) }, { userId: 'other' }, { user: { id: 'user', disabledAt: new Date() } }])('refuses unusable session %j', async override => {
+     state.session.mockResolvedValue({ ...session(), ...override });
+-    await expect(selectWorkspace(actor, { workspaceId: 'next' })).rejects.toMatchObject({ code: 'unauthorized' }); expect(state.set).not.toHaveBeenCalled();
++    await expect(selectWorkspace(actor, { workspaceId: 'next', confirmation: 'SELECT WORKSPACE next' })).rejects.toMatchObject({ code: 'unauthorized' }); expect(state.set).not.toHaveBeenCalled();
+   });
+   it('rechecks session after acquiring the workspace guard', async () => {
+     state.session.mockResolvedValueOnce(session()).mockResolvedValueOnce(null);
+-    await expect(selectWorkspace(actor, { workspaceId: 'next' })).rejects.toMatchObject({ code: 'unauthorized' }); expect(state.audit).not.toHaveBeenCalled();
++    await expect(selectWorkspace(actor, { workspaceId: 'next', confirmation: 'SELECT WORKSPACE next' })).rejects.toMatchObject({ code: 'unauthorized' }); expect(state.audit).not.toHaveBeenCalled();
+   });
+   it('excludes bearer keys before session cookie access', async () => {
+     const keyed = { ...viewer, apiKeyId: 'key' };
+@@ -72,6 +72,12 @@ describe('Agency browser session parity', () => {
+     expect(state.actor).toHaveBeenCalledWith('user', 'old'); expect(state.clients).toHaveBeenCalledWith({ userId: 'user' }, { q: 'Studio' });
+     expect(AGENCY_SESSION_MCP.features.list_agency_clients).toBe('agency/clients');
+   });
++  it.each([undefined, '', 'SELECT WORKSPACE other', 'SELECT WORKSPACE next '])('refuses the same invalid consent in the service and MCP: %s', async confirmation => {
++    const input = { workspaceId: 'next', ...(confirmation === undefined ? {} : { confirmation }) };
++    await expect(selectWorkspace(actor, input)).rejects.toMatchObject({ code: 'invalid_request' });
++    await expect(AGENCY_SESSION_MCP.execute(viewer, 'select_workspace', input, 100)).rejects.toMatchObject({ code: 'invalid_request' });
++    expect(state.membership).not.toHaveBeenCalled(); expect(state.audit).not.toHaveBeenCalled(); expect(state.set).not.toHaveBeenCalled();
++  });
+   it('requires MCP confirmation and shares the same selection service', async () => {
+     await expect(AGENCY_SESSION_MCP.execute(viewer, 'select_workspace', { workspaceId: 'next' }, 100)).rejects.toMatchObject({ code: 'invalid_request' });
+     await expect(AGENCY_SESSION_MCP.execute(viewer, 'select_workspace', { workspaceId: 'next', confirmation: 'SELECT WORKSPACE next' }, 100)).resolves.toEqual({ ok: true }); expect(state.set).toHaveBeenCalledOnce();
+diff --git a/rebuild/tests/workspace-selection-route.test.ts b/rebuild/tests/workspace-selection-route.test.ts
+index c604480a..110f10d9 100644
+--- a/rebuild/tests/workspace-selection-route.test.ts
++++ b/rebuild/tests/workspace-selection-route.test.ts
+@@ -68,7 +68,7 @@ describe('workspace selection route', () => {
+       id: 'session', userId: 'user', tokenHash: 'hash', expiresAt: new Date(Date.now() + 60_000), pending: 'totp',
+       user: { id: 'user', disabledAt: null },
+     });
+-    const response = await POST(request({ workspaceId: 'workspace-b' }));
++    const response = await POST(request({ workspaceId: 'workspace-b', confirmation: 'SELECT WORKSPACE workspace-b' }));
+     expect(response.status).toBe(401);
+     expect(state.listWorkspaces).not.toHaveBeenCalled();
+     expect(state.cookieSet).not.toHaveBeenCalled();
+@@ -79,7 +79,7 @@ describe('workspace selection route', () => {
+       id: 'session', userId: 'user', tokenHash: 'hash', expiresAt: new Date(Date.now() + 60_000), pending: null,
+       user: { id: 'user', disabledAt: new Date() },
+     });
+-    const response = await POST(request({ workspaceId: 'workspace-b' }));
++    const response = await POST(request({ workspaceId: 'workspace-b', confirmation: 'SELECT WORKSPACE workspace-b' }));
+     expect(response.status).toBe(401);
+     expect(state.listWorkspaces).not.toHaveBeenCalled();
+     expect(state.cookieSet).not.toHaveBeenCalled();
+@@ -93,13 +93,13 @@ describe('workspace selection route', () => {
+   });
+ 
+   it('rejects a workspace without a current membership', async () => {
+-    const response = await POST(request({ workspaceId: 'foreign-workspace' }));
++    const response = await POST(request({ workspaceId: 'foreign-workspace', confirmation: 'SELECT WORKSPACE foreign-workspace' }));
+     expect(response.status).toBe(404);
+     expect(state.cookieSet).not.toHaveBeenCalled();
+   });
+ 
+   it('sets only the authorized workspace cookie after validating the completed session', async () => {
+-    const response = await POST(request({ workspaceId: 'workspace-b' }));
++    const response = await POST(request({ workspaceId: 'workspace-b', confirmation: 'SELECT WORKSPACE workspace-b' }));
+     expect(response.status).toBe(200);
+     expect(await response.json()).toEqual({ ok: true });
+     expect(state.getSessionByTokenHash).toHaveBeenCalledTimes(3);
+@@ -111,8 +111,14 @@ describe('workspace selection route', () => {
+     });
+   });
+ 
++  it.each([undefined, '', 'SELECT WORKSPACE workspace-a', 'SELECT WORKSPACE workspace-b '])('refuses missing or inexact consent over REST: %s', async confirmation => {
++    const response = await POST(request({ workspaceId: 'workspace-b', ...(confirmation === undefined ? {} : { confirmation }) }));
++    expect(response.status).toBe(400);
++    expect(state.membership).not.toHaveBeenCalled(); expect(state.audit).not.toHaveBeenCalled(); expect(state.cookieSet).not.toHaveBeenCalled();
++  });
++
+   it('rejects mixed bearer credentials before reading cookies', async () => {
+-    const input = request({ workspaceId: 'workspace-b' });
++    const input = request({ workspaceId: 'workspace-b', confirmation: 'SELECT WORKSPACE workspace-b' });
+     input.headers.set('authorization', 'Bearer workspace-key');
+     expect((await POST(input)).status).toBe(403);
+     expect(state.cookieGet).not.toHaveBeenCalled();

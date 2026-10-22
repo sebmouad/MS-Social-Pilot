@@ -1,0 +1,1209 @@
+diff --git a/rebuild/src/app/api/ads/management/route.ts b/rebuild/src/app/api/ads/management/route.ts
+index 90b0c044..8087d765 100644
+--- a/rebuild/src/app/api/ads/management/route.ts
++++ b/rebuild/src/app/api/ads/management/route.ts
+@@ -1,3 +1,6 @@
++import { withPlatformAdsLocale } from '@/server/platforms/host';
++import { adsServiceText } from '@/modules/ads/server/copy';
++import { adsLocale } from '@/modules/ads/analysis/copy';
+ import { adsNoDispatchMetadata } from '@/modules/ads/management/errors';
+ import { NextResponse } from 'next/server';
+ import { requireViewer } from '@/server/context';
+@@ -11,6 +14,8 @@ export const dynamic = 'force-dynamic';
+ const reply = (body: unknown, status = 200) => NextResponse.json(body, { status, headers: { 'cache-control': 'no-store' } });
+ 
+ export async function GET(request: Request) {
++  const locale = adsLocale(request.headers.get('accept-language'));
++  return withPlatformAdsLocale(locale, async () => {
+   try {
+     const viewer = await requireViewer({ feature: 'ads/campaigns', channelScoped: true });
+     const actor = { userId: viewer.user.id, workspaceId: viewer.workspaceId };
+@@ -24,27 +29,31 @@ export async function GET(request: Request) {
+     if (view === 'creative-sources') return reply(await listAdsCreativeSources(actor, rest as { adAccountId: string; imageAfter?: string; targetOffset?: number }));
+     if (view === 'creatives') return reply(await listAdsCreatives(actor, rest as { adAccountId: string; after?: string; limit?: number }));
+     if (view === 'changes' || view === undefined) return reply(await listAdsOperations(actor, rest));
+-    throw new OperationError('invalid_request', 'Choose a valid Ads management view.');
++    throw new OperationError('invalid_request', await adsServiceText('managementInvalidView', {}, locale));
+   } catch (error) {
+-    const failure = operationFailure(error, 'Ads management could not be loaded. Please try again.');
++    const failure = operationFailure(error, await adsServiceText('managementLoadFailure', {}, locale));
+     return reply({ error: failure.error, code: failure.code, ...adsNoDispatchMetadata(error) }, failure.status);
+   }
++  });
+ }
+ 
+ export async function POST(request: Request) {
+-  if (!sameOrigin(request)) return reply({ error: 'Cross-origin request denied.', code: 'forbidden' }, 403);
++  const locale = adsLocale(request.headers.get('accept-language'));
++  return withPlatformAdsLocale(locale, async () => {
++  if (!sameOrigin(request)) return reply({ error: await adsServiceText('managementOriginDenied', {}, locale), code: 'forbidden' }, 403);
+   try {
+     const viewer = await requireViewer({ feature: 'ads/campaigns', channelScoped: true });
+     const actor = { userId: viewer.user.id, workspaceId: viewer.workspaceId };
+     const body = await request.json().catch(() => null) as Record<string, unknown> | null;
+-    if (!body || typeof body !== 'object' || Array.isArray(body)) throw new OperationError('invalid_request', 'Invalid Ads management request.');
++    if (!body || typeof body !== 'object' || Array.isArray(body)) throw new OperationError('invalid_request', await adsServiceText('managementInvalidRequest', {}, locale));
+     const { action, ...input } = body;
+     if (action === 'preview') return reply(await previewAdsManagement(actor, input as never));
+     if (action === 'apply') return reply(await withWorkspaceOperation(viewer.workspaceId, () => performAdsManagement(actor, input as never)));
+     if (action === 'resolve') return reply(await withWorkspaceOperation(viewer.workspaceId, () => resolveAdsOperation(actor, input as never)));
+-    throw new OperationError('invalid_request', 'Invalid Ads management request.');
++    throw new OperationError('invalid_request', await adsServiceText('managementInvalidRequest', {}, locale));
+   } catch (error) {
+-    const failure = operationFailure(error, 'The change outcome is unconfirmed. Check Ads change history before repeating it.');
++    const failure = operationFailure(error, await adsServiceText('managementOutcomeUnknown', {}, locale));
+     return reply({ error: failure.error, code: failure.code, ...adsNoDispatchMetadata(error) }, failure.status);
+   }
++  });
+ }
+diff --git a/rebuild/src/app/loading.tsx b/rebuild/src/app/loading.tsx
+index f3f168d5..555171e4 100644
+--- a/rebuild/src/app/loading.tsx
++++ b/rebuild/src/app/loading.tsx
+@@ -1,6 +1,16 @@
+-export default function Loading() {
++import { headers } from 'next/headers';
++import { runtimeConfig } from '@/server/config/store';
++import { z } from 'zod';
++
++// Shared-config owner must register ui.loadingCopy; fallback also covers configuration outages.
++const defaults = { en: 'Loading your workspace…', fr: 'Chargement de votre espace de travail…' };
++const catalogSchema = z.object({ en: z.string().trim().min(1).max(4000), fr: z.string().trim().min(1).max(4000) }).strict();
++
++export default async function Loading() {
++  const locale = /^\s*fr\b/i.test((await headers()).get('accept-language') ?? '') ? 'fr' : 'en';
++  const copy = await runtimeConfig('ui.loadingCopy').then(value => catalogSchema.parse(value)).catch(() => defaults);
+   return <div className="route-state" role="status" aria-busy="true">
+     <div className="route-state__mark" aria-hidden="true" />
+-    <p>Loading your workspace…</p>
++    <p>{copy[locale]}</p>
+   </div>;
+ }
+diff --git a/rebuild/src/app/root/errors/ResolveError.tsx b/rebuild/src/app/root/errors/ResolveError.tsx
+index 16195d80..85e7c84e 100644
+--- a/rebuild/src/app/root/errors/ResolveError.tsx
++++ b/rebuild/src/app/root/errors/ResolveError.tsx
+@@ -1,11 +1,12 @@
+ 'use client';
++import type { RootErrorCopy } from './config';
+ 
+ import { useState } from 'react';
+ import { useRouter } from 'next/navigation';
+ import { Button } from '@/components/Button';
+ 
+ /** Reversible bookkeeping, so one click rather than a typed phrase. */
+-export function ResolveError({ id, resolved }: { id: string; resolved: boolean }) {
++export function ResolveError({ id, resolved, copy }: { id: string; resolved: boolean; copy: RootErrorCopy }) {
+   const router = useRouter();
+   const [busy, setBusy] = useState(false);
+   const [error, setError] = useState('');
+@@ -14,9 +15,9 @@ export function ResolveError({ id, resolved }: { id: string; resolved: boolean }
+     try {
+       const response = await fetch(`/api/root/errors/${encodeURIComponent(id)}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ resolved: !resolved, confirmation: `${resolved ? 'REOPEN' : 'RESOLVE'} ROOT ERROR ${id}` }) });
+       const payload: unknown = await response.json().catch(() => null);
+-      if (!response.ok || typeof payload !== 'object' || payload === null || (payload as { ok?: unknown }).ok !== true) setError('The change could not be confirmed. Reload before repeating it.');
++      if (!response.ok || typeof payload !== 'object' || payload === null || (payload as { ok?: unknown }).ok !== true) setError(copy.saveFailure);
+       else router.refresh();
+-    } catch { setError('The change could not be confirmed. Reload before repeating it.'); } finally { setBusy(false); }
++    } catch { setError(copy.saveFailure); } finally { setBusy(false); }
+   }
+-  return <><Button type="button" size="sm" onClick={() => void toggle()} disabled={busy}>{busy ? 'Saving…' : resolved ? 'Reopen' : 'Mark resolved'}</Button>{error && <p role="alert" className="ui-error">{error}</p>}</>;
++  return <><Button type="button" size="sm" onClick={() => void toggle()} disabled={busy}>{busy ? copy.saving : resolved ? copy.reopen : copy.resolve}</Button>{error && <p role="alert" className="ui-error">{error}</p>}</>;
+ }
+diff --git a/rebuild/src/app/root/errors/[id]/page.tsx b/rebuild/src/app/root/errors/[id]/page.tsx
+index 73df9ac1..7e91fc31 100644
+--- a/rebuild/src/app/root/errors/[id]/page.tsx
++++ b/rebuild/src/app/root/errors/[id]/page.tsx
+@@ -1,3 +1,4 @@
++import { loadRootErrorCopy } from '../copy';
+ import { Breadcrumbs } from '@/components/Breadcrumbs';
+ import { PageHeader } from '@/components/PageHeader';
+ import { notFound } from 'next/navigation';
+@@ -9,22 +10,23 @@ import { ResolveError } from '../ResolveError';
+ import '../../plans/legacy-ops.css';
+ 
+ export const dynamic = 'force-dynamic';
+-export const metadata = { title: 'Error · Root' };
++export async function generateMetadata() { return { title: `${(await loadRootErrorCopy()).copy.detailTitle} · Root` }; }
+ 
+ export default async function RootErrorPage({ params }: { params: Promise<{ id: string }> }) {
+   const actor = await requireRootPage();
++  const { copy, locale } = await loadRootErrorCopy();
+   const { id } = await params;
+   let item: Awaited<ReturnType<typeof getRootError>>;
+   try { item = await getRootError(actor.id, id); } catch (error) {
+     if (error instanceof OperationError && (error.code === 'not_found' || error.code === 'invalid_request')) notFound();
+-    return <RootFrame active="/root/errors"><section className="root-control__notice" role="alert"><h2>Error unavailable</h2><p>The error could not be loaded.</p><a href="/root/errors">Back to errors</a></section></RootFrame>;
++    return <RootFrame active="/root/errors"><section className="root-control__notice" role="alert"><h2>{copy.detailUnavailable}</h2><p>{copy.detailFailure}</p><a href="/root/errors">{copy.back}</a></section></RootFrame>;
+   }
+   return <RootFrame active="/root/errors"><div className="root-ops">
+-    <PageHeader module="root" breadcrumbs={<Breadcrumbs items={[{ label: 'Errors', href: '/root/errors' }, { label: item.source }]} />} title={item.name ?? item.source} description={<>{item.message}</>} />
++    <PageHeader module="root" breadcrumbs={<Breadcrumbs items={[{ label: copy.title, href: '/root/errors' }, { label: item.source }]} />} title={item.name ?? item.source} description={<>{item.message}</>} />
+     <section className="root-ops__panel"><dl>
+-      <dt>Occurrences</dt><dd>{item.count}</dd><dt>First seen</dt><dd>{new Date(item.firstSeenAt).toLocaleString()}</dd><dt>Last seen</dt><dd>{new Date(item.lastSeenAt).toLocaleString()}</dd>
+-      <dt>Release</dt><dd>{item.release}</dd>{item.location && <><dt>Location</dt><dd>{item.location}</dd></>}<dt>Status</dt><dd>{item.resolvedAt ? 'Resolved' : 'Open'}</dd>
+-    </dl><ResolveError id={item.id} resolved={Boolean(item.resolvedAt)} /></section>
+-    <section className="root-ops__panel"><h2>Stack</h2>{item.stack ? <pre className="root-ops__stack" tabIndex={0}>{item.stack}</pre> : <p className="root-ops__muted">No stack was recorded.</p>}</section>
++      <dt>{copy.occurrences}</dt><dd>{item.count}</dd><dt>{copy.firstSeen}</dt><dd>{new Date(item.firstSeenAt).toLocaleString(locale)}</dd><dt>{copy.lastSeen}</dt><dd>{new Date(item.lastSeenAt).toLocaleString(locale)}</dd>
++      <dt>{copy.release}</dt><dd>{item.release}</dd>{item.location && <><dt>{copy.location}</dt><dd>{item.location}</dd></>}<dt>{copy.status}</dt><dd>{item.resolvedAt ? copy.resolved : copy.open}</dd>
++    </dl><ResolveError id={item.id} resolved={Boolean(item.resolvedAt)} copy={copy} /></section>
++    <section className="root-ops__panel"><h2>{copy.stack}</h2>{item.stack ? <pre className="root-ops__stack" tabIndex={0}>{item.stack}</pre> : <p className="root-ops__muted">{copy.noStack}</p>}</section>
+   </div></RootFrame>;
+ }
+diff --git a/rebuild/src/app/root/errors/config.ts b/rebuild/src/app/root/errors/config.ts
+new file mode 100644
+index 00000000..c637e950
+--- /dev/null
++++ b/rebuild/src/app/root/errors/config.ts
+@@ -0,0 +1,108 @@
++import { z } from 'zod';
++import { entry } from '@/lib/config/entry';
++import { copySchema } from '@/lib/config/copy-schema';
++
++export const ROOT_ERROR_COPY = {
++  "en": {
++    "title": "Errors",
++    "detailTitle": "Error",
++    "filterTitle": "Error filters",
++    "filterLabel": "Filter errors",
++    "status": "Status",
++    "open": "Open",
++    "resolved": "Resolved",
++    "all": "All",
++    "source": "Source",
++    "allSources": "All sources",
++    "server": "Server",
++    "worker": "Worker",
++    "browser": "Browser",
++    "search": "Search",
++    "filter": "Filter",
++    "description": "Application errors grouped by occurrence. Messages are shortened and credential-like text is hidden. A new occurrence reopens a resolved group.",
++    "unavailable": "Errors unavailable",
++    "loadFailure": "The error log could not be loaded. Try again.",
++    "reset": "Reset filters",
++    "emptyTitle": "No errors",
++    "empty": "No error groups match these filters.",
++    "group": "error group",
++    "groups": "error groups",
++    "caption": "Application errors",
++    "error": "Error",
++    "count": "Count",
++    "lastSeen": "Last seen",
++    "action": "Action",
++    "page": "Page {page} of {pages}",
++    "previous": "Previous",
++    "next": "Next",
++    "detailUnavailable": "Error unavailable",
++    "detailFailure": "The error could not be loaded.",
++    "back": "Back to errors",
++    "occurrences": "Occurrences",
++    "firstSeen": "First seen",
++    "release": "Release",
++    "location": "Location",
++    "request": "Request",
++    "stack": "Stack trace",
++    "noStack": "No stack was recorded.",
++    "resolvedAt": "Resolved at",
++    "resolvedBy": "Resolved by",
++    "saving": "Saving…",
++    "reopen": "Reopen",
++    "resolve": "Mark resolved",
++    "saveFailure": "The change could not be confirmed. Reload before repeating it."
++  },
++  "fr": {
++    "title": "Erreurs",
++    "detailTitle": "Erreur",
++    "filterTitle": "Filtres des erreurs",
++    "filterLabel": "Filtrer les erreurs",
++    "status": "État",
++    "open": "Ouvertes",
++    "resolved": "Résolues",
++    "all": "Toutes",
++    "source": "Source",
++    "allSources": "Toutes les sources",
++    "server": "Serveur",
++    "worker": "Traitement",
++    "browser": "Navigateur",
++    "search": "Rechercher",
++    "filter": "Filtrer",
++    "description": "Erreurs de l’application regroupées par occurrence. Les messages sont raccourcis et les informations sensibles sont masquées. Une nouvelle occurrence rouvre un groupe résolu.",
++    "unavailable": "Erreurs indisponibles",
++    "loadFailure": "Impossible de charger le journal des erreurs. Réessayez.",
++    "reset": "Réinitialiser les filtres",
++    "emptyTitle": "Aucune erreur",
++    "empty": "Aucun groupe d’erreurs ne correspond à ces filtres.",
++    "group": "groupe d’erreurs",
++    "groups": "groupes d’erreurs",
++    "caption": "Erreurs de l’application",
++    "error": "Erreur",
++    "count": "Nombre",
++    "lastSeen": "Dernière occurrence",
++    "action": "Action",
++    "page": "Page {page} sur {pages}",
++    "previous": "Précédente",
++    "next": "Suivante",
++    "detailUnavailable": "Erreur indisponible",
++    "detailFailure": "Impossible de charger l’erreur.",
++    "back": "Retour aux erreurs",
++    "occurrences": "Occurrences",
++    "firstSeen": "Première occurrence",
++    "release": "Version",
++    "location": "Emplacement",
++    "request": "Requête",
++    "stack": "Trace d’exécution",
++    "noStack": "Aucune trace d’exécution enregistrée.",
++    "resolvedAt": "Résolue le",
++    "resolvedBy": "Résolue par",
++    "saving": "Enregistrement…",
++    "reopen": "Rouvrir",
++    "resolve": "Marquer comme résolue",
++    "saveFailure": "La modification n’a pas pu être confirmée. Rechargez avant de la répéter."
++  }
++};
++export const rootErrorCopySchema = z.object({ en: copySchema(ROOT_ERROR_COPY.en), fr: copySchema(ROOT_ERROR_COPY.fr) }).strict();
++/** Integrator: spread into SHARED_CONFIG in src/lib/config/shared-config.ts. */
++export const ROOT_ERROR_CONFIG = [entry({ key: 'root.errorCopy', group: 'Root · Errors', label: 'Error screen copy (English and French)', kind: 'json', description: 'Labels and feedback for private error history and detail screens. Preserve named placeholders.', defaultValue: ROOT_ERROR_COPY, schema: rootErrorCopySchema, consumption: 'active' })] as const;
++export type RootErrorCopy = { [K in keyof typeof ROOT_ERROR_COPY.en]: string };
+diff --git a/rebuild/src/app/root/errors/copy.ts b/rebuild/src/app/root/errors/copy.ts
+new file mode 100644
+index 00000000..8244e036
+--- /dev/null
++++ b/rebuild/src/app/root/errors/copy.ts
+@@ -0,0 +1,10 @@
++import { headers } from 'next/headers';
++import { runtimeConfig } from '@/server/config/store';
++import { ROOT_ERROR_COPY, rootErrorCopySchema } from './config';
++
++export async function loadRootErrorCopy() {
++  const locale = /^\s*fr\b/i.test((await headers()).get('accept-language') ?? '') ? 'fr' : 'en';
++  // Bootstrap fallback also keeps errors inspectable when configuration storage fails.
++  const catalog = await runtimeConfig('root.errorCopy').then(value => rootErrorCopySchema.parse(value)).catch(() => ROOT_ERROR_COPY);
++  return { copy: catalog[locale], locale };
++}
+diff --git a/rebuild/src/app/root/errors/page.tsx b/rebuild/src/app/root/errors/page.tsx
+index 53bde301..e07e6bd8 100644
+--- a/rebuild/src/app/root/errors/page.tsx
++++ b/rebuild/src/app/root/errors/page.tsx
+@@ -1,3 +1,4 @@
++import { loadRootErrorCopy } from './copy';
+ import { RootEmptyState } from '@/server/root/RootEmptyState';
+ import { RootFilters, RootFilterSelect } from '@/server/root/RootFilters';
+ import { DataTable } from '@/components/DataTable';
+@@ -11,39 +12,40 @@ import { ResolveError } from './ResolveError';
+ import '../plans/legacy-ops.css';
+ 
+ export const dynamic = 'force-dynamic';
+-export const metadata = { title: 'Errors · Root' };
++export async function generateMetadata() { return { title: `${(await loadRootErrorCopy()).copy.title} · Root` }; }
+ type Search = { status?: string; source?: string; q?: string; page?: string };
+ 
+ export default async function RootErrorsPage({ searchParams }: { searchParams: Promise<Search> }) {
+   const actor = await requireRootPage();
++  const { copy, locale } = await loadRootErrorCopy();
+   const params = await searchParams;
+   let input: Record<string, string> = {};
+   let data: Awaited<ReturnType<typeof listRootErrors>> | null = null;
+   let message: string | null = null;
+-  try { input = pageSearchParamsObject(params, ['q', 'status', 'source', 'page']); data = await listRootErrors(actor.id, input); } catch (error) { message = error instanceof OperationError ? error.message : 'The error log could not be loaded. Try again.'; }
++  try { input = pageSearchParamsObject(params, ['q', 'status', 'source', 'page']); data = await listRootErrors(actor.id, input); } catch (error) { message = error instanceof OperationError ? error.message : copy.loadFailure; }
+   const pageUrl = (page: number) => `/root/errors?${new URLSearchParams({ ...input, page: String(page) })}`;
+-  const controls = <RootFilters title="Error filters" route="/root/errors" filters={Object.entries(params).filter(([key, value]) => key !== 'page' && typeof value === 'string' && value !== '').map(([key, value]) => ({ key, label: key, value: String(value) }))}>    <form key={JSON.stringify(params)} action="/root/errors" className="root-ops__filters" method="get" role="search" aria-label="Filter errors">
+-      <label className="ui-field"><span>Status</span><RootFilterSelect name="status" label="Status" initialValue={typeof params.status === 'string' ? params.status : 'open'} options={[{ value: 'open', label: 'Open' }, { value: 'resolved', label: 'Resolved' }, { value: 'all', label: 'All' }]} /></label>
+-      <label className="ui-field"><span>Source</span><RootFilterSelect name="source" label="Source" initialValue={typeof params.source === 'string' ? params.source : ''} options={[{ value: '', label: 'All sources' }, ...['server', 'worker', 'browser'].map(value => ({ value, label: value[0].toUpperCase() + value.slice(1) }))]} /></label>
+-      <label className="ui-field"><span>Search</span><input className="ui-input" name="q" maxLength={data?.limits.searchMaxCharacters} defaultValue={typeof params.q === 'string' ? params.q : ''} /></label>
+-      <button className="ui-button" type="submit">Filter</button>
++  const controls = <RootFilters title={copy.filterTitle} route="/root/errors" filters={Object.entries(params).filter(([key, value]) => key !== 'page' && typeof value === 'string' && value !== '').map(([key, value]) => ({ key, label: key === 'q' ? copy.search : key === 'status' ? copy.status : key === 'source' ? copy.source : key, value: String(value) }))}>    <form key={JSON.stringify(params)} action="/root/errors" className="root-ops__filters" method="get" role="search" aria-label={copy.filterLabel}>
++      <label className="ui-field"><span>{copy.status}</span><RootFilterSelect name="status" label={copy.status} initialValue={typeof params.status === 'string' ? params.status : 'open'} options={[{ value: 'open', label: copy.open }, { value: 'resolved', label: copy.resolved }, { value: 'all', label: copy.all }]} /></label>
++      <label className="ui-field"><span>{copy.source}</span><RootFilterSelect name="source" label={copy.source} initialValue={typeof params.source === 'string' ? params.source : ''} options={[{ value: '', label: copy.allSources }, ...['server', 'worker', 'browser'].map(value => ({ value, label: copy[value as 'server' | 'worker' | 'browser'] }))]} /></label>
++      <label className="ui-field"><span>{copy.search}</span><input className="ui-input" name="q" maxLength={data?.limits.searchMaxCharacters} defaultValue={typeof params.q === 'string' ? params.q : ''} /></label>
++      <button className="ui-button" type="submit">{copy.filter}</button>
+     </form></RootFilters>;
+   return <RootFrame active="/root/errors" controls={controls}><div className="root-ops">
+-    <PageHeader module="root" title="Errors" description={<>Application errors grouped by occurrence. Messages are shortened and credential-like text is hidden. A new occurrence reopens a resolved group.</>} />
++    <PageHeader module="root" title={copy.title} description={copy.description} />
+ 
+-    {!data ? <section className="root-control__notice" role="alert"><h2>Errors unavailable</h2><p>{message}</p><a href="/root/errors">Reset filters</a></section>
+-      : data.items.length === 0 ? <RootEmptyState route="/root/errors" title="No errors">No error groups match these filters.</RootEmptyState>
++    {!data ? <section className="root-control__notice" role="alert"><h2>{copy.unavailable}</h2><p>{message}</p><a href="/root/errors">{copy.reset}</a></section>
++      : data.items.length === 0 ? <RootEmptyState route="/root/errors" title={copy.emptyTitle}>{copy.empty}</RootEmptyState>
+       : <>
+-        <p className="root-activity__summary">{data.total} {data.total === 1 ? 'error group' : 'error groups'}</p>
+-        <DataTable caption={'Application errors'} rows={data.items} rowKey={item => item.id} columns={[
+-          { key: 'column0', label: 'Error', render: (item) => <><a href={`/root/errors/${encodeURIComponent(item.id)}`}><strong>{item.name}</strong></a><br />{item.message}{item.location ? <><br /><span className="root-ops__muted">{item.location}</span></> : null}</> },
+-          { key: 'column1', label: 'Source', render: (item) => <>{item.source}</> },
+-          { key: 'column2', label: 'Count', render: (item) => <>{item.count}</> },
+-          { key: 'column3', label: 'Last seen', render: (item) => <><time dateTime={item.lastSeenAt}>{new Date(item.lastSeenAt).toLocaleString()}</time>{item.resolvedAt ? <><br />Resolved</> : null}</> },
+-          { key: 'column4', label: 'Action', render: (item) => <><ResolveError id={item.id} resolved={Boolean(item.resolvedAt)} /></> }
++        <p className="root-activity__summary">{data.total} {data.total === 1 ? copy.group : copy.groups}</p>
++        <DataTable caption={copy.caption} rows={data.items} rowKey={item => item.id} columns={[
++          { key: 'column0', label: copy.error, render: (item) => <><a href={`/root/errors/${encodeURIComponent(item.id)}`}><strong>{item.name}</strong></a><br />{item.message}{item.location ? <><br /><span className="root-ops__muted">{item.location}</span></> : null}</> },
++          { key: 'column1', label: copy.source, render: (item) => <>{item.source === 'server' || item.source === 'worker' || item.source === 'browser' ? copy[item.source] : item.source}</> },
++          { key: 'column2', label: copy.count, render: (item) => <>{item.count}</> },
++          { key: 'column3', label: copy.lastSeen, render: (item) => <><time dateTime={item.lastSeenAt}>{new Date(item.lastSeenAt).toLocaleString(locale)}</time>{item.resolvedAt ? <><br />{copy.resolved}</> : null}</> },
++          { key: 'column4', label: copy.action, render: (item) => <><ResolveError id={item.id} resolved={Boolean(item.resolvedAt)} copy={copy} /></> }
+         ]} />
+-        <p className="root-directory__pager">Page {data.page} of {Math.max(1, Math.ceil(data.total / data.pageSize))}
+-          {data.page > 1 && <> · <a href={pageUrl(data.page - 1)}>Previous</a></>}{data.page * data.pageSize < data.total && <> · <a href={pageUrl(data.page + 1)}>Next</a></>}</p>
++        <p className="root-directory__pager">{copy.page.replace('{page}', String(data.page)).replace('{pages}', String(Math.max(1, Math.ceil(data.total / data.pageSize))))}
++          {data.page > 1 && <> · <a href={pageUrl(data.page - 1)}>{copy.previous}</a></>}{data.page * data.pageSize < data.total && <> · <a href={pageUrl(data.page + 1)}>{copy.next}</a></>}</p>
+       </>}
+   </div></RootFrame>;
+ }
+diff --git a/rebuild/src/modules/ads/CONTRACT_AUDIT_HANDOFF.md b/rebuild/src/modules/ads/CONTRACT_AUDIT_HANDOFF.md
+new file mode 100644
+index 00000000..29a65c60
+--- /dev/null
++++ b/rebuild/src/modules/ads/CONTRACT_AUDIT_HANDOFF.md
+@@ -0,0 +1,94 @@
++# Contract audit lane handoff — 2026-10-21
++
++Worker scope: Ads, Facebook analytics **copy only**, global loading and Root error screens. Changes are uncommitted; no push, server, deployment, production or live-provider action. Registry schema version remains **122**, untouched by this worker.
++
++## Audit row dispositions
++
++The audit report itself is outside the explicitly owned paths. Integrator: annotate the following rows in `docs/CONTRACT_AUDIT_2026-10-21.md`; do not mark the last two fully closed before registration.
++
++| Baseline finding | Disposition and evidence |
++| --- | --- |
++| Ads recovery note 500 | Fixed at source: `ads.managementPolicy.recoveryNoteMaxCharacters`; service/REST/MCP enforce it; page serializes it to ChangeHistory. Non-default service, REST, MCP and textarea tests. |
++| Creative 5000/200/2048 | Fixed in owned product paths: three validated Root policy fields, used by shared preview/apply parsing and serialized creative sources. UI consumes the same fields. Existing adapter ceilings remain an independent stricter guard; neutral platform limit descriptors remain an adapter-owner follow-up if broader formats/ceilings are introduced. |
++| Parent ID 100 | Fixed: `ads.managementPolicy.parentIdMaxCharacters`; directory UI and shared directory service use the minimum of this and report-filter policy; management creation parser also checks it. MCP uses that same service. |
++| Facebook normalized Ads English copy | Fixed at source: bilingual `ads.*` presentation entries in existing extensible `meta.metricLabels`, localized metric labels, categories and overlap notes; includes delivery breakdowns and unknown currency. French and custom Root override tests. Registering these defaults in the owning Facebook config improves Root discoverability; see below. |
++| Customer locale to platformAds | Fixed: shared Ads snapshot establishes validated HTTP locale (preserves standalone MCP host scope); management and campaign UI explicitly pass locale to host lookup. REST/MCP-to-host and nested service locale tests. |
++| Management route literals | Fixed: stable bilingual Ads catalog keys, including origin refusal and safe fallback text. Real route tests cover French and customized Root values. |
++| Campaign table caption | Fixed: `resultsCaption` and `accountFallback` in `ads.customerCopy`. |
++| Global loading | Bilingual/config-reading consumer implemented and tested. **Pending shared registry registration** of `ui.loadingCopy`; current unregistered-key path safely uses bilingual defaults. |
++| Root errors | List/detail, metadata, filters, status, empty/failure and resolve-action copy use a typed bilingual catalog. **Pending shared registry registration** of `root.errorCopy`; current unregistered-key path safely uses bilingual defaults. |
++
++## Root settings
++
++Existing registered `ads.managementPolicy` gains these JSON fields (legacy stored policy objects receive schema defaults):
++
++- `recoveryNoteMaxCharacters`: default 500, Root range 1–500.
++- `creativeMessageMaxCharacters`: default 5000, Root range 1–5000.
++- `creativeTitleMaxCharacters`: default 200, Root range 1–200.
++- `creativeUrlMaxCharacters`: default 2048, Root range 1–2048.
++- `parentIdMaxCharacters`: default 100, Root range 1–100.
++
++These upper bounds preserve the previous acceptance envelope; the product settings can tighten it. Current provider validation still runs independently and may refuse additional semantics.
++
++Existing `ads.customerCopy` gains `resultsCaption`, `accountFallback`, `managementInvalidView`, `managementLoadFailure`, `managementInvalidRequest`, `managementOriginDenied`, `managementOutcomeUnknown`. `service064` now interpolates `{max}` instead of claiming a fixed note limit.
++
++Existing extensible `meta.metricLabels` accepts these bilingual override entries: `ads.source`, `ads.latest`, `ads.latestDay`, `ads.latestDayNote`, `ads.selectedAccounts`, `ads.perAccount`, `ads.stored`, `ads.unknownCurrency`. Defaults are exported as `FACEBOOK_AD_ANALYTICS_COPY_DEFAULTS` in the owned analytics file. Categories and overlap reuse `meta.pageAnalyticsCopy`.
++
++New top-level keys requiring integration: `root.errorCopy`, `ui.loadingCopy`. Do not bump `CONFIG_SCHEMA_VERSION` until the integration owner combines all lanes.
++
++## Exact outside-owned integration edits
++
++1. `src/lib/config/shared-config.ts`: register `root.errorCopy` with the schema/defaults/entry prepared in `src/app/root/errors/config.ts` (`ROOT_ERROR_CONFIG`). Prefer moving that declaration into shared config ownership (`src/lib/config/root-error-copy.ts`) and updating the two owned imports in errors/copy.ts and ResolveError.tsx plus tests. It is not currently registered.
++2. Same shared config: register `ui.loadingCopy`, kind `json`, default `{ en: 'Loading your workspace…', fr: 'Chargement de votre espace de travail…' }`, schema matching loading.tsx: strict object with en/fr trimmed non-empty strings, max 4000. Prefer a shared config-owned exported catalog/schema used by loading.tsx. It is not currently registered.
++3. Optional discoverability improvement in `src/platforms/facebook/config.ts`: move/export `FACEBOOK_AD_ANALYTICS_COPY_DEFAULTS` there, spread it into `FACEBOOK_METRIC_LABEL_DEFAULTS`, and import it from analytics.ts. Existing `meta.metricLabels` already validates arbitrary bilingual entries and the consumer already merges them, so saved overrides work without that move. Do not import analytics.ts into config.ts (it imports config and server data).
++4. `docs/CONTRACT_AUDIT_2026-10-21.md`: annotate rows per table above. `docs/ARCHITECTURE.md`, `docs/DELIVERY_PLAN.md`, `docs/AGENT_HANDOFF.md`: record source/test evidence and pending registrations, not production completion.
++5. Adapter ownership remains unchanged: `src/platforms/facebook/ads-ops/index.ts` still independently enforces its existing creative ceilings. No protocol/transport code was changed in this copy-only lane.
++
++## Verification
++
++From `rebuild/`: `npx tsc --noEmit -p .` passed with zero errors. Targeted Vitest runs use `--no-cache` because the pre-existing node_modules symlink points to a cache location this sandbox cannot write. Eleven distinct targeted files passed, **242 tests** total; no full suite. Affected tests were rerun after the policy-field rename.
++
++- ads-parity-management.test.ts: 158
++- ads-copy-catalog.test.ts: 4
++- ads-parity-directory.test.ts: 17
++- ads-creative-ui.test.ts: 4
++- facebook-analytics-live-defects.test.ts: 7
++- ads-management-ui74.test.ts: 5
++- ads-creation-recovery.test.ts: 11
++- contract-audit-shell.test.ts: 5
++- ads-route-errors.test.ts: 23
++- ads-creative-surfaces.test.ts: 5
++- ads-management-transport-copy.test.ts: 3
++
++`git diff --check` passed. Evidence is unit/mock/jsdom/static rendering only. No browser, database, live provider, MCP-client, build or production verification is claimed. Pre-existing tests exercise safe fallback when DATABASE_URL is absent; that does not constitute database evidence.
++
++## Files changed
++
++- `src/app/api/ads/management/route.ts`
++- `src/app/loading.tsx`
++- `src/app/root/errors/ResolveError.tsx`
++- `src/app/root/errors/[id]/page.tsx`
++- `src/app/root/errors/page.tsx`
++- `src/modules/ads/copy.ts`
++- `src/modules/ads/directory/server.ts`
++- `src/modules/ads/management/config.ts`
++- `src/modules/ads/management/server.ts`
++- `src/modules/ads/server/copy.ts`
++- `src/modules/ads/server/errors.ts`
++- `src/modules/ads/ui/CreativeCreateForm.tsx`
++- `src/modules/ads/ui/campaigns/CampaignsScreen.tsx`
++- `src/modules/ads/ui/objects/ChangeHistory.tsx`
++- `src/modules/ads/ui/objects/ObjectsScreen.tsx`
++- `src/platforms/facebook/analytics.ts`
++- `tests/ads-copy-catalog.test.ts`
++- `tests/ads-creation-recovery.test.ts`
++- `tests/ads-creative-ui.test.ts`
++- `tests/ads-management-ui74.test.ts`
++- `tests/ads-parity-directory.test.ts`
++- `tests/ads-parity-management.test.ts`
++- `tests/facebook-analytics-live-defects.test.ts`
++- `src/app/root/errors/config.ts`
++- `src/app/root/errors/copy.ts`
++- `tests/contract-audit-shell.test.ts`
++- `tests/ads-management-transport-copy.test.ts`
++- `src/modules/ads/CONTRACT_AUDIT_HANDOFF.md`
+diff --git a/rebuild/src/modules/ads/copy.ts b/rebuild/src/modules/ads/copy.ts
+index 27781101..0b5aa263 100644
+--- a/rebuild/src/modules/ads/copy.ts
++++ b/rebuild/src/modules/ads/copy.ts
+@@ -3,6 +3,14 @@ import { adsCopy } from './analysis/copy';
+ import { creativeCopy } from './ui/creative-copy';
+ 
+ export const adsCustomerCopy = {
++"resultsCaption": {"en": "{level} results for {account}", "fr": "Résultats {level} pour {account}"},
++"accountFallback": {"en": "ad account", "fr": "compte publicitaire"},
++"managementInvalidView": {"en": "Choose a valid Ads management view.", "fr": "Choisissez une vue de gestion publicitaire valide."},
++"managementLoadFailure": {"en": "Ads management could not be loaded. Please try again.", "fr": "Impossible de charger la gestion publicitaire. Réessayez."},
++"managementInvalidRequest": {"en": "Invalid Ads management request.", "fr": "Demande de gestion publicitaire invalide."},
++"managementOriginDenied": {"en": "Cross-origin request denied.", "fr": "Demande provenant d’un autre site refusée."},
++"managementOutcomeUnknown": {"en": "The change outcome is unconfirmed. Check Ads change history before repeating it.", "fr": "Le résultat de la modification n’est pas confirmé. Consultez l’historique publicitaire avant de la répéter."},
++
+ "facebookNamePrintable": {"en": "Names must contain 1 to {max} printable characters.", "fr": "Les noms doivent contenir de 1 à {max} caractères imprimables."},
+ "facebookCampaignNamePrintable": {"en": "Campaign names must contain 1 to {max} printable characters.", "fr": "Les noms de campagne doivent contenir de 1 à {max} caractères imprimables."},
+ "facebookAdSetNamePrintable": {"en": "Ad set names must contain 1 to {max} printable characters.", "fr": "Les noms d’ensemble doivent contenir de 1 à {max} caractères imprimables."},
+@@ -175,7 +183,7 @@ export const adsCustomerCopy = {
+ "service061": {"en":"Choose a valid status.","fr":"Choisissez un état valide."},
+ "service062": {"en":"Choose a valid page.","fr":"Choisissez une page valide."},
+ "service063": {"en":"Choose a valid change and outcome.","fr":"Choisissez une modification et un résultat valides."},
+-"service064": {"en":"Keep the note to 500 printable characters.","fr":"Limitez la note à 500 caractères imprimables."},
++"service064": {"en":"Keep the note to {max} printable characters.","fr":"Limitez la note à {max} caractères imprimables."},
+ "service065": {"en":"This change was not found.","fr":"Cette modification est introuvable."},
+ "service066": {"en":"This change does not need resolving.","fr":"Cette modification ne nécessite pas de résolution."},
+ "service067": {"en":"This resolution could not be saved. Try again.","fr":"Cette résolution n’a pas pu être enregistrée. Réessayez."},
+diff --git a/rebuild/src/modules/ads/directory/server.ts b/rebuild/src/modules/ads/directory/server.ts
+index 62248f3d..6a4bd54d 100644
+--- a/rebuild/src/modules/ads/directory/server.ts
++++ b/rebuild/src/modules/ads/directory/server.ts
+@@ -1,3 +1,4 @@
++import { loadAdsManagementPolicy } from '../management/server';
+ import { withAdsCopySnapshot } from '@/modules/ads/server/copy';
+ import { defaultAdsText } from '@/modules/ads/copy';
+ import { adsServiceText } from '@/modules/ads/server/copy';
+@@ -43,7 +44,7 @@ export async function readAdsDirectory(actor: AdsReadActor, input: unknown = {},
+   const max = reportPolicy.maxFilterCharacters;
+   const level = (text(values.level, 'level', max) ?? 'campaign') as DirectoryLevel;
+   if (!LEVELS.includes(level)) throw new OperationError('invalid_request', await adsServiceText('service078'));
+-  const parentId = text(values.parentId, 'parent object', max);
++  const parentId = text(values.parentId, 'parent object', Math.min(max, (await loadAdsManagementPolicy()).parentIdMaxCharacters));
+   if (parentId !== undefined && !SAFE_ID.test(parentId)) throw new OperationError('invalid_request', await adsServiceText('service090'));
+   const q = text(values.q, 'search', max)?.trim().toLowerCase();
+   const sort = (text(values.sort, 'sort', max) ?? 'spend') as AdsObjectSortKey;
+diff --git a/rebuild/src/modules/ads/management/config.ts b/rebuild/src/modules/ads/management/config.ts
+index 300b2f98..9ca1afbf 100644
+--- a/rebuild/src/modules/ads/management/config.ts
++++ b/rebuild/src/modules/ads/management/config.ts
+@@ -1,8 +1,14 @@
+ import { z } from 'zod';
+ import { entry } from '@/lib/config/entry';
+ 
+-export const ADS_MANAGEMENT_DEFAULT_POLICY = { historyPageLimit: 50, creativePageLimit: 25, nameMaxCharacters: 100, maxBudgetMinor: 100_000_000 };
++export const ADS_MANAGEMENT_DEFAULT_POLICY = { historyPageLimit: 50, creativePageLimit: 25, nameMaxCharacters: 100, maxBudgetMinor: 100_000_000, recoveryNoteMaxCharacters: 500, creativeMessageMaxCharacters: 5000, creativeTitleMaxCharacters: 200, creativeUrlMaxCharacters: 2048, parentIdMaxCharacters: 100 };
+ export const ADS_MANAGEMENT_POLICY_SCHEMA = z.object({
++  // Upper bounds preserve the current adapter/storage acceptance envelope; Root may tighten them.
++  recoveryNoteMaxCharacters: z.number().int().min(1).max(500).default(500),
++  creativeMessageMaxCharacters: z.number().int().min(1).max(5000).default(5000),
++  creativeTitleMaxCharacters: z.number().int().min(1).max(200).default(200),
++  creativeUrlMaxCharacters: z.number().int().min(1).max(2048).default(2048),
++  parentIdMaxCharacters: z.number().int().min(1).max(100).default(100),
+   historyPageLimit: z.number().int().min(1).max(200),
+   creativePageLimit: z.number().int().min(1).max(100),
+   nameMaxCharacters: z.number().int().min(10).max(500),
+@@ -13,7 +19,7 @@ export const ADS_MANAGEMENT_POLICY_SCHEMA = z.object({
+ /** Root-owned management limits. Registered by the host; validated and consumed at every management boundary. */
+ export const ADS_MANAGEMENT_CONFIG = [entry({
+   key: 'ads.managementPolicy', group: 'Ads · Management', label: 'Ads management limits', kind: 'json',
+-  description: 'History and creative page sizes, object name length and the largest budget a single change may set.',
++  description: 'History and creative page sizes, object/identifier, recovery note and creative field lengths, and the largest budget a single change may set.',
+   defaultValue: ADS_MANAGEMENT_DEFAULT_POLICY, schema: ADS_MANAGEMENT_POLICY_SCHEMA, consumption: 'active',
+ })] as const;
+ export type AdsManagementPolicy = z.infer<typeof ADS_MANAGEMENT_POLICY_SCHEMA>;
+diff --git a/rebuild/src/modules/ads/management/server.ts b/rebuild/src/modules/ads/management/server.ts
+index 2d1bd1bc..9f1ccf69 100644
+--- a/rebuild/src/modules/ads/management/server.ts
++++ b/rebuild/src/modules/ads/management/server.ts
+@@ -13,8 +13,9 @@ import { loadPermissions } from '@/server/permissions/loader';
+ import { assertWorkspaceNotPurging } from '@/server/data-control/guard';
+ import { lockSelectedResources, withSelectedResourceOperation } from '@/server/platforms/resource-lock';
+ import { runtimeConfig } from '@/server/config/store';
++import { platformAdsLocale } from '@/server/platforms/host';
+ import { platformAds } from '@/server/platforms/registry';
+-import { ADS_MANAGEMENT_POLICY_SCHEMA, type AdsManagementPolicy } from './config';
++import { ADS_MANAGEMENT_DEFAULT_POLICY, ADS_MANAGEMENT_POLICY_SCHEMA, type AdsManagementPolicy } from './config';
+ import { adsOpsHostFor } from './registry';
+ import { AdsNoDispatchError, asNoDispatch } from './errors';
+ import { AD_OBJECT_TYPES, AD_OPERATION_IDS, isCreationOperation, type AdsNeutralOperation, type AdsObjectType, type AdsOpsHost } from './types';
+@@ -49,9 +50,10 @@ function accountTargetScope(actor: AdsManageActor, pageScope: AdsPageScope) {
+ }
+ 
+ /** Parse and bound an untrusted neutral operation. Shape checks only; the module validates semantics. */
+-export function parseNeutralOperation(raw: unknown): AdsNeutralOperation {
++export function parseNeutralOperation(raw: unknown, policy: AdsManagementPolicy = ADS_MANAGEMENT_DEFAULT_POLICY): AdsNeutralOperation {
+   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new OperationError('invalid_request', defaultAdsText('validation007'));
+   const value = raw as Record<string, unknown>;
++  if (typeof value.parentId === 'string' && value.parentId.length > policy.parentIdMaxCharacters) throw new OperationError('invalid_request', defaultAdsText('validation012'));
+   const { type, objectType, objectId } = value;
+   if (typeof type !== 'string' || !AD_OPERATION_IDS.includes(type as never) || typeof objectType !== 'string' || ![...AD_OBJECT_TYPES, 'creative'].includes(objectType as never)) throw new OperationError('invalid_request', defaultAdsText('validation007'));
+   const keys = (allowed: string[]) => { if (Object.keys(value).some(key => !allowed.includes(key))) throw new OperationError('invalid_request', defaultAdsText('validation007')); };
+@@ -78,10 +80,10 @@ export function parseNeutralOperation(raw: unknown): AdsNeutralOperation {
+   }
+   if (type === 'creative.create') {
+     keys(['type', 'objectType', 'name', 'targetId', 'mediaId', 'format', 'message', 'title', 'linkUrl']);
+-    if (objectType !== 'creative' || typeof value.name !== 'string' || !['image', 'link'].includes(String(value.format)) || typeof value.message !== 'string' || typeof value.title !== 'string' || value.message.length > 5000 || value.title.length > 200) throw new OperationError('invalid_request', defaultAdsText('validation015'));
++    if (objectType !== 'creative' || typeof value.name !== 'string' || !['image', 'link'].includes(String(value.format)) || typeof value.message !== 'string' || typeof value.title !== 'string' || value.message.length > policy.creativeMessageMaxCharacters || value.title.length > policy.creativeTitleMaxCharacters) throw new OperationError('invalid_request', defaultAdsText('validation015'));
+     let linkUrl: string | undefined;
+     if (value.format === 'link') {
+-      try { const url = new URL(String(value.linkUrl)); if (url.protocol !== 'https:' || url.username || url.password || url.href.length > 2048) throw new Error(); linkUrl = url.href; }
++      try { const url = new URL(String(value.linkUrl)); if (url.protocol !== 'https:' || url.username || url.password || url.href.length > policy.creativeUrlMaxCharacters) throw new Error(); linkUrl = url.href; }
+       catch { throw new OperationError('invalid_request', defaultAdsText('validation016')); }
+     } else if (value.linkUrl !== undefined) throw new OperationError('invalid_request', defaultAdsText('validation017'));
+     return { type, objectType, name: value.name.trim(), targetId: text(value.targetId, SAFE_ID, defaultAdsText('validation018')), mediaId: text(value.mediaId, /^[A-Za-z0-9_.-]{1,150}$/, defaultAdsText('validation019')), format: value.format as 'image' | 'link', message: value.message.trim(), title: value.title.trim(), ...(linkUrl ? { linkUrl } : {}) };
+@@ -143,7 +145,7 @@ async function managedContext(actor: AdsManageActor, adAccountId: string, level:
+   const connection = account?.socialAccount;
+   if (!account || !connection || connection.invalidatedAt || (connection.tokenExpiresAt && connection.tokenExpiresAt <= new Date())) throw new OperationError('reconnect_required', await adsServiceText('service037'));
+   if (!hasPlatformCapability(access.entitlements, connection.provider)) throw new OperationError('unavailable', await adsServiceText('service006'));
+-  const ads = await platformAds(connection.provider);
++  const ads = await platformAds(connection.provider, platformAdsLocale());
+   const ops = ads?.operations ?? adsOpsHostFor(connection.provider);
+   if (!ads || !ops) throw new OperationError('unavailable', await adsServiceText('service038'));
+   if (ads.isReady && (await ads.isReady().catch(() => false)) !== true) throw new OperationError('unavailable', await adsServiceText('service038'));
+@@ -227,7 +229,7 @@ export async function listAdsCreativeSources(actor: AdsManageActor, input: { adA
+     prisma.target.findMany({ where: { workspaceId: actor.workspaceId, enabled: true, canPublish: true, ...(ids === null ? {} : { id: { in: ids } }), type: { in: [...ctx.ops.creativeIdentityKinds] as TargetType[] }, socialAccount: { is: { workspaceId: actor.workspaceId, provider: ctx.provider, invalidatedAt: null, adAccounts: { some: { id: ctx.account.id, enabled: true } } } } }, select: { id: true, name: true }, orderBy: { id: 'asc' }, skip: offset, take: limit + 1 }),
+     listWorkspaceImages(actor.workspaceId, { limit, ...(input.imageAfter ? { cursor: input.imageAfter } : {}) }),
+   ]);
+-  return { targets: targets.slice(0, limit), nextTargetOffset: targets.length > limit ? offset + limit : null, images: images.items.map(item => ({ id: item.id, mimeType: item.mimeType })), nextImageAfter: images.nextCursor, nameMaxCharacters: policy.nameMaxCharacters };
++  return { targets: targets.slice(0, limit), nextTargetOffset: targets.length > limit ? offset + limit : null, images: images.items.map(item => ({ id: item.id, mimeType: item.mimeType })), nextImageAfter: images.nextCursor, nameMaxCharacters: policy.nameMaxCharacters, creativeMessageMaxCharacters: policy.creativeMessageMaxCharacters, creativeTitleMaxCharacters: policy.creativeTitleMaxCharacters, creativeUrlMaxCharacters: policy.creativeUrlMaxCharacters };
+ 
+   });
+ }
+@@ -260,7 +262,7 @@ export async function describeAdsManagement(actor: AdsManageActor, adAccountId:
+   try {
+     const ctx = await managedContext(actor, adAccountId, 'write');
+     const policy = await loadAdsManagementPolicy();
+-    return { canManage: true as const, operations: ctx.ops.operations.map(item => ({ ...item })), canListCreatives: Boolean(ctx.ops.listCreatives), limits: { nameMaxCharacters: policy.nameMaxCharacters, maxBudgetMinor: policy.maxBudgetMinor } };
++    return { canManage: true as const, operations: ctx.ops.operations.map(item => ({ ...item })), canListCreatives: Boolean(ctx.ops.listCreatives), limits: { ...policy } };
+   } catch (error) {
+     if (error instanceof OperationError && ['forbidden', 'unauthorized', 'unavailable', 'reconnect_required', 'not_found'].includes(error.code)) return { canManage: false as const, needsReconnect: error.code === 'reconnect_required', operations: [], canListCreatives: false };
+     throw error;
+@@ -272,7 +274,7 @@ export async function describeAdsManagement(actor: AdsManageActor, adAccountId:
+ /** Returns the exact confirmation a caller must repeat. No remote or ledger write. */
+ export async function previewAdsManagement(actor: AdsManageActor, input: { adAccountId: string; operation: unknown }) {
+   return withAdsCopySnapshot(async () => {
+-  const operation = parseNeutralOperation(input.operation);
++  const operation = parseNeutralOperation(input.operation, await loadAdsManagementPolicy());
+   const ctx = await managedContext(actor, input.adAccountId, 'write');
+   const support = supports(ctx.ops, operation);
+   assertCreationScope(operation, ctx.pageScope, actor.allowedTargetIds);
+@@ -342,7 +344,7 @@ async function replayRequest(actor: AdsManageActor, requestId: string, requestHa
+ export async function performAdsManagement(actor: AdsManageActor, input: { adAccountId: string; operation: unknown; confirmation: unknown; requestId: unknown }): Promise<AdsManagementOutcome> {
+   return withAdsCopySnapshot(async () => {
+   if (typeof input.requestId !== 'string' || !REQUEST_ID.test(input.requestId)) throw new OperationError('invalid_request', await adsServiceText('service051'));
+-  const operation = parseNeutralOperation(input.operation);
++  const operation = parseNeutralOperation(input.operation, await loadAdsManagementPolicy());
+   // Creation only: a preflight failure of THIS send happened before its intent and any provider request. It says nothing about an earlier send of the same request id.
+   const beforeJournal = isCreationOperation(operation) ? asNoDispatch : (error: unknown) => error;
+   let ctx: Awaited<ReturnType<typeof managedContext>>, support: ReturnType<typeof supports>, expected: string;
+@@ -518,7 +520,8 @@ export const pendingRecoveryConfirmation = (operationId: string, resolution: Ads
+ export async function resolveAdsOperation(actor: AdsManageActor, input: { operationId: string; resolution: AdsResolution; note?: string; confirmation: string }) {
+   return withAdsCopySnapshot(async () => {
+   if (typeof input.operationId !== 'string' || !SAFE_ID.test(input.operationId) || (input.resolution !== 'applied' && input.resolution !== 'not_applied')) throw new OperationError('invalid_request', await adsServiceText('service063'));
+-  if (input.note !== undefined && (typeof input.note !== 'string' || input.note.length > 500 || /[\u0000-\u001f\u007f]/.test(input.note))) throw new OperationError('invalid_request', await adsServiceText('service064'));
++  const policy = await loadAdsManagementPolicy();
++  if (input.note !== undefined && (typeof input.note !== 'string' || input.note.length > policy.recoveryNoteMaxCharacters || /[\u0000-\u001f\u007f]/.test(input.note))) throw new OperationError('invalid_request', await adsServiceText('service064', { max: policy.recoveryNoteMaxCharacters }));
+   const access = await authorizeManager(actor, 'write');
+   const rows = await prisma.$queryRaw<OperationRow[]>`SELECT (SELECT jsonb_agg(r.detail->'receipt') FROM (SELECT detail FROM root_activities WHERE action = 'ads.creation_receipt' AND detail->>'operationId' = ads_management_operations.id AND detail->>'workspaceId' = ${actor.workspaceId} ORDER BY "createdAt" DESC LIMIT 2) r) AS receipts, id, "adAccountId", "actorId", "operationType", "objectType", "objectId", params, status, "remoteId", "failureCode", "createdAt", "completedAt", "resolvedBy", "resolvedAt", "resolutionNote"
+     FROM ads_management_operations WHERE id = ${input.operationId} AND "workspaceId" = ${actor.workspaceId}`;
+diff --git a/rebuild/src/modules/ads/server/copy.ts b/rebuild/src/modules/ads/server/copy.ts
+index c02bb053..fffa3c16 100644
+--- a/rebuild/src/modules/ads/server/copy.ts
++++ b/rebuild/src/modules/ads/server/copy.ts
+@@ -1,9 +1,10 @@
+ import { configValueOrDefault } from '@/server/config/config-or-default';
+ import { AsyncLocalStorage } from 'node:async_hooks';
+ import { cache } from 'react';
+-import { runtimeConfig } from '@/server/config/store';
+ import { catalogLanguages, defaultAdsCatalogs, type AdsCatalogs } from '../copy';
+-import { platformAdsLocale } from '@/server/platforms/host';
++import { headers } from 'next/headers';
++import { adsLocale } from '../analysis/copy';
++import { platformAdsLocale, withPlatformAdsLocale } from '@/server/platforms/host';
+ 
+ const snapshots = new AsyncLocalStorage<{ copy?: Promise<AdsCatalogs> }>();
+ const readAdsCopy = cache(async (): Promise<AdsCatalogs> => {
+@@ -24,8 +25,12 @@ export function loadAdsCopy(): Promise<AdsCatalogs> {
+ }
+ 
+ /** Nested public services reuse their caller's snapshot; independent requests remain isolated. */
+-export function withAdsCopySnapshot<T>(operation: () => Promise<T>): Promise<T> {
+-  return snapshots.getStore() ? operation() : snapshots.run({}, operation);
++export async function withAdsCopySnapshot<T>(operation: () => Promise<T>): Promise<T> {
++  if (snapshots.getStore()) return operation();
++  let locale = platformAdsLocale();
++  // UI/REST request language; standalone MCP callers retain their host locale scope.
++  try { const language = (await headers()).get('accept-language'); if (language) locale = adsLocale(language); } catch { /* no HTTP request scope */ }
++  return withPlatformAdsLocale(locale, () => snapshots.run({}, operation));
+ }
+ 
+ /** Service/API/MCP failures use the same Root catalog as the customer screens. */
+diff --git a/rebuild/src/modules/ads/server/errors.ts b/rebuild/src/modules/ads/server/errors.ts
+index e44666bb..b68b1626 100644
+--- a/rebuild/src/modules/ads/server/errors.ts
++++ b/rebuild/src/modules/ads/server/errors.ts
+@@ -15,11 +15,12 @@ const FAILED = defaultAdsText('validation001');
+  */
+ export async function withAdsErrorBoundary<T>(operation: () => Promise<T>, locale: 'en' | 'fr' = platformAdsLocale()): Promise<T> {
+   return withPlatformAdsLocale(locale, () => withAdsCopySnapshot(async () => {
++  const effectiveLocale = platformAdsLocale();
+   try { return await operation(); }
+   catch (error) {
+-    if (error instanceof AdsNoDispatchError) { error.message = localizeAdsMessage(await loadAdsCopy(), locale, error.message); throw error; }
++    if (error instanceof AdsNoDispatchError) { error.message = localizeAdsMessage(await loadAdsCopy(), effectiveLocale, error.message); throw error; }
+     const failure = operationFailure(error, FAILED);
+-    throw new OperationError(failure.code, localizeAdsMessage(await loadAdsCopy(), locale, failure.error));
++    throw new OperationError(failure.code, localizeAdsMessage(await loadAdsCopy(), effectiveLocale, failure.error));
+   }
+ 
+   }));
+diff --git a/rebuild/src/modules/ads/ui/CreativeCreateForm.tsx b/rebuild/src/modules/ads/ui/CreativeCreateForm.tsx
+index 9cf12717..d5eaf92d 100644
+--- a/rebuild/src/modules/ads/ui/CreativeCreateForm.tsx
++++ b/rebuild/src/modules/ads/ui/CreativeCreateForm.tsx
+@@ -11,7 +11,7 @@ import { useAdsCatalogs } from './AdsCopyProvider';
+ 
+ type Creative = Extract<AdsNeutralOperation, { type: 'creative.create' }>;
+ type Review = { operation: Creative; confirmation: string; requestId: string };
+-type Sources = { targets: { id: string; name: string }[]; images: { id: string; mimeType: string }[]; nextTargetOffset: number | null; nextImageAfter: string | null; nameMaxCharacters: number };
++type Sources = { targets: { id: string; name: string }[]; images: { id: string; mimeType: string }[]; nextTargetOffset: number | null; nextImageAfter: string | null; nameMaxCharacters: number; creativeMessageMaxCharacters: number; creativeTitleMaxCharacters: number; creativeUrlMaxCharacters: number };
+ 
+ export function CreativeCreateForm({ adAccountId, accountName, ownerScope, locale = 'en' }: { adAccountId: string; accountName: string; ownerScope: CreationOwnerScope; locale?: 'en' | 'fr' }) {
+   const localize = useAdsMessage();
+@@ -122,8 +122,8 @@ export function CreativeCreateForm({ adAccountId, accountName, ownerScope, local
+         <label>{t.channel}<select name="targetId" required disabled={locked} {...validation.fieldProps('targetId')} defaultValue={held?.operation.targetId ?? ""}><option value="">{t.choose}</option>{held && !sources.targets.some(item => item.id === held.operation.targetId) ? <option value={held.operation.targetId}>{t.unavailable} · {held.operation.targetId}</option> : null}{sources.targets.map(target => <option key={target.id} value={target.id}>{target.name || t.unavailable}</option>)}</select><FieldError {...validation.errorProps('targetId')} /></label>
+         <label>{t.image}<select name="mediaId" onChange={event => { setSelectedImage(event.target.value); setImageFailed(false); }} required disabled={locked} {...validation.fieldProps('mediaId')} defaultValue={held?.operation.mediaId ?? ""}><option value="">{t.choose}</option>{held && !sources.images.some(item => item.id === held.operation.mediaId) ? <option value={held.operation.mediaId}>{t.unavailable} · {held.operation.mediaId}</option> : null}{sources.images.map(image => <option key={image.id} value={image.id}>{image.id} · {image.mimeType || t.unavailable}</option>)}</select><FieldError {...validation.errorProps('mediaId')} /></label>
+         <label>{t.format}<select name="format" value={format} onChange={event => setFormat(event.target.value)} disabled={locked}><option value="image">{t.photo}</option><option value="link">{t.link}</option></select></label>
+-        <label>{t.message}<AutoTextarea defaultValue={held?.operation.message} name="message" maxLength={5000} disabled={locked} /></label>
+-        {format === 'link' ? <><label>{t.headline}<input name="title" defaultValue={held?.operation.title} maxLength={200} disabled={locked} /></label><label>{t.destination}<input name="linkUrl" defaultValue={held?.operation.linkUrl} type="url" required maxLength={2048} disabled={locked} {...validation.fieldProps('linkUrl')} /><FieldError {...validation.errorProps('linkUrl')} /></label></> : null}
++        <label>{t.message}<AutoTextarea defaultValue={held?.operation.message} name="message" maxLength={sources.creativeMessageMaxCharacters} disabled={locked} /></label>
++        {format === 'link' ? <><label>{t.headline}<input name="title" defaultValue={held?.operation.title} maxLength={sources.creativeTitleMaxCharacters} disabled={locked} /></label><label>{t.destination}<input name="linkUrl" defaultValue={held?.operation.linkUrl} type="url" required maxLength={sources.creativeUrlMaxCharacters} disabled={locked} {...validation.fieldProps('linkUrl')} /><FieldError {...validation.errorProps('linkUrl')} /></label></> : null}
+       </div>
+       {selectedImage && imageFailed ? <p>{t.unavailable}</p> : selectedImage ? <img onError={() => setImageFailed(true)} className="ads-creative-image" width="160" height="120" src={`/api/ads/management?${new URLSearchParams({ view: "creative-image", adAccountId, mediaId: selectedImage })}`} alt={t.image} /> : null}
+       {sources.nextTargetOffset !== null || sources.nextImageAfter ? <Button onClick={() => void moreSources()} disabled={loading || locked}>{t.more}</Button> : null}
+diff --git a/rebuild/src/modules/ads/ui/campaigns/CampaignsScreen.tsx b/rebuild/src/modules/ads/ui/campaigns/CampaignsScreen.tsx
+index 289e39c6..b834b455 100644
+--- a/rebuild/src/modules/ads/ui/campaigns/CampaignsScreen.tsx
++++ b/rebuild/src/modules/ads/ui/campaigns/CampaignsScreen.tsx
+@@ -73,7 +73,7 @@ async function CampaignsPage({ searchParams }: { searchParams: Promise<AdsSearch
+   const nameMaxByAccount = new Map([...managementByAccount].map(([id, management]) => [id, 'limits' in management && management.limits ? management.limits.nameMaxCharacters : 100] as const));
+   const parentResolvers = new Map<string, ((input: { level: 'campaign' | 'adset' | 'ad'; fields: unknown }) => string | null) | undefined>();
+   const adsUi = new Map(await Promise.all(accounts.map(async account => {
+-    const host = account.socialAccount ? await platformAds(account.socialAccount.provider) : null;
++    const host = account.socialAccount ? await platformAds(account.socialAccount.provider, locale) : null;
+     parentResolvers.set(account.id, host?.parentObjectId);
+     const ui = host?.creationUi ? await host.creationUi().catch(() => null) : host?.ui ?? null;
+     return [account.id, ui] as const;
+@@ -112,7 +112,7 @@ async function CampaignsPage({ searchParams }: { searchParams: Promise<AdsSearch
+           const slot = (row: typeof levelRows[number]) => readAvailability.get(accountId) || actionAvailability.get(accountId)
+             ? <AdsObjectActions adAccountId={accountId} objectId={row.id} name={row.name} objectType={row.level as 'campaign' | 'adset' | 'ad'} currency={row.currency} canRead={Boolean(readAvailability.get(accountId))} canManage={Boolean(actionAvailability.get(accountId))} /> : null;
+           return <div className="ads-result-level" key={level.value}><h3>{level.label}</h3>
+-            <HierarchyTable locale={locale} caption={`${level.label} results for ${account?.name ?? rows[0]?.accountName ?? 'ad account'}`} objectsHref="/ads/objects"
++            <HierarchyTable locale={locale} caption={t('resultsCaption', { level: level.label, account: account?.name ?? rows[0]?.accountName ?? t('accountFallback') })} objectsHref="/ads/objects"
+               rows={levelRows.map(row => ({ key: row.key, id: row.id, name: row.name, level: row.level as 'campaign' | 'adset' | 'ad', currency: row.currency, spend: row.spend, impressions: row.impressions, clicks: row.clicks, ctr: row.ctr, cpc: row.cpc, days: row.rows, path: pathOf(row),
+                 spendSeries: [...row.dailyMetrics].sort((a, b) => a.date.getTime() - b.date.getTime()).map(entry => entry.spend) }))}
+               actions={Object.fromEntries(levelRows.map(row => [row.key, slot(row)]))}
+diff --git a/rebuild/src/modules/ads/ui/objects/ChangeHistory.tsx b/rebuild/src/modules/ads/ui/objects/ChangeHistory.tsx
+index f2c74f43..2557dbea 100644
+--- a/rebuild/src/modules/ads/ui/objects/ChangeHistory.tsx
++++ b/rebuild/src/modules/ads/ui/objects/ChangeHistory.tsx
+@@ -11,7 +11,7 @@ type Change = { receipts?: unknown; id: string; operationType: string; objectTyp
+ type Resolution = 'applied' | 'not_applied';
+ const isCreation = (type: string) => type === 'campaign.create' || type === 'adset.create' || type === 'creative.create';
+ 
+-export function ChangeHistory({ items, locale = 'en' }: { items: Change[]; locale?: 'en' | 'fr' }) {
++export function ChangeHistory({ items, noteMaxCharacters, locale = 'en' }: { items: Change[]; noteMaxCharacters: number; locale?: 'en' | 'fr' }) {
+   const localize = useAdsMessage();
+   const t = useAdsText();
+   const STATUS_TEXT: Record<string, string> = { pending: t('pending'), succeeded: t('succeeded'), rejected: t('rejected'), uncertain: t('uncertain'), resolved_applied: t('resolved_applied'), resolved_not_applied: t('resolved_not_applied') };
+@@ -80,7 +80,7 @@ export function ChangeHistory({ items, locale = 'en' }: { items: Change[]; local
+       <div className="ui-dialog__body">
+         <p><strong>{t('text139')}</strong></p>
+         <p>{t('text140')}</p>
+-        <label>{t('text141')}<textarea className="ui-input" value={note} maxLength={500} onChange={event => setNote(event.target.value)} disabled={busy} /></label>
++        <label>{t('text141')}<textarea className="ui-input" value={note} maxLength={noteMaxCharacters} onChange={event => setNote(event.target.value)} disabled={busy} /></label>
+         {message ? <RouteNotice error className="ui-error" focusKey={message.key}>{localize(message.text)}</RouteNotice> : null}
+       </div>
+       <div className="ui-dialog__actions">
+diff --git a/rebuild/src/modules/ads/ui/objects/ObjectsScreen.tsx b/rebuild/src/modules/ads/ui/objects/ObjectsScreen.tsx
+index 8f103996..8fdc4fed 100644
+--- a/rebuild/src/modules/ads/ui/objects/ObjectsScreen.tsx
++++ b/rebuild/src/modules/ads/ui/objects/ObjectsScreen.tsx
+@@ -1,3 +1,4 @@
++import { loadAdsManagementPolicy } from '@/modules/ads/management/server';
+ import { localizeAdsMessage } from '@/modules/ads/copy';
+ import { loadAdsCopy } from '@/modules/ads/server/copy';
+ import { customerText } from '@/modules/ads/copy';
+@@ -38,13 +39,14 @@ async function AdsObjectsPage({ searchParams }: { searchParams: Promise<Params>
+   const params = await searchParams;
+   const actor = { userId: viewer.user.id, workspaceId: viewer.workspaceId };
+   const policy = await loadAdsReportPolicy();
++  const managementPolicy = await loadAdsManagementPolicy();
+   const accounts = await getAdsAccounts(viewer.workspaceId, viewer.permissions.pageScope.all ? undefined : viewer.permissions.pageScope.ids, entitledPlatformIds(viewer.entitlements));
+   const hidden = (['period', 'since', 'until', 'account'] as const).map(key => first(params[key]) ? <input key={key} type="hidden" name={key} value={first(params[key])} /> : null);
+   const sidebar = <><AdsFiltersSidebar catalogs={catalogs} locale={locale} accounts={accounts} input={params} action="/ads/objects" policy={policy} />
+     <form noValidate method="get" action="/ads/objects" className="ads-extra-filters" aria-label={t('text055')}>{hidden}
+       <label>{t('text056')}<select name="level" defaultValue={first(params.level) ?? 'campaign'}><option value="campaign">{t('text057')}</option><option value="adset">{t('text058')}</option><option value="ad">{t('text059')}</option></select></label>
+       <label>{t('text060')}<input name="q" defaultValue={first(params.q) ?? ''} maxLength={policy.maxFilterCharacters} /></label>
+-      <label>{t('text061')}<input name="parentId" defaultValue={first(params.parentId) ?? ''} maxLength={100} /></label>
++      <label>{t('text061')}<input name="parentId" defaultValue={first(params.parentId) ?? ''} maxLength={Math.min(policy.maxFilterCharacters, managementPolicy.parentIdMaxCharacters)} /></label>
+       <label>{t('text062')}<select name="sort" defaultValue={first(params.sort) ?? 'spend'}><option value="spend">{t('text019')}</option><option value="impressions">{t('text020')}</option><option value="clicks">{t('text022')}</option><option value="ctr">{t('text063')}</option><option value="cpc">{t('text064')}</option><option value="cpm">{t('text065')}</option><option value="name">{t('text066')}</option></select></label>
+       <label>{t('text067')}<select name="direction" defaultValue={first(params.direction) ?? 'desc'}><option value="desc">{t('text068')}</option><option value="asc">{t('text069')}</option></select></label>
+       <button type="submit">{t('text070')}</button></form></>;
+@@ -83,7 +85,7 @@ async function AdsObjectsPage({ searchParams }: { searchParams: Promise<Params>
+       <nav aria-label={t('text076')}>{directory.offset > 0 ? <a href={pageLink(Math.max(0, directory.offset - directory.limit))}>{t('text077')}</a> : null}{' '}{directory.nextOffset !== null ? <a href={pageLink(directory.nextOffset)}>{t('text078')}</a> : null}</nav>
+       <p className="small-note">{directory.note}</p>
+     </section>
+-    {history ? <section className="panel" id="changes" aria-labelledby="changes-title"><h2 id="changes-title">{t('text079')}</h2><ChangeHistory locale={locale} items={history} /></section> : null}
++    {history ? <section className="panel" id="changes" aria-labelledby="changes-title"><h2 id="changes-title">{t('text079')}</h2><ChangeHistory noteMaxCharacters={managementPolicy.recoveryNoteMaxCharacters} locale={locale} items={history} /></section> : null}
+   </div></PageFrame>;
+ }
+ 
+diff --git a/rebuild/src/platforms/facebook/analytics.ts b/rebuild/src/platforms/facebook/analytics.ts
+index a03e0ca6..ef27ee27 100644
+--- a/rebuild/src/platforms/facebook/analytics.ts
++++ b/rebuild/src/platforms/facebook/analytics.ts
+@@ -73,7 +73,41 @@ type AdRow = { date: Date; spend: number; impressions: number; clicks: number; r
+ type FacebookTarget = AnalyticsTarget & { socialAccountId: string | null };
+ const object = (value: unknown): Record<string, unknown> => value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
+ const dayKey = (date: Date) => date.toISOString().slice(0, 10);
+-const overlappingPeopleNote = 'Counts may overlap across resources. Sums are not deduplicated people or total reach for the whole period.';
++/** Root can override these presentation entries in the existing extensible meta.metricLabels catalog. */
++export const FACEBOOK_AD_ANALYTICS_COPY_DEFAULTS = {
++  "ads.source": {
++    "en": "Advertising",
++    "fr": "Publicité"
++  },
++  "ads.latest": {
++    "en": "Latest per ad account",
++    "fr": "Dernière valeur par compte publicitaire"
++  },
++  "ads.latestDay": {
++    "en": "Calculated for the latest stored day",
++    "fr": "Calculé pour le dernier jour enregistré"
++  },
++  "ads.latestDayNote": {
++    "en": "Calculated using summed account reach for the latest stored day. People may overlap across accounts; this is not a deduplicated rate for the whole period.",
++    "fr": "Calculé avec la somme des portées des comptes pour le dernier jour enregistré. Une personne peut figurer dans plusieurs comptes ; ce taux ne représente pas des personnes distinctes sur toute la période."
++  },
++  "ads.selectedAccounts": {
++    "en": "Selected ad accounts",
++    "fr": "Comptes publicitaires sélectionnés"
++  },
++  "ads.perAccount": {
++    "en": "Per-account values",
++    "fr": "Valeurs par compte"
++  },
++  "ads.stored": {
++    "en": "Stored values",
++    "fr": "Valeurs enregistrées"
++  },
++  "ads.unknownCurrency": {
++    "en": "Unknown currency",
++    "fr": "Devise inconnue"
++  }
++};
+ 
+ type PagePresentation = { locale?: 'en' | 'fr'; metricLabels?: Record<string, { en: string; fr: string }>; pageCopy?: Record<'en' | 'fr', Omit<(typeof FACEBOOK_PAGE_ANALYTICS_COPY_DEFAULTS)['en'], 'postSeries' | 'postSeriesNote'> & { postSeries?: string; postSeriesNote?: string }> };
+ 
+@@ -157,7 +191,10 @@ type SelectedAdAccount = AnalyticsAdAccount;
+ type ExtraValue = { observation: AnalyticsObservation; sourcePriority: number };
+ 
+ function adInputs(rows: AdRow[], selectedAdAccounts: SelectedAdAccount[], presentation: PagePresentation = {}): AnalyticsMetricInput[] {
+-  const adCatalog = { ...FACEBOOK_METRIC_LABEL_DEFAULTS, ...presentation.metricLabels } as LabelCatalog;
++  const locale = presentation.locale ?? 'en';
++  const adCatalog = { ...FACEBOOK_METRIC_LABEL_DEFAULTS, ...FACEBOOK_AD_ANALYTICS_COPY_DEFAULTS, ...presentation.metricLabels } as LabelCatalog;
++  const text = (key: keyof typeof FACEBOOK_AD_ANALYTICS_COPY_DEFAULTS) => adCatalog[key]![locale];
++  const pageCopy = { ...FACEBOOK_PAGE_ANALYTICS_COPY_DEFAULTS[locale], ...presentation.pageCopy?.[locale] };
+   const facebookLabel = (key: string) => facebookAdLabel(key, adCatalog, presentation.locale ?? 'en');
+   const facebookMetricLabel = facebookLabel;
+   const metrics: AnalyticsMetricInput[] = [];
+@@ -165,7 +202,7 @@ function adInputs(rows: AdRow[], selectedAdAccounts: SelectedAdAccount[], presen
+   for (const row of rows) { const currency = row.adAccount.currency ?? ''; const group = byCurrency.get(currency) ?? []; group.push(row); byCurrency.set(currency, group); }
+   const availableForCurrency = (currency: string) => selectedAdAccounts.filter(account => (account.currency ?? '') === currency).length;
+   const currencyKey = (key: string, currency: string, unit: AnalyticsMetricInput['unit']) => unit === 'currency' ? `${key}::${currency || 'unknown-currency'}` : key;
+-  const currencyLabel = (key: string, currency: string, unit: AnalyticsMetricInput['unit']) => `${facebookLabel(key)}${unit === 'currency' ? ` · ${currency || 'Unknown currency'}` : ''}`;
++  const currencyLabel = (key: string, currency: string, unit: AnalyticsMetricInput['unit']) => `${facebookLabel(key)}${unit === 'currency' ? ` · ${currency || text('ads.unknownCurrency')}` : ''}`;
+   const latestSync = (source: AdRow[]) => source.length ? new Date(Math.max(...source.map(row => row.fetchedAt.getTime()))) : null;
+   const extraUnit = (key: string, currency: string): AnalyticsMetricInput['unit'] => {
+     const known = facebookAdMetricUnit(key, currency || null);
+@@ -175,14 +212,14 @@ function adInputs(rows: AdRow[], selectedAdAccounts: SelectedAdAccount[], presen
+   // Delivery counts can be combined across ad accounts; monetary spend is split into currency series.
+   for (const key of ['impressions', 'clicks', 'reach'] as const) {
+     const observations = rows.map(row => ({ date: row.date, channelId: row.adAccount.id, channelLabel: row.adAccount.name, value: row[key] }));
+-    if (observations.length) metrics.push({ key, label: key === 'reach' ? 'Reach · Latest per ad account' : facebookMetricLabel(key)!, sourceLabel: 'Advertising', kind: key === 'reach' ? 'stock' : 'flow', unit: 'count', observations, ...(key === 'reach' ? { aggregationNote: overlappingPeopleNote } : {}), coveredResourceIds: [...new Set(observations.map(row => row.channelId))].sort(), available: selectedAdAccounts.length, updatedAt: latestSync(rows) });
++    if (observations.length) metrics.push({ key, label: key === 'reach' ? `${facebookMetricLabel(key)} · ${text('ads.latest')}` : facebookMetricLabel(key)!, sourceLabel: text('ads.source'), kind: key === 'reach' ? 'stock' : 'flow', unit: 'count', observations, ...(key === 'reach' ? { aggregationNote: pageCopy.overlap } : {}), coveredResourceIds: [...new Set(observations.map(row => row.channelId))].sort(), available: selectedAdAccounts.length, updatedAt: latestSync(rows) });
+   }
+   for (const [currency, currencyRows] of byCurrency) {
+     const available = availableForCurrency(currency);
+     if (!currencyRows.length) continue;
+     const unit = 'currency';
+     const observations = currencyRows.map(row => ({ date: row.date, channelId: row.adAccount.id, channelLabel: row.adAccount.name, value: row.spend }));
+-    metrics.push({ key: currencyKey('spend', currency, unit), label: currencyLabel('spend', currency, unit), sourceLabel: 'Advertising', kind: 'flow', unit, observations, coveredResourceIds: [...new Set(observations.map(row => row.channelId))].sort(), available, updatedAt: latestSync(currencyRows) });
++    metrics.push({ key: currencyKey('spend', currency, unit), label: currencyLabel('spend', currency, unit), sourceLabel: text('ads.source'), kind: 'flow', unit, observations, coveredResourceIds: [...new Set(observations.map(row => row.channelId))].sort(), available, updatedAt: latestSync(currencyRows) });
+   }
+ 
+   const byDay = (source: AdRow[]) => {
+@@ -221,7 +258,7 @@ function adInputs(rows: AdRow[], selectedAdAccounts: SelectedAdAccount[], presen
+       const unit = facebookAdMetricUnit(key, currency || null);
+       const latestDayOnly = ['cpp', 'frequency'].includes(key);
+       const coveredResourceIds = latestDayOnly ? [...new Set(totalRows.filter(row => row.reach > 0).map(row => row.adAccount.id))].sort() : detailsByAccount.map(item => item.id).sort();
+-      metrics.push({ key: currencyKey(key, currency, unit), label: currencyLabel(key, currency, unit), ...(latestDayOnly ? { aggregationLabel: 'Calculated for the latest stored day', aggregationNote: 'Calculated using summed account reach for the latest stored day. People may overlap across accounts; this is not a deduplicated rate for the whole period.' } : {}), sourceLabel: 'Advertising', kind: 'ratio', unit, observations: daily.map(item => ({ ...item, channelId: 'total', channelLabel: 'Selected ad accounts' })), totalObservations, rows: details, coveredResourceIds, available, covered: coveredResourceIds.length, updatedAt: latestSync(currencyRows) });
++      metrics.push({ key: currencyKey(key, currency, unit), label: currencyLabel(key, currency, unit), ...(latestDayOnly ? { aggregationLabel: text('ads.latestDay'), aggregationNote: text('ads.latestDayNote') } : {}), sourceLabel: text('ads.source'), kind: 'ratio', unit, observations: daily.map(item => ({ ...item, channelId: 'total', channelLabel: text('ads.selectedAccounts') })), totalObservations, rows: details, coveredResourceIds, available, covered: coveredResourceIds.length, updatedAt: latestSync(currencyRows) });
+     }
+   }
+ 
+@@ -298,20 +335,20 @@ function adInputs(rows: AdRow[], selectedAdAccounts: SelectedAdAccount[], presen
+       const kind: AnalyticsKind = actionValue || (knownActions.has(key) && !costRatio) ? 'flow' : costRatio ? 'ratio' : 'stock';
+       const available = monetary ? availableForCurrency(currency) : selectedAdAccounts.length;
+       const accountRows = kind === 'flow' ? undefined : currencyObservations.map(item => ({ label: `${item.channelLabel}${currency ? ` · ${currency}` : ''} · ${dayKey(item.date)}`, value: item.value, asOf: item.date }));
+-      metrics.push({ key: currencyKey(key, currency, unit), label: kind === 'stock' ? `${currencyLabel(key, currency, unit)} · Latest per ad account` : currencyLabel(key, currency, unit), sourceLabel: 'Advertising', kind, unit, observations: currencyObservations, ...(accountRows ? { rows: accountRows, covered: new Set(currencyObservations.map(item => item.channelId)).size, totalOverride: null, displayTotal: costRatio ? 'Per-account values' : 'Stored values' } : {}), ...(kind === 'stock' ? { rollup: 'latest-per-channel' as const } : {}), coveredResourceIds: [...new Set(currencyObservations.map(item => item.channelId))].sort(), available, updatedAt: latestSync(rows.filter(row => currencyObservations.some(item => item.channelId === row.adAccount.id))) });
++      metrics.push({ key: currencyKey(key, currency, unit), label: kind === 'stock' ? `${currencyLabel(key, currency, unit)} · ${text('ads.latest')}` : currencyLabel(key, currency, unit), sourceLabel: text('ads.source'), kind, unit, observations: currencyObservations, ...(accountRows ? { rows: accountRows, covered: new Set(currencyObservations.map(item => item.channelId)).size, totalOverride: null, displayTotal: costRatio ? text('ads.perAccount') : text('ads.stored') } : {}), ...(kind === 'stock' ? { rollup: 'latest-per-channel' as const } : {}), coveredResourceIds: [...new Set(currencyObservations.map(item => item.channelId))].sort(), available, updatedAt: latestSync(rows.filter(row => currencyObservations.some(item => item.channelId === row.adAccount.id))) });
+     }
+   }
+   for (const [key, accounts] of breakdowns) {
+     const values = new Map<string, number>();
+     for (const account of accounts.values()) for (const [label, value] of account.values) values.set(label, (values.get(label) ?? 0) + value);
+     const latest = [...accounts.values()];
+-    if (values.size) metrics.push({ key: extras.has(key) ? `${key}::breakdown` : key, label: `${facebookLabel(key)} · Categories`, sourceLabel: 'Advertising', kind: 'breakdown', unit: 'count', observations: [], rows: [...values].map(([label, value]) => ({ label, value, asOf: null })), coveredResourceIds: [...accounts.keys()].sort(), available: selectedAdAccounts.length, covered: accounts.size, latestAt: new Date(Math.max(...latest.map(item => item.date.getTime()))), updatedAt: new Date(Math.max(...latest.map(item => item.fetchedAt.getTime()))) });
++    if (values.size) metrics.push({ key: extras.has(key) ? `${key}::breakdown` : key, label: `${facebookLabel(key)} · ${pageCopy.categories}`, sourceLabel: text('ads.source'), kind: 'breakdown', unit: 'count', observations: [], rows: [...values].map(([label, value]) => ({ label, value, asOf: null })), coveredResourceIds: [...accounts.keys()].sort(), available: selectedAdAccounts.length, covered: accounts.size, latestAt: new Date(Math.max(...latest.map(item => item.date.getTime()))), updatedAt: new Date(Math.max(...latest.map(item => item.fetchedAt.getTime()))) });
+   }
+-  return [...metrics, ...deliveryBreakdownInputs(rows, selectedAdAccounts, facebookLabel)].map(metric => ({ ...metric, resourceKind: 'ad-account' }));
++  return [...metrics, ...deliveryBreakdownInputs(rows, selectedAdAccounts, facebookLabel, text('ads.source'), pageCopy.overlap)].map(metric => ({ ...metric, resourceKind: 'ad-account' }));
+ }
+ 
+ /** Delivery dimensions retain daily/account/currency identity and never enter account totals. */
+-function deliveryBreakdownInputs(rows: AdRow[], selected: SelectedAdAccount[], facebookLabel: (key: string) => string): AnalyticsMetricInput[] {
++function deliveryBreakdownInputs(rows: AdRow[], selected: SelectedAdAccount[], facebookLabel: (key: string) => string, sourceLabel: string, overlap: string): AnalyticsMetricInput[] {
+   const groups = new Map<string, { field: string; currency: string; history: NonNullable<AnalyticsMetricInput['breakdownHistory']> }>();
+   for (const row of rows) {
+     const payload = object(row.fields).delivery_breakdowns;
+@@ -354,9 +391,9 @@ function deliveryBreakdownInputs(rows: AdRow[], selected: SelectedAdAccount[], f
+       const previous = latest.get(snapshot.resourceId);
+       if (!previous || snapshot.asOf > previous.asOf || (snapshot.asOf.getTime() === previous.asOf.getTime() && snapshot.fetchedAt > previous.fetchedAt)) latest.set(snapshot.resourceId, snapshot);
+     }
+-    return { key: `delivery:${key}`, label: `${facebookLabel(group.field)}${group.currency ? ` · ${group.currency}` : ''}`, sourceLabel: 'Advertising', kind: 'breakdown', unit: facebookAdMetricUnit(group.field), observations: [],
++    return { key: `delivery:${key}`, label: `${facebookLabel(group.field)}${group.currency ? ` · ${group.currency}` : ''}`, sourceLabel, kind: 'breakdown', unit: facebookAdMetricUnit(group.field), observations: [],
+       breakdownHistory: group.history, rows: [...latest.values()].flatMap(snapshot => snapshot.rows.flatMap(value => value.value === null ? [] : [{ label: `${snapshot.resourceLabel} · ${value.label}`, value: value.value, asOf: snapshot.asOf }])),
+-      available: selected.length, coveredResourceIds: [...latest.keys()], covered: latest.size, totalOverride: null, aggregationNote: overlappingPeopleNote,
++      available: selected.length, coveredResourceIds: [...latest.keys()], covered: latest.size, totalOverride: null, aggregationNote: overlap,
+       updatedAt: new Date(Math.max(...group.history.map(snapshot => snapshot.fetchedAt.getTime()))), latestAt: new Date(Math.max(...group.history.map(snapshot => snapshot.asOf.getTime()))) };
+   });
+ }
+diff --git a/rebuild/tests/ads-copy-catalog.test.ts b/rebuild/tests/ads-copy-catalog.test.ts
+index df0fae76..08a1db78 100644
+--- a/rebuild/tests/ads-copy-catalog.test.ts
++++ b/rebuild/tests/ads-copy-catalog.test.ts
+@@ -1,3 +1,4 @@
++import { platformAdsLocale } from '../src/server/platforms/host';
+ import { createElement } from 'react';
+ import { renderToStaticMarkup } from 'react-dom/server';
+ import { describe, expect, it, vi } from 'vitest';
+@@ -6,7 +7,8 @@ import { adsCustomerCopy, adsCustomerCopySchema, bilingualCatalog, defaultAdsCat
+ import { AdsCopyProvider } from '../src/modules/ads/ui/AdsCopyProvider';
+ import { AdsFilterForm } from '../src/modules/ads/ui/AdsFilterForm';
+ import { ADS_REPORT_DEFAULT_POLICY } from '../src/modules/ads/report-policy';
+-const config = vi.hoisted(() => ({ read: vi.fn() }));
++const config = vi.hoisted(() => ({ read: vi.fn(), language: vi.fn(() => 'en') }));
++vi.mock('next/headers', () => ({ headers: async () => new Headers({ 'accept-language': config.language() }) }));
+ vi.mock('@/server/config/store', () => ({ runtimeConfig: config.read }));
+ import { loadAdsCopy, adsServiceText, withAdsCopySnapshot } from '../src/modules/ads/server/copy';
+ 
+@@ -56,3 +58,13 @@ describe('Root Ads bilingual catalogs', () => {
+     expect(localizeAdsMessage(catalogs, 'fr', 'Unknown safe provider explanation')).toBe('Unknown safe provider explanation');
+   });
+ });
++
++it('establishes the French customer locale for nested shared services and restores it afterwards', async () => {
++  config.language.mockReturnValue('fr');
++  await withAdsCopySnapshot(async () => {
++    expect(platformAdsLocale()).toBe('fr');
++    await withAdsCopySnapshot(async () => expect(platformAdsLocale()).toBe('fr'));
++  });
++  expect(platformAdsLocale()).toBe('en');
++  config.language.mockReturnValue('en');
++});
+diff --git a/rebuild/tests/ads-creation-recovery.test.ts b/rebuild/tests/ads-creation-recovery.test.ts
+index e481c419..0f1a039e 100644
+--- a/rebuild/tests/ads-creation-recovery.test.ts
++++ b/rebuild/tests/ads-creation-recovery.test.ts
+@@ -217,7 +217,7 @@ describe('no-dispatch refusals versus held outcomes', () => {
+ describe('creation history labels', () => {
+   it('shows New campaign and New ad set instead of placeholder identifiers', async () => {
+     const base = { status: 'succeeded', createdAt: '2026-10-18T12:00:00.000Z', needsResolution: false, resolutionNote: null };
+-    await render(createElement(ChangeHistory, { items: [
++    await render(createElement(ChangeHistory, { noteMaxCharacters: 37, items: [
+       { ...base, id: 'a', operationType: 'campaign.create', objectType: 'campaign', objectId: '@create-campaign' },
+       { ...base, id: 'b', operationType: 'adset.create', objectType: 'adset', objectId: '@create-adset:c1' },
+     ] }));
+diff --git a/rebuild/tests/ads-creative-ui.test.ts b/rebuild/tests/ads-creative-ui.test.ts
+index 1652a2e1..695f7dcc 100644
+--- a/rebuild/tests/ads-creative-ui.test.ts
++++ b/rebuild/tests/ads-creative-ui.test.ts
+@@ -3,7 +3,7 @@ import { act, createElement } from 'react';
+ import { createRoot } from 'react-dom/client';
+ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+ import { CreativeCreateForm } from '@/modules/ads/ui/CreativeCreateForm';
+-const sources = { targets: [{ id: 'channel', name: 'Example shop' }], images: [{ id: 'stored-image', mimeType: 'image/png' }], nextTargetOffset: null, nextImageAfter: null, nameMaxCharacters: 100 };
++const sources = { targets: [{ id: 'channel', name: 'Example shop' }], images: [{ id: 'stored-image', mimeType: 'image/png' }], nextTargetOffset: null, nextImageAfter: null, nameMaxCharacters: 100, creativeMessageMaxCharacters: 41, creativeTitleMaxCharacters: 23, creativeUrlMaxCharacters: 99 };
+ const reply = (data: unknown) => new Response(JSON.stringify(data), { headers: { 'content-type': 'application/json' } });
+ let root: ReturnType<typeof createRoot>; let container: HTMLDivElement;
+ const key = 'ads-creation-pending:v2:creative:user:workspace:account';
+@@ -73,3 +73,11 @@ it('shows French copy and keeps entered values when review fails', async () => {
+   expect(container.querySelector<HTMLInputElement>('input[name="name"]')!.value).toBe('Summer');
+   expect(window.sessionStorage.getItem(key)).toBeNull();
+ });
++
++it('uses service-supplied creative field limits', async () => {
++  await render();
++  expect(container.querySelector<HTMLTextAreaElement>('[name="message"]')!.maxLength).toBe(41);
++  await act(async () => value(container.querySelector('select[name="format"]')!, 'link'));
++  expect(container.querySelector<HTMLInputElement>('[name="title"]')!.maxLength).toBe(23);
++  expect(container.querySelector<HTMLInputElement>('[name="linkUrl"]')!.maxLength).toBe(99);
++});
+diff --git a/rebuild/tests/ads-management-transport-copy.test.ts b/rebuild/tests/ads-management-transport-copy.test.ts
+new file mode 100644
+index 00000000..c87d5f2f
+--- /dev/null
++++ b/rebuild/tests/ads-management-transport-copy.test.ts
+@@ -0,0 +1,43 @@
++import { beforeEach, expect, it, vi } from 'vitest';
++const state = vi.hoisted(() => ({ config: vi.fn(), list: vi.fn(), viewer: vi.fn() }));
++vi.mock('@/server/config/store', () => ({ runtimeConfig: state.config }));
++vi.mock('@/server/context', () => ({ requireViewer: state.viewer }));
++vi.mock('@/server/request-origin', () => ({ requestOrigin: (request: Request) => new URL(request.url).origin }));
++vi.mock('@/server/data-control/guard', () => ({ withWorkspaceOperation: (_id: string, run: () => Promise<unknown>) => run() }));
++vi.mock('@/modules/ads/management/server', () => ({
++  describeAdsManagement: vi.fn(), readAdsCreativeImage: vi.fn(), listAdsCreativeSources: vi.fn(), listAdsCreatives: vi.fn(),
++  listAdsOperations: state.list, performAdsManagement: vi.fn(), previewAdsManagement: vi.fn(), resolveAdsOperation: vi.fn(),
++}));
++import { GET, POST } from '../src/app/api/ads/management/route';
++import { adsCustomerCopy, adsAnalysisCatalog, adsCreativeCatalog } from '../src/modules/ads/copy';
++
++beforeEach(() => {
++  vi.clearAllMocks();
++  state.viewer.mockResolvedValue({ user: { id: 'user' }, workspaceId: 'workspace' });
++  state.config.mockImplementation(async (key: string) => ({ 'ads.customerCopy': adsCustomerCopy, 'ads.analysisCopy': adsAnalysisCatalog, 'ads.creativeCopy': adsCreativeCatalog })[key]);
++});
++const request = (suffix: string, body?: string, origin = 'https://example.test') => new Request(`https://example.test/api/ads/management${suffix}`, { method: body === undefined ? 'GET' : 'POST', headers: { 'accept-language': 'fr', origin, 'content-type': 'application/json' }, ...(body === undefined ? {} : { body }) });
++
++it('localizes invalid view and request transport branches from the Ads catalog', async () => {
++  const view = await GET(request('?view=invalid'));
++  expect(view.status).toBe(400);
++  expect((await view.json()).error).toBe(adsCustomerCopy.managementInvalidView.fr);
++  const invalid = await POST(request('', 'null'));
++  expect(invalid.status).toBe(400);
++  expect((await invalid.json()).error).toBe(adsCustomerCopy.managementInvalidRequest.fr);
++});
++it('uses customized Root transport copy for a French request', async () => {
++  const custom = structuredClone(adsCustomerCopy);
++  custom.managementInvalidView.fr = 'Choisissez votre affichage personnalisé.';
++  state.config.mockImplementation(async (key: string) => key === 'ads.customerCopy' ? custom : key === 'ads.analysisCopy' ? adsAnalysisCatalog : adsCreativeCatalog);
++  expect((await (await GET(request('?view=invalid'))).json()).error).toBe(custom.managementInvalidView.fr);
++});
++it('localizes fallback failures and refuses cross-origin writes before authentication', async () => {
++  state.list.mockRejectedValue(new Error('private provider diagnostic'));
++  expect((await (await GET(request(''))).json()).error).toBe(adsCustomerCopy.managementLoadFailure.fr);
++  state.viewer.mockClear();
++  const denied = await POST(request('', '{}', 'https://other.test'));
++  expect(denied.status).toBe(403);
++  expect((await denied.json()).error).toBe(adsCustomerCopy.managementOriginDenied.fr);
++  expect(state.viewer).not.toHaveBeenCalled();
++});
+diff --git a/rebuild/tests/ads-management-ui74.test.ts b/rebuild/tests/ads-management-ui74.test.ts
+index a4078d7f..8063e55b 100644
+--- a/rebuild/tests/ads-management-ui74.test.ts
++++ b/rebuild/tests/ads-management-ui74.test.ts
+@@ -157,11 +157,12 @@ describe('Ads management UI', () => {
+ 
+   it('offers only service-approved pending recovery and keeps the review note after a save failure', async () => {
+     const item = { id: 'change-9', operationType: 'status.set', objectType: 'campaign', objectId: 'campaign-1', status: 'pending', createdAt: '2026-10-18T12:00:00.000Z', needsResolution: true, resolutionKind: 'pending_recovery' as const, onHold: true, resolutionNote: null };
+-    await act(async () => root.render(createElement(ChangeHistory, { items: [item] })));
++    await act(async () => root.render(createElement(ChangeHistory, { noteMaxCharacters: 37, items: [item] })));
+     expect(container.textContent).toContain('service checks for an active dispatch before it records your finding');
+     await click('I checked: it was applied');
+     await settle();
+     const note = container.querySelector<HTMLTextAreaElement>('textarea')!;
++    expect(note.maxLength).toBe(37);
+     const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!;
+     await act(async () => { setter.call(note, 'checked in the platform'); note.dispatchEvent(new Event('input', { bubbles: true })); note.dispatchEvent(new Event('change', { bubbles: true })); });
+     fetchMock.mockResolvedValueOnce(response({ error: 'The record could not be saved.' }, false));
+diff --git a/rebuild/tests/ads-parity-directory.test.ts b/rebuild/tests/ads-parity-directory.test.ts
+index c0e72874..2441492e 100644
+--- a/rebuild/tests/ads-parity-directory.test.ts
++++ b/rebuild/tests/ads-parity-directory.test.ts
+@@ -1,3 +1,4 @@
++import { ADS_MANAGEMENT_DEFAULT_POLICY } from '../src/modules/ads/management/config';
+ vi.mock('@/modules/ads/server/copy', async () => { const { defaultAdsCatalogs, customerText } = await import('../src/modules/ads/copy'); return { withAdsCopySnapshot: (operation: () => Promise<unknown>) => operation(), loadAdsCopy: async () => defaultAdsCatalogs, adsServiceText: async (key: Parameters<typeof customerText>[2]) => customerText(defaultAdsCatalogs.customer, 'en', key) }; });
+ import { beforeEach, describe, expect, it, vi } from 'vitest';
+ 
+@@ -31,7 +32,7 @@ describe('Ads object directory', () => {
+     state.platformAds.mockResolvedValue({ parentObjectId: ({ level, fields }: { level: string; fields: unknown }) => level === 'adset' && fields && typeof fields === 'object' ? ((fields as Record<string, unknown>).parentRef as string | undefined) ?? null : null });
+     state.reportPolicy.mockResolvedValue({ presets: [{ id: '7d', days: 7, label: 'Last 7 days' }], defaultPreset: '7d', maxRangeDays: 30, maxFilterCharacters: 80 });
+     state.readPolicy.mockResolvedValue({ pageSize: 2, maxRows: 100 });
+-    state.config.mockResolvedValue(ADS_ANALYSIS_DEFAULT_POLICY);
++    state.config.mockImplementation(async (key: string) => key === 'ads.managementPolicy' ? ADS_MANAGEMENT_DEFAULT_POLICY : ADS_ANALYSIS_DEFAULT_POLICY);
+     state.dataset.mockResolvedValue({ accounts: [], pageSize: 2, maxRows: 100, insights: [
+       row('s1', 'Spring', '2026-10-12', 10, 5, { campaign_id: 'ignored', parentRef: 'c1' }), row('s1', 'Spring', '2026-10-13', 5, 5, { campaign_id: 'ignored', parentRef: 'c1' }),
+       row('s2', 'Summer', '2026-10-12', 50, 1, { campaign_id: 'ignored', parentRef: 'c2' }), row('s3', 'Autumn', '2026-10-12', 0, 0),
+@@ -111,4 +112,10 @@ describe('Ads object directory', () => {
+     await expect(executeAdsDirectoryTool(actor, 'list_ads_objects', { level: 'adset' })).resolves.toMatchObject({ level: 'adset' });
+     await expect(executeAdsDirectoryTool(actor, 'x', {})).rejects.toMatchObject({ code: 'invalid_request' });
+   });
++it('enforces the same non-default parent identifier bound for directory and MCP reads', async () => {
++  state.config.mockImplementation(async (key: string) => key === 'ads.managementPolicy' ? { ...ADS_MANAGEMENT_DEFAULT_POLICY, parentIdMaxCharacters: 2 } : ADS_ANALYSIS_DEFAULT_POLICY);
++  await expect(readAdsDirectory(actor, { parentId: 'abc' }, now)).rejects.toMatchObject({ code: 'invalid_request' });
++  await expect(executeAdsDirectoryTool(actor, 'list_ads_objects', { parentId: 'abc' })).rejects.toMatchObject({ code: 'invalid_request' });
++});
++
+ });
+diff --git a/rebuild/tests/ads-parity-management.test.ts b/rebuild/tests/ads-parity-management.test.ts
+index 34d90851..662082d8 100644
+--- a/rebuild/tests/ads-parity-management.test.ts
++++ b/rebuild/tests/ads-parity-management.test.ts
+@@ -1,3 +1,4 @@
++import { withPlatformAdsLocale } from '../src/server/platforms/host';
+ vi.mock('@/modules/ads/server/copy', async () => { const { defaultAdsCatalogs, customerText } = await import('../src/modules/ads/copy'); return { withAdsCopySnapshot: (operation: () => Promise<unknown>) => operation(), loadAdsCopy: async () => defaultAdsCatalogs, adsServiceText: async (key: Parameters<typeof customerText>[2]) => customerText(defaultAdsCatalogs.customer, 'en', key) }; });
+ import { beforeEach, describe, expect, it, vi } from 'vitest';
+ import { createHash } from 'node:crypto';
+@@ -817,3 +818,33 @@ describe('Ads recovery independent credential ceilings', () => {
+     expect(state.prisma.$executeRaw).not.toHaveBeenCalled();
+   });
+ });
++
++describe('contract audit runtime policy and locale', () => {
++  it('enforces a non-default recovery note limit through service, REST and MCP', async () => {
++    state.config.mockImplementation(async (key: string) => key === 'ads.managementEnabled' ? true : { ...ADS_MANAGEMENT_DEFAULT_POLICY, recoveryNoteMaxCharacters: 3 });
++    const input = { operationId: 'op1', resolution: 'applied' as const, note: 'long', confirmation: resolutionConfirmation('op1', 'applied') };
++    await expect(resolveAdsOperation(actor, input)).rejects.toMatchObject({ code: 'invalid_request' });
++    await expect(executeAdsManagementTool(actor, 'resolve_ads_change', input)).rejects.toMatchObject({ code: 'invalid_request' });
++    const response = await managementPost(new Request('https://example.test/api/ads/management', { method: 'POST', headers: { origin: 'https://example.test', 'content-type': 'application/json' }, body: JSON.stringify({ action: 'resolve', ...input }) }));
++    expect(response.status).toBe(400);
++    expect(state.prisma.$queryRaw).not.toHaveBeenCalled();
++  });
++  it('enforces non-default creative field and parent limits before dispatch', async () => {
++    const policy = { ...ADS_MANAGEMENT_DEFAULT_POLICY, creativeMessageMaxCharacters: 3, creativeTitleMaxCharacters: 2, creativeUrlMaxCharacters: 20, parentIdMaxCharacters: 2 };
++    state.config.mockImplementation(async (key: string) => key === 'ads.managementEnabled' ? true : policy);
++    const creative = { type: 'creative.create', objectType: 'creative', name: 'Creative', targetId: 't1', mediaId: 'image', format: 'link', message: 'ok', title: 'ok', linkUrl: 'https://ex.test' };
++    for (const operation of [{ ...creative, message: 'long' }, { ...creative, title: 'long' }, { ...creative, linkUrl: 'https://example.test/long' }, { type: 'ad.create', objectType: 'ad', parentId: 'abc', name: 'Ad', creativeId: 'c1' }]) {
++      await expect(previewAdsManagement(actor, { adAccountId: 'acc1', operation })).rejects.toMatchObject({ code: 'invalid_request' });
++      await expect(executeAdsManagementTool(actor, 'preview_ads_change', { adAccountId: 'acc1', operation })).rejects.toMatchObject({ code: 'invalid_request' });
++    }
++    expect(execute).not.toHaveBeenCalled();
++  });
++  it('passes French locale from REST and MCP scope to the platform host', async () => {
++    const response = await managementPost(new Request('https://example.test/api/ads/management', { method: 'POST', headers: { origin: 'https://example.test', 'content-type': 'application/json', 'accept-language': 'fr' }, body: JSON.stringify({ action: 'preview', adAccountId: 'acc1', operation: pause }) }));
++    expect(response.status).toBe(200);
++    expect(state.platformAds).toHaveBeenCalledWith('testnet', 'fr');
++    state.platformAds.mockClear();
++    await withPlatformAdsLocale('fr', () => executeAdsManagementTool(actor, 'get_ads_management_options', { adAccountId: 'acc1' }));
++    expect(state.platformAds).toHaveBeenCalledWith('testnet', 'fr');
++  });
++});
+diff --git a/rebuild/tests/contract-audit-shell.test.ts b/rebuild/tests/contract-audit-shell.test.ts
+new file mode 100644
+index 00000000..c6f183ca
+--- /dev/null
++++ b/rebuild/tests/contract-audit-shell.test.ts
+@@ -0,0 +1,67 @@
++import { createElement, type ReactNode } from 'react';
++import { renderToStaticMarkup } from 'react-dom/server';
++import { beforeEach, describe, expect, it, vi } from 'vitest';
++
++const state = vi.hoisted(() => ({ config: vi.fn(), language: 'fr', list: vi.fn(), detail: vi.fn(), viewer: vi.fn() }));
++vi.mock('next/headers', () => ({ headers: async () => new Headers({ 'accept-language': state.language }) }));
++vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: vi.fn() }), notFound: () => { throw new Error('not found'); } }));
++vi.mock('@/server/config/store', () => ({ runtimeConfig: state.config }));
++vi.mock('@/server/config/access', () => ({ requireRootPage: async () => ({ id: 'root' }) }));
++vi.mock('@/server/root/legacy/errors', () => ({ listRootErrors: state.list, getRootError: state.detail }));
++vi.mock('@/server/root/RootFrame', () => ({ RootFrame: ({ children, controls }: { children: ReactNode; controls?: ReactNode }) => createElement('main', null, controls, children) }));
++vi.mock('@/server/root/RootFilters', () => ({
++  RootFilters: ({ children }: { children: ReactNode }) => createElement('aside', null, children),
++  RootFilterSelect: ({ options, name }: { options: { value: string; label: string }[]; name: string }) => createElement('select', { name }, options.map(item => createElement('option', { key: item.value, value: item.value }, item.label))),
++}));
++import Loading from '../src/app/loading';
++import RootErrorsPage from '../src/app/root/errors/page';
++import RootErrorPage from '../src/app/root/errors/[id]/page';
++import { ROOT_ERROR_COPY, ROOT_ERROR_CONFIG } from '../src/app/root/errors/config';
++
++beforeEach(() => {
++  vi.clearAllMocks(); state.language = 'fr';
++  state.config.mockImplementation(async (key: string) => {
++    if (key === 'root.errorCopy') return ROOT_ERROR_COPY;
++    if (key === 'ui.loadingCopy') return { en: 'Loading custom workspace', fr: 'Chargement personnalisé' };
++    throw new Error('unregistered');
++  });
++});
++
++describe('shell and Root error bilingual catalog consumers', () => {
++  it('uses Root-provided French loading copy and retains an accessible busy state', async () => {
++    const html = renderToStaticMarkup(await Loading());
++    expect(html).toContain('Chargement personnalisé');
++    expect(html).toContain('role="status"');
++    expect(html).toContain('aria-busy="true"');
++  });
++  it('keeps loading usable with localized fallback when config is unavailable', async () => {
++    state.config.mockRejectedValue(new Error('offline'));
++    expect(renderToStaticMarkup(await Loading())).toContain('Chargement de votre espace');
++  });
++  it('defines a validated Root error registration for the integrator', () => {
++    const entry = ROOT_ERROR_CONFIG[0];
++    expect(entry.key).toBe('root.errorCopy');
++    expect(entry.schema.safeParse(entry.defaultValue).success).toBe(true);
++    expect(entry.schema.safeParse({ en: ROOT_ERROR_COPY.en }).success).toBe(false);
++  });
++  it('uses customized filter, unavailable and recovery labels on the real list page', async () => {
++    state.list.mockRejectedValue(new Error('private error'));
++    const catalog = structuredClone(ROOT_ERROR_COPY);
++    catalog.fr.filterTitle = 'Filtres personnalisés'; catalog.fr.unavailable = 'Journal personnalisé indisponible'; catalog.fr.reset = 'Effacer la recherche';
++    state.config.mockResolvedValue(catalog);
++    const html = renderToStaticMarkup(await RootErrorsPage({ searchParams: Promise.resolve({}) }));
++    expect(html).toContain('Journal personnalisé indisponible');
++    expect(html).toContain('Effacer la recherche');
++    expect(html).toContain('Toutes les sources');
++    expect(html).not.toContain('private error');
++    expect(html).not.toContain('Errors unavailable');
++  });
++  it('localizes detail labels, status, absent stack and action labels', async () => {
++    state.detail.mockResolvedValue({ id: 'error-1', source: 'server', name: 'Example', message: 'Synthetic message', count: 2, firstSeenAt: '2026-10-21', lastSeenAt: '2026-10-21', release: 'test', location: null, resolvedAt: null, stack: null });
++    const html = renderToStaticMarkup(await RootErrorPage({ params: Promise.resolve({ id: 'error-1' }) }));
++    expect(html).toContain('Première occurrence');
++    expect(html).toContain('Aucune trace');
++    expect(html).toContain('Marquer comme résolue');
++    expect(html).not.toContain('No stack');
++  });
++});
+diff --git a/rebuild/tests/facebook-analytics-live-defects.test.ts b/rebuild/tests/facebook-analytics-live-defects.test.ts
+index 2e038971..71b2262e 100644
+--- a/rebuild/tests/facebook-analytics-live-defects.test.ts
++++ b/rebuild/tests/facebook-analytics-live-defects.test.ts
+@@ -74,3 +74,16 @@ describe('app-published posts read insights from the matching external post', ()
+     expect(rows[0]!.measuredAt).toEqual(new Date('2026-10-06'));
+   });
+ });
++
++it('localizes every Ads presentation branch and respects Root copy and metric overrides', () => {
++  const base = { locale: 'fr' as const, pageRows: [], audienceRows: [], selectedTargets: [], selectedAdAccounts: [account], adRows: [adRow({ estimated_ad_recallers: 2, cost_per_custom: 3, custom_categories: { first: 2 }, delivery_breakdowns: [{ dimensions: ['age'], rows: [{ age: '18-24', impressions: 10 }] }] })] };
++  const { metrics } = normalizeFacebookAnalytics(base);
++  expect(metrics.every(metric => metric.sourceLabel === 'Publicité')).toBe(true);
++  expect(metrics.find(metric => metric.key === 'reach')?.label).toContain('Dernière valeur par compte');
++  const presentation = metrics.flatMap(metric => [metric.label, metric.sourceLabel, metric.aggregationLabel, metric.aggregationNote, metric.displayTotal]).filter(Boolean).join(' ');
++  expect(presentation).not.toMatch(/Advertising|Latest per ad account|Calculated using|Per-account values|Stored values|Categories/);
++  const overridden = normalizeFacebookAnalytics({ ...base, metricLabels: { reach: { en: 'Custom reach', fr: 'Portée choisie' }, 'ads.source': { en: 'Custom ads', fr: 'Source choisie' }, 'ads.latest': { en: 'Custom latest', fr: 'Valeur choisie' }, 'ads.latestDayNote': { en: 'Custom note', fr: 'Note choisie' } } }).metrics;
++  expect(overridden.every(metric => metric.sourceLabel === 'Source choisie')).toBe(true);
++  expect(overridden.find(metric => metric.key === 'reach')?.label).toBe('Portée choisie · Valeur choisie');
++  expect(overridden.find(metric => metric.key === 'frequency')?.aggregationNote).toBe('Note choisie');
++});

@@ -1,0 +1,158 @@
+diff --git a/rebuild/DESIGN.md b/rebuild/DESIGN.md
+index 1e5888a2..94ee7435 100644
+--- a/rebuild/DESIGN.md
++++ b/rebuild/DESIGN.md
+@@ -201,6 +201,19 @@ and composer. Profile labels are text beside channel names, independent of post
+ labels. English/French strings follow request language. Browser/theme/viewport
+ verification remains open; DOM interaction evidence is in CHANNEL_PROFILES.md.
+ 
++## Design pass, round 4 — 2026-10-21 (owner: "the design is ugly")
++
++Decisions, implemented as one layer at the end of `src/styles/components.css` (tokens only; four themes, light and dark unchanged):
++
++- **Card system.** One surface recipe: hairline border, 16px radius and a soft two-part lift (`--card-lift`, `--card-lift-hover`; dark mode swaps to an inset highlight). Panels, home cards, metric tiles and tables share it. A tile inside a panel sits flat on a tinted surface so cards never stack lifted cards.
++- **Color by module.** The page-header chip is a solid module color with a white icon (tinted-soft in Clean). The top bar shows a module-colored dot and name. The sidebar page icons get a faint module wash.
++- **Typography.** 14px body, 29px page title at weight 780 with −0.028em tracking, 34px metric figures, 16px card titles; table headers are sentence case 12px instead of tiny uppercase. Sidebar section labels are 11px, quieter.
++- **Chrome.** The top bar no longer repeats the page title (the page `h1` owns it), the content gutter is 36px on desktop, and the primary action in the sidebar carries a colored lift.
++- **Empty states.** A filled calm surface with a module-tinted icon replaces the dashed wireframe border.
++- **Defect fixed.** In Inbox the bulk "Select all" bar was taking the list's 1fr grid row and left a large blank gap; the list pane is now a flex column and only the list scrolls.
++
++Evidence: local production build, synthetic data, Chromium screenshots (home, publishing queue/calendar/compose, inbox, analytics, ads, settings, root) at 1440 and 390 wide in light and dark across Vivid, Meta blue, Warm and Clean. This is visual review, not a full browser matrix rerun.
++
+ ## Current language and theme evidence — 2026-10-21
+ 
+ Source checked at `6fb0e57f`: Publishing, Inbox, Analytics, Ads, Home, Tasks and
+diff --git a/rebuild/src/styles/components.css b/rebuild/src/styles/components.css
+index 26b52473..163e5b0f 100644
+--- a/rebuild/src/styles/components.css
++++ b/rebuild/src/styles/components.css
+@@ -371,3 +371,96 @@ th[aria-sort="ascending"], th[aria-sort="descending"] { color: var(--ink); }
+ .ui-post-thumb__play { position: absolute; inset: 0; display: grid; place-items: center; color: #fff; background: color-mix(in srgb, #000 28%, transparent); }
+ .ui-post-thumb__count { position: absolute; right: 3px; bottom: 3px; padding: 0 5px; border-radius: 999px; background: color-mix(in srgb, var(--ink) 78%, transparent); color: var(--surface); font-size: 10px; font-weight: 750; }
+ @media (forced-colors: active) { .ui-post-thumb { border: 1px solid CanvasText; } }
++
++/* ======================================================================
++ * Design pass 2026-10-21 (round 4): one calmer, richer card system.
++ * Hierarchy: canvas < card (hairline + soft lift) < raised/hover. Module color
++ * appears as a solid icon chip and a thin accent, never as a wash. Tokens only.
++ * ====================================================================== */
++:root { --radius-lg: 16px; --radius-md: 12px; --card-lift: 0 1px 2px rgb(20 24 40 / 5%), 0 10px 28px -14px rgb(20 24 40 / 16%); --card-lift-hover: 0 1px 2px rgb(20 24 40 / 6%), 0 16px 34px -14px rgb(20 24 40 / 24%); }
++:root[data-mode="dark"] { --card-lift: 0 1px 0 rgb(255 255 255 / 4%) inset, 0 10px 28px -14px rgb(0 0 0 / 60%); --card-lift-hover: 0 1px 0 rgb(255 255 255 / 6%) inset, 0 16px 34px -14px rgb(0 0 0 / 70%); }
++@media (prefers-color-scheme: dark) { :root[data-mode="system"] { --card-lift: 0 1px 0 rgb(255 255 255 / 4%) inset, 0 10px 28px -14px rgb(0 0 0 / 60%); --card-lift-hover: 0 1px 0 rgb(255 255 255 / 6%) inset, 0 16px 34px -14px rgb(0 0 0 / 70%); } }
++:root[data-theme] { --shadow-raised: var(--card-lift); }
++
++/* Type scale: 12 / 13 / 14 body, 16 card title, 29 page title. Tighter display tracking. */
++body { font-size: 14px; line-height: 1.5; -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
++.shell-content { padding: 28px 36px 56px; max-width: 1480px; }
++.ui-page-header { margin-bottom: 26px; }
++.ui-page-header h1, .ui-page-header h2 { font-size: clamp(22px, 2.6vw, 29px); font-weight: 780; letter-spacing: -.028em; }
++.ui-page-header p { margin-top: 5px; font-size: 14px; color: var(--ink-soft); }
++.ui-page-header__chip { width: 48px; height: 48px; border-radius: 14px; background: var(--mod, var(--accent)); color: #fff; box-shadow: 0 6px 14px -6px color-mix(in srgb, var(--mod, var(--accent)) 70%, transparent); }
++:root[data-mode="dark"] .ui-page-header__chip { color: var(--canvas); }
++:root[data-theme="clean"] .ui-page-header__chip { background: var(--mod-soft, var(--surface-muted)); color: var(--mod, var(--ink)); box-shadow: none; }
++
++/* Top bar: quiet breadcrumb on the canvas; the page title lives in the page, not twice. */
++.shell-topbar { min-height: 60px; background: color-mix(in srgb, var(--canvas) 92%, var(--surface)); border-bottom: 1px solid var(--line-subtle); padding-inline: 36px; }
++.shell-topbar__user { display: none; }
++.shell-topbar__crumb { font-size: 13px; }
++.shell-topbar__crumb strong { color: var(--mod-ink, var(--ink)); font-weight: 700; }
++.shell-topbar__crumb strong::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-right: 8px; border-radius: 50%; background: var(--mod, var(--accent)); vertical-align: 1px; }
++.shell-mode-toggle { width: 38px; height: 38px; border-radius: 12px; box-shadow: var(--shadow-raised); }
++
++/* Context sidebar: calmer labels, softer links, a clearly raised primary action. */
++.shell-context-sidebar { padding: 22px 16px 14px; gap: 18px; }
++.shell-wordmark { font-size: 20px; font-weight: 800; letter-spacing: -.04em; }
++.shell-workspace-label, .shell-subnav__label, .ui-filter-panel__head h2 { font-size: 11px; letter-spacing: .06em; font-weight: 700; color: var(--ink-faint); }
++.shell-workspace-name, .shell-workspace-select { border-radius: 10px; background: var(--surface); box-shadow: var(--shadow-raised); }
++.shell-create { min-height: 42px; border-radius: 11px; font-size: 14px; box-shadow: 0 8px 18px -8px color-mix(in srgb, var(--accent) 80%, transparent), 0 1px 2px rgb(0 0 0 / 14%); }
++.shell-subnav { gap: 2px; }
++.shell-subnav__link { min-height: 38px; padding: 5px 10px 5px 6px; border-radius: 10px; font-size: 13.5px; }
++.shell-subnav__glyph { width: 28px; height: 28px; border-radius: 9px; background: color-mix(in srgb, var(--mod) 10%, transparent); }
++.shell-subnav__link.is-active { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--mod) 22%, transparent); }
++.shell-sidebar-filter, .shell-sidebar-tools:not(:empty) { border-top-color: var(--line-subtle); }
++.shell-context-footer { border-top-color: var(--line-subtle); }
++.shell-nav__link { font-size: 11.5px; }
++.shell-brand { border-radius: 14px; }
++
++/* Cards and panels, wherever a screen declares one. */
++.panel { border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface); box-shadow: var(--card-lift); padding: 22px 24px; }
++.panel h2, .panel h3 { letter-spacing: -.018em; }
++.panel h2 { font-size: 16px; font-weight: 740; }
++[class*="_card__"] { box-shadow: var(--card-lift) !important; border-top-width: 3px; }
++[class*="_card__"]:hover { box-shadow: var(--card-lift-hover) !important; }
++
++/* Metric tiles: larger figure, module-tinted chip, room to breathe. */
++.ui-metric { padding: 18px 20px; gap: 8px; border-radius: var(--radius-lg); box-shadow: var(--card-lift); }
++.ui-metric__label { font-size: 12.5px; font-weight: 650; color: var(--ink-soft); letter-spacing: 0; }
++.ui-metric__value { font-size: clamp(26px, 3vw, 34px); font-weight: 780; letter-spacing: -.035em; margin-top: 2px; }
++.ui-metric__chip { width: 38px; height: 38px; border-radius: 12px; }
++
++/* A tile inside a panel sits flat on a tinted surface instead of stacking a second lifted card. */
++.panel .ui-metric, [class*="_card__"] .ui-metric { box-shadow: none; background: color-mix(in srgb, var(--surface-muted) 60%, var(--surface)); border-color: var(--line-subtle); }
++.shell-context-content summary { cursor: pointer; padding: 8px 10px; border-radius: 10px; font-size: 11px; font-weight: 700; letter-spacing: .06em; }
++.shell-context-content summary:hover { background: var(--surface-muted); }
++
++/* Empty states: calm filled surface, no dashed wireframe border. */
++.ui-state { gap: 12px; padding: 36px 24px; border: 1px solid var(--line-subtle); border-radius: var(--radius-lg); background: color-mix(in srgb, var(--surface-muted) 55%, var(--surface)); }
++.ui-state > :is(h2, h3) { font-size: 15px; font-weight: 720; }
++.ui-state__icon { width: 48px; height: 48px; border-radius: 14px; background: var(--mod-soft, var(--accent-soft)); color: var(--mod, var(--accent)); }
++.ui-state--error { border-color: color-mix(in srgb, var(--danger) 35%, var(--line)); }
++
++/* Tables: sentence-case headers on a tinted bar, comfortable rows, quiet dividers. */
++.ui-table-wrap { border-radius: var(--radius-lg); box-shadow: var(--card-lift); border-color: var(--line); }
++.ui-table th { height: 42px; background: color-mix(in srgb, var(--surface-muted) 70%, var(--surface)); color: var(--ink-soft); font-size: 12px; letter-spacing: 0; text-transform: none; font-weight: 700; }
++.ui-table td { height: 54px; border-bottom-color: var(--line-subtle); }
++.ui-table--compact td { height: 44px; }
++
++/* Controls: one radius, one focus treatment, a tactile primary button. */
++.ui-button { border-radius: 10px; font-size: 13.5px; }
++.ui-button--primary { box-shadow: 0 1px 2px rgb(0 0 0 / 16%), inset 0 1px 0 rgb(255 255 255 / 14%); }
++.ui-button--secondary { box-shadow: 0 1px 2px rgb(20 24 40 / 6%); }
++.ui-input, .ui-select__trigger, .ui-filter select, .shell-sidebar-filter select, .shell-sidebar-filter input:not([type=checkbox]) { border-radius: 10px; border-color: var(--line-strong); }
++.ui-input:hover:not(:disabled):not([aria-invalid=true]) { border-color: var(--control-border); }
++.ui-chip, .ui-badge { font-weight: 650; }
++.ui-tabs__tab { font-size: 14px; }
++.ui-dialog { border-radius: 20px; }
++.ui-segmented { border-radius: 12px; }
++.ui-segmented__option { border-radius: 9px; }
++
++/* Inbox: the select-all bar is a second row; head, bar and list stack, and only the list scrolls. */
++section[class*="_listPane__"] { display: flex; flex-direction: column; grid-template-rows: none; }
++section[class*="_listPane__"] > ul[class*="_list__"] { flex: 1 1 auto; min-height: 0; }
++section[class*="_listPane__"] > div[class*="_bulk__"], section[class*="_listPane__"] > div[class*="_listHead__"] { flex: 0 0 auto; }
++
++@media (max-width: 1023px) { .shell-content { padding: 24px 24px 56px; } .shell-topbar { padding-inline: 20px; } }
++@media (max-width: 760px) { .shell-content { padding: 20px 16px 40px; } .panel { padding: 16px; } .ui-page-header__chip { width: 42px; height: 42px; } }
+diff --git a/rebuild/tests/design-pass-round4.test.ts b/rebuild/tests/design-pass-round4.test.ts
+new file mode 100644
+index 00000000..9745b8ff
+--- /dev/null
++++ b/rebuild/tests/design-pass-round4.test.ts
+@@ -0,0 +1,27 @@
++import { readFileSync } from 'node:fs';
++import { describe, expect, it } from 'vitest';
++
++const css = readFileSync('src/styles/components.css', 'utf8');
++const layer = css.slice(css.indexOf('Design pass 2026-10-21 (round 4)'));
++
++describe('design pass round 4 (shared stylesheet)', () => {
++  it('keeps the layer after the component rules and uses tokens, not raw palette colors', () => {
++    expect(layer.length).toBeGreaterThan(1000);
++    expect(layer).not.toMatch(/#(?!fff\b)[0-9a-f]{3,8}\b/i);
++  });
++  it('shares one soft card lift with a dark-mode and system-mode variant', () => {
++    expect(layer).toContain('--card-lift:');
++    expect(layer).toContain(':root[data-mode="dark"] { --card-lift');
++    expect(layer).toMatch(/prefers-color-scheme: dark\) \{ :root\[data-mode="system"\] \{ --card-lift/);
++  });
++  it('gives the page-header chip the module color and uses no gradients', () => {
++    expect(layer).toMatch(/\.ui-page-header__chip \{[^}]*background: var\(--mod/);
++    expect(layer).not.toContain('gradient');
++  });
++  it('lets only the Inbox list scroll when a bulk bar is present', () => {
++    expect(layer).toMatch(/section\[class\*="_listPane__"\] \{ display: flex; flex-direction: column; grid-template-rows: none/);
++  });
++  it('replaces dashed empty states with a filled surface', () => {
++    expect(layer).toMatch(/\.ui-state \{[^}]*border: 1px solid var\(--line-subtle\)/);
++  });
++});

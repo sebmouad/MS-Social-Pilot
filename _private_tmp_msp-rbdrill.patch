@@ -1,0 +1,53 @@
+diff --git a/tests/rollback-drill-script.test.ts b/tests/rollback-drill-script.test.ts
+new file mode 100644
+index 00000000..4e7338d3
+--- /dev/null
++++ b/tests/rollback-drill-script.test.ts
+@@ -0,0 +1,47 @@
++import { execFileSync } from 'node:child_process';
++import { existsSync, readFileSync } from 'node:fs';
++import { describe, expect, it } from 'vitest';
++
++const path = new URL('../rebuild/scripts/prod-rollback-drill.sh', import.meta.url);
++const source = () => existsSync(path) ? readFileSync(path, 'utf8') : '';
++
++describe('post-cutover rollback drill safety (static only)', () => {
++  it('has valid bash syntax without executing host operations', () => {
++    expect(existsSync(path)).toBe(true);
++    execFileSync('bash', ['-n', path.pathname]);
++  });
++  it('pins scratch database, loopback listeners and refuses occupied ports and prior resources', () => {
++    const sh = source();
++    for (const guard of ['readonly DB=social_pilot_drill', 'readonly LEGACY_PORT=3120 REBUILD_PORT=3121',
++      'Refusing: unsafe database or port', 'Refusing: port already listening',
++      'Refusing: scratch database already exists', 'Refusing: scratch role already exists', 'flock -n']) {
++      expect(sh).toContain(guard);
++    }
++    expect(sh).toContain('[ \"$DB\" = social_pilot_drill ]');
++    expect(sh).toContain('[ \"$LEGACY_PORT\" = 3120 ]');
++    expect(sh).toContain('[ \"$REBUILD_PORT\" = 3121 ]');
++    expect(sh.indexOf('Refusing: unsafe database or port')).toBeLessThan(sh.indexOf('createdb'));
++    expect(sh).not.toMatch(/systemctl (?:restart|stop|start) social-pilot(?:-rebuild)?(?:-worker)?\b/);
++  });
++  it('restores only the newest deploy dump without building or migrating either release', () => {
++    const sh = source();
++    for (const marker of ['/var/backups/socialpilot-deploy-*/social_pilot.dump', 'sort -nr',
++      'pg_restore --exit-on-error --no-owner --no-acl', '--dbname="$DB"',
++      '/srv/ms-social-pilot', '/srv/ms-social-pilot-rebuild/rebuild', '.next/BUILD_ID']) expect(sh).toContain(marker);
++    expect(sh).not.toMatch(/npm (?:ci|install)|next build|migrate deploy|pg_restore.*--create/);
++  });
++  it('isolates services, credentials, provider egress and files, and proves scratch DB connections', () => {
++    const sh = source();
++    for (const marker of ['systemd-run', 'IPAddressDeny=any', 'IPAddressAllow=localhost',
++      'ProtectSystem=strict', 'InaccessiblePaths=', 'default_transaction_read_only=on',
++      'NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT', 'pg_stat_activity', "application_name='rollback-$label'", 'Release changed during drill',
++      '-H 127.0.0.1', '/api/health', '/sign-in', '--max-time']) expect(sh).toContain(marker);
++  });
++  it('cleans only resources it created on failure/signals and reports timed verdict after cleanup', () => {
++    const sh = source();
++    for (const marker of ['trap cleanup EXIT', "trap 'exit 130' INT", "trap 'exit 143' TERM",
++      'DB_CREATED', 'ROLE_CREATED', 'STARTED_UNITS', 'dropdb', 'DROP ROLE',
++      'restore_seconds=', 'legacy_seconds=', 'rebuild_seconds=', 'ROLLBACK DRILL PASS', 'ROLLBACK DRILL FAIL']) expect(sh).toContain(marker);
++    expect(sh.indexOf('trap cleanup EXIT')).toBeLessThan(sh.indexOf('createdb'));
++  });
++});

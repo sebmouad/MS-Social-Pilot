@@ -1,0 +1,522 @@
+diff --git a/rebuild/generated b/rebuild/generated
+new file mode 120000
+index 00000000..526702ed
+--- /dev/null
++++ b/rebuild/generated
+@@ -0,0 +1 @@
++/Users/mouad/Documents/ChatGPT/MS Social Pilot/app/rebuild/generated
+\ No newline at end of file
+diff --git a/rebuild/src/modules/analytics/reports/generation/document.ts b/rebuild/src/modules/analytics/reports/generation/document.ts
+index 09025fc1..264e83eb 100644
+--- a/rebuild/src/modules/analytics/reports/generation/document.ts
++++ b/rebuild/src/modules/analytics/reports/generation/document.ts
+@@ -7,7 +7,7 @@ import { platformAnalytics } from '@/server/platforms/registry';
+ import type { DestinationMeasures, PostPerformance } from '@/server/platforms/host';
+ import { channelGoalProgress } from '../../goals/server/goals';
+ import type { GoalMonth, GoalProgress } from '../../goals/contracts';
+-import { describeBusinessHours, formatDuration, readResponseTime, type ResponseTimeSummary } from './response-time';
++import { describeBusinessHours, formatDuration, OUTSIDE_APP_LABEL, readResponseTime, type ResponseTimeSummary } from './response-time';
+ 
+ /** One channel's per-destination summary: neutral counts plus the platform module's stored measures (null = not stored). */
+ export type DestinationSummary = {
+@@ -78,6 +78,14 @@ export function renderReport(snapshot: Snapshot, input: { channelName: string; s
+     ? `Business hours (${describeBusinessHours(response.businessHours)}): median first response ${formatDuration(response.businessMedianMs)}, counting only time inside business hours. Calendar time: median first response ${formatDuration(response.medianMs)}.`
+     : `Calendar time: median first response ${formatDuration(response.medianMs)}. Business hours are not set for this workspace, so no business-hours figure is shown.`) : '';
+   const responseLine = response ? `${responseBasis} ${response.answered} answered, ${response.unanswered} waiting at period end. From stored Inbox messages${response.partial ? '; only the earliest messages were read' : ''}.` : '';
++  const mins = (ms: number | null) => ms === null ? '' : Math.round(ms / 60_000);
++  const hoursSet = Boolean(response?.businessHours);
++  const memberName = (name: string | null) => name === null ? OUTSIDE_APP_LABEL : clamp(name, 100);
++  const memberRows = response ? response.members.slice(0, Math.max(0, bounds.maxRows)) : [];
++  const memberNote = response ? (response.members.some(m => m.name === null) ? ' Replies made outside the app have no recorded author and are grouped separately, never attributed to a member.' : '') : '';
++  const resolveLine = response ? `Resolve time (first visitor message to the stored resolution): ${response.resolve.resolved} resolved, ${response.resolve.unresolved} not resolved. ${response.resolve.resolved ? `Median ${hoursSet ? `${formatDuration(response.resolve.businessMedianMs)} in business hours, ${formatDuration(response.resolve.medianMs)} in calendar time` : `${formatDuration(response.resolve.medianMs)} in calendar time`}.` : `Median resolve time: ${formatDuration(null)}.`}` : '';
++  const memberText = (m: ResponseTimeSummary['members'][number]) => `${memberName(m.name)}: ${m.answered} answered, median first response ${hoursSet ? `${formatDuration(m.businessMedianMs)} in business hours, ${formatDuration(m.medianMs)} in calendar time` : `${formatDuration(m.medianMs)} in calendar time`}`;
++  const membersHtml = response ? (memberRows.length ? `<table><thead><tr><th>Replied by</th><th>Answered</th><th>Median first response (calendar)</th>${hoursSet ? '<th>Median first response (business hours)</th>' : ''}</tr></thead><tbody>${memberRows.map(m => `<tr><td>${esc(memberName(m.name))}</td><td>${esc(m.answered)}</td><td>${esc(formatDuration(m.medianMs))}</td>${hoursSet ? `<td>${esc(formatDuration(m.businessMedianMs))}</td>` : ''}</tr>`).join('')}</tbody></table>${response.membersOmitted ? `<p><small>${esc(response.membersOmitted)} more members not listed.</small></p>` : ''}${memberNote ? `<p><small>${esc(memberNote.trim())}</small></p>` : ''}` : '<p>No answered waits by member in this period.</p>') : '';
+   const recap = included.includes('aiRecap') ? input.recap ?? null : null;
+   const recapText = recap ? (recap.state === 'ready' ? recap.text : RECAP_UNAVAILABLE) : '';
+   const topPosts = included.includes('topPosts') ? input.topPosts ?? [] : null;
+@@ -100,6 +108,17 @@ export function renderReport(snapshot: Snapshot, input: { channelName: string; s
+     rows.push(['response_time', 'median_first_response_business_minutes', 'Median first response (business hours)', 'Inbox', '', '', response.businessHours && response.businessMedianMs !== null ? Math.round(response.businessMedianMs / 60_000) : '', 'minutes', response.businessHours ? (response.partial ? 'partial' : '') : 'not set', response.businessHours ? `Median wait counting only business hours: ${describeBusinessHours(response.businessHours)}` : 'Business hours are not set for this workspace; no figure']);
+     rows.push(['response_time', 'answered_waits', 'Answered waits', 'Inbox', '', '', response.answered, 'waits', '', 'Count in period']);
+     rows.push(['response_time', 'unanswered_waits', 'Waiting at period end', 'Inbox', '', '', response.unanswered, 'waits', '', 'Count at period end']);
++    for (const m of memberRows) {
++      const who = memberName(m.name); const basis = m.name === null ? 'Sender not recorded: reply made outside the app' : 'Reply sent from the app by this member';
++      rows.push(['response_time_member', 'member_answered_waits', 'Answered waits by member', 'Inbox', who, '', m.answered, 'waits', '', basis]);
++      rows.push(['response_time_member', 'member_median_first_response_minutes', 'Median first response by member (calendar time)', 'Inbox', who, '', mins(m.medianMs), 'minutes', '', basis]);
++      rows.push(['response_time_member', 'member_median_first_response_business_minutes', 'Median first response by member (business hours)', 'Inbox', who, '', hoursSet ? mins(m.businessMedianMs) : '', 'minutes', hoursSet ? '' : 'not set', hoursSet ? basis : 'Business hours are not set for this workspace; no figure']);
++    }
++    if (response.membersOmitted) rows.push(['response_time_member', 'members_not_listed', 'Members not listed', 'Inbox', '', '', response.membersOmitted, 'members', '', 'Only the members with the most answers are listed']);
++    rows.push(['response_time_resolve', 'resolved_waits', 'Resolved waits', 'Inbox', '', '', response.resolve.resolved, 'waits', '', 'Waits closed by the stored conversation resolution time, measured from the first visitor message']);
++    rows.push(['response_time_resolve', 'unresolved_waits', 'Waits not resolved', 'Inbox', '', '', response.resolve.unresolved, 'waits', '', 'Count of waits in period with no stored resolution']);
++    rows.push(['response_time_resolve', 'median_resolve_minutes', 'Median resolve time (calendar time)', 'Inbox', '', '', mins(response.resolve.medianMs), 'minutes', '', 'First visitor message to stored resolution; empty means none resolved']);
++    rows.push(['response_time_resolve', 'median_resolve_business_minutes', 'Median resolve time (business hours)', 'Inbox', '', '', hoursSet ? mins(response.resolve.businessMedianMs) : '', 'minutes', hoursSet ? '' : 'not set', hoursSet && response.businessHours ? `Counting only business hours: ${describeBusinessHours(response.businessHours)}` : 'Business hours are not set for this workspace; no figure']);
+   }
+   if (goals) for (const g of goals.goals) rows.push(['goal', g.metric, g.label, 'Goals', '', goals.month.start, g.actual ?? '', 'target ' + g.target, `${g.percent}%`, `${g.paceLabel}; month ${goals.month.start} to ${goals.month.end} (${goals.month.timeZone})`]);
+   if (included.includes('destinations')) {
+@@ -146,7 +165,7 @@ export function renderReport(snapshot: Snapshot, input: { channelName: string; s
+       + `<h1>${esc(title)}</h1><p><small>Generated ${esc(input.generatedAt.toISOString())}. Values come from stored analytics; "Not available" means no data, not zero.</small></p>`
+       + (recap ? `<h2>AI recap</h2><p><strong>AI-generated.</strong> <small>${esc(RECAP_LABEL)}</small></p><p>${esc(recapText)}</p>` : '')
+       + (included.includes('published') ? `<h2>Published posts</h2><p>Published ${esc(snapshot.publishing.published)}, scheduled ${esc(snapshot.publishing.scheduled)}, failed ${esc(snapshot.publishing.failed)}.</p>` : '')
+-      + (response ? `<h2>Response time</h2><p>${esc(responseLine)}</p>` : '')
++      + (response ? `<h2>Response time</h2><p>${esc(responseLine)}</p><h3>By member</h3>${membersHtml}<h3>Resolve time</h3><p>${esc(resolveLine)}</p>` : '')
+       + (goals ? `<h2>Goals</h2>${goals.goals.length ? `<p><small>Month ${esc(goals.month.start)} to ${esc(goals.month.end)} (${esc(goals.month.timeZone)}), up to generation for the current month.</small></p><table><thead><tr><th>Goal</th><th>Target</th><th>This month</th><th>Progress</th><th>Pace</th></tr></thead><tbody>${goals.goals.map(g => `<tr><td>${esc(g.label)}</td><td>${esc(g.target)}</td><td>${g.actual === null ? 'No data' : esc(g.actual)}</td><td>${esc(g.percent)}%</td><td>${esc(g.paceLabel)}</td></tr>`).join('')}</tbody></table>` : '<p>No goals are set for this channel.</p>'}` : '')
+       + (included.includes('destinations') ? `<h2>Destinations</h2>${destination ? `<p><small>${esc(destinationNote)}</small></p><table><thead><tr><th>Destination</th><th>Type</th><th>Posts</th>${destination.measures.map(m => `<th>${esc(m.label)}</th>`).join('')}<th>Link clicks (lifetime)</th></tr></thead><tbody><tr><td>${esc(destination.name)}</td><td>${esc(destination.type)}</td><td>${esc(destination.posts)}</td>${destination.measures.map(m => `<td>${esc(measureText(m))}</td>`).join('')}<td>${esc(linkClicksText)}</td></tr></tbody></table><p><small>Link clicks are lifetime totals for posts that went only to this channel${destination.sharedPosts ? `; ${esc(destination.sharedPosts)} shared post${destination.sharedPosts === 1 ? ' is' : 's are'} not counted` : ''}.</small></p>` : '<p>Destination summary not available.</p>'}` : '')
+       + (topPosts ? `<h2>Top posts</h2>${topPosts.length ? `<table><thead><tr><th>#</th><th>Post</th><th>Published</th><th>${esc(topPosts[0]!.rankLabel)}</th>${topPosts[0]!.measures.map(m => `<th>${esc(m.label)}</th>`).join('')}</tr></thead><tbody>${topPosts.map((p, i) => `<tr><td>${i + 1}</td><td>${p.url ? `<a href="${esc(p.url)}">${esc(postTitle(p))}</a>` : esc(postTitle(p))}</td><td>${asOf(p.publishedAt)}</td><td>${p.rankValue === null ? 'Not available' : esc(p.rankValue)}</td>${p.measures.map(m => `<td>${m.value === null ? 'Not available' : esc(m.value)}</td>`).join('')}</tr>`).join('')}</tbody></table>` : '<p>No published posts with stored measures in this period.</p>'}` : '')
+@@ -164,7 +183,7 @@ export function renderReport(snapshot: Snapshot, input: { channelName: string; s
+     htmlTruncated = true;
+   }
+   const baseLines = [title, '', ...(recap ? [`AI recap (AI-generated; ${RECAP_LABEL})`, recapText, ''] : []), ...(included.includes('published') ? [`Published ${snapshot.publishing.published}, scheduled ${snapshot.publishing.scheduled}, failed ${snapshot.publishing.failed}.`] : []),
+-    ...(response ? [`Response time: ${responseLine}`] : []),
++    ...(response ? [`Response time: ${responseLine}`, 'Response time by member:', ...(memberRows.length ? memberRows.map(memberText) : ['No answered waits by member in this period.']), ...(response.membersOmitted ? [`${response.membersOmitted} more members not listed.`] : []), ...(memberNote ? [memberNote.trim()] : []), resolveLine] : []),
+     ...(goals ? [`Goals (month ${goals.month.start} to ${goals.month.end}):`, ...(goals.goals.length ? goals.goals.map(goalText) : ['No goals are set for this channel.'])] : []),
+     ...(included.includes('destinations') ? ['Destinations:', ...(destination ? [`${clamp(destination.name, 200)} (${destination.type}): ${destination.posts} posts; ${destination.measures.map(m => `${m.label} ${measureText(m)}`).join('; ')}; link clicks (lifetime) ${linkClicksText}`] : ['Destination summary not available.'])] : []),
+     ...(topPosts ? ['Top posts:', ...(topPosts.length ? topPosts.map((p, i) => `${i + 1}. ${postTitle(p)} (${asOf(p.publishedAt)}): ${p.rankLabel} ${p.rankValue ?? 'Not available'}`) : ['No published posts with stored measures in this period.'])] : []),
+@@ -191,7 +210,7 @@ export function recapFacts(snapshot: Snapshot, input: { sections: ReportSectionI
+   const lines: string[] = [];
+   if (wanted.has('published')) lines.push(`Posts: published ${snapshot.publishing.published}, scheduled ${snapshot.publishing.scheduled}, failed ${snapshot.publishing.failed}.`);
+   if (wanted.has('audience') && snapshot.audience) lines.push(`Audience: ${snapshot.audience.covered ? snapshot.audience.total : 'Not available'} (${snapshot.audience.covered} of ${snapshot.audience.selected} channels; not unique people).`);
+-  if (wanted.has('responseTime') && input.responseTime) lines.push(`Median first response ${input.responseTime.businessHours ? `${formatDuration(input.responseTime.businessMedianMs)} in business hours, ${formatDuration(input.responseTime.medianMs)} in calendar time` : `${formatDuration(input.responseTime.medianMs)} in calendar time (no business hours set)`}; ${input.responseTime.answered} answered, ${input.responseTime.unanswered} waiting.`);
++  if (wanted.has('responseTime') && input.responseTime) lines.push(`Median first response ${input.responseTime.businessHours ? `${formatDuration(input.responseTime.businessMedianMs)} in business hours, ${formatDuration(input.responseTime.medianMs)} in calendar time` : `${formatDuration(input.responseTime.medianMs)} in calendar time (no business hours set)`}; ${input.responseTime.answered} answered, ${input.responseTime.unanswered} waiting. Resolved ${input.responseTime.resolve.resolved}, not resolved ${input.responseTime.resolve.unresolved}; median resolve time ${input.responseTime.resolve.resolved ? formatDuration(input.responseTime.businessHours ? input.responseTime.resolve.businessMedianMs : input.responseTime.resolve.medianMs) : 'Not available'}. ${input.responseTime.members.length} reply groups (${input.responseTime.members.some(m => m.name === null) ? 'including replies made outside the app' : 'all from app members'}).`);
+   if (wanted.has('goals') && input.goals?.goals.length) for (const g of input.goals.goals.slice(0, 20)) lines.push(`Goal ${factText(g.label)}: ${g.actual === null ? 'No data' : g.actual} of ${g.target} (${g.percent}%, ${factText(g.paceLabel)}).`);
+   const d = wanted.has('destinations') ? input.destination : null;
+   if (d) lines.push(`Destination: ${d.posts} posts published; ${d.measures.map(m => `${factText(m.label)} ${m.value ?? 'Not available'}`).join('; ')}.`);
+diff --git a/rebuild/src/modules/analytics/reports/generation/response-time.ts b/rebuild/src/modules/analytics/reports/generation/response-time.ts
+index 6584ca53..2565baee 100644
+--- a/rebuild/src/modules/analytics/reports/generation/response-time.ts
++++ b/rebuild/src/modules/analytics/reports/generation/response-time.ts
+@@ -9,7 +9,24 @@ import { businessHoursOrNull, businessMs, calendarMs, type BusinessHoursSetting
+  * channel's own remote identity. Two medians are reported: calendar time (always) and, when the workspace has set business
+  * hours, the same waits counting only time inside those hours on the workspace clock. Without business hours the business
+  * figure is absent (`businessHours` null) and nothing is invented.
++ *
++ * Legacy parity: the reply is attributed to the member recorded as having sent it from this app (`sentById`). A reply the
++ * provider reports from the channel's own identity without an app record was made outside the app; its author is unknown and
++ * is grouped as such, never guessed. Resolve time uses the stored conversation resolution timestamp (`resolvedAt`): as in
++ * legacy it closes the last wait that began at or before it, and is measured from that wait's first visitor message.
++ * Comments on posts are not part of this section (it reads Inbox messages only).
+  */
++export type ResponseMemberRow = {
++  /** The member's display name (never an email); null groups replies made outside the app, where the sender is unknown. */
++  name: string | null;
++  answered: number; medianMs: number | null; businessMedianMs: number | null;
++};
++export type ResolveSummary = {
++  /** Waits marked resolved. */
++  resolved: number; unresolved: number;
++  /** Median from the first visitor message of a wait to the stored resolution time; null when none resolved. */
++  medianMs: number | null; businessMedianMs: number | null;
++};
+ export type ResponseTimeSummary = {
+   answered: number; unanswered: number; medianMs: number | null;
+   /** Median counting only business hours; null when no business hours are set or nothing was answered. */
+@@ -18,12 +35,28 @@ export type ResponseTimeSummary = {
+   businessHours: (BusinessHoursSetting & { timeZone: string }) | null;
+   /** True when the message read hit its safety bound; figures then cover only the earliest messages read. */
+   partial: boolean;
++  /** Answered waits per replying member, most answers first, then one "outside the app" row (name null) when any. */
++  members: ResponseMemberRow[];
++  /** Members beyond MEMBER_ROWS_CAP that are not listed. */
++  membersOmitted: number;
++  resolve: ResolveSummary;
+ };
+ 
++/** Members listed per report; the rest are only counted. */
++export const MEMBER_ROWS_CAP = 50;
++export const OUTSIDE_APP_LABEL = 'Replied outside the app';
++export const UNKNOWN_MEMBER_LABEL = 'Former member';
++
++export const emptyResponseTime = (): ResponseTimeSummary => ({
++  answered: 0, unanswered: 0, medianMs: null, businessMedianMs: null, businessHours: null, partial: false,
++  members: [], membersOmitted: 0, resolve: { resolved: 0, unresolved: 0, medianMs: null, businessMedianMs: null },
++});
++
+ /** Upper bound on messages read for one report, so one busy channel cannot make generation unbounded. */
+ export const RESPONSE_TIME_MESSAGE_CAP = 20_000;
+ 
+-export type ResponseMessage = { conversationId: string; createdTime: Date; fromChannel: boolean };
++/** `sentById` is the member who sent it from this app; null or absent when sent elsewhere. */
++export type ResponseMessage = { conversationId: string; createdTime: Date; fromChannel: boolean; sentById?: string | null };
+ 
+ export function median(values: number[]): number | null {
+   if (!values.length) return null;
+@@ -32,36 +65,67 @@ export function median(values: number[]): number | null {
+   return sorted.length % 2 ? sorted[mid]! : Math.round((sorted[mid - 1]! + sorted[mid]!) / 2);
+ }
+ 
+-/** Pure arithmetic over messages ordered by conversation then time. */
+-export function summarizeResponseTimes(messages: ResponseMessage[], partial = false, business: { hours: BusinessHoursSetting; timeZone: string } | null = null): ResponseTimeSummary {
+-  const waits: number[] = [];
+-  const businessWaits: number[] = [];
+-  let unanswered = 0;
++type Wait = { start: Date; answeredAt: Date | null; answeredBy: string | null; resolvedAt: Date | null };
++type Business = { hours: BusinessHoursSetting; timeZone: string };
++
++/**
++ * Pure arithmetic over messages ordered by conversation then time. `resolvedAt` maps a conversation to its stored resolution
++ * time; `names` maps member ids to display names.
++ */
++export function summarizeResponseTimes(
++  messages: ResponseMessage[], partial = false, business: Business | null = null,
++  extra: { resolvedAt?: ReadonlyMap<string, Date | null>; names?: ReadonlyMap<string, string> } = {},
++): ResponseTimeSummary {
++  const waits: Wait[] = [];
+   let current: string | null = null;
+-  let waitingSince: Date | null = null;
++  let open: Wait | null = null;
++  let convWaits: Wait[] = [];
++  const closeConversation = () => {
++    const resolved = current === null ? null : extra.resolvedAt?.get(current) ?? null;
++    if (resolved) {
++      const last = [...convWaits].reverse().find(w => w.start <= resolved);
++      if (last) last.resolvedAt = resolved;
++    }
++  };
+   for (const m of messages) {
+     if (m.conversationId !== current) {
+-      if (waitingSince) unanswered += 1;
+-      current = m.conversationId; waitingSince = null;
++      closeConversation();
++      current = m.conversationId; open = null; convWaits = [];
+     }
+     if (m.fromChannel) {
+-      if (waitingSince) {
+-        waits.push(calendarMs(waitingSince, m.createdTime));
+-        if (business) businessWaits.push(businessMs(waitingSince, m.createdTime, business.hours, business.timeZone));
+-        waitingSince = null;
+-      }
+-    } else if (!waitingSince) waitingSince = m.createdTime;
++      if (open) { open.answeredAt = m.createdTime; open.answeredBy = m.sentById ?? null; open = null; }
++    } else if (!open) {
++      open = { start: m.createdTime, answeredAt: null, answeredBy: null, resolvedAt: null };
++      waits.push(open); convWaits.push(open);
++    }
+   }
+-  if (waitingSince) unanswered += 1;
++  closeConversation();
++  const answeredWaits = waits.filter(w => w.answeredAt);
++  const medians = (list: Wait[], end: (w: Wait) => Date) => ({
++    medianMs: median(list.map(w => calendarMs(w.start, end(w)))),
++    businessMedianMs: business ? median(list.map(w => businessMs(w.start, end(w), business.hours, business.timeZone))) : null,
++  });
++  const resolvedWaits = waits.filter(w => w.resolvedAt);
++  const byMember = new Map<string | null, Wait[]>();
++  for (const w of answeredWaits) byMember.set(w.answeredBy, [...(byMember.get(w.answeredBy) ?? []), w]);
++  const row = (name: string | null, list: Wait[]): ResponseMemberRow => ({ name, answered: list.length, ...medians(list, w => w.answeredAt!) });
++  const people = [...byMember.entries()].filter(([id]) => id !== null)
++    .map(([id, list]) => row(extra.names?.get(id!) ?? UNKNOWN_MEMBER_LABEL, list))
++    .sort((a, b) => b.answered - a.answered || String(a.name).localeCompare(String(b.name)));
++  const listed = people.slice(0, MEMBER_ROWS_CAP);
++  const outside = byMember.get(null);
+   return {
+-    answered: waits.length, unanswered, medianMs: median(waits), partial,
+-    businessMedianMs: business ? median(businessWaits) : null,
++    answered: answeredWaits.length, unanswered: waits.length - answeredWaits.length, partial,
++    ...medians(answeredWaits, w => w.answeredAt!),
+     businessHours: business ? { ...business.hours, timeZone: business.timeZone } : null,
++    members: [...listed, ...(outside ? [row(null, outside)] : [])],
++    membersOmitted: people.length - listed.length,
++    resolve: { resolved: resolvedWaits.length, unresolved: waits.length - resolvedWaits.length, ...medians(resolvedWaits, w => w.resolvedAt!) },
+   };
+ }
+ 
+ /** The workspace's business hours and zone, or null when none are set (or the stored value is unusable). */
+-async function readBusinessHours(workspaceId: string): Promise<{ hours: BusinessHoursSetting; timeZone: string } | null> {
++async function readBusinessHours(workspaceId: string): Promise<Business | null> {
+   const rows = await prisma.$queryRaw<{ timezone: string | null; businessDays: number[] | null; businessStart: number | null; businessEnd: number | null }[]>`SELECT timezone, "businessDays", "businessStart", "businessEnd" FROM workspaces WHERE id = ${workspaceId}`;
+   const row = rows[0];
+   if (!row) return null;
+@@ -75,21 +139,31 @@ async function readBusinessHours(workspaceId: string): Promise<{ hours: Business
+ /** Inclusive UTC dates → [start, end + 1 day). The caller has already authorized the channel. */
+ export async function readResponseTime(workspaceId: string, channelId: string, period: ReportPeriod): Promise<ResponseTimeSummary> {
+   const target = await prisma.target.findFirst({ where: { id: channelId, workspaceId }, select: { providerId: true } });
+-  if (!target) return { answered: 0, unanswered: 0, medianMs: null, businessMedianMs: null, businessHours: null, partial: false };
++  if (!target) return emptyResponseTime();
+   const business = await readBusinessHours(workspaceId);
+   const from = new Date(`${period.start}T00:00:00.000Z`);
+   const to = new Date(new Date(`${period.end}T00:00:00.000Z`).getTime() + 86_400_000);
+   const rows = await prisma.conversationMessage.findMany({
+     where: { createdTime: { gte: from, lt: to }, conversation: { targetId: channelId, target: { workspaceId } } },
+-    select: { conversationId: true, createdTime: true, fromId: true, sentById: true },
++    select: { conversationId: true, createdTime: true, fromId: true, sentById: true, conversation: { select: { resolvedAt: true } } },
+     orderBy: [{ conversationId: 'asc' }, { createdTime: 'asc' }],
+     take: RESPONSE_TIME_MESSAGE_CAP + 1,
+   });
+   const partial = rows.length > RESPONSE_TIME_MESSAGE_CAP;
+-  const messages = rows.slice(0, RESPONSE_TIME_MESSAGE_CAP).map(r => ({
+-    conversationId: r.conversationId, createdTime: r.createdTime, fromChannel: r.sentById !== null || (r.fromId !== null && r.fromId === target.providerId),
++  const kept = rows.slice(0, RESPONSE_TIME_MESSAGE_CAP);
++  const messages = kept.map(r => ({
++    conversationId: r.conversationId, createdTime: r.createdTime, sentById: r.sentById,
++    fromChannel: r.sentById !== null || (r.fromId !== null && r.fromId === target.providerId),
+   }));
+-  return summarizeResponseTimes(messages, partial, business);
++  const resolvedAt = new Map(kept.map(r => [r.conversationId, r.conversation?.resolvedAt ?? null] as const));
++  // Display names only, and only for members of this workspace; anyone else is "Former member". Never emails.
++  const ids = [...new Set(kept.map(r => r.sentById).filter((id): id is string => id !== null))];
++  const names = new Map<string, string>();
++  if (ids.length) {
++    const members = await prisma.membership.findMany({ where: { workspaceId, userId: { in: ids } }, select: { userId: true, user: { select: { name: true } } } });
++    for (const m of members) if (m.user.name.trim()) names.set(m.userId, m.user.name.trim().slice(0, 100));
++  }
++  return summarizeResponseTimes(messages, partial, business, { resolvedAt, names });
+ }
+ 
+ export function formatDuration(ms: number | null): string {
+diff --git a/rebuild/tests/report-response-breakdown.test.ts b/rebuild/tests/report-response-breakdown.test.ts
+new file mode 100644
+index 00000000..445bf76b
+--- /dev/null
++++ b/rebuild/tests/report-response-breakdown.test.ts
+@@ -0,0 +1,192 @@
++import { describe, expect, it, vi } from 'vitest';
++
++const db = vi.hoisted(() => ({ $queryRaw: vi.fn(), target: { findFirst: vi.fn() }, conversationMessage: { findMany: vi.fn() }, membership: { findMany: vi.fn() } }));
++vi.mock('@/server/data', () => ({ prisma: db }));
++
++import { emptyResponseTime, MEMBER_ROWS_CAP, OUTSIDE_APP_LABEL, readResponseTime, summarizeResponseTimes, UNKNOWN_MEMBER_LABEL } from '../src/modules/analytics/reports/generation/response-time';
++import { recapFacts, renderReport } from '../src/modules/analytics/reports/generation/document';
++
++const at = (min: number) => new Date(Date.UTC(2026, 9, 1, 0, min));
++const MIN = 60_000;
++const v = (c: string, min: number) => ({ conversationId: c, createdTime: at(min), fromChannel: false });
++const r = (c: string, min: number, sentById: string | null = null) => ({ conversationId: c, createdTime: at(min), fromChannel: true, sentById });
++const snap = { period: { start: '2026-10-01', end: '2026-10-31' }, allMetrics: [], audience: null, publishing: { published: 0, scheduled: 0, failed: 0 } };
++const bounds = { maxRows: 200, maxBytes: 100_000 };
++
++describe('per-member attribution', () => {
++  it('attributes each first reply to the member who sent it from the app and groups the rest as outside the app', () => {
++    const s = summarizeResponseTimes([
++      v('a', 0), r('a', 10, 'u1'),
++      v('b', 0), r('b', 30, 'u1'),
++      v('c', 0), r('c', 4, 'u2'),
++      v('d', 0), r('d', 50, null),
++    ], false, null, { names: new Map([['u1', 'Amina'], ['u2', 'Youssef']]) });
++    expect(s.members).toEqual([
++      { name: 'Amina', answered: 2, medianMs: 20 * MIN, businessMedianMs: null },
++      { name: 'Youssef', answered: 1, medianMs: 4 * MIN, businessMedianMs: null },
++      { name: null, answered: 1, medianMs: 50 * MIN, businessMedianMs: null },
++    ]);
++    expect(s.answered).toBe(4);
++  });
++  it('never guesses: an unknown sender id is a former member, and no outside group appears when none exist', () => {
++    const s = summarizeResponseTimes([v('a', 0), r('a', 5, 'gone')]);
++    expect(s.members).toEqual([{ name: UNKNOWN_MEMBER_LABEL, answered: 1, medianMs: 5 * MIN, businessMedianMs: null }]);
++    expect(s.members.some(m => m.name === null)).toBe(false);
++  });
++  it('counts only the first reply of a wait toward its author', () => {
++    const s = summarizeResponseTimes([v('a', 0), r('a', 5, 'u1'), r('a', 6, 'u2')], false, null, { names: new Map([['u1', 'A'], ['u2', 'B']]) });
++    expect(s.members.map(m => [m.name, m.answered])).toEqual([['A', 1]]);
++  });
++  it('lists at most MEMBER_ROWS_CAP members and counts the rest, keeping the outside group', () => {
++    const msgs = [];
++    const names = new Map<string, string>();
++    for (let i = 0; i < MEMBER_ROWS_CAP + 3; i += 1) { msgs.push(v(`c${i}`, 0), r(`c${i}`, 5, `u${i}`)); names.set(`u${i}`, `M${i}`); }
++    msgs.push(v('x', 0), r('x', 9, null));
++    const s = summarizeResponseTimes(msgs, false, null, { names });
++    expect(s.members).toHaveLength(MEMBER_ROWS_CAP + 1);
++    expect(s.membersOmitted).toBe(3);
++    expect(s.members.at(-1)!.name).toBeNull();
++  });
++  it('computes member medians in business hours when set', () => {
++    const hours = { days: [0, 1, 2, 3, 4, 5, 6], start: 9, end: 18 };
++    const s = summarizeResponseTimes([
++      { conversationId: 'a', createdTime: new Date('2026-10-01T17:00:00Z'), fromChannel: false },
++      { conversationId: 'a', createdTime: new Date('2026-10-02T07:30:00Z'), fromChannel: true, sentById: 'u1' },
++    ], false, { hours, timeZone: 'UTC' }, { names: new Map([['u1', 'Amina']]) });
++    expect(s.members[0]).toMatchObject({ name: 'Amina', medianMs: 14.5 * 60 * MIN, businessMedianMs: 60 * MIN });
++  });
++});
++
++describe('resolve time', () => {
++  it('measures from the first visitor message of the wait to the stored resolution, per legacy', () => {
++    const s = summarizeResponseTimes(
++      [v('a', 0), v('a', 3), r('a', 10, 'u1'), v('a', 20), r('a', 25, 'u1'), v('b', 0)],
++      false, null, { resolvedAt: new Map([['a', at(120)], ['b', null]]) },
++    );
++    // Resolution closes the last wait that began before it (the one started at minute 20); b is not resolved.
++    expect(s.resolve).toEqual({ resolved: 1, unresolved: 2, medianMs: 100 * MIN, businessMedianMs: null });
++  });
++  it('does not close a wait that began after the resolution', () => {
++    const s = summarizeResponseTimes([v('a', 30), r('a', 40)], false, null, { resolvedAt: new Map([['a', at(10)]]) });
++    expect(s.resolve).toEqual({ resolved: 0, unresolved: 1, medianMs: null, businessMedianMs: null });
++  });
++  it('counts a wait resolved without a reply as resolved but not answered', () => {
++    const s = summarizeResponseTimes([v('a', 0)], false, null, { resolvedAt: new Map([['a', at(15)]]) });
++    expect(s.answered).toBe(0); expect(s.unanswered).toBe(1);
++    expect(s.resolve.resolved).toBe(1); expect(s.resolve.medianMs).toBe(15 * MIN);
++  });
++  it('gives both calendar and business-hours medians, with business hours only inside the window', () => {
++    const hours = { days: [1, 2, 3, 4, 5], start: 9, end: 18 };
++    // Thu 2026-10-01 17:00Z visitor, resolved Fri 2026-10-02 09:30Z: calendar 16.5 h, business 1 h + 0.5 h
++    const s = summarizeResponseTimes(
++      [{ conversationId: 'a', createdTime: new Date('2026-10-01T17:00:00Z'), fromChannel: false }],
++      false, { hours, timeZone: 'UTC' }, { resolvedAt: new Map([['a', new Date('2026-10-02T09:30:00Z')]]) },
++    );
++    expect(s.resolve.medianMs).toBe(16.5 * 60 * MIN);
++    expect(s.resolve.businessMedianMs).toBe(90 * MIN);
++  });
++  it('without business hours the business resolve median is null, never zero', () => {
++    const s = summarizeResponseTimes([v('a', 0)], false, null, { resolvedAt: new Map([['a', at(30)]]) });
++    expect(s.resolve.businessMedianMs).toBeNull();
++  });
++  it('handles a daylight-saving change inside the wait (Europe/Paris spring forward)', () => {
++    const hours = { days: [0, 1, 2, 3, 4, 5, 6], start: 9, end: 18 };
++    // Sat 2026-03-28 16:00Z = 17:00 CET; resolved Sun 2026-03-29 08:00Z = 10:00 CEST (clocks jumped at 01:00Z).
++    // Open time: Sat 17:00-18:00 (1 h) + Sun 09:00-10:00 CEST (1 h) = 2 h; calendar 16 h.
++    const s = summarizeResponseTimes(
++      [{ conversationId: 'a', createdTime: new Date('2026-03-28T16:00:00Z'), fromChannel: false }],
++      false, { hours, timeZone: 'Europe/Paris' }, { resolvedAt: new Map([['a', new Date('2026-03-29T08:00:00Z')]]) },
++    );
++    expect(s.resolve.medianMs).toBe(16 * 60 * MIN);
++    expect(s.resolve.businessMedianMs).toBe(2 * 60 * MIN);
++  });
++});
++
++describe('empty data', () => {
++  it('is not available, never zero', () => {
++    const s = summarizeResponseTimes([]);
++    expect(s).toEqual(emptyResponseTime());
++    expect(s.members).toEqual([]);
++    expect(s.resolve.medianMs).toBeNull();
++  });
++});
++
++describe('reader scope', () => {
++  it('reads only the authorized channel, resolves names from workspace memberships only, never emails', async () => {
++    db.target.findFirst.mockResolvedValue({ providerId: 'PAGE' });
++    db.$queryRaw.mockResolvedValue([{ timezone: 'UTC', businessDays: [], businessStart: 9, businessEnd: 18 }]);
++    const resolved = new Date(Date.UTC(2026, 9, 1, 2));
++    db.conversationMessage.findMany.mockResolvedValue([
++      { conversationId: 'a', createdTime: at(0), fromId: 'visitor', sentById: null, conversation: { resolvedAt: resolved } },
++      { conversationId: 'a', createdTime: at(5), fromId: null, sentById: 'u1', conversation: { resolvedAt: resolved } },
++      { conversationId: 'b', createdTime: at(0), fromId: 'visitor', sentById: null, conversation: { resolvedAt: null } },
++      { conversationId: 'b', createdTime: at(9), fromId: 'PAGE', sentById: null, conversation: { resolvedAt: null } },
++      { conversationId: 'c', createdTime: at(0), fromId: 'visitor', sentById: null, conversation: { resolvedAt: null } },
++      { conversationId: 'c', createdTime: at(2), fromId: null, sentById: 'ex', conversation: { resolvedAt: null } },
++    ]);
++    db.membership.findMany.mockResolvedValue([{ userId: 'u1', user: { name: ' Amina ' } }]);
++    const s = await readResponseTime('w1', 't1', { start: '2026-10-01', end: '2026-10-01' });
++    expect(s.members.map(m => [m.name, m.answered])).toEqual([['Amina', 1], [UNKNOWN_MEMBER_LABEL, 1], [null, 1]]);
++    expect(s.resolve).toMatchObject({ resolved: 1, unresolved: 2, medianMs: 120 * MIN });
++    const q = db.membership.findMany.mock.calls[0]![0];
++    expect(q.where).toEqual({ workspaceId: 'w1', userId: { in: ['u1', 'ex'] } });
++    expect(q.select).toEqual({ userId: true, user: { select: { name: true } } });
++    expect(JSON.stringify(s)).not.toMatch(/@|email/i);
++    expect(db.conversationMessage.findMany.mock.calls[0]![0].where.conversation).toEqual({ targetId: 't1', target: { workspaceId: 'w1' } });
++  });
++  it('returns the empty summary for a channel outside the workspace', async () => {
++    db.target.findFirst.mockResolvedValue(null);
++    expect(await readResponseTime('w1', 'x', { start: '2026-10-01', end: '2026-10-01' })).toEqual(emptyResponseTime());
++  });
++});
++
++describe('rendering', () => {
++  const hours = { days: [1, 2, 3, 4, 5], start: 9, end: 18, timeZone: 'Europe/Paris' };
++  const rt = {
++    ...emptyResponseTime(), answered: 3, unanswered: 1, medianMs: 30 * MIN, businessMedianMs: 20 * MIN, businessHours: hours,
++    members: [
++      { name: '<b>Amina</b>', answered: 2, medianMs: 40 * MIN, businessMedianMs: 25 * MIN },
++      { name: null, answered: 1, medianMs: 10 * MIN, businessMedianMs: 10 * MIN },
++    ],
++    resolve: { resolved: 2, unresolved: 2, medianMs: 300 * MIN, businessMedianMs: 120 * MIN },
++  };
++  const out = renderReport(snap as never, { channelName: 'P', sections: ['responseTime'], generatedAt: new Date(), responseTime: rt }, bounds);
++  it('labels members, the outside-the-app group and resolve time in CSV and JSON', () => {
++    for (const body of [out.csv, out.json!]) {
++      expect(body).toContain('member_answered_waits'); expect(body).toContain(OUTSIDE_APP_LABEL);
++      expect(body).toContain('median_resolve_minutes'); expect(body).toContain('median_resolve_business_minutes');
++      expect(body).toContain('unresolved_waits');
++    }
++    const records = JSON.parse(out.json!).records as Record<string, unknown>[];
++    const resolve = records.find(x => x.metric_key === 'median_resolve_business_minutes')!;
++    expect(resolve.value).toBe(120);
++    expect(records.find(x => x.metric_key === 'member_median_first_response_minutes' && x.resource === OUTSIDE_APP_LABEL)!.value).toBe(10);
++  });
++  it('escapes names and states the outside-the-app caveat in HTML and text', () => {
++    expect(out.html).toContain('&lt;b&gt;Amina&lt;/b&gt;'); expect(out.html).not.toContain('<b>Amina');
++    expect(out.html).toContain(OUTSIDE_APP_LABEL); expect(out.html).toContain('never attributed to a member');
++    expect(out.html).toContain('Resolve time');
++    expect(out.text).toContain('Response time by member:'); expect(out.text).toContain(`${OUTSIDE_APP_LABEL}: 1 answered`);
++    expect(out.text).toContain('2 resolved, 2 not resolved'); expect(out.text).toContain('2 h in business hours');
++  });
++  it('shows Not available for empty figures and omits business columns when hours are unset', () => {
++    const empty = renderReport(snap as never, { channelName: 'P', sections: ['responseTime'], generatedAt: new Date(), responseTime: emptyResponseTime() }, bounds);
++    expect(empty.text).toContain('0 resolved, 0 not resolved'); expect(empty.text).toContain('Median resolve time: Not available');
++    expect(empty.html).toContain('No answered waits by member');
++    expect(empty.html).not.toContain('(business hours)</th>');
++    const rows = JSON.parse(empty.json!).records as Record<string, unknown>[];
++    expect(rows.find(x => x.metric_key === 'median_resolve_minutes')!.value).toBeNull();
++    expect(rows.find(x => x.metric_key === 'median_resolve_business_minutes')!.coverage).toBe('not set');
++  });
++  it('respects the result ceiling on rows and stays valid JSON', () => {
++    const tight = renderReport(snap as never, { channelName: 'P', sections: ['responseTime'], generatedAt: new Date(), responseTime: rt }, { maxRows: 5, maxBytes: 100_000 });
++    expect(tight.rowCount).toBeLessThanOrEqual(5); expect(tight.truncated).toBe(true);
++    expect(() => JSON.parse(tight.json!)).not.toThrow();
++    expect(tight.html).not.toContain(OUTSIDE_APP_LABEL.repeat(2));
++  });
++  it('adds compact figures to the recap facts without member names', () => {
++    const facts = recapFacts(snap as never, { sections: ['responseTime'], responseTime: rt });
++    expect(facts).toContain('Resolved 2, not resolved 2'); expect(facts).toContain('including replies made outside the app');
++    expect(facts).not.toContain('Amina');
++  });
++});
+diff --git a/rebuild/tests/report-response-time.test.ts b/rebuild/tests/report-response-time.test.ts
+index ad9682f5..f8842ead 100644
+--- a/rebuild/tests/report-response-time.test.ts
++++ b/rebuild/tests/report-response-time.test.ts
+@@ -1,9 +1,9 @@
+ import { describe, expect, it, vi } from 'vitest';
+ 
+-const db = vi.hoisted(() => ({ $queryRaw: vi.fn(), target: { findFirst: vi.fn() }, conversationMessage: { findMany: vi.fn() } }));
++const db = vi.hoisted(() => ({ $queryRaw: vi.fn(), target: { findFirst: vi.fn() }, conversationMessage: { findMany: vi.fn() }, membership: { findMany: vi.fn().mockResolvedValue([]) } }));
+ vi.mock('@/server/data', () => ({ prisma: db }));
+ 
+-import { formatDuration, readResponseTime, summarizeResponseTimes, RESPONSE_TIME_MESSAGE_CAP } from '../src/modules/analytics/reports/generation/response-time';
++import { emptyResponseTime, formatDuration, readResponseTime, summarizeResponseTimes, RESPONSE_TIME_MESSAGE_CAP } from '../src/modules/analytics/reports/generation/response-time';
+ import { renderReport } from '../src/modules/analytics/reports/generation/document';
+ 
+ const at = (min: number) => new Date(Date.UTC(2026, 9, 1, 0, min));
+@@ -21,7 +21,7 @@ describe('response time arithmetic', () => {
+       { conversationId: 'b', createdTime: at(1), fromChannel: false },
+       { conversationId: 'c', createdTime: at(3), fromChannel: false },
+     ]);
+-    expect(s).toEqual({ answered: 2, unanswered: 2, medianMs: 20 * 60_000, businessMedianMs: null, businessHours: null, partial: false });
++    expect(s).toMatchObject({ answered: 2, unanswered: 2, medianMs: 20 * 60_000, businessMedianMs: null, businessHours: null, partial: false });
+   });
+   it('reports no data as not available, never zero', () => {
+     expect(summarizeResponseTimes([]).medianMs).toBeNull();
+@@ -42,7 +42,7 @@ describe('response time reader', () => {
+     ];
+     db.conversationMessage.findMany.mockResolvedValue(rows);
+     const s = await readResponseTime('w1', 't1', { start: '2026-10-01', end: '2026-10-01' });
+-    expect(s).toEqual({ answered: 2, unanswered: 0, medianMs: 3 * 60_000, businessMedianMs: null, businessHours: null, partial: false });
++    expect(s).toMatchObject({ answered: 2, unanswered: 0, medianMs: 3 * 60_000, businessMedianMs: null, businessHours: null, partial: false });
+     const call = db.conversationMessage.findMany.mock.calls[0]![0];
+     expect(call.where.conversation).toEqual({ targetId: 't1', target: { workspaceId: 'w1' } });
+     expect(call.where.createdTime.lt.toISOString()).toBe('2026-10-02T00:00:00.000Z');
+@@ -59,7 +59,7 @@ describe('response time reader', () => {
+ describe('response time report section', () => {
+   const snap = { period: { start: '2026-10-01', end: '2026-10-31' }, allMetrics: [], audience: null, publishing: { published: 1, scheduled: 0, failed: 0 } };
+   it('renders in CSV, HTML and text and is no longer listed as not included', () => {
+-    const out = renderReport(snap as never, { channelName: 'P', sections: ['responseTime'], generatedAt: new Date(), responseTime: { answered: 3, unanswered: 1, medianMs: 12 * 60_000, businessMedianMs: null, businessHours: null, partial: true } }, { maxRows: 100, maxBytes: 20000 });
++    const out = renderReport(snap as never, { channelName: 'P', sections: ['responseTime'], generatedAt: new Date(), responseTime: { ...emptyResponseTime(), answered: 3, unanswered: 1, medianMs: 12 * 60_000, businessMedianMs: null, businessHours: null, partial: true } }, { maxRows: 100, maxBytes: 20000 });
+     expect(out.sections).toEqual(['responseTime']); expect(out.notIncluded).toEqual([]);
+     expect(out.csv).toContain('"response_time","median_first_response_minutes"'); expect(out.csv).toContain('"12"');
+     expect(out.html).toContain('<h2>Response time</h2>'); expect(out.html).toContain('12 min');
+@@ -102,7 +102,7 @@ describe('response time with business hours', () => {
+   const base = { period: { start: '2026-10-01', end: '2026-10-31' }, allMetrics: [], audience: null, publishing: { published: 1, scheduled: 0, failed: 0 } };
+   const bounds = { maxRows: 100, maxBytes: 20000 };
+   it('labels business hours and calendar time in CSV, JSON, HTML and text', () => {
+-    const rt = { answered: 3, unanswered: 1, medianMs: 600 * 60_000, businessMedianMs: 90 * 60_000, businessHours: { ...hours, timeZone: 'Europe/Paris' }, partial: false };
++    const rt = { ...emptyResponseTime(), answered: 3, unanswered: 1, medianMs: 600 * 60_000, businessMedianMs: 90 * 60_000, businessHours: { ...hours, timeZone: 'Europe/Paris' }, partial: false };
+     const out = renderReport(base as never, { channelName: 'P', sections: ['responseTime'], generatedAt: new Date(), responseTime: rt }, bounds);
+     expect(out.csv).toContain('median_first_response_business_minutes'); expect(out.csv).toContain('"90"'); expect(out.csv).toContain('"600"');
+     expect(out.csv).toContain('Mon, Tue, Wed, Thu, Fri 09:00-18:00 (Europe/Paris)');
+@@ -114,7 +114,7 @@ describe('response time with business hours', () => {
+     expect(keys).toContain('median_first_response_business_minutes'); expect(keys).toContain('median_first_response_minutes');
+   });
+   it('says business hours are not set and gives an empty business figure', () => {
+-    const rt = { answered: 1, unanswered: 0, medianMs: 12 * 60_000, businessMedianMs: null, businessHours: null, partial: false };
++    const rt = { ...emptyResponseTime(), answered: 1, unanswered: 0, medianMs: 12 * 60_000, businessMedianMs: null, businessHours: null, partial: false };
+     const out = renderReport(base as never, { channelName: 'P', sections: ['responseTime'], generatedAt: new Date(), responseTime: rt }, bounds);
+     expect(out.html).toContain('Business hours are not set for this workspace');
+     expect(out.text).toContain('Business hours are not set');

@@ -1,0 +1,457 @@
+diff --git a/rebuild/src/lib/operation-error.ts b/rebuild/src/lib/operation-error.ts
+index 0469afd9..f2b39322 100644
+--- a/rebuild/src/lib/operation-error.ts
++++ b/rebuild/src/lib/operation-error.ts
+@@ -19,7 +19,20 @@ export function isOperationErrorCode(value: unknown): value is OperationErrorCod
+   return typeof value === 'string' && Object.hasOwn(HTTP_STATUS, value);
+ }
+ 
++/**
++ * A session guard that calls Next's `redirect()` inside an API handler's try block
++ * is an authorization outcome, not an upstream failure. `/access-limited` means a
++ * signed-in member lacks access; any other target means no usable session.
++ */
++function guardRedirect(error: unknown): OperationError | null {
++  const digest = (error as { digest?: unknown } | null)?.digest;
++  if (typeof digest !== 'string' || !digest.startsWith('NEXT_REDIRECT;')) return null;
++  return digest.split(';')[2] === '/access-limited'
++    ? new OperationError('forbidden', 'You do not have access to this feature.')
++    : new OperationError('unauthorized', 'Sign in to an authorized workspace.');
++}
++
+ export function operationFailure(error: unknown, fallback: string) {
+-  const safe = error instanceof OperationError ? error : new OperationError('upstream_failure', fallback);
++  const safe = error instanceof OperationError ? error : guardRedirect(error) ?? new OperationError('upstream_failure', fallback);
+   return { error: safe.message, code: safe.code, status: HTTP_STATUS[safe.code] };
+ }
+diff --git a/rebuild/tests/smoke-guard-redirect.test.ts b/rebuild/tests/smoke-guard-redirect.test.ts
+new file mode 100644
+index 00000000..560a63af
+--- /dev/null
++++ b/rebuild/tests/smoke-guard-redirect.test.ts
+@@ -0,0 +1,21 @@
++import { describe, expect, it } from 'vitest';
++import { OperationError, operationFailure } from '../src/lib/operation-error';
++
++const redirect = (to: string) => Object.assign(new Error('NEXT_REDIRECT'), { digest: `NEXT_REDIRECT;replace;${to};307;` });
++
++describe('session guard redirects inside API handlers', () => {
++  it('answer a missing session with 401, not an upstream failure', () => {
++    expect(operationFailure(redirect('/sign-in'), 'Could not load.')).toMatchObject({ status: 401, code: 'unauthorized' });
++    expect(operationFailure(redirect('/no-workspace'), 'Could not load.')).toMatchObject({ status: 401, code: 'unauthorized' });
++  });
++
++  it('answer a signed-in member without access with 403', () => {
++    expect(operationFailure(redirect('/access-limited'), 'Could not load.')).toMatchObject({ status: 403, code: 'forbidden' });
++  });
++
++  it('never expose the redirect digest and keep other failures unchanged', () => {
++    expect(JSON.stringify(operationFailure(redirect('/sign-in'), 'x'))).not.toMatch(/NEXT_REDIRECT|digest/);
++    expect(operationFailure(new Error('boom'), 'Could not load.')).toEqual({ error: 'Could not load.', code: 'upstream_failure', status: 502 });
++    expect(operationFailure(new OperationError('not_found', 'Gone.'), 'x')).toMatchObject({ status: 404 });
++  });
++});
+diff --git a/rebuild/tests/smoke-pages.test.ts b/rebuild/tests/smoke-pages.test.ts
+new file mode 100644
+index 00000000..6e2b3635
+--- /dev/null
++++ b/rebuild/tests/smoke-pages.test.ts
+@@ -0,0 +1,66 @@
++/// <reference types="vite/client" />
++import { RAW_ERROR_PATTERN, isNotFound, isRedirect, setSmoke, type SmokeLocale, type SmokeRole } from './smoke-support';
++import { describe, expect, it } from 'vitest';
++// @ts-expect-error react-dom ships no types for its edge build, which provides the streaming renderer.
++import { renderToReadableStream } from 'react-dom/server.edge';
++
++// Every page.tsx under src/app, discovered at build time so a new route is covered automatically.
++const loaders = import.meta.glob('../src/app/**/page.tsx') as Record<string, () => Promise<{ default: (props: unknown) => unknown }>>;
++const routeOf = (file: string) => file.replace('../src/app', '').replace(/\/page\.tsx$/, '') || '/';
++const sampleParams = (route: string) => Object.fromEntries([...route.matchAll(/\[(?:\.\.\.)?(\w+)\]/g)].map(match => [match[1], 'smoke-id']));
++
++const PUBLIC = new Set(['/', '/sign-in', '/sign-up', '/join', '/password-recovery', '/verify-email', '/two-step', '/two-step/enroll', '/no-workspace', '/access-limited', '/oauth/authorize', '/share/[token]/view', '/bio/[slug]/view', '/reports']);
++const ROLES: SmokeRole[] = ['anonymous', 'owner', 'member', 'viewer'];
++const LOCALES: SmokeLocale[] = ['en', 'fr'];
++
++type Outcome = { kind: 'rendered'; html: string } | { kind: 'redirect'; to: string } | { kind: 'not-found' } | { kind: 'threw'; error: unknown };
++
++async function visit(file: string, role: SmokeRole, locale: SmokeLocale): Promise<Outcome> {
++  setSmoke(role, locale);
++  const route = routeOf(file);
++  const page = (await loaders[file]!()).default;
++  try {
++    const element = await (page as (props: unknown) => unknown)({ params: Promise.resolve(sampleParams(route)), searchParams: Promise.resolve({}) });
++    // Errors thrown while streaming (including redirect()/notFound() inside async children) are
++    // captured and re-thrown here so they classify the same way as errors thrown by the page itself.
++    let captured: unknown;
++    // Render inside the real root layout so the theme/appearance providers exist, as in the app.
++    const { default: RootLayout } = await import('../src/app/layout');
++    const document = await RootLayout({ children: element as never });
++    const stream = await renderToReadableStream(document, { onError: (error: unknown) => { captured ??= error; return ''; } });
++    await Promise.race([stream.allReady, new Promise((_, reject) => setTimeout(() => reject(new Error(`render hung: ${route}`)), 20_000))]);
++    if (captured) throw captured;
++    const html = await new Response(stream).text();
++    return { kind: 'rendered', html };
++  } catch (error) {
++    const to = isRedirect(error);
++    if (to) return { kind: 'redirect', to };
++    if (isNotFound(error)) return { kind: 'not-found' };
++    return { kind: 'threw', error };
++  }
++}
++
++describe('page smoke', { timeout: 60_000 }, () => {
++  const files = Object.keys(loaders).sort();
++  it('discovers the page inventory', () => { expect(files.length).toBeGreaterThan(60); });
++
++  for (const file of files) {
++    const route = routeOf(file);
++    for (const role of ROLES) for (const locale of LOCALES) {
++      it(`${route} as ${role} (${locale}) never crashes or leaks raw errors`, async () => {
++        const outcome = await visit(file, role, locale);
++        if (outcome.kind === 'threw') throw outcome.error;
++        if (outcome.kind === 'rendered') expect(outcome.html).not.toMatch(RAW_ERROR_PATTERN);
++        if (outcome.kind === 'redirect') expect(['/sign-in', '/access-limited', '/no-workspace', '/home', '/two-step', '/', '/publishing/posts', '/analytics', '/root']).toContain(outcome.to.split('?')[0]);
++        // A signed-in owner never bounces to sign-in or access-limited on a customer or Root page.
++        if (role === 'owner' && !PUBLIC.has(route)) expect(outcome.kind === 'redirect' ? outcome.to : 'ok').not.toMatch(/^\/(sign-in|access-limited|no-workspace)/);
++        if (role === 'anonymous' && !PUBLIC.has(route)) {
++          expect(outcome.kind === 'redirect' && outcome.to.startsWith('/sign-in') || outcome.kind === 'not-found').toBe(true);
++        }
++        if (route.startsWith('/root') && role !== 'owner' && role !== 'anonymous') {
++          expect(outcome).toMatchObject({ kind: 'redirect', to: '/access-limited' });
++        }
++      });
++    }
++  }
++});
+diff --git a/rebuild/tests/smoke-routes.test.ts b/rebuild/tests/smoke-routes.test.ts
+new file mode 100644
+index 00000000..8796abee
+--- /dev/null
++++ b/rebuild/tests/smoke-routes.test.ts
+@@ -0,0 +1,163 @@
++/// <reference types="vite/client" />
++import { RAW_ERROR_PATTERN, SMOKE_ORIGIN, setSmoke, type SmokeLocale, type SmokeRole } from './smoke-support';
++import { afterAll, describe, expect, it } from 'vitest';
++import { writeFileSync } from 'node:fs';
++
++type Handler = (request: Request, context: { params: Promise<Record<string, unknown>> }) => Promise<Response> | Response;
++type RouteModule = Partial<Record<'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE', Handler>>;
++
++// Every route.ts under src/app, discovered at build time so a new route is covered automatically.
++const loaders: Record<string, () => Promise<RouteModule>> = {
++  ...(import.meta.glob('../src/app/**/route.ts') as Record<string, () => Promise<RouteModule>>),
++  ...(import.meta.glob('../src/app/.well-known/**/route.ts') as Record<string, () => Promise<RouteModule>>),
++};
++const routeOf = (file: string) => file.replace('../src/app', '').replace(/\/route\.ts$/, '') || '/';
++const paramsFor = (route: string) => Object.fromEntries([...route.matchAll(/\[(\.\.\.)?\[?(\w+)\]?\]/g)].map(match => [match[2], match[1] ? [] : 'smoke-id']));
++
++/** Routes that authenticate with something other than the workspace session cookie. */
++const NO_SESSION = /^\/(\.well-known|api\/(auth|oauth|v1|mcp|sharing\/public|connections\/\[platform\]\/callback)|bio|s\/|share)/;
++/** Bearer-token surfaces: anonymous callers must get 401, not a session redirect. */
++const BEARER = /^\/api\/(v1|mcp)/;
++/** Writes that are cross-origin by protocol (OAuth token exchange, dynamic registration, public decisions). */
++const CROSS_ORIGIN_BY_DESIGN = /^\/(api\/(oauth\/(token|register)|v1|mcp|sharing\/public)|\.well-known)/;
++const WRITE_METHODS = ['POST', 'PUT', 'PATCH', 'DELETE'] as const;
++const ROLES: SmokeRole[] = ['anonymous', 'owner', 'member', 'viewer'];
++const LOCALES: SmokeLocale[] = ['en', 'fr'];
++/** OAuth connectors are a Root switch; "temporarily_unavailable" (503) is the protocol answer while it is off. */
++const OAUTH_SWITCHED_OFF = /^\/api\/oauth\//;
++const BAD = new Set([500, 501, 502, 503, 504]);
++const isBad = (route: string, status: number) => BAD.has(status) && !(status === 503 && OAUTH_SWITCHED_OFF.test(route));
++
++/**
++ * Read models built from joined raw SQL that the shared stub does not fabricate (a CSV of joined
++ * member rows; a session-locking account export). They are still exercised for crashes; only the
++ * content/401 checks that depend on those rows are waived. Dedicated tests cover their content.
++ */
++const NEEDS_JOINED_ROWS = new Set(['/api/root/privileges/export', '/api/settings/account/export']);
++
++/** POST routes that only preview and change nothing, so they need no confirmation. */
++const READ_ONLY_POST = new Set(['/api/settings/data']);
++
++/**
++ * Known gaps found by this smoke test and reported, not hidden: the route answers a signed-in
++ * member or viewer with 401 (its own catch maps every guard failure to "Not authorized"), where
++ * 403 is the accurate status. Listing a route here only waives that one status check.
++ */
++const LIMITED_ROLE_ANSWERS_401 = new Set([
++  '/api/home/overview', '/api/settings/connections', '/api/settings/data', '/api/settings/data/exports', '/api/settings/data/exports/[id]',
++  '/api/settings/data/snapshot', '/api/settings/profiles', '/api/settings/team', '/api/settings/team/invitations',
++  '/api/settings/workspace/operations', '/api/settings/workspace/policy', '/api/webhooks', '/api/webhooks/[id]/deliveries', '/settings/profiles/operations',
++]);
++
++/**
++ * Known gap: a cross-origin POST to sign-out still signs the user out (the route has no Origin check).
++ * The test asserts the gap so that fixing it forces this entry to be removed.
++ */
++const CROSS_ORIGIN_ACCEPTED = new Set(['POST /api/auth/sign-out']);
++
++/** Validation runs before authentication, so an anonymous caller sees 400 instead of 401 (nothing is disclosed). */
++const VALIDATES_BEFORE_AUTH = new Set(['/api/publishing/recovery']);
++
++type Row = { route: string; method: string; role: string; locale: string; check: string; status: number | string };
++const report: Row[] = [];
++
++async function call(file: string, method: keyof RouteModule, init: { role: SmokeRole; locale: SmokeLocale; origin?: string | null; body?: unknown }) {
++  setSmoke(init.role, init.locale);
++  const route = routeOf(file);
++  const handler = (await loaders[file]!())[method]!;
++  const headers: Record<string, string> = { host: 'localhost', 'accept-language': init.locale, 'content-type': 'application/json' };
++  if (init.origin !== null) headers.origin = init.origin ?? SMOKE_ORIGIN;
++  const url = `${SMOKE_ORIGIN}${route.replace(/\[\[?\.{0,3}(\w+)\]?\]/g, 'smoke-id')}`;
++  const request = new Request(url, { method, headers, ...(method === 'GET' ? {} : { body: JSON.stringify(init.body ?? {}) }) });
++  let response: Response;
++  try { response = await handler(request, { params: Promise.resolve(paramsFor(route)) }); }
++  catch (error) {
++    // Route handlers may call redirect() (the OAuth callback does); Next turns that into a 307.
++    const to = (error as { redirectTo?: string } | null)?.redirectTo;
++    if (typeof to !== 'string') throw error;
++    response = new Response(null, { status: 307, headers: { location: to } });
++  }
++  const text = await response.clone().text().catch(() => '');
++  return { status: response.status, text, route };
++}
++
++function record(file: string, method: string, role: string, locale: string, check: string, status: number | string) {
++  report.push({ route: routeOf(file), method, role, locale, check, status });
++}
++
++describe('route smoke', { timeout: 60_000 }, () => {
++  const files = Object.keys(loaders).sort();
++  it('discovers the route inventory', () => { expect(files.length).toBeGreaterThan(150); });
++
++  for (const file of files) {
++    const route = routeOf(file);
++
++    for (const role of ROLES) for (const locale of LOCALES) {
++      it(`GET ${route} as ${role} (${locale}) answers without a crash or raw error`, async (context) => {
++        const mod = await loaders[file]!();
++        if (!mod.GET) return context.skip();
++        const { status, text } = await call(file, 'GET', { role, locale });
++        record(file, 'GET', role, locale, 'read', status);
++        expect(isBad(route, status), `${status} ${text.slice(0, 160)}`).toBe(false);
++        if (!NEEDS_JOINED_ROWS.has(route)) expect(text).not.toMatch(RAW_ERROR_PATTERN);
++        if (role === 'anonymous' && !NO_SESSION.test(route)) expect(VALIDATES_BEFORE_AUTH.has(route) ? [400, 401, 403] : [401, 403], text.slice(0, 160)).toContain(status);
++        // 429 is the shared rate limiter answering before the credential check on bearer surfaces.
++        if (role === 'anonymous' && BEARER.test(route)) expect([401, 429]).toContain(status);
++        if (role !== 'anonymous' && !NO_SESSION.test(route) && !LIMITED_ROLE_ANSWERS_401.has(route) && !NEEDS_JOINED_ROWS.has(route)) expect(status, 'a signed-in session is never answered 401 by a session route').not.toBe(401);
++        if (route.startsWith('/api/root') && role !== 'owner' && role !== 'anonymous') expect([401, 403, 404]).toContain(status);
++      });
++    }
++
++    for (const method of WRITE_METHODS) {
++      it(`${method} ${route} refuses anonymous callers and cross-origin requests`, async (context) => {
++        const mod = await loaders[file]!();
++        if (!mod[method]) return context.skip();
++        const anonymous = await call(file, method, { role: 'anonymous', locale: 'en' });
++        record(file, method, 'anonymous', 'en', 'write-anonymous', anonymous.status);
++        expect(isBad(route, anonymous.status), `${anonymous.status} ${anonymous.text.slice(0, 160)}`).toBe(false);
++        expect(anonymous.text).not.toMatch(RAW_ERROR_PATTERN);
++        if (!NO_SESSION.test(route)) expect([401, 403], anonymous.text.slice(0, 160)).toContain(anonymous.status);
++
++        if (!CROSS_ORIGIN_BY_DESIGN.test(route)) {
++          for (const origin of ['http://evil.example', null]) {
++            const foreign = await call(file, method, { role: 'owner', locale: 'en', origin });
++            record(file, method, 'owner', 'en', `write-origin:${origin ?? 'none'}`, foreign.status);
++            expect(isBad(route, foreign.status), `${origin}: ${foreign.text.slice(0, 160)}`).toBe(false);
++            const succeeded = foreign.status >= 200 && foreign.status < 300;
++            const gap = CROSS_ORIGIN_ACCEPTED.has(`${method} ${route}`) || (READ_ONLY_POST.has(route) && method === 'POST');
++            expect(succeeded, `cross-origin ${method} ${gap ? 'is a recorded gap and must still be listed' : 'must not succeed'} (${origin}): ${foreign.text.slice(0, 160)}`).toBe(gap);
++            expect(foreign.text).not.toMatch(RAW_ERROR_PATTERN);
++          }
++        }
++      });
++
++      it(`${method} ${route} never succeeds for a viewer or without confirmation, in English and French`, async (context) => {
++        const mod = await loaders[file]!();
++        if (!mod[method]) return context.skip();
++        for (const locale of LOCALES) {
++          const unconfirmed = await call(file, method, { role: 'owner', locale, body: {} });
++          record(file, method, 'owner', locale, 'write-unconfirmed', unconfirmed.status);
++          expect(isBad(route, unconfirmed.status), `${unconfirmed.status} ${unconfirmed.text.slice(0, 160)}`).toBe(false);
++          expect(unconfirmed.text).not.toMatch(RAW_ERROR_PATTERN);
++          if (!NO_SESSION.test(route)) {
++            const previewOnly = READ_ONLY_POST.has(route) && method === 'POST';
++            const signOut = CROSS_ORIGIN_ACCEPTED.has(`${method} ${route}`);
++            if (!previewOnly && !signOut) expect(unconfirmed.status < 200 || unconfirmed.status >= 300, `an empty ${method} must not succeed: ${unconfirmed.text.slice(0, 160)}`).toBe(true);
++            for (const role of ['viewer', 'member'] as const) {
++              const limited = await call(file, method, { role, locale, body: {} });
++              record(file, method, role, locale, 'write-limited', limited.status);
++              expect(isBad(route, limited.status), `${role}: ${limited.status} ${limited.text.slice(0, 160)}`).toBe(false);
++              if (!previewOnly && !signOut) expect(limited.status < 200 || limited.status >= 300, `${role} must not succeed: ${limited.text.slice(0, 160)}`).toBe(true);
++              expect(limited.text).not.toMatch(RAW_ERROR_PATTERN);
++            }
++          }
++        }
++      });
++    }
++  }
++
++  afterAll(() => {
++    const target = process.env.SMOKE_REPORT;
++    if (target) writeFileSync(target, JSON.stringify(report, null, 1));
++  });
++});
+diff --git a/rebuild/tests/smoke-support.ts b/rebuild/tests/smoke-support.ts
+new file mode 100644
+index 00000000..329f0b7e
+--- /dev/null
++++ b/rebuild/tests/smoke-support.ts
+@@ -0,0 +1,157 @@
++/**
++ * Shared harness for the route and action smoke tests (tests/smoke-*.test.ts).
++ *
++ * It replaces the Prisma client with a stub that behaves like an empty database
++ * for the signed-in user, so every page and route runs its real guards and
++ * services against synthetic fixtures. Import this file FIRST in a smoke test:
++ * its `vi.mock` calls must register before any application module loads.
++ */
++import { vi } from 'vitest';
++import { createHash } from 'node:crypto';
++import { mkdtempSync } from 'node:fs';
++import { tmpdir } from 'node:os';
++import { join } from 'node:path';
++
++export type SmokeRole = 'anonymous' | 'owner' | 'member' | 'viewer';
++export type SmokeLocale = 'en' | 'fr';
++
++const smoke = vi.hoisted(() => ({
++  role: 'owner' as 'anonymous' | 'owner' | 'member' | 'viewer',
++  locale: 'en' as 'en' | 'fr',
++  headers: {} as Record<string, string>,
++  rawCalls: [] as string[],
++}));
++
++export const SMOKE_USER = { id: 'smoke-user', name: 'Smoke User', email: 'smoke@example.test' };
++export const SMOKE_WORKSPACE = { id: 'smoke-workspace', name: 'Smoke Workspace', slug: 'smoke', timezone: 'Europe/Paris' };
++export const SMOKE_ORIGIN = 'http://localhost';
++
++const ROLE_ROW = { owner: 'owner', member: 'editor', viewer: 'viewer', anonymous: 'viewer' } as const;
++
++function sqlText(args: unknown[]): string {
++  const first = args[0];
++  return Array.isArray(first) ? first.join('?') : typeof first === 'string' ? first : '';
++}
++
++function rawQuery(args: unknown[]): unknown[] {
++  const text = sqlText(args);
++  smoke.rawCalls.push(text.slice(0, 80));
++  if (text.includes('member_page_access')) {
++    return [{ role: ROLE_ROW[smoke.role], allPages: smoke.role === 'owner', workspaceDisabled: [], memberDisabled: [], clientAccess: [], pageIds: [] }];
++  }
++  if (text.includes('"isInstanceOwner"') && text.includes('FROM memberships m')) {
++    return [{ workspaceId: SMOKE_WORKSPACE.id, workspaceDisabled: [], suspendedAt: null, memberDisabled: [], planFeatures: null, isInstanceOwner: smoke.role === 'owner' }];
++  }
++  if (smoke.role === 'anonymous') return [];
++  if (/FROM users WHERE (id|u\.id)\b|SELECT theme FROM users/.test(text)) return [{ id: SMOKE_USER.id, theme: 'vivid', disabledAt: null, isInstanceOwner: smoke.role === 'owner' }];
++  if (/SELECT m\.role::text AS role/.test(text)) {
++    return [{ role: ROLE_ROW[smoke.role], suspendedAt: null, allPages: smoke.role === 'owner', memberDisabled: [], workspaceDisabled: [], clientAccess: [] }];
++  }
++  return [];
++}
++
++const SMOKE_SETTINGS: Record<string, unknown> = { 'storage.mediaRoot': mkdtempSync(join(tmpdir(), 'smoke-media-')) };
++
++const SCALAR_DEFAULTS: Record<string, unknown> = {
++  count: 0, findMany: [], findFirst: null, findUnique: null, findFirstOrThrow: null, findUniqueOrThrow: null,
++  aggregate: {}, groupBy: [], create: {}, createMany: { count: 0 }, update: {}, updateMany: { count: 0 }, upsert: {}, delete: {}, deleteMany: { count: 0 },
++};
++
++function modelStub(model: string): Record<string, (...args: unknown[]) => Promise<unknown>> {
++  return new Proxy({}, {
++    get: (_t, method: string) => async (arg?: { where?: Record<string, unknown> }) => {
++      if (smoke.role !== 'anonymous') {
++        if (model === 'session' && method === 'findUnique') {
++          return { id: 'smoke-session', userId: SMOKE_USER.id, tokenHash: arg?.where?.tokenHash, expiresAt: new Date(Date.now() + 3_600_000), pending: null, user: { id: SMOKE_USER.id, disabledAt: null } };
++        }
++        if (model === 'user' && (method === 'findUnique' || method === 'findFirst')) {
++          return { ...SMOKE_USER, isInstanceOwner: smoke.role === 'owner', disabledAt: null, locale: smoke.locale };
++        }
++        if (model === 'membership' && method === 'findMany') {
++          return [{ id: 'smoke-membership', role: ROLE_ROW[smoke.role], userId: SMOKE_USER.id, workspaceId: SMOKE_WORKSPACE.id, allPages: true, workspace: SMOKE_WORKSPACE, user: { ...SMOKE_USER, isInstanceOwner: smoke.role === 'owner', disabledAt: null } }];
++        }
++        if (model === 'membership' && (method === 'findFirst' || method === 'findUnique')) {
++          return { id: 'smoke-membership', userId: SMOKE_USER.id, workspaceId: SMOKE_WORKSPACE.id, role: ROLE_ROW[smoke.role], allPages: smoke.role === 'owner', workspace: SMOKE_WORKSPACE };
++        }
++        if (model === 'workspace' && (method === 'findUnique' || method === 'findFirst')) return { ...SMOKE_WORKSPACE, suspendedAt: null };
++      }
++      // Installation settings that a configured preview would have; everything else falls back to registry defaults.
++      if (model === 'appSetting' && method === 'findUnique') {
++        const key = String(arg?.where?.key);
++        return key in SMOKE_SETTINGS ? { value: SMOKE_SETTINGS[key], encrypted: false } : null;
++      }
++      if (model === 'appSetting' && method === 'findMany') {
++        const keys = ((arg?.where as { key?: { in?: string[] } } | undefined)?.key?.in ?? []).filter(key => key in SMOKE_SETTINGS);
++        return keys.map(key => ({ key, value: SMOKE_SETTINGS[key], encrypted: false }));
++      }
++      const value = SCALAR_DEFAULTS[method];
++      return value === undefined ? null : Array.isArray(value) ? [] : value && typeof value === 'object' ? { ...value } : value;
++    },
++  });
++}
++
++class StubPrismaClient {
++  constructor() {
++    const models = new Map<string, unknown>();
++    // eslint-disable-next-line @typescript-eslint/no-this-alias
++    const self: unknown = new Proxy(this, {
++      get: (target, prop: string | symbol) => {
++        if (typeof prop === 'symbol') return undefined;
++        if (prop === '$queryRaw' || prop === '$queryRawUnsafe') return async (...args: unknown[]) => rawQuery(args);
++        if (prop === '$executeRaw' || prop === '$executeRawUnsafe') return async () => 0;
++        if (prop === '$transaction') return async (work: unknown) => (typeof work === 'function' ? (work as (tx: unknown) => unknown)(self) : Promise.all(work as Promise<unknown>[]));
++        if (prop === '$connect' || prop === '$disconnect') return async () => undefined;
++        if (prop === 'then') return undefined;
++        if (prop in target) return (target as never)[prop];
++        if (!models.has(prop)) models.set(prop, modelStub(prop));
++        return models.get(prop);
++      },
++    });
++    return self as StubPrismaClient;
++  }
++}
++
++vi.mock('../generated/client', async (importOriginal) => ({ ...(await importOriginal<Record<string, unknown>>()), PrismaClient: StubPrismaClient }));
++
++vi.mock('server-only', () => ({}));
++
++vi.mock('next/headers', () => {
++  const cookieJar = () => ({
++    get: (name: string) => (smoke.role !== 'anonymous' && name === 'msp_session' ? { name, value: Buffer.alloc(32, 7).toString('base64url') } : undefined),
++    getAll: () => [], has: () => false, set: () => undefined, delete: () => undefined, toString: () => '',
++  });
++  const headerJar = () => {
++    const map = new Map<string, string>([['accept-language', smoke.locale], ['host', 'localhost'], ['x-forwarded-proto', 'http'], ...Object.entries(smoke.headers)]);
++    return { get: (name: string) => map.get(name.toLowerCase()) ?? null, has: (name: string) => map.has(name.toLowerCase()), entries: () => map.entries(), forEach: (fn: (v: string, k: string) => void) => map.forEach(fn), [Symbol.iterator]: () => map.entries() };
++  };
++  return { cookies: async () => cookieJar(), headers: async () => headerJar() };
++});
++
++vi.mock('next/navigation', () => {
++  const redirect = (to: string) => { throw Object.assign(new Error('NEXT_REDIRECT'), { digest: `NEXT_REDIRECT;replace;${to};307;`, redirectTo: to }); };
++  const notFound = () => { throw Object.assign(new Error('NEXT_NOT_FOUND'), { digest: 'NEXT_HTTP_ERROR_FALLBACK;404' }); };
++  return {
++    redirect, permanentRedirect: redirect, notFound,
++    usePathname: () => '/', useRouter: () => ({ push: () => undefined, replace: () => undefined, refresh: () => undefined, back: () => undefined, prefetch: () => undefined }),
++    useSearchParams: () => new URLSearchParams(), useParams: () => ({}), useSelectedLayoutSegment: () => null, useSelectedLayoutSegments: () => [],
++  };
++});
++
++vi.mock('next/cache', () => ({
++  revalidatePath: () => undefined, revalidateTag: () => undefined, unstable_cache: <T,>(fn: T) => fn, unstable_noStore: () => undefined, cacheLife: () => undefined, cacheTag: () => undefined,
++}));
++
++export function setSmoke(role: SmokeRole, locale: SmokeLocale = 'en', headers: Record<string, string> = {}) {
++  smoke.role = role; smoke.locale = locale; smoke.headers = headers;
++}
++
++export const sessionHash = (token: string) => createHash('sha256').update(token).digest('hex');
++
++export function isRedirect(error: unknown): string | null {
++  const to = (error as { redirectTo?: string } | null)?.redirectTo;
++  return typeof to === 'string' ? to : null;
++}
++export const isNotFound = (error: unknown) => (error as { digest?: string } | null)?.digest === 'NEXT_HTTP_ERROR_FALLBACK;404';
++
++/** Text that must never reach a customer or an API client. */
++export const RAW_ERROR_PATTERN = /PrismaClient|PrismaClientKnownRequestError|Invalid `prisma|ECONNREFUSED|stack trace|TypeError|ReferenceError|Cannot read prop|is not a function|\[object Object\]|\bat (?:async )?[\w.<>]+ \(.*:\d+:\d+\)|node_modules|P20\d\d\b|\bundefined\b|\bNaN\b/;

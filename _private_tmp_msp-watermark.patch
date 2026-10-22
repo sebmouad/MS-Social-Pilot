@@ -1,0 +1,772 @@
+diff --git a/rebuild/UX-CONTRACT.md b/rebuild/UX-CONTRACT.md
+index e5032b02..7d0e492e 100644
+--- a/rebuild/UX-CONTRACT.md
++++ b/rebuild/UX-CONTRACT.md
+@@ -1,5 +1,13 @@
+ # MS Social Pilot UX Contract
+ 
++Workspace watermark branch (2026-10-20): Settings Workspace links to an en/fr
++logo/position/opacity/scale form and explicit image-copy action. Shared Button,
++FormValidation and useConfirm own controls, associated errors and confirmation;
++failures keep dialog/input for retry. Originals are retained. A returned copy
++is previewed with its media reference. Missing settings are empty; read failure
++is Not available. DOM tests pass; browser themes/viewports/keyboard remain open.
++See [WATERMARK.md](docs/WATERMARK.md).
++
+ This contract records observable behavior for the rebuild. It does not override the server's permission, publishing, provider, or data-lifecycle rules. Current gaps are marked as such so future batches cannot mistake intent for shipped behavior.
+ 
+ ## Product context
+diff --git a/rebuild/docs/AGENT_HANDOFF.md b/rebuild/docs/AGENT_HANDOFF.md
+index a7b30385..e0ab1fe1 100644
+--- a/rebuild/docs/AGENT_HANDOFF.md
++++ b/rebuild/docs/AGENT_HANDOFF.md
+@@ -920,3 +920,27 @@ outside Git) whose scratch restore matched every table count:
+ `20261030100000_rebuild_review_resolution` (shares a timestamp; name order applies),
+ `20261030110000_rebuild_ads_creative_creation`. All five are pinned in
+ `scripts/cutover-rehearsal.sh`; the full rehearsal still needs a sanitized staging dump.
++# Watermark worktree checkpoint — 2026-10-20
++
++`codex/watermark`: Settings owns workspace PNG/JPEG logo settings and explicit
++per-image copies, with shared current-authority UI/HTTP/MCP service and a neutral
++Sharp hook. Thin routes are `/settings/watermark` and its operations endpoint;
++Workspace policies links to it. Originals remain intact. Root key:
++`settings.watermarkMaxLogoBytes`; central registry unchanged. Migration
++`20261030120000_rebuild_workspace_watermark` is unapplied. See WATERMARK.md.
++
++Verification: 108 focused tests/11 files including raw SQL guard; TypeScript
++passed. Full suite attempted/interrupted on sandbox loopback listener failures
++and unchanged stale Analytics route expectations (both reproduce alone).
++Database migration/concurrency/export/erasure, actual browser themes/widths,
++real MCP transport and live-provider publication remain open. No install,
++Prisma generation, push, deploy or app servers. An external orchestrator made
++`3b4aadff` during implementation; preserve it and the follow-up changes.
++
++Follow-up commit is blocked: `git add` cannot create
++`/Users/mouad/Documents/ChatGPT/MS Social Pilot/app/.git/worktrees/msp-watermark/index.lock`
++(`Operation not permitted`). Shared Git metadata is outside writable roots and
++escalation is disabled. Source/UI/tests/docs after `3b4aadff` remain uncommitted;
++commit them from an environment allowed to write the existing Git metadata. Do
++not include the pre-existing untracked root `node_modules` link. Intended message:
++`feat(watermark): add controls and verification`. No push was attempted.
+diff --git a/rebuild/docs/ARCHITECTURE.md b/rebuild/docs/ARCHITECTURE.md
+index 15160390..c2a951d7 100644
+--- a/rebuild/docs/ARCHITECTURE.md
++++ b/rebuild/docs/ARCHITECTURE.md
+@@ -2,6 +2,13 @@
+ 
+ ## Authority
+ 
++Watermark branch checkpoint (2026-10-20): Settings owns workspace logo settings
++and explicit per-image application through one current-authority UI/HTTP/MCP
++service; shared media transforms raster buffers into a separate stored PNG.
++Root's logo byte limit is module-owned. The additive workspace-FK migration is
++unapplied; database/browser/live verification and legacy per-channel import
++remain open. See [WATERMARK.md](WATERMARK.md).
++
+ [ARCHITECTURE_CONTRACT.md](ARCHITECTURE_CONTRACT.md) is the mandatory target for Codex, Claude and subagents. This file describes implementation and gaps only. Follow [../../AGENTS.md](../../AGENTS.md); do not infer architecture permission from an unfinished boundary.
+ 
+ Updated 2026-10-19. This document distinguishes the intended production architecture from the current rebuild. A component existing in source is not proof that its complete workflow is production-ready.
+diff --git a/rebuild/docs/CHANNEL_PROFILES.md b/rebuild/docs/CHANNEL_PROFILES.md
+index ea31fb78..49506095 100644
+--- a/rebuild/docs/CHANNEL_PROFILES.md
++++ b/rebuild/docs/CHANNEL_PROFILES.md
+@@ -64,8 +64,10 @@ existing individual-channel workflow; Settings reports Not available instead.
+ 
+ Evidence: focused service, HTTP/MCP dispatch, DOM interaction, localized markup,
+ Publishing query and existing composer/Analytics regression tests. No database,
+-real browser/theme/viewport, live-provider or production proof. Watermark settings
+-and shared image transformation remain open; no setting is advertised as applied.
++real browser/theme/viewport, live-provider or production proof. The separate
++workspace watermark slice has settings and explicit shared image transformation
++on `codex/watermark`; see [WATERMARK.md](WATERMARK.md) for scope, unapplied
++migration and verification limits. It never applies automatically.
+ 
+ Verification in this worktree: 71 tests passed across nine focused Vitest files,
+ including both new channel-profile files, raw SQL guard, Publishing read/search,
+diff --git a/rebuild/docs/DELIVERY_PLAN.md b/rebuild/docs/DELIVERY_PLAN.md
+index 14f3e795..540eeff2 100644
+--- a/rebuild/docs/DELIVERY_PLAN.md
++++ b/rebuild/docs/DELIVERY_PLAN.md
+@@ -1,5 +1,11 @@
+ # Shared delivery plan
+ 
++Watermark checkpoint (2026-10-20): workspace logo settings and explicit image
++copies are implemented locally on `codex/watermark` through shared UI/HTTP/MCP
++services. Next: additive migration rehearsal, actual database/export/erasure,
++browser and live image-publication verification. See WATERMARK.md. No push,
++deployment or server execution is authorized for this branch batch.
++
+ Updated 2026-10-19. Goal: [GOAL.md](GOAL.md). Mandatory target:
+ [ARCHITECTURE_CONTRACT.md](ARCHITECTURE_CONTRACT.md). Current evidence and gaps:
+ [ARCHITECTURE.md](ARCHITECTURE.md), [LEGACY_CAPABILITY_PARITY.md](LEGACY_CAPABILITY_PARITY.md).
+diff --git a/rebuild/docs/GOAL.md b/rebuild/docs/GOAL.md
+index 72e9fbba..b6f7bd23 100644
+--- a/rebuild/docs/GOAL.md
++++ b/rebuild/docs/GOAL.md
+@@ -1,5 +1,10 @@
+ # Active delivery goal
+ 
++2026-10-20 watermark checkpoint: workspace logo settings and explicit image copies
++are implemented locally on `codex/watermark`; Settings parity and the full goal
++remain open. WATERMARK.md records the unapplied migration, automated evidence
++and remaining database/browser/provider verification.
++
+ Updated: 2026-10-19. **Status: active; incomplete.**
+ 
+ Rebuild MS Social Pilot in `app/rebuild` as a production-ready modular,
+diff --git a/rebuild/docs/LEGACY_CAPABILITY_PARITY.md b/rebuild/docs/LEGACY_CAPABILITY_PARITY.md
+index 4a25fb4c..fde9fc04 100644
+--- a/rebuild/docs/LEGACY_CAPABILITY_PARITY.md
++++ b/rebuild/docs/LEGACY_CAPABILITY_PARITY.md
+@@ -30,7 +30,7 @@ equivalent workflow; **unverified** means code exists without adequate evidence.
+ | P1 | Client review/calendar/portal links and public bio pages with tracked clicks in `src/app/share`, `src/app/bio`, and `src/app/(app)/settings/sharing` | Batch79b implements review/calendar/portal links, versioned editing/renewal, feedback and public bio with shared HTTP/MCP services. Isolated 2647 tests plus actual synthetic HTTP/MCP/PG/Chromium probe passed; see CLIENT_SHARING.md. | Portal results, publish-anyway, logos/email, cross-process throttling and end-to-end manager-key channel scope remain open; production/proxy proof outstanding. |
+ | P1 | Agency views, feed ingestion, post templates and tasks in `src/app/(app)/agency`, `feeds`, `templates`, `tasks` | Partial: Tasks integrated and locally verified (batch 76); Agency now integrated locally (batch 77); RSS/Atom feeds integrated at `/publishing/feeds` (FEEDS.md: review or queue handling that never bypasses approvals, leased worker polling, exactly-once items, API/MCP); unit tests only, no feed images/link previews or approval notifications. | Full CRUD/workflow parity, workspace permissions, provider-side behavior where relevant, and MCP/API parity. |
+ | P1 | Notifications, webhooks, REST v1 API tokens and OAuth clients in `src/app/(app)/settings/notifications`, `webhooks`, `api` and `src/app/api/v1` | Partial: Settings-owned in-app and queued email delivery for note mentions and mix-dry alerts, personal switches/mutes, current-authority delivery, uncertain holds, audit and UI/HTTP/MCP services are integrated (NOTIFICATIONS.md). Signed webhooks (`/settings/webhooks`, leased retrying delivery, secret reveal/rotate, test, delivery log, MCP) and a REST v1 slice (`me`, `pages`, `webhooks`) authenticated by existing scoped `mcp_` keys are integrated (INTEGRATIONS.md); unit tests only. Only post.published/post.failed events are emitted. REST v1 posts (through Publishing services) and all six webhook events followed, and OAuth connectors for MCP clients (dynamic registration, PKCE S256, member consent issuing a scoped `mcp_` key) are implemented behind a Root switch. The OAuth migration `20261026100000_rebuild_oauth_connectors` is not applied or pinned; it was validated only on a throwaway schema copy. Unit tests only for OAuth. | Delivery preferences, retries/redelivery, secret handling, scoped REST/OAuth contracts and audit tests. |
+-| P1 | Page profiles/groups/labels, media/watermark, custom fields, AI agents, history and owner export screens under `src/app/(app)/settings` | Partial: image library, scoped data export and Publishing custom fields/team notes/version history have integrated services and screens. Root operational history also exists; Settings now implements selected-channel groups and per-channel profile labels with shared UI/HTTP/MCP services, composer/Posts/Analytics shortcuts and bounded Root policy (CHANNEL_PROFILES.md). Migration application and database/browser proof remain open. This does not complete broader Page profiles, all group filters, watermarking, AI agents or every export/legacy setting. | Working feature screens and shared services, migrated data, permission and visual checks. |
++| P1 | Page profiles/groups/labels, media/watermark, custom fields, AI agents, history and owner export screens under `src/app/(app)/settings` | Partial: image library, scoped data export and Publishing custom fields/team notes/version history have integrated services and screens. Root operational history also exists; Settings implements selected-channel groups and per-channel profile labels with shared UI/HTTP/MCP services, composer/Posts/Analytics shortcuts and bounded Root policy (CHANNEL_PROFILES.md). Workspace logo settings and explicit per-image copies now share UI/HTTP/MCP services and a neutral image pipeline (WATERMARK.md, local branch). Watermark migration is unapplied; database/browser/provider proof and legacy per-channel watermark import remain open. This does not complete broader Page profiles, all group filters, AI agents or every export/legacy setting. | Working feature screens and shared services, migrated data, permission and visual checks. |
+ | P2 | Asynchronous owner ZIP export with job status and expiry in `src/app/(app)/settings/export` | Partial: asynchronous owner ZIP export with job status, reuse, worker build, download, expiry and file cleanup is implemented (`e3511510`), with a real-PostgreSQL lifecycle test after the void-lock fix (`21fe110d`); migration `20261027100000_rebuild_workspace_exports` is applied to the preview and pinned. Completeness reporting against every legacy export category and production-volume runs remain open. | Large-data async export, durable status, expiry/cleanup and completeness reporting. |
+ 
+ Publishing safety update, 2026-10-16: all lifecycle/local-draft service writes recheck current authority inside a single workspace operation guard with post/destination locks, bounded atomic writes/audits and adapter cancellation. Stale scheduled candidates are skipped. Inline edit/delete recover entered values and choices after failure; successful browser save/delete and scoped live localhost MCP were verified. A later batch added durable remote post deletion and operator recovery, but no automatic provider verification. This remains **partial**: publication intent and independently persisted receipts now support explicit human attestation, legacy claim adoption and local-only projection through customer/Root HTTP/MCP; unknown outcomes stay held without automatic resend; normal Publishing reads now share selected-resource and current authorization checks, excluding retained unselected and mixed-destination posts before counts/pagination. Dedicated retained-history browsing and complete read/API parity remain. Provider/live verification, full parity and release gates remain. See PUBLISHING_OPERATIONS.md and POST_DELETION_RECOVERY.md; do not infer full Publishing or production readiness.
+diff --git a/rebuild/docs/WATERMARK.md b/rebuild/docs/WATERMARK.md
+new file mode 100644
+index 00000000..0d56a1fd
+--- /dev/null
++++ b/rebuild/docs/WATERMARK.md
+@@ -0,0 +1,70 @@
++# Workspace image watermark
++
++Local implementation on `codex/watermark`; no push, database application,
++deployment or app server execution. This is a Settings parity slice, not full
++legacy per-channel watermark migration or completion of the rebuild.
++
++Settings owns `src/modules/settings/watermark/`. Thin page/operations routes live
++at `/settings/watermark` and `/settings/watermark/operations`. Workspace policies
++links to the screen. English/French follows request language. Shared Button,
++FormValidation and useConfirm supply controls, associated errors and
++confirmation. Failures retain dialog and entered values for retry.
++
++Managers upload a still PNG/JPEG logo and choose a corner or center, opacity
++(0–1) and scale (0.01–1). Scale fits the logo inside that fraction of both image
++dimensions. Option updates can retain the logo; removing settings keeps existing
++copies. Missing configuration is an empty state; failed reads say Not available.
++
++Saving settings never transforms images. A person chooses an uploaded image or
++existing workspace image ID and explicitly applies the watermark. The service
++calls the provider-neutral shared raster pipeline at
++`modules/publishing/server/media/watermark.ts`, then writes a new UUID PNG using
++the existing media store. The returned media reference can be attached through
++existing authoring and appears in the image library. Originals are never
++overwritten. EXIF orientation is applied before measuring; logo alpha is
++multiplied by opacity; derived PNG metadata is stripped. Other formats are
++refused rather than flattened. There is no automatic publish-time application.
++
++UI, HTTP and MCP share `readWatermark` / `changeWatermark`. Each call reloads
++identity, membership, entitlements and permissions, checks suspension/purge,
++locks workspace/actor rows, and rechecks authority. Configuration requires current
++owner/admin Settings Workspace access. Applying requires Publishing Posts write
++and Media read access. Branding/media are workspace-wide: channel-scoped members
++and resource-restricted credentials are refused, including independent key
++restrictions. Image reads always use the actor's workspace. Mutation and
++content-free audit commit together. On failure, cleanup attempts to remove a
++new unused derivative; existing orphan cleanup is the fallback. No provider rules
++are added to shared code.
++
++MCP tools: `get_workspace_watermark`, `save_workspace_watermark`,
++`remove_workspace_watermark`, `apply_image_watermark`. Exact confirmations:
++`SAVE WATERMARK`, `REMOVE WATERMARK`, `APPLY WATERMARK`. All are declared as
++workspace tools, unavailable to restricted credentials. HTTP writes require
++same-origin requests, stream-bound bodies and strict service schemas. Responses
++are no-store; caller-selected workspace IDs are refused.
++
++Root key: `settings.watermarkMaxLogoBytes` in the owning watermark `config.ts`,
++merged through Settings. It limits uploaded/normalized logos and the HTTP body.
++Existing media upload MIME/byte, inspection pixel and Settings transaction limits
++remain active. The central registry is unchanged; release coordination must
++handle its schema-version policy.
++
++Migration: `prisma/migrations/20261030120000_rebuild_workspace_watermark/migration.sql`
++adds normalized logo bytes/settings with a workspace FK and existing purge gate.
++No generated-client changes. Workspace deletion cascades the row; shared
++FK-discovered export/erasure can discover it. Actual database byte coverage is
++unverified. Legacy per-channel watermark JSON is untouched and not imported.
++
++Evidence: 108 tests passed across 11 focused files, including service authority,
++HTTP/MCP dispatch, DOM confirmation/failure/retry, localized markup, actual Sharp
++pixel/orientation/alpha checks, storage, workspace policy, channel profiles,
++data control, MCP scope and the raw SQL void guard. TypeScript passed with
++`npx tsc --noEmit -p .`. These are synthetic automated checks.
++
++Full suite attempted and interrupted after sandbox-blocked loopback socket tests
++and an unchanged stale Analytics manifest expectation (missing Ads/Posts routes).
++Both failures reproduce alone. No full-suite/build pass is claimed. Before
++release: CUTOVER.md migration rehearsal/application, actual database concurrency
++and export/erasure, browser themes/viewports/keyboard, real MCP transport and
++attaching/publishing the copy through live-provider workflows. An unconfirmed
++retry may create another independent copy; review the image library before retry.
+diff --git a/rebuild/src/app/settings/watermark/page.tsx b/rebuild/src/app/settings/watermark/page.tsx
+new file mode 100644
+index 00000000..913735a0
+--- /dev/null
++++ b/rebuild/src/app/settings/watermark/page.tsx
+@@ -0,0 +1,2 @@
++export { default } from '@/modules/settings/watermark/Screen';
++export const dynamic = 'force-dynamic';
+diff --git a/rebuild/src/modules/publishing/server/media/watermark.ts b/rebuild/src/modules/publishing/server/media/watermark.ts
+index 542c108a..b5f7a17f 100644
+--- a/rebuild/src/modules/publishing/server/media/watermark.ts
++++ b/rebuild/src/modules/publishing/server/media/watermark.ts
+@@ -1,8 +1,9 @@
+ import sharp from 'sharp';
+-import type { WatermarkOptions } from '@/modules/settings/watermark/contracts';
++
++export type ImageWatermarkOptions = { position: 'northwest' | 'northeast' | 'center' | 'southwest' | 'southeast'; opacity: number; scale: number };
+ 
+ /** Shared raster pipeline: buffers in, new PNG bytes out. Never writes either input. */
+-export async function watermarkImage(source: Buffer, logo: Buffer, options: WatermarkOptions, maxPixels: number): Promise<Buffer> {
++export async function watermarkImage(source: Buffer, logo: Buffer, options: ImageWatermarkOptions, maxPixels: number): Promise<Buffer> {
+   const input = sharp(source, { failOn: 'error', limitInputPixels: maxPixels });
+   const metadata = await input.metadata();
+   if (!['png', 'jpeg'].includes(metadata.format ?? '') || (metadata.pages ?? 1) > 1) throw new Error('Only still PNG/JPEG images can be watermarked.');
+diff --git a/rebuild/src/modules/settings/ui/workspace/WorkspaceScreen.tsx b/rebuild/src/modules/settings/ui/workspace/WorkspaceScreen.tsx
+index b172a07e..8868330c 100644
+--- a/rebuild/src/modules/settings/ui/workspace/WorkspaceScreen.tsx
++++ b/rebuild/src/modules/settings/ui/workspace/WorkspaceScreen.tsx
+@@ -1,4 +1,5 @@
+ import type { Metadata } from 'next';
++import { headers } from 'next/headers';
+ import { PageFrame } from '@/server/PageFrame';
+ import { requireViewer } from '@/server/context';
+ import { readWorkspacePolicy } from '@/modules/settings/server/workspace-policy';
+@@ -11,6 +12,7 @@ import { WorkspaceOperationsForm } from './operations-form';
+ export const metadata: Metadata = { title: 'Workspace policies' };
+ export default async function WorkspacePolicyPage() {
+   const viewer = await requireViewer({ feature: 'settings/workspace' });
++  const watermarkLabel = /^\s*fr\b/i.test((await headers()).get('accept-language') ?? '') ? 'Filigrane des images' : 'Image watermark';
+   let value: Awaited<ReturnType<typeof readWorkspacePolicy>> | null = null;
+   let error = '';
+   try { value = await readWorkspacePolicy({ userId: viewer.user.id, workspaceId: viewer.workspaceId }); } catch { error = 'Workspace policies are unavailable. Refresh the page or try again later.'; }
+@@ -18,6 +20,7 @@ export default async function WorkspacePolicyPage() {
+   try { operations = await readWorkspaceOperations({ userId: viewer.user.id, workspaceId: viewer.workspaceId }); } catch { operations = null; }
+   const copy = workspaceOperationsCopy.en;
+   return <PageFrame module="settings"><SettingsPage active="settings/workspace" title="Workspace policies" description={`Set the publishing time zone and review requirement for ${viewer.membership.workspace.name}.`}>
++    <a href="/settings/watermark">{watermarkLabel}</a>
+     <SettingsPanel title="Publishing time zone" detail="Used to display and schedule publishing times across this workspace.">
+       {error ? <p className={styles['settings-note']} role="alert">{error}</p> : value && <WorkspacePolicyForm key={viewer.workspaceId} workspaceId={viewer.workspaceId} timezone={value.timezone} requiresApproval={value.requiresApproval} maxTimezoneCharacters={value.maxTimezoneCharacters} />}
+     </SettingsPanel>
+diff --git a/rebuild/src/modules/settings/watermark/Screen.tsx b/rebuild/src/modules/settings/watermark/Screen.tsx
+new file mode 100644
+index 00000000..ad3f44c3
+--- /dev/null
++++ b/rebuild/src/modules/settings/watermark/Screen.tsx
+@@ -0,0 +1,23 @@
++import { headers } from 'next/headers';
++import { PageFrame } from '@/server/PageFrame';
++import { requireViewer } from '@/server/context';
++import { runtimeConfig } from '@/server/config/store';
++import { canUseFeature } from '@/server/entitlements';
++import { canAccessFeature } from '@/server/permissions';
++import { SettingsPage, SettingsPanel } from '@/modules/settings/ui/_components';
++import { readWatermark } from './service';
++import { watermarkCopy } from './copy';
++import { WatermarkManager } from './WatermarkManager';
++import type { WatermarkState } from './contracts';
++
++export default async function WatermarkScreen() {
++  const viewer = await requireViewer({ feature: 'settings/workspace' });
++  const locale = /^\s*fr\b/i.test((await headers()).get('accept-language') ?? '') ? 'fr' : 'en';
++  const c = watermarkCopy[locale];
++  let initial: WatermarkState = null; let available = true;
++  try { initial = await readWatermark({ userId: viewer.user.id, workspaceId: viewer.workspaceId }); } catch { available = false; }
++  return <PageFrame module="settings"><SettingsPage active="settings/workspace" title={c.title} description={c.description}>
++    <a href="/settings/workspace">{c.back}</a>
++    <SettingsPanel title={c.title}>{available ? <WatermarkManager initial={initial} locale={locale} maxLogoBytes={Number(await runtimeConfig('settings.watermarkMaxLogoBytes'))} canApply={canUseFeature(viewer.entitlements, 'publishing/posts') && canUseFeature(viewer.entitlements, 'publishing/media') && canAccessFeature(viewer.permissions, 'publishing/posts', 'write') && canAccessFeature(viewer.permissions, 'publishing/media', 'read')} /> : <p role="alert">{c.unavailable} <a href="/settings/watermark">{c.retry}</a></p>}</SettingsPanel>
++  </SettingsPage></PageFrame>;
++}
+diff --git a/rebuild/src/modules/settings/watermark/WatermarkManager.tsx b/rebuild/src/modules/settings/watermark/WatermarkManager.tsx
+new file mode 100644
+index 00000000..848d96d2
+--- /dev/null
++++ b/rebuild/src/modules/settings/watermark/WatermarkManager.tsx
+@@ -0,0 +1,105 @@
++'use client';
++import { useRef, useState } from 'react';
++import { Button } from '@/components/Button';
++import { useConfirm } from '@/components/useConfirm';
++import { FieldError, useFormValidation } from '@/components/FormValidation';
++import { watermarkOptions, type WatermarkState, type WatermarkOptions } from './contracts';
++import { watermarkCopy } from './copy';
++import styles from './watermark.module.css';
++
++export function WatermarkManager({ initial, locale, maxLogoBytes, canApply = true }: { initial: WatermarkState; locale: 'en' | 'fr'; maxLogoBytes: number; canApply?: boolean }) {
++  const c = watermarkCopy[locale];
++  const validation = useFormValidation();
++  const [saved, setSaved] = useState(initial !== null);
++  const [position, setPosition] = useState<WatermarkOptions['position']>(initial?.position ?? 'southeast');
++  const [opacity, setOpacity] = useState(String(initial?.opacity ?? 0.5));
++  const [scale, setScale] = useState(String(initial?.scale ?? 0.2));
++  const [imageId, setImageId] = useState('');
++  const [message, setMessage] = useState(''); const [failed, setFailed] = useState(false);
++  const [busy, setBusy] = useState(false); const lock = useRef(false);
++  const [result, setResult] = useState<{ reference: string; url: string } | null>(null);
++  const logo = useRef<HTMLInputElement>(null); const source = useRef<HTMLInputElement>(null); const feedback = useRef<HTMLParagraphElement>(null);
++  const [confirm, dialog] = useConfirm({ title: c.confirm, cancel: c.cancel, confirm: c.continue, danger: false });
++  async function post(input: unknown) {
++    const response = await fetch('/settings/watermark/operations', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(input) });
++    const data = await response.json(); if (!response.ok || data.ok !== true) throw new Error(); return data;
++  }
++  async function change(action: 'save' | 'remove' | 'apply') {
++    if (lock.current) return;
++    lock.current = true;
++    setMessage(''); setFailed(false);
++    try {
++      const options = watermarkOptions.safeParse({ position, opacity: opacity.trim() ? Number(opacity) : NaN, scale: scale.trim() ? Number(scale) : NaN });
++      const file = logo.current?.files?.[0];
++      if (action === 'save' && (!options.success || !saved && !file || file && (file.size > maxLogoBytes || !['image/png', 'image/jpeg'].includes(file.type)))) { setFailed(true); setMessage(c.validation); return; }
++      const image = source.current?.files?.[0];
++      if (action === 'apply' && (!saved || !image && !/^[0-9a-f-]{36}$/i.test(imageId))) { setFailed(true); setMessage(c.validation); return; }
++      const confirmation = action === 'save' ? 'SAVE WATERMARK' : action === 'remove' ? 'REMOVE WATERMARK' : 'APPLY WATERMARK';
++      let chosenId = imageId;
++      let uploaded = false;
++      await confirm(action === 'save' ? c.saveQuestion : action === 'remove' ? c.removeQuestion : c.applyQuestion, {
++        exactConfirmation: confirmation, confirmationLabel: c.confirm, pendingLabel: c.busy, failureLabel: c.failure,
++        onConfirm: async () => {
++          setBusy(true);
++          try {
++            if (action === 'save' && options.success) {
++              const logoBase64 = file ? await new Promise<string>((resolve, reject) => {
++                const reader = new FileReader(); reader.onerror = reject;
++                reader.onload = () => resolve(String(reader.result).split(',')[1]!); reader.readAsDataURL(file);
++              }) : undefined;
++              await post({ action, ...options.data, logoBase64, confirmation: 'SAVE WATERMARK' });
++              setSaved(true); if (logo.current) logo.current.value = ''; setMessage(c.success);
++            } else if (action === 'remove') {
++              await post({ action, confirmation: 'REMOVE WATERMARK' }); setSaved(false); setMessage(c.removed);
++            } else {
++              setResult(null);
++              if (image && !uploaded) {
++                const body = new FormData(); body.set('imageFile', image);
++                const upload = await fetch('/api/media', { method: 'POST', body });
++                const stored = await upload.json(); if (!upload.ok || !stored.id) throw new Error();
++                chosenId = stored.id; uploaded = true; setImageId(chosenId); if (source.current) source.current.value = '';
++              }
++              const receipt = await post({ action: 'apply', imageId: chosenId, confirmation: 'APPLY WATERMARK' });
++              if (!receipt.image?.reference || !receipt.image?.url) throw new Error();
++              setResult(receipt.image); setMessage(c.result);
++            }
++            return null;
++          } catch { return c.failure; }
++          finally { setBusy(false); }
++        },
++      });
++    } catch { setFailed(true); setMessage(c.failure); }
++    finally { lock.current = false; setBusy(false); requestAnimationFrame(() => feedback.current?.focus()); }
++  }
++  return <div className={styles.stack} aria-busy={busy}>{dialog}
++    <p id="watermark-feedback" ref={feedback} tabIndex={-1} role={failed ? 'alert' : 'status'}>{busy ? c.busy : message}</p>
++    <p>{saved ? c.saved : c.empty}</p>
++    <form noValidate className={styles.stack} onSubmit={event => {
++      event.preventDefault();
++      const errors: Record<string, string> = {};
++      const file = logo.current?.files?.[0];
++      if (!saved && !file || file && (file.size > maxLogoBytes || !['image/png', 'image/jpeg'].includes(file.type))) errors.logo = c.validation;
++      if (!opacity.trim() || !Number.isFinite(Number(opacity)) || Number(opacity) < 0 || Number(opacity) > 1) errors.opacity = c.validation;
++      if (!scale.trim() || !Number.isFinite(Number(scale)) || Number(scale) < 0.01 || Number(scale) > 1) errors.scale = c.validation;
++      if (validation.validate(event.currentTarget, errors)) void change('save');
++    }}>
++      <label className="ui-field">{c.logo}<input className="ui-input" name="logo" {...validation.fieldProps('logo')} ref={logo} type="file" accept="image/png,image/jpeg" disabled={busy} /><FieldError {...validation.errorProps('logo')} /></label>
++      <label className="ui-field">{c.position}<select className="ui-input" value={position} disabled={busy} onChange={event => setPosition(event.target.value as WatermarkOptions['position'])}>{Object.entries(c.positions).map(([key, label]) => <option value={key} key={key}>{label}</option>)}</select></label>
++      <label className="ui-field">{c.opacity}<input className="ui-input" name="opacity" {...validation.fieldProps('opacity')} type="number" min="0" max="1" step="0.01" required value={opacity} disabled={busy} onChange={event => setOpacity(event.target.value)} /><FieldError {...validation.errorProps('opacity')} /></label>
++      <label className="ui-field">{c.scale}<input className="ui-input" name="scale" {...validation.fieldProps('scale', 'watermark-scale-hint')} type="number" min="0.01" max="1" step="0.01" required value={scale} disabled={busy} onChange={event => setScale(event.target.value)} /><FieldError {...validation.errorProps('scale')} /></label>
++      <p id="watermark-scale-hint">{c.scaleHint}</p>
++      <div className={styles.actions}><Button type="submit" variant="primary" disabled={busy}>{c.save}</Button>{saved && <Button variant="danger" disabled={busy} onClick={() => void change('remove')}>{c.remove}</Button>}</div>
++    </form>
++    {saved && canApply && <form noValidate className={styles.stack} onSubmit={event => {
++      event.preventDefault();
++      const errors: Record<string, string> = source.current?.files?.[0] || /^[0-9a-f-]{36}$/i.test(imageId) ? {} : { imageId: c.validation };
++      if (validation.validate(event.currentTarget, errors)) void change('apply');
++    }}>
++      <h2>{c.apply}</h2><p>{c.choose}</p>
++      <label className="ui-field">{c.source}<input className="ui-input" ref={source} type="file" accept="image/png,image/jpeg" disabled={busy} /></label>
++      <label className="ui-field">{c.imageId}<input className="ui-input" name="imageId" {...validation.fieldProps('imageId')} value={imageId} disabled={busy} onChange={event => setImageId(event.target.value)} /><FieldError {...validation.errorProps('imageId')} /></label>
++      <Button type="submit" disabled={busy}>{c.apply}</Button>
++    </form>}
++    {result && <section><h2>{c.result}</h2><img className={styles.preview} src={result.url} alt={c.result} /><label className="ui-field">{c.reference}<input className="ui-input" readOnly value={result.reference} /></label><a href="/publishing/media">{c.result}</a></section>}
++  </div>;
++}
+diff --git a/rebuild/src/modules/settings/watermark/contracts.ts b/rebuild/src/modules/settings/watermark/contracts.ts
+index d2e891e3..f9ff4683 100644
+--- a/rebuild/src/modules/settings/watermark/contracts.ts
++++ b/rebuild/src/modules/settings/watermark/contracts.ts
+@@ -7,7 +7,7 @@ export const watermarkOptions = z.object({
+ }).strict();
+ export type WatermarkOptions = z.infer<typeof watermarkOptions>;
+ export type WatermarkState = WatermarkOptions | null;
+-export type WatermarkActor = { userId: string; workspaceId: string; allowedChannelIds?: readonly string[] };
++export type WatermarkActor = { userId: string; workspaceId: string; allowedChannelIds?: readonly string[]; resourceRestricted?: boolean };
+ export const watermarkAction = z.discriminatedUnion('action', [
+   watermarkOptions.extend({ action: z.literal('save'), logoBase64: z.string().min(4).max(12_000_000).optional(), confirmation: z.literal('SAVE WATERMARK') }).strict(),
+   z.object({ action: z.literal('remove'), confirmation: z.literal('REMOVE WATERMARK') }).strict(),
+diff --git a/rebuild/src/modules/settings/watermark/copy.ts b/rebuild/src/modules/settings/watermark/copy.ts
+new file mode 100644
+index 00000000..c3d2250c
+--- /dev/null
++++ b/rebuild/src/modules/settings/watermark/copy.ts
+@@ -0,0 +1,26 @@
++export const watermarkCopy = {
++  en: {
++    title: 'Image watermark', description: 'Save a workspace logo, then choose each image to watermark. Originals are always kept.',
++    back: 'Workspace policies', logo: 'Upload logo (PNG or JPEG)', position: 'Position', opacity: 'Opacity (0–1)', scale: 'Scale (0.01–1)',
++    scaleHint: 'The logo fits inside this fraction of the image width and height.', save: 'Save watermark', remove: 'Remove watermark',
++    apply: 'Apply to image', source: 'Choose image (PNG or JPEG)', imageId: 'Or enter an existing workspace image ID',
++    success: 'Watermark settings saved.', removed: 'Watermark removed. Existing copies are kept.', failure: 'Could not complete this action. Check your inputs and permissions, then try again.',
++    unavailable: 'Not available', empty: 'No watermark configured. Upload a logo to get started.', saved: 'A workspace logo is configured. Upload a file only to replace it.',
++    result: 'Watermarked copy', reference: 'Media reference to attach to a post', choose: 'Upload an image or enter its media ID. A new copy will appear here.',
++    confirm: 'Confirm watermark change', cancel: 'Cancel', continue: 'Continue', saveQuestion: 'Save these workspace watermark settings?', removeQuestion: 'Remove the workspace watermark? Existing image copies will be kept.', applyQuestion: 'Create a watermarked copy of this image? The original will be kept.',
++    busy: 'Working…', retry: 'Try again', validation: 'Choose a logo for the first save and valid opacity/scale values. Choose an image to apply the watermark.',
++    positions: { northwest: 'Top left', northeast: 'Top right', center: 'Center', southwest: 'Bottom left', southeast: 'Bottom right' },
++  },
++  fr: {
++    title: 'Filigrane des images', description: 'Enregistrez un logo pour cet espace, puis choisissez chaque image à marquer. Les originaux sont toujours conservés.',
++    back: 'Règles de l’espace', logo: 'Importer un logo (PNG ou JPEG)', position: 'Position', opacity: 'Opacité (0–1)', scale: 'Échelle (0.01–1)',
++    scaleHint: 'Le logo tient dans cette fraction de la largeur et de la hauteur de l’image.', save: 'Enregistrer le filigrane', remove: 'Supprimer le filigrane',
++    apply: 'Appliquer à une image', source: 'Choisir une image (PNG ou JPEG)', imageId: 'Ou saisir l’identifiant d’une image de cet espace',
++    success: 'Paramètres du filigrane enregistrés.', removed: 'Filigrane supprimé. Les copies existantes sont conservées.', failure: 'Action impossible. Vérifiez les données et vos autorisations, puis réessayez.',
++    unavailable: 'Non disponible', empty: 'Aucun filigrane configuré. Importez un logo pour commencer.', saved: 'Un logo est configuré. Importez un fichier uniquement pour le remplacer.',
++    result: 'Copie avec filigrane', reference: 'Référence média à joindre à une publication', choose: 'Importez une image ou saisissez son identifiant média. Une nouvelle copie apparaîtra ici.',
++    confirm: 'Confirmer la modification', cancel: 'Annuler', continue: 'Continuer', saveQuestion: 'Enregistrer ces paramètres de filigrane pour cet espace ?', removeQuestion: 'Supprimer le filigrane de cet espace ? Les copies existantes seront conservées.', applyQuestion: 'Créer une copie de cette image avec filigrane ? L’original sera conservé.',
++    busy: 'Traitement…', retry: 'Réessayer', validation: 'Choisissez un logo au premier enregistrement et des valeurs d’opacité et d’échelle valides. Choisissez une image pour appliquer le filigrane.',
++    positions: { northwest: 'En haut à gauche', northeast: 'En haut à droite', center: 'Au centre', southwest: 'En bas à gauche', southeast: 'En bas à droite' },
++  },
++} as const;
+diff --git a/rebuild/src/modules/settings/watermark/http.ts b/rebuild/src/modules/settings/watermark/http.ts
+index 6c5bc2e0..71e81418 100644
+--- a/rebuild/src/modules/settings/watermark/http.ts
++++ b/rebuild/src/modules/settings/watermark/http.ts
+@@ -14,7 +14,9 @@ async function handle(request: Request, write: boolean) {
+       if (!same) throw new OperationError('forbidden', 'Cross-origin request denied.');
+     }
+     // Request authentication precedes bounded body parsing. The service chooses and rechecks feature authority.
+-    const viewer = await requireViewer();
++    let viewer;
++    try { viewer = await requireViewer({ channelScoped: true }); }
++    catch { throw new OperationError('unauthorized', 'Sign in to continue.'); }
+     let input: unknown;
+     if (write) {
+       const limit = Math.ceil(Number(await runtimeConfig('settings.watermarkMaxLogoBytes')) / 3) * 4 + 4096;
+diff --git a/rebuild/src/modules/settings/watermark/mcp.ts b/rebuild/src/modules/settings/watermark/mcp.ts
+index 4205e2f6..20930343 100644
+--- a/rebuild/src/modules/settings/watermark/mcp.ts
++++ b/rebuild/src/modules/settings/watermark/mcp.ts
+@@ -17,7 +17,7 @@ export const WATERMARK_MCP: McpToolGroup = {
+   scope: { workspaceTools: names },
+   managers: [{ tools: new Set(names.slice(0, 3)), message: 'Only workspace managers can configure watermarks.', inExecutor: true }],
+   execute: async (viewer, name, args) => {
+-    const actor = { userId: viewer.userId, workspaceId: viewer.workspaceId, allowedChannelIds: pageIdsFor(viewer) };
++    const actor = { userId: viewer.userId, workspaceId: viewer.workspaceId, allowedChannelIds: pageIdsFor(viewer), resourceRestricted: viewer.resourceRestricted };
+     if (name === names[0]) {
+       if (Object.keys(args).length) throw new OperationError('invalid_request', 'No arguments are accepted.');
+       return readWatermark(actor);
+diff --git a/rebuild/src/modules/settings/watermark/service.ts b/rebuild/src/modules/settings/watermark/service.ts
+index 97961a0a..16c005af 100644
+--- a/rebuild/src/modules/settings/watermark/service.ts
++++ b/rebuild/src/modules/settings/watermark/service.ts
+@@ -24,7 +24,7 @@ async function authorize(actor: WatermarkActor, apply: boolean, write: boolean)
+   const feature = apply ? 'publishing/posts' : 'settings/workspace';
+   if (!user || user.disabledAt || !member || !access || access.workspaceId !== actor.workspaceId || !permissions || !canUseFeature(access, feature) || !canAccessFeature(permissions, feature, write ? 'write' : 'read')) throw denied();
+   // Images and branding are workspace-wide. No scoped credential may turn this into a media-read bypass.
+-  if (!permissions.pageScope.all || actor.allowedChannelIds !== undefined) throw denied();
++  if (!permissions.pageScope.all || actor.allowedChannelIds !== undefined || actor.resourceRestricted) throw denied();
+   if (!apply && !['owner', 'admin'].includes(member.role)) throw denied();
+   if (apply && (!canUseFeature(access, 'publishing/media') || !canAccessFeature(permissions, 'publishing/media', 'read'))) throw denied();
+ }
+diff --git a/rebuild/src/modules/settings/watermark/watermark.module.css b/rebuild/src/modules/settings/watermark/watermark.module.css
+new file mode 100644
+index 00000000..b646f6f6
+--- /dev/null
++++ b/rebuild/src/modules/settings/watermark/watermark.module.css
+@@ -0,0 +1,3 @@
++.stack { display: grid; gap: 1rem; min-width: 0; }
++.actions { display: flex; flex-wrap: wrap; gap: .75rem; }
++.preview { display: block; max-width: 100%; max-height: 24rem; object-fit: contain; margin-block: 1rem; }
+diff --git a/rebuild/tests/watermark-pipeline.test.ts b/rebuild/tests/watermark-pipeline.test.ts
+new file mode 100644
+index 00000000..77ab3216
+--- /dev/null
++++ b/rebuild/tests/watermark-pipeline.test.ts
+@@ -0,0 +1,40 @@
++import { describe, expect, it } from 'vitest';
++import sharp from 'sharp';
++import { watermarkImage } from '@/modules/publishing/server/media/watermark';
++
++const raster = (width: number, height: number, background: string) => sharp({ create: { width, height, channels: 4, background } }).png().toBuffer();
++const pixel = async (bytes: Buffer, left: number, top: number) => [...await sharp(bytes).extract({ left, top, width: 1, height: 1 }).removeAlpha().raw().toBuffer()];
++describe('shared image watermark pipeline', () => {
++  it.each([
++    ['northwest', 0, 0], ['northeast', 19, 0], ['center', 10, 5], ['southwest', 0, 9], ['southeast', 19, 9],
++  ] as const)('places a scaled logo at %s without changing input bytes', async (position, x, y) => {
++    const source = await raster(20, 10, 'white'); const original = Buffer.from(source);
++    const logo = await raster(4, 2, 'black'); const originalLogo = Buffer.from(logo);
++    const output = await watermarkImage(source, logo, { position, opacity: 1, scale: 0.2 }, 10000);
++    expect(await pixel(output, x, y)).toEqual([0, 0, 0]);
++    expect(source).toEqual(original); expect(logo).toEqual(originalLogo);
++    expect(await pixel(source, x, y)).toEqual([255, 255, 255]);
++    expect(await sharp(output).metadata()).toMatchObject({ format: 'png', width: 20, height: 10 });
++  });
++  it('multiplies existing logo transparency by opacity', async () => {
++    const source = await raster(10, 10, 'white'); const logo = await raster(2, 2, '#00000080');
++    const output = await watermarkImage(source, logo, { position: 'northwest', opacity: 0.5, scale: 0.2 }, 10000);
++    const p = await pixel(output, 0, 0); expect(p[0]).toBeGreaterThanOrEqual(190); expect(p[0]).toBeLessThanOrEqual(192);
++    expect(await pixel(output, 9, 9)).toEqual([255, 255, 255]);
++  });
++  it('supports explicit zero opacity and tiny source images', async () => {
++    const output = await watermarkImage(await raster(1, 1, 'white'), await raster(2, 2, 'black'), { position: 'center', opacity: 0, scale: 0.01 }, 10000);
++    expect(await pixel(output, 0, 0)).toEqual([255, 255, 255]);
++  });
++  it('orients JPEGs before scaling/compositing and strips metadata', async () => {
++    const source = await sharp(await raster(20, 10, 'white')).jpeg().withMetadata({ orientation: 6 }).toBuffer();
++    const output = await watermarkImage(source, await raster(4, 2, 'black'), { position: 'southeast', opacity: 1, scale: 0.5 }, 10000);
++    const metadata = await sharp(output).metadata(); expect(metadata).toMatchObject({ width: 10, height: 20 }); expect(metadata.orientation).toBeUndefined();
++  });
++  it('refuses corrupt input, animated/non-raster formats and oversized pixels', async () => {
++    const logo = await raster(2, 2, 'black');
++    const options = { position: 'center', opacity: 1, scale: 1 } as const;
++    for (const source of [Buffer.from('invalid'), await sharp(logo).gif().toBuffer(), Buffer.from('<svg width="2" height="2"></svg>')]) await expect(watermarkImage(source, logo, options, 10000)).rejects.toBeDefined();
++    await expect(watermarkImage(await raster(20, 20, 'white'), logo, options, 100)).rejects.toBeDefined();
++  });
++});
+diff --git a/rebuild/tests/watermark-service.test.ts b/rebuild/tests/watermark-service.test.ts
+new file mode 100644
+index 00000000..e38857c9
+--- /dev/null
++++ b/rebuild/tests/watermark-service.test.ts
+@@ -0,0 +1,107 @@
++import { beforeEach, describe, expect, it, vi } from 'vitest';
++import sharp from 'sharp';
++const m = vi.hoisted(() => ({
++  db: { user: { findUnique: vi.fn() }, membership: { findUnique: vi.fn() }, workspaceDataPurge: { findUnique: vi.fn() }, $queryRaw: vi.fn(), $executeRaw: vi.fn(), $transaction: vi.fn() },
++  config: vi.fn(), entitlements: vi.fn(), permissions: vi.fn(), use: vi.fn(), access: vi.fn(), read: vi.fn(), upload: vi.fn(), remove: vi.fn(),
++}));
++vi.mock('@/server/data', () => ({ prisma: m.db }));
++vi.mock('@/server/config/store', () => ({ runtimeConfig: m.config }));
++vi.mock('@/server/entitlements', () => ({ loadEntitlements: m.entitlements, canUseFeature: m.use }));
++vi.mock('@/server/permissions/loader', () => ({ loadPermissions: m.permissions }));
++vi.mock('@/server/permissions', () => ({ canAccessFeature: m.access }));
++vi.mock('@/modules/publishing/server/media/storage', () => ({ readWorkspaceImage: m.read, uploadWorkspaceImage: m.upload, deleteUnusedWorkspaceImage: m.remove }));
++import { changeWatermark, readWatermark } from '@/modules/settings/watermark/service';
++const actor = { userId: 'u1', workspaceId: 'w1' };
++const id = '11111111-1111-4111-8111-111111111111';
++const options = { position: 'southeast', opacity: 0.5, scale: 0.2 } as const;
++const apply = { action: 'apply', imageId: id, confirmation: 'APPLY WATERMARK' };
++let png: Buffer;
++const query = (call: unknown[]) => (call[0] as TemplateStringsArray).join('?');
++beforeEach(async () => {
++  vi.resetAllMocks();
++  png = await sharp({ create: { width: 10, height: 10, channels: 4, background: 'white' } }).png().toBuffer();
++  m.db.user.findUnique.mockResolvedValue({ disabledAt: null }); m.db.membership.findUnique.mockResolvedValue({ role: 'owner' });
++  m.entitlements.mockResolvedValue({ workspaceId: 'w1' }); m.permissions.mockResolvedValue({ pageScope: { all: true } }); m.use.mockReturnValue(true); m.access.mockReturnValue(true);
++  m.config.mockImplementation(async key => key === 'settings.watermarkMaxLogoBytes' || key === 'publishing.maxImageUploadBytes' ? 2097152 : 10000);
++  m.db.workspaceDataPurge.findUnique.mockResolvedValue(null); m.db.$executeRaw.mockResolvedValue(1);
++  m.db.$transaction.mockImplementation(async callback => callback(m.db));
++  m.db.$queryRaw.mockImplementation(async (strings: TemplateStringsArray) => {
++    const sql = strings.join('?');
++    if (sql.includes('FROM workspaces')) return [{ suspendedAt: null }];
++    if (sql.includes('FROM memberships')) return [{ id: 'm1' }];
++    if (sql.includes('FROM rebuild_workspace_watermarks')) return [{ ...options, logo: png }];
++    return [];
++  });
++  m.read.mockResolvedValue({ bytes: png }); m.upload.mockResolvedValue({ id: 'new-id', mimeType: 'image/png', fileName: 'watermarked.png' }); m.remove.mockResolvedValue('deleted');
++});
++describe('watermark shared service', () => {
++  it('reads settings without returning logo bytes and returns null for missing configuration', async () => {
++    expect(await readWatermark(actor)).toEqual(options);
++    m.db.$queryRaw.mockResolvedValueOnce([{ suspendedAt: null }]).mockResolvedValueOnce([{ id: 'm1' }]).mockResolvedValueOnce([]);
++    expect(await readWatermark(actor)).toBeNull();
++  });
++  it('normalizes an uploaded logo, persists settings and audits without applying it', async () => {
++    await expect(changeWatermark(actor, { action: 'save', ...options, logoBase64: png.toString('base64'), confirmation: 'SAVE WATERMARK' })).resolves.toEqual({ ok: true });
++    expect(query(m.db.$executeRaw.mock.calls[0]!)).toContain('ON CONFLICT');
++    expect(m.db.$executeRaw.mock.calls[0]).toContain('w1');
++    expect(query(m.db.$executeRaw.mock.calls[1]!)).toContain('INSERT INTO activity_logs');
++    expect(m.upload).not.toHaveBeenCalled(); expect(m.read).not.toHaveBeenCalled();
++  });
++  it('retains the logo when changing options and supports zero opacity', async () => {
++    await changeWatermark(actor, { action: 'save', ...options, opacity: 0, confirmation: 'SAVE WATERMARK' });
++    expect(m.db.$executeRaw.mock.calls[0]).toContainEqual(png); expect(m.db.$executeRaw.mock.calls[0]).toContain(0);
++  });
++  it('makes a separate copy from an image in the current workspace', async () => {
++    expect(await changeWatermark(actor, apply)).toMatchObject({ ok: true, image: { id: 'new-id', reference: 'media:new-id', url: '/api/media/new-id' } });
++    expect(m.read).toHaveBeenCalledWith('w1', id);
++    expect(m.upload).toHaveBeenCalledWith(actor, expect.any(File));
++    expect(m.remove).not.toHaveBeenCalled();
++    expect(m.access).toHaveBeenCalledWith(expect.anything(), 'publishing/posts', 'write');
++    expect(m.access).toHaveBeenCalledWith(expect.anything(), 'publishing/media', 'read');
++  });
++  it('allows an unscoped editor to apply but never configure', async () => {
++    m.db.membership.findUnique.mockResolvedValue({ role: 'editor' });
++    await expect(changeWatermark(actor, apply)).resolves.toMatchObject({ ok: true });
++    await expect(changeWatermark(actor, { action: 'remove', confirmation: 'REMOVE WATERMARK' })).rejects.toMatchObject({ code: 'forbidden' });
++  });
++  it.each(['disabled', 'membership', 'workspace', 'scope', 'key', 'independentKey', 'entitlement', 'permission', 'suspended', 'purging', 'recheck'])('refuses %s before reading an image or changing data', async reason => {
++    if (reason === 'disabled') m.db.user.findUnique.mockResolvedValue({ disabledAt: new Date() });
++    if (reason === 'membership') m.db.membership.findUnique.mockResolvedValue(null);
++    if (reason === 'workspace') m.entitlements.mockResolvedValue({ workspaceId: 'other' });
++    if (reason === 'scope') m.permissions.mockResolvedValue({ pageScope: { all: false, ids: ['a'] } });
++    if (reason === 'entitlement') m.use.mockReturnValue(false);
++    if (reason === 'permission') m.access.mockReturnValue(false);
++    if (reason === 'suspended') m.db.$queryRaw.mockResolvedValue([{ suspendedAt: new Date() }]);
++    if (reason === 'purging') m.db.workspaceDataPurge.findUnique.mockResolvedValue({ status: 'running' });
++    if (reason === 'recheck') m.db.membership.findUnique.mockResolvedValueOnce({ role: 'owner' }).mockResolvedValueOnce(null);
++    await expect(changeWatermark(reason === 'key' ? { ...actor, allowedChannelIds: [] } : reason === 'independentKey' ? { ...actor, resourceRestricted: true } : actor, apply)).rejects.toBeDefined();
++    expect(m.read).not.toHaveBeenCalled(); expect(m.upload).not.toHaveBeenCalled(); expect(m.db.$executeRaw).not.toHaveBeenCalled();
++  });
++  it('validates exact confirmation, numeric bounds and strict fields before transaction', async () => {
++    for (const value of [{ ...apply, confirmation: 'wrong' }, { ...apply, workspaceId: 'other' }, { action: 'save', ...options, scale: 0, confirmation: 'SAVE WATERMARK' }, { ...apply, imageId: '../../secret' }]) await expect(changeWatermark(actor, value)).rejects.toMatchObject({ code: 'invalid_request' });
++    expect(m.db.$transaction).not.toHaveBeenCalled();
++  });
++  it('rejects invalid, non-raster and oversized logos', async () => {
++    for (const logoBase64 of ['!!!!', Buffer.from('<svg></svg>').toString('base64'), Buffer.alloc(2097153).toString('base64')]) await expect(changeWatermark(actor, { action: 'save', ...options, logoBase64, confirmation: 'SAVE WATERMARK' })).rejects.toMatchObject({ code: 'invalid_request' });
++    expect(m.db.$executeRaw).not.toHaveBeenCalled();
++  });
++  it('rejects missing configuration, cross-workspace/missing image and corrupt source safely', async () => {
++    m.read.mockRejectedValueOnce(new Error('private path'));
++    await expect(changeWatermark(actor, apply)).rejects.toMatchObject({ code: 'not_found' });
++    m.read.mockResolvedValueOnce({ bytes: Buffer.from('corrupt') });
++    await expect(changeWatermark(actor, apply)).rejects.toMatchObject({ code: 'invalid_request' });
++    m.db.$queryRaw.mockResolvedValueOnce([{ suspendedAt: null }]).mockResolvedValueOnce([{ id: 'm1' }]).mockResolvedValueOnce([]);
++    await expect(changeWatermark(actor, apply)).rejects.toMatchObject({ code: 'not_found' });
++    expect(m.upload).not.toHaveBeenCalled();
++  });
++  it('removes only current workspace settings and keeps all media', async () => {
++    await changeWatermark(actor, { action: 'remove', confirmation: 'REMOVE WATERMARK' });
++    expect(query(m.db.$executeRaw.mock.calls[0]!)).toContain('DELETE FROM rebuild_workspace_watermarks WHERE "workspaceId" = ?');
++    expect(m.db.$executeRaw.mock.calls[0]).toContain('w1'); expect(m.remove).not.toHaveBeenCalled();
++  });
++  it('cleans up a new derivative on audit/transaction failure and masks private errors', async () => {
++    m.db.$executeRaw.mockRejectedValueOnce(new Error('secret connection string'));
++    await expect(changeWatermark(actor, apply)).rejects.toMatchObject({ code: 'unavailable', message: 'Watermarking is temporarily unavailable. Try again.' });
++    expect(m.remove).toHaveBeenCalledWith('w1', 'new-id');
++  });
++});
+diff --git a/rebuild/tests/watermark-surfaces.test.ts b/rebuild/tests/watermark-surfaces.test.ts
+new file mode 100644
+index 00000000..d2f016a4
+--- /dev/null
++++ b/rebuild/tests/watermark-surfaces.test.ts
+@@ -0,0 +1,117 @@
++// @vitest-environment jsdom
++import React, { act } from 'react';
++import { createRoot, type Root } from 'react-dom/client';
++import { renderToStaticMarkup } from 'react-dom/server';
++import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
++Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
++const m = vi.hoisted(() => ({ read: vi.fn(), change: vi.fn(), viewer: vi.fn(), config: vi.fn() }));
++vi.mock('@/modules/settings/watermark/service', () => ({ readWatermark: m.read, changeWatermark: m.change }));
++vi.mock('@/server/context', () => ({ requireViewer: m.viewer }));
++vi.mock('@/server/config/store', () => ({ runtimeConfig: m.config }));
++vi.mock('@/server/mcp/kit', () => ({ pageIdsFor: (viewer: { permissions: { pageScope: { all: boolean; ids: string[] } } }) => viewer.permissions.pageScope.all ? undefined : viewer.permissions.pageScope.ids }));
++import { WATERMARK_MCP } from '@/modules/settings/watermark/mcp';
++import { GET, POST } from '@/modules/settings/watermark/http';
++import { WatermarkManager } from '@/modules/settings/watermark/WatermarkManager';
++import { watermarkCopy } from '@/modules/settings/watermark/copy';
++import { OperationError } from '@/lib/operation-error';
++
++const options = { position: 'southeast', opacity: 0.5, scale: 0.2 } as const;
++let root: Root | undefined;
++beforeEach(() => {
++  vi.resetAllMocks(); m.viewer.mockResolvedValue({ user: { id: 'u1' }, workspaceId: 'w1' });
++  m.read.mockResolvedValue(options); m.change.mockResolvedValue({ ok: true }); m.config.mockResolvedValue(1024);
++  // jsdom has no native modal-dialog implementation.
++  HTMLDialogElement.prototype.showModal = function () { this.setAttribute('open', ''); };
++  HTMLDialogElement.prototype.close = function () { this.removeAttribute('open'); };
++});
++afterEach(async () => { if (root) await act(async () => root?.unmount()); root = undefined; document.body.innerHTML = ''; vi.unstubAllGlobals(); });
++const request = (body: string, origin = 'https://app.test') => new Request('https://app.test/settings/watermark/operations', { method: 'POST', headers: { origin, 'content-type': 'application/json' }, body });
++describe('watermark HTTP and MCP', () => {
++  it('uses the same authenticated service and prevents caller-selected tenants', async () => {
++    const response = await POST(request(JSON.stringify({ action: 'remove', confirmation: 'REMOVE WATERMARK' })));
++    expect(response.status).toBe(200); expect(response.headers.get('cache-control')).toBe('no-store');
++    expect(m.change).toHaveBeenCalledWith({ userId: 'u1', workspaceId: 'w1' }, { action: 'remove', confirmation: 'REMOVE WATERMARK' });
++    expect((await GET(new Request('https://app.test/settings/watermark/operations?workspaceId=other'))).status).toBe(400);
++    expect((await GET(new Request('https://app.test/settings/watermark/operations'))).status).toBe(200);
++    expect(m.read).toHaveBeenCalledWith({ userId: 'u1', workspaceId: 'w1' });
++  });
++  it('refuses cross-origin, malformed, oversized and unsigned requests before service dispatch', async () => {
++    expect((await POST(request('{}', 'https://evil.test'))).status).toBe(403);
++    expect((await POST(request('{'))).status).toBe(400);
++    expect((await POST(request(JSON.stringify({ logoBase64: 'a'.repeat(6000) })))).status).toBe(400);
++    m.viewer.mockRejectedValueOnce(new Error('NEXT_REDIRECT'));
++    expect((await POST(request('{}'))).status).toBe(401);
++    expect(m.change).not.toHaveBeenCalled();
++  });
++  it('returns deliberate service failures while masking internal errors', async () => {
++    m.change.mockRejectedValueOnce(new OperationError('forbidden', 'Denied.'));
++    expect((await POST(request('{}'))).status).toBe(403);
++    m.change.mockRejectedValueOnce(new Error('private filesystem path'));
++    const result = await POST(request('{}')); expect(JSON.stringify(await result.json())).not.toContain('private filesystem');
++  });
++  it('declares workspace-only tools, exact confirmations and passes the independent key scope', async () => {
++    const viewer = { userId: 'u1', workspaceId: 'w1', resourceRestricted: true, permissions: { pageScope: { all: false, ids: ['a'] } } } as never;
++    await WATERMARK_MCP.execute(viewer, 'get_workspace_watermark', {}, 100);
++    expect(m.read).toHaveBeenCalledWith({ userId: 'u1', workspaceId: 'w1', allowedChannelIds: ['a'], resourceRestricted: true });
++    await WATERMARK_MCP.execute(viewer, 'apply_image_watermark', { imageId: 'id', confirmation: 'APPLY WATERMARK' }, 100);
++    expect(m.change).toHaveBeenCalledWith(expect.objectContaining({ workspaceId: 'w1', allowedChannelIds: ['a'] }), { action: 'apply', imageId: 'id', confirmation: 'APPLY WATERMARK' });
++    for (const name of ['save_workspace_watermark', 'remove_workspace_watermark']) await WATERMARK_MCP.execute(viewer, name, {}, 100);
++    expect(WATERMARK_MCP.scope.workspaceTools).toHaveLength(4);
++    expect(WATERMARK_MCP.scope.resourceTools).toBeUndefined();
++    await expect(WATERMARK_MCP.execute(viewer, 'save_workspace_watermark', { action: 'apply' }, 100)).rejects.toMatchObject({ code: 'invalid_request' });
++    await expect(WATERMARK_MCP.execute(viewer, 'get_workspace_watermark', { workspaceId: 'other' }, 100)).rejects.toMatchObject({ code: 'invalid_request' });
++  });
++});
++
++const mount = async (initial: typeof options | null = options, locale: 'en' | 'fr' = 'en', canApply = true) => {
++  const host = document.createElement('div'); document.body.appendChild(host); root = createRoot(host);
++  await act(async () => root!.render(React.createElement(WatermarkManager, { initial, locale, maxLogoBytes: 1024, canApply })));
++  return host;
++};
++const setValue = async (input: HTMLInputElement, value: string) => {
++  await act(async () => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, value); input.dispatchEvent(new Event('input', { bubbles: true })); });
++};
++describe('watermark UI', () => {
++  it('renders localized empty/configured states, labels and usable-permission choices', () => {
++    for (const locale of ['en', 'fr'] as const) {
++      const empty = renderToStaticMarkup(React.createElement(WatermarkManager, { initial: null, locale, maxLogoBytes: 1024 }));
++      expect(empty).toContain(watermarkCopy[locale].empty); expect(empty).toContain(watermarkCopy[locale].opacity);
++      expect(empty).not.toContain('type="number" min="0" max="1" step="0.01" required="" value="0"');
++      expect(empty).toContain('noValidate=""'); expect(empty).not.toContain(watermarkCopy[locale].imageId);
++      const configured = renderToStaticMarkup(React.createElement(WatermarkManager, { initial: options, locale, maxLogoBytes: 1024, canApply: false }));
++      expect(configured).toContain(watermarkCopy[locale].saved); expect(configured).not.toContain(watermarkCopy[locale].imageId);
++    }
++  });
++  it('blocks first save without a logo and keeps the form available', async () => {
++    const fetcher = vi.fn(); vi.stubGlobal('fetch', fetcher); const host = await mount(null);
++    await act(async () => { host.querySelector('form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })); });
++    expect(host.querySelector('[role="alert"]')?.textContent).toContain(watermarkCopy.en.validation);
++    expect(fetcher).not.toHaveBeenCalled();
++  });
++  it('keeps confirmation and settings after failure, then saves on explicit retry', async () => {
++    const fetcher = vi.fn().mockResolvedValueOnce(new Response('{}', { status: 503 })).mockResolvedValueOnce(new Response('{"ok":true}'));
++    vi.stubGlobal('fetch', fetcher); const host = await mount();
++    await act(async () => { host.querySelector('form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })); });
++    const dialog = host.querySelector('dialog')!; expect(dialog.open).toBe(true);
++    await setValue(dialog.querySelector('input')!, 'SAVE WATERMARK');
++    const buttons = dialog.querySelectorAll('button');
++    await act(async () => { (buttons[buttons.length - 1] as HTMLButtonElement).click(); });
++    expect(dialog.open).toBe(true); expect(dialog.querySelector('[role="alert"]')?.textContent).toContain(watermarkCopy.en.failure);
++    expect(host.querySelector<HTMLInputElement>('input[type="number"]')?.value).toBe('0.5');
++    await act(async () => { (buttons[buttons.length - 1] as HTMLButtonElement).click(); });
++    expect(dialog.open).toBe(false); expect(host.querySelector('[role="status"]')?.textContent).toContain(watermarkCopy.en.success);
++    expect(JSON.parse(fetcher.mock.calls[1]![1].body)).toMatchObject({ action: 'save', ...options, confirmation: 'SAVE WATERMARK' });
++  });
++  it('applies only after confirmation and exposes the separate copy', async () => {
++    const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify({ ok: true, image: { reference: 'media:new', url: '/api/media/new' } })));
++    vi.stubGlobal('fetch', fetcher); const host = await mount(options, 'fr');
++    const input = host.querySelectorAll('form')[1]!.querySelector<HTMLInputElement>('input:not([type="file"])')!;
++    await setValue(input, '11111111-1111-4111-8111-111111111111');
++    await act(async () => { input.form!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })); });
++    expect(fetcher).not.toHaveBeenCalled();
++    const dialog = host.querySelector('dialog')!; await setValue(dialog.querySelector('input')!, 'APPLY WATERMARK');
++    await act(async () => { (dialog.querySelectorAll('button')[2] as HTMLButtonElement).click(); });
++    expect(fetcher).toHaveBeenCalledTimes(1); expect(host.querySelector('img')?.getAttribute('src')).toBe('/api/media/new');
++    expect(host.querySelector<HTMLInputElement>('input[readonly]')?.value).toBe('media:new');
++  });
++});

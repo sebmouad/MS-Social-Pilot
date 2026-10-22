@@ -1,0 +1,498 @@
+diff --git a/rebuild/generated b/rebuild/generated
+new file mode 120000
+index 00000000..526702ed
+--- /dev/null
++++ b/rebuild/generated
+@@ -0,0 +1 @@
++/Users/mouad/Documents/ChatGPT/MS Social Pilot/app/rebuild/generated
+\ No newline at end of file
+diff --git a/rebuild/src/app/analytics/posts/page.tsx b/rebuild/src/app/analytics/posts/page.tsx
+new file mode 100644
+index 00000000..0a967502
+--- /dev/null
++++ b/rebuild/src/app/analytics/posts/page.tsx
+@@ -0,0 +1 @@
++export { default } from '@/modules/analytics/ui/posts/PostsScreen';
+diff --git a/rebuild/src/app/api/analytics/posts/export/route.ts b/rebuild/src/app/api/analytics/posts/export/route.ts
+new file mode 100644
+index 00000000..b6d60eb2
+--- /dev/null
++++ b/rebuild/src/app/api/analytics/posts/export/route.ts
+@@ -0,0 +1,18 @@
++import { exportPostExplorer } from '@/modules/analytics/posts/server/posts';
++import { failure, paramsObject, reply, unauthorized, viewerActor } from '@/modules/analytics/http';
++export const dynamic = 'force-dynamic';
++
++export async function GET(request: Request) {
++  const actor = await viewerActor('analytics/posts', false); if (!actor) return unauthorized();
++  try {
++    const result = await exportPostExplorer(actor, paramsObject(request.url));
++    return new Response(result.csv, { headers: {
++      'content-type': 'text/csv; charset=utf-8',
++      'content-disposition': 'attachment; filename="analytics-posts.csv"',
++      'cache-control': 'no-store',
++      'x-msp-export-format': 'analytics-posts-v1',
++      'x-msp-post-count': String(result.rowCount),
++      'x-msp-export-bytes': String(result.byteLength),
++    } });
++  } catch (error) { return failure(error, 'The posts export could not be prepared. Please try again.'); }
++}
+diff --git a/rebuild/src/app/api/analytics/posts/route.ts b/rebuild/src/app/api/analytics/posts/route.ts
+new file mode 100644
+index 00000000..c2e0815b
+--- /dev/null
++++ b/rebuild/src/app/api/analytics/posts/route.ts
+@@ -0,0 +1,9 @@
++import { readPostExplorer } from '@/modules/analytics/posts/server/posts';
++import { failure, paramsObject, reply, unauthorized, viewerActor } from '@/modules/analytics/http';
++export const dynamic = 'force-dynamic';
++
++export async function GET(request: Request) {
++  const actor = await viewerActor('analytics/posts', false); if (!actor) return unauthorized();
++  try { return reply(await readPostExplorer(actor, paramsObject(request.url))); }
++  catch (error) { return failure(error, 'Posts could not be loaded. Please try again.'); }
++}
+diff --git a/rebuild/src/modules/analytics/config.ts b/rebuild/src/modules/analytics/config.ts
+index ea54e54e..57e7f030 100644
+--- a/rebuild/src/modules/analytics/config.ts
++++ b/rebuild/src/modules/analytics/config.ts
+@@ -6,6 +6,7 @@ import { COMPARISON_CONFIG } from './comparison/config';
+ import { REPORT_WORKFLOW_CONFIG } from './reports/config';
+ import { REPORT_UI_CONFIG, REPORT_HOST_CONFIG } from './report-ui-config';
+ import { ANALYTICS_EXPLORER_CONFIG } from './explorer-config';
++import { POST_EXPLORER_CONFIG } from './posts/config';
+ 
+ /** Every Root setting this product module declares. The registry merges installed modules; edit only here. */
+ export const ANALYTICS_MODULE_CONFIG = [
+@@ -16,6 +17,7 @@ export const ANALYTICS_MODULE_CONFIG = [
+   ...REPORT_UI_CONFIG,
+   ...REPORT_HOST_CONFIG,
+   ...ANALYTICS_EXPLORER_CONFIG,
++  ...POST_EXPLORER_CONFIG,
+   entry({ key: 'analytics.defaultRangeDays', group: 'Analytics metrics', label: 'Default analytics window (days)', kind: 'number', description: 'Default inclusive UTC calendar window; capped by the maximum range.', defaultValue: 30, schema: z.number().int().min(1).max(3650), consumption: 'active' }),
+   entry({ key: 'analytics.metricPageSize', group: 'Analytics metrics', label: 'Metrics per page', kind: 'number', description: 'Number of metric summaries shown on one Analytics page.', defaultValue: 12, schema: z.number().int().min(1).max(100), consumption: 'active' }),
+   entry({ key: 'analytics.detailPageSize', group: 'Analytics metrics', label: 'Metric detail rows per page', kind: 'number', description: 'Number of dated values or resource/category rows on one detail page.', defaultValue: 50, schema: z.number().int().min(1).max(1000), consumption: 'active' }),
+diff --git a/rebuild/src/modules/analytics/manifest.ts b/rebuild/src/modules/analytics/manifest.ts
+index 5d77fc52..ef3f6ead 100644
+--- a/rebuild/src/modules/analytics/manifest.ts
++++ b/rebuild/src/modules/analytics/manifest.ts
+@@ -13,6 +13,7 @@ export const analyticsManifest = {
+     { id: 'analytics/demographics', title: 'Audience', href: '/analytics/demographics', description: 'Understand available audience breakdowns and coverage.' },
+     { id: 'analytics/compare', title: 'Compare', href: '/analytics/compare', description: 'Compare periods and selected resource groups with honest metric semantics.' },
+     { id: 'analytics/goals', title: 'Goals', href: '/analytics/goals', description: 'Set monthly goals per channel and track progress.' },
++    { id: 'analytics/posts', title: 'Posts', href: '/analytics/posts', description: 'Explore every published post with its stored measures, sort, search and export.' },
+     { id: 'analytics/pins', title: 'Pinned metrics', href: '/analytics/pins', description: 'Keep a personal view of available metrics.' },
+     { id: 'analytics/reports', title: 'Reports', href: '/analytics/reports', description: 'Prepare reports, reuse templates and manage scheduled delivery.' },
+   ],
+diff --git a/rebuild/src/modules/analytics/mcp.ts b/rebuild/src/modules/analytics/mcp.ts
+index ecfa0030..337aeedf 100644
+--- a/rebuild/src/modules/analytics/mcp.ts
++++ b/rebuild/src/modules/analytics/mcp.ts
+@@ -8,6 +8,7 @@ import { analyticsReportToolDefinitions, analyticsReportAvailableToolDefinitions
+ import { analyticsDemographicsToolDefinitions, executeAnalyticsDemographicsTool } from './demographics/mcp';
+ import { analyticsPinToolDefinitions, executeAnalyticsPinTool } from './pins/mcp';
+ import { analyticsGoalToolDefinitions, executeAnalyticsGoalTool } from './goals/mcp';
++import { analyticsPostToolDefinitions, executeAnalyticsPostTool } from './posts/mcp';
+ import { analyticsComparisonToolDefinitions, executeAnalyticsComparisonTool } from './comparison/mcp';
+ import { analyticsExplorerToolDefinitions, executeAnalyticsExplorerTool } from './explorer-mcp';
+ 
+@@ -100,6 +101,16 @@ export const ANALYTICS_MCP: readonly McpToolGroup[] = [
+     ],
+     execute: (viewer, name, args, cap) => executeAnalyticsGoalTool(analyticsActorFor(viewer, cap), name, args),
+   },
++  {
++    id: 'analytics-posts',
++    tools: analyticsPostToolDefinitions,
++    features: { get_analytics_posts: 'analytics/posts' },
++    scope: { resourceTools: ['get_analytics_posts'], resources: ['msp://analytics/posts'] },
++    resources: [
++      { uri: 'msp://analytics/posts', name: "Post explorer", description: "Published posts with stored per-post measures for the default period.", mimeType: 'application/json', feature: 'analytics/posts', readTool: 'get_analytics_posts' },
++    ],
++    execute: (viewer, name, args, cap) => executeAnalyticsPostTool(analyticsActorFor(viewer, cap), name, args),
++  },
+   {
+     id: 'analytics-demographics',
+     tools: analyticsDemographicsToolDefinitions,
+diff --git a/rebuild/src/modules/analytics/posts/config.ts b/rebuild/src/modules/analytics/posts/config.ts
+new file mode 100644
+index 00000000..97561ab7
+--- /dev/null
++++ b/rebuild/src/modules/analytics/posts/config.ts
+@@ -0,0 +1,8 @@
++import { z } from 'zod';
++import { entry } from '@/lib/config/entry';
++
++export const POST_EXPLORER_CONFIG = [
++  entry({ key: 'analytics.posts.pageSize', group: 'Analytics · Post explorer', label: 'Posts per page', kind: 'number', description: 'Default and largest number of posts on one page of the post explorer, API and MCP read.', defaultValue: 25, schema: z.number().int().min(5).max(100), consumption: 'active' }),
++  entry({ key: 'analytics.posts.maxPostsPerChannel', group: 'Analytics · Post explorer', label: 'Posts read per channel', kind: 'number', description: 'Most published posts read from stored figures for one channel and period; a result that reaches it is marked incomplete.', defaultValue: 1000, schema: z.number().int().min(50).max(2000), consumption: 'active' }),
++  entry({ key: 'analytics.posts.exportRows', group: 'Analytics · Post explorer', label: 'Post explorer CSV row limit', kind: 'number', description: 'Most post rows in one post explorer CSV download; a larger selection is refused, not cut.', defaultValue: 2000, schema: z.number().int().min(50).max(20000), consumption: 'active' }),
++] as const;
+diff --git a/rebuild/src/modules/analytics/posts/contracts.ts b/rebuild/src/modules/analytics/posts/contracts.ts
+new file mode 100644
+index 00000000..1249500f
+--- /dev/null
++++ b/rebuild/src/modules/analytics/posts/contracts.ts
+@@ -0,0 +1,45 @@
++import { z } from 'zod';
++
++const id = z.string().regex(/^[A-Za-z0-9_-]{1,200}$/);
++const day = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine(value => new Date(`${value}T00:00:00Z`).toISOString().slice(0, 10) === value);
++/** `publishedAt`, the module's ranking measure (`rank`), or a stored measure key. */
++export const sortKey = z.string().regex(/^[A-Za-z][A-Za-z0-9_]{0,59}$/);
++const one = (value: unknown) => Array.isArray(value) ? (value.length === 1 ? value[0] : value) : value;
++const single = <T extends z.ZodTypeAny>(schema: T) => z.preprocess(one, schema);
++const ids = z.preprocess(value => value === undefined ? undefined : Array.isArray(value) ? value : [value], z.array(id).max(500).optional());
++const whole = (max: number) => z.union([z.number(), z.string().regex(/^[1-9]\d{0,3}$/).transform(Number)]).pipe(z.number().int().min(1).max(max));
++
++export const postExplorerSchema = z.object({
++  channel: ids,
++  start: single(day.optional()), end: single(day.optional()),
++  q: single(z.string().trim().max(100).optional()),
++  sort: single(sortKey.optional()), dir: single(z.enum(['asc', 'desc']).optional()),
++  page: single(whole(9999).optional()),
++  pageSize: single(whole(200).optional()),
++}).strict();
++export type PostExplorerInput = z.infer<typeof postExplorerSchema>;
++
++export type PostMeasureColumn = { key: string; label: string };
++export type ExplorerPost = {
++  postId: string; channelId: string; channelName: string; text: string;
++  publishedAt: string | null; url: string | null;
++  /** Stored measures by key; null is unknown, never zero. */
++  measures: Record<string, number | null>;
++  rank: number | null; measuredAt: string | null;
++};
++export type PostExplorerResult = {
++  ok: true;
++  period: { start: string; end: string; timeZone: string };
++  columns: PostMeasureColumn[]; rankLabel: string | null;
++  sort: { key: string; dir: 'asc' | 'desc' };
++  q: string; page: number; pageSize: number; total: number; nextPage: number | null;
++  posts: ExplorerPost[];
++  /** True when any channel reached the per-channel read limit, so the result may omit posts. */
++  incomplete: boolean;
++  /** Channels whose module stores no per-post measures; their posts are not listed (unknown, not zero). */
++  unsupportedChannels: Array<{ id: string; name: string }>;
++  /** Channels read for this result. */
++  channels: Array<{ id: string; name: string }>;
++  /** Every channel the viewer may choose. */
++  channelOptions: Array<{ id: string; name: string }>;
++};
+diff --git a/rebuild/src/modules/analytics/posts/copy.ts b/rebuild/src/modules/analytics/posts/copy.ts
+new file mode 100644
+index 00000000..f0ca1bf5
+--- /dev/null
++++ b/rebuild/src/modules/analytics/posts/copy.ts
+@@ -0,0 +1,49 @@
++/** Customer copy for the post explorer in both shipped languages; wording follows legacy `analytics.byPost*`/`posts.*`. */
++export const postsCopy = {
++  en: {
++    eyebrow: 'Analytics', title: 'Posts',
++    subtitle: 'Every published post with its stored figures ({from} to {to}, {zone}). Figures can arrive a day or two late; a blank figure is unknown, not zero.',
++    byPostHint: 'One row per post per channel: the same post can perform very differently on two channels, and averaging that away hides the signal.',
++    loadFailedTitle: 'Posts could not be loaded', loadFailed: 'Posts could not be loaded. Please try again.', retry: 'Try again',
++    noChannelsTitle: 'No channels yet', noChannels: 'Posts appear here once a channel is connected and selected.', manageConnections: 'Manage connections',
++    noPostsTitle: 'No published posts', noPosts: 'No published posts in this range.', noMatch: 'No posts match your search. Clear it or widen the period.',
++    unknown: 'Unknown',
++    from: 'From', to: 'To', channels: 'Channels', channelsHint: 'None selected means all channels.', search: 'Search post text', searchPlaceholder: 'Words in the post', apply: 'Apply', reset: 'Reset',
++    post: 'Post', channel: 'Channel', published: 'Published', link: 'Open post', noLink: 'No link', noText: 'No text',
++    sortedAsc: 'Sorted lowest first. Select to reverse.', sortedDesc: 'Sorted highest first. Select to reverse.', sortBy: 'Sort by {label}',
++    showing: 'Showing {from} to {to} of {total} posts', previous: 'Previous', next: 'Next', page: 'Page {page}',
++    incomplete: 'Some channels have more posts than are read at once ({limit} each), so older posts may be missing. Narrow the period for a complete list.',
++    unsupported: 'No per-post figures are stored for: {names}.',
++    exportHeading: 'Export posts', exportHelp: 'Download the posts matching your channels, period and search as CSV, up to {rows} rows. Paging does not limit the export.',
++    exportAction: 'Export CSV', exportPending: 'Preparing CSV…', exportNoun: 'post', exportNouns: 'posts',
++    measuredAt: 'Figures as of {at}',
++  },
++  fr: {
++    eyebrow: 'Statistiques', title: 'Publications',
++    subtitle: 'Chaque publication avec ses chiffres enregistrés ({from} au {to}, {zone}). Les chiffres peuvent arriver avec un ou deux jours de retard ; un chiffre vide est inconnu, pas zéro.',
++    byPostHint: 'Une ligne par publication et par canal : la même publication peut très bien performer sur un canal et pas sur l’autre, et une moyenne masque ce signal.',
++    loadFailedTitle: 'Impossible de charger les publications', loadFailed: 'Impossible de charger les publications. Réessayez.', retry: 'Réessayer',
++    noChannelsTitle: 'Aucun canal pour l’instant', noChannels: 'Les publications apparaissent ici une fois un canal connecté et sélectionné.', manageConnections: 'Gérer les connexions',
++    noPostsTitle: 'Aucune publication', noPosts: 'Aucune publication sur cette période.', noMatch: 'Aucune publication ne correspond à votre recherche. Effacez-la ou élargissez la période.',
++    unknown: 'Inconnu',
++    from: 'Du', to: 'Au', channels: 'Canaux', channelsHint: 'Aucun canal coché signifie tous les canaux.', search: 'Rechercher dans le texte', searchPlaceholder: 'Mots de la publication', apply: 'Appliquer', reset: 'Réinitialiser',
++    post: 'Publication', channel: 'Canal', published: 'Publiée', link: 'Ouvrir la publication', noLink: 'Pas de lien', noText: 'Sans texte',
++    sortedAsc: 'Tri croissant. Sélectionnez pour inverser.', sortedDesc: 'Tri décroissant. Sélectionnez pour inverser.', sortBy: 'Trier par {label}',
++    showing: '{from} à {to} sur {total} publications', previous: 'Précédent', next: 'Suivant', page: 'Page {page}',
++    incomplete: 'Certains canaux ont plus de publications que celles lues à la fois ({limit} chacun) ; des publications plus anciennes peuvent manquer. Réduisez la période pour une liste complète.',
++    unsupported: 'Aucun chiffre par publication n’est enregistré pour : {names}.',
++    exportHeading: 'Exporter les publications', exportHelp: 'Téléchargez en CSV les publications correspondant à vos canaux, période et recherche, jusqu’à {rows} lignes. La pagination ne limite pas l’export.',
++    exportAction: 'Exporter en CSV', exportPending: 'Préparation du CSV…', exportNoun: 'publication', exportNouns: 'publications',
++    measuredAt: 'Chiffres au {at}',
++  },
++} as const;
++
++export type PostsLocale = keyof typeof postsCopy;
++export type PostsCopyKey = keyof (typeof postsCopy)['en'];
++
++export function postsLocale(acceptLanguage: string | null | undefined): PostsLocale {
++  return acceptLanguage?.trim().toLowerCase().startsWith('fr') ? 'fr' : 'en';
++}
++export function postsText(locale: PostsLocale, key: PostsCopyKey, values: Record<string, string | number> = {}): string {
++  return postsCopy[locale][key].replace(/\{(\w+)\}/g, (match, name: string) => (name in values ? String(values[name]) : match));
++}
+diff --git a/rebuild/src/modules/analytics/posts/mcp.ts b/rebuild/src/modules/analytics/posts/mcp.ts
+new file mode 100644
+index 00000000..77863303
+--- /dev/null
++++ b/rebuild/src/modules/analytics/posts/mcp.ts
+@@ -0,0 +1,16 @@
++import { OperationError } from '@/lib/operation-error';
++import type { Actor } from '../server/access';
++import { readPostExplorer } from './server/posts';
++
++const day = { type: 'string', description: 'Inclusive workspace-time-zone date, YYYY-MM-DD.' };
++export const analyticsPostToolDefinitions = [
++  {
++    name: 'get_analytics_posts',
++    description: 'Read a page of published posts with their stored per-post measures for channels you can access, one row per post per channel. Sort by publishedAt, rank or any returned measure key; search post text; continue with nextPage until null. Unknown figures are null, never zero; channels whose module stores no per-post figures are listed in unsupportedChannels.',
++    inputSchema: { type: 'object', properties: { channel: { type: 'array', items: { type: 'string', pattern: '^[A-Za-z0-9_-]{1,200}$' }, maxItems: 500 }, start: day, end: day, q: { type: 'string', maxLength: 100 }, sort: { type: 'string', pattern: '^[A-Za-z][A-Za-z0-9_]{0,59}$' }, dir: { type: 'string', enum: ['asc', 'desc'] }, page: { type: 'integer', minimum: 1, maximum: 9999 }, pageSize: { type: 'integer', minimum: 1, maximum: 200 } }, additionalProperties: false },
++  },
++] as const;
++export async function executeAnalyticsPostTool(actor: Actor, name: string, args: Record<string, unknown>) {
++  if (name === 'get_analytics_posts') return readPostExplorer(actor, args);
++  throw new OperationError('invalid_request', 'Unknown Analytics posts action.');
++}
+diff --git a/rebuild/src/modules/analytics/posts/server/posts.ts b/rebuild/src/modules/analytics/posts/server/posts.ts
+new file mode 100644
+index 00000000..93584612
+--- /dev/null
++++ b/rebuild/src/modules/analytics/posts/server/posts.ts
+@@ -0,0 +1,137 @@
++import { OperationError } from '@/lib/operation-error';
++import { prisma } from '@/server/data';
++import { runtimeConfig } from '@/server/config/store';
++import { entitledPlatformIds, loadEntitlements } from '@/server/entitlements';
++import { selectedResourceConnectionWhere } from '@/server/platforms/resource-visibility';
++import { platformAnalytics } from '@/server/platforms/registry';
++import { authorize, bad, type Actor } from '../../server/access';
++import { usableChannelIds } from '../../reports/server/access';
++import { dayIn, shiftDay, validTimeZone, zonedToUtc } from '../../reports/schedule-time';
++import { postExplorerSchema, type ExplorerPost, type PostExplorerResult, type PostMeasureColumn } from '../contracts';
++
++const FEATURE = 'analytics/posts' as const;
++type Channel = { id: string; name: string; provider: string | null };
++
++async function channelsFor(actor: Actor, scope: string[] | null): Promise<string[]> {
++  const entitlements = await loadEntitlements(actor.userId, actor.workspaceId, { allowInstallationInspection: false });
++  const providers = entitlements ? (await selectedResourceConnectionWhere(actor.workspaceId, entitledPlatformIds(entitlements))).provider.in : [];
++  const ids = await usableChannelIds(prisma, actor.workspaceId, providers, scope);
++  return scope === null ? ids : ids.filter(id => scope.includes(id));
++}
++
++async function channelRows(workspaceId: string, ids: string[]): Promise<Channel[]> {
++  if (!ids.length) return [];
++  return prisma.$queryRaw<Channel[]>`SELECT t.id, t.name, a.provider FROM targets t LEFT JOIN social_accounts a ON a.id = t."socialAccountId" AND a."workspaceId" = t."workspaceId" WHERE t."workspaceId" = ${workspaceId} AND t.id = ANY(${ids}::text[]) ORDER BY t.name ASC`;
++}
++
++async function workspaceTimeZone(workspaceId: string): Promise<string> {
++  const rows = await prisma.$queryRaw<Array<{ timezone: string | null }>>`SELECT timezone FROM workspaces WHERE id = ${workspaceId}`;
++  const zone = rows[0]?.timezone;
++  return zone && validTimeZone(zone) ? zone : 'UTC';
++}
++
++async function bounds() {
++  const [pageSize, perChannel, exportRows, defaultDays, maxDays] = await Promise.all([
++    runtimeConfig('analytics.posts.pageSize'), runtimeConfig('analytics.posts.maxPostsPerChannel'), runtimeConfig('analytics.posts.exportRows'),
++    runtimeConfig('analytics.defaultRangeDays'), runtimeConfig('analytics.maxRangeDays'),
++  ]).then(values => values.map(Number));
++  const ok = (value: number | undefined, min: number, max: number): value is number => Number.isSafeInteger(value) && (value as number) >= min && (value as number) <= max;
++  if (!ok(pageSize, 5, 100) || !ok(perChannel, 50, 2000) || !ok(exportRows, 50, 20000) || !ok(defaultDays, 1, 3650) || !ok(maxDays, 1, 3650)) {
++    throw new OperationError('unavailable', 'Posts are temporarily unavailable.');
++  }
++  return { pageSize, perChannel, exportRows, defaultDays, maxDays };
++}
++
++type Collected = Omit<PostExplorerResult, 'page' | 'pageSize' | 'nextPage' | 'posts'> & { all: ExplorerPost[]; limits: Awaited<ReturnType<typeof bounds>> };
++
++const compare = (key: string, dir: 'asc' | 'desc') => (a: ExplorerPost, b: ExplorerPost): number => {
++  const pick = (post: ExplorerPost): number | null => key === 'publishedAt' ? (post.publishedAt ? Date.parse(post.publishedAt) : null) : key === 'rank' ? post.rank : (post.measures[key] ?? null);
++  const left = pick(a); const right = pick(b);
++  // Unknown is last whichever direction: a post without a figure is neither best nor worst.
++  if (left === null || right === null) return left === right ? a.postId.localeCompare(b.postId) : left === null ? 1 : -1;
++  return (dir === 'desc' ? right - left : left - right) || a.postId.localeCompare(b.postId);
++};
++
++async function collect(actor: Actor, rawInput: unknown, now: Date): Promise<Collected> {
++  const parsed = postExplorerSchema.safeParse(rawInput ?? {}); if (!parsed.success) throw bad('Choose valid dates, channels and sort options.');
++  const input = parsed.data;
++  const auth = await authorize(actor, FEATURE, 'read');
++  const limits = await bounds();
++  const timeZone = await workspaceTimeZone(actor.workspaceId);
++  const today = dayIn(now, timeZone);
++  const end = input.end ?? today;
++  const start = input.start ?? shiftDay(end, -(limits.defaultDays - 1));
++  if (start > end) throw bad('The start date must not be after the end date.');
++  const span = Math.round((Date.parse(`${end}T00:00:00Z`) - Date.parse(`${start}T00:00:00Z`)) / 86_400_000) + 1;
++  if (span > limits.maxDays) throw bad(`Choose a period of at most ${limits.maxDays} days.`);
++  const from = zonedToUtc(start, '00:00', timeZone); const to = zonedToUtc(shiftDay(end, 1), '00:00', timeZone);
++
++  const available = await channelsFor(actor, auth.scope);
++  const requested = input.channel?.length ? [...new Set(input.channel)] : null;
++  if (requested && requested.some(id => !available.includes(id))) throw new OperationError('not_found', 'A selected channel is unavailable in the current workspace.');
++  const ids = requested ?? available;
++  if (actor.maxResultItems !== undefined && ids.length > actor.maxResultItems) throw new OperationError('invalid_request', 'The posts result exceeds the current MCP limit. Choose fewer channels.');
++  const everyChannel = await channelRows(actor.workspaceId, available);
++  const channels = everyChannel.filter(channel => ids.includes(channel.id));
++
++  const all: ExplorerPost[] = []; const columns = new Map<string, string>(); const unsupportedChannels: Array<{ id: string; name: string }> = [];
++  let rankLabel: string | null = null; let incomplete = false;
++  for (const channel of channels) {
++    const analytics = channel.provider ? await platformAnalytics(channel.provider) : null;
++    if (!analytics?.postPerformance) { unsupportedChannels.push({ id: channel.id, name: channel.name }); continue; }
++    const rows = await analytics.postPerformance({ workspaceId: actor.workspaceId, targetId: channel.id, from, to, limit: limits.perChannel });
++    if (rows.length >= limits.perChannel) incomplete = true;
++    for (const row of rows) {
++      rankLabel ??= row.rankLabel;
++      const measures: Record<string, number | null> = {};
++      for (const measure of row.measures) { measures[measure.key] = measure.value; if (!columns.has(measure.key)) columns.set(measure.key, measure.label); }
++      all.push({ postId: row.postId, channelId: channel.id, channelName: channel.name, text: row.text, publishedAt: row.publishedAt ? row.publishedAt.toISOString() : null, url: row.url, measures, rank: row.rankValue, measuredAt: row.measuredAt ? row.measuredAt.toISOString() : null });
++    }
++  }
++
++  const q = (input.q ?? '').toLowerCase();
++  const filtered = q ? all.filter(post => post.text.toLowerCase().includes(q)) : all;
++  const key = input.sort ?? 'publishedAt'; const dir = input.dir ?? 'desc';
++  if (key !== 'publishedAt' && key !== 'rank' && !columns.has(key)) {
++    // A measure no loaded post carries cannot be sorted on; an empty selection accepts any well-formed key.
++    if (all.length) throw bad('Choose a measure that these posts have.');
++  }
++  filtered.sort(compare(key, dir));
++  const cols: PostMeasureColumn[] = [...columns].map(([k, label]) => ({ key: k, label }));
++  return {
++    ok: true, period: { start, end, timeZone }, columns: cols, rankLabel, sort: { key, dir }, q: input.q ?? '', total: filtered.length,
++    incomplete, unsupportedChannels, channels: channels.map(c => ({ id: c.id, name: c.name })), channelOptions: everyChannel.map(c => ({ id: c.id, name: c.name })), all: filtered, limits,
++  };
++}
++
++/** One page of the post explorer for the channels the actor may see. Measures a channel does not store are null. */
++export async function readPostExplorer(actor: Actor, input: unknown = {}, now = new Date()): Promise<PostExplorerResult> {
++  const { all, limits, ...rest } = await collect(actor, input, now);
++  const parsed = postExplorerSchema.parse(input ?? {});
++  const cap = Math.min(limits.pageSize, actor.maxResultItems ?? limits.pageSize);
++  const pageSize = Math.max(1, Math.min(parsed.pageSize ?? limits.pageSize, cap));
++  const lastPage = Math.max(1, Math.ceil(rest.total / pageSize));
++  const page = Math.min(parsed.page ?? 1, lastPage);
++  const posts = all.slice((page - 1) * pageSize, page * pageSize);
++  return { ...rest, page, pageSize, nextPage: page < lastPage ? page + 1 : null, posts };
++}
++
++/** Spreadsheet programs may ignore leading whitespace before a formula marker. */
++export function csvCell(value: string): string {
++  const safe = /^[\s﻿]*[=+\-@]/.test(value) ? `'${value}` : value;
++  return `"${safe.replaceAll('"', '""')}"`;
++}
++
++/** Every post matching the selection as CSV (not just one page); refused, never cut, above the Root row limit. */
++export async function exportPostExplorer(actor: Actor, input: unknown = {}, now = new Date()): Promise<{ csv: string; rowCount: number; byteLength: number; maxRows: number }> {
++  const stripped = input && typeof input === 'object' ? Object.fromEntries(Object.entries(input as Record<string, unknown>).filter(([key]) => key !== 'page' && key !== 'pageSize')) : input;
++  const { all, columns, rankLabel, limits, incomplete } = await collect(actor, stripped, now);
++  if (all.length > limits.exportRows) throw new OperationError('invalid_request', `This selection has more than ${limits.exportRows} posts. Narrow the channels, period or search.`);
++  if (incomplete) throw new OperationError('invalid_request', 'Some channels have more posts than can be read at once. Narrow the period so the export is complete.');
++  const header = ['Channel', 'Published (UTC)', 'Post', 'Link', ...columns.map(column => column.label), ...(rankLabel ? [rankLabel] : [])];
++  const cell = (value: number | null) => value === null ? '' : String(value);
++  const lines = [header.map(csvCell).join(',')];
++  for (const post of all) lines.push([post.channelName, post.publishedAt ?? '', post.text, post.url ?? '', ...columns.map(column => cell(post.measures[column.key] ?? null)), ...(rankLabel ? [cell(post.rank)] : [])].map(csvCell).join(','));
++  const csv = `${lines.join('\r\n')}\r\n`;
++  return { csv, rowCount: all.length, byteLength: Buffer.byteLength(csv), maxRows: limits.exportRows };
++}
+diff --git a/rebuild/src/modules/analytics/server/access.ts b/rebuild/src/modules/analytics/server/access.ts
+index a87c9ea4..3f20ff59 100644
+--- a/rebuild/src/modules/analytics/server/access.ts
++++ b/rebuild/src/modules/analytics/server/access.ts
+@@ -9,7 +9,7 @@ import { assertWorkspaceNotPurging } from '@/server/data-control/guard';
+ import type { AnalyticsAdCeiling } from './types';
+ 
+ export type Tx = Prisma.TransactionClient;
+-export type AnalyticsFeature = 'analytics/overview' | 'analytics/reports' | 'analytics/demographics' | 'analytics/pins' | 'analytics/goals' | 'analytics/compare';
++export type AnalyticsFeature = 'analytics/overview' | 'analytics/reports' | 'analytics/demographics' | 'analytics/pins' | 'analytics/goals' | 'analytics/posts' | 'analytics/compare';
+ export type Actor = { userId: string; workspaceId: string; allowedChannelIds?: readonly string[]; maxResultItems?: number } & AnalyticsAdCeiling;
+ export type Authorization = { role: string; scope: string[] | null };
+ 
+diff --git a/rebuild/src/modules/analytics/server/types.ts b/rebuild/src/modules/analytics/server/types.ts
+index fa334093..facc94d3 100644
+--- a/rebuild/src/modules/analytics/server/types.ts
++++ b/rebuild/src/modules/analytics/server/types.ts
+@@ -8,7 +8,7 @@ export type AnalyticsAdCeiling = { allowedAdAccountIds?: readonly string[]; adAc
+ export type AnalyticsReadActor = { userId: string; workspaceId: string } & AnalyticsAdCeiling;
+ export type AnalyticsReadConstraints = {
+   allowedChannelIds?: readonly string[];
+-  feature?: 'analytics/overview' | 'analytics/reports' | 'analytics/explorer' | 'analytics/demographics' | 'analytics/pins' | 'analytics/goals' | 'analytics/compare';
++  feature?: 'analytics/overview' | 'analytics/reports' | 'analytics/explorer' | 'analytics/demographics' | 'analytics/pins' | 'analytics/goals' | 'analytics/posts' | 'analytics/compare';
+ };
+ export type AnalyticsReadInput = {
+   start?: string;
+diff --git a/rebuild/src/platforms/facebook/post-performance.ts b/rebuild/src/platforms/facebook/post-performance.ts
+index 270e36a9..4ece278e 100644
+--- a/rebuild/src/platforms/facebook/post-performance.ts
++++ b/rebuild/src/platforms/facebook/post-performance.ts
+@@ -24,7 +24,7 @@ export function facebookPostPerformance(row: Row): PostPerformance {
+ }
+ 
+ export async function readFacebookPostPerformance(request: { workspaceId: string; targetId: string; from: Date; to: Date; limit: number }): Promise<PostPerformance[]> {
+-  const limit = Math.max(1, Math.min(100, Math.trunc(request.limit)));
++  const limit = Math.max(1, Math.min(2000, Math.trunc(request.limit)));
+   const rows = await prisma.$queryRaw<Row[]>`
+     SELECT p.id AS "postId", p.message, pt."publishedAt", pt."remoteUrl", pt.insights, pt."insightsSyncedAt"
+     FROM post_targets pt JOIN posts p ON p.id = pt."postId" JOIN targets t ON t.id = pt."targetId"
+diff --git a/rebuild/src/server/entitlements/index.ts b/rebuild/src/server/entitlements/index.ts
+index c55e0f78..587f1436 100644
+--- a/rebuild/src/server/entitlements/index.ts
++++ b/rebuild/src/server/entitlements/index.ts
+@@ -53,6 +53,7 @@ const FEATURE_ROOT_SWITCH: Record<FeatureId, string | null> = {
+   'analytics/compare': 'analytics/overview',
+   'analytics/pins': 'analytics/overview',
+   'analytics/goals': 'analytics/overview',
++  'analytics/posts': 'analytics/overview',
+   'analytics/reports': 'analytics/overview',
+   'ads/overview': 'ads/performance',
+   'ads/compare': 'ads/performance',
+diff --git a/rebuild/src/server/permissions/index.ts b/rebuild/src/server/permissions/index.ts
+index c4425154..8a6fd64b 100644
+--- a/rebuild/src/server/permissions/index.ts
++++ b/rebuild/src/server/permissions/index.ts
+@@ -45,6 +45,7 @@ const FEATURE_MODULE_SWITCH: Record<FeatureId, string | null> = {
+   'analytics/compare': 'analytics/overview',
+   'analytics/pins': 'analytics/overview',
+   'analytics/goals': 'analytics/overview',
++  'analytics/posts': 'analytics/overview',
+   'analytics/reports': 'analytics/overview',
+   'ads/overview': 'ads/performance',
+   'ads/compare': 'ads/performance',
+@@ -85,7 +86,7 @@ function roleFeatureAccess(role: string, feature: FeatureId, clientAccess: Reado
+     if (feature === 'publishing/posts' || feature === 'publishing/calendar' || feature === 'publishing/approvals') {
+       return { read: true, write: feature === 'publishing/approvals' };
+     }
+-    if (feature === 'analytics/overview' || feature === 'analytics/explorer' || feature === 'analytics/reports' || feature === 'analytics/demographics' || feature === 'analytics/compare' || feature === 'analytics/pins' || feature === 'analytics/goals') {
++    if (feature === 'analytics/overview' || feature === 'analytics/explorer' || feature === 'analytics/reports' || feature === 'analytics/demographics' || feature === 'analytics/compare' || feature === 'analytics/pins' || feature === 'analytics/goals' || feature === 'analytics/posts') {
+       return { read: clientAccess.has('analytics'), write: false };
+     }
+     if (feature === 'inbox/conversations') return { read: clientAccess.has('inbox'), write: false };
+diff --git a/rebuild/tests/mcp-security.test.ts b/rebuild/tests/mcp-security.test.ts
+index 732681d4..daab464f 100644
+--- a/rebuild/tests/mcp-security.test.ts
++++ b/rebuild/tests/mcp-security.test.ts
+@@ -103,7 +103,7 @@ const viewer: McpViewer = {
+   entitlements: {
+     workspaceId: 'workspace-a',
+     modules: { home: true, publishing: true, inbox: true, analytics: true, ads: true, tasks: true, agency: true, settings: true },
+-    features: { 'agency/overview': true, 'agency/clients': true, 'tasks/board': true, 'home/overview': true, 'publishing/posts': true, 'publishing/collaboration': true, 'publishing/labels': true, 'publishing/templates': true, 'publishing/calendar': true, 'publishing/queue': true, 'publishing/approvals': true, 'publishing/media': true, 'publishing/feeds': true, 'inbox/conversations': true, 'analytics/explorer': true, 'analytics/overview': true, 'analytics/demographics': true, 'analytics/pins': true, 'analytics/goals': true, 'analytics/compare': true, 'analytics/reports': true, 'ads/overview': true, 'ads/compare': true, 'ads/objects': true, 'ads/campaigns': true, 'settings/connections': true, 'settings/team': true, 'settings/workspace': true, 'settings/sharing': true, 'settings/bio': true, 'settings/mcp': true, 'settings/webhooks': true, 'settings/account': true, 'settings/notifications': true, 'settings/appearance': true, 'settings/data': true },
++    features: { 'agency/overview': true, 'agency/clients': true, 'tasks/board': true, 'home/overview': true, 'publishing/posts': true, 'publishing/collaboration': true, 'publishing/labels': true, 'publishing/templates': true, 'publishing/calendar': true, 'publishing/queue': true, 'publishing/approvals': true, 'publishing/media': true, 'publishing/feeds': true, 'inbox/conversations': true, 'analytics/explorer': true, 'analytics/overview': true, 'analytics/demographics': true, 'analytics/pins': true, 'analytics/goals': true, 'analytics/posts': true, 'analytics/compare': true, 'analytics/reports': true, 'ads/overview': true, 'ads/compare': true, 'ads/objects': true, 'ads/campaigns': true, 'settings/connections': true, 'settings/team': true, 'settings/workspace': true, 'settings/sharing': true, 'settings/bio': true, 'settings/mcp': true, 'settings/webhooks': true, 'settings/account': true, 'settings/notifications': true, 'settings/appearance': true, 'settings/data': true },
+     platformCapabilities: { facebook: true },
+   },
+   permissions: resolvePermissions({ role: 'owner', workspaceDisabledModules: [], memberDisabledModules: [], clientAccess: [], allPages: true, pageAccess: [] }),
+diff --git a/rebuild/tests/module-manifests.test.ts b/rebuild/tests/module-manifests.test.ts
+index 8086f7b1..6fb3a213 100644
+--- a/rebuild/tests/module-manifests.test.ts
++++ b/rebuild/tests/module-manifests.test.ts
+@@ -33,7 +33,7 @@ describe('customer module manifests', () => {
+ 
+   it('shows the Analytics overview, audience, comparison, goals and pins pages while retaining scoped CSV export as a capability', () => {
+     expect(PAGES.filter(({ module, navigation }) => module === 'analytics' && navigation !== false).map(({ href }) => href)).toEqual([
+-      '/analytics', '/analytics/demographics', '/analytics/compare', '/analytics/goals', '/analytics/pins', '/analytics/reports',
++      '/analytics', '/analytics/demographics', '/analytics/compare', '/analytics/goals', '/analytics/posts', '/analytics/pins', '/analytics/reports',
+     ]);
+     expect(PAGES.find(({ id }) => id === 'analytics/reports')?.href).toBe('/analytics/reports');
+     expect(moduleManifests.find(({id})=>id==='analytics')?.jobs).toEqual(expect.arrayContaining([expect.objectContaining({name:'analyticsReports',configKey:'analytics.reports.schedule'})]));

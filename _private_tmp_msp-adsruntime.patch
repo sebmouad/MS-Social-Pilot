@@ -1,0 +1,447 @@
+diff --git a/prisma/migrations/20261031180000_rebuild_ads_ad_creation/migration.sql b/prisma/migrations/20261031180000_rebuild_ads_ad_creation/migration.sql
+new file mode 100644
+index 00000000..d8b77a87
+--- /dev/null
++++ b/prisma/migrations/20261031180000_rebuild_ads_ad_creation/migration.sql
+@@ -0,0 +1,6 @@
++-- Add paused-ad creation to the existing request-id / open-object journal.
++-- Preserve all recorded requests, receipts, states, indexes and resolution guards.
++ALTER TABLE ads_management_operations DROP CONSTRAINT ads_operations_operation_kind;
++ALTER TABLE ads_management_operations ADD CONSTRAINT ads_operations_operation_kind CHECK (
++  "operationType" IN ('status.set','budget.set','rename','creative.assign','delete','campaign.create','adset.create','creative.create','ad.create')
++);
+diff --git a/rebuild/src/modules/ads/server/README.md b/rebuild/src/modules/ads/server/README.md
+index 3bec7f66..1657a061 100644
+--- a/rebuild/src/modules/ads/server/README.md
++++ b/rebuild/src/modules/ads/server/README.md
+@@ -4,8 +4,68 @@ The rebuild Ads routes read `AdAccount` and every stored `AdInsight` level (`acc
+ 
+ Summaries add daily spend, impressions, clicks, and numeric action values. Reach, CPP, frequency, and arbitrary provider `fields` use the latest daily row because they are snapshots or provider-specific values. CPC, CPM, and CTR are calculated from the selected-period spend/click/impression totals. Each object has a collapsed daily-details disclosure with every stored day's CPC, CPM, CPP, CTR, frequency, action JSON, and provider `fields`; this preserves values that should not be summed.
+ 
+-Campaign creation is available to workspace owners and admins when the Root ads-management switch, selected platform switch, workspace feature entitlement, write permission, resource scope, connected selected ad account, and provider grants are all present. The account's platform module owns provider scopes, objective validation and exact confirmation. Creation starts paused; it does not launch delivery or create creatives or ads. Each request records an audit event without credentials. Existing status and budget edits use the same server-side boundary and confirmation pattern.
++## Shared writes and copy
+ 
+-Managers can also create a paused ad set under a campaign present in that account's stored campaign insight history. The form requires a daily amount in the account currency, one two-letter country code, and a supported optimization goal; billing uses impressions and bidding uses lowest cost without cap. The provider reads the campaign's live `account_id` before submitting `POST /{ad-account-id}/adsets`. Workspace write authorization and the campaign/account relationship are checked before creation. Limited page-scope users cannot create ad sets because the current data model cannot prove a campaign-to-Page association. New ad sets stay paused; this path does not create creatives or ads, and a just-created campaign must first appear in synced insight history before it can be selected. If provider creation succeeds but the audit write fails, the action still returns the created ID with `auditRecorded: false`, and the UI warns against submitting again.
++UI, REST and MCP creation and management use `modules/ads/management/server.ts`.
++The service checks current membership, entitlements, write permission, selected
++account, resource scope, provider availability/grants and exact provider-owned
++consent before committing an intent. Campaigns, ad sets and ads start paused;
++creatives remain unattached. Parent campaigns/ad sets must exist in the selected
++account's stored history. Ad-set/ad creation refuses limited channel scope because
++the parent cannot be bounded to a selected channel.
+ 
+-Both campaign and ad-set creation preserve confirmed remote success if the subsequent local audit write fails. Responses include `created: true`, the paused remote ID, `auditRecorded`, and a warning when audit persistence failed; structured fallback logs contain only operation/actor/workspace/object IDs. Clients must retain that receipt and avoid repeating creation. This does not solve ambiguous provider timeouts, concurrent duplicate creation, or durable idempotency; those reconciliation paths remain release gaps.
++`PlatformAdsHost.configuredOperations(locale)` resolves the module-owned factory
++through the neutral `platformAds` registry. Installed registration supplies the
++Facebook factory; no provider branch is added to the registry or Ads service.
++Existing callers receive the runtime English catalog. `withPlatformAdsLocale`
++(or `withAdsErrorBoundary(operation, locale)`) carries English/French through
++nested service calls; `adsServiceText` and error formatting use that same locale.
++Each resolution returns a fresh host; configured factory failures do not silently
++fall back to the static engine. No transport/provider requests occur while the
++factory reads its Root copy. Frontend creation templates are still supplied by
++`creationUi` separately; their consent must agree with the live preview.
++
++The ledger preserves request ids per workspace/actor and hashes the normalized
++account/operation payload. Reusing an id replays its recorded outcome; a changed
++payload conflicts. Pending/uncertain operations hold their object identity,
++including `@create-ad:<parentAdSetId>`, so an ambiguous creation cannot be blindly
++resent. A missing remote id remains uncertain. Explicit confirmed recovery records
++human attestation without contacting the provider or inventing a created identity.
++Only a positively recorded provider success returns the `created` receipt.
++
++Migration `20261031180000_rebuild_ads_ad_creation` extends the existing
++operation-kind CHECK to `ad.create`; it preserves prior operations, records,
++indexes, uniqueness and resolution rules. Its SHA-256 is
++`1769fa24129e6d74119e84d0677a2baf0c935cb73a4e722ae0a443b7fbc7120f`.
++Source/checksum and mocked recovery tests are distinct from PostgreSQL application,
++provider writes, browser and production evidence. No migration was applied here.
++
++## Integration outside this lane
++
++- `rebuild/scripts/cutover-rehearsal.sh`: append the new migration name to
++  `approved_migrations`, add `verify_migration` with the SHA above and apply the
++  file after `20261030110000_rebuild_ads_creative_creation`. Extend the migration
++  history refusal placeholders/USING list to include the new migration (the
++  current query only checks its first 22 parameters despite a longer USING list).
++  Add a post-apply CHECK/valid-invalid operation probe. Update the approved set
++  and pin/order assertions in `tests/cutover-rehearsal.test.ts` together.
++- `src/modules/ads/ui/campaigns/CampaignsScreen.tsx`,
++  `src/app/api/ads/management/route.ts` and `src/modules/ads/mcp.ts`: pass the
++  resolved customer locale into
++  `withAdsErrorBoundary(operation, locale)` or wrap the complete service call in
++  `withPlatformAdsLocale(locale, operation)`. Do so for both preview and apply;
++  exact consent from another locale must not be silently accepted. The new scope
++  defaults to English until callers opt in. The UI directories and transport
++  handlers were outside this lane.
++- Platform-owned `creationUi` and UI forms should consume the live management
++  preview for confirmation. The independent creation template catalog is not
++  synchronized automatically when Root changes `meta.adsCopy` consent templates.
++- `src/modules/ads/management/server.ts`: recovery currently checks account
++  visibility but does not repeat the unrestricted-channel requirement used for
++  ad/ad-set creation. Review/enforce the stored operation scope before allowing
++  a channel-limited manager to release a held creation. This existing gap was
++  observed in source, not exercised against PostgreSQL.
++- Architecture/Ads parity/handoff documents must record the source changes and
++  pending migration rehearsal/application and locale entry-point integration.
++
++No new Root keys; existing `meta.adsCopy` and Ads customer catalogs are consumed.
+diff --git a/rebuild/src/modules/ads/server/copy.ts b/rebuild/src/modules/ads/server/copy.ts
+index d9865691..3c1ff35a 100644
+--- a/rebuild/src/modules/ads/server/copy.ts
++++ b/rebuild/src/modules/ads/server/copy.ts
+@@ -3,6 +3,7 @@ import { AsyncLocalStorage } from 'node:async_hooks';
+ import { cache } from 'react';
+ import { runtimeConfig } from '@/server/config/store';
+ import { catalogLanguages, defaultAdsCatalogs, type AdsCatalogs } from '../copy';
++import { platformAdsLocale } from '@/server/platforms/ads-locale';
+ 
+ const snapshots = new AsyncLocalStorage<{ copy?: Promise<AdsCatalogs> }>();
+ const readAdsCopy = cache(async (): Promise<AdsCatalogs> => {
+@@ -28,7 +29,7 @@ export function withAdsCopySnapshot<T>(operation: () => Promise<T>): Promise<T>
+ }
+ 
+ /** Service/API/MCP failures use the same Root catalog as the customer screens. */
+-export async function adsServiceText(key: import('../copy').AdsCustomerKey, values: Record<string, string | number> = {}, locale: 'en' | 'fr' = 'en') {
++export async function adsServiceText(key: import('../copy').AdsCustomerKey, values: Record<string, string | number> = {}, locale: 'en' | 'fr' = platformAdsLocale()) {
+   const { customer } = await loadAdsCopy();
+   return customer[key][locale].replace(/\{(\w+)\}/g, (whole, name: string) => name in values ? String(values[name]) : whole);
+ }
+diff --git a/rebuild/src/modules/ads/server/errors.ts b/rebuild/src/modules/ads/server/errors.ts
+index c02ee2df..c86f8e35 100644
+--- a/rebuild/src/modules/ads/server/errors.ts
++++ b/rebuild/src/modules/ads/server/errors.ts
+@@ -5,6 +5,7 @@ import { defaultAdsText } from '@/modules/ads/copy';
+ import { z } from 'zod';
+ import { OperationError, operationFailure } from '@/lib/operation-error';
+ import { AdsNoDispatchError, adsNoDispatchMetadata, asNoDispatch } from '@/modules/ads/management/errors';
++import { platformAdsLocale, withPlatformAdsLocale } from '@/server/platforms/ads-locale';
+ 
+ const FAILED = defaultAdsText('validation001');
+ 
+@@ -12,25 +13,25 @@ const FAILED = defaultAdsText('validation001');
+  * API and MCP expose only intentional product errors, never provider exceptions. A typed no-dispatch refusal
+  * keeps its safe marker (it describes this send only); any other failure is reduced to code and message.
+  */
+-export async function withAdsErrorBoundary<T>(operation: () => Promise<T>): Promise<T> {
+-  return withAdsCopySnapshot(async () => {
++export async function withAdsErrorBoundary<T>(operation: () => Promise<T>, locale: 'en' | 'fr' = platformAdsLocale()): Promise<T> {
++  return withPlatformAdsLocale(locale, () => withAdsCopySnapshot(async () => {
+   try { return await operation(); }
+   catch (error) {
+-    if (error instanceof AdsNoDispatchError) { error.message = localizeAdsMessage(await loadAdsCopy(), 'en', error.message); throw error; }
++    if (error instanceof AdsNoDispatchError) { error.message = localizeAdsMessage(await loadAdsCopy(), locale, error.message); throw error; }
+     const failure = operationFailure(error, FAILED);
+-    throw new OperationError(failure.code, localizeAdsMessage(await loadAdsCopy(), 'en', failure.error));
++    throw new OperationError(failure.code, localizeAdsMessage(await loadAdsCopy(), locale, failure.error));
+   }
+ 
+-  });
++  }));
+ }
+ 
+-export async function adsErrorResponse(error: unknown, invalidRequestMessage: string) {
++export async function adsErrorResponse(error: unknown, invalidRequestMessage: string, locale: 'en' | 'fr' = platformAdsLocale()) {
+   return withAdsCopySnapshot(async () => {
+   // A malformed body is refused before any service call, so this send provably dispatched nothing.
+   const reported = error instanceof z.ZodError || error instanceof SyntaxError
+     ? asNoDispatch(new OperationError('invalid_request', invalidRequestMessage)) : error;
+   const failure = operationFailure(reported, FAILED);
+-  return Response.json({ error: localizeAdsMessage(await loadAdsCopy(), 'en', failure.error), code: failure.code, ...adsNoDispatchMetadata(reported) }, { status: failure.status, headers: { 'cache-control': 'no-store' } });
++  return Response.json({ error: localizeAdsMessage(await loadAdsCopy(), locale, failure.error), code: failure.code, ...adsNoDispatchMetadata(reported) }, { status: failure.status, headers: { 'cache-control': 'no-store' } });
+ 
+   });
+ }
+diff --git a/rebuild/src/server/platforms/ads-locale.ts b/rebuild/src/server/platforms/ads-locale.ts
+new file mode 100644
+index 00000000..653d1d53
+--- /dev/null
++++ b/rebuild/src/server/platforms/ads-locale.ts
+@@ -0,0 +1,13 @@
++import { AsyncLocalStorage } from 'node:async_hooks';
++
++export type PlatformAdsLocale = 'en' | 'fr';
++const locales = new AsyncLocalStorage<PlatformAdsLocale>();
++
++/** Transport-independent locale scope shared by nested Ads service calls. */
++export function withPlatformAdsLocale<T>(locale: PlatformAdsLocale, operation: () => Promise<T>): Promise<T> {
++  return locales.run(locale, operation);
++}
++
++export function platformAdsLocale(): PlatformAdsLocale {
++  return locales.getStore() ?? 'en';
++}
+diff --git a/rebuild/src/server/platforms/host.ts b/rebuild/src/server/platforms/host.ts
+index 65a9a0b9..a51b3648 100644
+--- a/rebuild/src/server/platforms/host.ts
++++ b/rebuild/src/server/platforms/host.ts
+@@ -110,6 +110,8 @@ export interface PlatformAnalyticsHost {
+ export interface PlatformAdsHost {
+   /** Optional complete object-management engine owned by this platform. */
+   operations?: AdsOpsHost;
++  /** Resolve Root-managed customer copy for this request; failures must never fall back to a static engine. */
++  configuredOperations?(locale: 'en' | 'fr'): Promise<AdsOpsHost>;
+   /** Pure interpretation of provider-owned stored fields; no credentials or network requests. */
+   parentObjectId?(input: { level: 'campaign' | 'adset' | 'ad'; fields: unknown }): string | null;
+   /** Safe, serializable UI configuration; never contains credentials or server functions. */
+diff --git a/rebuild/src/server/platforms/index.ts b/rebuild/src/server/platforms/index.ts
+index 86317567..c3a50cea 100644
+--- a/rebuild/src/server/platforms/index.ts
++++ b/rebuild/src/server/platforms/index.ts
+@@ -1,10 +1,11 @@
+ import type { PlatformId } from '@/platforms';
+ import type { PlatformHost } from './host';
+ import { facebookHost } from '@/platforms/facebook/host';
++import { configuredFacebookAdsOps } from '@/platforms/facebook/ads-ops';
+ 
+ export type { ConnectionViewer, PlatformHost, PlatformInboxHost, PlatformAdsHost, PlatformAnalyticsHost } from './host';
+ 
+ /** Explicit installed-module wiring; implementation and assembly stay in each module. */
+ export const PLATFORM_HOSTS: Readonly<Record<PlatformId, PlatformHost>> = {
+-  facebook: facebookHost,
++  facebook: { ...facebookHost, ads: { ...facebookHost.ads, configuredOperations: configuredFacebookAdsOps } },
+ };
+diff --git a/rebuild/src/server/platforms/registry.ts b/rebuild/src/server/platforms/registry.ts
+index 18e53759..bea94674 100644
+--- a/rebuild/src/server/platforms/registry.ts
++++ b/rebuild/src/server/platforms/registry.ts
+@@ -5,6 +5,7 @@ import { runtimeConfig } from '@/server/config/store';
+ import { PLATFORM_HOSTS, type PlatformHost } from './index';
+ import type { PlatformJobName, JobSummary } from '@/server/jobs/types';
+ import type { RetryBackoff } from '@/server/jobs/retry';
++import { platformAdsLocale } from './ads-locale';
+ 
+ /**
+  * Product code reaches platforms only through here: by provider ID and
+@@ -38,11 +39,13 @@ export async function platformInbox(provider: string): Promise<PlatformHost['inb
+ }
+ 
+ /** Enabled Ads implementation for a module that declares the Ads capability. */
+-export async function platformAds(provider: string): Promise<NonNullable<PlatformHost['ads']> | null> {
++export async function platformAds(provider: string, locale: 'en' | 'fr' = platformAdsLocale()): Promise<NonNullable<PlatformHost['ads']> | null> {
+   const module = platformModule(provider);
+   const ads = hostFor(provider)?.ads;
+   if (!module || module.capabilities.ads !== 'supported' || !ads || !await isPlatformEnabled(provider)) return null;
+-  return ads;
++  // Return a request-local host: concurrent locales and later Root saves cannot mutate
++  // the installed singleton. Keep the resolved engine for validation, consent and I/O.
++  return ads.configuredOperations ? { ...ads, operations: await ads.configuredOperations(locale) } : ads;
+ }
+ 
+ /** Enabled module-owned storage loader and analytics normalizer. */
+diff --git a/rebuild/tests/ads-ad-create-migration.test.ts b/rebuild/tests/ads-ad-create-migration.test.ts
+new file mode 100644
+index 00000000..700b2ed0
+--- /dev/null
++++ b/rebuild/tests/ads-ad-create-migration.test.ts
+@@ -0,0 +1,22 @@
++import { createHash } from 'node:crypto';
++import { readFileSync } from 'node:fs';
++import { describe, expect, it } from 'vitest';
++
++const migration = readFileSync('../prisma/migrations/20261031180000_rebuild_ads_ad_creation/migration.sql', 'utf8');
++const previous = readFileSync('../prisma/migrations/20261030110000_rebuild_ads_creative_creation/migration.sql', 'utf8');
++
++describe('additive ad.create journal migration', () => {
++  it('pins the reviewed SQL checksum', () => {
++    expect(createHash('sha256').update(migration).digest('hex')).toBe('1769fa24129e6d74119e84d0677a2baf0c935cb73a4e722ae0a443b7fbc7120f');
++  });
++
++  it('extends only the operation-kind CHECK and preserves all existing operations', () => {
++    const kinds = (sql: string) => [...sql.matchAll(/"operationType" IN \(([^)]+)\)/g)][0]![1]!.match(/'[^']+'/g)!;
++    expect(kinds(migration)).toEqual([...kinds(previous), "'ad.create'"]);
++    const sql = migration.replace(/--[^\n]*/g, '').trim();
++    expect(sql.split(';').filter(part => part.trim())).toHaveLength(2);
++    expect(sql).toContain('DROP CONSTRAINT ads_operations_operation_kind');
++    expect(sql).toContain('ADD CONSTRAINT ads_operations_operation_kind CHECK');
++    expect(sql).not.toMatch(/DROP (TABLE|INDEX)|DELETE FROM|UPDATE \w+ SET|INSERT INTO|TRUNCATE|NOT VALID/i);
++  });
++});
+diff --git a/rebuild/tests/ads-ad-create.test.ts b/rebuild/tests/ads-ad-create.test.ts
+index 62f25aeb..4b03a508 100644
+--- a/rebuild/tests/ads-ad-create.test.ts
++++ b/rebuild/tests/ads-ad-create.test.ts
+@@ -1,5 +1,6 @@
+ vi.mock('@/modules/ads/server/copy', async () => { const { defaultAdsCatalogs, customerText } = await import('../src/modules/ads/copy'); return { withAdsCopySnapshot: (operation: () => Promise<unknown>) => operation(), loadAdsCopy: async () => defaultAdsCatalogs, adsServiceText: async (key: Parameters<typeof customerText>[2]) => customerText(defaultAdsCatalogs.customer, 'en', key) }; });
+ import { beforeEach, describe, expect, it, vi } from 'vitest';
++import { createHash } from 'node:crypto';
+ 
+ const state = vi.hoisted(() => ({
+   prisma: {
+@@ -23,7 +24,7 @@ vi.mock('../src/server/platforms/resource-lock', () => ({ lockSelectedResources:
+ 
+ import { clearAdsOpsHosts, registerAdsOpsHost } from '../src/modules/ads/management/registry';
+ import { ADS_MANAGEMENT_DEFAULT_POLICY } from '../src/modules/ads/management/config';
+-import { describeAdsManagement, parseNeutralOperation, performAdsManagement, previewAdsManagement } from '../src/modules/ads/management/server';
++import { describeAdsManagement, parseNeutralOperation, performAdsManagement, previewAdsManagement, resolveAdsOperation, resolutionConfirmation, pendingRecoveryConfirmation } from '../src/modules/ads/management/server';
+ import { executeAdsManagementTool } from '../src/modules/ads/management/mcp';
+ import { defaultAdsCatalogs, localizeAdsMessage } from '../src/modules/ads/copy';
+ import type { AdsNeutralOperation, AdsOpsHost } from '../src/modules/ads/management/types';
+@@ -154,3 +155,60 @@ describe('missing advertising-changes grant', () => {
+     expect(defaultAdsCatalogs.customer.grantMissing.fr).toMatch(/Reconnectez/);
+   });
+ });
++
++
++describe('ad.create request replay and recovery', () => {
++  const input = { adAccountId: 'acc1', operation: adOp, confirmation: CONFIRM, requestId: 'request-0001' };
++  const requestHash = createHash('sha256').update(JSON.stringify({ adAccountId: 'acc1', operation: adOp })).digest('hex');
++  const duplicate = () => state.prisma.$executeRaw.mockRejectedValueOnce(new Error('23505 duplicate key'));
++  const recorded = (status: string, hash = requestHash) => state.prisma.$queryRaw.mockResolvedValue([{
++    id: 'op1', requestHash: hash, status, remoteId: status === 'succeeded' ? 'ad-existing' : null, operationType: 'ad.create', objectType: 'ad',
++  }]);
++
++  it('replays the recorded created identity without dispatching again', async () => {
++    duplicate(); recorded('succeeded');
++    await expect(performAdsManagement(actor, input)).resolves.toMatchObject({ outcome: 'succeeded', replay: true, created: { objectType: 'ad', remoteId: 'ad-existing' } });
++    expect(execute).not.toHaveBeenCalled();
++    expect(state.prisma.$queryRaw.mock.calls[0]).toEqual(expect.arrayContaining(['w1', 'u1', 'request-0001']));
++  });
++
++  it('refuses reuse of a request id for a different payload', async () => {
++    duplicate(); recorded('succeeded', 'different-payload');
++    await expect(performAdsManagement(actor, input)).rejects.toMatchObject({ code: 'conflict' });
++    expect(execute).not.toHaveBeenCalled();
++  });
++
++  it.each(['pending', 'uncertain', 'resolved_applied', 'resolved_not_applied'])('never resends a %s request or invents a created identity', async status => {
++    duplicate(); recorded(status);
++    if (status === 'pending') await expect(performAdsManagement(actor, input)).rejects.toMatchObject({ code: 'conflict' });
++    else {
++      const result = await performAdsManagement(actor, input);
++      expect(result).not.toHaveProperty('created');
++      expect(result.outcome).toBe(status === 'resolved_applied' ? 'succeeded' : status === 'resolved_not_applied' ? 'rejected' : 'uncertain');
++    }
++    expect(execute).not.toHaveBeenCalled();
++  });
++
++  it('holds an ambiguous provider timeout and a missing receipt', async () => {
++    execute.mockRejectedValueOnce(new Error('timeout'));
++    await expect(performAdsManagement(actor, input)).resolves.toMatchObject({ outcome: 'uncertain' });
++    expect(state.prisma.$executeRaw.mock.calls.some(call => call.includes('unknown_outcome'))).toBe(true);
++    execute.mockResolvedValueOnce({});
++    const result = await performAdsManagement(actor, { ...input, requestId: 'request-0002' });
++    expect(result.outcome).toBe('uncertain');
++    expect(result).not.toHaveProperty('created');
++    expect(state.prisma.$executeRaw.mock.calls.some(call => String(call[0]).includes('missing_remote_id'))).toBe(true);
++  });
++
++  it.each(['pending', 'uncertain'] as const)('reconciles a %s creation by exact attestation without a provider call', async status => {
++    state.prisma.$queryRaw.mockImplementation(async (strings: TemplateStringsArray) => /FOR UPDATE/.test(strings.join('?')) ? [{ status }] : [{
++      id: 'op1', adAccountId: 'acc1', actorId: 'u1', operationType: 'ad.create', objectType: 'ad', objectId: '@create-ad:s1', params: adOp, status,
++      remoteId: null, createdAt: new Date(), completedAt: null,
++    }]);
++    const confirmation = (status === 'pending' ? pendingRecoveryConfirmation : resolutionConfirmation)('op1', 'applied');
++    await expect(resolveAdsOperation(actor, { operationId: 'op1', resolution: 'applied', confirmation: 'yes' })).rejects.toMatchObject({ code: 'invalid_request' });
++    await expect(resolveAdsOperation(actor, { operationId: 'op1', resolution: 'applied', confirmation })).resolves.toMatchObject({ status: 'resolved_applied', recoveredPending: status === 'pending' });
++    expect(execute).not.toHaveBeenCalled();
++    expect(state.prisma.$executeRaw.mock.calls.some(call => call.includes('resolved_applied') && call.includes('w1'))).toBe(true);
++  });
++});
+diff --git a/rebuild/tests/ads-ledger74.integration.test.ts b/rebuild/tests/ads-ledger74.integration.test.ts
+index 630c4c88..473109a7 100644
+--- a/rebuild/tests/ads-ledger74.integration.test.ts
++++ b/rebuild/tests/ads-ledger74.integration.test.ts
+@@ -62,8 +62,8 @@ describe.skipIf(!databaseUrl)('Ads ledger constraints on isolated PostgreSQL', (
+     const rows = await tx.$queryRaw<Array<{ count: bigint }>>`SELECT COUNT(*)::bigint AS count FROM ads_management_operations WHERE "workspaceId"=${id}`;
+     expect(rows[0]?.count).toBe(BigInt(2));
+   }));
+-  it.each(['campaign', 'adset'] as const)('holds an ambiguous %s creation until explicit resolution', async kind => fixture(async (tx, id) => {
+-    const object = kind === 'campaign' ? '@create-campaign' : '@create-adset:parent-one';
++  it.each(['campaign', 'adset', 'ad'] as const)('holds an ambiguous %s creation until explicit resolution', async kind => fixture(async (tx, id) => {
++    const object = kind === 'campaign' ? '@create-campaign' : kind === 'adset' ? '@create-adset:parent-one' : '@create-ad:parent-one';
+     const operation = `${kind}.create`;
+     const create = (suffix: string, request: string) => tx.$executeRaw`INSERT INTO ads_management_operations (id,"workspaceId","adAccountId","actorId","requestId","requestHash","operationType","objectType","objectId",params,status) VALUES (${`${id}_${suffix}`},${id},${id},${id},${request},${'b'.repeat(64)},${operation},${kind},${object},'{}'::jsonb,'pending')`;
+     await create('first', 'creation-request-first');
+diff --git a/rebuild/tests/ads-runtime-host.test.ts b/rebuild/tests/ads-runtime-host.test.ts
+new file mode 100644
+index 00000000..22f3eba2
+--- /dev/null
++++ b/rebuild/tests/ads-runtime-host.test.ts
+@@ -0,0 +1,86 @@
++import { beforeEach, describe, expect, it, vi } from 'vitest';
++import type { PlatformAdsHost } from '@/server/platforms/host';
++import type { AdsOpsHost } from '@/modules/ads/management/types';
++const state = vi.hoisted(() => ({ config: vi.fn(), factory: vi.fn(), hosts: {} as Record<string, { ads: PlatformAdsHost }> }));
++vi.mock('@/server/config/store', () => ({ runtimeConfig: state.config, runtimeSecret: vi.fn() }));
++vi.mock('@/platforms', async importOriginal => ({ ...await importOriginal<typeof import('@/platforms')>(), PLATFORM_MODULES: [], platformModule: (id: string) => id === 'testnet' ? { enabledKey: 'testnet.enabled', capabilities: { ads: 'supported' } } : null }));
++vi.mock('@/server/platforms/index', () => ({ PLATFORM_HOSTS: state.hosts }));
++import { platformAds } from '@/server/platforms/registry';
++import { platformAdsLocale, withPlatformAdsLocale } from '@/server/platforms/ads-locale';
++import { withAdsErrorBoundary, adsErrorResponse } from '@/modules/ads/server/errors';
++import { adsServiceText } from '@/modules/ads/server/copy';
++import { defaultAdsCatalogs, bilingualCatalog } from '@/modules/ads/copy';
++import { configuredFacebookAdsOps } from '@/platforms/facebook/ads-ops';
++import { FACEBOOK_ADS_COPY } from '@/platforms/facebook/ads-copy';
++import { OperationError } from '@/lib/operation-error';
++import { AdsNoDispatchError } from '@/modules/ads/management/errors';
++
++beforeEach(() => {
++  vi.clearAllMocks();
++  state.config.mockResolvedValue(true);
++  state.hosts.testnet = { ads: { configuredOperations: state.factory } as unknown as PlatformAdsHost };
++});
++
++describe('configured Ads factory through the neutral host', () => {
++  it('resolves current copy for both locales without mutating the installed host', async () => {
++    const copy = structuredClone(FACEBOOK_ADS_COPY);
++    copy.adCreateLabel.en = 'Add an advertisement';
++    copy.adCreateLabel.fr = 'Ajouter une publicité';
++    state.config.mockImplementation(async (key: string) => key === 'meta.adsCopy' ? structuredClone(copy) : true);
++    state.factory.mockImplementation(configuredFacebookAdsOps);
++    const [en, fr] = await Promise.all([platformAds('testnet', 'en'), platformAds('testnet', 'fr')]);
++    expect(en?.operations?.operations.find(item => item.id === 'ad.create')?.label).toBe(copy.adCreateLabel.en);
++    expect(fr?.operations?.operations.find(item => item.id === 'ad.create')?.label).toBe(copy.adCreateLabel.fr);
++    expect(state.hosts.testnet!.ads.operations).toBeUndefined();
++    const operation = { type: 'ad.create', objectType: 'ad', parentId: 'set1', name: 'Spring', creativeId: 'creative1' } as const;
++    expect(fr?.operations?.confirmation(operation, { adAccountId: 'account1', currency: null })).toContain('AVEC LE VISUEL creative1');
++    expect(() => fr?.operations?.validate({ ...operation, name: '' })).toThrow('caractères imprimables');
++    copy.adCreateLabel.fr = 'Nouvelle annonce';
++    expect((await platformAds('testnet', 'fr'))?.operations?.operations.find(item => item.id === 'ad.create')?.label).toBe('Nouvelle annonce');
++  });
++
++  it('carries isolated locale scopes through nested service calls', async () => {
++    state.factory.mockImplementation(async locale => ({ provider: locale } as AdsOpsHost));
++    const run = (locale: 'en' | 'fr') => withAdsErrorBoundary(async () => {
++      await Promise.resolve();
++      return withAdsErrorBoundary(async () => (await platformAds('testnet'))?.operations?.provider);
++    }, locale);
++    expect(await Promise.all([run('fr'), run('en')])).toEqual(['fr', 'en']);
++    expect(platformAdsLocale()).toBe('en');
++    await expect(withPlatformAdsLocale('fr', async () => { throw new Error('failure'); })).rejects.toThrow('failure');
++    expect(platformAdsLocale()).toBe('en');
++  });
++
++  it('does not resolve factories for disabled or unknown modules', async () => {
++    state.config.mockResolvedValue(false);
++    expect(await platformAds('testnet', 'fr')).toBeNull();
++    expect(await platformAds('unknown', 'fr')).toBeNull();
++    expect(state.factory).not.toHaveBeenCalled();
++  });
++
++  it('never falls back to static copy after a configured factory fails', async () => {
++    state.hosts.testnet!.ads.operations = { provider: 'static' } as AdsOpsHost;
++    state.factory.mockRejectedValueOnce(new Error('copy unavailable'));
++    await expect(platformAds('testnet', 'fr')).rejects.toThrow('copy unavailable');
++  });
++
++  it('keeps modules without a factory compatible', async () => {
++    delete state.hosts.testnet!.ads.configuredOperations;
++    expect(await platformAds('testnet')).toBe(state.hosts.testnet!.ads);
++  });
++});
++
++describe('Ads service runtime locale', () => {
++  it('uses the same Root locale for service messages and no-dispatch error responses', async () => {
++    const catalogs = structuredClone(defaultAdsCatalogs);
++    catalogs.customer.service011 = { en: 'Choose an account.', fr: 'Choisissez votre compte publicitaire.' };
++    state.config.mockImplementation(async (key: string) => ({ 'ads.customerCopy': catalogs.customer, 'ads.analysisCopy': bilingualCatalog(catalogs.analysis), 'ads.creativeCopy': bilingualCatalog(catalogs.creative) })[key]);
++    await withPlatformAdsLocale('fr', async () => {
++      expect(await adsServiceText('service011')).toBe(catalogs.customer.service011.fr);
++      const error = new AdsNoDispatchError('invalid_request', catalogs.customer.service011.en);
++      await expect(withAdsErrorBoundary(async () => { throw error; })).rejects.toMatchObject({ message: catalogs.customer.service011.fr });
++      const response = await adsErrorResponse(new OperationError('invalid_request', catalogs.customer.service011.en), 'invalid');
++      expect(await response.json()).toMatchObject({ code: 'invalid_request', error: catalogs.customer.service011.fr });
++    });
++  });
++});

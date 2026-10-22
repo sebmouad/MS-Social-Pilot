@@ -1,0 +1,1018 @@
+diff --git a/rebuild/docs/LEGACY_CAPABILITY_PARITY.md b/rebuild/docs/LEGACY_CAPABILITY_PARITY.md
+index 1cb304d6..441f279a 100644
+--- a/rebuild/docs/LEGACY_CAPABILITY_PARITY.md
++++ b/rebuild/docs/LEGACY_CAPABILITY_PARITY.md
+@@ -21,7 +21,7 @@ a manifest, saved setting or unit test is not complete workflow proof. See
+ | P1 | Post list filters, saved views, pagination, bulk actions, retry/duplicate, CSV export and public Posts v1 API in `src/app/(app)/posts/page.tsx` and `src/app/api/posts` | Partial: scoped lists/search/paging/views/export and bulk actions share services; key REST v1 Posts includes scheduling. Large asynchronous Posts CSV is absent (workspace ZIP is different); draft aliases and v1 create now share confirmed lifecycle boundaries (`acb56bd7`); real client outcomes remain unverified. Missing-image fallback and saved-view expired-session feedback are source/unit fixes (`36946d9e`), without browser rerun. | Full list/action/API parity with workspace authorization and large-data pagination tests. |
+ | P1 | Publishing calendar navigation and month coverage in `src/app/(app)/calendar` | Partial: Month/Week/phone agenda, workspace-day grouping, previews, saved views and drag/keyboard moves exist. Shared lifecycle supports adapter-held cancel/reschedule. Calendar editing, queue-slot presentation, high-volume months and actual drag/remote-schedule browser/provider evidence remain open. | Browser and database tests with records on timezone and month boundaries, high-volume month, permissions, drag-and-drop E2E, and edit workflows. |
+ | P1 | Inbox assignment, private notes, saved replies, moderation rules, comment deletion and full discovery in `src/lib/inbox.ts` and `src/app/api/inbox` | Partial: scoped conversations/comments/nested replies/reviews, sync/actions/recovery, assignment/notes/replies and moderation rules exist. New quick filters, stored contact/sentiment details, bulk actions, replies drawer and shortcuts have mocked/DOM tests. Contact REST and bulk UI/REST/MCP exist (`f5c21c96`). Facebook Inbox reads now fetch before the locked write phase (`e0584777`); write-time scope/binding checks remain. Complete discovery/backfill, attachments/participants and live moderation remain open. | Multi-user assignment, notes, moderation log/undo, all relevant posts/reviews, and provider/MCP tests. |
+-| P1 | Image/video media library, import, usage/quota, holder attribution and stream/raw delivery in `src/lib/media.ts` | Partial: modules/media owns images/videos/search/usage/holders/quota, guarded import and delete with UI/REST/MCP. Round 9 adds confirmed database-backed asset rename via the shared service, bilingual UI/server action and MCP; the tested module HTTP handler still needs a PATCH re-export in the app route outside worker ownership. Stored images without metadata cannot be renamed. Thumbnails and real video/storage/browser workflows still need completion or proof. Reference/export completeness needs actual-data checks. | Video upload/library, imports, quotas, usage and reference display, secure retrieval/deletion tests. |
++| P1 | Image/video media library, import, usage/quota, holder attribution and stream/raw delivery in `src/lib/media.ts` | Partial: modules/media owns images/videos/search/usage/holders/quota, guarded import and delete with UI/REST/MCP. Round 11 adds still-WebP URL import converted to PNG, durable/searchable imported-image names, and first-rename metadata for uploaded/stored images through shared UI/REST/MCP services. Canonical image metadata reuses media rows without double-counting storage; the existing PATCH route is present and mapped. Root media.webpImportPolicy bounds conversion, with EN/FR guidance/errors. TypeScript and 78 focused tests (including parity guard, real WebP conversion, mocked services/HTTP and jsdom) pass locally; PostgreSQL, browser and actual client proof remain open. Older image-delete/orphan-cleanup paths still need metadata cleanup integration. Thumbnails and real video/storage/browser workflows still need completion or proof. Reference/export completeness needs actual-data checks. | Video upload/library, imports, quotas, usage and reference display, secure retrieval/deletion tests. |
+ | P1 | Connections for Groups, Instagram and other networks, token health and lifecycle callbacks in `src/app/(app)/connections/page.tsx` and `src/app/api/facebook` | Partial: Facebook Page/ad-account discovery, selection, stored health, reconnect and retain/delete exist. OAuth startup including compatibility route shares service; batch selection UI/REST/MCP share confirmed wrapper. Single selection/disconnect confirmations differ. New Instagram/Group adapters and provider lifecycle/revocation proof remain absent. | Channel/ad-account selection, token/grant status, remote lifecycle callbacks, retain/delete semantics and complete provider discovery. |
+ | P1 | Ads comparison/trends, findings, sorting, export and freshness in `src/app/(app)/ads/page.tsx`, `src/lib/ads-analysis.ts` | Partial: comparison/trends/findings, rows/export/freshness, hierarchy/charts, directory and durable campaign/ad-set/paused-ad/creative management exist through session API/MCP and key REST v1, with a reconnect notice when the `ads_management` grant is absent (`46c6bdae`, mocked evidence). Management is off by default; the `ad.create` ledger CHECK migration (`20261031180000_rebuild_ads_ad_creation`) is authored and recorded applied in production (owner/integrator), while the Ads runtime copy locale is not yet passed by the UI/REST/MCP entry points. Live management grants, paused creation/cleanup and exhaustive reporting outcomes remain unproven. | Date/account-scoped trends, deltas, findings, CSV, coverage and live sync checks. |
+ | P0 | Root users, workspaces, plans, registration, connections, errors, worker, backups, privileges and audit console in `src/app/(root)/root` and `src/app/api/root` | Partial: grouped settings/stored health/diagnostics, users/workspaces/plans/privileges/audit/errors/sessions, lifecycle, installation transfer, registration MCP and connection refresh/disconnect-with-delete exist. All 48 private Root REST inventory exceptions are replaced by 51 mapped tools, including workspace create/rename and directory GET (`8f423ec7`); workspace, directory, configuration-save and error-resolution services now own actor checks and confirmations (`46c6bdae`, mocked evidence). Backups page is read-only. Complete operations/configuration and real installation-transfer/production-volume evidence remain open. | Role-guarded operator UI/API for each function, with change audit and isolated production-shaped checks. |
+diff --git a/rebuild/docs/MCP_PARITY.md b/rebuild/docs/MCP_PARITY.md
+index 0850ad35..d0fd3cb3 100644
+--- a/rebuild/docs/MCP_PARITY.md
++++ b/rebuild/docs/MCP_PARITY.md
+@@ -346,10 +346,10 @@ live catalog inside the test or add a blanket exclusion to make it pass.
+ | delete_inbox_moderation_rule | inbox/conversations | write | POST /api/inbox/moderation | Shared customer operation; transport arguments may differ. |
+ | run_inbox_moderation_rules | inbox/conversations | write | POST /api/inbox/moderation | Shared customer operation; transport arguments may differ. |
+ | undo_inbox_moderation_action | inbox/conversations | write | POST /api/inbox/moderation | Shared customer operation; transport arguments may differ. |
+-| list_media_library | publishing/media | read | GET /api/media-library | Shared customer operation; transport arguments may differ. |
+-| import_media_from_url | publishing/media | write | POST /api/media-library | Shared customer operation; transport arguments may differ. |
++| list_media_library | publishing/media | read | GET /api/media-library | Shared readLibrary service includes saved image names in display/search; canonical image metadata is excluded from duplicate quota totals. Local query-shape/mocked evidence; PostgreSQL/client proof open. |
++| import_media_from_url | publishing/media | write | POST /api/media-library | Shared confirmed importFromUrl persists image names and converts still WebP to PNG under media.webpImportPolicy. UI submits this REST route; EN/FR guidance, real decoder and mocked host evidence only. |
+ | delete_media_asset | publishing/media | write | DELETE /api/media-library/[id] | Shared customer operation; transport arguments may differ. |
+-| rename_media_asset | publishing/media | write | PATCH /api/media-library/[id] | Shared customer operation; transport arguments may differ. |
++| rename_media_asset | publishing/media | write | PATCH /api/media-library/[id] | Shared confirmed renameAsset handles library rows and stored images, creating metadata on first rename. Service repeats all-channel authorization under lock and audits without names; UI action/actual PATCH/MCP mapping tests pass. Real database/client proof open. |
+ | list_content_feeds | publishing/feeds | read | GET /api/feeds | Shared customer operation; transport arguments may differ. |
+ | create_content_feed | publishing/feeds | write | POST /api/feeds | Shared customer operation; transport arguments may differ. |
+ | update_content_feed | publishing/feeds | write | PUT /api/feeds/[id] | Shared customer operation; transport arguments may differ. |
+diff --git a/rebuild/premium-audit.json b/rebuild/premium-audit.json
+new file mode 100644
+index 00000000..cdcad133
+--- /dev/null
++++ b/rebuild/premium-audit.json
+@@ -0,0 +1,320 @@
++{
++  "findings": [
++    {
++      "category": "violation",
++      "file": "src/components/Button.tsx",
++      "line": 11,
++      "message": "Enabled literal button has no detectable action or submit behavior.",
++      "remediation": "Connect the button to a real action, make it a submit button, or disable/remove it.",
++      "ruleId": "affordance.actionless-button",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/app/agency/AgencyFilters.tsx",
++      "line": 17,
++      "message": "Application-owned form does not declare its validation owner.",
++      "remediation": "Add noValidate/novalidate and implement the canonical validation contract.",
++      "ruleId": "form.novalidate-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/app/agency/AgencyFilters.tsx",
++      "line": 30,
++      "message": "Application-owned form does not declare its validation owner.",
++      "remediation": "Add noValidate/novalidate and implement the canonical validation contract.",
++      "ruleId": "form.novalidate-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/app/analytics/explorer/sidebar.tsx",
++      "line": 10,
++      "message": "Application-owned form does not declare its validation owner.",
++      "remediation": "Add noValidate/novalidate and implement the canonical validation contract.",
++      "ruleId": "form.novalidate-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/app/media/MediaLibrary.tsx",
++      "line": 56,
++      "message": "Application-owned form does not declare its validation owner.",
++      "remediation": "Add noValidate/novalidate and implement the canonical validation contract.",
++      "ruleId": "form.novalidate-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/app/password-recovery/recovery-form.tsx",
++      "line": 63,
++      "message": "Application-owned form does not declare its validation owner.",
++      "remediation": "Add noValidate/novalidate and implement the canonical validation contract.",
++      "ruleId": "form.novalidate-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/app/password-recovery/recovery-form.tsx",
++      "line": 69,
++      "message": "Application-owned form does not declare its validation owner.",
++      "remediation": "Add noValidate/novalidate and implement the canonical validation contract.",
++      "ruleId": "form.novalidate-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/app/publishing/collaboration/BulkLabels.tsx",
++      "line": 45,
++      "message": "Application-owned form does not declare its validation owner.",
++      "remediation": "Add noValidate/novalidate and implement the canonical validation contract.",
++      "ruleId": "form.novalidate-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/app/publishing/labels/LabelManager.tsx",
++      "line": 78,
++      "message": "Application-owned form does not declare its validation owner.",
++      "remediation": "Add noValidate/novalidate and implement the canonical validation contract.",
++      "ruleId": "form.novalidate-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/app/publishing/templates/TemplateManager.tsx",
++      "line": 72,
++      "message": "Application-owned form does not declare its validation owner.",
++      "remediation": "Add noValidate/novalidate and implement the canonical validation contract.",
++      "ruleId": "form.novalidate-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/app/root/errors/page.tsx",
++      "line": 21,
++      "message": "Application-owned form does not declare its validation owner.",
++      "remediation": "Add noValidate/novalidate and implement the canonical validation contract.",
++      "ruleId": "form.novalidate-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/app/root/privileges/page.tsx",
++      "line": 25,
++      "message": "Application-owned form does not declare its validation owner.",
++      "remediation": "Add noValidate/novalidate and implement the canonical validation contract.",
++      "ruleId": "form.novalidate-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/app/settings/api-access/connect/ConnectForm.tsx",
++      "line": 16,
++      "message": "Application-owned form does not declare its validation owner.",
++      "remediation": "Add noValidate/novalidate and implement the canonical validation contract.",
++      "ruleId": "form.novalidate-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/app/settings/bio/BioManager.tsx",
++      "line": 43,
++      "message": "Application-owned form does not declare its validation owner.",
++      "remediation": "Add noValidate/novalidate and implement the canonical validation contract.",
++      "ruleId": "form.novalidate-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/app/settings/notifications/NotificationCenter.tsx",
++      "line": 118,
++      "message": "Application-owned form does not declare its validation owner.",
++      "remediation": "Add noValidate/novalidate and implement the canonical validation contract.",
++      "ruleId": "form.novalidate-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/app/settings/sharing/LinksManager.tsx",
++      "line": 173,
++      "message": "Application-owned form does not declare its validation owner.",
++      "remediation": "Add noValidate/novalidate and implement the canonical validation contract.",
++      "ruleId": "form.novalidate-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/app/settings/workspace/policy-form.tsx",
++      "line": 16,
++      "message": "Application-owned form does not declare its validation owner.",
++      "remediation": "Add noValidate/novalidate and implement the canonical validation contract.",
++      "ruleId": "form.novalidate-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/app/share/[token]/ReviewActions.tsx",
++      "line": 24,
++      "message": "Application-owned form does not declare its validation owner.",
++      "remediation": "Add noValidate/novalidate and implement the canonical validation contract.",
++      "ruleId": "form.novalidate-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/app/tasks/TaskBoard.tsx",
++      "line": 166,
++      "message": "Application-owned form does not declare its validation owner.",
++      "remediation": "Add noValidate/novalidate and implement the canonical validation contract.",
++      "ruleId": "form.novalidate-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/app/tasks/TaskBoard.tsx",
++      "line": 193,
++      "message": "Application-owned form does not declare its validation owner.",
++      "remediation": "Add noValidate/novalidate and implement the canonical validation contract.",
++      "ruleId": "form.novalidate-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/app/tasks/TaskFilters.tsx",
++      "line": 11,
++      "message": "Application-owned form does not declare its validation owner.",
++      "remediation": "Add noValidate/novalidate and implement the canonical validation contract.",
++      "ruleId": "form.novalidate-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/app/ads/objects/ChangeHistory.tsx",
++      "line": 77,
++      "message": "Literal product textarea does not show evidence of the canonical resize-none rule.",
++      "remediation": "Use the shared Textarea owner or apply resize-none/resize: none with adequate height or auto-grow behavior.",
++      "ruleId": "form.textarea-resize-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/app/feeds/FeedManager.tsx",
++      "line": 85,
++      "message": "Literal product textarea does not show evidence of the canonical resize-none rule.",
++      "remediation": "Use the shared Textarea owner or apply resize-none/resize: none with adequate height or auto-grow behavior.",
++      "ruleId": "form.textarea-resize-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/app/publishing/templates/TemplateManager.tsx",
++      "line": 85,
++      "message": "Literal product textarea does not show evidence of the canonical resize-none rule.",
++      "remediation": "Use the shared Textarea owner or apply resize-none/resize: none with adequate height or auto-grow behavior.",
++      "ruleId": "form.textarea-resize-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/app/publishing/templates/TemplateManager.tsx",
++      "line": 86,
++      "message": "Literal product textarea does not show evidence of the canonical resize-none rule.",
++      "remediation": "Use the shared Textarea owner or apply resize-none/resize: none with adequate height or auto-grow behavior.",
++      "ruleId": "form.textarea-resize-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/app/publishing/templates/TemplateManager.tsx",
++      "line": 87,
++      "message": "Literal product textarea does not show evidence of the canonical resize-none rule.",
++      "remediation": "Use the shared Textarea owner or apply resize-none/resize: none with adequate height or auto-grow behavior.",
++      "ruleId": "form.textarea-resize-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/app/settings/sharing/LinksManager.tsx",
++      "line": 179,
++      "message": "Literal product textarea does not show evidence of the canonical resize-none rule.",
++      "remediation": "Use the shared Textarea owner or apply resize-none/resize: none with adequate height or auto-grow behavior.",
++      "ruleId": "form.textarea-resize-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/app/share/[token]/ReviewActions.tsx",
++      "line": 26,
++      "message": "Literal product textarea does not show evidence of the canonical resize-none rule.",
++      "remediation": "Use the shared Textarea owner or apply resize-none/resize: none with adequate height or auto-grow behavior.",
++      "ruleId": "form.textarea-resize-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/app/tasks/TaskBoard.tsx",
++      "line": 169,
++      "message": "Literal product textarea does not show evidence of the canonical resize-none rule.",
++      "remediation": "Use the shared Textarea owner or apply resize-none/resize: none with adequate height or auto-grow behavior.",
++      "ruleId": "form.textarea-resize-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/app/tasks/TaskBoard.tsx",
++      "line": 195,
++      "message": "Literal product textarea does not show evidence of the canonical resize-none rule.",
++      "remediation": "Use the shared Textarea owner or apply resize-none/resize: none with adequate height or auto-grow behavior.",
++      "ruleId": "form.textarea-resize-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/app/tasks/TaskBoard.tsx",
++      "line": 224,
++      "message": "Literal product textarea does not show evidence of the canonical resize-none rule.",
++      "remediation": "Use the shared Textarea owner or apply resize-none/resize: none with adequate height or auto-grow behavior.",
++      "ruleId": "form.textarea-resize-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/components/AutoTextarea.tsx",
++      "line": 42,
++      "message": "Literal product textarea does not show evidence of the canonical resize-none rule.",
++      "remediation": "Use the shared Textarea owner or apply resize-none/resize: none with adequate height or auto-grow behavior.",
++      "ruleId": "form.textarea-resize-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/modules/inbox/components/ThreadProductivity.tsx",
++      "line": 32,
++      "message": "Literal product textarea does not show evidence of the canonical resize-none rule.",
++      "remediation": "Use the shared Textarea owner or apply resize-none/resize: none with adequate height or auto-grow behavior.",
++      "ruleId": "form.textarea-resize-missing",
++      "severity": "error"
++    },
++    {
++      "category": "violation",
++      "file": "src/modules/inbox/components/ThreadProductivity.tsx",
++      "line": 35,
++      "message": "Literal product textarea does not show evidence of the canonical resize-none rule.",
++      "remediation": "Use the shared Textarea owner or apply resize-none/resize: none with adequate height or auto-grow behavior.",
++      "ruleId": "form.textarea-resize-missing",
++      "severity": "error"
++    }
++  ],
++  "mode": "strict",
++  "projectRoot": "/Users/mouad/Documents/ChatGPT/MS Social Pilot/app/rebuild",
++  "schemaVersion": 1,
++  "summary": {
++    "errors": 34,
++    "total": 34,
++    "unresolved": 0,
++    "violations": 34,
++    "warnings": 0
++  }
++}
+diff --git a/rebuild/src/modules/media/ROUND11.md b/rebuild/src/modules/media/ROUND11.md
+new file mode 100644
+index 00000000..afb82e48
+--- /dev/null
++++ b/rebuild/src/modules/media/ROUND11.md
+@@ -0,0 +1,62 @@
++# Round 11: stored-image names and still WebP import
++
++Ownership: src/modules/media, focused tests, the media inventory status cell and
++three MCP_PARITY rows. Three remaining media workflow slices reuse the existing
++shared services: still-WebP imports, persistent imported-image names (including
++search after refresh), and rename for stored/uploaded images without metadata.
++This does not complete the media or overall legacy inventory.
++
++The library UI submits imports to POST /api/media-library; MCP
++import_media_from_url enters the same importFromUrl service. The existing UI
++server action, PATCH /api/media-library/[id] and rename_media_asset enter
++renameAsset. GET /api/media-library and list_media_library share readLibrary.
++No route re-export is needed: the actual PATCH route already exists in this tree.
++Service confirmations, current authorization, workspace lock, write-time actor
++checks and transactional audit remain authoritative. Rename needs all-channel
++access; audit records asset identity without customer file names.
++
++Still WebP is converted to PNG because workspace image storage accepts
++JPEG/PNG/GIF. Bytes determine format. Animated WebP is refused. Root owns the
++new typed media.webpImportPolicy object: enabled, maxPixels, maxConcurrent
++(per process), timeoutMs, maxOutputBytes. A timed-out native conversion retains
++its permit until work settles. Converted bytes determine quota, stored metadata
++and the import receipt. The image storage service also enforces its own MIME
++and upload limits; enabling conversion cannot bypass them. EN/FR Root catalogs
++explain conversion and refusal. CONFIG_SCHEMA_VERSION is intentionally unchanged.
++
++Canonical stored-image names use media rows with id equal to the image UUID,
++url media:<UUID>, image kind and null storageKey. These rows have workspace FK
++ownership, original file size/MIME/date and no duplicate bytes. The file listing
++remains authoritative for presence, usage and age. The library excludes name
++rows from database quota/count totals and reads names for the bounded image
++listing before applying search. Missing files do not appear merely because a
++name row remains. Upsert refuses a collision with another workspace, a derived
++record or a noncanonical record. Rename does not move or rewrite attachments.
++Library deletion removes its metadata in the same transaction as its audit.
++
++Evidence: rebuild TypeScript passes with zero errors. 78 focused tests across
++media-library-service, media-library-module, media-library-net,
++media-rename-entrypoints, media-webp-policy, media-round11-ui and parity-guard
++pass with --no-cache. Tests include a real Sharp still-WebP round trip, final-byte
++quota enforcement, policy/output/pixel/animation refusal, timed-out permit
++retention, scoped SQL shapes, shared actual REST/MCP/action mapping, bilingual
++guidance, failed rename input retention and refreshed names without remounting.
++Mocks do not prove PostgreSQL execution, transaction rollback or cross-process
++concurrency. jsdom does not prove browser layout, keyboard or download behavior.
++
++Outside-owned-path integration follow-ups:
++
++- Integrator bumps CONFIG_SCHEMA_VERSION for media.webpImportPolicy and changed
++  media.copy/media.messages catalogs, and records this batch in ARCHITECTURE.md,
++  DELIVERY_PLAN.md and AGENT_HANDOFF.md.
++- Publishing owner should remove canonical name metadata after confirmed removal
++  via DELETE /api/media/[id], delete_workspace_image and orphan cleanup. Those
++  older image services bypass this module. Until integrated, metadata may outlive
++  a removed file; it is hidden by the library and excluded from its quota.
++- Verify export/erasure with real data, including canonical name rows and image
++  files. Existing media-table ownership is reused; export completeness is not
++  established here. Existing raw image listings do not expose these saved names.
++
++No migration, server, whole suite, deploy, push, production operation or commit.
++Changes remain in this worker's working tree. Existing untracked dependency links
++and premium-audit.json were not changed.
+diff --git a/rebuild/src/modules/media/config.ts b/rebuild/src/modules/media/config.ts
+index 3405a8e7..e39f2fe4 100644
+--- a/rebuild/src/modules/media/config.ts
++++ b/rebuild/src/modules/media/config.ts
+@@ -24,7 +24,13 @@ export const VIDEO_MIME_CHOICES = ['video/mp4', 'video/quicktime', 'video/webm']
+ const int = (range: { min: number; max: number }) => z.number().int().min(range.min).max(range.max);
+ const G = 'Media library';
+ 
++export const webpImportPolicySchema = z.object({
++  enabled: z.boolean(), maxPixels: z.number().int().min(1).max(100000000),
++  maxConcurrent: z.number().int().min(1).max(8), timeoutMs: z.number().int().min(100).max(300000),
++  maxOutputBytes: z.number().int().min(1).max(104857600),
++}).strict();
+ export const MEDIA_CONFIG = [
++  entry({ key: 'media.webpImportPolicy', group: G, label: 'WebP import conversion', kind: 'json', description: 'Convert still WebP imports to PNG for workspace image storage. Animated WebP is refused. Bounds cover decoded pixels, concurrent conversions per process, elapsed time and encoded output bytes.', defaultValue: { enabled: true, maxPixels: 16000000, maxConcurrent: 2, timeoutMs: 10000, maxOutputBytes: 26214400 }, schema: webpImportPolicySchema, consumption: 'active' }),
+   entry({ key: 'media.libraryPageSize', group: G, label: 'Library page size', kind: 'number', description: 'Assets listed on one media library page.', defaultValue: MEDIA_DEFAULTS.pageSize, schema: int(MEDIA_BOUNDS.pageSize), consumption: 'active' }),
+   entry({ key: 'media.workspaceQuotaBytes', group: G, label: 'Workspace storage quota (bytes)', kind: 'number', description: 'Total stored media bytes one workspace may hold; imports beyond it are refused.', defaultValue: MEDIA_DEFAULTS.workspaceQuotaBytes, schema: int(MEDIA_BOUNDS.workspaceQuotaBytes), consumption: 'active' }),
+   entry({ key: 'media.videoMaxBytes', group: G, label: 'Maximum video size (bytes)', kind: 'number', description: 'Largest single video accepted into the library. A publishing provider may enforce a lower limit.', defaultValue: MEDIA_DEFAULTS.videoMaxBytes, schema: int(MEDIA_BOUNDS.videoMaxBytes), consumption: 'active' }),
+diff --git a/rebuild/src/modules/media/copy.ts b/rebuild/src/modules/media/copy.ts
+index 16ddfd7f..1f453db4 100644
+--- a/rebuild/src/modules/media/copy.ts
++++ b/rebuild/src/modules/media/copy.ts
+@@ -53,13 +53,14 @@ export const mediaCopy = {
+     next: 'Next page',
+     page: 'Page {page}',
+     importTitle: 'Import media',
+-    importDescription: 'Only public https addresses are fetched. The file is checked for type, size and your storage limit before it is saved.',
++    importDescription: 'Only public https addresses are fetched. The file is checked for type, size and your storage limit before it is saved. Still WebP images are saved as PNG; animated WebP is not supported. Names are kept for library search.',
+     importAddress: 'Web address',
+     importName: 'Name (optional)',
+     importConfirm: 'Type {phrase} to confirm',
+     importAction: 'Import',
+     importing: 'Importing…',
+     imported: 'Imported.',
++    importedConverted: 'Imported. The WebP image was saved as PNG.',
+     importUnknown: 'The import result is unknown. Refresh the library to check before retrying.',
+     cancel: 'Cancel',
+     deleteTitle: 'Delete media',
+@@ -128,13 +129,14 @@ export const mediaCopy = {
+     next: 'Page suivante',
+     page: 'Page {page}',
+     importTitle: 'Importer un média',
+-    importDescription: 'Seules les adresses https publiques sont récupérées. Le fichier est contrôlé (type, taille, espace disponible) avant d’être enregistré.',
++    importDescription: 'Seules les adresses https publiques sont récupérées. Le fichier est contrôlé (type, taille, espace disponible) avant d’être enregistré. Les images WebP fixes sont enregistrées au format PNG ; les WebP animés ne sont pas pris en charge. Les noms sont conservés pour la recherche.',
+     importAddress: 'Adresse web',
+     importName: 'Nom (facultatif)',
+     importConfirm: 'Saisissez {phrase} pour confirmer',
+     importAction: 'Importer',
+     importing: 'Importation…',
+     imported: 'Importé.',
++    importedConverted: 'Importé. L’image WebP a été enregistrée au format PNG.',
+     importUnknown: 'Le résultat de l’importation est inconnu. Actualisez la médiathèque pour vérifier avant de réessayer.',
+     cancel: 'Annuler',
+     deleteTitle: 'Supprimer le média',
+diff --git a/rebuild/src/modules/media/library.ts b/rebuild/src/modules/media/library.ts
+index 61084043..59d9000e 100644
+--- a/rebuild/src/modules/media/library.ts
++++ b/rebuild/src/modules/media/library.ts
+@@ -43,6 +43,7 @@ export function sniffMedia(bytes: Uint8Array): Sniffed | null {
+   if (b.length >= 3 && b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return { kind: 'image', mimeType: 'image/jpeg' };
+   if (b.length >= 8 && b.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))) return { kind: 'image', mimeType: 'image/png' };
+   if (b.length >= 6 && ['GIF87a', 'GIF89a'].includes(b.toString('ascii', 0, 6))) return { kind: 'image', mimeType: 'image/gif' };
++  if (b.length >= 12 && b.toString('ascii', 0, 4) === 'RIFF' && b.toString('ascii', 8, 12) === 'WEBP') return { kind: 'image', mimeType: 'image/webp' };
+   if (b.length >= 12 && b.toString('ascii', 4, 8) === 'ftyp') return { kind: 'video', mimeType: b.toString('ascii', 8, 12) === 'qt  ' ? 'video/quicktime' : 'video/mp4' };
+   if (b.length >= 4 && b[0] === 0x1a && b[1] === 0x45 && b[2] === 0xdf && b[3] === 0xa3) return { kind: 'video', mimeType: 'video/webm' };
+   return null;
+diff --git a/rebuild/src/modules/media/manifest.ts b/rebuild/src/modules/media/manifest.ts
+index f7bf5e2f..cc1a1072 100644
+--- a/rebuild/src/modules/media/manifest.ts
++++ b/rebuild/src/modules/media/manifest.ts
+@@ -11,7 +11,7 @@ export const MEDIA_PAGES = [
+ 
+ /** Must equal the keys of MEDIA_CONFIG (checked by tests/media-library-module.test.ts). */
+ export const MEDIA_ROOT_KEYS = [
+-  'media.copy', 'media.messages', 'media.libraryPageSize', 'media.workspaceQuotaBytes', 'media.videoMaxBytes', 'media.allowedVideoMimeTypes', 'media.importMaxBytes',
++  'media.webpImportPolicy', 'media.copy', 'media.messages', 'media.libraryPageSize', 'media.workspaceQuotaBytes', 'media.videoMaxBytes', 'media.allowedVideoMimeTypes', 'media.importMaxBytes',
+   'media.importTimeoutMs', 'media.importMaxRedirects', 'media.importAllowHttp', 'media.importHostAllowlist', 'media.holderScanLimit',
+   'media.holderListLimit', 'media.imageListLimit', 'media.holderExcerptCharacters', 'media.identifierMaxCharacters', 'media.pageNumberMax', 'media.importUrlMaxCharacters', 'media.assetNameMaxCharacters', 'media.searchMaxCharacters', 'media.transactionTimeoutMs', 'media.transactionMaxWaitMs',
+ ] as const;
+diff --git a/rebuild/src/modules/media/mcp.ts b/rebuild/src/modules/media/mcp.ts
+index 14481dff..c0230981 100644
+--- a/rebuild/src/modules/media/mcp.ts
++++ b/rebuild/src/modules/media/mcp.ts
+@@ -6,16 +6,16 @@ import { MEDIA_FEATURE_ID } from './manifest';
+ import { MEDIA_BOUNDS } from './config';
+ 
+ export const mediaToolDefinitions = [
+-  { name: 'rename_media_asset', description: 'Rename a database-backed library image or video without changing attachments. Requires all-channel access. Confirmation: RENAME MEDIA <id>. Stored image files without library metadata cannot be renamed.', inputSchema: { type: 'object', required: ['id', 'name', 'confirmation'], properties: { id: { type: 'string', maxLength: MEDIA_BOUNDS.identifierMaxCharacters.max }, name: { type: 'string', minLength: 1, maxLength: MEDIA_BOUNDS.assetNameMaxCharacters.max }, confirmation: { type: 'string' } }, additionalProperties: false } },
++  { name: 'rename_media_asset', description: 'Rename a stored workspace image or library image/video without changing attachments. Requires all-channel access. Confirmation: RENAME MEDIA <id>. Stored-image metadata is created on first rename; attachment identity and bytes stay unchanged.', inputSchema: { type: 'object', required: ['id', 'name', 'confirmation'], properties: { id: { type: 'string', maxLength: MEDIA_BOUNDS.identifierMaxCharacters.max }, name: { type: 'string', minLength: 1, maxLength: MEDIA_BOUNDS.assetNameMaxCharacters.max }, confirmation: { type: 'string' } }, additionalProperties: false } },
+   { name: 'list_media_library', description: 'List images and videos in the current workspace media library with storage usage against the workspace quota. Filter by kind, usage (used or unused) and literal file-name search; continue with page while hasMore is true. A member limited to some channels sees usage only as used or unused, not which posts hold an asset.', inputSchema: { type: 'object', properties: { kind: { enum: ['image', 'video'] }, q: { type: 'string', maxLength: MEDIA_BOUNDS.maxSearchCharacters.max }, usage: { enum: ['used', 'unused'] }, page: { type: 'integer', minimum: 1, maximum: MEDIA_BOUNDS.pageNumberMax.max } }, additionalProperties: false } },
+-  { name: 'import_media_from_url', description: 'Import one public image or video into the workspace library. Only public https addresses are fetched; private networks are refused, and size, type and quota limits are enforced. Confirmation must exactly match IMPORT MEDIA <url>.', inputSchema: { type: 'object', required: ['url', 'confirmation'], properties: { url: { type: 'string', maxLength: MEDIA_BOUNDS.importUrlMaxCharacters.max }, name: { type: 'string', maxLength: MEDIA_BOUNDS.assetNameMaxCharacters.max }, confirmation: { type: 'string' } }, additionalProperties: false } },
++  { name: 'import_media_from_url', description: 'Import one public image or video into the workspace library. Still WebP images are converted to PNG under Root policy; animated WebP is refused. Image names persist and are searchable. Only public https addresses are fetched; private networks are refused, and size, type and quota limits are enforced. Confirmation must exactly match IMPORT MEDIA <url>.', inputSchema: { type: 'object', required: ['url', 'confirmation'], properties: { url: { type: 'string', maxLength: MEDIA_BOUNDS.importUrlMaxCharacters.max }, name: { type: 'string', maxLength: MEDIA_BOUNDS.assetNameMaxCharacters.max }, confirmation: { type: 'string' } }, additionalProperties: false } },
+   { name: 'delete_media_asset', description: 'Delete one library asset. Refused while any post uses it unless allowInUse is true, and never while a using post is scheduled, publishing or awaiting approval. Requires access to all channels. Confirmation must exactly match DELETE MEDIA <id>, or DELETE IN-USE MEDIA <id> with allowInUse.', inputSchema: { type: 'object', required: ['id', 'confirmation'], properties: { id: { type: 'string', maxLength: MEDIA_BOUNDS.identifierMaxCharacters.max }, allowInUse: { type: 'boolean' }, confirmation: { type: 'string' } }, additionalProperties: false } },
+ ] as const;
+ export const mediaTools = new Set<string>(mediaToolDefinitions.map(tool => tool.name));
+ export const mediaWriteTools = new Set<string>(['import_media_from_url', 'delete_media_asset', 'rename_media_asset']);
+ 
+ export async function executeMediaTool(actor: ToolActor, name: string, args: unknown, deps: MediaDeps = {}) {
+-  if (name === 'rename_media_asset') return renameAsset(actor, args);
++  if (name === 'rename_media_asset') return renameAsset(actor, args, deps);
+   if (name === 'list_media_library') return readLibrary(actor, args ?? {}, deps);
+   if (name === 'import_media_from_url') return importFromUrl(actor, args, deps);
+   if (name === 'delete_media_asset') return deleteAsset(actor, args, deps);
+diff --git a/rebuild/src/modules/media/messages.ts b/rebuild/src/modules/media/messages.ts
+index 69595ada..21fc24de 100644
+--- a/rebuild/src/modules/media/messages.ts
++++ b/rebuild/src/modules/media/messages.ts
+@@ -8,6 +8,8 @@ import { z } from 'zod';
+ const row = (en: string, fr: string) => ({ en, fr });
+ 
+ export const mediaMessages = {
++  'This WebP image could not be imported. Use a still PNG or JPEG image instead.': row('This WebP image could not be imported. Use a still PNG or JPEG image instead.', 'Cette image WebP ne peut pas être importée. Utilisez une image PNG ou JPEG fixe.'),
++  'Image conversion is busy. Try again shortly.': row('Image conversion is busy. Try again shortly.', 'La conversion d’images est occupée. Réessayez dans un instant.'),
+   'Sign in with an active account to continue.': row('Sign in with an active account to continue.', 'Connectez-vous avec un compte actif pour continuer.'),
+   'Sign in to an authorized workspace.': row('Sign in to an authorized workspace.', 'Connectez-vous à un espace autorisé.'),
+   'This feature is unavailable in this workspace.': row('This feature is unavailable in this workspace.', 'Cette fonctionnalité n’est pas disponible dans cet espace.'),
+diff --git a/rebuild/src/modules/media/server/library.ts b/rebuild/src/modules/media/server/library.ts
+index b33d72cb..ae19e3de 100644
+--- a/rebuild/src/modules/media/server/library.ts
++++ b/rebuild/src/modules/media/server/library.ts
+@@ -14,6 +14,7 @@ import {
+   libraryQuerySchema, importSchema, deleteSchema, likeContains, safeAssetName, sniffMedia, type AssetHolder, type LibraryAsset, type LibraryUsage,
+ } from '../library';
+ import { MEDIA_BOUNDS } from '../config';
++import { convertWebp } from './webp';
+ 
+ const FEATURE = 'publishing/media' as const;
+ type Tx = Prisma.TransactionClient;
+@@ -81,7 +82,7 @@ async function attribute(db: Pick<Tx, '$queryRaw'>, workspaceId: string, assets:
+ 
+ async function usageOf(db: Pick<Tx, '$queryRaw'>, workspaceId: string, store: MediaStore, quota: number, imageLimit: number): Promise<LibraryUsage> {
+   const [totals, images] = await Promise.all([
+-    db.$queryRaw<Array<{ bytes: bigint | number; count: bigint | number }>>`SELECT COALESCE(SUM(size), 0)::bigint AS bytes, COUNT(*)::bigint AS count FROM media WHERE "workspaceId" = ${workspaceId}`,
++    db.$queryRaw<Array<{ bytes: bigint | number; count: bigint | number }>>`SELECT COALESCE(SUM(size), 0)::bigint AS bytes, COUNT(*)::bigint AS count FROM media WHERE "workspaceId" = ${workspaceId} AND NOT (kind::text = 'image' AND "storageKey" IS NULL AND url = 'media:' || id)`,
+     store.listImages(workspaceId, imageLimit),
+   ]);
+   const exact = images.totalFiles !== undefined && images.totalBytes !== undefined;
+@@ -102,14 +103,20 @@ export async function readLibrary(actor: ToolActor, input: unknown = {}, deps: M
+   const window = page * l.pageSize + 1;
+   return protect((async () => {
+     const [rows, images, usage] = await Promise.all([
+-      prisma.$queryRaw<Row[]>`SELECT id, filename, "mimeType", size, kind::text AS kind, url, "storageKey", width, height, "createdAt" FROM media WHERE "workspaceId" = ${actor.workspaceId} AND "derivedFromId" IS NULL AND (${kind} = '' OR kind::text = ${kind}) AND (${q} = '' OR filename ILIKE ${likeContains(q)}) ORDER BY "createdAt" DESC, id ASC LIMIT ${window}`,
++      prisma.$queryRaw<Row[]>`SELECT id, filename, "mimeType", size, kind::text AS kind, url, "storageKey", width, height, "createdAt" FROM media WHERE "workspaceId" = ${actor.workspaceId} AND "derivedFromId" IS NULL AND NOT (kind::text = 'image' AND "storageKey" IS NULL AND url = 'media:' || id) AND (${kind} = '' OR kind::text = ${kind}) AND (${q} = '' OR filename ILIKE ${likeContains(q)}) ORDER BY "createdAt" DESC, id ASC LIMIT ${window}`,
+       kind === 'video' ? Promise.resolve({ items: [], truncated: false }) : store.listImages(actor.workspaceId, l.imageLimit),
+       usageOf(prisma, actor.workspaceId, store, l.quota, l.imageLimit),
+     ]);
++    // Canonical image rows carry names only; the file listing remains the authority for existence,
++    // bytes and age. Fetch names before applying search, so default names cannot resurrect a mismatch.
++    const imageIds = images.items.map(i => i.id);
++    const names = imageIds.length ? await prisma.$queryRaw<Array<{ id: string; filename: string }>>`SELECT id, filename FROM media WHERE "workspaceId" = ${actor.workspaceId} AND id = ANY(${imageIds}::text[]) AND kind::text = 'image' AND "storageKey" IS NULL AND url = 'media:' || id AND "derivedFromId" IS NULL` : [];
++    const imageNames = new Map(names.map(row => [row.id, row.filename]));
++    const imageName = (id: string) => imageNames.get(id) ?? nameFor(id);
+     const known = new Set(rows.map(r => r.id.toLowerCase()));
+     const candidates: Array<Source & { asset: Omit<LibraryAsset, 'inUse' | 'holderCount' | 'holders'> }> = [
+       ...rows.map(r => ({ id: r.id, source: 'library' as const, url: r.url, storageKey: r.storageKey, asset: { id: r.id, kind: r.kind === 'video' ? 'video' as const : 'image' as const, mimeType: r.mimeType, name: r.filename, size: r.size, createdAt: r.createdAt, width: r.width, height: r.height, source: 'library' as const } })),
+-      ...images.items.filter(i => !known.has(i.id.toLowerCase()) && (q === '' || nameFor(i.id).toLowerCase().includes(q.toLowerCase()))).map(i => ({ id: i.id, source: 'stored-image' as const, asset: { id: i.id, kind: 'image' as const, mimeType: i.mimeType, name: nameFor(i.id), size: i.size, createdAt: i.createdAt, width: null, height: null, source: 'stored-image' as const } })),
++      ...images.items.filter(i => !known.has(i.id.toLowerCase()) && (q === '' || imageName(i.id).toLowerCase().includes(q.toLowerCase()))).map(i => ({ id: i.id, source: 'stored-image' as const, asset: { id: i.id, kind: 'image' as const, mimeType: i.mimeType, name: imageName(i.id), size: i.size, createdAt: i.createdAt, width: null, height: null, source: 'stored-image' as const } })),
+     ].sort((a, b) => b.asset.createdAt.getTime() - a.asset.createdAt.getTime() || a.id.localeCompare(b.id));
+     const scope = query.usage ? candidates : candidates.slice((page - 1) * l.pageSize, page * l.pageSize + 1);
+     const { byAsset, truncated } = await attribute(prisma, actor.workspaceId, scope, l.scan, l.holderExcerpt);
+@@ -135,19 +142,24 @@ export async function importFromUrl(actor: ToolActor, input: unknown, deps: Medi
+     const declaredOk = fetched.contentType === '' || fetched.contentType === 'application/octet-stream' || fetched.contentType === 'binary/octet-stream' || (sniffed !== null && fetched.contentType.startsWith(`${sniffed.kind}/`));
+     if (!sniffed || !declaredOk) throw await bad('That address does not return a supported image or video.');
+     if (sniffed.kind === 'video' && (!l.videoMimes.includes(sniffed.mimeType) || fetched.bytes.length > l.videoMax)) throw await bad('That video is not an accepted type or is larger than the allowed size.');
++    let bytes = fetched.bytes;
++    let mimeType = sniffed.mimeType;
++    const converted = mimeType === 'image/webp';
++    if (converted) { bytes = await convertWebp(bytes); mimeType = 'image/png'; }
+     const name = safeAssetName(data.name, data.url, sniffed.kind === 'video' ? 'video' : 'image', l.nameMax);
+     return transact(actor.workspaceId, l, async tx => {
+       await lockActor(tx, actor, true);
+       const usage = await usageOf(tx, actor.workspaceId, store, l.quota, l.imageLimit);
+-      if (usage.usedBytes + fetched.bytes.length > l.quota) throw await mediaError('conflict', 'This workspace has reached its media storage limit. Delete unused media and try again.');
++      if (usage.usedBytes + bytes.length > l.quota) throw await mediaError('conflict', 'This workspace has reached its media storage limit. Delete unused media and try again.');
+       if (sniffed.kind === 'image') {
+-        const file = new File([new Uint8Array(fetched.bytes)], name, { type: sniffed.mimeType });
++        const file = new File([new Uint8Array(bytes)], name, { type: mimeType });
+         const stored = await store.putImage({ userId: actor.userId, workspaceId: actor.workspaceId }, file);
+         try {
+-          await audit(tx, actor, 'media.imported', { assetId: stored.id, kind: 'image', size: fetched.bytes.length, host: new URL(fetched.finalUrl).hostname });
++          await saveImageName(tx, actor.workspaceId, stored.id, name, { mimeType: stored.mimeType, size: bytes.length, createdAt: new Date() });
++          await audit(tx, actor, 'media.imported', { assetId: stored.id, kind: 'image', size: bytes.length, converted, host: new URL(fetched.finalUrl).hostname });
+           await lockActor(tx, actor, true);
+         } catch (error) { await store.removeImage(actor.workspaceId, stored.id, true).catch(() => undefined); throw error; }
+-        return { id: stored.id, kind: 'image' as const, mimeType: stored.mimeType, name, size: fetched.bytes.length, source: 'stored-image' as const };
++        return { id: stored.id, kind: 'image' as const, mimeType: stored.mimeType, name, size: bytes.length, source: 'stored-image' as const, converted };
+       }
+       const fileId = randomUUID(); const rowId = `med_${fileId}`;
+       const { storageKey } = await store.putVideo(actor.workspaceId, fileId, fetched.bytes);
+@@ -193,6 +205,8 @@ export async function deleteAsset(actor: ToolActor, input: unknown, deps: MediaD
+       if (truncated || holders.some(h => COMMITTED_STATUSES.has(h.status))) throw await mediaError('conflict', 'This media is used by posts that are scheduled, publishing or awaiting approval. Change those posts first.');
+     }
+     if (isFile) {
++      // Metadata has no separate bytes. Remove it transactionally alongside the normal image action.
++      await tx.$executeRaw`DELETE FROM media WHERE id = ${data.id} AND "workspaceId" = ${actor.workspaceId} AND kind::text = 'image' AND "storageKey" IS NULL AND url = 'media:' || id`;
+       await audit(tx, actor, 'media.deleted', { assetId: data.id, kind: 'image', affectedPosts: holders.map(h => h.postId), forced: force });
+       const removal = await store.removeImage(actor.workspaceId, data.id, force);
+       if (removal === 'missing') throw await mediaError('not_found', 'This media is unavailable in the current workspace.');
+@@ -214,8 +228,17 @@ export async function deleteAsset(actor: ToolActor, input: unknown, deps: MediaD
+ export { NetGuardError };
+ 
+ 
+-/** Rename database-backed assets without changing their stable attachment identity. */
+-export async function renameAsset(actor: ToolActor, input: unknown) {
++/** Image metadata uses the canonical media:<UUID> identity; file bytes are counted only by storage.
++ * The workspace FK gives metadata the same export/erasure ownership as other media rows.
++ * Refuse an id collision with a different workspace or a noncanonical media record.
++ */
++async function saveImageName(tx: Tx, workspaceId: string, id: string, name: string, image: { mimeType: string; size: number; createdAt: Date }) {
++  const changed = await tx.$executeRaw`INSERT INTO media (id, "workspaceId", filename, "mimeType", size, kind, url, "storageProvider", "storageKey", "createdAt") VALUES (${id}, ${workspaceId}, ${name}, ${image.mimeType}, ${image.size}, 'image', ${`media:${id}`}, 'local', NULL, ${image.createdAt}) ON CONFLICT (id) DO UPDATE SET filename = EXCLUDED.filename WHERE media."workspaceId" = EXCLUDED."workspaceId" AND media.kind::text = 'image' AND media."storageKey" IS NULL AND media.url = 'media:' || media.id AND media."derivedFromId" IS NULL`;
++  if (changed !== 1) throw await unavailable();
++}
++
++/** Rename assets without changing their stable attachment identity. */
++export async function renameAsset(actor: ToolActor, input: unknown, deps: MediaDeps = {}) {
+   const l = await bounds();
+   const { z } = await import('zod');
+   const data = await parse(z.object({ id: z.string().min(1).max(l.identifierMax).regex(/^[A-Za-z0-9_-]+$/), name: z.string().trim().min(1).max(l.nameMax).refine(v => !/[\u0000-\u001f\u007f\\/]/.test(v)), confirmation: z.string() }).strict(), input);
+@@ -225,6 +248,14 @@ export async function renameAsset(actor: ToolActor, input: unknown) {
+   return protect(transact(actor.workspaceId, l, async tx => {
+     const fresh = await lockActor(tx, actor, true);
+     if (!fresh.workspaceWide) throw await mediaError('forbidden', 'Renaming media requires access to all channels.');
++    if (isImageFileId(data.id)) {
++      let image;
++      try { image = await (deps.store ?? fsMediaStore).inspectImage(actor.workspaceId, data.id); }
++      catch { throw await mediaError('not_found', 'This media is unavailable in the current workspace.'); }
++      await saveImageName(tx, actor.workspaceId, data.id, data.name, image);
++      await audit(tx, actor, 'media.renamed', { assetId: data.id });
++      return { id: data.id, name: data.name, renamed: true as const };
++    }
+     const rows = await tx.$queryRaw<Array<{ filename: string }>>`SELECT filename FROM media WHERE id = ${data.id} AND "workspaceId" = ${actor.workspaceId} AND "derivedFromId" IS NULL FOR UPDATE`;
+     if (!rows[0]) throw await mediaError('not_found', 'This media is unavailable in the current workspace.');
+     if (rows[0].filename !== data.name) {
+diff --git a/rebuild/src/modules/media/server/store.ts b/rebuild/src/modules/media/server/store.ts
+index 3ea9ecfd..0991d92e 100644
+--- a/rebuild/src/modules/media/server/store.ts
++++ b/rebuild/src/modules/media/server/store.ts
+@@ -3,13 +3,14 @@ import { lstat, mkdir, open, unlink } from 'node:fs/promises';
+ import path from 'node:path';
+ import { runtimeConfig } from '@/server/config/store';
+ import { canonicalMediaRoot, validateWorkspaceId } from '@/server/data-control/storage';
+-import { deleteUnusedWorkspaceImage, listWorkspaceImages, uploadWorkspaceImage, type WorkspaceImageListing } from '@/modules/publishing/server/media/storage';
++import { deleteUnusedWorkspaceImage, listWorkspaceImages, getWorkspaceImageMetadata, uploadWorkspaceImage, type WorkspaceImageListing } from '@/modules/publishing/server/media/storage';
+ import { mediaError } from './messages';
+ 
+ /** Storage port: the service never touches the filesystem directly, so tests inject a fake. */
+ export interface MediaStore {
+   /** `totalFiles`/`totalBytes` cover every stored image file, not just the returned page. */
+   listImages(workspaceId: string, limit: number): Promise<{ items: WorkspaceImageListing[]; truncated: boolean; totalFiles?: number; totalBytes?: number }>;
++  inspectImage(workspaceId: string, id: string): Promise<Pick<WorkspaceImageListing, 'size' | 'mimeType' | 'createdAt'>>;
+   putImage(actor: { userId: string; workspaceId: string }, file: File): Promise<{ id: string; mimeType: string }>;
+   /** Writes a new video file exclusively and returns the key to record. */
+   putVideo(workspaceId: string, id: string, bytes: Buffer): Promise<{ storageKey: string }>;
+@@ -40,6 +41,7 @@ export const fsMediaStore: MediaStore = {
+     const page = await listWorkspaceImages(workspaceId, { limit });
+     return { items: page.items, truncated: page.nextCursor !== null, totalFiles: page.usage.files, totalBytes: page.usage.bytes };
+   },
++  async inspectImage(workspaceId, id) { return getWorkspaceImageMetadata(workspaceId, id); },
+   async putImage(actor, file) {
+     const stored = await uploadWorkspaceImage(actor, file);
+     return { id: stored.id, mimeType: stored.mimeType };
+diff --git a/rebuild/src/modules/media/server/webp.ts b/rebuild/src/modules/media/server/webp.ts
+new file mode 100644
+index 00000000..9a1d4877
+--- /dev/null
++++ b/rebuild/src/modules/media/server/webp.ts
+@@ -0,0 +1,30 @@
++import sharp from 'sharp';
++import { runtimeConfig } from '@/server/config/store';
++import { webpImportPolicySchema } from '../config';
++import { mediaError } from './messages';
++
++let active = 0;
++/** Native work keeps its concurrency permit until it settles, including after a caller deadline. */
++export async function convertWebp(bytes: Buffer): Promise<Buffer> {
++  const checked = webpImportPolicySchema.safeParse(await runtimeConfig('media.webpImportPolicy'));
++  if (!checked.success) throw await mediaError('unavailable', 'The media library is temporarily unavailable. Refresh and try again.');
++  const policy = checked.data;
++  const invalid = () => mediaError('invalid_request', 'This WebP image could not be imported. Use a still PNG or JPEG image instead.');
++  if (!policy.enabled) throw await invalid();
++  if (active >= policy.maxConcurrent) throw await mediaError('unavailable', 'Image conversion is busy. Try again shortly.');
++  active++;
++  const work = (async () => {
++    const image = sharp(bytes, { failOn: 'error', limitInputPixels: policy.maxPixels });
++    const meta = await image.metadata();
++    if (meta.format !== 'webp' || !meta.width || !meta.height || meta.width * meta.height > policy.maxPixels || (meta.pages ?? 1) !== 1) throw new Error('Invalid image');
++    const converted = await image.rotate().png().toBuffer();
++    if (converted.length > policy.maxOutputBytes) throw new Error('Output too large');
++    return converted;
++  })();
++  void work.then(() => { active--; }, () => { active--; });
++  let timer: ReturnType<typeof setTimeout> | undefined;
++  try {
++    return await Promise.race([work, new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error('Deadline')), policy.timeoutMs); })]);
++  } catch { throw await invalid(); }
++  finally { if (timer) clearTimeout(timer); }
++}
+diff --git a/rebuild/src/modules/media/ui/MediaLibrary.tsx b/rebuild/src/modules/media/ui/MediaLibrary.tsx
+index 4ae59b60..199723a9 100644
+--- a/rebuild/src/modules/media/ui/MediaLibrary.tsx
++++ b/rebuild/src/modules/media/ui/MediaLibrary.tsx
+@@ -1,6 +1,6 @@
+ 'use client';
+ 
+-import { useRef, useState } from 'react';
++import { useEffect, useRef, useState } from 'react';
+ import { useRouter } from 'next/navigation';
+ import { Button } from '@/components/Button';
+ import { Dialog } from '@/components/Dialog';
+@@ -25,6 +25,7 @@ export function MediaLibrary({ items, usage, page, hasMore, filters, canWrite, w
+   const day = (v: string) => Number.isFinite(Date.parse(v)) ? new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeZone: 'UTC' }).format(new Date(v)) : t('unknownDate');
+   const errorText = (body: unknown) => body && typeof body === 'object' && 'error' in body && typeof (body as { error: unknown }).error === 'string' ? (body as { error: string }).error : t('unconfirmed');
+   const [assets, setAssets] = useState(items);
++  useEffect(() => setAssets(items), [items]);
+   const [importing, setImporting] = useState(false);
+   const [url, setUrl] = useState(''); const [name, setName] = useState('');
+   const [renaming, setRenaming] = useState<Asset | null>(null);
+@@ -55,7 +56,7 @@ export function MediaLibrary({ items, usage, page, hasMore, filters, canWrite, w
+     const body = await response.json().catch(() => null);
+     if (!response.ok || !body || typeof body.id !== 'string') throw new Error(errorText(body));
+     setImporting(false); setUrl(''); setName(''); setConfirmation('');
+-    say(t('imported')); router.refresh();
++    say(body.converted === true ? t('importedConverted') : t('imported')); router.refresh();
+   }, t('importUnknown'));
+   const performUpload = (file: File) => run(async () => {
+     const form = new FormData(); form.set('imageFile', file);
+@@ -104,7 +105,7 @@ export function MediaLibrary({ items, usage, page, hasMore, filters, canWrite, w
+         <th scope="row"><span className={styles.name}>{a.name}</span><span className={styles.meta}>{a.mimeType} · {t('added', { date: day(a.createdAt) })}</span></th>
+         <td>{size(a.size)}</td>
+         <td>{a.inUse ? usedLabel(a.holderCount) : t('unused')}{a.holders && a.holders.length > 0 && <ul className={styles.holders}>{a.holders.map(h => <li key={h.postId}>{h.excerpt || t('untitled')} ({h.status.replace(/_/g, ' ')})</li>)}</ul>}</td>
+-        {canWrite && workspaceWide && <td>{a.source === 'library' && <Button size="sm" disabled={busy} onClick={() => { setNotice(null); setConfirmation(''); setRenameName(a.name); setRenaming(a); }}>{t('rename')}</Button>}<Button size="sm" variant="danger" disabled={busy} aria-label={`${t('delete')} ${a.name}`} onClick={() => { setNotice(null); setConfirmation(''); setForce(false); setRemoving(a); }}>{t('delete')}</Button></td>}
++        {canWrite && workspaceWide && <td><Button size="sm" disabled={busy} onClick={() => { setNotice(null); setConfirmation(''); setRenameName(a.name); setRenaming(a); }}>{t('rename')}</Button><Button size="sm" variant="danger" disabled={busy} aria-label={`${t('delete')} ${a.name}`} onClick={() => { setNotice(null); setConfirmation(''); setForce(false); setRemoving(a); }}>{t('delete')}</Button></td>}
+       </tr>)}
+     </tbody></table></div> : <p className={styles.empty}>{filtered ? t('noMatch') : t('empty')}</p>}
+     <nav className={styles.pagination} aria-label={t('pages')}>{page > 1 && <a href={query(page - 1)}>{t('previous')}</a>}<span>{t('page', { page })}</span>{hasMore && <a href={query(page + 1)}>{t('next')}</a>}</nav>
+diff --git a/rebuild/tests/media-library-net.test.ts b/rebuild/tests/media-library-net.test.ts
+index 3baf2334..ece9b1f5 100644
+--- a/rebuild/tests/media-library-net.test.ts
++++ b/rebuild/tests/media-library-net.test.ts
+@@ -7,6 +7,8 @@ describe('media content helpers', () => {
+     expect(sniffMedia(Buffer.concat([Buffer.from([0, 0, 0, 24]), Buffer.from('ftypmp42')]))).toEqual({ kind: 'video', mimeType: 'video/mp4' });
+     expect(sniffMedia(Buffer.from('<html><script>'))).toBeNull();
+     expect(sniffMedia(Buffer.alloc(0))).toBeNull();
++    expect(sniffMedia(Buffer.from('RIFF0000WEBP'))).toEqual({ kind: 'image', mimeType: 'image/webp' });
++    expect(sniffMedia(Buffer.from('RIFF0000WAVE'))).toBeNull();
+   });
+   it('cleans names and builds reference sets', () => {
+     expect(safeAssetName('../../etc/passwd', 'https://x.test/a.png', 'image')).toBe('etcpasswd');
+diff --git a/rebuild/tests/media-library-service.test.ts b/rebuild/tests/media-library-service.test.ts
+index cf5723d9..da360b20 100644
+--- a/rebuild/tests/media-library-service.test.ts
++++ b/rebuild/tests/media-library-service.test.ts
+@@ -1,6 +1,7 @@
++import sharp from 'sharp';
+ import { beforeEach, describe, expect, it, vi } from 'vitest';
+ 
+-const state = vi.hoisted(() => ({ auth: vi.fn(), workspace: vi.fn(), exec: [] as Array<{ sql: string; values: unknown[] }>, mediaRows: [] as unknown[], posts: [] as unknown[], used: 0, mediaRow: null as unknown, failAudit: false, overrides: {} as Record<string, unknown> }));
++const state = vi.hoisted(() => ({ auth: vi.fn(), workspace: vi.fn(), exec: [] as Array<{ sql: string; values: unknown[] }>, mediaRows: [] as unknown[], imageNames: [] as unknown[], queries: [] as Array<{ sql: string; values: unknown[] }>, posts: [] as unknown[], used: 0, mediaRow: null as unknown, failAudit: false, overrides: {} as Record<string, unknown> }));
+ const db = vi.hoisted(() => ({ $queryRaw: vi.fn(), $executeRaw: vi.fn(), $transaction: vi.fn() }));
+ vi.mock('@/server/data', () => ({ prisma: db }));
+ vi.mock('@/server/config/store', async () => {
+@@ -21,7 +22,8 @@ const MP4 = Buffer.concat([Buffer.from([0, 0, 0, 24]), Buffer.from('ftypmp42'),
+ const UUID = '11111111-2222-4333-8444-555555555555';
+ const store = () => ({
+   listImages: vi.fn(async () => ({ items: [{ id: UUID, size: 1000, mimeType: 'image/jpeg', createdAt: new Date('2026-05-01T00:00:00Z') }], truncated: false })),
+-  putImage: vi.fn(async () => ({ id: UUID, mimeType: 'image/jpeg' })), putVideo: vi.fn(async (_w: string, id: string) => ({ storageKey: `w1/videos/${id}` })),
++  inspectImage: vi.fn(async () => ({ size: 1000, mimeType: 'image/jpeg', createdAt: new Date('2026-05-01T00:00:00Z') })),
++  putImage: vi.fn(async (_actor: unknown, _file: File) => ({ id: UUID, mimeType: 'image/jpeg' })), putVideo: vi.fn(async (_w: string, id: string) => ({ storageKey: `w1/videos/${id}` })),
+   removeImage: vi.fn(async () => 'deleted' as const), removeStored: vi.fn(async () => 'deleted' as const),
+ });
+ const net = (bytes: Buffer, headers: Record<string, string> = {}) => ({ resolve: vi.fn(async () => ['93.184.216.34']), fetcher: vi.fn(async () => new Response(new Uint8Array(bytes), { status: 200, headers })) });
+@@ -30,12 +32,13 @@ const sql = (s: TemplateStringsArray, v: unknown[]) => ({ sql: s.join('?'), valu
+ const executed = (needle: string) => state.exec.filter(e => e.sql.includes(needle));
+ 
+ beforeEach(() => {
+-  vi.clearAllMocks(); state.exec = []; state.mediaRows = [vrow]; state.posts = []; state.used = 2000; state.mediaRow = vrow; state.failAudit = false; state.overrides = {};
++  vi.clearAllMocks(); state.exec = []; state.queries = []; state.imageNames = []; state.mediaRows = [vrow]; state.posts = []; state.used = 2000; state.mediaRow = vrow; state.failAudit = false; state.overrides = {};
+   state.auth.mockResolvedValue({ role: 'owner', actor, workspaceWide: true });
+   state.workspace.mockImplementation((_id: string, cb: () => Promise<unknown>) => cb());
+   db.$transaction.mockImplementation(async (cb: (tx: typeof db) => Promise<unknown>) => cb(db));
+   db.$queryRaw.mockImplementation(async (s: TemplateStringsArray, ...v: unknown[]) => {
+-    const q = sql(s, v);
++    const q = sql(s, v); state.queries.push(q);
++    if (q.sql.includes('id = ANY')) return state.imageNames;
+     if (q.sql.includes('memberships m JOIN users')) return [{ role: 'owner', disabledAt: null }];
+     if (q.sql.includes('SUM(size)')) return [{ bytes: BigInt(state.used), count: BigInt(1) }];
+     if (q.sql.includes('FROM posts p')) return state.posts;
+@@ -242,3 +245,75 @@ it('the installed media MCP dispatcher executes the confirmed rename service', a
+   await expect(executeMediaTool(actor, 'rename_media_asset', { id: vrow.id, name: 'renamed.mp4', confirmation: `RENAME MEDIA ${vrow.id}` })).resolves.toMatchObject({ renamed: true, id: vrow.id });
+   expect(executed('UPDATE media')).toHaveLength(1);
+ });
++
++
++describe('round 11 stored image names and still WebP imports', () => {
++  it('persists the import name as canonical metadata without replacing its attachment identity', async () => {
++    const result = await importFromUrl(actor, { url: 'https://example.com/p.jpg', name: 'Spring launch.jpg', confirmation: 'IMPORT MEDIA https://example.com/p.jpg' }, { store: store() as never, net: net(JPEG) });
++    expect(result).toMatchObject({ id: UUID, source: 'stored-image', name: 'Spring launch.jpg' });
++    const saved = executed('INSERT INTO media')[0]!;
++    expect(saved.values).toEqual([UUID, 'w1', 'Spring launch.jpg', 'image/jpeg', JPEG.length, `media:${UUID}`, expect.any(Date)]);
++    expect(saved.sql).toContain('media."workspaceId" = EXCLUDED."workspaceId"');
++    expect(saved.sql).toContain('media."derivedFromId" IS NULL');
++  });
++  it('uses saved names for display and literal search, without reviving a default-name mismatch', async () => {
++    state.imageNames = [{ id: UUID, filename: 'Spring launch.jpg' }]; state.mediaRows = [];
++    const s = store();
++    const page = await readLibrary(actor, { q: 'SPRING' }, { store: s as never });
++    expect(page.items).toMatchObject([{ id: UUID, name: 'Spring launch.jpg', source: 'stored-image' }]);
++    expect((await readLibrary(actor, { q: 'Uploaded image' }, { store: s as never })).items).toEqual([]);
++    const query = state.queries.find(q => q.sql.includes('id = ANY'))!;
++    expect(query.values).toEqual(['w1', [UUID]]);
++    expect(state.queries.find(q => q.sql.includes('SUM(size)'))!.sql).toContain("url = 'media:' || id");
++    expect(state.queries.find(q => q.sql.includes('SELECT id, filename, "mimeType"'))!.sql).toContain("url = 'media:' || id");
++    expect(page.usage.usedBytes).toBe(3000);
++  });
++  it('does not display metadata when the underlying file is absent', async () => {
++    state.imageNames = [{ id: UUID, filename: 'Missing.jpg' }]; state.mediaRows = [];
++    const s = store(); s.listImages.mockResolvedValue({ items: [], truncated: false });
++    expect((await readLibrary(actor, {}, { store: s as never })).items).toEqual([]);
++  });
++  it('renames an uploaded image through MCP using the same audited, confirmed service', async () => {
++    const s = store();
++    const args = { id: UUID, name: 'Retained.jpg', confirmation: `RENAME MEDIA ${UUID}` };
++    expect(await executeMediaTool(actor, 'rename_media_asset', args, { store: s as never })).toEqual({ id: UUID, name: args.name, renamed: true });
++    expect(s.inspectImage).toHaveBeenCalledWith('w1', UUID);
++    expect(executed('INSERT INTO media')[0]!.values).toContain(`media:${UUID}`);
++    expect(executed('activity_logs')[0]!.values).toContain('media.renamed');
++    expect(JSON.stringify(executed('activity_logs'))).not.toContain(args.name);
++    expect(s.putImage).not.toHaveBeenCalled(); expect(s.removeImage).not.toHaveBeenCalled();
++  });
++  it('refuses missing images, scoped actors and audit failures without returning a rename receipt', async () => {
++    const s = store(), args = { id: UUID, name: 'x.jpg', confirmation: `RENAME MEDIA ${UUID}` };
++    s.inspectImage.mockRejectedValueOnce(new Error('/private/path'));
++    await expect(renameAsset(actor, args, { store: s as never })).rejects.toMatchObject({ code: 'not_found' });
++    expect(executed('INSERT INTO media')).toHaveLength(0);
++    state.auth.mockResolvedValueOnce({ workspaceWide: false });
++    await expect(renameAsset(actor, args, { store: s as never })).rejects.toMatchObject({ code: 'forbidden' });
++    state.failAudit = true;
++    await expect(renameAsset(actor, args, { store: s as never })).rejects.toMatchObject({ code: 'upstream_failure' });
++  });
++  it('clears name metadata on image deletion under the workspace lock', async () => {
++    await deleteAsset(actor, { id: UUID, confirmation: `DELETE MEDIA ${UUID}` }, { store: store() as never });
++    expect(executed('DELETE FROM media')[0]!.values).toEqual([UUID, 'w1']);
++    expect(executed('DELETE FROM media')[0]!.sql).toContain("url = 'media:' || id");
++  });
++  it('converts a real still WebP to PNG before storage and applies quota to converted bytes', async () => {
++    const webp = await sharp({ create: { width: 2, height: 3, channels: 3, background: 'red' } }).webp().toBuffer();
++    const s = store(); s.putImage.mockResolvedValue({ id: UUID, mimeType: 'image/png' });
++    const url = 'https://example.com/image.webp';
++    const result = await importFromUrl(actor, { url, confirmation: `IMPORT MEDIA ${url}` }, { store: s as never, net: net(webp, { 'content-type': 'image/webp' }) });
++    expect(result).toMatchObject({ converted: true, mimeType: 'image/png', source: 'stored-image' });
++    const file = s.putImage.mock.calls[0]![1] as File;
++    expect(file.type).toBe('image/png');
++    const metadata = await sharp(Buffer.from(await file.arrayBuffer())).metadata();
++    expect(metadata).toMatchObject({ format: 'png', width: 2, height: 3 });
++    expect(result.size).toBe(file.size);
++    expect(file.size).toBeGreaterThan(webp.length);
++    state.overrides['media.workspaceQuotaBytes'] = 1048576;
++    state.used = 1048576 - 1000 - webp.length; // store() contributes a separate 1000 image bytes.
++    const s2 = store();
++    await expect(importFromUrl(actor, { url, confirmation: `IMPORT MEDIA ${url}` }, { store: s2 as never, net: net(webp) })).rejects.toMatchObject({ code: 'conflict' });
++    expect(s2.putImage).not.toHaveBeenCalled();
++  });
++});
+diff --git a/rebuild/tests/media-rename-entrypoints.test.ts b/rebuild/tests/media-rename-entrypoints.test.ts
+index de46c999..8220d49e 100644
+--- a/rebuild/tests/media-rename-entrypoints.test.ts
++++ b/rebuild/tests/media-rename-entrypoints.test.ts
+@@ -1,10 +1,12 @@
+ import { beforeEach, expect, it, vi } from 'vitest';
+ import { OperationError, type OperationErrorCode } from '@/lib/operation-error';
+-const state = vi.hoisted(() => ({ rename: vi.fn(), viewer: vi.fn() }));
++const state = vi.hoisted(() => ({ rename: vi.fn(), import: vi.fn(), viewer: vi.fn() }));
+ vi.mock('@/server/context', () => ({ requireViewer: state.viewer }));
+ vi.mock('@/server/request-origin', () => ({ requestOrigin: () => 'https://app.example' }));
+-vi.mock('@/modules/media/server/library', () => ({ renameAsset: state.rename }));
++vi.mock('@/modules/media/server/library', () => ({ renameAsset: state.rename, importFromUrl: state.import }));
+ vi.mock('@/modules/media/server/messages', () => ({ mediaMessage: async (message: string) => message, mediaError: async (code: OperationErrorCode, message: string) => new OperationError(code, message) }));
++import { POST } from '@/app/api/media-library/route';
++import { PATCH } from '@/app/api/media-library/[id]/route';
+ import { renameMediaHttp } from '@/modules/media/server/http';
+ import { renameMediaAction } from '@/modules/media/ui/rename-action';
+ import { executeMediaTool } from '@/modules/media/mcp';
+@@ -17,7 +19,8 @@ it('HTTP, server action and MCP pass the same intent to the shared service', asy
+   expect((await renameMediaHttp(request(args), context)).status).toBe(200);
+   await renameMediaAction({ ...args, id: 'm1' });
+   await executeMediaTool(actor, 'rename_media_asset', { ...args, id: 'm1' });
+-  expect(state.rename.mock.calls).toEqual(Array.from({ length: 3 }, () => [actor, { ...args, id: 'm1' }]));
++  expect((await PATCH(request(args), context)).status).toBe(200);
++  expect(state.rename.mock.calls.map(call => call.slice(0, 2))).toEqual(Array.from({ length: 4 }, () => [actor, { ...args, id: 'm1' }]));
+ });
+ it('HTTP refuses cross-origin requests and body identity substitution', async () => {
+   expect((await renameMediaHttp(request(args, 'https://other.example'), context)).status).toBe(403);
+@@ -29,3 +32,12 @@ it('HTTP refuses a missing session before calling the service', async () => {
+   expect((await renameMediaHttp(request(args), context)).status).toBe(401);
+   expect(state.rename).not.toHaveBeenCalled();
+ });
++
++it('REST and MCP import map the same named WebP intent to the shared service', async () => {
++  const input = { url: 'https://example.com/still.webp', name: 'Spring.webp', confirmation: 'IMPORT MEDIA https://example.com/still.webp' };
++  state.import.mockResolvedValue({ id: 'image1', converted: true, mimeType: 'image/png' });
++  const response = await POST(new Request('https://app.example/api/media-library', { method: 'POST', headers: { origin: 'https://app.example', 'content-type': 'application/json' }, body: JSON.stringify(input) }));
++  expect(response.status).toBe(201); expect(await response.json()).toMatchObject({ converted: true, mimeType: 'image/png' });
++  await executeMediaTool(actor, 'import_media_from_url', input);
++  expect(state.import.mock.calls.map(call => call.slice(0, 2))).toEqual([[actor, input], [actor, input]]);
++});
+diff --git a/rebuild/tests/media-round11-ui.test.ts b/rebuild/tests/media-round11-ui.test.ts
+new file mode 100644
+index 00000000..67ce6add
+--- /dev/null
++++ b/rebuild/tests/media-round11-ui.test.ts
+@@ -0,0 +1,46 @@
++// @vitest-environment jsdom
++import { act, createElement, type ReactNode } from 'react';
++import { createRoot } from 'react-dom/client';
++import { afterEach, beforeEach, expect, it, vi } from 'vitest';
++const state = vi.hoisted(() => ({ rename: vi.fn(), refresh: vi.fn() }));
++vi.mock('@/modules/media/ui/rename-action', () => ({ renameMediaAction: state.rename }));
++vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: state.refresh }) }));
++vi.mock('@/components/SidebarDock', () => ({ SidebarDock: ({ children }: { children: ReactNode }) => children }));
++import { MediaLibrary, type Asset } from '@/modules/media/ui/MediaLibrary';
++const asset: Asset = { id: '11111111-2222-4333-8444-555555555555', kind: 'image', mimeType: 'image/jpeg', name: 'Spring.jpg', size: 100, createdAt: '2026-10-21T00:00:00Z', source: 'stored-image', width: null, height: null, inUse: false, holderCount: 0, holders: [] };
++let root: ReturnType<typeof createRoot>, container: HTMLDivElement;
++const props = { items: [asset], usage: { usedBytes: 100, quotaBytes: 1000, assetCount: 1, approximate: false }, page: 1, hasMore: false, filters: { kind: '', usage: '', q: '' }, canWrite: true, workspaceWide: true, usageMayBeIncomplete: false, maxSearch: 120, maxName: 180 };
++const button = (label: string, scope: ParentNode = container) => [...scope.querySelectorAll<HTMLButtonElement>('button')].find(b => b.textContent === label)!;
++const fill = async (input: HTMLInputElement, value: string) => act(async () => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, value); input.dispatchEvent(new Event('input', { bubbles: true })); });
++beforeEach(async () => {
++  (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
++  HTMLDialogElement.prototype.showModal = function () { this.setAttribute('open', ''); }; HTMLDialogElement.prototype.close = function () { this.removeAttribute('open'); };
++  vi.clearAllMocks(); vi.stubGlobal('fetch', vi.fn()); container = document.createElement('div'); document.body.append(container); root = createRoot(container); await act(async () => root.render(createElement(MediaLibrary, props)));
++});
++afterEach(async () => { await act(async () => root.unmount()); container.remove(); vi.unstubAllGlobals(); });
++it('offers image rename and retains failed input until a matching receipt', async () => {
++  await act(async () => button('Rename').click()); const dialog = container.querySelector('dialog[open]')!; const inputs = dialog.querySelectorAll('input');
++  await fill(inputs[0]!, 'Summer.jpg'); await fill(inputs[1]!, `RENAME MEDIA ${asset.id}`);
++  state.rename.mockResolvedValueOnce({ error: 'Refresh and try again.' }); await act(async () => button('Rename', dialog).click());
++  expect(inputs[0]!.value).toBe('Summer.jpg'); expect(dialog.hasAttribute('open')).toBe(true); expect(state.refresh).not.toHaveBeenCalled();
++  state.rename.mockResolvedValueOnce({ id: asset.id, name: 'Summer.jpg', renamed: true }); await act(async () => button('Rename', dialog).click());
++  expect(state.rename).toHaveBeenLastCalledWith({ id: asset.id, name: 'Summer.jpg', confirmation: `RENAME MEDIA ${asset.id}` }); expect(container.textContent).toContain('Summer.jpg'); expect(state.refresh).toHaveBeenCalledOnce();
++});
++it('hides rename for limited access and exposes French WebP guidance', async () => {
++  await act(async () => root.render(createElement(MediaLibrary, { ...props, workspaceWide: false, locale: 'fr' }))); expect(button('Renommer')).toBeUndefined();
++  await act(async () => button('Importer depuis une adresse web').click()); expect(container.querySelector('dialog[open]')!.textContent).toContain('Les images WebP fixes sont enregistrées au format PNG');
++});
++it('updates visible names after server refresh without remounting', async () => {
++  await act(async () => root.render(createElement(MediaLibrary, { ...props, items: [{ ...asset, name: 'Retained.jpg' }] }))); expect(container.textContent).toContain('Retained.jpg'); expect(container.textContent).not.toContain('Spring.jpg');
++});
++
++it('submits a named WebP through REST and announces conversion only on a confirmed receipt', async () => {
++  vi.mocked(fetch).mockResolvedValue({ ok: true, json: async () => ({ id: asset.id, converted: true, mimeType: 'image/png' }) } as Response);
++  await act(async () => button('Import from web address').click());
++  const dialog = container.querySelector('dialog[open]')!, inputs = dialog.querySelectorAll('input');
++  const url = 'https://example.com/spring.webp';
++  await fill(inputs[0]!, url); await fill(inputs[1]!, 'Spring.webp'); await fill(inputs[2]!, `IMPORT MEDIA ${url}`);
++  await act(async () => button('Import', dialog).click());
++  expect(JSON.parse(String(vi.mocked(fetch).mock.calls[0]![1]!.body))).toEqual({ url, name: 'Spring.webp', confirmation: `IMPORT MEDIA ${url}` });
++  expect(container.textContent).toContain('The WebP image was saved as PNG.'); expect(state.refresh).toHaveBeenCalledOnce();
++});
+diff --git a/rebuild/tests/media-webp-policy.test.ts b/rebuild/tests/media-webp-policy.test.ts
+new file mode 100644
+index 00000000..598c6885
+--- /dev/null
++++ b/rebuild/tests/media-webp-policy.test.ts
+@@ -0,0 +1,30 @@
++import { afterEach, beforeEach, expect, it, vi } from 'vitest';
++const state = vi.hoisted(() => ({ metadata: vi.fn(), output: vi.fn(), policy: { enabled: true, maxPixels: 20, maxConcurrent: 1, timeoutMs: 100, maxOutputBytes: 100 } }));
++vi.mock('sharp', () => ({ default: vi.fn(() => ({ metadata: state.metadata, rotate: () => ({ png: () => ({ toBuffer: state.output }) }) }) ) }));
++vi.mock('@/server/config/store', () => ({ runtimeConfig: async () => state.policy }));
++import { convertWebp } from '@/modules/media/server/webp';
++import { OperationError } from '@/lib/operation-error';
++vi.mock('@/modules/media/server/messages', () => ({ mediaError: async (code: ConstructorParameters<typeof OperationError>[0], message: string) => new OperationError(code, message) }));
++beforeEach(() => { vi.clearAllMocks(); state.policy = { enabled: true, maxPixels: 20, maxConcurrent: 1, timeoutMs: 100, maxOutputBytes: 100 }; state.metadata.mockResolvedValue({ format: 'webp', width: 2, height: 3, pages: 1 }); state.output.mockResolvedValue(Buffer.from('png')); });
++afterEach(() => vi.useRealTimers());
++it('honors the Root switch and fails closed on malformed policy', async () => {
++  state.policy.enabled = false;
++  await expect(convertWebp(Buffer.from('webp'))).rejects.toMatchObject({ code: 'invalid_request' }); expect(state.metadata).not.toHaveBeenCalled();
++  state.policy.maxPixels = 0; await expect(convertWebp(Buffer.from('webp'))).rejects.toMatchObject({ code: 'unavailable' });
++});
++it.each([{ format: 'webp', width: 2, height: 3, pages: 2 }, { format: 'webp', width: 100, height: 100, pages: 1 }, { format: 'jpeg', width: 2, height: 3 }])('refuses animated, oversized or mismatched content: %j', async meta => {
++  state.metadata.mockResolvedValue(meta); await expect(convertWebp(Buffer.from('webp'))).rejects.toMatchObject({ code: 'invalid_request' }); expect(state.output).not.toHaveBeenCalled();
++});
++it('enforces encoded output bytes and redacts native errors', async () => {
++  state.output.mockResolvedValueOnce(Buffer.alloc(101)); await expect(convertWebp(Buffer.from('webp'))).rejects.toMatchObject({ code: 'invalid_request' });
++  state.metadata.mockRejectedValueOnce(new Error('/private/decoder/path')); await expect(convertWebp(Buffer.from('webp'))).rejects.toThrow('This WebP image could not be imported. Use a still PNG or JPEG image instead.');
++});
++it('retains its permit after deadline until native work settles', async () => {
++  vi.useFakeTimers(); let settle!: (value: Buffer) => void;
++  state.output.mockImplementationOnce(() => new Promise<Buffer>(resolve => { settle = resolve; }));
++  const first = convertWebp(Buffer.from('webp')); const rejected = expect(first).rejects.toMatchObject({ code: 'invalid_request' });
++  await vi.advanceTimersByTimeAsync(101); await rejected;
++  await expect(convertWebp(Buffer.from('webp'))).rejects.toMatchObject({ code: 'unavailable' });
++  settle(Buffer.from('late png')); await Promise.resolve(); await Promise.resolve();
++  await expect(convertWebp(Buffer.from('webp'))).resolves.toEqual(Buffer.from('png'));
++});

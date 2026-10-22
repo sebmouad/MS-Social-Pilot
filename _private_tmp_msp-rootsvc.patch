@@ -1,0 +1,1463 @@
+diff --git a/rebuild/src/app/api/root/config/route.ts b/rebuild/src/app/api/root/config/route.ts
+index d8d30aa7..596957a5 100644
+--- a/rebuild/src/app/api/root/config/route.ts
++++ b/rebuild/src/app/api/root/config/route.ts
+@@ -1,65 +1,11 @@
+-import { NextResponse } from 'next/server';
+-import { safeConfigShape, AVAILABILITY_CATALOG, CONFIG_BY_KEY, CONFIG_SCHEMA_VERSION } from '@/lib/config/registry';
+-import { currentRootActor } from '@/server/config/access';
+-import { readConfig, saveConfig } from '@/server/config/store';
+-
++import { readRootConfig, saveRootConfig } from '@/modules/root/server/configuration';
++import { rootRoute, readBody, searchParamsObject } from '@/server/root/legacy/http';
+ export const runtime = 'nodejs';
+-const reply = (body: unknown, status = 200) => NextResponse.json(body, { status, headers: { 'cache-control': 'no-store' } });
+-
+-export async function GET() {
+-  try {
+-    const actor = await currentRootActor();
+-    if (!actor?.isInstanceOwner) return reply({ error: 'Not found.' }, actor ? 404 : 401);
+-    return reply({ schemaVersion: CONFIG_SCHEMA_VERSION, definitions: safeConfigShape(), values: await readConfig(), availability: AVAILABILITY_CATALOG });
+-  } catch {
+-    return reply({ error: 'Configuration could not be loaded.' }, 500);
+-  }
+-}
+-
+-export async function PUT(request: Request) {
+-  const origin = request.headers.get('origin');
+-  if (!origin || !isSameOrigin(origin, request.url)) {
+-    return reply({ error: 'Cross-origin request denied.' }, 403);
+-  }
+-  const actor = await currentRootActor();
+-  if (!actor?.isInstanceOwner) return reply({ error: 'Not found.' }, actor ? 404 : 401);
+-  let body: unknown;
+-  try { body = await request.json(); } catch { return reply({ error: 'Request body must be valid JSON.' }, 400); }
+-  const validationError = validateRegisteredValue(body);
+-  if (validationError) return reply({ error: validationError }, 400);
+-  try {
+-    await saveConfig(body, actor.id);
+-    return reply({ ok: true, schemaVersion: CONFIG_SCHEMA_VERSION, values: await readConfig() });
+-  } catch (error) {
+-    if (error instanceof Error && (error.message === 'Unknown configuration key.' || error.message === 'Only secret values can be cleared.' || error.message.startsWith('Invalid value') || error.message.startsWith('Enter a secret'))) {
+-      return reply({ error: error.message }, 400);
+-    }
+-    return reply({ error: 'Configuration could not be saved.' }, 500);
+-  }
+-}
+-
+-/** Validate against the registry before persistence so schema errors stay client-actionable. */
+-function validateRegisteredValue(body: unknown): string | null {
+-  if (!body || typeof body !== 'object' || Array.isArray(body)) return null;
+-  const input = body as Record<string, unknown>;
+-  if (typeof input.key !== 'string') return null;
+-  const definition = CONFIG_BY_KEY.get(input.key);
+-  if (!definition) return null;
+-  if (input.clear && definition.kind !== 'secret') return null;
+-  if (input.clear === true && definition.kind === 'secret') return null;
+-  const result = definition.schema.safeParse(input.value);
+-  if (!result.success) {
+-    const issue = result.error.issues[0];
+-    const path = issue?.path.length ? `${issue.path.join('.')}: ` : '';
+-    return `${path}${issue?.message ?? 'Invalid value.'}`;
+-  }
+-  return null;
+-}
+-
+-function isSameOrigin(origin: string, requestUrl: string): boolean {
+-  try {
+-    return new URL(origin).origin === new URL(requestUrl).origin;
+-  } catch {
+-    return false;
+-  }
+-}
++export const GET = rootRoute({}, async (request, actorId) => {
++  searchParamsObject(request);
++  return readRootConfig(actorId);
++});
++export const PUT = rootRoute({ write: true }, async (request, actorId) => {
++  await saveRootConfig(await readBody(request), actorId);
++  return readRootConfig(actorId);
++});
+diff --git a/rebuild/src/app/api/root/errors/[id]/route.ts b/rebuild/src/app/api/root/errors/[id]/route.ts
+index fc831824..e8049930 100644
+--- a/rebuild/src/app/api/root/errors/[id]/route.ts
++++ b/rebuild/src/app/api/root/errors/[id]/route.ts
+@@ -9,5 +9,5 @@ type Ctx = { params: Promise<{ id: string }> };
+ export const GET = rootRoute<Ctx>({}, async (request, actorId, { params }) => { searchParamsObject(request); return { error: await getRootError(actorId, (await params).id) }; });
+ export const POST = rootRoute<Ctx>({ write: true }, async (request, actorId, { params }) => {
+   const input = errorResolveSchema.parse(await readBody(request));
+-  return setRootErrorResolved(actorId, (await params).id, input.resolved);
++  return setRootErrorResolved(actorId, (await params).id, input.resolved, input.confirmation);
+ });
+diff --git a/rebuild/src/app/api/root/workspaces/[id]/route.ts b/rebuild/src/app/api/root/workspaces/[id]/route.ts
+index 6b5a0ccf..ae3e25b8 100644
+--- a/rebuild/src/app/api/root/workspaces/[id]/route.ts
++++ b/rebuild/src/app/api/root/workspaces/[id]/route.ts
+@@ -1,30 +1,9 @@
+-import { requestOrigin } from '@/server/request-origin';
+-import { NextResponse } from 'next/server';
+-import { z } from 'zod';
+-import { currentRootActor } from '@/server/config/access';
+-import { runtimeConfig } from '@/server/config/store';
+ import { renameRootWorkspace } from '@/server/root/workspace-controls';
+-
++import { rootRoute } from '@/server/root/legacy/http';
++import { z } from 'zod';
+ export const runtime = 'nodejs';
+-const schema = z.object({ name: z.string().trim().min(1), confirmation: z.string().min(1) }).strict();
+-
+-export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
+-  const origin = request.headers.get('origin');
+-  try { if (!origin || new URL(origin).origin !== requestOrigin(request)) return NextResponse.json({ error: 'Cross-origin request denied.' }, { status: 403 }); }
+-  catch { return NextResponse.json({ error: 'Cross-origin request denied.' }, { status: 403 }); }
+-  const actor = await currentRootActor();
+-  if (!actor?.isInstanceOwner) return NextResponse.json({ error: 'Not found.' }, { status: actor ? 404 : 401 });
+-  try {
+-    const { id } = await params;
+-    if (!id || id.length > 200) return NextResponse.json({ error: 'Invalid workspace.' }, { status: 400 });
+-    const input = schema.parse(await request.json());
+-    const maxName = await runtimeConfig('root.workspaceNameMaxCharacters');
+-    if (input.name.length > maxName) return NextResponse.json({ error: `Workspace name must be ${maxName} characters or fewer.` }, { status: 400 });
+-    const result = await renameRootWorkspace(actor.id, id, input.name, input.confirmation);
+-    return NextResponse.json({ ok: true, ...result });
+-  } catch (error) {
+-    if (error instanceof z.ZodError || error instanceof SyntaxError) return NextResponse.json({ error: 'Invalid workspace change.' }, { status: 400 });
+-    if (error instanceof Error && /^(Workspace not found|Workspace deletion|Enter a workspace|Enter the exact|Workspace changed)/.test(error.message)) return NextResponse.json({ error: error.message }, { status: error.message === 'Workspace not found.' ? 404 : 409 });
+-    return NextResponse.json({ error: 'Workspace could not be renamed.' }, { status: 500 });
+-  }
+-}
++const schema = z.object({ name: z.string(), confirmation: z.string() }).strict();
++export const PATCH = rootRoute<{ params: Promise<{ id: string }> }>({ write: true }, async (request, actorId, { params }) => {
++  const input = schema.parse(await request.json());
++  return renameRootWorkspace(actorId, (await params).id, input.name, input.confirmation);
++});
+diff --git a/rebuild/src/app/api/root/workspaces/route.ts b/rebuild/src/app/api/root/workspaces/route.ts
+index 84d45dc1..e4041b31 100644
+--- a/rebuild/src/app/api/root/workspaces/route.ts
++++ b/rebuild/src/app/api/root/workspaces/route.ts
+@@ -1,39 +1,16 @@
+-import { requestOrigin } from '@/server/request-origin';
+ import { NextResponse } from 'next/server';
+ import { z } from 'zod';
+-import { currentRootActor } from '@/server/config/access';
+-import { runtimeConfig } from '@/server/config/store';
+ import { createRootWorkspace } from '@/server/root/workspace-controls';
+ import { listRootWorkspaces } from '@/server/root/directory';
+ import { rootRoute, searchParamsObject } from '@/server/root/legacy/http';
+-import { OperationError } from '@/lib/operation-error';
+ 
+ export const runtime = 'nodejs';
+ const schema = z.object({ name: z.string().trim().min(1), ownerEmail: z.string().trim().email(), confirmation: z.string().min(1), timezone: z.string().optional() }).strict();
+ 
+ /** Private directory read through the same service and Root page size as MCP/UI. */
+-export const GET = rootRoute({}, async request => {
+-  const query = searchParamsObject(request, ['q', 'page']);
+-  if (query.page !== undefined && (!Number.isSafeInteger(Number(query.page)) || Number(query.page) < 1)) throw new OperationError('invalid_request', 'Choose a valid workspace query and page.');
+-  return listRootWorkspaces(query, Number(await runtimeConfig('root.directoryPageSize')));
+-});
++export const GET = rootRoute({}, async (request, actorId) => listRootWorkspaces(actorId, searchParamsObject(request, ['q', 'page'])));
+ 
+-export async function POST(request: Request) {
+-  const origin = request.headers.get('origin');
+-  try { if (!origin || new URL(origin).origin !== requestOrigin(request)) return NextResponse.json({ error: 'Cross-origin request denied.' }, { status: 403 }); }
+-  catch { return NextResponse.json({ error: 'Cross-origin request denied.' }, { status: 403 }); }
+-  const actor = await currentRootActor();
+-  if (!actor?.isInstanceOwner) return NextResponse.json({ error: 'Not found.' }, { status: actor ? 404 : 401 });
+-  try {
+-    const input = schema.parse(await request.json());
+-    const maxName = await runtimeConfig('root.workspaceNameMaxCharacters');
+-    if (input.name.length > maxName) return NextResponse.json({ error: `Workspace name must be ${maxName} characters or fewer.` }, { status: 400 });
+-    const timezone = input.timezone ?? await runtimeConfig('root.defaultWorkspaceTimezone');
+-    const result = await createRootWorkspace(actor.id, { ...input, timezone });
+-    return NextResponse.json({ ok: true, ...result }, { status: 201 });
+-  } catch (error) {
+-    if (error instanceof z.ZodError || error instanceof SyntaxError) return NextResponse.json({ error: 'Invalid workspace.' }, { status: 400 });
+-    if (error instanceof Error && /^(Enter a workspace|Choose a valid|Enter the exact|Choose an existing)/.test(error.message)) return NextResponse.json({ error: error.message }, { status: 409 });
+-    return NextResponse.json({ error: 'Workspace could not be created.' }, { status: 500 });
+-  }
+-}
++export const POST = rootRoute({ write: true }, async (request, actorId) => {
++  const result = await createRootWorkspace(actorId, schema.parse(await request.json()));
++  return NextResponse.json({ ok: true, ...result }, { status: 201, headers: { 'cache-control': 'no-store' } });
++});
+diff --git a/rebuild/src/app/root/config/page.tsx b/rebuild/src/app/root/config/page.tsx
+index 184b4bc0..c026a18e 100644
+--- a/rebuild/src/app/root/config/page.tsx
++++ b/rebuild/src/app/root/config/page.tsx
+@@ -1,3 +1,4 @@
++import { readRootConfig } from '@/modules/root/server/configuration';
+ import { headers } from 'next/headers';
+ import { rootCopyLocale } from '@/server/root/legacy/copy';
+ import { ROOT_INTERFACE_COPY, type RootInterfaceCatalog } from '@/lib/config/root-interface-copy';
+@@ -16,11 +17,11 @@ export async function generateMetadata() {
+ }
+ 
+ export default async function RootConfigPage({ searchParams }: { searchParams: Promise<{ search?: string | string[] }> }) {
+-  await requireRootPage();
++  const actor = await requireRootPage();
+   // readConfig validates the same registry snapshot used by HTTP and MCP and masks secrets.
+   // Registry defaults keep the recovery screen available if the store cannot be read.
+   let values: Awaited<ReturnType<typeof readConfig>> | null = null;
+-  try { values = await readConfig(); } catch { /* Render a recoverable store state. */ }
++  try { values = (await readRootConfig(actor.id)).values; } catch { /* Render a recoverable store state. */ }
+   const copy = (values?.find(value => value.key === 'root.configCopy')?.value ?? ROOT_CONFIG_COPY) as RootConfigCopy;
+   const searchLimit = Number(values?.find(value => value.key === 'root.configSearchMaxCharacters')?.value ?? CONFIG_BY_KEY.get('root.configSearchMaxCharacters')!.defaultValue);
+   const locale = rootCopyLocale((await headers()).get('accept-language'));
+diff --git a/rebuild/src/app/root/config/root-config-form.tsx b/rebuild/src/app/root/config/root-config-form.tsx
+index ea09f0af..20e75f08 100644
+--- a/rebuild/src/app/root/config/root-config-form.tsx
++++ b/rebuild/src/app/root/config/root-config-form.tsx
+@@ -65,7 +65,7 @@ export function RootConfigForm({ definitions, initialValues, availability, group
+     setFieldErrors(current => { const next = { ...current }; delete next[key]; return next; });
+     setMessage({ text: operation === 'save' ? copy.saving : copy.clearing, error: false });
+     try {
+-      const response = await fetch('/api/root/config', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ key, value, ...(operation === 'clear' ? { clear: true } : {}) }) });
++      const response = await fetch('/api/root/config', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ key, value, confirmation: `${operation === 'clear' ? 'CLEAR ROOT SECRET' : 'SET ROOT CONFIG'} ${key}`, ...(operation === 'clear' ? { clear: true } : {}) }) });
+       const result = await response.json() as { error?: unknown; values?: unknown };
+       if (!response.ok) {
+         return failure(typeof result.error === 'string' && result.error ? result.error : (operation === 'save' ? copy.saveFailure : copy.clearFailure));
+diff --git a/rebuild/src/app/root/errors/ResolveError.tsx b/rebuild/src/app/root/errors/ResolveError.tsx
+index 473d2546..16195d80 100644
+--- a/rebuild/src/app/root/errors/ResolveError.tsx
++++ b/rebuild/src/app/root/errors/ResolveError.tsx
+@@ -12,7 +12,7 @@ export function ResolveError({ id, resolved }: { id: string; resolved: boolean }
+   async function toggle() {
+     setBusy(true); setError('');
+     try {
+-      const response = await fetch(`/api/root/errors/${encodeURIComponent(id)}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ resolved: !resolved }) });
++      const response = await fetch(`/api/root/errors/${encodeURIComponent(id)}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ resolved: !resolved, confirmation: `${resolved ? 'REOPEN' : 'RESOLVE'} ROOT ERROR ${id}` }) });
+       const payload: unknown = await response.json().catch(() => null);
+       if (!response.ok || typeof payload !== 'object' || payload === null || (payload as { ok?: unknown }).ok !== true) setError('The change could not be confirmed. Reload before repeating it.');
+       else router.refresh();
+diff --git a/rebuild/src/app/root/workspaces/page.tsx b/rebuild/src/app/root/workspaces/page.tsx
+index 6e2cf533..ba20e107 100644
+--- a/rebuild/src/app/root/workspaces/page.tsx
++++ b/rebuild/src/app/root/workspaces/page.tsx
+@@ -12,10 +12,10 @@ export const dynamic = 'force-dynamic';
+ export const metadata = { title: 'Workspaces · Root' };
+ 
+ export default async function RootWorkspacesPage({ searchParams }: { searchParams: Promise<{ q?: string; page?: string }> }) {
+-  await requireRootPage();
++  const actor = await requireRootPage();
+   const params = await searchParams;
+-  const [pageSize, defaultTimezone, maxName] = await Promise.all([runtimeConfig('root.directoryPageSize'), runtimeConfig('root.defaultWorkspaceTimezone'), runtimeConfig('root.workspaceNameMaxCharacters')]);
+-  const data = await listRootWorkspaces(params, pageSize);
++  const [defaultTimezone, maxName] = await Promise.all([runtimeConfig('root.defaultWorkspaceTimezone'), runtimeConfig('root.workspaceNameMaxCharacters')]);
++  const data = await listRootWorkspaces(actor.id, params);
+   const url = (page: number) => `/root/workspaces?${new URLSearchParams({ ...(data.query ? { q: data.query } : {}), page: String(page) })}`;
+   return <RootFrame active="/root/workspaces"><PageHeader module="root" title="Workspaces" description={<>{data.total} {data.query ? 'matching workspaces' : 'workspaces across this installation'}.</>} /><RootDirectorySearch kind="workspaces" query={data.query} />
+     <CreateRootWorkspace defaultTimezone={defaultTimezone} maxName={maxName} />
+diff --git a/rebuild/src/modules/root/server/configuration.ts b/rebuild/src/modules/root/server/configuration.ts
+new file mode 100644
+index 00000000..83519a62
+--- /dev/null
++++ b/rebuild/src/modules/root/server/configuration.ts
+@@ -0,0 +1,82 @@
++import { z } from 'zod';
++import { createCipheriv, randomBytes } from 'node:crypto';
++import { CONFIG_BY_KEY, CONFIG_SCHEMA_VERSION, safeConfigShape, AVAILABILITY_CATALOG, type ConfigKey } from '@/lib/config/registry';
++import { prisma } from '@/server/data';
++import type { Prisma } from '../../../../generated/client';
++import { applySynchronousPolicy } from '@/server/synchronous-policy';
++import { applyConnectionHealthCopy } from '@/lib/connection-health';
++import { readConfig } from '@/server/config/store';
++import { assertRootActor, lockRootActor, invalid } from '@/server/root/legacy/authz';
++// Versioned AES-GCM envelope and random audit entropy, not operational limits.
++const CONFIG_SECRET_KEY_BYTES = 32;
++const CONFIG_SECRET_IV_BYTES = 12;
++const CONFIG_AUDIT_ID_BYTES = 12;
++const secretKey = () => {
++  const encoded = process.env.ENCRYPTION_KEY;
++  if (!encoded) throw new Error('ENCRYPTION_KEY is required before saving secret configuration.');
++  const key = Buffer.from(encoded, 'base64');
++  if (key.length !== CONFIG_SECRET_KEY_BYTES) throw new Error('ENCRYPTION_KEY must decode to 32 bytes.');
++  return key;
++};
++
++function encrypt(value: string): string {
++  const iv = randomBytes(CONFIG_SECRET_IV_BYTES);
++  const cipher = createCipheriv('aes-256-gcm', secretKey(), iv);
++  const encrypted = Buffer.concat([cipher.update(value, 'utf8'), cipher.final()]);
++  return ['v1', iv.toString('base64url'), cipher.getAuthTag().toString('base64url'), encrypted.toString('base64url')].join(':');
++}
++
++
++/** One private snapshot shared by UI, REST and installation MCP. */
++export async function readRootConfig(actorId: string) {
++  await assertRootActor(prisma, actorId);
++  return { schemaVersion: CONFIG_SCHEMA_VERSION, definitions: safeConfigShape(), values: await readConfig(), availability: AVAILABILITY_CATALOG };
++}
++const writeSchema = z.object({ key: z.string(), value: z.unknown().optional(), clear: z.boolean().optional(), confirmation: z.string().optional() }).strict();
++export async function saveRootConfig(input: unknown, actorId: string) {
++  await assertRootActor(prisma, actorId);
++  const requestResult = writeSchema.safeParse(input);
++  if (!requestResult.success) throw invalid('Invalid value: expected a key and value.');
++  const request = requestResult.data;
++  const definition = CONFIG_BY_KEY.get(request.key as ConfigKey);
++  if (!definition) throw invalid('Unknown configuration key.');
++  if (request.clear && definition.kind !== 'secret') throw invalid('Only secret values can be cleared.');
++  const expected = `${request.clear ? 'CLEAR ROOT SECRET' : 'SET ROOT CONFIG'} ${request.key}`;
++  if (request.confirmation !== expected) throw invalid(`Confirmation required. Repeat with confirmation exactly: ${expected}`);
++  if (definition.kind === 'secret' && request.clear) {
++    await prisma.$transaction(async (tx) => {
++    await lockRootActor(tx, actorId);
++      await tx.appSetting.deleteMany({ where: { key: definition.key } });
++      await audit(tx, actorId, definition.key, 'cleared');
++    });
++    return;
++  }
++  const checked = definition.schema.safeParse(request.value);
++  if (!checked.success) throw invalid(checked.error.issues.map(issue => `${issue.path.join('.')}: ${issue.message}`).join(' '));
++  if (definition.kind === 'secret' && checked.data === '') throw invalid('Enter a secret or use Clear saved secret.');
++  const encrypted = definition.kind === 'secret';
++  const value = encrypted ? encrypt(String(checked.data)) : checked.data;
++  await prisma.$transaction(async (tx) => {
++    await lockRootActor(tx, actorId);
++    await tx.appSetting.upsert({
++      where: { key: definition.key },
++      create: { key: definition.key, value, encrypted, updatedAt: new Date() },
++      update: { value, encrypted, updatedAt: new Date() },
++    });
++    await audit(tx, actorId, definition.key, encrypted ? 'secret updated' : 'value updated');
++  });
++  applySynchronousPolicy(definition.key, checked.data);
++  if (definition.key === 'connections.healthCopy') applyConnectionHealthCopy(checked.data);
++  if (definition.key === 'app.publicOrigin' || definition.key === 'app.developmentOrigins') await (await import('@/server/request-origin')).refreshPublicOrigin();
++}
++
++async function audit(tx: Prisma.TransactionClient, actorId: string, key: string, change: string) {
++  // Existing installation-wide audit table from the legacy schema. Parameterized
++  // values keep the query safe; the secret itself is never included in detail.
++  await tx.$executeRaw`INSERT INTO root_activities (id, "actorId", action, detail, "createdAt") VALUES (${`cfg_${randomBytes(CONFIG_AUDIT_ID_BYTES).toString('hex')}`}, ${actorId}, 'config.changed', ${JSON.stringify(configAuditDetail(key, change))}::jsonb, NOW())`;
++}
++
++/** Stable, value-free audit payload for validating Root setting changes. */
++export function configAuditDetail(key: string, change: string) {
++  return { key, change, schemaVersion: CONFIG_SCHEMA_VERSION };
++}
+diff --git a/rebuild/src/modules/root/server/directory.ts b/rebuild/src/modules/root/server/directory.ts
+new file mode 100644
+index 00000000..3ac82f0d
+--- /dev/null
++++ b/rebuild/src/modules/root/server/directory.ts
+@@ -0,0 +1,34 @@
++import { prisma } from '@/server/data';
++import { assertRootActor, invalid } from '@/server/root/legacy/authz';
++import { runtimeConfig } from '@/server/config/store';
++import { rootResultLimit } from '@/server/root/legacy/policy';
++
++export function rootDirectoryQuery(input: { q?: string; page?: string }, pageSize: number) {
++  if (!Number.isInteger(pageSize) || pageSize < 1) throw new Error('Invalid Root directory page size.');
++  const query = (input.q ?? '').trim();
++  const parsed = Number(input.page ?? '1');
++  const page = Number.isSafeInteger(parsed) && parsed > 0 ? Math.min(parsed, Math.floor(Number.MAX_SAFE_INTEGER / pageSize)) : 1;
++  return { query, page, skip: (page - 1) * pageSize, take: pageSize };
++}
++
++export async function listRootWorkspaces(actorId: string, input: { q?: string; page?: string }, resultCap?: number) {
++  await assertRootActor(prisma, actorId);
++  const [configuredSize, searchMax, pageMax] = await Promise.all([runtimeConfig('root.directoryPageSize'), runtimeConfig('root.legacy.searchMaxCharacters'), runtimeConfig('root.pageMaxNumber')]);
++  if (!input || typeof input !== 'object' || Array.isArray(input) || Object.keys(input).some(key => !['q', 'page'].includes(key)) || input.q !== undefined && (typeof input.q !== 'string' || input.q.length > searchMax) || input.page !== undefined && (typeof input.page !== 'string' || !Number.isSafeInteger(Number(input.page)) || Number(input.page) < 1 || Number(input.page) > pageMax)) throw invalid('Choose a valid workspace query and page.');
++  const pageSize = rootResultLimit(configuredSize, resultCap);
++  let selection = rootDirectoryQuery(input, pageSize);
++  const where = selection.query ? { OR: [
++    { name: { contains: selection.query, mode: 'insensitive' as const } },
++    { slug: { contains: selection.query, mode: 'insensitive' as const } },
++  ] } : {};
++  const total = await prisma.workspace.count({ where });
++  selection = rootDirectoryQuery({ ...input, page: String(Math.min(selection.page, Math.max(1, Math.ceil(total / pageSize)))) }, pageSize);
++  const workspaces = await prisma.workspace.findMany({ where, orderBy: [{ createdAt: 'desc' }, { id: 'asc' }], skip: selection.skip, take: selection.take,
++      select: { id: true, name: true, slug: true, timezone: true, createdAt: true,
++        _count: { select: { memberships: true, targets: true, posts: true, adAccounts: true } },
++        dataPurge: { select: { status: true } } } });
++  const ids = workspaces.map(workspace => workspace.id);
++  const access = ids.length ? await prisma.$queryRaw<Array<{ id: string; suspendedAt: Date | null }>>`SELECT id, "suspendedAt" FROM workspaces WHERE id = ANY(${ids}::text[])` : [];
++  const suspendedById = new Map(access.map(row => [row.id, row.suspendedAt]));
++  return { ...selection, total, workspaces: workspaces.map(workspace => ({ ...workspace, suspendedAt: suspendedById.get(workspace.id) ?? null })) };
++}
+diff --git a/rebuild/src/modules/root/server/errors.ts b/rebuild/src/modules/root/server/errors.ts
+new file mode 100644
+index 00000000..1f5e1538
+--- /dev/null
++++ b/rebuild/src/modules/root/server/errors.ts
+@@ -0,0 +1,81 @@
++import { synchronousPolicy, withinSynchronousLimit } from '@/lib/config/synchronous-policy';
++import { runtimeConfig } from '@/server/config/store';
++import { z } from 'zod';
++import { prisma } from '@/server/data';
++import { OperationError } from '@/lib/operation-error';
++import { assertRootActor, lockRootActor, invalid, isMissingRelation, redact } from '@/server/root/legacy/authz';
++import { writeRootAudit } from '@/server/root/legacy/audit';
++import { rootResultLimit, legacySetting, rootTransaction } from '@/server/root/legacy/policy';
++
++type ErrorRow = { id: string; source: string; name: string; message: string; stack?: string | null; location: string | null; release: string; count: number; firstSeenAt: Date; lastSeenAt: Date; resolvedAt: Date | null; total?: number };
++
++const filterSchema = z.object({ status: z.enum(['open', 'resolved', 'all']).optional(), source: z.enum(['server', 'worker', 'browser']).optional(), q: z.string().trim().optional(), page: z.coerce.number().int().min(1).refine(value => value <= synchronousPolicy('root.pageMaxNumber')).optional() }).strict();
++const like = (value: string) => `%${value.replace(/[\\%_]/g, match => `\\${match}`)}%`;
++const unavailable = () => new OperationError('unavailable', 'The error log is not available in this database.');
++
++async function errorShapePolicy(withStack: boolean) {
++  const [message, stack, name, location, release] = await Promise.all([legacySetting('root.legacy.errorMessageMaxCharacters'), withStack ? legacySetting('root.legacy.errorStackMaxCharacters') : Promise.resolve(0), runtimeConfig('root.errorNameMaxCharacters'), runtimeConfig('root.errorLocationMaxCharacters'), runtimeConfig('root.errorReleaseMaxCharacters')]);
++  return { message, stack, name, location, release };
++}
++
++function shape(row: ErrorRow, withStack: boolean, { message, stack, name, location, release }: Awaited<ReturnType<typeof errorShapePolicy>>) {
++  return {
++    id: row.id, source: row.source, name: redact(row.name, name), message: redact(row.message, message), location: redact(row.location?.split(/[?#]/)[0], location), release: row.release.replace(/[^\x20-\x7e]/g, "").slice(0, release), count: row.count,
++    firstSeenAt: row.firstSeenAt.toISOString(), lastSeenAt: row.lastSeenAt.toISOString(), resolvedAt: row.resolvedAt ? row.resolvedAt.toISOString() : null,
++    ...(withStack ? { stack: redact(row.stack, stack) } : {}),
++  };
++}
++
++/** Grouped error occurrences, newest first. Messages are redacted and truncated; stacks are detail only. */
++export async function listRootErrors(actorId: string, input: unknown = {}, resultCap?: number) {
++  await assertRootActor(prisma, actorId);
++  const parsed = filterSchema.safeParse(input);
++  const max = await legacySetting('root.legacy.searchMaxCharacters');
++  if (!parsed.success || (parsed.data.q?.length ?? 0) > max) throw invalid('Use a shorter search and a valid filter.');
++  const { status = 'open', source, q, page = 1 } = parsed.data;
++  const size = rootResultLimit(await legacySetting('root.legacy.errorPageSize'), resultCap);
++  const pattern = q ? like(q) : null;
++  const sourceFilter = source ?? null;
++  try {
++    const rows = await prisma.$queryRaw<ErrorRow[]>`SELECT id, source, name, message, location, release, count, "firstSeenAt", "lastSeenAt", "resolvedAt", COUNT(*) OVER()::int AS total FROM error_events WHERE (${status} = 'all' OR (${status} = 'open' AND "resolvedAt" IS NULL) OR (${status} = 'resolved' AND "resolvedAt" IS NOT NULL)) AND (${sourceFilter}::text IS NULL OR source = ${sourceFilter}) AND (${pattern}::text IS NULL OR name ILIKE ${pattern} ESCAPE '\\' OR message ILIKE ${pattern} ESCAPE '\\' OR location ILIKE ${pattern} ESCAPE '\\') ORDER BY "lastSeenAt" DESC, id LIMIT ${size} OFFSET ${(page - 1) * size}`;
++    const policy = await errorShapePolicy(false);
++    return { items: rows.map(row => shape(row, false, policy)), page, pageSize: size, total: rows[0]?.total ?? 0, limits: { searchMaxCharacters: max } };
++  } catch (error) {
++    if (isMissingRelation(error)) throw unavailable();
++    throw error;
++  }
++}
++
++export async function getRootError(actorId: string, id: string) {
++  await assertRootActor(prisma, actorId);
++  if (!id || id.length > synchronousPolicy('root.identifierMaxCharacters')) throw invalid('Choose an error.');
++  try {
++    const row = (await prisma.$queryRaw<ErrorRow[]>`SELECT id, source, name, message, stack, location, release, count, "firstSeenAt", "lastSeenAt", "resolvedAt" FROM error_events WHERE id = ${id}`)[0];
++    if (!row) throw new OperationError('not_found', 'Error not found.');
++    return shape(row, true, await errorShapePolicy(true));
++  } catch (error) {
++    if (isMissingRelation(error)) throw unavailable();
++    throw error;
++  }
++}
++
++/** Confirmed reversible bookkeeping, audited atomically. A new occurrence reopens it by itself. */
++export async function setRootErrorResolved(actorId: string, id: string, resolved: boolean, confirmation?: string) {
++  if (typeof id !== 'string' || !id || id.length > await runtimeConfig('root.identifierMaxCharacters') || typeof resolved !== 'boolean') throw invalid('Choose an error.');
++  try {
++    return await rootTransaction(async tx => {
++      await lockRootActor(tx, actorId);
++      if (typeof confirmation !== 'string' || confirmation.length > await runtimeConfig('root.confirmationMaxCharacters') || confirmation !== `${resolved ? 'RESOLVE' : 'REOPEN'} ROOT ERROR ${id}`) throw invalid('Enter the exact error action confirmation.');
++      const row = (await tx.$queryRaw<Array<{ id: string; resolvedAt: Date | null }>>`SELECT id, "resolvedAt" FROM error_events WHERE id = ${id} FOR UPDATE`)[0];
++      if (!row) throw new OperationError('not_found', 'Error not found.');
++      if (Boolean(row.resolvedAt) === resolved) return { changed: false, id, resolved };
++      const changed = await tx.$executeRaw`UPDATE error_events SET "resolvedAt" = ${resolved ? new Date() : null} WHERE id = ${id}`;
++      if (changed !== 1) throw new OperationError('conflict', 'The error record changed. Reload and try again.');
++      await writeRootAudit(tx, actorId, resolved ? 'root.error_resolved' : 'root.error_reopened', { errorId: id });
++      return { changed: true, id, resolved };
++    });
++  } catch (error) {
++    if (isMissingRelation(error)) throw unavailable();
++    throw error;
++  }
++}
+diff --git a/rebuild/src/modules/root/server/workspace-controls.ts b/rebuild/src/modules/root/server/workspace-controls.ts
+new file mode 100644
+index 00000000..0454ded0
+--- /dev/null
++++ b/rebuild/src/modules/root/server/workspace-controls.ts
+@@ -0,0 +1,64 @@
++import { randomUUID } from 'node:crypto';
++import { z } from 'zod';
++import { runtimeConfig } from '@/server/config/store';
++import { lockRootActor, invalid, conflict } from '@/server/root/legacy/authz';
++import { OperationError } from '@/lib/operation-error';
++import { rootTransaction } from '@/server/root/legacy/policy';
++
++type CreateInput = { name: string; ownerEmail: string; timezone?: string; confirmation: string };
++
++function validTimezone(timezone: string) {
++  try { new Intl.DateTimeFormat('en', { timeZone: timezone }); return true; } catch { return false; }
++}
++
++export async function createRootWorkspace(actorId: string, input: CreateInput) {
++  const parsed = z.object({ name: z.string().trim().min(1), ownerEmail: z.string().trim().toLowerCase().email(), timezone: z.string().optional(), confirmation: z.string() }).strict().safeParse(input);
++  if (!parsed.success) throw invalid('Enter a workspace name, owner email and exact confirmation.');
++  input = parsed.data;
++  const name = input.name.trim();
++  const timezone = input.timezone ?? await runtimeConfig('root.defaultWorkspaceTimezone');
++  await validateWorkspaceInput(name, input.confirmation);
++  if (input.ownerEmail.length > await runtimeConfig('root.emailMaxCharacters')) throw invalid('Choose a valid owner email.');
++  const ownerEmail = input.ownerEmail.trim().toLowerCase();
++  if (!name) throw invalid('Enter a workspace name.');
++  if (!validTimezone(timezone)) throw invalid('Choose a valid timezone.');
++  if (input.confirmation !== `CREATE ${name} FOR ${ownerEmail}`) throw invalid('Enter the exact confirmation shown.');
++  const id = randomUUID();
++  const base = name.normalize('NFKD').toLowerCase().replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'workspace';
++  const slug = `${base}-${id}`;
++  return rootTransaction(async tx => {
++    await lockRootActor(tx, actorId);
++    const owner = await tx.user.findUnique({ where: { email: ownerEmail }, select: { id: true, email: true, disabledAt: true } });
++    if (!owner || owner.disabledAt) throw invalid('Choose an existing active account as owner.');
++    const workspace = await tx.workspace.create({ data: { id, name, slug, timezone, memberships: { create: { id: randomUUID(), userId: owner.id, role: 'owner' } } }, select: { id: true, slug: true } });
++    const detail = JSON.stringify({ workspaceId: workspace.id, ownerId: owner.id });
++    await tx.$executeRaw`INSERT INTO root_activities (id, "actorId", action, detail, "createdAt") VALUES (${randomUUID()}, ${actorId}, ${'root.workspace_created'}, ${detail}::jsonb, NOW())`;
++    return workspace;
++  });
++}
++
++export async function renameRootWorkspace(actorId: string, workspaceId: string, nameInput: string, confirmation: string) {
++  if (typeof nameInput !== 'string' || typeof workspaceId !== 'string' || !workspaceId || workspaceId.length > await runtimeConfig('root.identifierMaxCharacters')) throw invalid('Choose a valid workspace and name.');
++  const name = nameInput.trim();
++  await validateWorkspaceInput(name, confirmation);
++  if (!name) throw invalid('Enter a workspace name.');
++  return rootTransaction(async tx => {
++    await lockRootActor(tx, actorId);
++    const workspace = await tx.workspace.findUnique({ where: { id: workspaceId }, select: { id: true, name: true, dataPurge: { select: { status: true } } } });
++    if (!workspace) throw new OperationError('not_found', 'Workspace not found.');
++    if (workspace.dataPurge) throw conflict('Workspace deletion is in progress.');
++    if (confirmation !== `RENAME ${workspace.name} TO ${name}`) throw invalid('Enter the exact confirmation shown.');
++    if (name === workspace.name) return { changed: false };
++    const result = await tx.workspace.updateMany({ where: { id: workspaceId, name: workspace.name }, data: { name } });
++    if (result.count !== 1) throw conflict('Workspace changed; reload and try again.');
++    const detail = JSON.stringify({ workspaceId, previousName: workspace.name, name });
++    await tx.$executeRaw`INSERT INTO root_activities (id, "actorId", action, detail, "createdAt") VALUES (${randomUUID()}, ${actorId}, ${'root.workspace_renamed'}, ${detail}::jsonb, NOW())`;
++    return { changed: true };
++  });
++}
++
++async function validateWorkspaceInput(name: string, confirmation: string) {
++  const [nameMax, confirmationMax] = await Promise.all([runtimeConfig('root.workspaceNameMaxCharacters'), runtimeConfig('root.confirmationMaxCharacters')]);
++  if (!name || name.length > nameMax) throw invalid('Enter a workspace name within the configured limit.');
++  if (typeof confirmation !== 'string' || confirmation.length > confirmationMax) throw invalid('Enter the exact confirmation shown.');
++}
+diff --git a/rebuild/src/server/config/store.ts b/rebuild/src/server/config/store.ts
+index bb8cf286..d94a6e05 100644
+--- a/rebuild/src/server/config/store.ts
++++ b/rebuild/src/server/config/store.ts
+@@ -1,17 +1,10 @@
+-import { applyConnectionHealthCopy } from '@/lib/connection-health';
+-import { applySynchronousPolicy } from '@/server/synchronous-policy';
+-import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
+-import { z } from 'zod';
+-import { CONFIG_BY_KEY, CONFIG_REGISTRY, CONFIG_SCHEMA_VERSION, type ConfigKey, type ConfigValue } from '@/lib/config/registry';
++import { createDecipheriv } from 'node:crypto';
++import { CONFIG_BY_KEY, CONFIG_REGISTRY, type ConfigKey, type ConfigValue } from '@/lib/config/registry';
+ import { prisma } from '@/server/data';
+-import { Prisma } from '../../../generated/client';
+ 
+-// AES-256-GCM envelope v1 invariants: key width and recommended nonce width.
++// AES-256-GCM envelope v1 invariant: key width.
+ // These cannot vary without a separately versioned encryption format.
+ const CONFIG_SECRET_KEY_BYTES = 32;
+-const CONFIG_SECRET_IV_BYTES = 12;
+-// Audit identifiers use random entropy rather than an operational record limit.
+-const CONFIG_AUDIT_ID_BYTES = 12;
+ 
+ const secretKey = () => {
+   const encoded = process.env.ENCRYPTION_KEY;
+@@ -21,13 +14,6 @@ const secretKey = () => {
+   return key;
+ };
+ 
+-function encrypt(value: string): string {
+-  const iv = randomBytes(CONFIG_SECRET_IV_BYTES);
+-  const cipher = createCipheriv('aes-256-gcm', secretKey(), iv);
+-  const encrypted = Buffer.concat([cipher.update(value, 'utf8'), cipher.final()]);
+-  return ['v1', iv.toString('base64url'), cipher.getAuthTag().toString('base64url'), encrypted.toString('base64url')].join(':');
+-}
+-
+ function decrypt(value: string): string {
+   const parts = value.split(':');
+   if (parts.length !== 4 || parts[0] !== 'v1') throw new Error('Malformed encrypted configuration.');
+@@ -95,46 +81,4 @@ export async function readConfig() {
+   });
+ }
+ 
+-const writeSchema = z.object({ key: z.string(), value: z.unknown(), clear: z.boolean().optional() });
+-export async function saveConfig(input: unknown, actorId: string) {
+-  const requestResult = writeSchema.safeParse(input);
+-  if (!requestResult.success) throw new Error('Invalid value: expected a key and value.');
+-  const request = requestResult.data;
+-  const definition = CONFIG_BY_KEY.get(request.key as ConfigKey);
+-  if (!definition) throw new Error('Unknown configuration key.');
+-  if (request.clear && definition.kind !== 'secret') throw new Error('Only secret values can be cleared.');
+-  if (definition.kind === 'secret' && request.clear) {
+-    await prisma.$transaction(async (tx) => {
+-      await tx.appSetting.deleteMany({ where: { key: definition.key } });
+-      await audit(tx, actorId, definition.key, 'cleared');
+-    });
+-    return;
+-  }
+-  const checked = definition.schema.safeParse(request.value);
+-  if (!checked.success) throw new Error(checked.error.issues[0]?.message ?? 'Invalid value.');
+-  if (definition.kind === 'secret' && checked.data === '') throw new Error('Enter a secret or use Clear saved secret.');
+-  const encrypted = definition.kind === 'secret';
+-  const value = encrypted ? encrypt(String(checked.data)) : checked.data;
+-  await prisma.$transaction(async (tx) => {
+-    await tx.appSetting.upsert({
+-      where: { key: definition.key },
+-      create: { key: definition.key, value, encrypted, updatedAt: new Date() },
+-      update: { value, encrypted, updatedAt: new Date() },
+-    });
+-    await audit(tx, actorId, definition.key, encrypted ? 'secret updated' : 'value updated');
+-  });
+-  applySynchronousPolicy(definition.key, checked.data);
+-  if (definition.key === 'connections.healthCopy') applyConnectionHealthCopy(checked.data);
+-  if (definition.key === 'app.publicOrigin' || definition.key === 'app.developmentOrigins') await (await import('@/server/request-origin')).refreshPublicOrigin();
+-}
+-
+-async function audit(tx: Prisma.TransactionClient, actorId: string, key: string, change: string) {
+-  // Existing installation-wide audit table from the legacy schema. Parameterized
+-  // values keep the query safe; the secret itself is never included in detail.
+-  await tx.$executeRaw`INSERT INTO root_activities (id, "actorId", action, detail, "createdAt") VALUES (${`cfg_${randomBytes(CONFIG_AUDIT_ID_BYTES).toString('hex')}`}, ${actorId}, 'config.changed', ${JSON.stringify(configAuditDetail(key, change))}::jsonb, NOW())`;
+-}
+-
+-/** Stable, value-free audit payload for validating Root setting changes. */
+-export function configAuditDetail(key: string, change: string) {
+-  return { key, change, schemaVersion: CONFIG_SCHEMA_VERSION };
+-}
++export { saveRootConfig as saveConfig, configAuditDetail } from '@/modules/root/server/configuration';
+diff --git a/rebuild/src/server/mcp/root-tools.ts b/rebuild/src/server/mcp/root-tools.ts
+index 17ef9232..fbf88cad 100644
+--- a/rebuild/src/server/mcp/root-tools.ts
++++ b/rebuild/src/server/mcp/root-tools.ts
+@@ -1,3 +1,4 @@
++import { readRootConfig, saveRootConfig } from '@/modules/root/server/configuration';
+ import { listRootInboxDeletions, confirmRootInboxDeletion } from '../root/inbox-deletions';
+ import { listRootPostDeletions, recordRootPostDeletionOutcome } from '../root/post-deletions';
+ import { adoptRootLegacyPublication, finishRootPublicationProjection, listRootPublicationAttempts, recordRootPublicationOutcome } from '../root/publication-attempts';
+@@ -5,8 +6,8 @@ import { z } from 'zod';
+ import { listRootDiagnostics, runRootDiagnostics } from '../root/diagnostics';
+ import { loadRootOperations } from '../root/operations';
+ import { prisma } from '../data';
+-import { readConfig, runtimeConfig, saveConfig } from '../config/store';
+-import { CONFIG_BY_KEY, CONFIG_SCHEMA_VERSION, safeConfigShape } from '@/lib/config/registry';
++import { runtimeConfig } from '../config/store';
++import { CONFIG_SCHEMA_VERSION } from '@/lib/config/registry';
+ import { OperationError, operationFailure } from '@/lib/operation-error';
+ import { setRootWorkspaceAccess } from '../root/workspace-access';
+ import { listRootWorkspaces } from '../root/directory';
+@@ -133,27 +134,25 @@ export async function runRootTool(viewer: RootMcpActor, name: string, args: Reco
+       }
+       case 'get_root_config':
+         if (Object.keys(args).length) throw new OperationError('invalid_request', 'This read does not accept filters.');
+-        return { schemaVersion: CONFIG_SCHEMA_VERSION, definitions: safeConfigShape(), values: await readConfig() };
++        return await readRootConfig(viewer.userId);
+       case 'list_root_activity':
+         return await listRootActivity(viewer.userId, args, viewer.maxResultItems ?? Number(await runtimeConfig('mcp.maxResultItems')));
+       case 'create_root_workspace': {
+         const parsed = z.object({ name: z.string().trim().min(1), ownerEmail: z.string().trim().email(), timezone: z.string().optional(), confirmation: z.string().min(1) }).strict().safeParse(args);
+         if (!parsed.success) throw new OperationError('invalid_request', 'Enter a workspace name, owner email and exact confirmation.');
+         const input = parsed.data;
+-        if (input.name.length > await runtimeConfig('root.workspaceNameMaxCharacters')) throw new OperationError('invalid_request', 'Choose a shorter workspace name.');
+-        return await createRootWorkspace(viewer.userId, { ...input, timezone: input.timezone ?? await runtimeConfig('root.defaultWorkspaceTimezone') });
++        return await createRootWorkspace(viewer.userId, input);
+       }
+       case 'rename_root_workspace': {
+         const parsed = z.object({ workspaceId: z.string().min(1), name: z.string().trim().min(1), confirmation: z.string().min(1) }).strict().safeParse(args);
+         if (!parsed.success) throw new OperationError('invalid_request', 'Choose a workspace, a name and the exact confirmation.');
+         const input = parsed.data;
+-        if (input.workspaceId.length > await runtimeConfig('root.identifierMaxCharacters') || input.name.length > await runtimeConfig('root.workspaceNameMaxCharacters')) throw new OperationError('invalid_request', 'Choose a valid workspace and a shorter name.');
+         return await renameRootWorkspace(viewer.userId, input.workspaceId, input.name, input.confirmation);
+       }
+       case 'list_root_workspaces': {
+         if (Object.keys(args).some(key => !['q', 'page'].includes(key)) || args.q !== undefined && typeof args.q !== 'string' || args.page !== undefined && (typeof args.page !== 'number' || !Number.isSafeInteger(args.page) || args.page < 1)) throw new OperationError('invalid_request', 'Choose a valid workspace query and page.');
+         const cap = viewer.maxResultItems ?? Number(await runtimeConfig('mcp.maxResultItems'));
+-        return await listRootWorkspaces({ q: args.q as string | undefined, page: args.page === undefined ? undefined : String(args.page) }, Math.min(cap, Number(await runtimeConfig('root.directoryPageSize'))));
++        return await listRootWorkspaces(viewer.userId, { q: args.q as string | undefined, page: args.page === undefined ? undefined : String(args.page) }, cap);
+       }
+       case 'set_root_workspace_access':
+         if (Object.keys(args).some(key => !['workspaceId', 'suspended', 'confirmation'].includes(key)) || typeof args.workspaceId !== 'string' || !args.workspaceId.trim() || typeof args.suspended !== 'boolean' || typeof args.confirmation !== 'string' || !args.confirmation.length) throw new OperationError('invalid_request', 'Invalid workspace access change.');
+@@ -162,16 +161,7 @@ export async function runRootTool(viewer: RootMcpActor, name: string, args: Reco
+         const parsed = configInput.safeParse(args);
+         if (!parsed.success) throw new OperationError('invalid_request', 'Enter a valid configuration change and exact confirmation.');
+         const input = parsed.data;
+-        const definition = CONFIG_BY_KEY.get(input.key);
+-        if (!definition) throw new OperationError('invalid_request', 'Unknown configuration key.');
+-        const clear = input.clear === true;
+-        if (clear && definition.kind !== 'secret') throw new OperationError('invalid_request', 'Only secret values can be cleared.');
+-        if (!clear && (!definition.schema.safeParse(input.value).success || definition.kind === 'secret' && input.value === '')) throw new OperationError('invalid_request', 'Choose a valid value for this setting, or use its clear-secret action.');
+-        const expected = `${clear ? 'CLEAR ROOT SECRET' : 'SET ROOT CONFIG'} ${input.key}`;
+-        if (input.confirmation !== expected) throw new OperationError('invalid_request', `Confirmation required. Repeat the call with confirmation exactly: ${expected}`);
+-        // The shared service commits the setting and value-free audit atomically.
+-        // A separate after-commit MCP audit must not turn a saved change into a failure.
+-        await saveConfig({ key: input.key, value: input.value, clear }, viewer.userId);
++        await saveRootConfig(input, viewer.userId);
+         return { key: input.key, saved: true, schemaVersion: CONFIG_SCHEMA_VERSION };
+       }
+       default: throw new OperationError('invalid_request', 'Unknown installation tool.');
+diff --git a/rebuild/src/server/root/RootModuleSettings.tsx b/rebuild/src/server/root/RootModuleSettings.tsx
+index 174be820..ac67ed4f 100644
+--- a/rebuild/src/server/root/RootModuleSettings.tsx
++++ b/rebuild/src/server/root/RootModuleSettings.tsx
+@@ -1,3 +1,4 @@
++import { readRootConfig } from '@/modules/root/server/configuration';
+ import { headers } from 'next/headers';
+ import { rootCopyLocale } from '@/server/root/legacy/copy';
+ import { ROOT_INTERFACE_COPY, type RootInterfaceCatalog } from '@/lib/config/root-interface-copy';
+@@ -16,11 +17,11 @@ import { requireRootPage } from '@/server/config/access';
+ export async function RootModuleSettings({ kind, id, title, description, children, groupPrefix }: {
+   kind: 'product' | 'platform'; id: string; title: string; description: string; children?: ReactNode; groupPrefix?: string;
+ }) {
+-  await requireRootPage();
++  const actor = await requireRootPage();
+   const definitions = safeConfigShape().filter(setting => setting.owner.kind === kind && setting.owner.id === id)
+     .sort((a, b) => Number(!a.key.startsWith('entitlements.')) - Number(!b.key.startsWith('entitlements.')));
+   let values: Awaited<ReturnType<typeof readConfig>> | null = null;
+-  try { values = await readConfig(); } catch { /* Keep the Root navigation available during a store outage. */ }
++  try { values = (await readRootConfig(actor.id)).values; } catch { /* Keep the Root navigation available during a store outage. */ }
+   const locale = rootCopyLocale((await headers()).get('accept-language'));
+   const interfaceCopy = ((values?.find(value => value.key === 'root.interfaceCopy')?.value ?? ROOT_INTERFACE_COPY) as RootInterfaceCatalog)[locale];
+   const keys = new Set(definitions.map(definition => definition.key));
+diff --git a/rebuild/src/server/root/directory.ts b/rebuild/src/server/root/directory.ts
+index 8739142c..feb57fa2 100644
+--- a/rebuild/src/server/root/directory.ts
++++ b/rebuild/src/server/root/directory.ts
+@@ -1,27 +1 @@
+-import { prisma } from '@/server/data';
+-
+-export function rootDirectoryQuery(input: { q?: string; page?: string }, pageSize: number) {
+-  if (!Number.isInteger(pageSize) || pageSize < 1) throw new Error('Invalid Root directory page size.');
+-  const query = (input.q ?? '').trim();
+-  const parsed = Number(input.page ?? '1');
+-  const page = Number.isSafeInteger(parsed) && parsed > 0 ? Math.min(parsed, Math.floor(Number.MAX_SAFE_INTEGER / pageSize)) : 1;
+-  return { query, page, skip: (page - 1) * pageSize, take: pageSize };
+-}
+-
+-export async function listRootWorkspaces(input: { q?: string; page?: string }, pageSize: number) {
+-  let selection = rootDirectoryQuery(input, pageSize);
+-  const where = selection.query ? { OR: [
+-    { name: { contains: selection.query, mode: 'insensitive' as const } },
+-    { slug: { contains: selection.query, mode: 'insensitive' as const } },
+-  ] } : {};
+-  const total = await prisma.workspace.count({ where });
+-  selection = rootDirectoryQuery({ ...input, page: String(Math.min(selection.page, Math.max(1, Math.ceil(total / pageSize)))) }, pageSize);
+-  const workspaces = await prisma.workspace.findMany({ where, orderBy: [{ createdAt: 'desc' }, { id: 'asc' }], skip: selection.skip, take: selection.take,
+-      select: { id: true, name: true, slug: true, timezone: true, createdAt: true,
+-        _count: { select: { memberships: true, targets: true, posts: true, adAccounts: true } },
+-        dataPurge: { select: { status: true } } } });
+-  const ids = workspaces.map(workspace => workspace.id);
+-  const access = ids.length ? await prisma.$queryRaw<Array<{ id: string; suspendedAt: Date | null }>>`SELECT id, "suspendedAt" FROM workspaces WHERE id = ANY(${ids}::text[])` : [];
+-  const suspendedById = new Map(access.map(row => [row.id, row.suspendedAt]));
+-  return { ...selection, total, workspaces: workspaces.map(workspace => ({ ...workspace, suspendedAt: suspendedById.get(workspace.id) ?? null })) };
+-}
++export { rootDirectoryQuery, listRootWorkspaces } from '@/modules/root/server/directory';
+diff --git a/rebuild/src/server/root/legacy/errors.ts b/rebuild/src/server/root/legacy/errors.ts
+index c6752d6e..296ad373 100644
+--- a/rebuild/src/server/root/legacy/errors.ts
++++ b/rebuild/src/server/root/legacy/errors.ts
+@@ -1,80 +1 @@
+-import { synchronousPolicy, withinSynchronousLimit } from '@/lib/config/synchronous-policy';
+-import { runtimeConfig } from '@/server/config/store';
+-import { z } from 'zod';
+-import { prisma } from '@/server/data';
+-import { OperationError } from '@/lib/operation-error';
+-import { assertRootActor, lockRootActor, invalid, isMissingRelation, redact } from './authz';
+-import { writeRootAudit } from './audit';
+-import { rootResultLimit, legacySetting, rootTransaction } from './policy';
+-
+-type ErrorRow = { id: string; source: string; name: string; message: string; stack?: string | null; location: string | null; release: string; count: number; firstSeenAt: Date; lastSeenAt: Date; resolvedAt: Date | null; total?: number };
+-
+-const filterSchema = z.object({ status: z.enum(['open', 'resolved', 'all']).optional(), source: z.enum(['server', 'worker', 'browser']).optional(), q: z.string().trim().optional(), page: z.coerce.number().int().min(1).refine(value => value <= synchronousPolicy('root.pageMaxNumber')).optional() }).strict();
+-const like = (value: string) => `%${value.replace(/[\\%_]/g, match => `\\${match}`)}%`;
+-const unavailable = () => new OperationError('unavailable', 'The error log is not available in this database.');
+-
+-async function errorShapePolicy(withStack: boolean) {
+-  const [message, stack, name, location, release] = await Promise.all([legacySetting('root.legacy.errorMessageMaxCharacters'), withStack ? legacySetting('root.legacy.errorStackMaxCharacters') : Promise.resolve(0), runtimeConfig('root.errorNameMaxCharacters'), runtimeConfig('root.errorLocationMaxCharacters'), runtimeConfig('root.errorReleaseMaxCharacters')]);
+-  return { message, stack, name, location, release };
+-}
+-
+-function shape(row: ErrorRow, withStack: boolean, { message, stack, name, location, release }: Awaited<ReturnType<typeof errorShapePolicy>>) {
+-  return {
+-    id: row.id, source: row.source, name: redact(row.name, name), message: redact(row.message, message), location: redact(row.location?.split(/[?#]/)[0], location), release: row.release.replace(/[^\x20-\x7e]/g, "").slice(0, release), count: row.count,
+-    firstSeenAt: row.firstSeenAt.toISOString(), lastSeenAt: row.lastSeenAt.toISOString(), resolvedAt: row.resolvedAt ? row.resolvedAt.toISOString() : null,
+-    ...(withStack ? { stack: redact(row.stack, stack) } : {}),
+-  };
+-}
+-
+-/** Grouped error occurrences, newest first. Messages are redacted and truncated; stacks are detail only. */
+-export async function listRootErrors(actorId: string, input: unknown = {}, resultCap?: number) {
+-  await assertRootActor(prisma, actorId);
+-  const parsed = filterSchema.safeParse(input);
+-  const max = await legacySetting('root.legacy.searchMaxCharacters');
+-  if (!parsed.success || (parsed.data.q?.length ?? 0) > max) throw invalid('Use a shorter search and a valid filter.');
+-  const { status = 'open', source, q, page = 1 } = parsed.data;
+-  const size = rootResultLimit(await legacySetting('root.legacy.errorPageSize'), resultCap);
+-  const pattern = q ? like(q) : null;
+-  const sourceFilter = source ?? null;
+-  try {
+-    const rows = await prisma.$queryRaw<ErrorRow[]>`SELECT id, source, name, message, location, release, count, "firstSeenAt", "lastSeenAt", "resolvedAt", COUNT(*) OVER()::int AS total FROM error_events WHERE (${status} = 'all' OR (${status} = 'open' AND "resolvedAt" IS NULL) OR (${status} = 'resolved' AND "resolvedAt" IS NOT NULL)) AND (${sourceFilter}::text IS NULL OR source = ${sourceFilter}) AND (${pattern}::text IS NULL OR name ILIKE ${pattern} ESCAPE '\\' OR message ILIKE ${pattern} ESCAPE '\\' OR location ILIKE ${pattern} ESCAPE '\\') ORDER BY "lastSeenAt" DESC, id LIMIT ${size} OFFSET ${(page - 1) * size}`;
+-    const policy = await errorShapePolicy(false);
+-    return { items: rows.map(row => shape(row, false, policy)), page, pageSize: size, total: rows[0]?.total ?? 0, limits: { searchMaxCharacters: max } };
+-  } catch (error) {
+-    if (isMissingRelation(error)) throw unavailable();
+-    throw error;
+-  }
+-}
+-
+-export async function getRootError(actorId: string, id: string) {
+-  await assertRootActor(prisma, actorId);
+-  if (!id || id.length > synchronousPolicy('root.identifierMaxCharacters')) throw invalid('Choose an error.');
+-  try {
+-    const row = (await prisma.$queryRaw<ErrorRow[]>`SELECT id, source, name, message, stack, location, release, count, "firstSeenAt", "lastSeenAt", "resolvedAt" FROM error_events WHERE id = ${id}`)[0];
+-    if (!row) throw new OperationError('not_found', 'Error not found.');
+-    return shape(row, true, await errorShapePolicy(true));
+-  } catch (error) {
+-    if (isMissingRelation(error)) throw unavailable();
+-    throw error;
+-  }
+-}
+-
+-/** Mark an error group resolved or reopen it. Reversible bookkeeping, so no typed confirmation; audited atomically. A new occurrence reopens it by itself. */
+-export async function setRootErrorResolved(actorId: string, id: string, resolved: boolean) {
+-  if (!id || id.length > synchronousPolicy('root.identifierMaxCharacters') || typeof resolved !== 'boolean') throw invalid('Choose an error.');
+-  try {
+-    return await rootTransaction(async tx => {
+-      await lockRootActor(tx, actorId);
+-      const row = (await tx.$queryRaw<Array<{ id: string; resolvedAt: Date | null }>>`SELECT id, "resolvedAt" FROM error_events WHERE id = ${id} FOR UPDATE`)[0];
+-      if (!row) throw new OperationError('not_found', 'Error not found.');
+-      if (Boolean(row.resolvedAt) === resolved) return { changed: false, id, resolved };
+-      const changed = await tx.$executeRaw`UPDATE error_events SET "resolvedAt" = ${resolved ? new Date() : null} WHERE id = ${id}`;
+-      if (changed !== 1) throw new OperationError('conflict', 'The error record changed. Reload and try again.');
+-      await writeRootAudit(tx, actorId, resolved ? 'root.error_resolved' : 'root.error_reopened', { errorId: id });
+-      return { changed: true, id, resolved };
+-    });
+-  } catch (error) {
+-    if (isMissingRelation(error)) throw unavailable();
+-    throw error;
+-  }
+-}
++export { listRootErrors, getRootError, setRootErrorResolved } from '@/modules/root/server/errors';
+diff --git a/rebuild/src/server/root/legacy/mcp.ts b/rebuild/src/server/root/legacy/mcp.ts
+index 2230c9d7..97c74c88 100644
+--- a/rebuild/src/server/root/legacy/mcp.ts
++++ b/rebuild/src/server/root/legacy/mcp.ts
+@@ -133,8 +133,8 @@ export async function callRootLegacyTool(viewer: RootMcpActor, name: string, arg
+     case 'get_root_error': { const { id: errorId, ...extra } = args; reject(extra); return getRootError(id, typeof errorId === 'string' ? errorId : ''); }
+     case 'set_root_error_resolved': {
+       const { id: errorId, resolved, confirmation, ...extra } = args; reject(extra);
+-      if (typeof errorId !== 'string' || typeof resolved !== 'boolean' || typeof confirmation !== 'string' || confirmation.length > synchronousPolicy('root.confirmationMaxCharacters') || confirmation !== `${resolved ? 'RESOLVE' : 'REOPEN'} ROOT ERROR ${errorId}`) throw new OperationError('invalid_request', 'Enter the exact error action confirmation.');
+-      return setRootErrorResolved(id, errorId, resolved);
++      if (typeof errorId !== 'string' || typeof resolved !== 'boolean' || typeof confirmation !== 'string') throw new OperationError('invalid_request', 'Enter the exact error action confirmation.');
++      return setRootErrorResolved(id, errorId, resolved, confirmation);
+     }
+     case 'get_root_backup_status': reject(args); return readRootBackupStatus(id, undefined, cap);
+     case 'get_root_diagnostics_summary': reject(args); return readRootDiagnosticsSummary(id, undefined, cap);
+diff --git a/rebuild/src/server/root/legacy/shared.ts b/rebuild/src/server/root/legacy/shared.ts
+index 0df9c0c5..596eb3da 100644
+--- a/rebuild/src/server/root/legacy/shared.ts
++++ b/rebuild/src/server/root/legacy/shared.ts
+@@ -70,7 +70,7 @@ export const planUpdateSchema = z.object({ patch: planPatchSchema, confirmation:
+ export const planAssignSchema = z.object({ userId: idSchema, planKey: z.string().min(1).refine(withinSynchronousLimit('root.planKeyMaxCharacters')).nullable(), confirmation: confirmationSchema }).strict();
+ export const roleChangeSchema = z.object({ membershipId: idSchema, role: z.enum(WORKSPACE_ROLES), confirmation: confirmationSchema }).strict();
+ export const transferSchema = z.object({ workspaceId: idSchema, newOwnerEmail: z.string().trim().toLowerCase().email().refine(withinSynchronousLimit('root.emailMaxCharacters')), previousOwners: z.enum(['keep', 'demote_admin']), confirmation: confirmationSchema }).strict();
+-export const errorResolveSchema = z.object({ resolved: z.boolean() }).strict();
++export const errorResolveSchema = z.object({ resolved: z.boolean(), confirmation: z.string().min(1) }).strict();
+ 
+ /** Stable first-party download protocol, shared by the server and confirmed download control. */
+ export const ROOT_PRIVILEGE_CSV_FORMAT = 'root-privileges-v1';
+diff --git a/rebuild/src/server/root/workspace-controls.ts b/rebuild/src/server/root/workspace-controls.ts
+index 358c8d87..ba28e29e 100644
+--- a/rebuild/src/server/root/workspace-controls.ts
++++ b/rebuild/src/server/root/workspace-controls.ts
+@@ -1,44 +1 @@
+-import { randomUUID } from 'node:crypto';
+-import { prisma } from '@/server/data';
+-
+-type CreateInput = { name: string; ownerEmail: string; timezone: string; confirmation: string };
+-
+-function validTimezone(timezone: string) {
+-  try { new Intl.DateTimeFormat('en', { timeZone: timezone }); return true; } catch { return false; }
+-}
+-
+-export async function createRootWorkspace(actorId: string, input: CreateInput) {
+-  const name = input.name.trim();
+-  const ownerEmail = input.ownerEmail.trim().toLowerCase();
+-  if (!name) throw new Error('Enter a workspace name.');
+-  if (!validTimezone(input.timezone)) throw new Error('Choose a valid timezone.');
+-  if (input.confirmation !== `CREATE ${name} FOR ${ownerEmail}`) throw new Error('Enter the exact confirmation shown.');
+-  const id = randomUUID();
+-  const base = name.normalize('NFKD').toLowerCase().replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'workspace';
+-  const slug = `${base}-${id}`;
+-  return prisma.$transaction(async tx => {
+-    const owner = await tx.user.findUnique({ where: { email: ownerEmail }, select: { id: true, email: true, disabledAt: true } });
+-    if (!owner || owner.disabledAt) throw new Error('Choose an existing active account as owner.');
+-    const workspace = await tx.workspace.create({ data: { id, name, slug, timezone: input.timezone, memberships: { create: { id: randomUUID(), userId: owner.id, role: 'owner' } } }, select: { id: true, slug: true } });
+-    const detail = JSON.stringify({ workspaceId: workspace.id, ownerId: owner.id });
+-    await tx.$executeRaw`INSERT INTO root_activities (id, "actorId", action, detail, "createdAt") VALUES (${randomUUID()}, ${actorId}, ${'root.workspace_created'}, ${detail}::jsonb, NOW())`;
+-    return workspace;
+-  });
+-}
+-
+-export async function renameRootWorkspace(actorId: string, workspaceId: string, nameInput: string, confirmation: string) {
+-  const name = nameInput.trim();
+-  if (!name) throw new Error('Enter a workspace name.');
+-  return prisma.$transaction(async tx => {
+-    const workspace = await tx.workspace.findUnique({ where: { id: workspaceId }, select: { id: true, name: true, dataPurge: { select: { status: true } } } });
+-    if (!workspace) throw new Error('Workspace not found.');
+-    if (workspace.dataPurge) throw new Error('Workspace deletion is in progress.');
+-    if (confirmation !== `RENAME ${workspace.name} TO ${name}`) throw new Error('Enter the exact confirmation shown.');
+-    if (name === workspace.name) return { changed: false };
+-    const result = await tx.workspace.updateMany({ where: { id: workspaceId, name: workspace.name }, data: { name } });
+-    if (result.count !== 1) throw new Error('Workspace changed; reload and try again.');
+-    const detail = JSON.stringify({ workspaceId, previousName: workspace.name, name });
+-    await tx.$executeRaw`INSERT INTO root_activities (id, "actorId", action, detail, "createdAt") VALUES (${randomUUID()}, ${actorId}, ${'root.workspace_renamed'}, ${detail}::jsonb, NOW())`;
+-    return { changed: true };
+-  });
+-}
++export { createRootWorkspace, renameRootWorkspace } from '@/modules/root/server/workspace-controls';
+diff --git a/rebuild/tests/mcp-installation-context.test.ts b/rebuild/tests/mcp-installation-context.test.ts
+index 5e9ad716..968a3889 100644
+--- a/rebuild/tests/mcp-installation-context.test.ts
++++ b/rebuild/tests/mcp-installation-context.test.ts
+@@ -5,7 +5,10 @@ vi.mock('../src/server/root/registration-admin', async importOriginal => ({
+   ...state.registration,
+ }));
+ const state = vi.hoisted(() => ({ refreshConnection: vi.fn(), registration: { listRootRegistration: vi.fn(), revokeRootRegistrationInvitation: vi.fn(), controlRootRegistrationAccount: vi.fn() }, actor: vi.fn(), read: vi.fn(), save: vi.fn(), workspaces: vi.fn(), activity: vi.fn(), access: vi.fn(), lock: vi.fn(), post: vi.fn(), execute: vi.fn(), diagnostics: vi.fn(), diagnosticRun: vi.fn(), operations: vi.fn(), deletions: vi.fn(), confirmDeletion: vi.fn(), publishingRead: vi.fn() }));
+-vi.mock('../src/server/data', () => ({ prisma: { user: { findUnique: state.actor }, post: { findMany: state.post }, $executeRaw: state.execute } }));
++vi.mock('../src/server/data', () => {
++  const tx = { user: { findUnique: state.actor }, post: { findMany: state.post }, appSetting: { upsert: state.save, deleteMany: vi.fn() }, $queryRaw: vi.fn(), $executeRaw: state.execute };
++  return { prisma: { ...tx, $transaction: async (fn: (db: unknown) => unknown) => fn(tx) } };
++});
+ vi.mock('../src/server/config/store', () => ({ readConfig: state.read, saveConfig: state.save, runtimeConfig: async () => 100 }));
+ vi.mock('../src/server/root/inbox-deletions', () => ({ listRootInboxDeletions: state.deletions, confirmRootInboxDeletion: state.confirmDeletion }));
+ vi.mock('../src/server/root/diagnostics', () => ({ listRootDiagnostics: state.diagnostics, runRootDiagnostics: state.diagnosticRun }));
+@@ -55,7 +58,7 @@ describe('installation-only MCP context', () => {
+     await call('list_root_activity', { limit: 100 });
+     expect(state.activity).toHaveBeenCalledWith('root', { limit: 100 }, 10);
+     await invoke('resources/read', { uri: 'msp://root/workspaces' });
+-    expect(state.workspaces).toHaveBeenCalledWith({ q: undefined, page: undefined }, 10);
++    expect(state.workspaces).toHaveBeenCalledWith('root', { q: undefined, page: undefined }, 10);
+     await call('set_root_workspace_access', { workspaceId: 'workspace-a', suspended: false, confirmation: 'RESTORE WORKSPACE workspace-a' });
+     expect(state.access).toHaveBeenCalledWith('root', 'workspace-a', false, 'RESTORE WORKSPACE workspace-a');
+     expect(state.lock).not.toHaveBeenCalled();
+@@ -106,8 +109,8 @@ describe('installation-only MCP context', () => {
+     expect(state.save).not.toHaveBeenCalled();
+     const input = { key: 'mcp.enabled', value: true, confirmation: 'SET ROOT CONFIG mcp.enabled' };
+     expect((await (await call('set_root_config', input)).json()).result.structuredContent.saved).toBe(true);
+-    expect(state.save).toHaveBeenCalledWith({ key: 'mcp.enabled', value: true, clear: false }, 'root');
+-    expect(state.execute).not.toHaveBeenCalled();
++    expect(state.save).toHaveBeenCalledWith(expect.objectContaining({ where: { key: 'mcp.enabled' }, create: expect.objectContaining({ value: true, encrypted: false }) }));
++    expect(state.execute).toHaveBeenCalledOnce();
+     state.read.mockRejectedValueOnce(new Error('postgres://private-password@host'));
+     const failure = (await (await call('get_root_config')).json()).result;
+     expect(failure.structuredContent.code).toBe('upstream_failure');
+diff --git a/rebuild/tests/mcp-security.test.ts b/rebuild/tests/mcp-security.test.ts
+index 99410177..4bb2b92b 100644
+--- a/rebuild/tests/mcp-security.test.ts
++++ b/rebuild/tests/mcp-security.test.ts
+@@ -12,6 +12,8 @@ const db = vi.hoisted(() => ({
+   pageInsight: { findMany: vi.fn() },
+   conversation: { findMany: vi.fn() },
+   postComment: { findMany: vi.fn() },
++  appSetting: { upsert: vi.fn() },
++  $queryRaw: vi.fn(),
+   $executeRaw: vi.fn(),
+   $transaction: vi.fn(),
+   membership: { findUnique: vi.fn() },
+@@ -351,7 +353,7 @@ describe('MCP workspace boundaries', () => {
+   it('routes Root workspace operations through shared services with bounded reads and strict input types', async () => {
+     const invoke = (name: string, args: Record<string, unknown>) => handleMcpMessage({ ...viewer, isInstanceOwner: true }, { jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: args } });
+     await invoke('list_root_workspaces', { q: 'Studio', page: 2 });
+-    expect(rootWorkspaces.list).toHaveBeenCalledWith({ q: 'Studio', page: '2' }, 25);
++    expect(rootWorkspaces.list).toHaveBeenCalledWith('user-a', { q: 'Studio', page: '2' }, 100);
+     const invalid = await (await invoke('set_root_workspace_access', { workspaceId: 'workspace-b', suspended: 'true', confirmation: 'yes' })).json();
+     expect(invalid.result.structuredContent.code).toBe('invalid_request');
+     expect(rootWorkspaces.change).not.toHaveBeenCalled();
+@@ -1403,13 +1405,14 @@ describe('MCP workspace boundaries', () => {
+   });
+ 
+   it('requires an exact Root confirmation and reuses registry validation and audit', async () => {
++    db.$transaction.mockImplementation(async (fn: (tx: unknown) => unknown) => fn(db));
+     const root = { ...viewer, isInstanceOwner: true };
+     const missing = await handleMcpMessage(root, { jsonrpc: '2.0', id: 14, method: 'tools/call', params: { name: 'set_root_config', arguments: { key: 'mcp.enabled', value: false } } });
+     expect((await missing.json()).result.isError).toBe(true);
+     expect(rootConfig.save).not.toHaveBeenCalled();
+     const saved = await handleMcpMessage(root, { jsonrpc: '2.0', id: 15, method: 'tools/call', params: { name: 'set_root_config', arguments: { key: 'mcp.enabled', value: false, confirmation: 'SET ROOT CONFIG mcp.enabled' } } });
+     expect((await saved.json()).result.structuredContent).toMatchObject({ key: 'mcp.enabled', saved: true });
+-    expect(rootConfig.save).toHaveBeenCalledWith({ key: 'mcp.enabled', value: false, clear: false }, 'user-a');
+-    expect(db.$executeRaw).not.toHaveBeenCalled(); // Domain service owns its atomic audit.
++    expect(db.appSetting.upsert).toHaveBeenCalledWith(expect.objectContaining({ where: { key: 'mcp.enabled' }, create: expect.objectContaining({ value: false, encrypted: false }) }));
++    expect(db.$executeRaw).toHaveBeenCalledOnce(); // Shared service owns the atomic audit.
+   });
+ });
+diff --git a/rebuild/tests/parity-guard.test.ts b/rebuild/tests/parity-guard.test.ts
+index 660738f0..037e52ed 100644
+--- a/rebuild/tests/parity-guard.test.ts
++++ b/rebuild/tests/parity-guard.test.ts
+@@ -13,14 +13,18 @@ vi.mock('@/server/root/directory', () => ({ listRootWorkspaces: state.directory
+ vi.mock('@/server/data', () => ({ prisma: {
+   user: { findUnique: state.actor },
+   $transaction: async (run: (tx: unknown) => unknown) => run({
+-    user: { findUnique: state.owner },
++    user: { findUnique: (args: { where: { id?: string } }) => args.where.id ? state.actor(args) : state.owner(args) },
++    $queryRaw: vi.fn(),
+     workspace: { create: state.create, findUnique: state.workspace, updateMany: state.rename },
+     $executeRaw: state.audit,
+   }),
+ } }));
+ vi.mock('@/server/config/store', () => ({ runtimeConfig: async (key: string) => {
++  if (key === 'root.accountOperationTimeoutMs' || key === 'root.accountOperationLockWaitMs') return 5000;
+   if (key === 'root.workspaceNameMaxCharacters') return 80;
+   if (key === 'root.identifierMaxCharacters') return 200;
++  if (key === 'root.emailMaxCharacters') return 254;
++  if (key === 'root.confirmationMaxCharacters') return 400;
+   if (key === 'root.defaultWorkspaceTimezone') return 'Africa/Casablanca';
+   return 10;
+ } }));
+@@ -246,9 +250,9 @@ describe('Root workspace MCP uses the existing confirmed, audited services', ()
+     const query = { q: 'Studio', page: '2' };
+     const response = await workspaceDirectory(new Request('https://example.test/api/root/workspaces?q=Studio&page=2'), undefined);
+     expect(response.status).toBe(200);
+-    expect(state.directory).toHaveBeenLastCalledWith(query, 10);
++    expect(state.directory).toHaveBeenLastCalledWith('root', query);
+     await runRootTool({ ...actor, maxResultItems: 10 }, 'list_root_workspaces', { q: 'Studio', page: 2 });
+-    expect(state.directory).toHaveBeenLastCalledWith(query, 10);
++    expect(state.directory).toHaveBeenLastCalledWith('root', query, 10);
+     expect(response.headers.get('cache-control')).toContain('no-store');
+   });
+   it('refuses anonymous/non-Root directory requests and malformed or repeated filters', async () => {
+@@ -257,7 +261,7 @@ describe('Root workspace MCP uses the existing confirmed, audited services', ()
+     expect((await workspaceDirectory(request(), undefined)).status).toBe(401);
+     state.currentRoot.mockResolvedValueOnce({ id: 'member', isInstanceOwner: false });
+     expect((await workspaceDirectory(request(), undefined)).status).toBe(404);
+-    for (const query of ['?page=0', '?page=1.5', '?page=wrong', '?q=a&q=b', '?workspaceId=other']) {
++    for (const query of ['?q=a&q=b', '?workspaceId=other']) {
+       expect((await workspaceDirectory(request(query), undefined)).status).toBe(400);
+     }
+     expect(state.directory).not.toHaveBeenCalled();
+diff --git a/rebuild/tests/root-config-authority.test.ts b/rebuild/tests/root-config-authority.test.ts
+new file mode 100644
+index 00000000..fe2c0d16
+--- /dev/null
++++ b/rebuild/tests/root-config-authority.test.ts
+@@ -0,0 +1,42 @@
++import { beforeEach, expect, it, vi } from 'vitest';
++const h = vi.hoisted(() => ({ actor: vi.fn(), upsert: vi.fn(), clear: vi.fn(), audit: vi.fn(), read: vi.fn() }));
++vi.mock('@/server/data', () => {
++  const db = { user: { findUnique: h.actor }, appSetting: { upsert: h.upsert, deleteMany: h.clear }, $queryRaw: vi.fn(), $executeRaw: h.audit };
++  return { prisma: { ...db, $transaction: async (fn: (tx: unknown) => unknown) => fn(db) } };
++});
++vi.mock('@/server/config/store', () => ({ readConfig: h.read }));
++import { readRootConfig, saveRootConfig } from '@/modules/root/server/configuration';
++beforeEach(() => { vi.clearAllMocks(); h.actor.mockResolvedValue({ isInstanceOwner: true, disabledAt: null }); h.read.mockResolvedValue([]); });
++it.each([null, { isInstanceOwner: false, disabledAt: null }, { isInstanceOwner: true, disabledAt: new Date() }])('refuses reads and writes by a stale or unauthorized actor: %j', async actor => {
++  h.actor.mockResolvedValue(actor);
++  await expect(readRootConfig('actor')).rejects.toMatchObject({ code: 'forbidden' });
++  await expect(saveRootConfig({ key: 'root.workspaceNameMaxCharacters', value: 100, confirmation: 'SET ROOT CONFIG root.workspaceNameMaxCharacters' }, 'actor')).rejects.toMatchObject({ code: 'forbidden' });
++  expect(h.upsert).not.toHaveBeenCalled(); expect(h.read).not.toHaveBeenCalled();
++});
++it('requires exact confirmation in the shared writer', async () => {
++  await expect(saveRootConfig({ key: 'root.workspaceNameMaxCharacters', value: 100 }, 'root')).rejects.toMatchObject({ code: 'invalid_request' });
++  expect(h.upsert).not.toHaveBeenCalled();
++});
++it('saves confirmed values and value-free audit together', async () => {
++  await saveRootConfig({ key: 'root.workspaceNameMaxCharacters', value: 100, confirmation: 'SET ROOT CONFIG root.workspaceNameMaxCharacters' }, 'root');
++  expect(h.upsert).toHaveBeenCalledOnce(); expect(h.audit).toHaveBeenCalledOnce();
++});
++it('returns the availability inventory alongside masked settings for every caller', async () => {
++  expect(await readRootConfig('root')).toMatchObject({ values: [], definitions: expect.any(Array), availability: { modules: expect.any(Array), features: expect.any(Array) } });
++});
++it('requires the clear-secret phrase for secret removal', async () => {
++  await expect(saveRootConfig({ key: 'root.workspaceNameMaxCharacters', clear: true, confirmation: 'CLEAR ROOT SECRET root.workspaceNameMaxCharacters' }, 'root')).rejects.toMatchObject({ code: 'invalid_request' });
++  expect(h.clear).not.toHaveBeenCalled();
++});
++
++it('rechecks actor authority within the save transaction', async () => {
++  h.actor.mockResolvedValueOnce({ isInstanceOwner: true, disabledAt: null }).mockResolvedValue({ isInstanceOwner: false, disabledAt: null });
++  await expect(saveRootConfig({ key: 'root.workspaceNameMaxCharacters', value: 100, confirmation: 'SET ROOT CONFIG root.workspaceNameMaxCharacters' }, 'root')).rejects.toMatchObject({ code: 'forbidden' });
++  expect(h.upsert).not.toHaveBeenCalled(); expect(h.audit).not.toHaveBeenCalled();
++});
++it('clears a secret only with the exact clear action', async () => {
++  await expect(saveRootConfig({ key: 'meta.appSecret', clear: true, confirmation: 'SET ROOT CONFIG meta.appSecret' }, 'root')).rejects.toMatchObject({ code: 'invalid_request' });
++  expect(h.clear).not.toHaveBeenCalled();
++  await saveRootConfig({ key: 'meta.appSecret', clear: true, confirmation: 'CLEAR ROOT SECRET meta.appSecret' }, 'root');
++  expect(h.clear).toHaveBeenCalledWith({ where: { key: 'meta.appSecret' } }); expect(h.audit).toHaveBeenCalledOnce();
++});
+diff --git a/rebuild/tests/root-config-form.test.ts b/rebuild/tests/root-config-form.test.ts
+index 90d8b3d4..b7e70c3c 100644
+--- a/rebuild/tests/root-config-form.test.ts
++++ b/rebuild/tests/root-config-form.test.ts
+@@ -138,7 +138,7 @@ it('uses shared switches and selects, retaining the saved boolean after a failed
+   await act(async () => root.render(createElement(RootConfigForm, { definitions: [boolean, selection], initialValues: [{ key: boolean.key, value: false, isSet: true, source: 'database' }], availability: AVAILABILITY_CATALOG, initialSearch: ' ' })));
+   const switchButton = container.querySelector<HTMLButtonElement>('[role=switch]')!;
+   expect(switchButton).not.toBeNull(); await act(async () => switchButton.click());
+-  expect(JSON.parse(fetch.mock.calls[0][1].body)).toMatchObject({ key: boolean.key, value: true });
++  expect(JSON.parse(fetch.mock.calls[0][1].body)).toMatchObject({ key: boolean.key, value: true, confirmation: `SET ROOT CONFIG ${boolean.key}` });
+   expect(switchButton.getAttribute('aria-checked')).toBe('false');
+   const search = container.querySelector<HTMLInputElement>('#root-config-search')!;
+   await fill(search, selection.key);
+@@ -170,6 +170,6 @@ it('names the secret in a shared confirmation and retains the dialog on failure'
+   expect(document.activeElement?.textContent).toBe('Cancel');
+   const confirm = [...dialog.querySelectorAll('button')].find(button => button.textContent === 'Clear saved secret')!;
+   await act(async () => confirm.click());
+-  expect(JSON.parse(fetch.mock.calls[0][1].body)).toEqual({ key: definition.key, value: '', clear: true });
++  expect(JSON.parse(fetch.mock.calls[0][1].body)).toEqual({ key: definition.key, value: '', clear: true, confirmation: `CLEAR ROOT SECRET ${definition.key}` });
+   expect(document.querySelector('dialog [role=alert]')?.textContent).toContain('Could not clear');
+ });
+diff --git a/rebuild/tests/root-config-route.test.ts b/rebuild/tests/root-config-route.test.ts
+index f3ca6df6..a2b4b1d4 100644
+--- a/rebuild/tests/root-config-route.test.ts
++++ b/rebuild/tests/root-config-route.test.ts
+@@ -1,8 +1,12 @@
+ import { beforeEach, describe, expect, it, vi } from 'vitest';
+ 
+-const state = vi.hoisted(() => ({ actor: vi.fn(), read: vi.fn(), save: vi.fn() }));
++const state = vi.hoisted(() => ({ actor: vi.fn(), read: vi.fn(), save: vi.fn(), dbActor: vi.fn() }));
+ vi.mock('../src/server/config/access', () => ({ currentRootActor: state.actor }));
+-vi.mock('../src/server/config/store', () => ({ readConfig: state.read, saveConfig: state.save }));
++vi.mock('../src/server/config/store', () => ({ readConfig: state.read }));
++vi.mock('../src/server/data', () => {
++  const tx = { user: { findUnique: state.dbActor }, appSetting: { upsert: state.save, deleteMany: vi.fn() }, $queryRaw: vi.fn(), $executeRaw: vi.fn() };
++  return { prisma: { ...tx, $transaction: async (fn: (db: unknown) => unknown) => fn(tx) } };
++});
+ 
+ import { GET, PUT } from '../src/app/api/root/config/route';
+ 
+@@ -11,12 +15,13 @@ const policy = {
+   defaultPreset: '14d', maxRangeDays: 14, maxFilterCharacters: 80,
+ };
+ const request = (body: unknown, origin = 'https://social.example.test') => new Request('https://social.example.test/api/root/config', {
+-  method: 'PUT', headers: { origin, 'content-type': 'application/json' }, body: JSON.stringify(body),
++  method: 'PUT', headers: { origin, 'content-type': 'application/json' }, body: JSON.stringify({ ...(body as object), confirmation: `SET ROOT CONFIG ${(body as { key: string }).key}` }),
+ });
+ 
+ beforeEach(() => {
+   vi.clearAllMocks();
+   state.actor.mockResolvedValue({ id: 'root-user', isInstanceOwner: true });
++  state.dbActor.mockResolvedValue({ isInstanceOwner: true, disabledAt: null });
+   state.read.mockResolvedValue([]);
+   state.save.mockResolvedValue(undefined);
+ });
+@@ -24,16 +29,16 @@ beforeEach(() => {
+ describe('Root config write validation', () => {
+   it.each([[null, 401], [{ id: 'workspace-owner', isInstanceOwner: false }, 404], [{ id: 'root-user', isInstanceOwner: true }, 200]])('never caches private configuration reads: %j', async (actor, status) => {
+     state.actor.mockResolvedValue(actor);
+-    const response = await GET();
++    const response = await GET(new Request('https://social.example.test/api/root/config'), undefined);
+     expect(response.status).toBe(status);
+-    expect(response.headers.get('cache-control')).toBe('no-store');
++    expect(response.headers.get('cache-control')).toContain('no-store');
+     if (status !== 200) expect(state.read).not.toHaveBeenCalled();
+   });
+   it('masks configuration read failures and refuses caching the failure', async () => {
+     state.read.mockRejectedValueOnce(new Error('DATABASE SECRET PAYLOAD'));
+-    const response = await GET();
+-    expect(response.status).toBe(500);
+-    expect(response.headers.get('cache-control')).toBe('no-store');
++    const response = await GET(new Request('https://social.example.test/api/root/config'), undefined);
++    expect(response.status).toBe(502);
++    expect(response.headers.get('cache-control')).toContain('no-store');
+     expect(JSON.stringify(await response.json())).not.toContain('DATABASE SECRET PAYLOAD');
+   });
+   it.each([
+@@ -41,58 +46,56 @@ describe('Root config write validation', () => {
+     ['missing default preset', { presets: policy.presets, maxRangeDays: 14, maxFilterCharacters: 80 }, /defaultPreset/i],
+     ['preset over range cap', { ...policy, maxRangeDays: 7 }, /maxRangeDays/i],
+   ])('returns actionable 400 for %s using the registry schema', async (_label, value, message) => {
+-    const response = await PUT(request({ key: 'ads.reportingFilters', value }));
++    const response = await PUT(request({ key: 'ads.reportingFilters', value }), undefined);
+     const body = await response.json();
+     expect(response.status).toBe(400);
+-    expect(response.headers.get('cache-control')).toBe('no-store');
++    expect(response.headers.get('cache-control')).toContain('no-store');
+     expect(body.error).toMatch(message);
+     expect(state.save).not.toHaveBeenCalled();
+   });
+ 
+   it('saves a valid registry-checked Ads policy', async () => {
+-    const response = await PUT(request({ key: 'ads.reportingFilters', value: policy }));
++    const response = await PUT(request({ key: 'ads.reportingFilters', value: policy }), undefined);
+     expect(response.status).toBe(200);
+-    expect(response.headers.get('cache-control')).toBe('no-store');
+-    expect(state.save).toHaveBeenCalledWith({ key: 'ads.reportingFilters', value: policy }, 'root-user');
++    expect(response.headers.get('cache-control')).toContain('no-store');
++    expect(state.save).toHaveBeenCalledWith(expect.objectContaining({ where: { key: 'ads.reportingFilters' }, create: expect.objectContaining({ value: policy, encrypted: false }) }));
+   });
+ 
+   it('preserves unknown-key rejection from the shared writer', async () => {
+-    state.save.mockRejectedValue(new Error('Unknown configuration key.'));
+-    const response = await PUT(request({ key: 'unknown.setting', value: true }));
++    const response = await PUT(request({ key: 'unknown.setting', value: true }), undefined);
+     expect(response.status).toBe(400);
+     expect((await response.json()).error).toBe('Unknown configuration key.');
+   });
+ 
+   it('preserves the secret-only clear guard', async () => {
+-    state.save.mockRejectedValue(new Error('Only secret values can be cleared.'));
+-    const response = await PUT(request({ key: 'ads.reportingFilters', value: null, clear: true }));
++    const response = await PUT(request({ key: 'ads.reportingFilters', value: null, clear: true }), undefined);
+     expect(response.status).toBe(400);
+     expect((await response.json()).error).toBe('Only secret values can be cleared.');
+   });
+ 
+   it('refuses cross-origin writes before authorization or persistence', async () => {
+-    const response = await PUT(request({ key: 'ads.reportingFilters', value: policy }, 'https://attacker.example.test'));
++    const response = await PUT(request({ key: 'ads.reportingFilters', value: policy }, 'https://attacker.example.test'), undefined);
+     expect(response.status).toBe(403);
+-    expect(response.headers.get('cache-control')).toBe('no-store');
++    expect(response.headers.get('cache-control')).toContain('no-store');
+     expect(state.actor).not.toHaveBeenCalled();
+     expect(state.save).not.toHaveBeenCalled();
+   });
+ 
+   it.each([[null, 401], [{ id: 'workspace-owner', isInstanceOwner: false }, 404]])('refuses writes without installation-owner access: %j', async (actor, status) => {
+     state.actor.mockResolvedValue(actor);
+-    const response = await PUT(request({ key: 'ads.reportingFilters', value: policy }));
++    const response = await PUT(request({ key: 'ads.reportingFilters', value: policy }), undefined);
+     expect(response.status).toBe(status);
+-    expect(response.headers.get('cache-control')).toBe('no-store');
++    expect(response.headers.get('cache-control')).toContain('no-store');
+     expect(state.save).not.toHaveBeenCalled();
+   });
+ 
+   it('keeps persistence failures generic and does not expose their detail', async () => {
+     state.save.mockRejectedValue(new Error('DATABASE SECRET PAYLOAD'));
+-    const response = await PUT(request({ key: 'ads.reportingFilters', value: policy }));
++    const response = await PUT(request({ key: 'ads.reportingFilters', value: policy }), undefined);
+     const body = await response.json();
+-    expect(response.status).toBe(500);
+-    expect(response.headers.get('cache-control')).toBe('no-store');
+-    expect(body.error).toBe('Configuration could not be saved.');
+-    expect(JSON.stringify(body)).not.toContain('DATABASE SECRET PAYLOAD');
++    expect(response.status).toBe(502);
++    expect(response.headers.get('cache-control')).toContain('no-store');
++    expect(body.error).toBe('The change could not be confirmed. Check the current state before repeating it.');
++    expect(JSON.stringify({ ...(body as object), confirmation: `SET ROOT CONFIG ${(body as { key: string }).key}` })).not.toContain('DATABASE SECRET PAYLOAD');
+   });
+ });
+diff --git a/rebuild/tests/root-directory.test.ts b/rebuild/tests/root-directory.test.ts
+index 8a19fa66..43d518b0 100644
+--- a/rebuild/tests/root-directory.test.ts
++++ b/rebuild/tests/root-directory.test.ts
+@@ -1,9 +1,31 @@
+ import { describe, expect, it, vi } from 'vitest';
+-const state = vi.hoisted(() => ({ count: vi.fn(), find: vi.fn(), access: vi.fn() }));
+-vi.mock('../src/server/data', () => ({ prisma: { user: { count: state.count, findMany: state.find }, workspace: { count: state.count, findMany: state.find }, $queryRaw: state.access } }));
++const state = vi.hoisted(() => ({ actor: vi.fn(), count: vi.fn(), find: vi.fn(), access: vi.fn() }));
++vi.mock('../src/server/data', () => ({ prisma: { user: { findUnique: state.actor, count: state.count, findMany: state.find }, workspace: { count: state.count, findMany: state.find }, $queryRaw: state.access } }));
++vi.mock('../src/server/config/store', () => ({ runtimeConfig: async (key: string) => ({ 'root.directoryPageSize': 25, 'root.legacy.searchMaxCharacters': 200, 'root.pageMaxNumber': 1000000 }[key]) }));
+ import { listRootWorkspaces, rootDirectoryQuery } from '../src/server/root/directory';
+ 
+ describe('Root directory pagination', () => {
++  it.each([{ page: '0' }, { page: '1.5' }, { page: 'wrong' }, { page: '1000001' }, { q: 'x'.repeat(201) }])('refuses invalid filters at the service boundary: %j', async input => {
++    state.actor.mockResolvedValue({ isInstanceOwner: true, disabledAt: null });
++    state.count.mockClear();
++    await expect(listRootWorkspaces('root', input)).rejects.toMatchObject({ code: 'invalid_request' });
++    expect(state.count).not.toHaveBeenCalled();
++  });
++
++  it('applies the transport result cap within the configured page size', async () => {
++    state.actor.mockResolvedValue({ isInstanceOwner: true, disabledAt: null });
++    state.count.mockResolvedValue(20); state.find.mockResolvedValue([]);
++    expect(await listRootWorkspaces('root', {}, 5)).toMatchObject({ take: 5 });
++    expect(await listRootWorkspaces('root', {}, 100)).toMatchObject({ take: 25 });
++  });
++
++  it('refuses direct directory reads without current Root authority', async () => {
++    state.count.mockClear();
++    state.actor.mockResolvedValue(null);
++    await expect(listRootWorkspaces('visitor', {})).rejects.toMatchObject({ code: 'forbidden' });
++    expect(state.count).not.toHaveBeenCalled();
++  });
++
+   it('normalizes search and keeps page within safe bounds', () => {
+     expect(rootDirectoryQuery({ q: '  Mouad  ', page: '2' }, 25)).toEqual({ query: 'Mouad', page: 2, skip: 25, take: 25 });
+     expect(rootDirectoryQuery({ q: ' ', page: '-8' }, 25)).toEqual({ query: '', page: 1, skip: 0, take: 25 });
+@@ -15,7 +37,8 @@ describe('Root directory pagination', () => {
+ 
+   it('keeps empty workspace searches on page one without an unbounded access query', async () => {
+     state.count.mockResolvedValue(0); state.find.mockResolvedValue([]); state.access.mockClear();
+-    const result = await listRootWorkspaces({ q: 'Missing', page: '999999' }, 25);
++    state.actor.mockResolvedValue({ isInstanceOwner: true, disabledAt: null });
++    const result = await listRootWorkspaces('root', { q: 'Missing', page: '999999' }, 25);
+     expect(result).toMatchObject({ page: 1, skip: 0, total: 0, workspaces: [] });
+     expect(state.access).not.toHaveBeenCalled();
+   });
+diff --git a/rebuild/tests/root-legacy-http-mcp.test.ts b/rebuild/tests/root-legacy-http-mcp.test.ts
+index ed670f05..ee23b3d2 100644
+--- a/rebuild/tests/root-legacy-http-mcp.test.ts
++++ b/rebuild/tests/root-legacy-http-mcp.test.ts
+@@ -151,13 +151,23 @@ describe('strict query parsing', () => {
+ });
+ 
+ 
++describe('REST error action confirmation', () => {
++  it('requires confirmation and forwards it to the shared service', async () => {
++    const request = (body: unknown) => new Request('https://app.example.test/api/root/errors/e1', { method: 'POST', headers: { origin: 'https://app.example.test', 'content-type': 'application/json' }, body: JSON.stringify(body) });
++    expect((await resolveError(request({ resolved: true }), ctx('e1'))).status).toBe(400);
++    expect(h.errs.setRootErrorResolved).not.toHaveBeenCalled();
++    await resolveError(request({ resolved: true, confirmation: 'RESOLVE ROOT ERROR e1' }), ctx('e1'));
++    expect(h.errs.setRootErrorResolved).toHaveBeenCalledWith('root', 'e1', true, 'RESOLVE ROOT ERROR e1');
++  });
++});
++
+ describe('MCP error action confirmation', () => {
+   it('requires the exact explicit confirmation and rejects stray read arguments', async () => {
+     const viewer = { userId: 'root', isInstanceOwner: true } as never;
+     await expect(callRootLegacyTool(viewer, 'set_root_error_resolved', { id: 'e1', resolved: true })).rejects.toMatchObject({ code: 'invalid_request' });
+     expect(h.errs.setRootErrorResolved).not.toHaveBeenCalled();
+     await callRootLegacyTool(viewer, 'set_root_error_resolved', { id: 'e1', resolved: true, confirmation: 'RESOLVE ROOT ERROR e1' });
+-    expect(h.errs.setRootErrorResolved).toHaveBeenCalledWith('root', 'e1', true);
++    expect(h.errs.setRootErrorResolved).toHaveBeenCalledWith('root', 'e1', true, 'RESOLVE ROOT ERROR e1');
+     await expect(callRootLegacyTool(viewer, 'get_root_error', { id: 'e1', extra: true })).rejects.toMatchObject({ code: 'invalid_request' });
+   });
+ });
+diff --git a/rebuild/tests/root-legacy-services.test.ts b/rebuild/tests/root-legacy-services.test.ts
+index 2e190cdd..b2c1b256 100644
+--- a/rebuild/tests/root-legacy-services.test.ts
++++ b/rebuild/tests/root-legacy-services.test.ts
+@@ -61,6 +61,14 @@ beforeEach(() => {
+   actor(true);
+ });
+ 
++describe('Root error confirmation service boundary', () => {
++  it('refuses an unconfirmed direct error state change', async () => {
++    actor();
++    await expect(setRootErrorResolved('root', 'e1', true)).rejects.toMatchObject({ code: 'invalid_request' });
++    expect(writes()).toEqual([]);
++  });
++});
++
+ describe('Root-only authorization', () => {
+   const calls: Array<[string, () => Promise<unknown>]> = [
+     ['listRootPlans', () => listRootPlans('u')],
+@@ -339,16 +347,16 @@ describe('error browser', () => {
+ 
+   it('resolves and reopens with audit, and does nothing when the state already matches', async () => {
+     when(/FROM error_events WHERE id/, [{ id: 'e1', resolvedAt: null }]);
+-    expect(await setRootErrorResolved('root', 'e1', true)).toMatchObject({ changed: true });
++    expect(await setRootErrorResolved('root', 'e1', true, 'RESOLVE ROOT ERROR e1')).toMatchObject({ changed: true });
+     expect(audits()[0]!.values[2]).toBe('root.error_resolved');
+     h.executed.length = 0;
+-    expect(await setRootErrorResolved('root', 'e1', false)).toMatchObject({ changed: false });
++    expect(await setRootErrorResolved('root', 'e1', false, 'REOPEN ROOT ERROR e1')).toMatchObject({ changed: false });
+     expect(h.executed).toHaveLength(0);
+     h.rules.length = 0; when(/FROM error_events WHERE id/, [{ id: 'e1', resolvedAt: new Date() }]);
+-    await setRootErrorResolved('root', 'e1', false);
++    await setRootErrorResolved('root', 'e1', false, 'REOPEN ROOT ERROR e1');
+     expect(audits()[0]!.values[2]).toBe('root.error_reopened');
+     h.rules.length = 0; when(/FROM error_events WHERE id/, []);
+-    await expect(setRootErrorResolved('root', 'zz', true)).rejects.toMatchObject({ code: 'not_found' });
++    await expect(setRootErrorResolved('root', 'zz', true, 'RESOLVE ROOT ERROR zz')).rejects.toMatchObject({ code: 'not_found' });
+   });
+ });
+ 
+diff --git a/rebuild/tests/root-module-pages.test.ts b/rebuild/tests/root-module-pages.test.ts
+index 3f8eabd8..2b73b268 100644
+--- a/rebuild/tests/root-module-pages.test.ts
++++ b/rebuild/tests/root-module-pages.test.ts
+@@ -14,6 +14,7 @@ vi.mock('../src/server/root/RootFrame', () => ({ RootFrame: 'main' }));
+ vi.mock('../src/app/root/config/root-config-form', () => ({ RootConfigForm: state.form }));
+ vi.mock('next/headers', () => ({ headers: async () => new Headers() }));
+ vi.mock('next/navigation', () => ({ notFound: () => { throw new Error('Not found'); } }));
++vi.mock('../src/server/data', () => ({ prisma: { user: { findUnique: async () => ({ isInstanceOwner: true, disabledAt: null }) } } }));
+ import { RootModuleSettings } from '../src/server/root/RootModuleSettings';
+ import ProductPage from '../src/app/root/modules/[id]/page';
+ import PlatformPage from '../src/app/root/platforms/[id]/page';
+diff --git a/rebuild/tests/root-workspace-controls.test.ts b/rebuild/tests/root-workspace-controls.test.ts
+index 287b22e0..4f5d6c30 100644
+--- a/rebuild/tests/root-workspace-controls.test.ts
++++ b/rebuild/tests/root-workspace-controls.test.ts
+@@ -3,23 +3,55 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
+ const state = vi.hoisted(() => ({
+   user: { findUnique: vi.fn() },
+   workspace: { create: vi.fn(), findUnique: vi.fn(), updateMany: vi.fn() },
+-  executeRaw: vi.fn(), transaction: vi.fn(),
++  executeRaw: vi.fn(), queryRaw: vi.fn(), transaction: vi.fn(), runtime: vi.fn(),
+ }));
+-state.transaction.mockImplementation((callback: (tx: unknown) => unknown) => callback({ user: state.user, workspace: state.workspace, $executeRaw: state.executeRaw }));
++state.transaction.mockImplementation((callback: (tx: unknown) => unknown) => callback({ user: state.user, workspace: state.workspace, $executeRaw: state.executeRaw, $queryRaw: state.queryRaw }));
+ vi.mock('@/server/data', () => ({ prisma: { $transaction: state.transaction } }));
+ 
++vi.mock('@/server/config/store', () => ({ runtimeConfig: state.runtime }));
++
+ import { createRootWorkspace, renameRootWorkspace } from '@/server/root/workspace-controls';
+ 
+ describe('Root workspace controls', () => {
+   beforeEach(() => {
+     vi.clearAllMocks();
+-    state.transaction.mockImplementation((callback: (tx: unknown) => unknown) => callback({ user: state.user, workspace: state.workspace, $executeRaw: state.executeRaw }));
+-    state.user.findUnique.mockResolvedValue({ id: 'owner', email: 'owner@example.com', disabledAt: null });
++    state.transaction.mockImplementation((callback: (tx: unknown) => unknown) => callback({ user: state.user, workspace: state.workspace, $executeRaw: state.executeRaw, $queryRaw: state.queryRaw }));
++    state.runtime.mockImplementation(async (key: string) => ({ 'root.workspaceNameMaxCharacters': 100, 'root.identifierMaxCharacters': 200, 'root.emailMaxCharacters': 254, 'root.confirmationMaxCharacters': 400, 'root.defaultWorkspaceTimezone': 'UTC', 'root.accountOperationTimeoutMs': 10000, 'root.accountOperationLockWaitMs': 5000 }[key]));
++    state.user.findUnique.mockImplementation(async ({ where }: any) => where.id ? { isInstanceOwner: true, disabledAt: null } : { id: 'owner', email: 'owner@example.com', disabledAt: null });
+     state.workspace.create.mockResolvedValue({ id: 'workspace-new', slug: 'acme-example' });
+     state.workspace.findUnique.mockResolvedValue({ id: 'workspace-1', name: 'Acme', dataPurge: null });
+     state.workspace.updateMany.mockResolvedValue({ count: 1 });
+   });
+ 
++  it.each([null, { isInstanceOwner: false, disabledAt: null }, { isInstanceOwner: true, disabledAt: new Date() }])('refuses direct mutations for unauthorized actors: %j', async actor => {
++    state.user.findUnique.mockResolvedValue(actor);
++    await expect(createRootWorkspace('untrusted', { name: 'Acme', ownerEmail: 'owner@example.com', timezone: 'UTC', confirmation: 'CREATE Acme FOR owner@example.com' })).rejects.toMatchObject({ code: 'forbidden' });
++    await expect(renameRootWorkspace('untrusted', 'w', 'New', 'RENAME Acme TO New')).rejects.toMatchObject({ code: 'forbidden' });
++    expect(state.workspace.create).not.toHaveBeenCalled();
++    expect(state.workspace.updateMany).not.toHaveBeenCalled();
++  });
++
++  it('enforces runtime name limits for direct service callers', async () => {
++    await expect(renameRootWorkspace('root', 'w', 'x'.repeat(101), 'anything')).rejects.toMatchObject({ code: 'invalid_request' });
++    expect(state.workspace.updateMany).not.toHaveBeenCalled();
++  });
++
++  it('uses the current Root timezone when a direct caller omits it', async () => {
++    await createRootWorkspace('root', { name: 'Acme', ownerEmail: 'Owner@Example.com', confirmation: 'CREATE Acme FOR owner@example.com' });
++    expect(state.workspace.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ timezone: 'UTC' }) }));
++  });
++
++  it('rechecks Root authority after acquiring the actor lock', async () => {
++    state.user.findUnique.mockResolvedValueOnce({ isInstanceOwner: true, disabledAt: null }).mockResolvedValue({ isInstanceOwner: false, disabledAt: null });
++    await expect(renameRootWorkspace('root', 'w', 'New', 'RENAME Acme TO New')).rejects.toMatchObject({ code: 'forbidden' });
++    expect(state.workspace.updateMany).not.toHaveBeenCalled();
++  });
++
++  it.each([{ name: 'x'.repeat(101) }, { ownerEmail: 'invalid' }, { timezone: 'Unknown/Zone' }])('rejects invalid direct create input: %j', async overrides => {
++    await expect(createRootWorkspace('root', { name: 'Acme', ownerEmail: 'owner@example.com', confirmation: 'CREATE Acme FOR owner@example.com', ...overrides })).rejects.toMatchObject({ code: 'invalid_request' });
++    expect(state.workspace.create).not.toHaveBeenCalled();
++  });
++
+   it('creates a workspace and owner membership atomically with an audit entry', async () => {
+     await expect(createRootWorkspace('root', { name: 'Acme', ownerEmail: 'owner@example.com', timezone: 'Africa/Casablanca', confirmation: 'CREATE Acme FOR owner@example.com' })).resolves.toEqual({ id: 'workspace-new', slug: 'acme-example' });
+     expect(state.workspace.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ name: 'Acme', timezone: 'Africa/Casablanca', memberships: { create: expect.objectContaining({ userId: 'owner', role: 'owner' }) } }) }));
+@@ -28,7 +60,7 @@ describe('Root workspace controls', () => {
+ 
+   it('rejects missing owner and wrong confirmation before creating', async () => {
+     await expect(createRootWorkspace('root', { name: 'Acme', ownerEmail: 'owner@example.com', timezone: 'UTC', confirmation: 'yes' })).rejects.toThrow(/confirmation/);
+-    state.user.findUnique.mockResolvedValue(null);
++    state.user.findUnique.mockImplementation(async ({ where }: any) => where.id ? { isInstanceOwner: true, disabledAt: null } : null);
+     await expect(createRootWorkspace('root', { name: 'Acme', ownerEmail: 'owner@example.com', timezone: 'UTC', confirmation: 'CREATE Acme FOR owner@example.com' })).rejects.toThrow(/active account/);
+     expect(state.workspace.create).not.toHaveBeenCalled();
+   });
+diff --git a/rebuild/tests/root-workspace-routes.test.ts b/rebuild/tests/root-workspace-routes.test.ts
+index d4a016cf..a0edaa5a 100644
+--- a/rebuild/tests/root-workspace-routes.test.ts
++++ b/rebuild/tests/root-workspace-routes.test.ts
+@@ -21,22 +21,22 @@ describe('Root workspace mutation routes', () => {
+   });
+ 
+   it('rejects cross-origin create and rename before actor lookup', async () => {
+-    expect((await POST(create('https://evil.example'))).status).toBe(403);
++    expect((await POST(create('https://evil.example'), undefined)).status).toBe(403);
+     expect((await PATCH(rename('https://evil.example'), { params: Promise.resolve({ id: 'ws-1' }) })).status).toBe(403);
+     expect(state.currentRootActor).not.toHaveBeenCalled();
+   });
+ 
+   it('restricts both routes to installation owner', async () => {
+     state.currentRootActor.mockResolvedValue({ id: 'viewer', isInstanceOwner: false });
+-    expect((await POST(create('https://app.example.test'))).status).toBe(404);
++    expect((await POST(create('https://app.example.test'), undefined)).status).toBe(404);
+     expect((await PATCH(rename('https://app.example.test'), { params: Promise.resolve({ id: 'ws-1' }) })).status).toBe(404);
+     expect(state.createRootWorkspace).not.toHaveBeenCalled();
+     expect(state.renameRootWorkspace).not.toHaveBeenCalled();
+   });
+ 
+   it('applies Root defaults and passes validated changes to service', async () => {
+-    expect((await POST(create('https://app.example.test'))).status).toBe(201);
+-    expect(state.createRootWorkspace).toHaveBeenCalledWith('root', { name: 'Acme', ownerEmail: 'owner@example.com', confirmation: 'CREATE Acme FOR owner@example.com', timezone: 'UTC' });
++    expect((await POST(create('https://app.example.test'), undefined)).status).toBe(201);
++    expect(state.createRootWorkspace).toHaveBeenCalledWith('root', { name: 'Acme', ownerEmail: 'owner@example.com', confirmation: 'CREATE Acme FOR owner@example.com' });
+     expect((await PATCH(rename('https://app.example.test'), { params: Promise.resolve({ id: 'ws-1' }) })).status).toBe(200);
+     expect(state.renameRootWorkspace).toHaveBeenCalledWith('root', 'ws-1', 'Acme Studio', 'RENAME Acme TO Acme Studio');
+   });

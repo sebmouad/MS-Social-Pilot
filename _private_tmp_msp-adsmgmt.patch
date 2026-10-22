@@ -1,0 +1,982 @@
+diff --git a/rebuild/docs/ADS_PARITY.md b/rebuild/docs/ADS_PARITY.md
+index 17218ca2..f210bd04 100644
+--- a/rebuild/docs/ADS_PARITY.md
++++ b/rebuild/docs/ADS_PARITY.md
+@@ -327,3 +327,35 @@ Final local verification from `rebuild/`:
+ 
+ No install, client generation, server, push or deployment was run. Browser,
+ PostgreSQL migration/concurrency and live-provider evidence remain unverified.
++
++## Management completeness — paused ad creation, missing grant, hierarchy
++
++Status: source and fixture tests only. No live Graph call, browser run, migration
++application or production change.
++
++- **Create ad.** Neutral `ad.create` (`parentId` = ad set in stored history, `creativeId`
++  = existing account creative, `name`) goes through the same `previewAdsManagement` /
++  `performAdsManagement` service as every other change, so the Campaigns UI
++  (`AdCreateForm`), session REST (`/api/ads/management`) and MCP (`preview_ads_change` /
++  `apply_ads_change`) share parsing, authority, exact confirmation, ledger and recovery.
++  The journal key is `@create-ad:<adSetId>` (one unresolved creation per ad set). Scope
++  must be unrestricted, as for ad sets. Facebook (`ads-ops/index.ts`) verifies the ad set
++  (carries a campaign, is not an ad) and the creative belong to the account, then posts
++  `/{act}/ads` with a module-fixed `PAUSED` status; a missing id stays uncertain.
++- **Existing objects.** Pause/resume, daily/lifetime budget, rename, creative assign and
++  delete keep the shared path; fixtures now exercise every Facebook write body and the
++  spend-changing/irreversible confirmations.
++- **Missing grant.** `describeAdsManagement` returns `needsReconnect: true` when management
++  is withheld by `reconnect_required` (absent `ads_management` grant or invalid
++  connection). The object manager and Campaigns screen show a bilingual reconnect notice
++  linking to Settings → Connections. The thrown message is in the Ads catalog
++  (`grantMissing`), so API/MCP errors localize in French.
++- **Hierarchy.** Campaigns rows show their ancestor path (`Campaign › Ad set`) resolved by
++  the platform's neutral `parentObjectId`, are ordered by it, and a note says levels
++  overlap and must not be added together.
++- **Migration required before activation.** `ads_operations_operation_kind` (CHECK on
++  `operationType`) must list `ad.create`; `objectType` already allows `ad`. Until a root
++  `prisma/migrations` migration extends it, the ledger insert fails closed before any
++  provider call.
++- **New Root keys: none** (customer copy keys were added to the existing `ads.customerCopy`
++  default catalog; `CONFIG_SCHEMA_VERSION` untouched).
+diff --git a/rebuild/src/modules/ads/copy.ts b/rebuild/src/modules/ads/copy.ts
+index 0eaf2200..f7685050 100644
+--- a/rebuild/src/modules/ads/copy.ts
++++ b/rebuild/src/modules/ads/copy.ts
+@@ -12,6 +12,30 @@ export const adsCustomerCopy = {
+ "findingConcentrated": {"en": "{name} accounts for {share}% of spend.", "fr": "{name} représente {share} % des dépenses."},
+ "findingBestCtr": {"en": "{name} has a click-through rate {ratio} times the account average.", "fr": "Le taux de clic de {name} est {ratio} fois la moyenne du compte."},
+ "viewOnlyObject": {"en": "You can view this {kind}. Changes are not available for your access or this account.", "fr": "Vous pouvez consulter cet objet : {kind}. Les modifications ne sont pas disponibles pour vos droits ou ce compte."},
++"grantMissing": {"en": "Reconnect this advertising connection and allow advertising changes.", "fr": "Reconnectez cette connexion publicitaire et autorisez les modifications publicitaires."},
++"needsReconnectObject": {"en": "Changes are paused for this {kind} until the advertising connection is reconnected with permission to make changes.", "fr": "Les modifications sont suspendues pour cet objet ({kind}) tant que la connexion publicitaire n’est pas reconnectée avec l’autorisation de modifier."},
++"needsReconnectAction": {"en": "Reconnect in Settings", "fr": "Reconnecter dans les paramètres"},
++"needsReconnectAccount": {"en": "Advertising changes are paused for {account}. Reconnect its connection and allow advertising changes to create or edit campaigns, ad sets and ads.", "fr": "Les modifications publicitaires sont suspendues pour {account}. Reconnectez sa connexion et autorisez les modifications pour créer ou modifier campagnes, ensembles et publicités."},
++"adCreateName": {"en": "Enter an ad name.", "fr": "Saisissez un nom de publicité."},
++"adCreateParent": {"en": "Choose a valid ad set.", "fr": "Choisissez un ensemble de publicités valide."},
++"adCreateParentMissing": {"en": "This ad set cannot be verified for the selected account. Wait for the next sync or choose another ad set.", "fr": "Cet ensemble de publicités ne peut pas être vérifié pour le compte sélectionné. Attendez la prochaine synchronisation ou choisissez-en un autre."},
++"adCreateTitle": {"en": "Create paused ad under {adSetName}", "fr": "Créer une publicité en pause dans {adSetName}"},
++"adCreateDescription": {"en": "The ad uses an existing creative and starts paused. Nothing is delivered or spent until you resume it separately.", "fr": "La publicité utilise un visuel existant et démarre en pause. Rien n’est diffusé ni dépensé tant que vous ne la reprenez pas séparément."},
++"adCreateNameLabel": {"en": "Ad name", "fr": "Nom de la publicité"},
++"adCreateCreativeLabel": {"en": "Creative", "fr": "Visuel"},
++"adCreateChoose": {"en": "Choose a creative", "fr": "Choisissez un visuel"},
++"adCreateLoad": {"en": "Load creatives", "fr": "Charger les visuels"},
++"adCreateNoCreatives": {"en": "This account has no creatives yet. Create one first, then add the ad.", "fr": "Ce compte n’a pas encore de visuel. Créez-en un, puis ajoutez la publicité."},
++"adCreateReview": {"en": "Review ad", "fr": "Vérifier la publicité"},
++"adCreateAction": {"en": "Create paused ad", "fr": "Créer la publicité en pause"},
++"adCreateConfirmTitle": {"en": "Create this paused ad?", "fr": "Créer cette publicité en pause ?"},
++"adCreateHeldLabel": {"en": "Ad creation needs review", "fr": "La création de la publicité doit être vérifiée"},
++"adCreateSuccess": {"en": "Paused ad created.", "fr": "Publicité créée en pause."},
++"adCreateChooseCreative": {"en": "Choose a creative.", "fr": "Choisissez un visuel."},
++"hierarchyNote": {"en": "Campaigns contain ad sets, and ad sets contain ads. Figures at each level overlap, so do not add them together.", "fr": "Les campagnes contiennent des ensembles de publicités, qui contiennent des publicités. Les chiffres de chaque niveau se recoupent : ne les additionnez pas."},
++"hierarchyAdSetsOf": {"en": "Ad sets in {name}", "fr": "Ensembles de {name}"},
++"hierarchyAdsOf": {"en": "Ads in {name}", "fr": "Publicités de {name}"},
++"hierarchyUngrouped": {"en": "Not linked to a parent in stored data", "fr": "Non rattaché à un parent dans les données enregistrées"},
+ "objectDailyLine": {"en": "{date} · {currency}{spend} · {impressions} impressions · {clicks} clicks", "fr": "{date} · {currency}{spend} · {impressions} impressions · {clicks} clics"},
+ "validation001": {"en":"The advertising action could not be completed. Check the connection and try again.","fr":"L’action publicitaire n’a pas pu aboutir. Vérifiez la connexion et réessayez."},
+ "validation002": {"en":"Choose valid Ads report filters.","fr":"Choisissez des filtres de rapport publicitaire valides."},
+diff --git a/rebuild/src/modules/ads/directory/management-port.ts b/rebuild/src/modules/ads/directory/management-port.ts
+index 60db2082..419649a6 100644
+--- a/rebuild/src/modules/ads/directory/management-port.ts
++++ b/rebuild/src/modules/ads/directory/management-port.ts
+@@ -3,7 +3,7 @@ import type { AdsOperationSupport, AdsOpsLimits } from '../management/types';
+ 
+ export type AdsDirectoryObjectLevel = 'campaign' | 'adset' | 'ad';
+ export type AdsDirectoryOperation = AdsOperationSupport;
+-export type AdsDirectoryManagement = { canManage: boolean; operations: AdsDirectoryOperation[]; canListCreatives?: boolean; limits?: AdsOpsLimits };
++export type AdsDirectoryManagement = { canManage: boolean; /** True when management is withheld only because the connection must be reconnected (for example the advertising-changes grant is missing). */ needsReconnect?: boolean; operations: AdsDirectoryOperation[]; canListCreatives?: boolean; limits?: AdsOpsLimits };
+ export type AdsDirectoryChange = { id: string; operationType: string; objectType: string; objectId: string; status: string; createdAt: string; needsResolution: boolean; onHold?: boolean; resolutionNote: string | null };
+ 
+ /** Optional host-owned management read surface. Ads reads remain usable without it. */
+diff --git a/rebuild/src/modules/ads/directory/server.ts b/rebuild/src/modules/ads/directory/server.ts
+index 91b5785b..62248f3d 100644
+--- a/rebuild/src/modules/ads/directory/server.ts
++++ b/rebuild/src/modules/ads/directory/server.ts
+@@ -140,7 +140,7 @@ export async function readAdsObjectDetail(actor: AdsReadActor, input: unknown, n
+     range: { from: adsIsoDay(filters.since), to: adsIsoDay(filters.until), endExclusive: true as const },
+     daily: [...rows].sort((a, b) => a.date.getTime() - b.date.getTime()).map(flow), live,
+     management: management
+-      ? { available: true as const, canManage: management.canManage, operations: management.operations.filter(op => op.objectTypes.includes(level as DirectoryLevel)) }
++      ? { available: true as const, canManage: management.canManage, needsReconnect: management.needsReconnect === true, operations: management.operations.filter(op => op.objectTypes.includes(level as DirectoryLevel)) }
+       : { available: false as const, canManage: false as const, operations: [] },
+   };
+ 
+diff --git a/rebuild/src/modules/ads/management/mcp.ts b/rebuild/src/modules/ads/management/mcp.ts
+index 3ca65f8a..c098a311 100644
+--- a/rebuild/src/modules/ads/management/mcp.ts
++++ b/rebuild/src/modules/ads/management/mcp.ts
+@@ -4,7 +4,7 @@ import { assertAdsResultCeiling, validateAdsResultCeiling } from '../result-ceil
+ import { OperationError } from '@/lib/operation-error';
+ import { describeAdsManagement, readAdsCreativeImage, listAdsCreativeSources, listAdsCreatives, listAdsOperations, performAdsManagement, previewAdsManagement, resolveAdsOperation, type AdsManageActor } from './server';
+ 
+-const operation = { type: 'object', description: 'A neutral change: {type: status.set|budget.set|rename|creative.assign|delete, objectType, objectId, ...fields} or a paused creation: {type:"campaign.create", objectType:"campaign", name, objective} / {type:"adset.create", objectType:"adset", parentId (existing campaign id), name, dailyBudgetMinor, countryCode, optimizationGoal}. Creative creation: {type:"creative.create", objectType:"creative", name, targetId (selected channel), mediaId (stored workspace image filename), format:"image"|"link", message, title, linkUrl (HTTPS, required only for link)}. Creatives are unattached and cannot deliver or spend. Creations carry no objectId or status. Campaigns and ad sets start paused; creatives have no delivery state and stay unattached. Only changes the account advertises will succeed.' };
++const operation = { type: 'object', description: 'A neutral change: {type: status.set|budget.set|rename|creative.assign|delete, objectType, objectId, ...fields} or a paused creation: {type:"campaign.create", objectType:"campaign", name, objective} / {type:"adset.create", objectType:"adset", parentId (existing campaign id), name, dailyBudgetMinor, countryCode, optimizationGoal} / {type:"ad.create", objectType:"ad", parentId (existing ad set id), name, creativeId (existing creative id from list_ads_creatives)}. Creative creation: {type:"creative.create", objectType:"creative", name, targetId (selected channel), mediaId (stored workspace image filename), format:"image"|"link", message, title, linkUrl (HTTPS, required only for link)}. Creatives are unattached and cannot deliver or spend. Creations carry no objectId or status. Campaigns, ad sets and ads start paused; creatives have no delivery state and stay unattached. Only changes the account advertises will succeed.' };
+ export const adsManagementTools = new Set(['get_ads_management_options', 'get_ads_creative_image', 'preview_ads_change', 'apply_ads_change', 'list_ads_changes', 'resolve_ads_change', 'list_ads_creatives', 'list_ads_creative_sources']);
+ export const adsManagementWriteTools = new Set(['apply_ads_change', 'resolve_ads_change']);
+ export const adsManagementToolDefinitions = [
+diff --git a/rebuild/src/modules/ads/management/server.ts b/rebuild/src/modules/ads/management/server.ts
+index e2e547bf..42b9d3c1 100644
+--- a/rebuild/src/modules/ads/management/server.ts
++++ b/rebuild/src/modules/ads/management/server.ts
+@@ -71,6 +71,11 @@ export function parseNeutralOperation(raw: unknown): AdsNeutralOperation {
+       countryCode: text(value.countryCode, /^[A-Z]{2}$/, defaultAdsText('validation013')), optimizationGoal: text(value.optimizationGoal, CREATE_TOKEN, defaultAdsText('validation014')),
+     };
+   }
++  if (type === 'ad.create') {
++    keys(['type', 'objectType', 'parentId', 'name', 'creativeId']);
++    if (objectType !== 'ad' || typeof value.name !== 'string') throw new OperationError('invalid_request', defaultAdsText('adCreateName'));
++    return { type, objectType, parentId: text(value.parentId, SAFE_ID, defaultAdsText('adCreateParent')), name: value.name.trim(), creativeId: text(value.creativeId, SAFE_ID, defaultAdsText('validation025')) };
++  }
+   if (type === 'creative.create') {
+     keys(['type', 'objectType', 'name', 'targetId', 'mediaId', 'format', 'message', 'title', 'linkUrl']);
+     if (objectType !== 'creative' || typeof value.name !== 'string' || !['image', 'link'].includes(String(value.format)) || typeof value.message !== 'string' || typeof value.title !== 'string' || value.message.length > 5000 || value.title.length > 200) throw new OperationError('invalid_request', defaultAdsText('validation015'));
+@@ -168,12 +173,13 @@ function ledgerObjectId(operation: AdsNeutralOperation) {
+   if (operation.type === 'creative.create') return '@create-creative';
+   if (operation.type === 'campaign.create') return '@create-campaign';
+   if (operation.type === 'adset.create') return `@create-adset:${operation.parentId}`;
++  if (operation.type === 'ad.create') return `@create-ad:${operation.parentId}`;
+   return operation.objectId;
+ }
+ 
+ /** Ad set creation needs unrestricted page scope (the parent can't be bounded to channel targets). */
+ function assertCreationScope(operation: AdsNeutralOperation, pageScope: AdsPageScope, allowedTargetIds?: readonly string[]) {
+-  if (operation.type === 'adset.create' && (!pageScope.all || allowedTargetIds !== undefined)) throw new OperationError('forbidden', defaultAdsText('validation027'));
++  if ((operation.type === 'adset.create' || operation.type === 'ad.create') && (!pageScope.all || allowedTargetIds !== undefined)) throw new OperationError('forbidden', defaultAdsText('validation027'));
+ }
+ 
+ async function assertOwnedObject(accountDbId: string, operation: AdsNeutralOperation) {
+@@ -183,6 +189,11 @@ async function assertOwnedObject(accountDbId: string, operation: AdsNeutralOpera
+     if (!parent) throw new OperationError('not_found', await adsServiceText('service042'));
+     return;
+   }
++  if (operation.type === 'ad.create') {
++    const parent = await prisma.adInsight.findFirst({ where: { adAccountId: accountDbId, level: 'adset', objectId: operation.parentId }, select: { id: true } });
++    if (!parent) throw new OperationError('not_found', await adsServiceText('adCreateParentMissing'));
++    return;
++  }
+   const owned = await prisma.adInsight.findFirst({ where: { adAccountId: accountDbId, level: objectLevel[operation.objectType], objectId: operation.objectId }, select: { id: true } });
+   if (!owned) throw new OperationError('not_found', await adsServiceText('service007'));
+ }
+@@ -251,7 +262,7 @@ export async function describeAdsManagement(actor: AdsManageActor, adAccountId:
+     const policy = await loadAdsManagementPolicy();
+     return { canManage: true as const, operations: ctx.ops.operations.map(item => ({ ...item })), canListCreatives: Boolean(ctx.ops.listCreatives), limits: { nameMaxCharacters: policy.nameMaxCharacters, maxBudgetMinor: policy.maxBudgetMinor } };
+   } catch (error) {
+-    if (error instanceof OperationError && ['forbidden', 'unauthorized', 'unavailable', 'reconnect_required', 'not_found'].includes(error.code)) return { canManage: false as const, operations: [], canListCreatives: false };
++    if (error instanceof OperationError && ['forbidden', 'unauthorized', 'unavailable', 'reconnect_required', 'not_found'].includes(error.code)) return { canManage: false as const, needsReconnect: error.code === 'reconnect_required', operations: [], canListCreatives: false };
+     throw error;
+   }
+ 
+@@ -288,11 +299,11 @@ export type AdsManagementOutcome =
+   | { outcome: 'uncertain'; operationId: string; message: string };
+ 
+ /** Present only when the provider proved a creation (or a recorded success is replayed). Never on pending/uncertain/rejected. */
+-export type AdsCreatedObject = { objectType: 'campaign' | 'adset' | 'creative'; remoteId: string };
++export type AdsCreatedObject = { objectType: 'campaign' | 'adset' | 'ad' | 'creative'; remoteId: string };
+ type AdsLedgerStatus = { status: string; remoteId: string | null; operationType?: string; objectType?: string };
+ function createdFrom(ledger: { operationType?: string; objectType?: string }, remoteId: string | null): { created?: AdsCreatedObject } {
+-  if (!remoteId || (ledger.operationType !== 'campaign.create' && ledger.operationType !== 'adset.create' && ledger.operationType !== 'creative.create')) return {};
+-  return { created: { objectType: ledger.operationType === 'campaign.create' ? 'campaign' : ledger.operationType === 'creative.create' ? 'creative' : 'adset', remoteId } };
++  if (!remoteId || (ledger.operationType !== 'campaign.create' && ledger.operationType !== 'adset.create' && ledger.operationType !== 'ad.create' && ledger.operationType !== 'creative.create')) return {};
++  return { created: { objectType: ledger.operationType === 'campaign.create' ? 'campaign' : ledger.operationType === 'creative.create' ? 'creative' : ledger.operationType === 'ad.create' ? 'ad' : 'adset', remoteId } };
+ }
+ class AdsIntentNoLongerPending extends Error {
+   constructor(readonly ledger: AdsLedgerStatus) { super(defaultAdsText('validation029')); }
+@@ -400,7 +411,7 @@ export async function performAdsManagement(actor: AdsManageActor, input: { adAcc
+         assertCreationScope(operation, current.pageScope, actor.allowedTargetIds);
+         await validateWithPolicy(current.ops, operation);
+         creative = await creativeContext(actor, current, operation);
+-        if (operation.type === 'adset.create') await assertOwnedObject(current.account.id, operation);
++        if (operation.type === 'adset.create' || operation.type === 'ad.create') await assertOwnedObject(current.account.id, operation);
+         if (current.ops.confirmation(operation, { adAccountId: current.account.id, currency: current.account.currency }) !== expected) throw new OperationError('conflict', await adsServiceText('service056'));
+         signal.throwIfAborted();
+       } catch (error) {
+diff --git a/rebuild/src/modules/ads/management/types.ts b/rebuild/src/modules/ads/management/types.ts
+index 68f3e995..980ba7d8 100644
+--- a/rebuild/src/modules/ads/management/types.ts
++++ b/rebuild/src/modules/ads/management/types.ts
+@@ -5,7 +5,7 @@
+  */
+ export type AdsObjectType = 'campaign' | 'adset' | 'ad';
+ export type AdsManagedObjectType = AdsObjectType | 'creative';
+-export type AdsOperationId = 'status.set' | 'budget.set' | 'rename' | 'creative.assign' | 'delete' | 'campaign.create' | 'adset.create' | 'creative.create';
++export type AdsOperationId = 'status.set' | 'budget.set' | 'rename' | 'creative.assign' | 'delete' | 'campaign.create' | 'adset.create' | 'ad.create' | 'creative.create';
+ 
+ export type AdsNeutralOperation =
+   | { type: 'status.set'; objectType: AdsObjectType; objectId: string; status: 'active' | 'paused' }
+@@ -17,6 +17,8 @@ export type AdsNeutralOperation =
+   | { type: 'campaign.create'; objectType: 'campaign'; name: string; objective: string }
+   /** parentId is an existing campaign remote id; the shared service verifies it belongs to the account from stored history. */
+   | { type: 'adset.create'; objectType: 'adset'; parentId: string; name: string; dailyBudgetMinor: number; countryCode: string; optimizationGoal: string }
++  /** parentId is an existing ad set remote id verified from stored history; creativeId is an existing account creative. The platform module always creates the ad paused. */
++  | { type: 'ad.create'; objectType: 'ad'; parentId: string; name: string; creativeId: string }
+   /** Stored workspace image and selected channel identity; never an arbitrary image URL or remote identity. No delivery or assignment. */
+   | { type: 'creative.create'; objectType: 'creative'; name: string; targetId: string; mediaId: string; format: 'image' | 'link'; message: string; title: string; linkUrl?: string };
+ 
+@@ -65,7 +67,7 @@ export interface AdsOpsHost {
+ }
+ 
+ export const AD_OBJECT_TYPES: readonly AdsObjectType[] = ['campaign', 'adset', 'ad'];
+-export const AD_OPERATION_IDS: readonly AdsOperationId[] = ['status.set', 'budget.set', 'rename', 'creative.assign', 'delete', 'campaign.create', 'adset.create', 'creative.create'];
++export const AD_OPERATION_IDS: readonly AdsOperationId[] = ['status.set', 'budget.set', 'rename', 'creative.assign', 'delete', 'campaign.create', 'adset.create', 'ad.create', 'creative.create'];
+ 
+-export type AdsCreationOperation = Extract<AdsNeutralOperation, { type: 'campaign.create' | 'adset.create' | 'creative.create' }>;
+-export function isCreationOperation(operation: AdsNeutralOperation): operation is AdsCreationOperation { return operation.type === 'campaign.create' || operation.type === 'adset.create' || operation.type === 'creative.create'; }
++export type AdsCreationOperation = Extract<AdsNeutralOperation, { type: 'campaign.create' | 'adset.create' | 'ad.create' | 'creative.create' }>;
++export function isCreationOperation(operation: AdsNeutralOperation): operation is AdsCreationOperation { return operation.type === 'campaign.create' || operation.type === 'adset.create' || operation.type === 'ad.create' || operation.type === 'creative.create'; }
+diff --git a/rebuild/src/modules/ads/ui/AdCreateForm.tsx b/rebuild/src/modules/ads/ui/AdCreateForm.tsx
+new file mode 100644
+index 00000000..7143266f
+--- /dev/null
++++ b/rebuild/src/modules/ads/ui/AdCreateForm.tsx
+@@ -0,0 +1,118 @@
++'use client';
++import { useAdsMessage, useAdsText } from '@/modules/ads/ui/AdsCopyProvider';
++
++import { useId, useState, type FormEvent } from 'react';
++import { Button } from '@/components/Button';
++import { FieldError, useFormValidation } from '@/components/FormValidation';
++import { ModalDialog } from '@/components/ModalDialog';
++import { RouteNotice } from '@/components/RouteNotice';
++import type { AdsNeutralOperation } from '@/modules/ads/management/types';
++
++type Creative = { id: string; name: string | null; title: string | null };
++type Review = { operation: Extract<AdsNeutralOperation, { type: 'ad.create' }>; confirmation: string; requestId: string; spendChanging: boolean; blocked: boolean };
++
++/**
++ * Create a paused ad under one ad set from an existing creative. It speaks only the neutral preview/apply
++ * service, so the confirmation text, spend warning, ledger and recovery are the shared management ones.
++ * The same reviewed payload keeps its request id; an unknown outcome is held, never resent automatically.
++ */
++export function AdCreateForm({ adAccountId, adSetId, adSetName, nameMaxCharacters }: { adAccountId: string; adSetId: string; adSetName: string; nameMaxCharacters: number }) {
++  const localize = useAdsMessage();
++  const t = useAdsText();
++  const id = useId();
++  const validation = useFormValidation();
++  const [name, setName] = useState('');
++  const [creativeId, setCreativeId] = useState('');
++  const [creatives, setCreatives] = useState<Creative[] | null>(null);
++  const [busy, setBusy] = useState(false);
++  const [review, setReview] = useState<Review | null>(null);
++  const [dialogOpen, setDialogOpen] = useState(false);
++  const [held, setHeld] = useState('');
++  const [message, setMessage] = useState<{ tone: 'ok' | 'error'; text: string } | null>(null);
++
++  async function loadCreatives() {
++    setBusy(true); setMessage(null);
++    try {
++      const response = await fetch(`/api/ads/management?${new URLSearchParams({ view: 'creatives', adAccountId })}`);
++      const payload = await response.json().catch(() => ({})) as { error?: string; items?: Creative[] };
++      if (!response.ok || !payload.items) throw new Error(payload.error || t('text248'));
++      setCreatives(payload.items);
++    } catch (error) { setMessage({ tone: 'error', text: error instanceof Error ? error.message : t('text248') }); }
++    finally { setBusy(false); }
++  }
++
++  async function submit(event: FormEvent<HTMLFormElement>) {
++    event.preventDefault();
++    if (busy || held) return;
++    const cleanName = name.trim();
++    const errors: Record<string, string> = {};
++    if (!cleanName) errors.name = t('adCreateName');
++    else if (cleanName.length > nameMaxCharacters) errors.name = t('text246', { value0: nameMaxCharacters });
++    if (!creativeId) errors.creativeId = t('adCreateChooseCreative');
++    if (!validation.validate(event.currentTarget, errors)) return;
++    const operation = { type: 'ad.create', objectType: 'ad', parentId: adSetId, name: cleanName, creativeId } as const;
++    setBusy(true); setMessage(null);
++    try {
++      const response = await fetch('/api/ads/management', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'preview', adAccountId, operation }) });
++      const payload = await response.json().catch(() => ({})) as { error?: string; confirmation?: string; spendChanging?: boolean; blockedByOpenChange?: boolean | null };
++      if (!response.ok || !payload.confirmation) throw new Error(payload.error || t('text238'));
++      // Same reviewed payload and confirmation keep the same request id; any change mints a new one.
++      const same = review && review.confirmation === payload.confirmation;
++      setReview(same ? review : { operation, confirmation: payload.confirmation, requestId: globalThis.crypto.randomUUID(), spendChanging: payload.spendChanging !== false, blocked: payload.blockedByOpenChange !== false });
++      setDialogOpen(true);
++    } catch (error) { setMessage({ tone: 'error', text: error instanceof Error ? error.message : t('text238') }); }
++    finally { setBusy(false); }
++  }
++
++  async function apply() {
++    if (!review || busy || review.blocked) return;
++    setBusy(true);
++    try {
++      const response = await fetch('/api/ads/management', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'apply', adAccountId, operation: review.operation, confirmation: review.confirmation, requestId: review.requestId }) });
++      const payload = await response.json().catch(() => null) as { outcome?: string; message?: string; warning?: string; error?: string } | null;
++      if (response.ok && payload?.outcome === 'succeeded') {
++        setMessage({ tone: 'ok', text: payload.warning ?? t('adCreateSuccess') });
++        setReview(null); setDialogOpen(false); setHeld(''); setName(''); setCreativeId('');
++      } else if (response.ok && payload?.outcome === 'rejected') {
++        setMessage({ tone: 'error', text: payload.message ?? t('text200') });
++        setReview(null); setDialogOpen(false); setHeld('');
++      } else {
++        setHeld(payload?.message ?? payload?.error ?? t('text241')); setDialogOpen(false);
++      }
++    } catch { setHeld(t('networkChangeHeld')); setDialogOpen(false); }
++    finally { setBusy(false); }
++  }
++
++  const locked = busy || Boolean(held);
++  return <form noValidate className="ads-campaign-create" onSubmit={event => void submit(event)} aria-label={t('adCreateTitle', { adSetName })}>
++    <h4>{t('adCreateTitle', { adSetName })}</h4>
++    <p className="small-note">{t('adCreateDescription')}</p>
++    {creatives === null ? <Button type="button" onClick={() => void loadCreatives()} disabled={busy}>{t('adCreateLoad')}</Button>
++      : creatives.length === 0 ? <p className="small-note">{t('adCreateNoCreatives')}</p>
++        : <div className="ads-campaign-create__fields">
++          <label>{t('adCreateNameLabel')}<input {...validation.fieldProps('name')} name="name" value={name} maxLength={nameMaxCharacters} onChange={event => { setName(event.target.value); validation.clear('name'); }} disabled={locked} required /><FieldError {...validation.errorProps('name')} /></label>
++          <label>{t('adCreateCreativeLabel')}<select {...validation.fieldProps('creativeId')} name="creativeId" value={creativeId} onChange={event => { setCreativeId(event.target.value); validation.clear('creativeId'); }} disabled={locked}>
++            <option value="">{t('adCreateChoose')}</option>{creatives.map(item => <option key={item.id} value={item.id}>{item.name || item.title || item.id}</option>)}
++          </select><FieldError {...validation.errorProps('creativeId')} /></label>
++          <Button type="submit" variant="primary" disabled={locked}>{busy ? t('text208') : t('adCreateReview')}</Button>
++        </div>}
++    {message ? <RouteNotice error={message.tone === 'error'} className={message.tone === 'ok' ? 'small-note' : 'ui-error'} focusKey={message.text}>{localize(message.text)}</RouteNotice> : null}
++    {held && review ? <div role="region" aria-label={t('adCreateHeldLabel')} className="ads-object-manager__pending">
++      <p role="alert" className="ui-error">{localize(held)}</p>
++      <p className="small-note">{t('text210')}<a href="/ads/objects#changes">{t('text211')}</a> {t('text212')}</p>
++      <Button type="button" variant="primary" onClick={() => void apply()} disabled={busy}>{busy ? t('text118') : t('text213')}</Button>
++    </div> : null}
++    {review && dialogOpen ? <ModalDialog className="ui-dialog" labelledBy={`${id}-title`} onDismiss={() => { if (!busy) setDialogOpen(false); }} busy={busy}>
++      <div className="ui-dialog__header"><div><h2 id={`${id}-title`}>{t('adCreateConfirmTitle')}</h2><p>{t('adCreateDescription')}</p></div></div>
++      <div className="ui-dialog__body">
++        {review.spendChanging ? <p role="note"><strong>{t('text120')}</strong></p> : null}
++        <p><strong>{review.operation.name}</strong> {t('text224')}{adSetName}</p>
++        {review.blocked ? <p role="alert">{t('text122')}<a href="/ads/objects#changes">{t('text102')}</a>{t('text251')}</p> : null}
++      </div>
++      <div className="ui-dialog__actions">
++        <Button data-dialog-cancel onClick={() => setDialogOpen(false)} disabled={busy}>{t('text125')}</Button>
++        <Button variant="primary" onClick={() => void apply()} disabled={busy || review.blocked}>{busy ? t('text126') : t('adCreateAction')}</Button>
++      </div>
++    </ModalDialog> : null}
++  </form>;
++}
+diff --git a/rebuild/src/modules/ads/ui/campaigns/CampaignsScreen.tsx b/rebuild/src/modules/ads/ui/campaigns/CampaignsScreen.tsx
+index ab5ba760..289e39c6 100644
+--- a/rebuild/src/modules/ads/ui/campaigns/CampaignsScreen.tsx
++++ b/rebuild/src/modules/ads/ui/campaigns/CampaignsScreen.tsx
+@@ -21,6 +21,7 @@ import { canManageWorkspaceAds, canReadWorkspaceAds } from '@/modules/ads/server
+ import { AdsObjectActions } from '@/modules/ads/ui/AdsObjectActions';
+ import { CampaignCreateForm } from '@/modules/ads/ui/CampaignCreateForm';
+ import { AdSetCreateForm } from '@/modules/ads/ui/AdSetCreateForm';
++import { AdCreateForm } from '@/modules/ads/ui/AdCreateForm';
+ import { platformAds } from '@/server/platforms/registry';
+ import { loadAdsReportPolicy } from '@/modules/ads/server/report-policy';
+ import { pageAdsRows, parseAdsResultPage } from '@/modules/ads/report-page';
+@@ -64,9 +65,16 @@ async function CampaignsPage({ searchParams }: { searchParams: Promise<AdsSearch
+     await canReadWorkspaceAds({ userId: viewer.user.id, workspaceId }, accountId, allowedTargetIds),
+   ] as const)));
+   const createAvailability = new Map(await Promise.all(accounts.map(async account => [account.id, await canManageWorkspaceAds({ userId: viewer.user.id, workspaceId }, account.id)] as const)));
+-  const creativeAvailability = new Map(await Promise.all(accounts.map(async account => [account.id, (await describeAdsManagement({ userId: viewer.user.id, workspaceId }, account.id)).operations.some(op => op.id === 'creative.create')] as const)));
++  const managementByAccount = new Map(await Promise.all(accounts.map(async account => [account.id, await describeAdsManagement({ userId: viewer.user.id, workspaceId }, account.id)] as const)));
++  const creativeAvailability = new Map([...managementByAccount].map(([id, management]) => [id, management.operations.some(op => op.id === 'creative.create')] as const));
++  // A module that cannot offer ad creation, or a restricted page scope, never shows the form.
++  const adCreateAvailability = new Map([...managementByAccount].map(([id, management]) => [id, viewer.permissions.pageScope.all && management.canManage && management.canListCreatives && management.operations.some(op => op.id === 'ad.create')] as const));
++  const reconnectAccounts = new Set([...managementByAccount].filter(([, management]) => !management.canManage && management.needsReconnect === true).map(([id]) => id));
++  const nameMaxByAccount = new Map([...managementByAccount].map(([id, management]) => [id, 'limits' in management && management.limits ? management.limits.nameMaxCharacters : 100] as const));
++  const parentResolvers = new Map<string, ((input: { level: 'campaign' | 'adset' | 'ad'; fields: unknown }) => string | null) | undefined>();
+   const adsUi = new Map(await Promise.all(accounts.map(async account => {
+     const host = account.socialAccount ? await platformAds(account.socialAccount.provider) : null;
++    parentResolvers.set(account.id, host?.parentObjectId);
+     const ui = host?.creationUi ? await host.creationUi().catch(() => null) : host?.ui ?? null;
+     return [account.id, ui] as const;
+   })));
+@@ -84,14 +92,28 @@ async function CampaignsPage({ searchParams }: { searchParams: Promise<AdsSearch
+       return <section className="panel ads-results-panel" key={accountId}>
+         <div className="analytics-panel-title"><div><h2>{rows[0]?.accountName ?? account?.name ?? t('text044')}</h2><p className="small-note">{account?.actId}{account?.currency ? ` · ${account.currency}` : ''}</p></div><span className="badge">{rows.length} {t('text045')}</span></div>
+         <CampaignCharts accountName={rows[0]?.accountName ?? account?.name ?? t('text044')} rows={rows} locale={locale} />
++        {reconnectAccounts.has(accountId) ? <p className="small-note" role="note">{t('needsReconnectAccount', { account: rows[0]?.accountName ?? account?.name ?? t('text044') })} <a href="/settings/connections">{t('needsReconnectAction')}</a></p> : null}
++        <p className="small-note">{t('hierarchyNote')}</p>
+         {levels.map(level => {
+-          const levelRows = rows.filter(row => row.level === level.value);
++          const resolveParent = parentResolvers.get(accountId);
++          const known = summaries.filter(row => row.accountId === accountId);
++          const named = new Map(known.map(row => [`${row.level}:${row.id}`, row] as const));
++          const parentOf = (row: typeof known[number]) => {
++            const parentId = resolveParent && (row.level === 'adset' || row.level === 'ad') ? resolveParent({ level: row.level, fields: row.fields }) : null;
++            return parentId ? named.get(`${row.level === 'ad' ? 'adset' : 'campaign'}:${parentId}`) : undefined;
++          };
++          // Campaign > ad set > ad: a row's path lists its ancestors that are present in stored data.
++          const pathOf = (row: typeof known[number]) => {
++            const parent = parentOf(row), grand = parent ? parentOf(parent) : undefined;
++            return [grand?.name, parent?.name].filter(Boolean).join(' › ');
++          };
++          const levelRows = rows.filter(row => row.level === level.value).sort((a, b) => pathOf(a).localeCompare(pathOf(b)) || a.name.localeCompare(b.name) || a.id.localeCompare(b.id));
+           if (!levelRows.length) return null;
+           const slot = (row: typeof levelRows[number]) => readAvailability.get(accountId) || actionAvailability.get(accountId)
+             ? <AdsObjectActions adAccountId={accountId} objectId={row.id} name={row.name} objectType={row.level as 'campaign' | 'adset' | 'ad'} currency={row.currency} canRead={Boolean(readAvailability.get(accountId))} canManage={Boolean(actionAvailability.get(accountId))} /> : null;
+           return <div className="ads-result-level" key={level.value}><h3>{level.label}</h3>
+             <HierarchyTable locale={locale} caption={`${level.label} results for ${account?.name ?? rows[0]?.accountName ?? 'ad account'}`} objectsHref="/ads/objects"
+-              rows={levelRows.map(row => ({ key: row.key, id: row.id, name: row.name, level: row.level as 'campaign' | 'adset' | 'ad', currency: row.currency, spend: row.spend, impressions: row.impressions, clicks: row.clicks, ctr: row.ctr, cpc: row.cpc, days: row.rows,
++              rows={levelRows.map(row => ({ key: row.key, id: row.id, name: row.name, level: row.level as 'campaign' | 'adset' | 'ad', currency: row.currency, spend: row.spend, impressions: row.impressions, clicks: row.clicks, ctr: row.ctr, cpc: row.cpc, days: row.rows, path: pathOf(row),
+                 spendSeries: [...row.dailyMetrics].sort((a, b) => a.date.getTime() - b.date.getTime()).map(entry => entry.spend) }))}
+               actions={Object.fromEntries(levelRows.map(row => [row.key, slot(row)]))}
+               details={Object.fromEntries(levelRows.map(row => [row.key, <details className="ads-stored-details" key={row.key}><summary>{t('dailyRowCount', { count: row.rows, suffix: row.rows === 1 ? '' : 's' })}</summary><div className="ads-detail-content"><h4>{t('text029')}</h4>{row.actions.length ? <ul>{row.actions.map(action => <li key={action.name}><span>{action.name}</span><strong>{number.format(action.value)}</strong></li>)}</ul> : <p>{t('text030')}</p>}<h4>{t('text031')}</h4><DailyMetrics rows={row.dailyMetrics} currency={row.currency} /></div></details>]))} />
+@@ -100,6 +122,9 @@ async function CampaignsPage({ searchParams }: { searchParams: Promise<AdsSearch
+         {viewer.permissions.pageScope.all && actionAvailability.get(accountId) && adsUi.get(accountId)?.adSet && rows.some(row => row.level === 'campaign') ? <div className="ads-result-level"><h3>{t('text047')}</h3><p className="small-note">{t('text048')}</p>
+           {adsUi.get(accountId)?.adSet ? rows.filter(row => row.level === 'campaign').map(row => <AdSetCreateForm key={row.id} adAccountId={accountId} campaignId={row.id} campaignName={row.name} currency={row.currency} config={adsUi.get(accountId)!.adSet!} ownerScope={{ userId: viewer.user.id, workspaceId }} />) : null}
+         </div> : null}
++        {adCreateAvailability.get(accountId) && rows.some(row => row.level === 'adset') ? <div className="ads-result-level"><h3>{t('adCreateAction')}</h3><p className="small-note">{t('adCreateDescription')}</p>
++          {rows.filter(row => row.level === 'adset').map(row => <AdCreateForm key={row.id} adAccountId={accountId} adSetId={row.id} adSetName={row.name} nameMaxCharacters={nameMaxByAccount.get(accountId) ?? 100} />)}
++        </div> : null}
+       </section>;
+     }) : <section className="panel"><EmptyState icon={<IconSpeakerphone />} title={t('text049')} action={<a className="text-link" href="/ads">{t('text050')}</a>}>{t('text051')}</EmptyState></section>}
+     {accounts.filter(account => !filters.accountId || account.id === filters.accountId).some(account => createAvailability.get(account.id) && adsUi.get(account.id)?.campaign) ? <section className="panel"><h2>{t('text052')}</h2><p className="small-note">{t('text053')}</p>
+diff --git a/rebuild/src/modules/ads/ui/campaigns/HierarchyTable.tsx b/rebuild/src/modules/ads/ui/campaigns/HierarchyTable.tsx
+index c17bb50a..52a779ee 100644
+--- a/rebuild/src/modules/ads/ui/campaigns/HierarchyTable.tsx
++++ b/rebuild/src/modules/ads/ui/campaigns/HierarchyTable.tsx
+@@ -14,6 +14,8 @@ export type HierarchyRow = {
+   spend: number; impressions: number; clicks: number; ctr: number | null; cpc: number | null;
+   /** Days with stored delivery rows. */
+   days: number;
++  /** Ancestors present in stored data, outermost first (for example "Campaign › Ad set"); empty when unlinked. */
++  path?: string;
+   /** Daily spend, oldest first; null is a day without a stored row. */
+   spendSeries: Array<number | null>;
+ };
+@@ -55,7 +57,7 @@ export function HierarchyTable({ caption, rows, locale, actions, details, object
+     columns={[
+       { key: 'name', label: t('text066'), hideCardLabel: true, render: row => <span className="ads-hierarchy__name">
+         <span className="ui-mod-chip" data-module="ads" aria-hidden="true">{LEVEL_ICON[row.level]}</span>
+-        <span><strong>{row.name}</strong><small className="ads-object-id">{levelWord[row.level]} {t('text166')}{row.id}</small></span>
++        <span>{row.path ? <small className="ads-object-id">{row.path}</small> : null}<strong>{row.name}</strong><small className="ads-object-id">{levelWord[row.level]} {t('text166')}{row.id}</small></span>
+       </span> },
+       { key: 'delivery', label: t('text167'), render: row => row.spend > 0 || row.impressions > 0
+         ? <Badge tone="success">{t('text168')} {t('text166')}{row.days} {row.days === 1 ? t('text169') : t('text170')}</Badge>
+diff --git a/rebuild/src/modules/ads/ui/objects/ObjectManager.tsx b/rebuild/src/modules/ads/ui/objects/ObjectManager.tsx
+index 3cdced84..cd113707 100644
+--- a/rebuild/src/modules/ads/ui/objects/ObjectManager.tsx
++++ b/rebuild/src/modules/ads/ui/objects/ObjectManager.tsx
+@@ -18,9 +18,9 @@ type Detail = {
+   totals: { spend: number; impressions: number; clicks: number; cpc: number | null; ctr: number | null; cpm: number | null };
+   daily: Array<{ date: string; spend: number; impressions: number; clicks: number }>;
+   live: { available: boolean; configuredStatus?: string | null; effectiveStatus?: string | null };
+-  management: { available: boolean; canManage: boolean; operations: AdsOperationSupport[] };
++  management: { available: boolean; canManage: boolean; needsReconnect?: boolean; operations: AdsOperationSupport[] };
+ };
+-type Capabilities = { canManage: boolean; canListCreatives?: boolean; operations: AdsOperationSupport[]; limits?: AdsOpsLimits };
++type Capabilities = { canManage: boolean; needsReconnect?: boolean; canListCreatives?: boolean; operations: AdsOperationSupport[]; limits?: AdsOpsLimits };
+ type Creative = { id: string; name: string | null; title: string | null; body: string | null };
+ type Pending = {
+   operation: AdsNeutralOperation;
+@@ -66,6 +66,7 @@ export function ObjectManager({ adAccountId, level, objectId, name }: { adAccoun
+ 
+   const supports = (capabilities?.operations ?? detail?.management.operations ?? []).filter(operation => operation.id !== 'campaign.create' && operation.id !== 'adset.create');
+   const canManage = capabilities?.canManage ?? detail?.management.canManage ?? false;
++  const needsReconnect = !canManage && (capabilities?.needsReconnect ?? detail?.management.needsReconnect ?? false);
+   const limits = capabilities?.limits;
+   const supportFor = (opId: string) => supports.find(item => item.id === opId && item.objectTypes.includes(level));
+ 
+@@ -195,7 +196,8 @@ export function ObjectManager({ adAccountId, level, objectId, name }: { adAccoun
+         <dl className="ads-compare-grid"><div><dt>{t('text019')}</dt><dd>{detail.currency ? `${detail.currency} ` : ''}{number.format(detail.totals.spend)}</dd></div><div><dt>{t('text020')}</dt><dd>{number.format(detail.totals.impressions)}</dd></div><div><dt>{t('text022')}</dt><dd>{number.format(detail.totals.clicks)}</dd></div><div><dt>{t('text064')}</dt><dd>{detail.totals.cpc === null ? t('text094') : number.format(detail.totals.cpc)}</dd></div><div><dt>{t('text063')}</dt><dd>{detail.totals.ctr === null ? t('text094') : `${number.format(detail.totals.ctr)}%`}</dd></div><div><dt>{t('text065')}</dt><dd>{detail.totals.cpm === null ? t('text094') : number.format(detail.totals.cpm)}</dd></div></dl>
+         <details><summary>{t('text095')}</summary><ul>{detail.daily.map(day => <li key={day.date}>{t('objectDailyLine', { date: day.date, currency: detail.currency ? `${detail.currency} ` : '', spend: number.format(day.spend), impressions: number.format(day.impressions), clicks: number.format(day.clicks) })}</li>)}</ul></details>
+         <p className="small-note">{detail.live.available ? t('text249', { value0: detail.live.configuredStatus ?? t('text094'), value1: detail.live.effectiveStatus ?? t('text094') }) : t('text098')}</p>
+-        {!canManage || !supports.length ? <p className="small-note">{t('viewOnlyObject', { kind: t(level) })}</p> : operationBlocked ? <p className="small-note">{t('text101')}<a href="/ads/objects#changes">{t('text102')}</a>{t('text103')}</p> : <>
++        {needsReconnect ? <p className="small-note" role="note">{t('needsReconnectObject', { kind: t(level) })} <a href="/settings/connections">{t('needsReconnectAction')}</a></p>
++          : !canManage || !supports.length ? <p className="small-note">{t('viewOnlyObject', { kind: t(level) })}</p> : operationBlocked ? <p className="small-note">{t('text101')}<a href="/ads/objects#changes">{t('text102')}</a>{t('text103')}</p> : <>
+           {statusSupport && statusInput?.kind === 'choice' ? <div className="ads-object-manager__row">{statusInput.options.map(option => {
+             if (option.value !== 'paused' && option.value !== 'active') return null;
+             const status = option.value as 'paused' | 'active';
+diff --git a/rebuild/src/platforms/facebook/ads-ops/index.ts b/rebuild/src/platforms/facebook/ads-ops/index.ts
+index 1e0095a1..854cdfc5 100644
+--- a/rebuild/src/platforms/facebook/ads-ops/index.ts
++++ b/rebuild/src/platforms/facebook/ads-ops/index.ts
+@@ -22,6 +22,7 @@ export const FACEBOOK_ADS_OPERATIONS: readonly AdsOperationSupport[] = [
+   { id: 'delete', objectTypes: ['campaign', 'adset', 'ad'], spendChanging: false, irreversible: true, label: 'Delete' },
+   { id: 'creative.create', objectTypes: ['creative'], spendChanging: false, label: 'Create unattached creative' },
+   { id: 'campaign.create', objectTypes: ['campaign'], spendChanging: true, label: 'Create paused campaign', inputs: [{ name: 'name', kind: 'text' }, { name: 'objective', kind: 'choice', options: FACEBOOK_CAMPAIGN_OBJECTIVES }] },
++  { id: 'ad.create', objectTypes: ['ad'], spendChanging: true, label: 'Create paused ad', inputs: [{ name: 'name', kind: 'text' }, { name: 'creativeId', kind: 'creative-ref' }] },
+   { id: 'adset.create', objectTypes: ['adset'], spendChanging: true, label: 'Create paused ad set', inputs: [
+     { name: 'name', kind: 'text' }, { name: 'budget', kind: 'money-minor', budgetKinds: ['daily'] },
+     { name: 'countryCode', kind: 'choice', options: facebookCountryOptions() }, { name: 'optimizationGoal', kind: 'choice', options: FACEBOOK_ADSET_OPTIMIZATION_GOALS },
+@@ -52,6 +53,12 @@ export function validateFacebookAdsOperation(operation: AdsNeutralOperation, lim
+   const support = FACEBOOK_ADS_OPERATIONS.find(item => item.id === operation.type);
+   if (!support || !support.objectTypes.includes(operation.objectType)) throw new OperationError('unavailable', 'This change is not available.');
+   if (operation.type === 'campaign.create' || operation.type === 'adset.create') return validateCreation(operation, nameMax, limits);
++  if (operation.type === 'ad.create') {
++    if (operation.objectType !== 'ad' || typeof operation.name !== 'string' || !validName(operation.name, nameMax)) throw new OperationError('invalid_request', `Names must contain 1 to ${nameMax} printable characters.`);
++    if (typeof operation.parentId !== 'string' || !SAFE_ID.test(operation.parentId)) throw new OperationError('invalid_request', 'Choose a valid parent ad set.');
++    if (typeof operation.creativeId !== 'string' || !SAFE_ID.test(operation.creativeId)) throw new OperationError('invalid_request', 'Choose a valid creative.');
++    return;
++  }
+   if (operation.type === 'creative.create') {
+     if (!validName(operation.name, nameMax) || !SAFE_ID.test(operation.targetId) || !/^[A-Za-z0-9_.-]{1,150}$/.test(operation.mediaId) || !['image', 'link'].includes(operation.format) || operation.message.length > 5000 || operation.title.length > 200) throw new OperationError('invalid_request', 'Enter valid creative details.');
+     if (operation.format === 'link') {
+@@ -74,6 +81,7 @@ export function facebookAdsConfirmation(operation: AdsNeutralOperation, context:
+   }
+   const where = `IN ACCOUNT ${context.adAccountId}`;
+   if (operation.type === 'campaign.create') return `CREATE PAUSED FACEBOOK CAMPAIGN ${JSON.stringify(operation.name.trim())} ${where} WITH OBJECTIVE ${operation.objective}`;
++  if (operation.type === 'ad.create') return `CREATE PAUSED FACEBOOK AD ${JSON.stringify(operation.name.trim())} UNDER AD SET ${operation.parentId} ${where} WITH CREATIVE ${operation.creativeId}`;
+   if (operation.type === 'adset.create') return `CREATE PAUSED FACEBOOK AD SET ${JSON.stringify(operation.name.trim())} UNDER CAMPAIGN ${operation.parentId} ${where} WITH DAILY BUDGET ${operation.dailyBudgetMinor} MINOR UNITS${context.currency ? ` ${context.currency}` : ''} TARGETING ${operation.countryCode} OPTIMIZED FOR ${operation.optimizationGoal}`;
+   const subject = `FACEBOOK ${label(operation.objectType)} ${operation.objectId}`;
+   switch (operation.type) {
+@@ -122,6 +130,22 @@ async function executeCreation(transport: FacebookAdsTransport, token: string, c
+   return { remoteId: result.id };
+ }
+ 
++/** An ad starts paused under a verified ad set with a verified existing creative; status is never taken from the caller. */
++async function executeAdCreation(transport: FacebookAdsTransport, token: string, context: AdsOpsContext, operation: Extract<AdsNeutralOperation, { type: 'ad.create' }>) {
++  // A campaign or ad has no sibling shape of an ad set: an ad set carries a campaign_id and no adset_id.
++  const parent = await transport.get(encodeURIComponent(operation.parentId), token, { fields: 'id,account_id,campaign_id,adset_id' }, context.signal);
++  if (parent.id !== operation.parentId || !belongs(parent, context.accountId) || typeof parent.campaign_id !== 'string' || parent.adset_id !== undefined) {
++    throw new FacebookAdsOpsError('This ad set does not belong to the selected ad account.', { status: 0, beforeWrite: true });
++  }
++  await verifyOwned(transport, token, context.accountId, operation.creativeId, 'creative', context.signal);
++  const result = await transport.post(`${encodeURIComponent(context.accountId)}/ads`, token, {
++    name: operation.name.trim(), adset_id: operation.parentId, creative: JSON.stringify({ creative_id: operation.creativeId }), status: FACEBOOK_CREATE_STATUS,
++  }, context.signal);
++  if (typeof result.id !== 'string' || !SAFE_ID.test(result.id)) throw new FacebookAdsOpsError('Facebook did not confirm the new object.', { status: 200 });
++  await context.recordReceipt?.({ remoteId: result.id });
++  return { remoteId: result.id };
++}
++
+ async function configuredCreationUi(): Promise<AdsUiSchema> {
+   const checked = FACEBOOK_ADS_CREATION_UI_SCHEMA.safeParse(await runtimeConfig('meta.adsCreationUi'));
+   if (!checked.success) throw new FacebookAdsOpsError('Creation policy is unavailable.', { status: 0, beforeWrite: true });
+@@ -158,6 +182,7 @@ export function createFacebookAdsOps(loadTransport: () => Promise<FacebookAdsTra
+       const token = context.credential.accessToken;
+       if (!SAFE_ID.test(context.accountId)) throw new FacebookAdsOpsError('Invalid ad account.', { status: 0, beforeWrite: true });
+       if (operation.type === 'creative.create') return executeFacebookCreative(transport, context, operation);
++      if (operation.type === 'ad.create') return executeAdCreation(transport, token, context, operation);
+       if (operation.type === 'campaign.create' || operation.type === 'adset.create') return executeCreation(transport, token, context, operation);
+       await verifyOwned(transport, token, context.accountId, operation.objectId, 'object', context.signal);
+       const path = encodeURIComponent(operation.objectId);
+diff --git a/rebuild/tests/ads-ad-create-ui.test.ts b/rebuild/tests/ads-ad-create-ui.test.ts
+new file mode 100644
+index 00000000..e6bc0342
+--- /dev/null
++++ b/rebuild/tests/ads-ad-create-ui.test.ts
+@@ -0,0 +1,137 @@
++// @vitest-environment jsdom
++import { act, createElement } from 'react';
++import { createRoot } from 'react-dom/client';
++import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
++
++const state = vi.hoisted(() => ({ randomUUID: vi.fn(() => 'ad-request-1') }));
++import { AdCreateForm } from '../src/modules/ads/ui/AdCreateForm';
++import { ObjectManager } from '../src/modules/ads/ui/objects/ObjectManager';
++import { AdsCopyProvider } from '../src/modules/ads/ui/AdsCopyProvider';
++import { defaultAdsCatalogs } from '../src/modules/ads/copy';
++
++let root: ReturnType<typeof createRoot>;
++let container: HTMLDivElement;
++const fetchMock = vi.fn();
++const dialog = HTMLDialogElement.prototype as HTMLDialogElement & { showModal?: () => void; close?: () => void };
++dialog.showModal ??= function () { this.setAttribute('open', ''); };
++dialog.close ??= function () { this.removeAttribute('open'); };
++
++const ok = (body: unknown) => ({ ok: true, json: async () => body });
++const settle = () => act(async () => { await Promise.resolve(); await Promise.resolve(); });
++async function click(label: string) {
++  const button = [...container.querySelectorAll('button')].find(item => item.textContent?.includes(label));
++  if (!button) throw new Error(`Missing button ${label}`);
++  await act(async () => button.click());
++}
++async function type(selector: string, value: string) {
++  const field = container.querySelector(selector) as HTMLInputElement | HTMLSelectElement;
++  const proto = field instanceof HTMLSelectElement ? HTMLSelectElement.prototype : HTMLInputElement.prototype;
++  await act(async () => { Object.getOwnPropertyDescriptor(proto, 'value')!.set!.call(field, value); field.dispatchEvent(new Event(field instanceof HTMLSelectElement ? 'change' : 'input', { bubbles: true })); });
++}
++const bodies = () => fetchMock.mock.calls.filter(([, init]) => init?.body).map(([, init]) => JSON.parse(String(init.body)));
++
++beforeEach(() => {
++  (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
++  vi.clearAllMocks();
++  vi.stubGlobal('crypto', { randomUUID: state.randomUUID });
++  vi.stubGlobal('fetch', fetchMock);
++  container = document.createElement('div'); document.body.append(container); root = createRoot(container);
++});
++afterEach(async () => { await act(async () => root.unmount()); container.remove(); vi.unstubAllGlobals(); });
++
++describe('paused ad creation form', () => {
++  async function fillAndReview() {
++    fetchMock.mockImplementation(async (input: string, init?: RequestInit) => {
++      if (String(input).includes('view=creatives')) return ok({ items: [{ id: 'cr1', name: 'Summer image', title: null }] });
++      const body = JSON.parse(String(init?.body ?? '{}'));
++      if (body.action === 'preview') return ok({ confirmation: 'CREATE PAUSED FACEBOOK AD "Spring ad" UNDER AD SET s1 IN ACCOUNT acc1 WITH CREATIVE cr1', spendChanging: true, irreversible: false, blockedByOpenChange: false });
++      return ok({ outcome: 'succeeded', operationId: 'op1', remoteId: 'ad-new', recorded: true, created: { objectType: 'ad', remoteId: 'ad-new' } });
++    });
++    await act(async () => root.render(createElement(AdCreateForm, { adAccountId: 'acc1', adSetId: 's1', adSetName: 'Prospecting', nameMaxCharacters: 40 })));
++    await click('Load creatives'); await settle();
++    await type('input[name="name"]', 'Spring ad');
++    await type('select[name="creativeId"]', 'cr1');
++    await click('Review ad'); await settle();
++  }
++
++  it('previews the module confirmation, warns about spend and applies it with the reviewed request id', async () => {
++    await fillAndReview();
++    expect(bodies()[0]).toEqual({ action: 'preview', adAccountId: 'acc1', operation: { type: 'ad.create', objectType: 'ad', parentId: 's1', name: 'Spring ad', creativeId: 'cr1' } });
++    expect(container.querySelector('.ui-dialog')?.textContent).toMatch(/Spring ad/);
++    expect(container.querySelector('[role="note"]')).toBeTruthy();
++    await click('Create paused ad'); await settle();
++    const apply = bodies()[1];
++    expect(apply).toMatchObject({ action: 'apply', requestId: 'ad-request-1', confirmation: 'CREATE PAUSED FACEBOOK AD "Spring ad" UNDER AD SET s1 IN ACCOUNT acc1 WITH CREATIVE cr1', operation: { type: 'ad.create' } });
++    expect(JSON.stringify(apply.operation)).not.toMatch(/status/);
++    expect(container.textContent).toContain('Paused ad created.');
++  });
++
++  it('validates before any request and sends nothing', async () => {
++    fetchMock.mockImplementation(async () => ok({ items: [{ id: 'cr1', name: 'Summer image', title: null }] }));
++    await act(async () => root.render(createElement(AdCreateForm, { adAccountId: 'acc1', adSetId: 's1', adSetName: 'Prospecting', nameMaxCharacters: 40 })));
++    await click('Load creatives'); await settle();
++    await click('Review ad'); await settle();
++    expect(container.textContent).toContain('Enter an ad name.');
++    expect(fetchMock).toHaveBeenCalledTimes(1);
++  });
++
++  it('holds an unconfirmed write, keeps the same request id for the retry and never resends on its own', async () => {
++    await fillAndReview();
++    fetchMock.mockRejectedValueOnce(new TypeError('network interrupted'));
++    await click('Create paused ad'); await settle();
++    expect(container.querySelector('.ui-dialog')).toBeNull();
++    expect(container.querySelector('a[href="/ads/objects#changes"]')).toBeTruthy();
++    expect(bodies().filter(body => body.action === 'apply')).toHaveLength(1);
++    expect(container.querySelector('[aria-label="Ad creation needs review"]')).toBeTruthy();
++    await click('same request'); await settle();
++    const applies = bodies().filter(body => body.action === 'apply');
++    expect(applies).toHaveLength(2);
++    expect(applies.map(body => body.requestId)).toEqual(['ad-request-1', 'ad-request-1']);
++    expect(state.randomUUID).toHaveBeenCalledTimes(1);
++  });
++
++  it('shows a definite rejection as an error without holding the form', async () => {
++    await fillAndReview();
++    fetchMock.mockResolvedValueOnce(ok({ outcome: 'rejected', operationId: 'op1', message: 'Facebook did not accept the change.' }));
++    await click('Create paused ad'); await settle();
++    expect(container.textContent).toContain('Facebook did not accept the change.');
++    expect(container.querySelector('[aria-label="Ad creation needs review"]')).toBeNull();
++  });
++
++  it('keeps a failed preview in the form and creates nothing', async () => {
++    await fillAndReview();
++    expect(fetchMock).toHaveBeenCalled();
++    fetchMock.mockClear();
++    await click('Cancel');
++    fetchMock.mockResolvedValueOnce({ ok: false, json: async () => ({ error: 'This ad set cannot be verified for the selected account.' }) });
++    await click('Review ad'); await settle();
++    expect(container.textContent).toContain('This ad set cannot be verified');
++    expect(bodies().filter(body => body.action === 'apply')).toHaveLength(0);
++  });
++});
++
++describe('missing advertising-changes grant in the object manager', () => {
++  const detail = (needsReconnect: boolean) => ({ name: 'Spring', currency: 'EUR', totals: { spend: 0, impressions: 0, clicks: 0, cpc: null, ctr: null, cpm: null }, daily: [], live: { available: false }, management: { available: true, canManage: false, needsReconnect, operations: [] } });
++
++  async function open(locale: 'en' | 'fr', needsReconnect: boolean) {
++    fetchMock.mockImplementation(async (input: string) => String(input).includes('view=capabilities') ? ok({ canManage: false, needsReconnect, operations: [] }) : ok(detail(needsReconnect)));
++    await act(async () => root.render(createElement(AdsCopyProvider, { catalogs: defaultAdsCatalogs, locale, children: createElement(ObjectManager, { adAccountId: 'acc1', level: 'campaign', objectId: 'c1', name: 'Spring' }) })));
++    await act(async () => (container.querySelector('button') as HTMLButtonElement).click()); await settle();
++  }
++
++  it('tells the customer to reconnect, in English and French, with a link to connections', async () => {
++    await open('en', true);
++    expect(container.textContent).toContain('until the advertising connection is reconnected');
++    expect(container.querySelector('a[href="/settings/connections"]')?.textContent).toBe('Reconnect in Settings');
++    await act(async () => root.unmount()); root = createRoot(container);
++    await open('fr', true);
++    expect(container.textContent).toContain('reconnectée');
++    expect(container.querySelector('a[href="/settings/connections"]')?.textContent).toBe('Reconnecter dans les paramètres');
++  });
++
++  it('keeps the plain view-only message when reconnecting would not help', async () => {
++    await open('en', false);
++    expect(container.textContent).toContain('Changes are not available for your access');
++    expect(container.querySelector('a[href="/settings/connections"]')).toBeNull();
++  });
++});
+diff --git a/rebuild/tests/ads-ad-create.test.ts b/rebuild/tests/ads-ad-create.test.ts
+new file mode 100644
+index 00000000..fdff9ecd
+--- /dev/null
++++ b/rebuild/tests/ads-ad-create.test.ts
+@@ -0,0 +1,149 @@
++vi.mock('@/modules/ads/server/copy', async () => { const { defaultAdsCatalogs, customerText } = await import('../src/modules/ads/copy'); return { withAdsCopySnapshot: (operation: () => Promise<unknown>) => operation(), loadAdsCopy: async () => defaultAdsCatalogs, adsServiceText: async (key: Parameters<typeof customerText>[2]) => customerText(defaultAdsCatalogs.customer, 'en', key) }; });
++import { beforeEach, describe, expect, it, vi } from 'vitest';
++
++const state = vi.hoisted(() => ({
++  prisma: {
++    target: { findFirst: vi.fn(), findMany: vi.fn() },
++    user: { findUnique: vi.fn() }, membership: { findUnique: vi.fn() }, adAccount: { findFirst: vi.fn(), findMany: vi.fn() }, adInsight: { findFirst: vi.fn() },
++    $executeRaw: vi.fn(), $queryRaw: vi.fn(), $transaction: vi.fn(),
++  },
++  image: vi.fn(), images: vi.fn(), entitlements: vi.fn(), permissions: vi.fn(), canUse: vi.fn(), canAccess: vi.fn(), hasPlatform: vi.fn(), purge: vi.fn(), config: vi.fn(), platformAds: vi.fn(), decrypt: vi.fn(), selectedLock: vi.fn(), selectedOperation: vi.fn(),
++  validateManageScopes: vi.fn(),
++}));
++vi.mock('../src/modules/publishing/server/media/storage', () => ({ readWorkspaceImage: state.image, listWorkspaceImages: state.images }));
++vi.mock('../src/server/data', () => ({ prisma: state.prisma }));
++vi.mock('../src/server/secret-crypto', () => ({ decryptSecret: state.decrypt }));
++vi.mock('../src/server/entitlements', () => ({ loadEntitlements: state.entitlements, canUseFeature: state.canUse, hasPlatformCapability: state.hasPlatform }));
++vi.mock('../src/server/permissions', () => ({ canAccessFeature: state.canAccess }));
++vi.mock('../src/server/permissions/loader', () => ({ loadPermissions: state.permissions }));
++vi.mock('../src/server/data-control/guard', () => ({ assertWorkspaceNotPurging: state.purge }));
++vi.mock('../src/server/config/store', () => ({ runtimeConfig: state.config }));
++vi.mock('../src/server/platforms/registry', () => ({ platformAds: state.platformAds }));
++vi.mock('../src/server/platforms/resource-lock', () => ({ lockSelectedResources: state.selectedLock, withSelectedResourceOperation: state.selectedOperation }));
++
++import { clearAdsOpsHosts, registerAdsOpsHost } from '../src/modules/ads/management/registry';
++import { ADS_MANAGEMENT_DEFAULT_POLICY } from '../src/modules/ads/management/config';
++import { describeAdsManagement, parseNeutralOperation, performAdsManagement, previewAdsManagement } from '../src/modules/ads/management/server';
++import { executeAdsManagementTool } from '../src/modules/ads/management/mcp';
++import { defaultAdsCatalogs, localizeAdsMessage } from '../src/modules/ads/copy';
++import type { AdsNeutralOperation, AdsOpsHost } from '../src/modules/ads/management/types';
++import { OperationError } from '../src/lib/operation-error';
++
++const actor = { userId: 'u1', workspaceId: 'w1' };
++const adOp: AdsNeutralOperation = { type: 'ad.create', objectType: 'ad', parentId: 's1', name: 'Spring ad', creativeId: 'cr1' };
++const CONFIRM = 'CREATE PAUSED AD Spring ad UNDER s1 WITH cr1';
++const execute = vi.fn();
++const host: AdsOpsHost = {
++  provider: 'testnet',
++  operations: [{ id: 'ad.create', objectTypes: ['ad'], spendChanging: true, label: 'Create paused ad' }],
++  validate: () => undefined,
++  confirmation: op => op.type === 'ad.create' ? `CREATE PAUSED AD ${op.name} UNDER ${op.parentId} WITH ${op.creativeId}` : 'OTHER',
++  execute: (...args) => execute(...args), classifyFailure: () => 'uncertain',
++  listCreatives: vi.fn(async () => ({ items: [], next: null })),
++};
++
++beforeEach(() => {
++  vi.clearAllMocks(); clearAdsOpsHosts(); registerAdsOpsHost(host);
++  state.prisma.user.findUnique.mockResolvedValue({ disabledAt: null });
++  state.prisma.membership.findUnique.mockResolvedValue({ role: 'admin' });
++  state.entitlements.mockResolvedValue({ workspaceId: 'w1' });
++  state.permissions.mockResolvedValue({ pageScope: { all: true, ids: [] } });
++  state.canUse.mockReturnValue(true); state.canAccess.mockReturnValue(true); state.hasPlatform.mockReturnValue(true); state.purge.mockResolvedValue(undefined);
++  state.selectedLock.mockResolvedValue(undefined);
++  state.selectedOperation.mockImplementation(async (_w: string, _r: unknown, run: (tx: typeof state.prisma, signal: AbortSignal) => Promise<unknown>) => run(state.prisma, new AbortController().signal));
++  state.config.mockImplementation(async (key: string) => key === 'ads.managementEnabled' ? true : ADS_MANAGEMENT_DEFAULT_POLICY);
++  state.decrypt.mockReturnValue('token');
++  state.prisma.adAccount.findFirst.mockResolvedValue({ id: 'acc1', actId: 'act_1', currency: 'USD', socialAccount: { provider: 'testnet', accessToken: 'enc', scopes: 'ads_management', invalidatedAt: null, tokenExpiresAt: null } });
++  state.prisma.adInsight.findFirst.mockResolvedValue({ id: 'i1' });
++  state.validateManageScopes.mockReset();
++  state.platformAds.mockResolvedValue({ isReady: async () => true, manageScopes: async () => ['ads_management'], readScopes: async () => ['ads_read'], validateManageScopes: state.validateManageScopes, hasReadScopes: () => true });
++  state.prisma.$executeRaw.mockResolvedValue(1);
++  state.prisma.$queryRaw.mockImplementation(async (strings: TemplateStringsArray) => /FOR UPDATE/.test(strings.join('?')) ? [{ status: 'pending', remoteId: null }] : []);
++  state.prisma.$transaction.mockImplementation(async (arg: unknown) => typeof arg === 'function' ? (arg as (tx: unknown) => unknown)(state.prisma) : Promise.all(arg as Promise<unknown>[]));
++  execute.mockResolvedValue({ remoteId: 'ad-new' });
++});
++
++describe('paused ad creation through the shared management service', () => {
++  it('parses strictly: no objectId or status, safe ids, trimmed name', () => {
++    expect(parseNeutralOperation({ ...adOp, name: ' Spring ad ' })).toEqual(adOp);
++    for (const bad of [
++      { ...adOp, objectId: 'x' }, { ...adOp, status: 'active' }, { ...adOp, objectType: 'adset' }, { ...adOp, parentId: 'bad id' }, { ...adOp, parentId: undefined },
++      { ...adOp, creativeId: '' }, { ...adOp, creativeId: undefined }, { ...adOp, name: 5 },
++    ]) expect(() => parseNeutralOperation(bad), JSON.stringify(bad)).toThrow(OperationError);
++  });
++
++  it('previews the module confirmation with a spend warning, verifying the ad set from stored history', async () => {
++    const preview = await previewAdsManagement(actor, { adAccountId: 'acc1', operation: adOp });
++    expect(preview).toMatchObject({ confirmation: CONFIRM, spendChanging: true, irreversible: false });
++    expect(state.prisma.adInsight.findFirst).toHaveBeenCalledWith({ where: { adAccountId: 'acc1', level: 'adset', objectId: 's1' }, select: { id: true } });
++    expect(execute).not.toHaveBeenCalled();
++  });
++
++  it('journals one open creation per parent ad set, then returns created only after provider success', async () => {
++    const result = await performAdsManagement(actor, { adAccountId: 'acc1', operation: adOp, confirmation: CONFIRM, requestId: 'request-0001' });
++    expect(result).toMatchObject({ outcome: 'succeeded', recorded: true, remoteId: 'ad-new', created: { objectType: 'ad', remoteId: 'ad-new' } });
++    const insert = state.prisma.$executeRaw.mock.calls[0] as unknown[];
++    expect(insert).toContain('ad.create'); expect(insert).toContain('@create-ad:s1');
++    expect(execute).toHaveBeenCalledWith(expect.objectContaining({ accountId: 'act_1' }), adOp);
++    expect(JSON.stringify(execute.mock.calls[0]![1])).not.toMatch(/status|objectId/);
++  });
++
++  it('requires the exact confirmation before any ledger write or provider call', async () => {
++    await expect(performAdsManagement(actor, { adAccountId: 'acc1', operation: adOp, confirmation: 'yes', requestId: 'request-0001' })).rejects.toMatchObject({ code: 'invalid_request' });
++    expect(execute).not.toHaveBeenCalled(); expect(state.prisma.$executeRaw).not.toHaveBeenCalled();
++  });
++
++  it('refuses an ad set that is not in the account history, without a ledger write', async () => {
++    state.prisma.adInsight.findFirst.mockResolvedValue(null);
++    await expect(performAdsManagement(actor, { adAccountId: 'acc1', operation: adOp, confirmation: CONFIRM, requestId: 'request-0001' })).rejects.toMatchObject({ code: 'not_found' });
++    expect(execute).not.toHaveBeenCalled(); expect(state.prisma.$executeRaw).not.toHaveBeenCalled();
++  });
++
++  it('refuses limited page scope and non-managers because the parent cannot be bounded to channels', async () => {
++    state.permissions.mockResolvedValue({ pageScope: { all: false, ids: ['t1'] } });
++    await expect(previewAdsManagement(actor, { adAccountId: 'acc1', operation: adOp })).rejects.toMatchObject({ code: 'forbidden' });
++    state.permissions.mockResolvedValue({ pageScope: { all: true, ids: [] } });
++    await expect(previewAdsManagement({ ...actor, allowedTargetIds: ['t1'] }, { adAccountId: 'acc1', operation: adOp })).rejects.toMatchObject({ code: 'forbidden' });
++    state.prisma.membership.findUnique.mockResolvedValue({ role: 'editor' });
++    await expect(previewAdsManagement(actor, { adAccountId: 'acc1', operation: adOp })).rejects.toMatchObject({ code: 'forbidden' });
++    expect(execute).not.toHaveBeenCalled();
++  });
++
++  it('is unavailable when the account module does not advertise it', async () => {
++    clearAdsOpsHosts();
++    registerAdsOpsHost({ ...host, operations: [{ id: 'rename', objectTypes: ['ad'], spendChanging: false, label: 'Rename' }] });
++    await expect(previewAdsManagement(actor, { adAccountId: 'acc1', operation: adOp })).rejects.toMatchObject({ code: 'unavailable' });
++  });
++
++  it('serves the same preview through the MCP tool', async () => {
++    await expect(executeAdsManagementTool(actor, 'preview_ads_change', { adAccountId: 'acc1', operation: adOp })).resolves.toMatchObject({ confirmation: CONFIRM, spendChanging: true });
++  });
++});
++
++describe('missing advertising-changes grant', () => {
++  const missing = () => state.validateManageScopes.mockImplementation(() => { throw new OperationError('reconnect_required', 'Reconnect this advertising connection and allow advertising changes.'); });
++
++  it('tells management clients to reconnect rather than showing a silent read-only state', async () => {
++    missing();
++    await expect(describeAdsManagement(actor, 'acc1')).resolves.toEqual({ canManage: false, needsReconnect: true, operations: [], canListCreatives: false });
++  });
++
++  it('does not ask to reconnect when management is withheld for another reason', async () => {
++    state.prisma.membership.findUnique.mockResolvedValue({ role: 'editor' });
++    await expect(describeAdsManagement(actor, 'acc1')).resolves.toMatchObject({ canManage: false, needsReconnect: false });
++  });
++
++  it('refuses every write with reconnect_required before any ledger write or provider call', async () => {
++    missing();
++    await expect(previewAdsManagement(actor, { adAccountId: 'acc1', operation: adOp })).rejects.toMatchObject({ code: 'reconnect_required' });
++    await expect(performAdsManagement(actor, { adAccountId: 'acc1', operation: adOp, confirmation: CONFIRM, requestId: 'request-0001' })).rejects.toMatchObject({ code: 'reconnect_required' });
++    expect(execute).not.toHaveBeenCalled(); expect(state.prisma.$executeRaw).not.toHaveBeenCalled();
++  });
++
++  it('localizes the recovery message in French through the Ads catalog', () => {
++    const english = 'Reconnect this advertising connection and allow advertising changes.';
++    expect(localizeAdsMessage(defaultAdsCatalogs, 'en', english)).toBe(english);
++    expect(localizeAdsMessage(defaultAdsCatalogs, 'fr', english)).toBe(defaultAdsCatalogs.customer.grantMissing.fr);
++    expect(defaultAdsCatalogs.customer.grantMissing.fr).toMatch(/Reconnectez/);
++  });
++});
+diff --git a/rebuild/tests/ads-parity-management.test.ts b/rebuild/tests/ads-parity-management.test.ts
+index 7c2df159..1fa4c643 100644
+--- a/rebuild/tests/ads-parity-management.test.ts
++++ b/rebuild/tests/ads-parity-management.test.ts
+@@ -43,7 +43,7 @@ const host: AdsOpsHost = {
+   operations: [{ id: 'status.set', objectTypes: ['campaign', 'ad'], spendChanging: true, label: 'Pause or resume' }, { id: 'rename', objectTypes: ['campaign'], spendChanging: false, label: 'Rename' },
+     { id: 'campaign.create', objectTypes: ['campaign'], spendChanging: true, label: 'Create campaign' }, { id: 'adset.create', objectTypes: ['adset'], spendChanging: true, label: 'Create ad set' }],
+   validate: op => { if (op.type === 'rename' && !op.name) throw new OperationError('invalid_request', 'Enter a name.'); },
+-  confirmation: op => op.type === 'campaign.create' ? `CREATE PAUSED CAMPAIGN ${op.name}` : op.type === 'adset.create' ? `CREATE PAUSED AD SET ${op.name} UNDER ${op.parentId}` : op.type === 'creative.create' ? `CREATE CREATIVE ${op.name}` : `CONFIRM ${op.type === 'status.set' ? (op.status === 'paused' ? 'pause' : 'resume') : op.type} ${op.objectId}`,
++  confirmation: op => op.type === 'campaign.create' ? `CREATE PAUSED CAMPAIGN ${op.name}` : op.type === 'adset.create' ? `CREATE PAUSED AD SET ${op.name} UNDER ${op.parentId}` : op.type === 'creative.create' ? `CREATE CREATIVE ${op.name}` : op.type === 'ad.create' ? `CREATE PAUSED AD ${op.name} UNDER ${op.parentId} WITH ${op.creativeId}` : `CONFIRM ${op.type === 'status.set' ? (op.status === 'paused' ? 'pause' : 'resume') : op.type} ${op.objectId}`,
+   execute: (...args) => execute(...args), classifyFailure: error => classify(error),
+   listCreatives: vi.fn(async () => ({ items: [], next: null })),
+ };
+@@ -247,7 +247,7 @@ describe('Ads management service', () => {
+   it('fails closed when no module registered its operations', async () => {
+     clearAdsOpsHosts();
+     await expect(performAdsManagement(actor, { adAccountId: 'acc1', operation: pause, confirmation: CONFIRM })).rejects.toMatchObject({ code: 'unavailable' });
+-    expect(await describeAdsManagement(actor, 'acc1')).toEqual({ canManage: false, operations: [], canListCreatives: false });
++    expect(await describeAdsManagement(actor, 'acc1')).toEqual({ canManage: false, needsReconnect: false, operations: [], canListCreatives: false });
+   });
+ 
+   it('previews without writing and advertises capabilities only to managers', async () => {
+diff --git a/rebuild/tests/facebook-ads-ad-create.test.ts b/rebuild/tests/facebook-ads-ad-create.test.ts
+new file mode 100644
+index 00000000..46ab088d
+--- /dev/null
++++ b/rebuild/tests/facebook-ads-ad-create.test.ts
+@@ -0,0 +1,102 @@
++import { describe, expect, it, vi } from 'vitest';
++
++vi.mock('../src/server/config/store', () => ({ runtimeConfig: vi.fn(), runtimeSecret: vi.fn() }));
++
++import { FACEBOOK_ADS_UI_DEFAULTS } from '../src/platforms/facebook/ads-ui-config';
++import { createFacebookAdsTransport, classifyFacebookAdsFailure } from '../src/platforms/facebook/ads-ops/transport';
++import { createFacebookAdsOps, facebookAdsConfirmation, validateFacebookAdsOperation } from '../src/platforms/facebook/ads-ops';
++import type { AdsNeutralOperation } from '../src/modules/ads/management/types';
++
++const config = {
++  graphBaseUrl: 'https://graph.example.test', oauthBaseUrl: 'https://www.example.test', graphVersion: 'v99.0', requestTimeoutMs: 5000, maxPages: 2, pageSize: 25,
++  pageInsightMetrics: [], adInsightFields: [], maxImageUploadBytes: 1000, allowedImageMimeTypes: ['image/png'], appSecretProofEnabled: true, appSecret: 'secret',
++};
++const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
++const ctx = { credential: { accessToken: 'tok' }, accountId: 'act_1', recordReceipt: vi.fn(async () => undefined) };
++const adOp: AdsNeutralOperation = { type: 'ad.create', objectType: 'ad', parentId: '222', name: 'Spring ad', creativeId: '333' };
++
++function harness(responses: Array<Response | Error>) {
++  const fetchImpl = vi.fn(async (..._args: unknown[]) => { const next = responses.shift(); if (next instanceof Error) throw next; return next ?? json({ success: true }); });
++  const ops = createFacebookAdsOps(async () => createFacebookAdsTransport(config, fetchImpl as unknown as typeof fetch), async () => FACEBOOK_ADS_UI_DEFAULTS);
++  const method = (index: number) => (fetchImpl.mock.calls[index]![1] as RequestInit).method;
++  return { ops, fetchImpl, method, bodyOf: (index: number) => new URLSearchParams(String((fetchImpl.mock.calls[index]![1] as RequestInit).body)), urlOf: (index: number) => String(fetchImpl.mock.calls[index]![0]) };
++}
++// Responses are single-read, so every use needs a fresh one.
++const adSet = () => json({ id: '222', account_id: '1', campaign_id: '111' });
++const creative = () => json({ id: '333', account_id: '1' });
++
++describe('Facebook paused ad creation', () => {
++  it('verifies the ad set and creative, then sends one paused ad write with a provider-owned status', async () => {
++    const h = harness([adSet(), creative(), json({ id: '444' })]);
++    await expect(h.ops.execute(ctx, adOp)).resolves.toEqual({ remoteId: '444' });
++    expect(h.fetchImpl).toHaveBeenCalledTimes(3);
++    expect(h.method(0)).toBe('GET'); expect(h.urlOf(0)).toContain('/222'); expect(h.method(1)).toBe('GET'); expect(h.urlOf(1)).toContain('/333');
++    expect(h.method(2)).toBe('POST'); expect(h.urlOf(2)).toContain('/act_1/ads');
++    const body = h.bodyOf(2);
++    expect(body.get('status')).toBe('PAUSED'); expect(body.get('adset_id')).toBe('222'); expect(body.get('name')).toBe('Spring ad');
++    expect(JSON.parse(body.get('creative')!)).toEqual({ creative_id: '333' });
++    expect(body.get('appsecret_proof')).toBeTruthy();
++    expect(ctx.recordReceipt).toHaveBeenCalledWith({ remoteId: '444' });
++  });
++
++  it('refuses an ad set of another account, or an ad passed as the parent, before any write', async () => {
++    for (const parent of [json({ id: '222', account_id: '999', campaign_id: '111' }), json({ id: '222', account_id: '1', campaign_id: '111', adset_id: '555' }), json({ id: '222', account_id: '1' })]) {
++      const h = harness([parent]);
++      const error = await h.ops.execute(ctx, adOp).catch(failure => failure);
++      expect(error).toMatchObject({ message: expect.stringContaining('ad set') });
++      expect(classifyFacebookAdsFailure(error)).toBe('rejected');
++      expect(h.fetchImpl).toHaveBeenCalledTimes(1);
++    }
++  });
++
++  it('refuses a creative of another account before any write', async () => {
++    const h = harness([adSet(), json({ id: '333', account_id: '999' })]);
++    const error = await h.ops.execute(ctx, adOp).catch(failure => failure);
++    expect(classifyFacebookAdsFailure(error)).toBe('rejected');
++    expect(h.fetchImpl).toHaveBeenCalledTimes(2);
++  });
++
++  it('keeps an unconfirmed or failed write uncertain, and a definite Graph rejection rejected', async () => {
++    const unconfirmed = await harness([adSet(), creative(), json({})]).ops.execute(ctx, adOp).catch(failure => failure);
++    expect(classifyFacebookAdsFailure(unconfirmed)).toBe('uncertain');
++    const timeout = await harness([adSet(), creative(), new Error('socket hang up')]).ops.execute(ctx, adOp).catch(failure => failure);
++    expect(classifyFacebookAdsFailure(timeout)).toBe('uncertain');
++    const rejected = await harness([adSet(), creative(), json({ error: { code: 100, message: 'Invalid parameter token' } }, 400)]).ops.execute(ctx, adOp).catch(failure => failure);
++    expect(classifyFacebookAdsFailure(rejected)).toBe('rejected');
++    expect(rejected.message).not.toContain('token');
++  });
++
++  it('validates input and produces the module-owned confirmation', () => {
++    expect(() => validateFacebookAdsOperation(adOp)).not.toThrow();
++    for (const bad of [{ ...adOp, name: '' }, { ...adOp, name: 'x'.repeat(101) }, { ...adOp, parentId: 'a/b' }, { ...adOp, creativeId: '' }, { ...adOp, name: 'bad\u0007' }]) {
++      expect(() => validateFacebookAdsOperation(bad as AdsNeutralOperation), JSON.stringify(bad)).toThrow();
++    }
++    expect(() => validateFacebookAdsOperation(adOp, { nameMaxCharacters: 5, maxBudgetMinor: 100 })).toThrow();
++    expect(facebookAdsConfirmation(adOp, { adAccountId: 'acc1', currency: 'USD' })).toBe('CREATE PAUSED FACEBOOK AD "Spring ad" UNDER AD SET 222 IN ACCOUNT acc1 WITH CREATIVE 333');
++  });
++});
++
++describe('Facebook management operations on existing objects (fixtures, no live calls)', () => {
++  const owned = (id: string) => json({ id, account_id: '1' });
++  const cases: Array<[string, AdsNeutralOperation, Record<string, string>, Array<Response>]> = [
++    ['pause', { type: 'status.set', objectType: 'campaign', objectId: '111', status: 'paused' }, { status: 'PAUSED' }, [owned('111')]],
++    ['resume', { type: 'status.set', objectType: 'adset', objectId: '222', status: 'active' }, { status: 'ACTIVE' }, [owned('222')]],
++    ['daily budget', { type: 'budget.set', objectType: 'adset', objectId: '222', budget: { kind: 'daily', minor: 2500 } }, { daily_budget: '2500' }, [owned('222')]],
++    ['lifetime budget', { type: 'budget.set', objectType: 'campaign', objectId: '111', budget: { kind: 'lifetime', minor: 90000 } }, { lifetime_budget: '90000' }, [owned('111')]],
++    ['rename', { type: 'rename', objectType: 'ad', objectId: '444', name: 'New name' }, { name: 'New name' }, [owned('444')]],
++    ['delete', { type: 'delete', objectType: 'ad', objectId: '444' }, { status: 'DELETED' }, [owned('444')]],
++  ];
++  it.each(cases)('%s: one signed write after an ownership read', async (_label, operation, expected, reads) => {
++    const h = harness([...reads, json({ success: true })]);
++    await expect(h.ops.execute(ctx, operation)).resolves.toEqual({ remoteId: (operation as { objectId: string }).objectId });
++    expect(h.fetchImpl).toHaveBeenCalledTimes(2);
++    for (const [key, value] of Object.entries(expected)) expect(h.bodyOf(1).get(key)).toBe(value);
++  });
++
++  it('spend-changing confirmations name the account, object and effect', () => {
++    const where = { adAccountId: 'acc1', currency: 'USD' };
++    expect(facebookAdsConfirmation(cases[1]![1], where)).toBe('RESUME FACEBOOK AD SET 222 ALLOWING DELIVERY AND SPEND IN ACCOUNT acc1');
++    expect(facebookAdsConfirmation(cases[2]![1], where)).toBe('SET FACEBOOK AD SET 222 DAILY BUDGET TO 2500 MINOR UNITS USD IN ACCOUNT acc1');
++    expect(facebookAdsConfirmation(cases[5]![1], where)).toBe('DELETE FACEBOOK AD 444 PERMANENTLY IN ACCOUNT acc1');
++  });
++});
+diff --git a/rebuild/tests/facebook-ads-ops.test.ts b/rebuild/tests/facebook-ads-ops.test.ts
+index 4d9e30f8..6e9a9b62 100644
+--- a/rebuild/tests/facebook-ads-ops.test.ts
++++ b/rebuild/tests/facebook-ads-ops.test.ts
+@@ -57,9 +57,9 @@ describe('Facebook ads operations', () => {
+   });
+ 
+   it('advertises exactly the implemented operations', () => {
+-    expect(FACEBOOK_ADS_OPERATIONS.map(op => op.id).sort()).toEqual(['adset.create', 'budget.set', 'campaign.create', 'creative.assign', 'creative.create', 'delete', 'rename', 'status.set']);
++    expect(FACEBOOK_ADS_OPERATIONS.map(op => op.id).sort()).toEqual(['ad.create', 'adset.create', 'budget.set', 'campaign.create', 'creative.assign', 'creative.create', 'delete', 'rename', 'status.set']);
+     expect(FACEBOOK_ADS_OPERATIONS.find(op => op.id === 'budget.set')!.objectTypes).not.toContain('ad');
+-    expect(FACEBOOK_ADS_OPERATIONS.filter(op => op.spendChanging).map(op => op.id).sort()).toEqual(['adset.create', 'budget.set', 'campaign.create', 'creative.assign', 'status.set']);
++    expect(FACEBOOK_ADS_OPERATIONS.filter(op => op.spendChanging).map(op => op.id).sort()).toEqual(['ad.create', 'adset.create', 'budget.set', 'campaign.create', 'creative.assign', 'status.set']);
+   });
+ 
+   it('verifies ownership with a signed read, then sends one signed form write', async () => {

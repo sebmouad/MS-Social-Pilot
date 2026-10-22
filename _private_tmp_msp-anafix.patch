@@ -1,0 +1,221 @@
+diff --git a/rebuild/src/modules/analytics/explorer-posts/Screen.tsx b/rebuild/src/modules/analytics/explorer-posts/Screen.tsx
+index fa10f5fd..89fbb822 100644
+--- a/rebuild/src/modules/analytics/explorer-posts/Screen.tsx
++++ b/rebuild/src/modules/analytics/explorer-posts/Screen.tsx
+@@ -3,7 +3,8 @@ import { headers } from 'next/headers';
+ import { PageFrame } from '@/server/PageFrame';
+ import { requireViewer } from '@/server/context';
+ import { Button } from '@/components/Button';
+-import { DataTable } from '@/components/DataTable';
++import { PostsTable } from '@/modules/analytics/ui/posts/PostsTable';
++import { postsTableMeasures, postsTableRows } from '@/modules/analytics/ui/posts/rows';
+ import { readPosts } from './service';
+ import styles from '@/modules/analytics/ui/reports/workflows.module.css';
+ import local from './screen.module.css';
+@@ -22,7 +23,6 @@ export default async function PostsScreen({ searchParams }: { searchParams: Prom
+     const q = new URLSearchParams({ start: d.period.start, end: d.period.end, sort: d.input.sort, direction: d.input.direction, page: String(d.input.page), filter: '1' });
+     d.selectedIds.forEach(id => q.append('channel', id)); Object.entries(patch).forEach(([k, v]) => q.set(k, v)); return q.toString();
+   };
+-  const unavailable = t("Not available");
+   const measureLabel = (m: { label: string; labelFr?: string }) => fr ? m.labelFr ?? m.label : m.label;
+   const sidebar = <form action="/analytics/posts" className={styles.filters}>
+     <h2>{t("Post explorer")}</h2>
+@@ -37,12 +37,6 @@ export default async function PostsScreen({ searchParams }: { searchParams: Prom
+     <nav aria-label={t("Pages")} className={styles.actions}>{d.input.page > 1 && <a href={`?${query({ page: String(d.input.page - 1) })}`}>{t("Previous")}</a>}<span>{t("Page")} {d.input.page}</span>{d.nextPage && <a href={`?${query({ page: String(d.nextPage) })}`}>{t("Next")}</a>}</nav>
+   </form>;
+   return <PageFrame module="analytics" scopedAccess sidebar={sidebar}><div className={`${styles.root} ${local.content}`}><header className={styles.heading}><h1>{t("Post explorer")}</h1><p>{t("Published posts with stored measures. Measures are snapshots, not period totals. Missing data is not available.")}</p></header>
+-    <DataTable caption={t("Published posts")} rows={d.items} rowKey={p => `${p.channelId}:${p.postId}`} emptyMessage={t("No published posts for this selection and period.")} columns={[
+-      { key: 'post', label: t("Post"), render: p => p.url ? <a href={p.url} rel="noreferrer" target="_blank">{p.text || unavailable}</a> : p.text || unavailable },
+-      { key: 'channel', label: t("Channel"), render: p => p.channelName },
+-      { key: 'publishedAt', label: t("Published (UTC)"), render: p => p.publishedAt?.toISOString() ?? unavailable },
+-      { key: 'measuredAt', label: t("Measured (UTC)"), render: p => p.measuredAt?.toISOString() ?? unavailable },
+-      ...d.measures.map(m => ({ key: m.key, label: measureLabel(m), render: (p: typeof d.items[number]) => { const value = p.measures.find(v => v.key === m.key)?.value; return value == null ? unavailable : new Intl.NumberFormat(fr ? 'fr' : 'en').format(value); } })),
+-    ]} />
++    <PostsTable copy={copy} rows={postsTableRows(d.items)} measures={postsTableMeasures(d.measures, fr ? 'fr' : 'en')} locale={fr ? 'fr' : 'en'} />
+   </div></PageFrame>;
+ }
+diff --git a/rebuild/src/modules/analytics/explorer-posts/provider.test.ts b/rebuild/src/modules/analytics/explorer-posts/provider.test.ts
+index bb2098da..4a4929a9 100644
+--- a/rebuild/src/modules/analytics/explorer-posts/provider.test.ts
++++ b/rebuild/src/modules/analytics/explorer-posts/provider.test.ts
+@@ -1,6 +1,7 @@
+ import { beforeEach, expect, it, vi } from 'vitest';
+ const query = vi.hoisted(() => vi.fn());
+ vi.mock('@/server/data', () => ({ prisma: { $queryRaw: query } }));
++vi.mock('@/server/config/store', () => ({ runtimeConfig: async () => ({}) }));
+ import { facebookPostPerformance, readFacebookPostPerformance } from '@/platforms/facebook/post-performance';
+ beforeEach(() => query.mockReset().mockResolvedValue([]));
+ it('retains additional stored numeric measures and leaves absent values unknown', () => {
+@@ -15,5 +16,5 @@ it('sorts the complete stored population in SQL and binds offset, measure key an
+   const sql = query.mock.calls[0][0];
+   expect(sql.text).toContain('ASC NULLS LAST'); expect(sql.text).not.toContain('LIMIT 2000');
+   expect(sql.values).toEqual(expect.arrayContaining(['reach', 'w', 't', 3001, 2001]));
+-  expect(sql.text).toContain("= 'number' THEN CASE WHEN");
++  expect(sql.text).toMatch(/jsonb_typeof\(r\.insights::jsonb -> \$\d+\) = 'number' THEN/);
+ });
+diff --git a/rebuild/src/modules/analytics/ui/posts/PostsTable.tsx b/rebuild/src/modules/analytics/ui/posts/PostsTable.tsx
+index 96655785..2cc4675f 100644
+--- a/rebuild/src/modules/analytics/ui/posts/PostsTable.tsx
++++ b/rebuild/src/modules/analytics/ui/posts/PostsTable.tsx
+@@ -22,17 +22,24 @@ const NONE = '__none__';
+  * stored measures, and a bar under the first metric scaled to the largest known value on the page.
+  * Per-post history is not stored, so no trend line is drawn.
+  */
+-export function PostsTable({ rows, measures, locale, emptyAction, copy = recordsCopyDefaults }: {
++export function PostsTable({ rows, measures: allMeasures, locale, emptyAction, copy = recordsCopyDefaults }: {
+   copy?: RecordsCopy; rows: PostsTableRow[]; measures: PostsTableMeasure[]; locale: 'en' | 'fr'; emptyAction?: React.ReactNode;
+ }) {
+   const fr = locale === 'fr';
+   const t = (key: keyof RecordsCopy) => copy[key][locale];
+   const unavailable = t("Not available");
+-  const [first, setFirst] = useState(measures[0]?.key ?? NONE);
+-  const [second, setSecond] = useState(measures[1]?.key ?? NONE);
++  // A measure with no stored value on this page is not offered: it would only add a column of dashes.
++  const measures = useMemo(() => allMeasures.filter(measure => rows.some(row => typeof row.measures[measure.key] === 'number')), [allMeasures, rows]);
++  const [picked, setPicked] = useState<{ first?: string; second?: string }>({});
++  const offered = (key: string | undefined, fallback: string) => key !== undefined && (key === NONE || measures.some(measure => measure.key === key)) ? key : fallback;
++  const first = offered(picked.first, measures[0]?.key ?? NONE);
++  const second = offered(picked.second, measures[1]?.key ?? NONE);
++  const setFirst = (key: string) => setPicked(current => ({ ...current, first: key }));
++  const setSecond = (key: string) => setPicked(current => ({ ...current, second: key }));
+   const number = useMemo(() => new Intl.NumberFormat(locale), [locale]);
+-  const date = useMemo(() => new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short', timeZone: 'UTC' }), [locale]);
+-  const when = (value: string | null) => value ? `${date.format(new Date(value))} UTC` : unavailable;
++  // Viewer's own timezone; the server render may differ from the browser, so the <time> text may update on hydration.
++  const date = useMemo(() => new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' }), [locale]);
++  const when = (value: string | null) => value ? <time dateTime={value} suppressHydrationWarning>{date.format(new Date(value))}</time> : unavailable;
+   const options = measures.map(measure => ({ value: measure.key, label: measure.label }));
+   const chosen = [first, second].filter((key, index, all) => key !== NONE && all.indexOf(key) === index).map(key => measures.find(measure => measure.key === key)).filter((measure): measure is PostsTableMeasure => Boolean(measure));
+   const peak = (key: string) => Math.max(0, ...rows.map(row => row.measures[key]).filter((value): value is number => typeof value === 'number' && Number.isFinite(value)));
+diff --git a/rebuild/src/platforms/facebook/analytics.ts b/rebuild/src/platforms/facebook/analytics.ts
+index 91f36c9d..212ef412 100644
+--- a/rebuild/src/platforms/facebook/analytics.ts
++++ b/rebuild/src/platforms/facebook/analytics.ts
+@@ -39,6 +39,11 @@ export function facebookAdMetricUnit(key: string, _currency?: string | null): An
+   return 'count';
+ }
+ 
++/** Identity, naming and date-window fields of an insights payload; they describe the row and are never measures, even when numeric-looking. */
++export function facebookIdentifierField(key: string): boolean {
++  return /(^|:)([a-z0-9]+_)*(id|ids|name|currency|start|stop)$/i.test(key) || /(^|:)(date_start|date_stop|objective|account_id)$/.test(key);
++}
++
+ type PageRow = { metric: string; period: string | null; endTime: Date; fetchedAt: Date; numeric: number | null; value: unknown; target: { id: string; name: string } };
+ type AdRow = { date: Date; spend: number; impressions: number; clicks: number; reach: number; cpc: number | null; cpm: number | null; cpp: number | null; ctr: number | null; frequency: number | null; actions: unknown; fields: unknown; fetchedAt: Date; adAccount: { id: string; name: string; currency: string | null } };
+ type FacebookTarget = AnalyticsTarget & { socialAccountId: string | null };
+@@ -181,6 +186,7 @@ function adInputs(rows: AdRow[], selectedAdAccounts: SelectedAdAccount[]): Analy
+     breakdowns.set(key, accounts);
+   };
+   const readField = (key: string, row: AdRow, raw: unknown, sourcePriority: number, knownAction = false) => {
++    if (facebookIdentifierField(key)) return;
+     if (Array.isArray(raw)) {
+       const categories: Array<[string, unknown]> = [];
+       raw.forEach((entry, index) => {
+diff --git a/rebuild/tests/analytics-posts-table-live-defects.test.ts b/rebuild/tests/analytics-posts-table-live-defects.test.ts
+new file mode 100644
+index 00000000..6439cce4
+--- /dev/null
++++ b/rebuild/tests/analytics-posts-table-live-defects.test.ts
+@@ -0,0 +1,20 @@
++import { describe, expect, it } from 'vitest';
++import { createElement } from 'react';
++import { renderToStaticMarkup } from 'react-dom/server';
++import { PostsTable } from '../src/modules/analytics/ui/posts/PostsTable';
++
++const measures = Array.from({ length: 17 }, (_, index) => ({ key: `m${index}`, label: `Measure ${index}` }));
++const rows = [{ key: 'a:1', text: 'Launch', url: null, channelName: 'Page A', publishedAt: '2026-10-05T14:30:00.000Z', measuredAt: '2026-10-06T08:00:00.000Z', measures: { ...Object.fromEntries(measures.map(m => [m.key, null])), m3: 12, m5: 0 } }];
++
++describe('post explorer table', () => {
++  const html = renderToStaticMarkup(createElement(PostsTable, { rows, measures, locale: 'en' }));
++  it('offers only measures with a stored value on the page and shows no all-dash columns', () => {
++    expect(html).toContain('Measure 3'); expect(html).toContain('Measure 5');
++    for (const unused of [0, 1, 2, 4, 6, 16]) expect(html).not.toContain(`Measure ${unused}<`);
++  });
++  it('shows human-readable dates, never ISO text', () => {
++    expect(html).not.toContain('>2026-10-05T14:30');
++    expect(html).toMatch(/Oct (5|6), 2026/); expect(html).not.toContain(' UTC');
++    expect(html).toContain('dateTime="2026-10-05T14:30:00.000Z"');
++  });
++});
+diff --git a/rebuild/tests/facebook-analytics-live-defects.test.ts b/rebuild/tests/facebook-analytics-live-defects.test.ts
+new file mode 100644
+index 00000000..19abf7b8
+--- /dev/null
++++ b/rebuild/tests/facebook-analytics-live-defects.test.ts
+@@ -0,0 +1,76 @@
++import { beforeEach, describe, expect, it, vi } from 'vitest';
++
++const db = vi.hoisted(() => ({ settings: vi.fn(), targets: vi.fn(), adAccounts: vi.fn(), pageInsights: vi.fn(), adInsights: vi.fn(), query: vi.fn() }));
++vi.mock('../src/server/data', () => ({ prisma: {
++  appSetting: { findMany: db.settings }, target: { findMany: db.targets }, adAccount: { findMany: db.adAccounts },
++  pageInsight: { findMany: db.pageInsights }, adInsight: { findMany: db.adInsights }, $queryRaw: db.query,
++} }));
++vi.mock('@/modules/analytics/server/error-copy', () => ({ analyticsLanguage: async () => 'en' }));
++vi.mock('@/server/config/store', () => ({ runtimeConfig: async () => ({}), runtimeConfigBatch: async () => ({}) }));
++
++import { facebookAnalyticsHost, facebookIdentifierField, normalizeFacebookAnalytics } from '../src/platforms/facebook/analytics';
++
++const account = { id: 'ad-a', name: 'Ad account A', currency: 'USD' };
++const adRow = (fields: unknown) => ({ date: new Date('2026-10-10'), spend: 5, impressions: 100, clicks: 4, reach: 80, cpc: 1.25, cpm: 50, cpp: 0.06, ctr: 4, frequency: 1.25, actions: [], fields, fetchedAt: new Date('2026-10-11'), adAccount: account });
++const target = { id: 'page-a', name: 'Page A' };
++const pageRow = { metric: 'page_media_view', period: 'day', endTime: new Date('2026-10-10'), fetchedAt: new Date('2026-10-11'), numeric: 12, value: 12, target };
++
++describe('ad insight identifiers are never metrics', () => {
++  it('drops account, campaign, name, currency and date-window fields but keeps numeric measures', () => {
++    const { metrics } = normalizeFacebookAnalytics({ pageRows: [], audienceRows: [], selectedTargets: [], selectedAdAccounts: [account], adRows: [adRow({
++      account_id: '159977536979568', account_name: 'Ad account A', account_currency: 'USD', campaign_id: '120000000000001', adset_id: '5', date_start: '2026-10-10', date_stop: '2026-10-10',
++      inline_link_clicks: '7', outbound_clicks: [{ action_type: 'link_click', value: '3' }],
++    })] });
++    const keys = metrics.map(metric => metric.key);
++    expect(keys).toEqual(expect.arrayContaining(['inline_link_clicks', 'outbound_clicks:link_click']));
++    for (const key of keys) expect(key).not.toMatch(/account_id|account_name|campaign_id|adset_id|date_start|date_stop|account_currency/);
++    expect(metrics.some(metric => /Account Id/i.test(metric.label))).toBe(false);
++  });
++  it('recognises identifier shapes without catching measures', () => {
++    for (const key of ['account_id', 'campaign_id', 'actions:account_id', 'account_name', 'date_start', 'date_stop', 'account_currency']) expect(facebookIdentifierField(key), key).toBe(true);
++    for (const key of ['reach', 'paid_views', 'inline_link_clicks', 'cost_per_inline_link_click', 'video_p25_watched_actions:video_view']) expect(facebookIdentifierField(key), key).toBe(false);
++  });
++});
++
++describe('page metrics are emitted alongside ad metrics', () => {
++  it('returns Facebook Page and Advertising metrics from one normalization', () => {
++    const { metrics } = normalizeFacebookAnalytics({ pageRows: [pageRow], audienceRows: [], selectedTargets: [{ ...target, type: 'page', providerId: 'facebook', socialAccountId: 's' } as never], selectedAdAccounts: [account], adRows: [adRow({})] });
++    expect(metrics.some(metric => metric.key.startsWith('page_media_view'))).toBe(true);
++    expect(metrics.some(metric => metric.sourceLabel === 'Advertising')).toBe(true);
++  });
++});
++
++describe('Facebook analytics targets report the platform id', () => {
++  beforeEach(() => {
++    vi.clearAllMocks();
++    db.settings.mockResolvedValue([]); db.adAccounts.mockResolvedValue([]); db.pageInsights.mockResolvedValue([]); db.adInsights.mockResolvedValue([]);
++    db.targets.mockResolvedValue([{ id: 'page-a', name: 'Page A', type: 'page', providerId: '1029384756', socialAccountId: 'src' }]);
++  });
++  it('maps providerId to "facebook", never the remote Page id, for visible and selected targets', async () => {
++    const result = await facebookAnalyticsHost.load({ workspaceId: 'w', range: { from: new Date('2026-10-01'), to: new Date('2026-10-31') }, selectedTargetIds: ['page-a'] });
++    expect(result.targets).toEqual([{ id: 'page-a', name: 'Page A', type: 'page', providerId: 'facebook' }]);
++    expect(result.selectedTargets.map(t => t.providerId)).toEqual(['facebook']);
++    expect(JSON.stringify(result)).not.toContain('1029384756');
++  });
++});
++
++describe('app-published posts read insights from the matching external post', () => {
++  const request = { workspaceId: 'w', targetId: 't', from: new Date('2026-10-01'), to: new Date('2026-11-01'), limit: 10 };
++  it('joins external_posts on target and remote id, preferring its snapshot only when the post target has none', async () => {
++    db.query.mockResolvedValue([]);
++    await facebookAnalyticsHost.postPerformance(request);
++    const query = db.query.mock.calls[0]![0] as { text: string; values: unknown[] };
++    expect(query.text).toMatch(/LEFT JOIN external_posts ep ON ep\."targetId" = pt\."targetId" AND ep\."remoteId" = pt\."remotePostId"/);
++    expect(query.text).toMatch(/CASE WHEN pt\."insightsSyncedAt" IS NULL AND ep\."insightsSyncedAt" IS NOT NULL THEN ep\.insights ELSE pt\.insights END/);
++    expect(query.text).toMatch(/COALESCE\(pt\."insightsSyncedAt", ep\."insightsSyncedAt"\)/);
++    expect(query.text).toMatch(/COALESCE\(pt\."remoteUrl", ep\.permalink\)/);
++    expect(query.values).toEqual(expect.arrayContaining(['w', 't']));
++  });
++  it('maps the snapshot the query returns for such a row into measures', async () => {
++    db.query.mockResolvedValue([{ postId: 'p1', message: 'Hi', publishedAt: new Date('2026-10-05'), remoteUrl: 'https://facebook.com/x', insights: { reach: 40, reactions: 3 }, insightsSyncedAt: new Date('2026-10-06') }]);
++    const rows = await facebookAnalyticsHost.postPerformance(request);
++    expect(rows[0]!.measures.find(m => m.key === 'reach')?.value).toBe(40);
++    expect(rows[0]!.rankValue).toBe(3);
++    expect(rows[0]!.measuredAt).toEqual(new Date('2026-10-06'));
++  });
++});

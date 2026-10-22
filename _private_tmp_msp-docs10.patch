@@ -1,0 +1,630 @@
+diff --git a/rebuild/docs/ADS_PARITY.md b/rebuild/docs/ADS_PARITY.md
+index f210bd04..75373e1a 100644
+--- a/rebuild/docs/ADS_PARITY.md
++++ b/rebuild/docs/ADS_PARITY.md
+@@ -2,6 +2,48 @@
+ 
+ Status: **integrated stored reports, durable object/creation services and stored-image creative creation, with scoped mocked verification; incomplete browser/database/live-provider/release coverage.** Management is off by default. The current proof and remaining gaps are recorded below. Target: [ARCHITECTURE_CONTRACT.md](ARCHITECTURE_CONTRACT.md).
+ 
++Updated 2026-10-21 against HEAD `ffdb1cdf` (schema **118**). The owner/integrator
++records this release as deployed and `20261031180000_rebuild_ads_ad_creation` as
++applied in production; this documentation lane made no production calls and has
++no fresh migration receipt. Earlier batch sections below retain their dated scope;
++the current status here supersedes their local-only/application-pending statements.
++
++## Current ledger, runtime copy and recovery status
++
++- **Ledger gap closed in source:** root migration
++  `prisma/migrations/20261031180000_rebuild_ads_ad_creation/migration.sql` extends
++  `ads_operations_operation_kind` to accept `ad.create`. SHA-256:
++  `1769fa24129e6d74119e84d0677a2baf0c935cb73a4e722ae0a443b7fbc7120f`.
++  Source/checksum tests (`ads-ad-create-migration`) and mocked creation/recovery
++  tests are distinct from the owner's production-application record. An exact
++  database CHECK/history receipt and the cutover-rehearsal allowlist, checksum,
++  history-refusal parameters and post-apply probe remain follow-up work.
++- **Runtime copy wired at host level:** `configuredOperations(locale)` resolves
++  Root `meta.adsCopy` through the neutral platform host into a request-local
++  engine. Factory failures fail closed. UI/REST/MCP entry points still default to
++  English because they do not pass the customer locale; creation-form consent
++  templates must also agree with the live management preview.
++- **Round 9 scoped recovery authorization:** `resolveAdsOperation` checks current
++  account visibility before revealing state/confirmation, intersects membership
++  channel scope and key target/account ceilings, and checks a creative's exact
++  target. It repeats manager authorization and visibility after acquiring the
++  account/ledger locks, before compare-and-set settlement and audit. Retained
++  disabled/invalidated accounts remain eligible for local attestation without
++  provider grants or a remote call. Fakes in `ads-parity-management.test.ts` cover
++  pending/uncertain operations, scope/role revocation while waiting, empty
++  credential ceilings and invisible-account disclosure refusal. This is not
++  PostgreSQL concurrency, real-client or live-provider evidence.
++- **Remaining policy distinction:** creation of ad sets/ads requires unrestricted
++  channel scope; recovery permits a limited administrator whose current scope
++  reaches a target on the account connection (the round 9 tests explicitly allow
++  it). It does not repeat the creation-only unrestricted check. Do not describe
++  this as full creation/recovery policy equivalence; reconcile that policy with
++  the owning service/README before declaring parity complete.
++- Management remains off by default; live `ads_management` grant, paused creation,
++  edits, recovery, remote outcome verification and cleanup remain unproven.
++  Browser round 5 covers local synthetic Ads routes only, before rounds 6–9;
++  it is not management-write or current-copy browser evidence.
++
+ ## What exists
+ 
+ | Area | Path | Notes |
+@@ -34,14 +76,14 @@ Directory management reads use `directory/management-port.ts`, an optional neutr
+ 
+ Request identities bind to a normalized payload hash. Replays return the recorded outcome without sending another provider write; changed payloads under an existing identity are refused. Pending/uncertain creations retain their hold. A human attestation is not a provider receipt and does not assert a remote identity or current paused state.
+ 
+-## Ledger migration (local preview only)
++## Initial ledger migration (historical local-preview record)
+ 
+ Canonical migration: `prisma/migrations/20261018170000_rebuild_ads_operations/migration.sql` in the application repository. It includes immutable request identity/hash, per-actor request uniqueness, the open-object hold and resolution-shape constraints. Do not apply older proposal SQL from worker handoffs.
+ 
+ 
+ Without this table every write fails closed (`unavailable`) before any provider call.
+ 
+-## Current host wiring
++## Historical host wiring (batches 74–75; superseded above)
+ 
+ - Published registry 67 includes analysis and management policies; pending creation integration adds version 68. Management stays off by default.
+ - Facebook-owned host assembly provides its optional neutral object-operations engine.
+@@ -349,13 +391,12 @@ application or production change.
+   is withheld by `reconnect_required` (absent `ads_management` grant or invalid
+   connection). The object manager and Campaigns screen show a bilingual reconnect notice
+   linking to Settings → Connections. The thrown message is in the Ads catalog
+-  (`grantMissing`), so API/MCP errors localize in French.
++  (`grantMissing`), so the service can localize errors; entry-point customer-locale plumbing remains open.
+ - **Hierarchy.** Campaigns rows show their ancestor path (`Campaign › Ad set`) resolved by
+   the platform's neutral `parentObjectId`, are ordered by it, and a note says levels
+   overlap and must not be added together.
+-- **Migration required before activation.** `ads_operations_operation_kind` (CHECK on
+-  `operationType`) must list `ad.create`; `objectType` already allows `ad`. Until a root
+-  `prisma/migrations` migration extends it, the ledger insert fails closed before any
+-  provider call.
++- **Ledger follow-up closed in round 8.** Migration
++  `20261031180000_rebuild_ads_ad_creation` now permits `ad.create`; see current
++  status above for the owner-recorded application and remaining rehearsal evidence.
+ - **New Root keys: none** (customer copy keys were added to the existing `ads.customerCopy`
+   default catalog; `CONFIG_SCHEMA_VERSION` untouched).
+diff --git a/rebuild/docs/AGENT_HANDOFF.md b/rebuild/docs/AGENT_HANDOFF.md
+index c443f1d2..d3f6a249 100644
+--- a/rebuild/docs/AGENT_HANDOFF.md
++++ b/rebuild/docs/AGENT_HANDOFF.md
+@@ -1,11 +1,10 @@
+ # Shared agent handoff
+ 
+-Updated 2026-10-21 against local HEAD `960831df` (rounds 7 and 8), reviewing
+-`git log 6d3347fb..HEAD`, the round 7 and 8 diffs, dated release and browser records
+-and selected current source. This supersedes the previous `6d3347fb` continuation.
+-The binding contract is unchanged; the full goal remains active. No fresh database,
+-browser, provider or production observation was made by this documentation worker;
+-production facts below are owner/integrator records.
++Updated 2026-10-21 against local HEAD `ffdb1cdf` (round 9), reviewing current
++source, round 7–9 diffs and dated release/browser records. This supersedes the
++`960831df` continuation. The contract is unchanged; the full goal remains active.
++No fresh database, browser, provider or production observation was made by this
++documentation worker; production facts below are owner/integrator records.
+ 
+ ## Required context
+ 
+@@ -17,7 +16,7 @@ release work; source and historical receipts do not identify current deployment.
+ 
+ ## Production record
+ 
+-Deployed release (integrator statement): `960831df`, configuration schema **117**,
++Deployed release (owner/integrator statement): `ffdb1cdf`, configuration schema **118**,
+ with migration `20261031180000_rebuild_ads_ad_creation` applied in production
+ (owner/integrator record; not observed here, and no receipt such as a
+ `_prisma_migrations` row or CHECK probe is in the repository; confirm it). Owner cutover: 2026-10-20 22:09 CEST, release `5f1e52d7`, via
+@@ -62,7 +61,7 @@ Anthropic was blocked by account credit. Mail and live recovery remain open.
+   Sharing; last three include service/public error localization. `configOrDefault`
+   validates runtime or registry default; `configValueOrDefault` checks outer shape
+   only. Residual literals/prompts/dynamic labels and stale OAuth metadata remain
+-  in CONFIG_LITERAL_AUDIT. Schema version is now **117**, not 104–116.
++  in CONFIG_LITERAL_AUDIT. Schema version is now **118**; historical version numbers below describe their batches.
+ - Appearance (`2b42470b`): global shell and Settings save through confirmed
+   appearance service; theme in users, mode under exact account key, transaction
+   audit, Root-lifetime cookie cache and validated-session fallback in layout.
+@@ -78,8 +77,9 @@ Anthropic was blocked by account credit. Mail and live recovery remain open.
+   pause-cancel via Publishing, cached pool estimates, worker summaries, origin
+   badges/filters, Feeds sidebar link, bilingual status/supply/next-time card and
+   Root visibility bounds. Fake/unit/render evidence for follow-ups, not live
+-  recovery. Refused first cancel batches can starve later posts; slot matching
+-  can accept manual posts or miss cancelled drafts. Preserve uncertain ledgers.
++  recovery. Round 6 closes refused-batch starvation and channel/time reconciliation at
++  unit level (details below). Claims lacking a stored post id remain uncertain.
++  Preserve uncertain ledgers; live recovery is unproven.
+ - Reliability (`e0584777`, `d511e39c`): Facebook Inbox, Page analytics/history and
+   Ads fetch outside locked writes; current binding/access/purge rechecks before
+   persistence. Signals stop claims, request safe stops, drain with Root grace/
+@@ -103,14 +103,14 @@ Anthropic was blocked by account credit. Mail and live recovery remain open.
+   re-export them. Mocked/unit evidence (`tests/root-config-authority.test.ts`,
+   `root-workspace-controls.test.ts`, `root-directory.test.ts`); no PostgreSQL
+   transaction, real MCP client or browser evidence.
+-- Ads (`46c6bdae`): neutral paused `ad.create` through the shared management
+-  service for UI (`AdCreateForm`), session REST and MCP, with a Facebook-owned
+-  implementation; reconnect notice when the `ads_management` grant is absent;
+-  Campaigns hierarchy path. Mocked/fixture tests only. **No migration at HEAD
+-  extends the ledger operation-kind CHECK to `ad.create`** (searched
+-  `prisma/migrations`), so ad creation fails closed before any provider call until
+-  one is authored and applied. Management is off by default; the live
+-  `ads_management` grant is pending; no live Ads write has been made.
++- Ads (`46c6bdae`, `960831df`, `ffdb1cdf`): paused `ad.create` through shared
++  management for UI, session REST and MCP, Facebook-owned transport, missing-grant
++  reconnect notice and hierarchy. The former ledger CHECK gap is closed by
++  `20261031180000_rebuild_ads_ad_creation` (source/checksum tests and owner-recorded
++  production application). Management is off by default; live `ads_management`
++  grant/write/cleanup evidence remains open. Runtime copy is resolved per request,
++  but entry points still omit customer locale. Recovery authority/scope follow-up
++  and residual policy distinction are detailed in round 9 below.
+ - Performance (`245683ce`): migration `20261031160000_rebuild_read_path_indexes`
+   under root prisma/migrations adds three Posts and one Page-insights indexes;
+   Analytics exact-scope read reuse/request limits, Publishing adapter reuse and
+@@ -137,8 +137,9 @@ Anthropic was blocked by account credit. Mail and live recovery remain open.
+   provider or production run):
+   - Ads copy: Facebook-owned `ads-copy.ts` (EN/FR labels, name validation, confirmation
+     templates) behind new Root key `meta.adsCopy` (placeholders validated); Ads
+-    `copy.ts` customer strings. `ad.create` is still blocked by the missing ledger
+-    CHECK migration and `ads_management` grant.
++    `copy.ts` customer strings. The missing ledger CHECK at that round was closed
++    in round 8; the live
++    `ads_management` grant remains unverified.
+   - Join: preview answers `{ invitation: null }` (200) for a missing/unknown token and
+     `join-form.tsx` shows "link needed" from it (no 404; a 429 from the per-token limit
+     is still possible).
+@@ -173,7 +174,7 @@ Anthropic was blocked by account credit. Mail and live recovery remain open.
+     separate observations (insight, summary edge, per-type edges) with
+     `reactionProvenance` and a conflict flag instead of mixing them; lifetime
+     insight responses are not paged and use the requested end as snapshot anchor.
+-    Explicitly saved metric lists replace defaults.
++    That round's saved-list replacement is superseded by round 9 below.
+   - Reports: Published posts views (destination content log with attempt counts,
+     daily UTC counts, currently failed destinations) through the existing confirmed
+     UI/REST/MCP generator; new key `analytics.reports.publicationDetails`. Tests
+@@ -196,8 +197,8 @@ Anthropic was blocked by account credit. Mail and live recovery remain open.
+     default English). A failing configured factory does not fall back to the static
+     engine. **The UI, REST and MCP entry points do not yet pass the customer locale**
+     (`CampaignsScreen.tsx`, `api/ads/management/route.ts`, `ads/mcp.ts`), so Ads
+-    messages stay English there, and recovery does not recheck the unrestricted-
+-    channel requirement. See `src/modules/ads/server/README.md`; test `ads-runtime-host`.
++    messages stay English there, and recovery does not repeat the creation-only unrestricted-channel
++    requirement; round 9 adds current scope/authority rechecks under lock. See `src/modules/ads/server/README.md`; test `ads-runtime-host`.
+   - Facebook metric config: `FACEBOOK_METRIC_LABEL_DEFAULTS` adds Page/post/reaction
+     labels; `meta.metricLabels` merges saved entries over shipped defaults so older
+     stored catalogs gain new labels (`facebook-metric-config`).
+@@ -212,6 +213,49 @@ Anthropic was blocked by account credit. Mail and live recovery remain open.
+   - Root keys added in these rounds: `analytics.reports.publicationDetails` (116) and
+     `analytics.reports.topPostContent` (117). This documentation lane adds none.
+ 
++Round 9 (`ffdb1cdf`; source and unit/mocked/query-shape evidence; schema 118;
++no fresh browser, PostgreSQL or live-provider verification by this lane):
++
++- Ads recovery checks current account/channel visibility and independent key
++  ceilings before disclosing state/confirmation, then repeats manager authority
++  and account visibility under the account/ledger locks before settlement/audit.
++  Creative recovery checks the exact target; retained disabled accounts do not
++  need active provider grants for local attestation. Tests cover narrowed scope,
++  revoked role, empty ceilings and invisible-account refusal. This closes the
++  stale-authority/disclosure gap. A limited manager whose scope reaches the
++  account connection is still permitted to recover ad/ad-set creations; the
++  unrestricted-channel rule for creating them is not repeated. Reconcile that
++  remaining policy distinction rather than claiming identical creation/recovery
++  scope (see ADS_PARITY.md).
++- Facebook Page presentation reads Root `meta.metricLabels` and new
++  `meta.pageAnalyticsCopy` for EN/FR metric/audience labels, provenance,
++  latest-per-channel/category text and overlap notes. Saved labels override
++  shipped defaults, which now also include Page likes and older impressions.
++  Ads/dynamic-label English literals remain; this is not full analytics copy
++  extraction or provider completeness.
++- Post-history metric lists now merge saved additions with shipped defaults and
++  apply explicit `excludedMetrics` last (including future names). Legacy absence
++  is not an exclusion. Read normalization is pure; a confirmed Root save persists
++  normalized policy with the existing audit. The same Page-policy schema exists,
++  but `facebook/module.ts` still registers `meta.pageInsightMetrics` as an array;
++  `runtime.ts`, `adset.ts` and `ads-ops/index.ts` still consume arrays. Integrating
++  that declaration and all `.metrics` projections is outstanding.
++- Destinations reports add per-link lifetime inventory, retained period clicks
++  and independent daily UTC retained counts through the existing confirmed
++  UI/REST/MCP generator (`runReportNow`). New Root
++  `analytics.reports.linkDetails` bounds link/day rows; the existing bilingual
++  report-document catalog discloses clipping and retention gaps. The cohort is
++  posts currently published to the selected channel within the report period,
++  not clicks on every older post. Unattributed legacy links qualify only with
++  exactly one published destination; ambiguous links are excluded. No visitor
++  metadata, destination URL or slug is projected. Zero means no retained click
++  records; lifetime counters are separate. See
++  `../src/modules/analytics/reports/LINK_REPORTS.md`.
++- Relevant tests: `ads-parity-management`, `facebook-page-labels`,
++  `facebook-metric-config`, `facebook-analytics-selection`,
++  `facebook-post-history`, `root-config-authority`, `report-link-details*`.
++  No new screen, route, MCP tool or migration for these report details.
++
+ ## Browser evidence, not an all-green gate
+ 
+ BROWSER_MATRIX_2026-10-21 records local production builds against a synthetic
+@@ -243,7 +287,7 @@ preview PostgreSQL database; none of it is production or provider evidence.
+   `SavedViews.tsx`/`saved_saveFailed` unchanged). Firefox/WebKit and the dynamic/
+   empty/system/keyboard/failure parts were not rerun.
+ 
+-Unresolved (no browser run since round 5; rounds 6–8 changed source only):
++Unresolved (no browser run since round 5; rounds 6–9 have source/automated changes without a browser rerun):
+ `not-found.tsx` exists since round 8 (unit render test) but has not been seen in a
+ browser; unknown bio/share/Root ids answered HTTP 200 in round 4 (the collaboration
+ post screen now calls `notFound()`, unit evidence); raw server text on Tasks, Labels,
+@@ -259,7 +303,7 @@ and WAVE1 checks retain their dates.
+ 
+ ## Next actions / edits outside this documentation lane
+ 
+-1. Release owner verifies the exact deployed SHA (recorded `960831df`), migrations
++1. Release owner verifies the exact deployed SHA (recorded `ffdb1cdf`), migrations
+    and ownership (purge-gate, read-index, inbox-metadata, trigram and ad-creation
+    migrations; keep a receipt), media backup coverage and a proxy-level cutback;
+    extend the rollback drill to the exact release (including the newest CHECK);
+@@ -268,8 +312,9 @@ and WAVE1 checks retain their dates.
+    Remaining: append it to `scripts/cutover-rehearsal.sh` (approved list, SHA-256
+    from `src/modules/ads/server/README.md`, history-refusal parameter list, post-apply
+    CHECK probe) with `tests/cutover-rehearsal.test.ts`; pass the customer locale from
+-   the Ads UI/REST/MCP entry points; enforce the unrestricted-channel rule in
+-   recovery; then obtain the live `ads_management` grant on a test account and
++   the Ads UI/REST/MCP entry points; reconcile the creation-only unrestricted-channel rule with limited-scope
++   recovery (round 9 already rechecks current role/account/channel/key scope
++   before disclosure and under lock); then obtain the live `ads_management` grant on a test account and
+    exercise paused creation, status/budget/creative changes, recovery and cleanup
+    with exact confirmations. Keep management off by default until then.
+ 3. Agency owner (workspace switching: REST versus MCP confirmation) and Sharing
+@@ -290,18 +335,29 @@ and WAVE1 checks retain their dates.
+    metrics/history, live REST/MCP scope, provider outcomes/cleanup and index plans/
+    volume. Preserve unresolved photo-canary ledger/Page lock; failed Graph lookup
+    is not absence proof. Unknown remote effects must not be blindly resent.
+-7. Documentation outside ownership: ADS_PARITY.md may still state the ledger CHECK gap; FEEDS.md needs the 15:00/17:00 slots, the 40/40
+-   day and the link-removal outcome; CONFIG_LITERAL_AUDIT needs latest catalogs/error
+-   localization; operation docs should add data gates/read-index migration status
+-   without claiming target application. Legacy round narratives retain historical
+-   version-bump text; version 117 is current.
++7. Facebook owner: register `facebookPageMetricPolicySchema`/defaults in
++   `src/platforms/facebook/module.ts` for `meta.pageInsightMetrics` and project
++   `.metrics` in `runtime.ts`, `adset.ts`, `ads-ops/index.ts`; add consumer tests.
++   Do not infer exclusions from absent legacy entries or persist from reads.
++8. Documentation outside ownership: GOAL.md and DELIVERY_PLAN.md still name
++   `960831df`/117 and pre-round-9 recovery/metric/report status; MCP_PARITY.md and
++   LEGACY_CAPABILITY_PARITY.md need the scoped recovery/new policy distinction.
++   The Ads server README's recovery bullet must distinguish closed locked
++   visibility/authority rechecks from the remaining unrestricted-creation rule.
++   LINK_REPORTS.md's historical request to bump the schema is already integrated
++   (118). Operation docs still need exact target receipts/rehearsal coverage;
++   do not manufacture them from source or the owner's deployment statement.
+ 
+ ## Current lane validation
+ 
+-Only the six assigned docs are owned; LEGACY_CAPABILITY_PARITY changes are limited
+-to the header date and existing Rebuild state cells. No contract, registry,
+-source/test, migration, server, deploy, push or production edits/calls. No new Root
+-keys; `CONFIG_SCHEMA_VERSION` is read as 117 from `src/lib/config/registry.ts` and
+-not edited. No tests were run by this documentation lane. Pre-existing untracked node_modules links are not task changes.
+-Validation results are in the lane report. Changes remain uncommitted in this
+-worktree for integration; nothing was pushed.
++Only ADS_PARITY.md, FEEDS.md, CONFIG_LITERAL_AUDIT.md, ARCHITECTURE.md and
++AGENT_HANDOFF.md are owned. No source, tests, registry, contract, migration,
++server, deploy, push or production edits/calls. No new Root keys in this lane;
++round 9's existing `meta.pageAnalyticsCopy` and `analytics.reports.linkDetails`
++are documented, with `CONFIG_SCHEMA_VERSION` read as 118 and left unchanged.
++`npx tsc --noEmit -p .` passed with zero errors; `git diff --check` passed.
++No test file was changed or added. A focused six-file Vitest run passed 190
++tests (Ads recovery, Page labels/metric configuration, short-link reports and
++recipe recovery), using unit/mocked/query-shape evidence only. Pre-existing untracked node_modules links are untouched. Changes
++remain uncommitted for integration; nothing was pushed under this lane's explicit
++no-push instruction.
+diff --git a/rebuild/docs/ARCHITECTURE.md b/rebuild/docs/ARCHITECTURE.md
+index 879ae00f..1373ebb6 100644
+--- a/rebuild/docs/ARCHITECTURE.md
++++ b/rebuild/docs/ARCHITECTURE.md
+@@ -1,6 +1,6 @@
+ # MS Social Pilot architecture
+ 
+-Updated 2026-10-21 against local HEAD `960831df` (round 8); reviewed `git log 6d3347fb..HEAD` and the round 7–8 diffs.
++Updated 2026-10-21 against local HEAD `ffdb1cdf` (round 9); reviewed current source and the round 7–9 diffs.
+ [ARCHITECTURE_CONTRACT.md](ARCHITECTURE_CONTRACT.md) remains the binding target,
+ unchanged. This document describes implementation and gaps; deployment, source,
+ automated tests, browser checks and live-provider evidence are separate claims.
+@@ -20,7 +20,7 @@ not fresh probes by this documentation worker. That log records 34 applied
+ migrations, backup, health checks, ownership repair, owner sign-in confirmation,
+ legacy configuration import and later AI/browser checks. Cutover happened; full
+ contract completion is still unproven. The deployed release is recorded by the
+-integrator as `960831df` (schema 117), with migration
++integrator as `ffdb1cdf` (schema 118), with migration
+ `20261031180000_rebuild_ads_ad_creation` stated as applied in production; this
+ review did not observe either and no receipt is in the repository, so confirm the
+ applied migrations before claiming source live. The log also
+@@ -62,11 +62,12 @@ moves. Registration of a module does not prove its workflows or health.
+ ## Configuration and public origin
+ 
+ `src/lib/config/registry.ts` aggregates module/platform declarations and
+-`src/lib/config/shared-config.ts`. Local HEAD has schema version **117** (round 6 added `meta.adsCopy`, the Facebook
++`src/lib/config/shared-config.ts`. Local HEAD has schema version **118** (round 6 added `meta.adsCopy`, the Facebook
+ Ads action copy, owned by `src/platforms/facebook/ads-ui-config.ts`; round 7 added
+ `analytics.reports.publicationDetails` (116); round 8 added
+-`analytics.reports.topPostContent` (117); `meta.metricLabels` and
+-`meta.postHistoryPolicy` changed defaults only). Runtime
++`analytics.reports.topPostContent` (117); `meta.metricLabels` merges saved labels
++over defaults and `meta.postHistoryPolicy` now merges saved metric additions with explicit exclusions;
++round 9 adds `meta.pageAnalyticsCopy` and `analytics.reports.linkDetails`). Runtime
+ consumers use `runtimeConfig`; Root validates and transactionally audits saves,
+ encrypts secrets and groups controls under Shared, Product and Platform owners.
+ Database access and encryption trust material remain bootstrap dependencies.
+@@ -185,8 +186,11 @@ contains `{link}`. The original link-preview observation is historical.
+ `d68fc5c1` adds date/ID ordering, failed-slot retry with uncertain-slot reconciliation,
+ pause-and-cancel via Publishing, cached pool-health estimates and recipe worker
+ summaries. These follow-ups have fake/unit evidence, not live recovery proof.
+-Refused cancels can starve later batches; reconciliation can accept a hand-made
+-post at the same time or miss one returned to draft. `e43d16d2`/`6c2b7a6f` add
++Round 6 (`6d3347fb`) closes the earlier refusal-starvation and time-matching
++gaps at unit level: refused cancels rotate behind untouched work, and
++reconciliation uses the ledger's stored post id, including cancelled drafts.
++Missing/unreadable identity stays uncertain; claims without a stored id require
++manual reconciliation. This is not live recovery proof. `e43d16d2`/`6c2b7a6f` add
+ recipe origin badges/filters in Posts and Calendar, a Feeds sidebar link and a
+ bilingual status card (next times, published today, failed/uncertain, supply).
+ Labels/visibility bounds are Root settings; unit/render evidence does not prove
+@@ -369,11 +373,12 @@ provider run**; schema 117):
+   `server/platforms/host.ts` and `registry.ts`; no provider branch). The Ads UI,
+   session REST and MCP entry points do not yet pass the customer locale, so Ads
+   messages are English there; the cutover rehearsal script and tests do not yet list
+-  the migration; recovery does not recheck the unrestricted-channel rule (see
++  the migration; recovery had not yet gained round 9 locked authority/visibility rechecks and
++  still does not repeat the creation-only unrestricted-channel rule (see
+   `src/modules/ads/server/README.md`).
+ - Facebook configuration: shipped Page/post/reaction metric labels merge under saved
+   `meta.metricLabels`; default `meta.postHistoryPolicy` metrics gain clicks and video
+-  metrics. Explicitly saved lists still replace defaults.
++  metrics. That round's replacement behavior is superseded by round 9 additions/exclusions below.
+ - Analytics and Inbox: Top posts report content (saved destination text, media
+   references, optional image previews, article preview; Root
+   `analytics.reports.topPostContent`; `reports/TOP_POST_CONTENT.md`); focus rings,
+@@ -384,10 +389,54 @@ provider run**; schema 117):
+   `report-top-post-content*`, `inbox-analytics-ux-polish`. The applied-migration claim
+   is an owner record, not test evidence.
+ 
++Round 9 (`ffdb1cdf`; source and unit/mocked/query-shape evidence; schema 118;
++no fresh browser, PostgreSQL or live-provider verification by this lane):
++
++- Ads recovery checks current account/channel visibility and independent key
++  ceilings before disclosing state/confirmation, then repeats manager authority
++  and account visibility under the account/ledger locks before settlement/audit.
++  Creative recovery checks the exact target; retained disabled accounts do not
++  need active provider grants for local attestation. Tests cover narrowed scope,
++  revoked role, empty ceilings and invisible-account refusal. This closes the
++  stale-authority/disclosure gap. A limited manager whose scope reaches the
++  account connection is still permitted to recover ad/ad-set creations; the
++  unrestricted-channel rule for creating them is not repeated. Reconcile that
++  remaining policy distinction rather than claiming identical creation/recovery
++  scope (see ADS_PARITY.md).
++- Facebook Page presentation reads Root `meta.metricLabels` and new
++  `meta.pageAnalyticsCopy` for EN/FR metric/audience labels, provenance,
++  latest-per-channel/category text and overlap notes. Saved labels override
++  shipped defaults, which now also include Page likes and older impressions.
++  Ads/dynamic-label English literals remain; this is not full analytics copy
++  extraction or provider completeness.
++- Post-history metric lists now merge saved additions with shipped defaults and
++  apply explicit `excludedMetrics` last (including future names). Legacy absence
++  is not an exclusion. Read normalization is pure; a confirmed Root save persists
++  normalized policy with the existing audit. The same Page-policy schema exists,
++  but `facebook/module.ts` still registers `meta.pageInsightMetrics` as an array;
++  `runtime.ts`, `adset.ts` and `ads-ops/index.ts` still consume arrays. Integrating
++  that declaration and all `.metrics` projections is outstanding.
++- Destinations reports add per-link lifetime inventory, retained period clicks
++  and independent daily UTC retained counts through the existing confirmed
++  UI/REST/MCP generator (`runReportNow`). New Root
++  `analytics.reports.linkDetails` bounds link/day rows; the existing bilingual
++  report-document catalog discloses clipping and retention gaps. The cohort is
++  posts currently published to the selected channel within the report period,
++  not clicks on every older post. Unattributed legacy links qualify only with
++  exactly one published destination; ambiguous links are excluded. No visitor
++  metadata, destination URL or slug is projected. Zero means no retained click
++  records; lifetime counters are separate. See
++  `../src/modules/analytics/reports/LINK_REPORTS.md`.
++- Relevant tests: `ads-parity-management`, `facebook-page-labels`,
++  `facebook-metric-config`, `facebook-analytics-selection`,
++  `facebook-post-history`, `root-config-authority`, `report-link-details*`.
++  No new screen, route, MCP tool or migration for these report details.
++
+ Historical 328/328 synthetic checks and the production Chrome sweep remain dated
+ evidence. No browser round covers every later merge, and no declaration guard
+ replaces actual MCP/provider verification. [MCP_PARITY.md](MCP_PARITY.md) records
+ the structural guard and closed Root/draft inventory gaps alongside remaining
+ behavioral gaps. [LEGACY_CAPABILITY_PARITY.md](LEGACY_CAPABILITY_PARITY.md) retains
+ full scope; [DELIVERY_PLAN.md](DELIVERY_PLAN.md) orders follow-up. Full rebuild
+-completion and the exact current production revision remain unproven.
++completion remains unproven; the deployed `ffdb1cdf` statement has not been
++independently re-observed by this documentation lane.
+diff --git a/rebuild/docs/CONFIG_LITERAL_AUDIT.md b/rebuild/docs/CONFIG_LITERAL_AUDIT.md
+index 1b173f86..1f65a7de 100644
+--- a/rebuild/docs/CONFIG_LITERAL_AUDIT.md
++++ b/rebuild/docs/CONFIG_LITERAL_AUDIT.md
+@@ -1,12 +1,55 @@
+ # Configuration literal audit — current coverage and historical rounds
+ 
+-Status updated 2026-10-21 against local HEAD `6d3347fb` plus this provider-error
+-working-tree batch: **partial literal coverage; no rebuild or release completion
+-claim**. Current source registry version is **115**; this lane does not edit it.
+-Earlier key tables, counts and publication prose below are historical lane
+-records. Current source consumers and the explicit residuals take precedence.
+-
+-## Facebook provider-error mapping follow-up — 2026-10-21
++Status updated 2026-10-21 against local HEAD `ffdb1cdf`: **partial literal
++coverage; no rebuild or release completion claim**. Current source registry version
++is **118**. Deployment of this SHA is an owner/integrator statement, not observed
++by this lane. No new Root key or schema edit belongs to this documentation batch.
++Earlier key tables, counts, verification and publication prose are historical lane
++records. Current source consumers and explicit residuals below take precedence.
++
++## Round 8–9 current configuration status
++
++- Root `meta.adsCopy` now reaches installed Ads operations through the neutral
++  `configuredOperations(locale)` host factory and request-local locale scope.
++  The old missing-production-caller finding below is closed at host level;
++  Campaigns UI, session REST and MCP still omit the customer locale (English
++  default). Independent creation-form consent templates also need live-preview
++  alignment. Stable issue codes and safe EN/FR errors do not prove every provider
++  engine uses this mapping.
++- `meta.metricLabels` merges saved entries over shipped Page/post/reaction labels;
++  existing custom labels survive and missing shipped labels are inherited.
++  Round 9 adds `page_fans`, `page_impressions`, `page_impressions_unique`.
++  New Root `meta.pageAnalyticsCopy` in `src/platforms/facebook/config.ts` owns
++  EN/FR Page source, latest-per-channel, categories and overlap labels;
++  `analytics.ts` reads both catalogs with runtimeConfigBatch and the request's
++  analytics locale for Page metrics/audience. Ads metric labels/notes and unknown
++  dynamic-label fallbacks there still contain English source literals.
++- `meta.postHistoryPolicy` now normalizes saved metrics as additions to shipped
++  defaults, then removes explicit `excludedMetrics` (exclusions win, including
++  future metric names). Legacy absence is not inferred as a deliberate removal.
++  Reads normalize purely; only a confirmed Root save persists the normalized
++  policy with the existing transactional audit. No worker/read silently writes it.
++  Video metrics still require positively identified video posts.
++- **Page metric merge is not integrated:** `facebookPageMetricPolicySchema` and
++  `FACEBOOK_PAGE_METRIC_DEFAULTS` implement the same additive/exclusion semantics
++  for legacy arrays or policy objects, but `facebook/module.ts` still registers
++  `meta.pageInsightMetrics` as `stringList`; `runtime.ts`, `adset.ts` and
++  `ads-ops/index.ts` still pass arrays into FacebookConfig. Wire the owning
++  registration and project normalized `.metrics` in all constructors together.
++  Schema tests alone do not prove this setting merges at runtime.
++- Existing report settings `analytics.reports.publicationDetails` (116),
++  `analytics.reports.topPostContent` (117), and new
++  `analytics.reports.linkDetails` (118) bound stored-data detail views. The latter
++  lives in `src/modules/analytics/reports/config.ts`, reads independent `links`
++  and `days` limits via runtimeConfig, and expands the existing bilingual
++  `analytics.reportDocumentCopy`. No new route/tool is needed. See
++  `src/modules/analytics/reports/LINK_REPORTS.md` for retention/cohort exclusions.
++- Source/test evidence: `facebook-page-labels`, `facebook-metric-config`,
++  `facebook-analytics-selection`, `facebook-post-history`, `root-config-authority`,
++  `report-link-details*`. These are unit/mocked/query-shape checks; no fresh
++  PostgreSQL, browser, provider or production evidence is implied.
++
++## Facebook provider-error mapping follow-up — 2026-10-21 (historical lane record)
+ 
+ Owned changes: `src/platforms/facebook/ads-copy.ts`, `ads.ts`,
+ `ads-ops/{index,transport,creative}.ts`, `tests/facebook-ads-copy.test.ts`, and
+@@ -39,16 +82,11 @@ missing, invalid or older incomplete stored catalogs fall back to the complete
+ registry default. That fallback replaces the whole catalog, so older partial
+ customizations need reconciliation when Root next saves the expanded catalog.
+ 
+-**Wiring limitation, found by source search:** `configuredFacebookAdsOps(locale)`
+-has no production caller at this HEAD. `facebook/host.ts` installs static
+-`facebookAdsOps`; the shared Ads service consumes that host. The configurable
+-factory is tested, but this is not evidence that installed customer requests
+-apply Root edits or French locale to every provider validation. Integrator must
+-add a neutral locale-aware operations resolver to the host/service contract and
+-install the configured factory in `facebook/host.ts`; shared code must not import
+-Facebook or branch on provider. The synchronous pure validators keep catalog
+-bootstrap defaults unless supplied request-resolved text. Do not mark full copy
+-consumption complete from the existing active setting metadata.
++**Historical wiring finding (superseded at host level in round 8):** the
++configured factory is now installed and resolved by the neutral Ads host. Customer
++locale entry points and creation-form confirmation alignment remain open as
++listed above. Pure synchronous validators still use catalog defaults unless
++supplied request-resolved text.
+ 
+ Residual provider mappings (not protocol exceptions):
+ 
+@@ -67,7 +105,7 @@ Residual provider mappings (not protocol exceptions):
+ - `ads.ts` remaining availability, reconnect and configured-UI failures still
+   use English literals; its legacy campaign/ad-set pure validation now uses
+   the catalog and stable issues. Their locale/configuration wiring is also
+-  subject to the host limitation above.
++  subject to the entry-point locale limitation above.
+ - Existing Ads name/content/title/URL parser bounds (100/5000/200/2048), choices
+   and other operational literals remain an extraction gap; this batch changes
+   error mapping only and does not reclassify them as protocol invariants.
+@@ -369,7 +407,7 @@ Source: `src/lib/connection-health.ts`. Each of the following fields exists in b
+ 
+ 1. Root copy extraction now covers Operations, Backups, shared Diagnostics, worker health, platform publication evidence and Activity controls. It is **not** full Root copy coverage: `app/root/{page,users,workspaces,plans,privileges,errors,sessions,connections,lifecycle,registration,activity}/**`, `server/root/legacy/copy.ts`, `legacy/shared.ts` feature/group labels, Root navigation/filter components, other recovery controls and many service/wire descriptions still have source catalogs or inline copy. Activity page/filter copy beyond the extracted controls is still source text. These are operational-copy backlog, not constants.
+ 2. `lib/reschedule.ts` quick moves, bilingual labels, presentation locale/clock and generic failure now use `shared.reschedulePolicy` through the existing runtime-refreshed snapshot (see follow-up). Normal Publishing server callers already serialize moveOptions. Browser fallback calls without server options retain bootstrap defaults unless passed an explicit policy; other calendar grid labels/copy remain Publishing-owned. `lib/calendar-dates.ts` Gregorian representation and the excluded `lib/themes.ts` are unchanged. Do not claim all calendar copy is configurable.
+-3. Media still has generated `Uploaded image {id.slice(0,8)}`, fallback image/video names, and the minimum reference-fragment length8 in `assetReferences`; module-level runtime copy/reference policy and locale plumbing remain. Feeds still has source `DEFAULT_MESSAGE_TEMPLATE`, HTML text normalization choices and safe/customer failure catalogs. AI still has source prompts, tone names and default summary language English; moving provider input syntax limits does not complete configurable prompts or EN/FR customer-copy coverage. Home UI/copy was outside this non-UI module lane.
++3. Media still has generated `Uploaded image {id.slice(0,8)}`, fallback image/video names, and the minimum reference-fragment length8 in `assetReferences`; module-level runtime copy/reference policy and locale plumbing remain. Feeds still has source `DEFAULT_MESSAGE_TEMPLATE` and HTML text normalization choices; its service/public failure catalogs now have localized readers. AI still has source prompts, tone names and default summary language English; moving provider input syntax limits does not complete configurable prompts or EN/FR customer-copy coverage. Home now declares `home.uiCopy`; `home.authCopy` retains pending route-integration metadata.
+ 4. The Root-gap follow-up replaces non-evidence recovery 200/300-character ceilings with existing Root identifier/confirmation settings and serializes limits to the corresponding dialogs. Other direct wire/service limits and internal messages were not exhaustively converted.
+ 5. New synchronous policies are refreshed by the existing Node startup lifecycle. Standalone scripts/worker processes do not start that Next lifecycle automatically; if they begin using these synchronous helper policies, invoke/maintain `refreshSynchronousPolicy` explicitly. Snapshot refresh is bounded by the existing origin reload interval; direct async service policy may observe a save slightly before another process’s synchronous snapshot. No cross-process immediate-apply claim is made.
+ 
+diff --git a/rebuild/docs/FEEDS.md b/rebuild/docs/FEEDS.md
+index 10e4233d..d0be0f01 100644
+--- a/rebuild/docs/FEEDS.md
++++ b/rebuild/docs/FEEDS.md
+@@ -1,8 +1,8 @@
+ # Content feeds (legacy parity wave 3)
+ 
+-Status: **source/mock evidence plus recorded production recipe planning**.
+-Updated 2026-10-21 against local HEAD `6d3347fb` (deployed per the integrator;
+-schema 115; round 6 recovery changes below). The rebuild is in production;
++Status: **source/mock recovery evidence plus owner-recorded production planning, publication and first comments for one full day**.
++Updated 2026-10-21 against local HEAD `ffdb1cdf` (deployed per the owner/integrator;
++schema 118; not re-observed by this lane). The rebuild is in production;
+ [RELEASE_GATES_PLAN.md](RELEASE_GATES_PLAN.md#production-log--2026-10-21) records
+ the recipe run below. Original RSS/Atom mocked tests do not establish live checks
+ of every feed kind. No fresh database, browser or provider calls in this doc pass.
+@@ -60,7 +60,7 @@ Content feeds are a feature of the Publishing product module (feature id `publis
+ 
+ ## Root keys (registry version 84)
+ 
+-Existing WIP keys plus `feeds.autoCheck.schedule`, `feeds.autoCheck.maxItemsPerFeed`, `feeds.autoCheck.disableAfterFailures`, `feeds.maxSpreadMinutes`, `feeds.queueLookaheadDays`, `feeds.fallbackDelayMinutes`, `feeds.fallbackSpacingMinutes`. All bounded, all consumed. Owned by Publishing in Root. Fetch, size, redirect, host, per-workspace count, name/message/target limits and transaction bounds are Root keys; no operational literal lives in code.
++Existing WIP keys plus `feeds.autoCheck.schedule`, `feeds.autoCheck.maxItemsPerFeed`, `feeds.autoCheck.disableAfterFailures`, `feeds.maxSpreadMinutes`, `feeds.queueLookaheadDays`, `feeds.fallbackDelayMinutes`, `feeds.fallbackSpacingMinutes`. All bounded, all consumed. Owned by Publishing in Root. Fetch, size, redirect, host, per-workspace count, name/message/target limits and transaction bounds are Root keys; residual defaults/literals are tracked in CONFIG_LITERAL_AUDIT.md.
+ 
+ ## API and MCP
+ 
+@@ -78,7 +78,7 @@ HTTP routes are same-origin for writes and call the same services. MCP group `co
+ 
+ ## WordPress recipe planner (2026-10-21)
+ 
+-Status: **implemented with mocked tests and owner-recorded production planning**.
++Status: **implemented with mocked recovery tests and owner-recorded production delivery for one full day**.
+ Unit seams use mocked `mysql2`, an in-memory ledger and fake Publishing/image
+ ports, with real `sharp` conversion. Separately, the 2026-10-21 production log
+ records read-only MariaDB permission checks, image download/JPEG conversion and
+@@ -102,7 +102,8 @@ Purpose: keep every selected Page continuously scheduled with recipes from the o
+ | `server/wordpress.ts` | customer service: read, save, pause/resume, preview, run now |
+ | `copy-recipes.ts`, `ui/RecipeSource.tsx` | en+fr copy and the screen section on `/publishing/feeds` |
+ 
+-Migration `20261031140000_rebuild_wordpress_sources` (additive, SHA-256 `cce64edcfbcf19553f7eafe661f86fb067d8d0152e08712d05dc1745121c4642`, pinned in `scripts/cutover-rehearsal.sh` and its test, **pinned source; the production recipe run is recorded separately, without an exact migration receipt in this feature report**): `wordpress_recipe_sources` (one per workspace; name, site, enabled, all-or-selected channels, JSON config overrides, last run) and `wordpress_recipe_plans` (the ledger). Both carry `workspaceId` FKs with cascade and the purge write gate, so catalog-driven export and erasure cover them.
++Migration `20261031140000_rebuild_wordpress_sources` (additive, SHA-256 `cce64edcfbcf19553f7eafe661f86fb067d8d0152e08712d05dc1745121c4642`, pinned in `scripts/cutover-rehearsal.sh` and its test, **pinned source; the production recipe run is recorded separately, without an exact migration receipt in this feature report**): `wordpress_recipe_sources` (one per workspace; name, site, enabled, all-or-selected channels, JSON config overrides, last run) and `wordpress_recipe_plans` (the ledger). Both carry `workspaceId` FKs with cascade and the purge write gate, the ownership catalog declares export/erasure coverage. Exact PostgreSQL export,
++erasure and purge-race evidence remains separate from these declarations.
+ 
+ ### Data mapping (verified production facts)
+ 
+@@ -110,7 +111,9 @@ Migration `20261031140000_rebuild_wordpress_sources` (additive, SHA-256 `cce64ed
+ - Caption: meta `_msrwa_facebook_caption`. Image: meta `_msrwa_facebook_generated` is an attachment ID; the attachment's `_wp_attached_file` gives the path, public address `{siteUrl}{uploadsPath}/{path}`. Recipe: meta `_msrwa_recipe` (JSON). Already shared: meta `fb_shared_at` (skipped when "skip shared" is on). A recipe needs all three of caption, image file and a recipe with at least one ingredient or step, otherwise it is not a candidate.
+ - Link: `feeds.wordpress.permalinkTemplate` (`{siteUrl}/{slug}/`), e.g. ID 60938 becomes `https://recettes.newsgeet.com/potee-auvergnate-a-lancienne-fondante-et-doree/`.
+ - Ingredients and steps may be strings or objects (`name/text/item`, `quantity/qty/amount`, `unit`, `note`, nested groups with `items`); group titles become heading lines.
+-- First comment: template with `{title} {description} {ingredients} {steps} {servings} {prep} {cook} {total} {link}` (French default). Ingredients get bullets, steps are numbered. Over the limit (the smaller of `feeds.wordpress.firstCommentMaxCharacters` and `publishing.maxMessageCharacters`) steps are cut first, then ingredients, with a mark, and the link is always kept.
++- First comment: template with `{title} {description} {ingredients} {steps} {servings} {prep} {cook} {total} {link}` (French default). Ingredients get bullets, steps are numbered. Over the limit (the smaller of `feeds.wordpress.firstCommentMaxCharacters` and `publishing.maxMessageCharacters`) steps are cut first, then ingredients, with a mark, and a link is preserved only when the configured template contains `{link}`. The
++  owner removed the article link from production recipe comments; do not restore
++  it from the historical default/template description.
+ - Image: downloaded with the address-pinned public fetch (feeds redirect/allow-http/host-allowlist settings apply, so the WordPress host must pass `feeds.hostAllowlist` when that list is not empty), checked by `inspectMediaSnapshot`, converted to JPEG (quality from Root, lowered stepwise until under `publishing.maxImageUploadBytes`), and stored as a workspace image referenced as `media:<id>`.
+ 
+ ### Planning
+@@ -130,18 +133,25 @@ Ledger states: `planned` (post id stored), `claimed` (unfinished; older than `cl
+ 
+ ### Limitations and open work
+ 
+-- The production log supersedes the original no-runtime claim for the recorded MariaDB/image/storage/planning path. Dependency lockfile integration is in `b940fad9`. Exact target migration history, export/erasure, crash recovery, real MCP/client scope, browser and Facebook publication/comment/cleanup outcomes still need their own evidence; the 80-post plan does not prove these.
++- The production log supersedes the original no-runtime claim for the recorded MariaDB/image/storage/planning path. Dependency lockfile integration is in `b940fad9`. Exact target migration history, export/erasure, crash recovery, real MCP/client scope, current browser and Facebook recovery/cleanup outcomes still need their own evidence.
++  The 40/40 publication/comment day below closes the original no-delivery-evidence
++  claim only for that recorded run; an 80-post plan alone does not prove delivery.
+ - Chronological order now follows `post_date_gmt` (see Follow-ups below).
+ - The pool of eligible recipes is finite (about 2,900 with caption and image). At 40 posts a day with a 365-day cooldown it is exhausted in about 70 days; the planner then reports unfilled slots instead of repeating.
+ - A crash between creating the post and saving its ID leaves an `uncertain` row (slot consumed, no duplicate); the post itself is found in Publishing.
+ - Planned posts are not removed when a source is paused unless the member asks to cancel them (Follow-ups below) or when a channel is deselected (they are ordinary scheduled posts).
+ - The preview shows the original WordPress image address in an `<img>`; a strict `img-src` policy must allow the site, or a proxy would be needed.
+-- Shortening marks, minutes suffix and the French default template are Root settings; the customer-facing error text of the service is English like the rest of the feeds service.
++- Shortening marks, minutes suffix and the French default template are Root settings; `feeds.copy` and `feeds.recipeCopy` now supply EN/FR customer copy, including
++  localized service errors through `server/messages.ts`. Residual parser defaults
++  and literals remain in CONFIG_LITERAL_AUDIT; this is not full extraction proof.
++
+ ### Follow-ups (2026-10-21: order, retry, pause-cancel, pool health, log line)
+ 
+ - **Order.** Candidates are read by `post_date_gmt` (newest or oldest first per the source `order`), ties by `ID`, with keyset paging over (date, ID). Undated (zero-date) rows sort last newest-first and first oldest-first. Source/unit evidence only; no query was run against the production MariaDB, where the `(post_date_gmt, ID)` sort has not been timed.
+-- **Retry failed times** (`POST /api/feeds/wordpress/retry`, MCP `retry_recipe_slots`, confirmation `RETRY RECIPE SLOTS`; "Plan failed times again" in the UI when failed or uncertain times exist). Acts only on upcoming times of an active source. A `failed` time never produced a post and is planned again with another recipe, ignoring the `maxSlotAttempts` cap. An `uncertain` time is reconciled first: if its claim is younger than `claimLeaseSeconds`, or Publishing cannot be asked, it stays uncertain; if Publishing holds a post for that channel and time (any status, by scheduled time) the ledger records it as `planned` (reason `reconciled`) and nothing is created; only when none exists is it moved (conditionally, `uncertain` to `failed`, reason `not_created`) and planned again. Only the released and failed times are re-planned; the rest of the horizon is left alone. Residual risk: a post cancelled back to a draft has no scheduled time and is not found, and a hand-made post for the same channel and time is accepted as the slot's post.
+-- **Pause and cancel** (`POST /api/feeds/wordpress/state` and MCP `set_recipe_source_state` with `cancelScheduled: true`, confirmation `PAUSE RECIPE SOURCE AND CANCEL SCHEDULED POSTS`). Allowed only while Root `feeds.wordpress.pauseCancelEnabled` is on. The pause is saved first; then the source's `planned` ledger posts scheduled in the future are cancelled one by one through Publishing's `cancelScheduledPost` as the signed-in member (so Publishing's rights, channel scope and platform-held-copy removal apply; the post returns to a draft). A slot is released (`failed`, reason `cancelled`) only after its post was cancelled; a refused cancel leaves slot and post untouched and is counted in `notCancelled`. At most `pauseCancelBatchSize` per request; `remaining: true` means repeat. A failure inside the cancel step never undoes the pause (`incomplete: true`). Resuming plans the freed times again.
++- **Retry failed times** (`POST /api/feeds/wordpress/retry`, MCP `retry_recipe_slots`, confirmation `RETRY RECIPE SLOTS`). Acts only on upcoming times of an active source. Definitively failed times can be planned with another recipe, ignoring `maxSlotAttempts`. Uncertain claims inside the lease stay held; older claims reconcile only by the ledger's stored post identity (round 6 below), never by matching channel/time. Missing/unreadable identity stays uncertain and is not blindly resent. Only released/failed times are replanned; the rest of the horizon is unchanged.
++- **Pause and cancel** (`POST /api/feeds/wordpress/state` and MCP `set_recipe_source_state` with `cancelScheduled: true`, confirmation `PAUSE RECIPE SOURCE AND CANCEL SCHEDULED POSTS`). Allowed only while Root `feeds.wordpress.pauseCancelEnabled` is on. The pause is saved first; then the source's `planned` ledger posts scheduled in the future are cancelled one by one through Publishing's `cancelScheduledPost` as the signed-in member (so Publishing's rights, channel scope and platform-held-copy removal apply; the post returns to a draft). A slot is released (`failed`, reason `cancelled`) only after its post was cancelled; a refused cancel leaves slot and post untouched and is counted in `notCancelled`. At most `pauseCancelBatchSize` per request; `remaining: true` means repeat.
++  Refused rows rotate behind untouched work by least-recent-attempt order (round 6);
++  a fully refused batch still reports remaining work. A failure inside the cancel step never undoes the pause (`incomplete: true`). Resuming plans the freed times again.
+ - **Pool health** in `get_recipe_source`, `GET /api/feeds/wordpress` and the UI ("Recipe supply"): per channel, eligible recipes (not planned or recently posted there, and not planned elsewhere when channels must differ) and `daysLeft = floor(eligible / (posts per day x channels sharing the pool))`; `null` when the cooldown is 0 (recipes may repeat). Flagged low under `feeds.wordpress.poolWarnDays`. `complete: false` means the scan limit was reached and the counts are lower bounds. The estimate does not count recipes that return after the cooldown. It needs a full library scan, so the result is cached per source for `poolCacheSeconds` (per process) and is `null` when the library cannot be read.
+ - **Worker log.** The `feedsPoll` line now ends with `recipes: sources=.. planned=.. failed=.. uncertain=.. unfilled=..` plus `reason=` and `stops=` (budget, no_pages, error, ...) or `recipes=off`.
+ - New Root keys: `feeds.wordpress.poolWarnDays`, `poolCacheSeconds`, `pauseCancelEnabled`, `pauseCancelBatchSize`. Evidence: unit and service tests with fakes (`feeds-wordpress-planner`, `-recovery-service`, `-db-image`, `feeds-mcp`); no PostgreSQL, browser, MariaDB, Facebook or production run.

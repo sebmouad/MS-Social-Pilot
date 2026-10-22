@@ -1,0 +1,145 @@
+diff --git a/rebuild/src/modules/publishing/action-catalog.ts b/rebuild/src/modules/publishing/action-catalog.ts
+index 78b062d6..e8f35779 100644
+--- a/rebuild/src/modules/publishing/action-catalog.ts
++++ b/rebuild/src/modules/publishing/action-catalog.ts
+@@ -787,6 +787,10 @@ export const publishingActionCopy = {
+     "en": "You have reached the saved view limit for this screen. Remove one first.",
+     "fr": "Vous avez atteint la limite de vues enregistrées pour cet écran. Supprimez-en une d’abord."
+   },
++  "saved_sessionEnded": {
++    "en": "Your session has ended. Sign in again, then save the view.",
++    "fr": "Votre session est terminée. Reconnectez-vous, puis enregistrez la vue."
++  },
+   "saved_invalid": {
+     "en": "These filters cannot be saved. Reset the filters and try again.",
+     "fr": "Ces filtres ne peuvent pas être enregistrés. Réinitialisez les filtres et réessayez."
+@@ -990,5 +994,5 @@ export function actionBulkCopy(t: PublishingActionText) {
+   return { select: (label: string) => t('bulk_select', { label }), selectAll: t('bulk_selectAll'), actions, titles, descriptions, date: t('bulk_date'), time: t('bulk_time'), cancel: t('bulk_cancel'), confirm: t('bulk_confirm'), working: t('bulk_working'), clear: t('bulk_clear'), unconfirmed: t('bulk_unconfirmed'), retryOne: t('bulk_retryOne'), whenRequired: t('bulk_whenRequired'), tryAgain: t('bulk_tryAgain'), selected: (count: number) => t(count === 0 ? 'bulk_selectedZero' : count === 1 ? 'bulk_selectedOne' : 'bulk_selectedMany', { count }), summary: (result: { done: number; needsReview: number; skipped: number; failed: number }) => t('bulk_summary', result), retryOneHelp: (count: number) => t(count === 0 ? 'bulk_retryOneHelpZero' : count === 1 ? 'bulk_retryOneHelpOne' : 'bulk_retryOneHelpMany', { count }) };
+ }
+ export function actionSavedViewCopy(t: PublishingActionText) {
+-  return { heading: t('saved_heading'), empty: t('saved_empty'), nameLabel: t('saved_nameLabel'), save: t('saved_save'), saving: t('saved_saving'), saved: t('saved_saved'), remove: t('saved_remove'), removed: t('saved_removed'), loadFailed: t('saved_loadFailed'), saveFailed: t('saved_saveFailed'), removeFailed: t('saved_removeFailed'), nameRequired: t('saved_nameRequired'), limit: t('saved_limit'), invalid: t('saved_invalid'), removeLabel: (name: string) => t('saved_removeLabel', { name }) };
++  return { heading: t('saved_heading'), empty: t('saved_empty'), nameLabel: t('saved_nameLabel'), save: t('saved_save'), saving: t('saved_saving'), saved: t('saved_saved'), remove: t('saved_remove'), removed: t('saved_removed'), loadFailed: t('saved_loadFailed'), saveFailed: t('saved_saveFailed'), sessionEnded: t('saved_sessionEnded'), removeFailed: t('saved_removeFailed'), nameRequired: t('saved_nameRequired'), limit: t('saved_limit'), invalid: t('saved_invalid'), removeLabel: (name: string) => t('saved_removeLabel', { name }) };
+ }
+diff --git a/rebuild/src/modules/publishing/ui/SavedViews.tsx b/rebuild/src/modules/publishing/ui/SavedViews.tsx
+index 78a90920..d8a8d146 100644
+--- a/rebuild/src/modules/publishing/ui/SavedViews.tsx
++++ b/rebuild/src/modules/publishing/ui/SavedViews.tsx
+@@ -36,7 +36,7 @@ export function SavedViews({ screen }: { screen: SavedViewScreen }) {
+     try {
+       const response = await fetch('/api/publishing/saved-views', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ screen, name: name.trim(), query: current }) });
+       const body = await response.json().catch(() => ({}));
+-      if (!response.ok) { setMessage({ text: body.code === 'conflict' ? copy.limit : copy.saveFailed, error: true }); return; }
++      if (!response.ok) { setMessage({ text: response.status === 401 || body.code === 'unauthorized' ? copy.sessionEnded : body.code === 'conflict' ? copy.limit : copy.saveFailed, error: true }); return; }
+       setViews(list => [...(list ?? []), body.view].sort((a, b) => a.name.localeCompare(b.name)));
+       setName(''); setMessage({ text: copy.saved, error: false });
+     } catch { setMessage({ text: copy.saveFailed, error: true }); }
+diff --git a/rebuild/src/modules/publishing/ui/calendar/calendar.module.css b/rebuild/src/modules/publishing/ui/calendar/calendar.module.css
+index 831660dd..b36888a4 100644
+--- a/rebuild/src/modules/publishing/ui/calendar/calendar.module.css
++++ b/rebuild/src/modules/publishing/ui/calendar/calendar.module.css
+@@ -85,7 +85,8 @@
+ .post:not([data-status="failed"]):not([data-status="partially_failed"]):not([data-status="rejected"]) { border-left-color: var(--chip, var(--mod, var(--accent))); background: color-mix(in srgb, var(--chip, var(--mod, var(--accent))) 9%, var(--surface)); }
+ .post { box-shadow: 0 1px 2px color-mix(in srgb, var(--ink) 8%, transparent); transition: box-shadow var(--ease), transform var(--ease); }
+ .post:hover { box-shadow: 0 3px 10px color-mix(in srgb, var(--ink) 14%, transparent); }
+-.post[data-status="published"] { opacity: .88; }
++/* Published posts are marked by a dashed edge and a quieter fill, never by opacity, so text keeps full contrast. */
++.post[data-status="published"] { border-left-style: dashed; background: color-mix(in srgb, var(--chip, var(--mod, var(--accent))) 4%, var(--surface)); }
+ .day[data-today] { background: var(--mod-soft, var(--accent-soft)); box-shadow: inset 0 3px 0 var(--mod, var(--accent)); }
+ .day[data-today] .dayHead time { display: inline-grid; place-items: center; min-width: 24px; height: 24px; border-radius: 50%; background: color-mix(in srgb, var(--mod, var(--accent)) 45%, black); color: #fff; }
+ .weekHead[data-today] { background: var(--mod-soft, var(--accent-soft)); box-shadow: inset 0 3px 0 var(--mod, var(--accent)); }
+diff --git a/rebuild/src/modules/publishing/ui/collaboration/post/postId/PostDetailScreen.tsx b/rebuild/src/modules/publishing/ui/collaboration/post/postId/PostDetailScreen.tsx
+index e6445671..e7237d0b 100644
+--- a/rebuild/src/modules/publishing/ui/collaboration/post/postId/PostDetailScreen.tsx
++++ b/rebuild/src/modules/publishing/ui/collaboration/post/postId/PostDetailScreen.tsx
+@@ -9,6 +9,7 @@ import { loadComposerCopy } from '../../../../server/composer-copy';
+ import { ensurePublishingCollaboration } from '@/modules/publishing/server/collaboration';
+ import { SidebarDock } from '@/components/SidebarDock';
+ import { parsePostCollaborationSearch } from '@/modules/publishing/collaboration/search';
++import { notFound } from 'next/navigation';
+ import { OperationError } from '@/lib/operation-error';
+ import { RouteNotice } from '@/components/RouteNotice';
+ import { requireViewer } from '@/server/context';
+@@ -59,6 +60,7 @@ async function PostCollaborationPageContent({ params, searchParams }: { params:
+         recycle={recycle ? { enabled: recycle.enabled, everyDays: recycle.everyDays, limit: recycle.limit, count: recycle.count, nextAt: recycle.nextAt?.toISOString() ?? null, variants: recycle.variants, isRepeat: recycle.isRepeat, maxIntervalDays: recycle.limits.maxIntervalDays, maxRepeats: recycle.limits.maxRepeats, defaultIntervalDays: recycle.limits.defaultIntervalDays, maxVariants: recycle.limits.maxVariants } : null} />
+     </>;
+   } catch (error) {
++    if (error instanceof OperationError && error.code === 'not_found') notFound();
+     return <><PageHeading title={copy.postTitle} description={copy.postHelp} /><RouteNotice error focusKey="collab-post-error">{error instanceof OperationError ? error.message : copy.postFailure}</RouteNotice></>;
+   }
+ }
+diff --git a/rebuild/tests/publishing-browser-findings.test.ts b/rebuild/tests/publishing-browser-findings.test.ts
+new file mode 100644
+index 00000000..16b25117
+--- /dev/null
++++ b/rebuild/tests/publishing-browser-findings.test.ts
+@@ -0,0 +1,70 @@
++// @vitest-environment jsdom
++import { readFileSync } from 'node:fs';
++import { act, createElement } from 'react';
++import { createRoot } from 'react-dom/client';
++import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
++
++vi.mock('next/navigation', () => ({ useSearchParams: () => new URLSearchParams('status=scheduled'), notFound: () => { throw new Error('NEXT_NOT_FOUND'); } }));
++
++import { SavedViews } from '@/modules/publishing/ui/SavedViews';
++import { PublishingActionCopyProvider } from '@/modules/publishing/ui/WorkflowSubmitButtons';
++import { publishingActionCopy } from '@/modules/publishing/action-catalog';
++
++let root: ReturnType<typeof createRoot>;
++let container: HTMLDivElement;
++beforeEach(() => {
++  (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
++  container = document.createElement('div'); document.body.append(container); root = createRoot(container);
++});
++afterEach(async () => { await act(async () => root.unmount()); container.remove(); vi.unstubAllGlobals(); });
++const flush = () => act(async () => { await new Promise(resolve => setTimeout(resolve, 0)); });
++
++async function saveWith(post: { status: number; body: unknown }, locale: 'en' | 'fr') {
++  vi.stubGlobal('fetch', vi.fn(async (_url: string, init?: RequestInit) => init?.method === 'POST'
++    ? { ok: false, status: post.status, json: async () => post.body }
++    : { ok: true, status: 200, json: async () => ({ views: [] }) }));
++  await act(async () => { root.render(createElement(PublishingActionCopyProvider, { catalog: publishingActionCopy, locale, children: createElement(SavedViews, { screen: 'posts' }) } as never)); });
++  await flush();
++  const input = container.querySelector<HTMLInputElement>('input')!;
++  await act(async () => {
++    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, 'Mine');
++    input.dispatchEvent(new Event('input', { bubbles: true }));
++  });
++  await act(async () => { container.querySelector('form')!.requestSubmit(); });
++  await flush();
++  return container.querySelector('[role="alert"]')?.textContent ?? '';
++}
++
++describe('saved view save after the session ends', () => {
++  it('says the session ended (English) instead of blaming the name', async () => {
++    const text = await saveWith({ status: 401, body: { code: 'unauthorized' } }, 'en');
++    expect(text).toBe(publishingActionCopy.saved_sessionEnded.en);
++    expect(text).not.toContain('Check its name');
++  });
++  it('says the session ended (French)', async () => {
++    expect(await saveWith({ status: 401, body: {} }, 'fr')).toBe(publishingActionCopy.saved_sessionEnded.fr);
++  });
++  it('keeps the generic failure for other errors and the limit message for conflicts', async () => {
++    expect(await saveWith({ status: 400, body: { code: 'invalid_request' } }, 'en')).toBe(publishingActionCopy.saved_saveFailed.en);
++    await act(async () => root.unmount()); root = createRoot(container);
++    expect(await saveWith({ status: 409, body: { code: 'conflict' } }, 'en')).toBe(publishingActionCopy.saved_limit.en);
++  });
++});
++
++describe('calendar published-post cue', () => {
++  const css = readFileSync('src/modules/publishing/ui/calendar/calendar.module.css', 'utf8');
++  it('never dims interactive post content with opacity', () => {
++    expect(css).not.toMatch(/\.post[^{]*\{[^}]*opacity\s*:/);
++  });
++  it('marks published posts with a non-opacity cue', () => {
++    expect(css).toMatch(/\.post\[data-status="published"\]\s*\{[^}]*border-left-style:\s*dashed/);
++  });
++});
++
++describe('unknown post ids', () => {
++  it('collaboration post page turns a missing post into a real 404', () => {
++    const source = readFileSync('src/modules/publishing/ui/collaboration/post/postId/PostDetailScreen.tsx', 'utf8');
++    expect(source).toContain("from 'next/navigation'");
++    expect(source).toMatch(/error\.code === 'not_found'\) notFound\(\)/);
++  });
++});

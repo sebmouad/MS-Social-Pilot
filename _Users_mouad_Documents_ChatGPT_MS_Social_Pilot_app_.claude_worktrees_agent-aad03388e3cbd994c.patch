@@ -1,0 +1,1498 @@
+diff --git a/rebuild/docs/ANALYTICS.md b/rebuild/docs/ANALYTICS.md
+index 5cc17044..b9b26a08 100644
+--- a/rebuild/docs/ANALYTICS.md
++++ b/rebuild/docs/ANALYTICS.md
+@@ -1,7 +1,54 @@
+-# Analytics ingestion and coverage
++# Analytics
+ 
+-The single `/analytics` view sums the latest stored audience value once per selected channel and displays every stored Page metric and account-level advertising metric in the chosen range. Audience is a cross-channel sum, not deduplicated people. Publishing counts now use the same selected channels and range. Published items use `publishedAt`, scheduled items use `scheduledAt`, and failed items use `createdAt`.
++`/analytics` shows stored channel and advertising results for the channels, ad accounts and dates chosen in the sidebar. `/reports` redirects to it with the same selection, and the CSV export (`/api/reports/export`) is built from the same loader (`src/server/analytics/view.ts`), so the file always matches the screen.
+ 
+-Facebook Page ingestion reads the Root-managed `meta.pageInsightMetrics` list. The default requests follows, media views, post engagements, and Page views; Root can change the list without editing code. Every dated value returned by Graph is stored under its own metric, provider period, and `end_time`. Numeric values and JSON breakdowns are retained. Repeating a sync updates the same observation rather than creating a new point under the sync date. Disabled Facebook engines do not run Page, Ads, or Inbox sync jobs.
++## What the page shows
+ 
+-Provider support still requires live validation against this installation's approved scopes and API version. Page Insights requests are isolated per configured metric: a rejected metric no longer discards observations from successful metrics. A partial sync increments the job failure count, but a Root view naming the rejected metrics remains to be built. Root can remove unsupported entries from the metric list. Page sync follows Graph Insights pagination up to Root's configured page limit and rejects a response that exceeds that limit or points outside the configured Graph endpoint. Advertising sync is account-level; campaign, ad-set, and ad-level analytics remain incomplete. Other platform adapters and channel types do not yet contribute insights.
++- **Selected channel audience**: the latest stored follower count of each selected channel, added once per channel. People who follow several channels can be counted more than once; the page says so.
++- **Key numbers**: one card per measure with its plain name, value, change against the previous equal-length period (arrow, signed percentage and words, so colour is never the only signal), a small trend line and a one-line definition. Cards are toggles: up to three can be shown in the main chart. Measures the catalogue marks as headline measures come first; the rest sit behind "Show other measures".
++- **Trend**: a time-series chart of the chosen cards by day, an optional dashed previous-period line when one card is shown, and a table view of the same numbers. Cards with different units are drawn on separate scales (stated under the chart; values are in the tooltip and table). Running totals such as followers do not start the axis at zero.
++- **Compare channels / ad accounts**: one line, bar or table row per channel for any measure, with legend buttons to show or hide each one. Distinct-people measures keep each channel's own value.
++- **Top posts**: published posts for the selected channels and dates, sortable, with a link to the post. Interactions add up the comments (and likes where stored) held for each post. Per-post reach and views are not stored yet.
++- **Breakdowns** (for example followers by country), **No longer available** (retired measures that still have stored history, with the replacement named) and **Technical details** (stored names, period, source, latest day and last sync; the only place stored API names appear).
++- **Publishing records**: counts of published, scheduled and failed posts for the same selection.
++- **Ads**: ad-account selection stays in the sidebar; advertising measures appear beside channel measures, with money split by currency.
++
++Charts are plain SVG/React in `src/components/LineChart.tsx`, coloured only by the `--chart-1..6` theme tokens (kept at 3:1 against every surface by `tests/chart-tokens.test.ts`). Lines also differ by dash pattern and marker shape. Charts have a text summary, keyboard reading (arrow keys), a live readout, and a table alternative. Layout works at phone width: the chart is measured and redrawn at the container width, and tables scroll inside their own region.
++
++## Metric catalogue
++
++Platform modules supply their metrics through `PlatformModule.metrics` (`src/platforms/metrics.ts` defines the neutral shape; Facebook's entries, including its linked Instagram professional account and ad account measures, are in `src/platforms/facebook/metrics.ts`). Each entry has the stored name, a customer name, a one-line definition, a unit (`count`, `people`, `currency`, `rate`, `duration`), an aggregation rule, a group, and optionally a retirement (date and replacement), `headline`, `lowerIsBetter` (costs, lost followers) or `neutral` (spend) flags. A module may also provide `inferMetric` for stored names it does not list (ad actions are named from their action type). Shared code calls `findMetric(scope, key)` in `src/platforms/index.ts`; no shared UI names a platform. Names that nothing describes are shown in readable words and remain visible in Technical details.
++
++| Rule | Behaviour |
++| --- | --- |
++| `sum` | Events add across channels and days. |
++| `unique` | Distinct people are **not** additive. Totals are an upper bound shown as "up to N" (exact only for one channel and one day); every channel keeps its own value. |
++| `latest` | Running totals (followers): each channel contributes its newest value, channels are summed; the daily line carries each channel's last value forward. |
++| `rate` | Click-through rate, cost per click, cost per 1,000 impressions, cost per person reached and frequency are recomputed from summed parts, never averaged; a zero denominator gives no value. Rates that divide by distinct people are marked as estimates. |
++| money | Never mixed across currencies: each currency is its own measure ("Ad spend (EUR)"). Accounts that report no currency are shown without a symbol. |
++| rolling windows | Stored week or 28-day values are labelled with their window and use the newest value instead of being added. |
++| retired | Measures the platform has stopped serving appear as unavailable with an explanation and replacement, never as an empty chart. |
++
++Pure functions with unit tests: `src/server/analytics/overview.ts` (all rules above, previous period, change), `src/server/analytics/time.ts` (calendar-day arithmetic, previous period, zone-aware day boundaries including daylight saving and half-hour zones), `src/server/analytics/posts.ts` (ranking), `src/lib/analytics/format.ts` and `chart-math.ts`.
++
++## Dates and time zones
++
++A day is a calendar day in the workspace time zone. The range, the daily buckets and the previous period (same number of days, ending the day before the range starts) all use it. Channel values are placed on the day of their stored end time in that zone; advertising rows are already calendar dates and keep their own date. Ranges are capped at 400 days.
++
++## Export
++
++`/api/reports/export` returns a long-form CSV (`record_type, metric, channel, date, value, previous_value, change_percent, unit, currency, note, link`) with plain metric names: key-number summaries (with "up to" notes), each channel's value, audience, top posts, breakdowns, retired measures, daily values and per-channel daily values, in that order. When the Root row limit is reached the file ends with an explicit `truncated` row, dropping daily detail first. Provider text that looks like a spreadsheet formula is quoted.
++
++## Ingestion and coverage
++
++Facebook Page ingestion reads the Root-managed `meta.pageInsightMetrics` list. The default requests follows, media views, post engagements and Page views. Every dated value returned by Graph is stored under its own metric, provider period and `end_time`; numeric values and JSON breakdowns are kept, and repeating a sync updates the same observation. Disabled Facebook engines do not run Page, Ads or Inbox sync jobs.
++
++Provider support still needs live validation against this installation's approved scopes and API version. Page Insights requests are isolated per configured metric: a rejected metric does not discard successful ones. A partial sync increments the job failure count, but a Root view naming the rejected metrics remains to be built. Advertising sync is account level; campaign, ad-set and ad-level analytics are incomplete. Other platform adapters do not yet contribute insights.
++
++## Known gaps
++
++- Top posts rank by stored comments and likes only; post-level reach, views and reactions are not synced.
++- Ad measures stored as scalar fields without a catalogue entry (for example quality rankings) are not shown; action counts and action values are.
++- Demographic maps and pinned metrics from the legacy app are not rebuilt.
++- The MCP analytics tools still return the earlier metric list (`src/server/analytics/aggregate.ts`) and do not yet use the catalogue, comparison or previous-period rules.
++- Rolling-window and breakdown measures get no previous-period comparison beyond the totals the series shows.
+diff --git a/rebuild/docs/DESIGN_SYSTEM.md b/rebuild/docs/DESIGN_SYSTEM.md
+index 0a34eed5..c8250872 100644
+--- a/rebuild/docs/DESIGN_SYSTEM.md
++++ b/rebuild/docs/DESIGN_SYSTEM.md
+@@ -28,3 +28,7 @@ This interface uses a quiet editorial look for a focused social publishing works
+ ## Composition guidance
+ 
+ Use a single clear page title followed by supporting context and actions. Keep filters adjacent to the data they affect. Place important actions first in the action group and destructive actions last. Use table captions even when visually hidden, label every filter, and keep keyboard focus inside native modal dialogs. Use text or shape alongside status colors.
++
++## Charts
++
++`LineChart`, `ChartLegend` and `Sparkline` (`src/components/LineChart.tsx`) are plain SVG. Series colours come only from `--chart-1` to `--chart-6`, which every theme defines at 3:1 or better against its surfaces; each series also has its own dash pattern and marker shape, so meaning never rests on colour alone. A chart always has an accessible name and text summary, keyboard reading with the arrow keys, and a table alternative supplied by the page. Legend items are toggle buttons with `aria-pressed`.
+diff --git a/rebuild/docs/LEGACY_CAPABILITY_PARITY.md b/rebuild/docs/LEGACY_CAPABILITY_PARITY.md
+index b0d062e1..c2ed20e1 100644
+--- a/rebuild/docs/LEGACY_CAPABILITY_PARITY.md
++++ b/rebuild/docs/LEGACY_CAPABILITY_PARITY.md
+@@ -15,8 +15,8 @@ equivalent workflow; **unverified** means code exists without adequate evidence.
+ | --- | --- | --- | --- |
+ | P0 | Eleven network connectors and publishing destinations in `src/lib/networks/index.ts` and `src/lib/networks/connect.ts` | Partial: `rebuild/src/server/platforms/registry.ts` registers Facebook only; Instagram and the other legacy destinations have no rebuild engines. | Adapter-level connection, discovery, publishing/status/delete, analytics, inbox, and ads where provider supports them; scoped UI/API/MCP and live tests. |
+ | P0 | Facebook feed, photo, carousel, video, Reel, Story, Group and native scheduling in `src/lib/facebook/publish.ts` | Partial: `rebuild/src/platforms/facebook` handles basic Page content and remote video URLs. Local video, Reel/Story, Group, and native scheduling are missing. | Provider fixture and live create/status/delete tests for each supported format; visible choices limited to available capabilities. |
+-| P0 | Analytics views, comparisons, post explorer, demographics, network analysis, pinned metrics and coverage in `src/app/(app)/analytics/AnalyticsScreen.tsx` and `src/lib/analytics-views.ts` | Partial: `rebuild/src/app/analytics/page.tsx` exposes stored metrics, selected-channel audience totals, and ad-account selection shared with the scoped CSV export. Comparisons, post explorer, demographics, pinned metrics and complete ad-object analysis remain. | Shared metric catalog feeding full UI, export, and MCP with date/channel/ad-account scope, comparison, availability, and refresh evidence. |
+-| P0 | Reports and CSV exports in `src/app/(app)/reports/page.tsx`, `src/lib/reports.ts`, and `src/lib/analytics-export.ts` | Partial: `rebuild/src/app/reports` now shows scoped stored metrics and selected-channel audience totals, with a bounded long-form CSV. Ranked posts, destination summaries, other export formats, schedules and templates are absent. | Complete relevant report sections and exports, schedule/template workflows, UI/API/MCP parity and provider-shaped tests. |
++| P0 | Analytics views, comparisons, post explorer, demographics, network analysis, pinned metrics and coverage in `src/app/(app)/analytics/AnalyticsScreen.tsx` and `src/lib/analytics-views.ts` | Partial: `rebuild/src/app/analytics/page.tsx` now has a module-supplied metric catalogue (plain names, definitions, units, aggregation rules, retired measures), key-number cards with previous-period change and trend lines that drive a main chart with table view, per-channel comparison (lines, bars, table), a sortable top-posts table, breakdowns, selected-channel audience totals and ad-account selection, all driven by one date/channel/ad-account selection shared with the CSV export, with workspace time-zone days, currency-separated ad money and unit-tested rules (see `docs/ANALYTICS.md`). Missing: post-level reach/views, demographic maps, pinned metrics, ad campaign/ad-set/ad analysis, and MCP use of the catalogue. | Post-level insight sync, demographics and pinned views, complete ad-object analysis, and MCP parity with the catalogue; live provider validation. |
++| P0 | Reports and CSV exports in `src/app/(app)/reports/page.tsx`, `src/lib/reports.ts`, and `src/lib/analytics-export.ts` | Partial: `rebuild/src/app/reports` redirects to Analytics with the same selection, and `/api/reports/export` returns a bounded long-form CSV built from the exact data on screen (plain names, previous-period comparison, "up to" notes, per-channel values, audience, top posts, breakdowns, retired measures, daily values). Destination summaries, other export formats, schedules and templates are absent. | Complete relevant report sections and exports, schedule/template workflows, UI/API/MCP parity and provider-shaped tests. |
+ | P1 | Composer overrides, queue slots, approvals, labels, custom fields, notes, versions, templates, first-comment retries, and UTM/link preparation in `src/lib/posts.ts` and related API routes | Partial: `rebuild/src/server/publishing/lifecycle.ts` provides drafts, approval, one timestamp, publish, first comment, status and delete. Queue and Approvals lists now query their statuses and channel scope before pagination. | End-to-end workflow tests, per-target behavior, bulk actions, scheduling rules, and provider verification. |
+ | P1 | Post list filters, saved views, pagination, bulk actions, retry/duplicate, CSV export and public Posts v1 API in `src/app/(app)/posts/page.tsx` and `src/app/api/posts` | Partial: `rebuild/src/app/publishing/posts/page.tsx` now pages through scoped workspace posts, with channel access and sidebar status/channel filters applied before counting and paging. Basic actions work; saved views, bulk actions, retry/duplicate, CSV export and v1 API remain. | Full list/action/API parity with workspace authorization and large-data pagination tests. |
+ | P1 | Publishing calendar navigation and month coverage in `src/app/(app)/calendar` | Partial: rebuild Calendar now supports month URLs and a sidebar month picker, queries scoped posts near the workspace month boundary without the former 100-post truncation, and groups them by workspace-local date. Calendar editing, drag/drop, queue slots and large-month performance remain. | Browser and database tests with records on timezone and month boundaries, high-volume month, permissions and edit workflows. |
+diff --git a/rebuild/docs/PLATFORMS.md b/rebuild/docs/PLATFORMS.md
+index 74e0b387..883dc672 100644
+--- a/rebuild/docs/PLATFORMS.md
++++ b/rebuild/docs/PLATFORMS.md
+@@ -11,6 +11,7 @@ untouched; switching it back on restores everything.
+ | --- | --- | --- |
+ | Engine | `src/platforms/<id>/` | Provider operations behind the neutral contract in `src/platforms/types.ts` |
+ | Manifest + settings | `src/platforms/<id>/module.ts` | Name, badge, capabilities, channel kinds, required settings, and all of the module's Root settings (including `platforms.<id>.enabled`) |
++| Metric catalogue | `src/platforms/<id>/metrics.ts`, exposed as `metrics` (and optional `inferMetric`) on the manifest | Plain customer names, definitions, units, aggregation rules and retirements for the module's stored metrics; read by Analytics through `findMetric` (see `docs/ANALYTICS.md`) |
+ | Server wiring | `src/server/platforms/<id>.ts` (+ `<id>-connect.ts`) | Building the engine from Root settings; the connection start/callback flow |
+ | Installed list | `src/platforms/index.ts` and `src/server/platforms/index.ts` | The only places that name platforms; TypeScript keeps the two in step |
+ 
+diff --git a/rebuild/src/app/analytics/AnalyticsNotes.tsx b/rebuild/src/app/analytics/AnalyticsNotes.tsx
+new file mode 100644
+index 00000000..07de858f
+--- /dev/null
++++ b/rebuild/src/app/analytics/AnalyticsNotes.tsx
+@@ -0,0 +1,41 @@
++import { formatDateTime, formatDay, formatNumber } from '@/lib/analytics/format';
++import type { AnalyticsOverview } from '@/lib/analytics/types';
++
++/** Breakdowns, retired measures and technical details. Raw stored names appear only inside the technical disclosure. */
++export function AnalyticsNotes({ overview }: { overview: AnalyticsOverview }) {
++  const technical = [
++    ...overview.series.map(item => ({ id: item.id, name: item.name, detail: item.technical })),
++    ...overview.breakdowns.map(item => ({ id: item.id, name: item.name, detail: item.technical })),
++  ];
++  return <>
++    {overview.breakdowns.length > 0 && <section className="panel" aria-labelledby="analytics-breakdowns">
++      <div className="analytics-panel-title"><div><h2 id="analytics-breakdowns">Breakdowns</h2><p className="small-note">Where audiences and activity come from, added across the selected channels.</p></div></div>
++      <div className="analytics-breakdowns">
++        {overview.breakdowns.map(item => <details className="analytics-breakdown" key={item.id}>
++          <summary><span>{item.name}</span><small>{item.rows.length} categories{item.coverage < item.available ? ` · data for ${item.coverage} of ${item.available} channels` : ''}</small></summary>
++          <p className="small-note">{item.definition}{item.asOf ? ` Latest data ${formatDay(item.asOf, true)}.` : ''}</p>
++          <div className="report-list">{item.rows.map(row => <div className="report-row" key={row.label}><span>{row.label}</span><strong>{formatNumber(row.value)}</strong></div>)}</div>
++        </details>)}
++      </div>
++    </section>}
++    {overview.retired.length > 0 && <section className="panel" aria-labelledby="analytics-retired">
++      <div className="analytics-panel-title"><div><h2 id="analytics-retired">No longer available</h2><p className="small-note">These measures were stored earlier but the platform has stopped providing them. They are not charted.</p></div></div>
++      <ul className="analytics-retired">
++        {overview.retired.map(item => <li key={item.id}>
++          <strong>{item.name}</strong><span className="badge">Unavailable</span>
++          <p>{item.source ?? 'The platform'} retired this measure on {formatDay(item.retiredOn, true)}.{item.replacedByName ? ` Use ${item.replacedByName} instead.` : ' There is no direct replacement.'} {item.definition}</p>
++        </li>)}
++      </ul>
++    </section>}
++    {technical.length > 0 && <details className="panel analytics-technical">
++      <summary>Technical details</summary>
++      <p className="small-note">For support and developers. Names are as stored; times are shown in UTC.</p>
++      <div className="report-list">
++        {technical.map(item => <div className="report-row" key={item.id}>
++          <span>{item.name}<small> {item.detail.source ?? 'Source unknown'} · {item.detail.period} period · {item.detail.points} stored values</small></span>
++          <strong><code>{item.detail.storedName}</code>{item.detail.lastDay ? ` · latest ${formatDay(item.detail.lastDay, true)}` : ''}{item.detail.lastSynced ? ` · synced ${formatDateTime(item.detail.lastSynced)}` : ''}</strong>
++        </div>)}
++      </div>
++    </details>}
++  </>;
++}
+diff --git a/rebuild/src/app/analytics/AnalyticsOverview.tsx b/rebuild/src/app/analytics/AnalyticsOverview.tsx
+new file mode 100644
+index 00000000..70ba7d7c
+--- /dev/null
++++ b/rebuild/src/app/analytics/AnalyticsOverview.tsx
+@@ -0,0 +1,132 @@
++"use client";
++
++import { useMemo, useState } from "react";
++import { ChartLegend, DataTable, LineChart, Sparkline, type ChartLine, type TableColumn } from "@/components";
++import { describeChange, formatDay, formatTotal, formatValue } from "@/lib/analytics/format";
++import type { AnalyticsOverview as Overview, ChannelValues, OverviewSeries } from "@/lib/analytics/types";
++
++const MAX_CHARTED = 3;
++const DEFAULT_VISIBLE_CHANNELS = 6;
++
++function Segmented<T extends string>({ label, value, options, onChange }: { label: string; value: T; options: Array<{ value: T; label: string }>; onChange: (value: T) => void }) {
++  return <div className="ui-segmented" role="group" aria-label={label}>{options.map(option => <button type="button" key={option.value} aria-pressed={value === option.value} onClick={() => onChange(option.value)}>{option.label}</button>)}</div>;
++}
++
++function ChangeText({ series, periodLabel }: { series: OverviewSeries; periodLabel: string }) {
++  const change = describeChange(series.change);
++  const tone = series.change?.favourable === true ? "is-good" : series.change?.favourable === false ? "is-bad" : "";
++  return <p className={`analytics-kpi__change ${tone}`}>
++    {series.change && <span aria-hidden="true">{change.arrow} </span>}
++    <span>{change.text}</span>
++    <span className="ui-visually-hidden">. {change.words}</span>
++    {series.change && <small> vs {periodLabel}</small>}
++  </p>;
++}
++
++function KeyNumber({ series, slot, selected, onToggle, periodLabel }: { series: OverviewSeries; slot: number | null; selected: boolean; onToggle: () => void; periodLabel: string }) {
++  const partial = series.coverage < series.available;
++  return <li>
++    <button type="button" className="analytics-kpi" aria-pressed={selected} onClick={onToggle}>
++      <span className="analytics-kpi__name">{series.name}</span>
++      <span className="analytics-kpi__value">{formatTotal(series.total, series.format, series.upTo, { compact: true })}</span>
++      <ChangeText series={series} periodLabel={periodLabel} />
++      <Sparkline values={series.values} slot={slot ?? 5} />
++      <span className="analytics-kpi__definition">{series.definition}{series.upTo ? " People can be counted more than once, so this is a ceiling." : ""}{series.approximate ? " Estimated from daily figures." : ""}</span>
++      {partial && <span className="analytics-kpi__coverage">Data for {series.coverage} of {series.available} {series.entityLabel === "ad account" ? "ad accounts" : "channels"}</span>}
++      <span className="analytics-kpi__state">{selected ? "✓ Shown in chart" : "Show in chart"}</span>
++    </button>
++  </li>;
++}
++
++export function AnalyticsOverview({ overview }: { overview: Overview }) {
++  const { series, days, previousDays } = overview;
++  const featured = useMemo(() => { const head = series.filter(item => item.headline); return head.length ? head : series.slice(0, 6); }, [series]);
++  const others = useMemo(() => series.filter(item => !featured.includes(item)), [series, featured]);
++  const [selected, setSelected] = useState<string[]>(() => featured.slice(0, 1).map(item => item.id));
++  const [view, setView] = useState<"chart" | "table">("chart");
++  const [compareWithPrevious, setCompareWithPrevious] = useState(false);
++  const [showOthers, setShowOthers] = useState(false);
++  const [comparisonIndex, setComparisonIndex] = useState<number | null>(null);
++  const [comparisonView, setComparisonView] = useState<"lines" | "bars" | "table">("lines");
++  const [hidden, setHidden] = useState<Record<string, boolean | undefined>>({});
++
++  const byId = useMemo(() => new Map(series.map(item => [item.id, item])), [series]);
++  const periodLabel = `the previous ${days.length} ${days.length === 1 ? "day" : "days"}`;
++  if (!series.length) return null;
++
++  const toggle = (id: string) => setSelected(current => current.includes(id) ? (current.length > 1 ? current.filter(item => item !== id) : current) : [...current, id].slice(-MAX_CHARTED));
++  const charted = selected.map(id => byId.get(id)).filter((item): item is OverviewSeries => Boolean(item));
++  const sameScale = new Set(charted.map(item => `${item.format.unit}:${item.format.currency ?? ""}`)).size <= 1;
++  const single = charted.length === 1 ? charted[0]! : null;
++  const lines: ChartLine[] = charted.map((item, index) => ({ id: item.id, label: item.upTo ? `${item.name} (up to)` : item.name, values: item.values, slot: index }));
++  if (single && compareWithPrevious) lines.push({ id: "previous", label: "Previous period", values: single.previousValues, slot: 0, reference: true });
++  const formatLine = (value: number, id: string) => formatValue(value, id === "previous" ? single!.format : byId.get(id)!.format);
++
++  const comparable = series.filter(item => item.channels.length > 0);
++  const chosen = comparisonIndex === null ? undefined : comparable[comparisonIndex];
++  const comparison = chosen ?? comparable.find(item => selected.includes(item.id)) ?? comparable[0];
++  const channelOrder = comparison ? comparison.channels : [];
++  const isVisible = (channel: ChannelValues, index: number) => hidden[`${comparison!.id}:${channel.id}`] ?? index < DEFAULT_VISIBLE_CHANNELS;
++  const channelLines: ChartLine[] = comparison ? channelOrder.flatMap((channel, index) => isVisible(channel, index) ? [{ id: channel.id, label: channel.name, values: channel.values, slot: index }] : []) : [];
++
++  const tableColumns: Array<TableColumn<number>> = [
++    { key: "day", label: "Date", render: index => formatDay(days[index]!, true) },
++    ...charted.map<TableColumn<number>>(item => ({ key: item.id, label: item.name, align: "end", render: index => formatValue(item.values[index], item.format) })),
++    ...(single && compareWithPrevious ? [{ key: "previous", label: `Previous period (${formatDay(previousDays[0]!)} – ${formatDay(previousDays.at(-1)!)})`, align: "end" as const, render: (index: number) => formatValue(single.previousValues[index], single.format) }] : []),
++  ];
++
++  const channelColumns: Array<TableColumn<ChannelValues>> = comparison ? [
++    { key: "name", label: comparison.entityLabel === "ad account" ? "Ad account" : "Channel", render: row => row.name },
++    { key: "total", label: comparison.upTo ? "Up to" : "Total", align: "end", render: row => formatValue(row.total, comparison.format) },
++    { key: "previous", label: "Previous period", align: "end", render: row => formatValue(row.previousTotal, comparison.format) },
++    { key: "change", label: "Change", align: "end", render: row => row.total !== null && row.previousTotal ? `${row.total >= row.previousTotal ? "+" : "−"}${Math.abs((row.total - row.previousTotal) / Math.abs(row.previousTotal) * 100).toLocaleString("en-US", { maximumFractionDigits: 1 })}%` : "—" },
++  ] : [];
++  const largest = Math.max(1, ...channelOrder.map(channel => Math.abs(channel.total ?? 0)));
++
++  return <>
++    <section className="panel" aria-labelledby="analytics-key-numbers">
++      <div className="analytics-panel-title"><div><h2 id="analytics-key-numbers">Key numbers</h2><p className="small-note">Compared with {periodLabel} ({formatDay(previousDays[0]!)} – {formatDay(previousDays.at(-1)!)}). Choose up to {MAX_CHARTED} to show in the chart.</p></div><span className="badge">{series.length} {series.length === 1 ? "measure" : "measures"}</span></div>
++      <ul className="analytics-kpis" aria-label="Key numbers">
++        {featured.map(item => <KeyNumber key={item.id} series={item} slot={selected.includes(item.id) ? selected.indexOf(item.id) : null} selected={selected.includes(item.id)} onToggle={() => toggle(item.id)} periodLabel={periodLabel} />)}
++      </ul>
++      {others.length > 0 && <div className="analytics-more">
++        <button type="button" className="analytics-more__toggle" aria-expanded={showOthers} onClick={() => setShowOthers(value => !value)}>{showOthers ? "Hide other measures" : `Show ${others.length} other ${others.length === 1 ? "measure" : "measures"}`}</button>
++        {showOthers && <ul className="analytics-kpis" aria-label="Other measures">{others.map(item => <KeyNumber key={item.id} series={item} slot={selected.includes(item.id) ? selected.indexOf(item.id) : null} selected={selected.includes(item.id)} onToggle={() => toggle(item.id)} periodLabel={periodLabel} />)}</ul>}
++      </div>}
++    </section>
++
++    <section className="panel" aria-labelledby="analytics-trend">
++      <div className="analytics-panel-title"><div><h2 id="analytics-trend">Trend</h2><p className="small-note">{charted.map(item => item.name).join(", ")} by day, {formatDay(days[0]!)} – {formatDay(days.at(-1)!, true)}. Days follow the workspace time zone ({overview.timeZone.replaceAll("_", " ")}).</p></div>
++        <Segmented label="Chart or table" value={view} onChange={setView} options={[{ value: "chart", label: "Chart" }, { value: "table", label: "Table" }]} /></div>
++      <ChartLegend label="Charted measures" items={lines.map(line => ({ id: line.id, label: line.label, slot: line.slot, active: true, reference: line.reference, detail: line.reference ? `${formatDay(previousDays[0]!)} – ${formatDay(previousDays.at(-1)!)}` : undefined }))} />
++      {single && <label className="analytics-check"><input type="checkbox" checked={compareWithPrevious} onChange={event => setCompareWithPrevious(event.target.checked)} /> Compare with the previous period</label>}
++      {charted.some(item => item.upTo) && <p className="small-note analytics-note">Distinct people are not added across days or channels, so these lines show the most people that could have been reached (&ldquo;up to&rdquo;).</p>}
++      {view === "chart"
++        ? <LineChart days={days} lines={lines} separateScales={!sameScale} includeZero={!charted.every(item => item.aggregation === "latest")} formatValue={formatLine} formatAxis={value => formatValue(value, charted[0]!.format, { compact: 'axis' })} formatDay={day => formatDay(day)} label={`Daily trend of ${charted.map(item => item.name).join(", ")}`} />
++        : <DataTable caption={`Daily values of ${charted.map(item => item.name).join(", ")}`} columns={tableColumns} rows={days.map((_, index) => index)} rowKey={index => days[index]!} />}
++    </section>
++
++    {comparison && <section className="panel" aria-labelledby="analytics-compare">
++      <div className="analytics-panel-title"><div><h2 id="analytics-compare">{comparison.entityLabel === "ad account" ? "Compare ad accounts" : "Compare channels"}</h2><p className="small-note">{comparison.upTo ? "Distinct people are not added: each channel keeps its own value. " : ""}{comparison.name}, {formatDay(days[0]!)} – {formatDay(days.at(-1)!)}.</p></div>
++        <Segmented label="How to compare" value={comparisonView} onChange={setComparisonView} options={[{ value: "lines", label: "Lines" }, { value: "bars", label: "Bars" }, { value: "table", label: "Table" }]} /></div>
++      <div className="analytics-compare__controls">
++        <label>Measure<select value={comparable.indexOf(comparison)} onChange={event => setComparisonIndex(Number(event.target.value))}>{comparable.map((item, index) => <option key={item.id} value={index}>{item.name}</option>)}</select></label>
++        <p className="analytics-compare__total"><span>{comparison.upTo ? "Up to" : "Total"}</span> <strong>{formatValue(comparison.total, comparison.format)}</strong><small> across {comparison.channels.length} {comparison.entityLabel === "ad account" ? "ad accounts" : comparison.channels.length === 1 ? "channel" : "channels"}</small></p>
++      </div>
++      {comparisonView === "lines" && <>
++        <ChartLegend label={`Show or hide ${comparison.entityLabel === "ad account" ? "ad accounts" : "channels"}`} onToggle={id => setHidden(current => ({ ...current, [`${comparison.id}:${id}`]: isVisible(channelOrder.find(channel => channel.id === id)!, channelOrder.findIndex(channel => channel.id === id)) ? false : true }))}
++          items={channelOrder.map((channel, index) => ({ id: channel.id, label: channel.name, slot: index, active: isVisible(channel, index), detail: formatValue(channel.total, comparison.format, { compact: true }) }))} />
++        {channelLines.length ? <LineChart days={days} lines={channelLines} includeZero={comparison.aggregation !== "latest"} formatValue={(value) => formatValue(value, comparison.format)} formatAxis={value => formatValue(value, comparison.format, { compact: 'axis' })} formatDay={day => formatDay(day)} label={`Daily ${comparison.name} for each ${comparison.entityLabel}`} />
++          : <p className="empty-note">Turn on at least one {comparison.entityLabel} in the key above to draw the chart.</p>}
++      </>}
++      {comparisonView === "bars" && <ul className="analytics-bars" aria-label={`${comparison.name} by ${comparison.entityLabel}`}>
++        {channelOrder.map((channel, index) => <li key={channel.id}>
++          <span className="analytics-bars__name">{channel.name}</span>
++          <span className="analytics-bars__track" aria-hidden="true"><span style={{ width: `${Math.max(2, Math.abs(channel.total ?? 0) / largest * 100)}%` }} data-slot={index % 6} /></span>
++          <strong>{formatValue(channel.total, comparison.format)}</strong>
++        </li>)}
++      </ul>}
++      {comparisonView === "table" && <DataTable caption={`${comparison.name} by ${comparison.entityLabel}`} columns={channelColumns} rows={channelOrder} rowKey={row => row.id} />}
++    </section>}
++  </>;
++}
+diff --git a/rebuild/src/app/analytics/TopPosts.tsx b/rebuild/src/app/analytics/TopPosts.tsx
+new file mode 100644
+index 00000000..58bd45c2
+--- /dev/null
++++ b/rebuild/src/app/analytics/TopPosts.tsx
+@@ -0,0 +1,41 @@
++"use client";
++
++import { useMemo, useState } from "react";
++import { DataTable, type TableColumn } from "@/components";
++import { formatDateTime, formatNumber } from "@/lib/analytics/format";
++import type { TopPost } from "@/lib/analytics/types";
++
++type SortKey = "interactions" | "comments" | "likes" | "publishedAt" | "channelName";
++const INITIAL_ROWS = 10;
++
++export function TopPosts({ posts }: { posts: TopPost[] }) {
++  const [sort, setSort] = useState<{ key: SortKey; direction: "ascending" | "descending" }>({ key: "interactions", direction: "descending" });
++  const [showAll, setShowAll] = useState(false);
++  const hasLikes = posts.some(post => post.likes !== null);
++
++  const sorted = useMemo(() => {
++    const factor = sort.direction === "ascending" ? 1 : -1;
++    return [...posts].sort((a, b) => {
++      const left = a[sort.key]; const right = b[sort.key];
++      const compared = typeof left === "string" || typeof right === "string" ? String(left ?? "").localeCompare(String(right ?? "")) : (left ?? -1) - (right ?? -1);
++      return compared * factor || a.id.localeCompare(b.id);
++    });
++  }, [posts, sort]);
++  const rows = showAll ? sorted : sorted.slice(0, INITIAL_ROWS);
++
++  const change = (key: string) => setSort(current => ({ key: key as SortKey, direction: current.key === key && current.direction === "descending" ? "ascending" : "descending" }));
++  const columns: Array<TableColumn<TopPost>> = [
++    { key: "excerpt", label: "Post", render: post => <span className="analytics-post"><span>{post.excerpt}</span>{post.url && <a className="text-link" href={post.url} target="_blank" rel="noopener noreferrer">View post<span className="ui-visually-hidden"> (opens in a new tab)</span></a>}</span> },
++    { key: "channelName", label: "Channel", sortable: true, render: post => post.channelName },
++    { key: "publishedAt", label: "Published", sortable: true, render: post => formatDateTime(post.publishedAt) },
++    { key: "comments", label: "Comments", sortable: true, align: "end", render: post => post.comments === null ? "—" : formatNumber(post.comments) },
++    ...(hasLikes ? [{ key: "likes", label: "Likes", sortable: true, align: "end" as const, render: (post: TopPost) => post.likes === null ? "—" : formatNumber(post.likes) }] : []),
++    { key: "interactions", label: "Interactions", sortable: true, align: "end", render: post => formatNumber(post.interactions) },
++  ];
++
++  return <section className="panel" aria-labelledby="analytics-top-posts">
++    <div className="analytics-panel-title"><div><h2 id="analytics-top-posts">Top posts</h2><p className="small-note">Posts published in this period on the selected channels. Interactions add up the comments{hasLikes ? " and likes" : ""} stored for each post.</p></div><span className="badge">{posts.length} {posts.length === 1 ? "post" : "posts"}</span></div>
++    <DataTable caption="Top posts for the selected channels and dates" columns={columns} rows={rows} rowKey={post => post.id} sort={{ key: sort.key, direction: sort.direction, onChange: change }} emptyMessage="No posts were published on the selected channels in this period." />
++    {posts.length > INITIAL_ROWS && <button type="button" className="analytics-more__toggle" aria-expanded={showAll} onClick={() => setShowAll(value => !value)}>{showAll ? "Show fewer posts" : `Show all ${posts.length} posts`}</button>}
++  </section>;
++}
+diff --git a/rebuild/src/app/analytics/analytics.css b/rebuild/src/app/analytics/analytics.css
+index a7e0cadb..faf244c9 100644
+--- a/rebuild/src/app/analytics/analytics.css
++++ b/rebuild/src/app/analytics/analytics.css
+@@ -4,12 +4,6 @@
+ .analytics-panel-title { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+ .analytics-panel-title h2 { margin-bottom: 4px; }
+ .analytics-panel-title p { margin: 0; }
+-.activity-chart { min-height: 230px; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 14px; margin-top: 28px; }
+-.activity-chart__item { min-width: 0; display: grid; grid-template-rows: auto 1fr auto; align-items: end; gap: 8px; text-align: center; }
+-.activity-chart__item strong { color: var(--ink-soft); font-size: 12px; }
+-.activity-chart__track { height: 160px; display: flex; align-items: end; justify-content: center; border-bottom: 1px solid var(--line); background: repeating-linear-gradient(to top, transparent 0, transparent 39px, var(--line) 40px); }
+-.activity-chart__track span { display: block; width: min(48px, 70%); min-height: 5px; border-radius: 7px 7px 0 0; background: var(--accent); }
+-.activity-chart__item small { color: var(--ink-faint); font-size: 10px; white-space: nowrap; }
+ .report-list { display: grid; }
+ .report-row { display: flex; justify-content: space-between; gap: 16px; padding: 14px 0; border-bottom: 1px solid var(--line); font-size: 14px; overflow-wrap: anywhere; }
+ .report-row:last-child { border-bottom: 0; }
+@@ -32,24 +26,66 @@
+ .analytics-audience__total span, .analytics-coverage { color: var(--ink-faint); font-size: 12px; }
+ .analytics-coverage { margin: 12px 0 0; }
+ .analytics-ad-coverage { margin: -8px 0 14px; }
+-.analytics-metrics { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin-top: 18px; }
+-.analytics-metric { min-width: 0; padding: 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-raised); }
+-.analytics-metric__heading { display: flex; align-items: start; justify-content: space-between; gap: 10px; }
+-.analytics-metric__heading h3 { margin: 0; font-size: 14px; overflow-wrap: anywhere; }
+-.analytics-metric__heading p { margin: 5px 0 0; color: var(--ink-faint); font-size: 11px; }
+-.analytics-metric__heading > strong { color: var(--ink); font-size: 18px; font-variant-numeric: tabular-nums; }
+-.analytics-spark { height: 95px; display: flex; align-items: end; gap: 3px; margin: 18px 0 10px; padding: 0 0 1px; border-bottom: 1px solid var(--line); }
+-.analytics-spark span { flex: 1; min-width: 2px; max-width: 14px; min-height: 3px; border-radius: 3px 3px 0 0; background: var(--accent); opacity: .8; }
+-.analytics-metric__details { margin-top: 12px; }
+-.analytics-metric__details summary { color: var(--accent); font-size: 12px; font-weight: 650; cursor: pointer; }
+-.analytics-metric__details .report-row { padding: 9px 0; font-size: 12px; }
+-.analytics-metric__details .report-row strong { text-align: right; }
+-.analytics-metric__details small { display: block; margin-top: 3px; color: var(--ink-faint); font-size: 10px; }
+ .analytics-state { text-align: center; padding-block: 48px; }
+ .analytics-state h2 { margin-bottom: 8px; }
+ .analytics-state p { margin: 0; color: var(--ink-soft); }
+ .analytics-state__action { display: inline-flex; align-items: center; justify-content: center; min-height: 40px; margin-top: 18px; padding: 0 15px; border-radius: var(--radius-sm); background: var(--accent); color: var(--on-accent, white); font-size: 13px; font-weight: 700; }
+ .analytics-state__action:hover { background: var(--accent-hover); }
+ .analytics-panel-title + .metric-grid { margin-top: 20px; }
+-@media (max-width: 620px) { .activity-chart { gap: 5px; } .activity-chart__item small { font-size: 9px; white-space: normal; } .analytics-panel-title { align-items: flex-start; flex-direction: column; } }
+-@media (max-width: 900px) { .analytics-metrics { grid-template-columns: 1fr; } }
++@media (max-width: 620px) { .analytics-panel-title { align-items: flex-start; flex-direction: column; } }
++
++.analytics-presets { display: flex; flex-wrap: wrap; gap: 6px; }
++.analytics-presets a { display: inline-flex; align-items: center; min-height: 36px; padding: 0 11px; border: 1px solid var(--line-strong); border-radius: 999px; color: var(--ink-soft); font-size: 12px; font-weight: 600; }
++.analytics-presets a:hover { background: var(--surface-muted); color: var(--ink); }
++.analytics-presets a[aria-current="true"] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
++.analytics-kpis { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; margin: 18px 0 0; padding: 0; list-style: none; }
++.analytics-kpis > li { min-width: 0; display: flex; }
++.analytics-kpi { width: 100%; display: grid; align-content: start; gap: 6px; padding: 14px 16px; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-raised); color: var(--ink); text-align: left; cursor: pointer; }
++.analytics-kpi:hover { background: var(--surface-hover); border-color: var(--ink-faint); }
++.analytics-kpi[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--accent); }
++.analytics-kpi__name { font-size: 13px; font-weight: 700; overflow-wrap: anywhere; }
++.analytics-kpi__value { font-size: 26px; font-weight: 750; letter-spacing: -.03em; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
++.analytics-kpi__change { margin: 0; color: var(--ink-soft); font-size: 12px; font-weight: 650; font-variant-numeric: tabular-nums; }
++.analytics-kpi__change small { color: var(--ink-soft); font-weight: 500; }
++.analytics-kpi__change.is-good { color: var(--accent); }
++.analytics-kpi__change.is-bad { color: var(--danger); }
++.analytics-kpi__definition, .analytics-kpi__coverage { color: var(--ink-soft); font-size: 12px; line-height: 1.45; }
++.analytics-kpi__coverage { color: var(--warning); }
++.analytics-kpi__state { margin-top: 2px; color: var(--accent); font-size: 12px; font-weight: 700; }
++.analytics-more { margin-top: 14px; }
++.analytics-more__toggle { min-height: 40px; padding: 0 14px; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface); color: var(--accent); font-size: 12px; font-weight: 700; cursor: pointer; }
++.analytics-more__toggle:hover { background: var(--surface-muted); }
++.analytics-more .analytics-kpis { margin-top: 12px; }
++.analytics-check { display: inline-flex; align-items: center; gap: 8px; min-height: 36px; margin: 0 0 8px; color: var(--ink-soft); font-size: 13px; }
++.analytics-check input { width: 18px; height: 18px; accent-color: var(--accent); }
++.analytics-note { margin: 0 0 10px; }
++.analytics-compare__controls { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 14px; margin: 16px 0 12px; }
++.analytics-compare__controls label { display: grid; gap: 5px; color: var(--ink-soft); font-size: 12px; font-weight: 650; }
++.analytics-compare__controls select { min-height: 44px; max-width: 100%; padding: 0 10px; border: 1px solid var(--line-strong); border-radius: 7px; background: var(--surface); color: var(--ink); font-size: 14px; }
++.analytics-compare__total { margin: 0; color: var(--ink-soft); font-size: 13px; }
++.analytics-compare__total strong { margin-left: 6px; color: var(--ink); font-size: 20px; font-variant-numeric: tabular-nums; }
++.analytics-bars { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
++.analytics-bars li { display: grid; grid-template-columns: minmax(90px, 200px) minmax(0, 1fr) auto; align-items: center; gap: 12px; font-size: 13px; }
++.analytics-bars__name { overflow-wrap: anywhere; }
++.analytics-bars__track { display: block; height: 14px; border-radius: 7px; background: var(--surface-muted); overflow: hidden; }
++.analytics-bars__track span { display: block; height: 100%; border-radius: 7px; background: var(--chart-1); }
++.analytics-bars__track span[data-slot="1"] { background: var(--chart-2); }
++.analytics-bars__track span[data-slot="2"] { background: var(--chart-3); }
++.analytics-bars__track span[data-slot="3"] { background: var(--chart-4); }
++.analytics-bars__track span[data-slot="4"] { background: var(--chart-5); }
++.analytics-bars__track span[data-slot="5"] { background: var(--chart-6); }
++.analytics-bars strong { font-variant-numeric: tabular-nums; }
++.analytics-post { display: grid; gap: 4px; min-width: 200px; max-width: 420px; overflow-wrap: anywhere; }
++.analytics-breakdowns { display: grid; gap: 10px; margin-top: 14px; }
++.analytics-breakdown { padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-raised); }
++.analytics-breakdown summary { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 12px; font-size: 14px; font-weight: 650; cursor: pointer; }
++.analytics-breakdown summary small { color: var(--ink-soft); font-size: 12px; font-weight: 500; }
++.analytics-retired { display: grid; gap: 14px; margin: 14px 0 0; padding: 0; list-style: none; }
++.analytics-retired li { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-raised); }
++.analytics-retired p { flex-basis: 100%; margin: 4px 0 0; color: var(--ink-soft); font-size: 13px; line-height: 1.5; }
++.analytics-technical summary { color: var(--ink-soft); font-size: 13px; font-weight: 650; cursor: pointer; }
++.analytics-technical .report-row small { display: block; margin-top: 3px; color: var(--ink-soft); font-size: 11px; }
++.analytics-technical code { font-size: 11px; }
++@media (max-width: 620px) { .analytics-bars li { grid-template-columns: minmax(0, 1fr) auto; } .analytics-bars__track { grid-column: 1 / -1; grid-row: 2; } .analytics-kpis { grid-template-columns: 1fr; } }
++.analytics-stack > * { min-width: 0; }
++.analytics-stack .ui-chart { width: 100%; overflow: hidden; }
+diff --git a/rebuild/src/app/analytics/page.tsx b/rebuild/src/app/analytics/page.tsx
+index 53cb309d..7c0ed05f 100644
+--- a/rebuild/src/app/analytics/page.tsx
++++ b/rebuild/src/app/analytics/page.tsx
+@@ -1,58 +1,38 @@
+ import { PageFrame } from '@/server/PageFrame';
+ import { requireViewer } from '@/server/context';
+-import { buildAnalytics } from '@/server/analytics/aggregate';
+-import { analyticsRange, loadAnalytics } from '@/server/analytics/data';
+ import { prisma } from '@/server/data';
+ import { canUseFeature } from '@/server/entitlements';
+ import { canAccessFeature } from '@/server/permissions';
++import { loadAnalyticsView, presetRange, type AnalyticsView } from '@/server/analytics/view';
++import { safeTimeZone, zonedDay } from '@/server/analytics/time';
++import { formatDay, formatNumber } from '@/lib/analytics/format';
++import { AnalyticsOverview } from './AnalyticsOverview';
++import { AnalyticsNotes } from './AnalyticsNotes';
++import { TopPosts } from './TopPosts';
+ 
+ type Search = { start?: string; end?: string; filter?: string; channel?: string | string[]; adFilter?: string; adAccount?: string | string[] };
+-const inputDate = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+-
+-function formatValue(value: number | null, unit: string) {
+-  if (value === null) return '—';
+-  const amount = new Intl.NumberFormat(undefined, { maximumFractionDigits: unit === 'currency' ? 2 : 1 }).format(value);
+-  return unit === 'percent' ? `${amount}%` : unit === 'multiple' ? `${amount}×` : amount;
+-}
+-
+-function MetricChart({ metric }: { metric: ReturnType<typeof buildAnalytics>['metrics'][number] }) {
+-  const sourceLabel = metric.source === 'page' ? 'Page performance' : metric.source === 'instagram' ? 'Instagram performance' : 'Advertising';
+-  const detailLabel = metric.source === 'page' ? 'Page' : metric.source === 'instagram' ? 'Instagram account' : 'ad account';
+-  const coverageLabel = metric.source === 'page' ? 'Pages' : metric.source === 'instagram' ? 'Instagram accounts' : 'ad accounts';
+-  const maximum = Math.max(1, ...metric.points.map(point => point.value));
+-  return <div className="analytics-metric" key={metric.key}>
+-    <div className="analytics-metric__heading"><div><h3>{metric.label}</h3><p>{sourceLabel} · {metric.coverage} of {metric.available} covered{metric.latestAt ? ` · data ${metric.latestAt.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}` : ''}{metric.updatedAt ? ` · synced ${metric.updatedAt.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}` : ''}</p></div><strong>{metric.displayTotal ?? (metric.kind === 'breakdown' ? 'By category' : formatValue(metric.total, metric.unit))}</strong></div>
+-    {metric.points.length > 0 && <div className="analytics-spark" role="img" aria-label={`${metric.label} over the selected date range`}>
+-      {metric.points.slice(-28).map(point => <span key={point.date} title={`${point.label}: ${formatValue(point.value, metric.unit)}`} style={{ height: `${Math.max(4, point.value / maximum * 100)}%` }} />)}
+-    </div>}
+-    {metric.points.length > 0 && <details className="analytics-metric__details"><summary>View date and value series</summary><div className="report-list">{metric.points.map(point => <div className="report-row" key={point.date}><span>{point.label}</span><strong>{formatValue(point.value, metric.unit)}</strong></div>)}</div></details>}
+-    {metric.rows.length > 0 && <details className="analytics-metric__details"><summary>{metric.kind === 'breakdown' ? 'View breakdown' : `View ${metric.rows.length} ${detailLabel} details`}</summary><div className="report-list">{metric.rows.slice(0, 30).map(row => <div className="report-row" key={row.label}><span>{row.label}</span><strong>{formatValue(row.value, metric.unit)}{row.asOf ? ` · ${row.asOf.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}` : ''}</strong></div>)}</div></details>}
+-    {metric.points.length === 0 && metric.rows.length === 0 && <p className="empty-note">No values are available for this metric in the selected period.</p>}
+-    {metric.coverage < metric.available && <p className="analytics-coverage">Values were found for {metric.coverage} of {metric.available} selected {coverageLabel} in this date range.</p>}
+-  </div>;
+-}
++const list = (value: string | string[] | undefined) => Array.isArray(value) ? value : value ? [value] : [];
+ 
+ export default async function AnalyticsPage({ searchParams }: { searchParams: Promise<Search> }) {
+-  const { workspaceId, permissions, entitlements } = await requireViewer({ feature: 'analytics/overview' });
++  const { workspaceId, permissions, entitlements, membership } = await requireViewer({ feature: 'analytics/overview' });
+   const allowedTargetIds = permissions.pageScope.all ? undefined : permissions.pageScope.ids;
+   const params = await searchParams;
+-  const range = analyticsRange(params.start, params.end);
+-  let data: Awaited<ReturnType<typeof loadAnalytics>> | null = null;
++  const timeZone = safeTimeZone(membership.workspace.timezone);
++  let view: AnalyticsView | null = null;
+   try {
+-    const targets = await loadAnalytics(workspaceId, [], range, allowedTargetIds);
+-    const requested = new Set(Array.isArray(params.channel) ? params.channel : params.channel ? [params.channel] : []);
+-    const selectedIds = targets.targets.filter(target => params.filter !== '1' || requested.has(target.id)).map(target => target.id);
+-    const requestedAdIds = Array.isArray(params.adAccount) ? params.adAccount : params.adAccount ? [params.adAccount] : [];
+-    data = await loadAnalytics(workspaceId, selectedIds, range, allowedTargetIds, params.adFilter === '1' ? requestedAdIds : undefined);
++    view = await loadAnalyticsView({ workspaceId, allowedTargetIds, timeZone, query: { start: params.start, end: params.end, filter: params.filter, channel: list(params.channel), adFilter: params.adFilter, adAccount: list(params.adAccount) } });
+   } catch (error) {
+     console.error('Analytics data could not be loaded', error);
+   }
+ 
++  const data = view?.data ?? null;
+   const selected = data?.selectedTargets ?? [];
+   const selectedSet = new Set(selected.map(target => target.id));
+-  const view = data ? buildAnalytics(data.pageRows, data.adRows, data.audienceRows, selected, data.adAccountCount, data.instagramRows, data.selectedInstagramAudience) : null;
+-  const audienceMissing = selected.filter(channel => ['page', 'instagram'].includes(channel.type) && !view?.audience.entries.some(entry => entry.id === channel.id));
+-  const publishingByStatus = selected.length ? await prisma.post.groupBy({
++  const audience = view?.audience ?? null;
++  const days = view?.days ?? { start: '', end: '' };
++  const audienceMissing = audience ? selected.filter(channel => ['page', 'instagram'].includes(channel.type) && !audience.entries.some(entry => entry.id === channel.id)) : [];
++  const range = view?.range;
++  const publishingByStatus = selected.length && range ? await prisma.post.groupBy({
+     by: ['status'],
+     where: {
+       workspaceId,
+@@ -66,21 +46,29 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
+     _count: { _all: true },
+   }) : [];
+   const countStatus = (status: string) => publishingByStatus.find(row => row.status === status)?._count._all ?? 0;
+-  const publishingCounts = {
+-    published: countStatus('published'),
+-    scheduled: countStatus('scheduled'),
+-    failed: countStatus('failed') + countStatus('partially_failed'),
++  const publishingCounts = { published: countStatus('published'), scheduled: countStatus('scheduled'), failed: countStatus('failed') + countStatus('partially_failed') };
++
++  // Export and quick ranges carry exactly the channels and ad accounts on screen.
++  const selection = (start: string, end: string) => {
++    const query = new URLSearchParams({ start, end, filter: '1' });
++    selected.forEach(target => query.append('channel', target.id));
++    query.set('adFilter', '1');
++    data?.selectedAdIds.forEach(id => query.append('adAccount', id));
++    return query;
+   };
+-  const exportParams = new URLSearchParams({ start: inputDate(range.from), end: inputDate(range.to), filter: '1' });
+-  selected.forEach(target => exportParams.append('channel', target.id));
+-  exportParams.set('adFilter', '1');
+-  data?.selectedAdIds.forEach(id => exportParams.append('adAccount', id));
++  const exportParams = selection(days.start, days.end);
++  const today = zonedDay(new Date(), timeZone);
++  const presets = [{ label: 'Last 7 days', days: 7 }, { label: 'Last 30 days', days: 30 }, { label: 'Last 90 days', days: 90 }].map(preset => {
++    const range = presetRange(preset.days, today);
++    return { ...preset, href: `/analytics?${selection(range.start, range.end)}`, current: days.end === range.end && days.start === range.start };
++  });
+   const canExport = selected.length > 0 && canUseFeature(entitlements, 'analytics/reports') && canAccessFeature(permissions, 'analytics/reports');
+   const sidebar = <form action="/analytics" method="get" className="analytics-sidebar-filter">
+     <p className="analytics-filter-heading">Filters</p>
+     <p className="shell-subnav__label">Date range</p>
+-    <label className="analytics-date-filter">From<input type="date" name="start" defaultValue={inputDate(range.from)} /></label>
+-    <label className="analytics-date-filter">To<input type="date" name="end" defaultValue={inputDate(range.to)} /></label>
++    <div className="analytics-presets">{presets.map(preset => <a key={preset.days} href={preset.href} aria-current={preset.current ? 'true' : undefined}>{preset.label}</a>)}</div>
++    <label className="analytics-date-filter">From<input type="date" name="start" defaultValue={days.start} /></label>
++    <label className="analytics-date-filter">To<input type="date" name="end" defaultValue={days.end} /></label>
+     <fieldset className="analytics-channel-group"><legend className="shell-subnav__label">Channels</legend><input type="hidden" name="filter" value="1" />
+     {data?.targets.length ? data.targets.map(target => <label key={target.id}><input type="checkbox" name="channel" value={target.id} defaultChecked={selectedSet.has(target.id)} /><span>{target.name}</span></label>) : <p className="small-note">No channels connected.</p>}</fieldset>
+     {data?.adAccounts.length ? <fieldset className="analytics-channel-group"><legend className="shell-subnav__label">Ad accounts</legend><input type="hidden" name="adFilter" value="1" />
+@@ -90,23 +78,23 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
+     <a className="analytics-filter-reset" href="/analytics">Reset filters</a>
+   </form>;
+ 
+-  return <PageFrame module="analytics" sidebar={sidebar}><div className="page-stack">
+-    <header className="page-heading"><div><p className="eyebrow">Analytics</p><h1>Performance</h1><p>Stored channel and advertising metrics from {range.from.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })} to {range.to.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}.</p></div>{canExport && <a className="button button-secondary" href={`/api/reports/export?${exportParams}`}>Export CSV</a>}</header>
+-    {!data || !view ? <section className="panel analytics-state"><h2>Analytics could not be loaded</h2><p>Please try again in a moment.</p></section> : <>
++  return <PageFrame module="analytics" sidebar={sidebar}><div className="page-stack analytics-stack">
++    <header className="page-heading"><div><p className="eyebrow">Analytics</p><h1>Performance</h1><p>{view ? `Stored channel and advertising results from ${formatDay(days.start, true)} to ${formatDay(days.end, true)}.` : 'Stored channel and advertising results.'}</p></div>{canExport && <a className="button button-secondary" href={`/api/reports/export?${exportParams}`}>Export CSV</a>}</header>
++    {!data || !view || !audience ? <section className="panel analytics-state"><h2>Analytics could not be loaded</h2><p>Please try again in a moment.</p></section> : <>
+       {!selected.length ? <section className="panel analytics-state"><h2>{data.targets.length ? 'No channels selected' : 'No channels connected'}</h2><p>{data.targets.length ? 'Choose one or more channels in the sidebar to see available metrics.' : 'Connect a channel to see its audience and available metrics here.'}</p>{!data.targets.length && canUseFeature(entitlements, 'settings/connections') && <a className="analytics-state__action" href="/settings/connections">View connections</a>}</section> : <>
+-        <section className="panel analytics-audience"><div className="analytics-panel-title"><div><h2>Selected channel audience</h2><p className="small-note">The latest stored follower or Page-like count is included once for each channel with audience data.</p></div><span className="badge">{view.audience.covered} of {view.audience.selected} channels</span></div>
+-          <div className="analytics-audience__total"><strong>{new Intl.NumberFormat().format(view.audience.total)}</strong><span>total audience across channels with data</span></div>
+-          {view.audience.entries.length ? <div className="report-list">{view.audience.entries.map(entry => <div className="report-row" key={entry.id}><span>{entry.name}<small> {entry.metric === 'page_fans' ? 'Page likes' : 'Followers'}</small></span><strong>{new Intl.NumberFormat().format(entry.value)} · data {entry.asOf.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })} · synced {entry.fetchedAt.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</strong></div>)}</div> : <p className="empty-note">No audience counts are stored for the selected channels.</p>}
++        <section className="panel analytics-audience"><div className="analytics-panel-title"><div><h2>Selected channel audience</h2><p className="small-note">The latest stored follower count is included once for each channel with audience data.</p></div><span className="badge">{audience.covered} of {audience.selected} channels</span></div>
++          <div className="analytics-audience__total"><strong>{formatNumber(audience.total)}</strong><span>total audience across channels with data</span></div>
++          {audience.entries.length ? <div className="report-list">{audience.entries.map(entry => <div className="report-row" key={entry.id}><span>{entry.name}<small> {entry.label}</small></span><strong>{formatNumber(entry.value)} · data {formatDay(entry.asOf.toISOString().slice(0, 10), true)}</strong></div>)}</div> : <p className="empty-note">No audience counts are stored for the selected channels.</p>}
+           {audienceMissing.length > 0 && <p className="analytics-coverage">No stored audience count for: {audienceMissing.map(channel => channel.name).join(', ')}.</p>}
+-          <p className="small-note">Counts are added across channels. People who follow more than one selected Page may be counted more than once.</p>
++          <p className="small-note">Counts are added across channels. People who follow more than one selected channel may be counted more than once.</p>
++        </section>
++        {data.adAccounts.length > 0 && <p className="small-note analytics-ad-coverage">{data.adAccountCount ? `Advertising data was found for ${new Set(data.adRows.map(row => row.adAccount.id)).size} of ${data.adAccountCount} selected ad accounts in this period.` : 'No ad accounts selected. Choose accounts in the sidebar to include advertising results.'}</p>}
++        {view.overview.series.length ? <AnalyticsOverview overview={view.overview} /> : <section className="panel analytics-state"><h2>No results for this selection yet</h2><p>Try another date range or channel. New connections may take time to show performance data; advertising results appear when a connected ad account has data.</p></section>}
++        <TopPosts posts={view.topPosts} />
++        <section className="panel"><div className="analytics-panel-title"><div><h2>Publishing records</h2><p className="small-note">Workspace posts matched to the selected channels and period. Published posts use their publish date, scheduled posts use their scheduled date, and failed posts use their creation date.</p></div></div>
++          <div className="metric-grid"><article className="metric-card"><dl><dt>Published</dt><dd>{publishingCounts.published}</dd></dl></article><article className="metric-card"><dl><dt>Scheduled</dt><dd>{publishingCounts.scheduled}</dd></dl></article><article className="metric-card"><dl><dt>Failed or partial</dt><dd>{publishingCounts.failed}</dd></dl></article></div>
+         </section>
+-        {data.adAccounts.length > 0 && <p className="small-note analytics-ad-coverage">{data.adAccountCount ? `Advertising data was found for ${new Set(data.adRows.map(row => row.adAccount.id)).size} of ${data.adAccountCount} selected ad accounts in this date range.` : 'No ad accounts selected. Choose accounts in the sidebar to include advertising metrics.'}</p>}
+-        {view.metrics.length ? <section className="panel"><div className="analytics-panel-title"><div><h2>Available metrics</h2><p className="small-note">Each chart and table is built from metrics already stored for this workspace.</p></div><span className="badge">{view.metrics.length} metrics</span></div>
+-          <div className="analytics-metrics">{view.metrics.map(metric => <MetricChart metric={metric} key={`${metric.source}:${metric.key}`} />)}</div>
+-        </section> : <section className="panel analytics-state"><h2>No metrics for this selection yet</h2><p>Try another date range or channel. New connections may take time to show performance data; advertising results appear when a connected ad account has data.</p></section>}
+-      <section className="panel"><div className="analytics-panel-title"><div><h2>Publishing records</h2><p className="small-note">Workspace posts matched to the selected channels and date range. Published posts use their publish date, scheduled posts use their scheduled date, and failed posts use their creation date.</p></div></div>
+-        <div className="metric-grid"><article className="metric-card"><dl><dt>Published</dt><dd>{publishingCounts.published}</dd></dl></article><article className="metric-card"><dl><dt>Scheduled</dt><dd>{publishingCounts.scheduled}</dd></dl></article><article className="metric-card"><dl><dt>Failed or partial</dt><dd>{publishingCounts.failed}</dd></dl></article></div>
+-      </section>
++        <AnalyticsNotes overview={view.overview} />
+       </>}
+     </>}
+   </div></PageFrame>;
+diff --git a/rebuild/src/app/api/reports/export/route.ts b/rebuild/src/app/api/reports/export/route.ts
+index ae3c0f62..1cc7c41a 100644
+--- a/rebuild/src/app/api/reports/export/route.ts
++++ b/rebuild/src/app/api/reports/export/route.ts
+@@ -1,17 +1,12 @@
+ import { NextResponse } from 'next/server';
+ import { requireViewer } from '@/server/context';
+-import { analyticsRange, loadAnalytics } from '@/server/analytics/data';
+-import { buildReportOverview, reportOverviewCsv } from '@/server/analytics/reports';
++import { loadAnalyticsView } from '@/server/analytics/view';
++import { reportCsv } from '@/server/analytics/reports';
++import { isCalendarDay } from '@/server/analytics/time';
+ import { runtimeConfig } from '@/server/config/store';
+ 
+ export const dynamic = 'force-dynamic';
+ 
+-function isCalendarDay(value: string | null): value is string {
+-  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+-  const date = new Date(`${value}T00:00:00.000Z`);
+-  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
+-}
+-
+ export async function GET(request: Request) {
+   let viewer;
+   try { viewer = await requireViewer({ feature: 'analytics/reports', channelScoped: true }); }
+@@ -22,21 +17,19 @@ export async function GET(request: Request) {
+   if ((start && !isCalendarDay(start)) || (end && !isCalendarDay(end)) || (start && end && start > end)) {
+     return NextResponse.json({ error: 'Choose a valid date range.' }, { status: 400 });
+   }
+-  const range = analyticsRange(start ?? undefined, end ?? undefined);
+-  const allowedTargetIds = viewer.permissions.pageScope.all ? undefined : viewer.permissions.pageScope.ids;
+-  const initial = await loadAnalytics(viewer.workspaceId, [], range, allowedTargetIds);
+   const channels = params.getAll('channel');
+   const maxChannels = await runtimeConfig('analytics.reportMaxChannels');
+   if (channels.length > maxChannels) return NextResponse.json({ error: `Select at most ${maxChannels} channels for one export.` }, { status: 400 });
+   const adAccounts = params.getAll('adAccount');
+   if (adAccounts.length > maxChannels) return NextResponse.json({ error: `Select at most ${maxChannels} ad accounts for one export.` }, { status: 400 });
+-  const requested = new Set(channels);
+-  const selectedIds = params.get('filter') === '1'
+-    ? initial.targets.filter(target => requested.has(target.id)).map(target => target.id)
+-    : initial.targets.map(target => target.id);
+-  const data = await loadAnalytics(viewer.workspaceId, selectedIds, range, allowedTargetIds, params.get('adFilter') === '1' ? adAccounts : undefined);
+-  const result = reportOverviewCsv(buildReportOverview(data), await runtimeConfig('analytics.reportExportRows'));
+-  const filename = `report-${start ?? 'last-30-days'}-${end ?? 'today'}.csv`;
++  const allowedTargetIds = viewer.permissions.pageScope.all ? undefined : viewer.permissions.pageScope.ids;
++  // The same loader as the Analytics page, so the file matches what is on screen.
++  const view = await loadAnalyticsView({
++    workspaceId: viewer.workspaceId, allowedTargetIds, timeZone: viewer.membership.workspace.timezone,
++    query: { start: start ?? undefined, end: end ?? undefined, filter: params.get('filter') ?? undefined, channel: channels, adFilter: params.get('adFilter') ?? undefined, adAccount: adAccounts },
++  });
++  const result = reportCsv({ overview: view.overview, audience: view.audience, topPosts: view.topPosts }, await runtimeConfig('analytics.reportExportRows'));
++  const filename = `report-${view.days.start}-to-${view.days.end}.csv`;
+   return new NextResponse(result.csv, { headers: {
+     'content-type': 'text/csv; charset=utf-8',
+     'content-disposition': `attachment; filename="${filename}"`,
+diff --git a/rebuild/src/app/reports/page.tsx b/rebuild/src/app/reports/page.tsx
+index e57a6d4f..89416fd3 100644
+--- a/rebuild/src/app/reports/page.tsx
++++ b/rebuild/src/app/reports/page.tsx
+@@ -4,7 +4,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
+   const params = new URLSearchParams();
+   const search = await searchParams;
+   for (const [key, value] of Object.entries(search)) {
+-    if (!['start', 'end', 'filter', 'channel'].includes(key)) continue;
++    if (!['start', 'end', 'filter', 'channel', 'adFilter', 'adAccount'].includes(key)) continue;
+     for (const item of Array.isArray(value) ? value : value ? [value] : []) params.append(key, item);
+   }
+   redirect(`/analytics${params.size ? `?${params}` : ''}`);
+diff --git a/rebuild/src/components/LineChart.tsx b/rebuild/src/components/LineChart.tsx
+new file mode 100644
+index 00000000..b5e7e831
+--- /dev/null
++++ b/rebuild/src/components/LineChart.tsx
+@@ -0,0 +1,185 @@
++"use client";
++
++import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent as ReactPointerEvent } from "react";
++import { extentOf, labelIndexes, linePath, nearestIndex, niceScale } from "@/lib/analytics/chart-math";
++
++/** Colour, dash and marker shape for the nth series, so no meaning rests on colour alone. */
++const DASHES = ["", "7 4", "2 3", "10 3 2 3", "1 5", "14 4"] as const;
++const SHAPES = ["circle", "square", "triangle", "diamond", "cross", "circle-open"] as const;
++export const CHART_SLOTS = DASHES.length;
++
++export function seriesStyle(slot: number) {
++  const index = ((slot % CHART_SLOTS) + CHART_SLOTS) % CHART_SLOTS;
++  return { color: `var(--chart-${index + 1})`, dash: DASHES[index]!, shape: SHAPES[index]! };
++}
++
++type Shape = (typeof SHAPES)[number];
++
++export function Marker({ shape, x, y, color, size = 4.5 }: { shape: Shape; x: number; y: number; color: string; size?: number }) {
++  const common = { fill: color, stroke: "var(--surface)", strokeWidth: 1.5 };
++  switch (shape) {
++    case "square": return <rect x={x - size} y={y - size} width={size * 2} height={size * 2} {...common} />;
++    case "triangle": return <polygon points={`${x},${y - size - 1} ${x + size + 1},${y + size} ${x - size - 1},${y + size}`} {...common} />;
++    case "diamond": return <polygon points={`${x},${y - size - 1} ${x + size + 1},${y} ${x},${y + size + 1} ${x - size - 1},${y}`} {...common} />;
++    case "cross": return <path d={`M${x - size} ${y - size}L${x + size} ${y + size}M${x + size} ${y - size}L${x - size} ${y + size}`} stroke={color} strokeWidth={2.4} fill="none" />;
++    case "circle-open": return <circle cx={x} cy={y} r={size} fill="var(--surface)" stroke={color} strokeWidth={2.2} />;
++    default: return <circle cx={x} cy={y} r={size} {...common} />;
++  }
++}
++
++export type ChartLine = {
++  id: string;
++  label: string;
++  values: Array<number | null>;
++  /** Index into the colour, dash and marker set. */
++  slot: number;
++  /** A muted comparison line drawn behind the others (for example the previous period). */
++  reference?: boolean;
++};
++
++type LineChartProps = {
++  /** Calendar days (YYYY-MM-DD), one per value. */
++  days: string[];
++  lines: ChartLine[];
++  /** Writes a value for the tooltip and the text summary. */
++  formatValue: (value: number, lineId: string) => string;
++  /** Writes a short axis value. */
++  formatAxis: (value: number) => string;
++  formatDay: (day: string) => string;
++  /** Accessible name of the chart. */
++  label: string;
++  /** Scale every line to its own range (lines of different units); the axis then shows no numbers. */
++  separateScales?: boolean;
++  /** Start the axis at zero (default). Turn off for running totals such as followers, where zero hides the movement. */
++  includeZero?: boolean;
++  height?: number;
++};
++
++function useWidth() {
++  const ref = useRef<HTMLDivElement | null>(null);
++  const [width, setWidth] = useState(720);
++  useEffect(() => {
++    const node = ref.current;
++    if (!node) return;
++    const update = () => setWidth(Math.max(240, Math.round(node.getBoundingClientRect().width)));
++    update();
++    if (typeof ResizeObserver === "undefined") return;
++    const observer = new ResizeObserver(update);
++    observer.observe(node);
++    return () => observer.disconnect();
++  }, []);
++  return [ref, width] as const;
++}
++
++export function LineChart({ days, lines, formatValue, formatAxis, formatDay, label, separateScales = false, includeZero = true, height }: LineChartProps) {
++  const [hostRef, width] = useWidth();
++  const [active, setActive] = useState<number | null>(null);
++  const hintId = useId();
++  const compact = width < 480;
++  const chartHeight = height ?? (compact ? 220 : 300);
++  const margin = { top: 14, right: compact ? 12 : 20, bottom: 30, left: separateScales ? 12 : compact ? 44 : 56 };
++  const plotWidth = Math.max(40, width - margin.left - margin.right);
++  const plotHeight = chartHeight - margin.top - margin.bottom;
++
++  const scale = useMemo(() => {
++    const extent = extentOf(lines.map(line => line.values), includeZero);
++    return niceScale(extent.min, extent.max, compact ? 3 : 4);
++  }, [lines, compact, includeZero]);
++  const own = useMemo(() => new Map(lines.map(line => { const extent = extentOf([line.values], includeZero); return [line.id, niceScale(extent.min, extent.max, 4)] as const; })), [lines, includeZero]);
++
++  const x = (index: number) => margin.left + (days.length <= 1 ? plotWidth / 2 : (index / (days.length - 1)) * plotWidth);
++  const yFor = (line: ChartLine) => {
++    const s = separateScales ? own.get(line.id)! : scale;
++    return (value: number) => margin.top + plotHeight - ((value - s.min) / (s.max - s.min || 1)) * plotHeight;
++  };
++  const xLabels = labelIndexes(days.length, compact ? 4 : 7);
++  const showMarkers = days.length <= 45;
++
++  const summary = lines.filter(line => !line.reference).map(line => {
++    const points = line.values.flatMap((value, index) => value === null ? [] : [{ value, index }]);
++    if (!points.length) return `${line.label}: no values`;
++    const high = points.reduce((best, point) => (point.value > best.value ? point : best));
++    return `${line.label}: from ${formatValue(points[0]!.value, line.id)} on ${formatDay(days[points[0]!.index]!)} to ${formatValue(points.at(-1)!.value, line.id)} on ${formatDay(days[points.at(-1)!.index]!)}, highest ${formatValue(high.value, line.id)} on ${formatDay(days[high.index]!)}`;
++  }).join(". ");
++
++  const move = (event: ReactPointerEvent<SVGRectElement>) => {
++    const box = event.currentTarget.ownerSVGElement!.getBoundingClientRect();
++    setActive(nearestIndex(event.clientX - box.left, margin.left, plotWidth, days.length));
++  };
++  const onKey = (event: KeyboardEvent<HTMLDivElement>) => {
++    if (!days.length) return;
++    const last = days.length - 1;
++    const next = event.key === "ArrowRight" ? Math.min(last, (active ?? -1) + 1) : event.key === "ArrowLeft" ? Math.max(0, (active ?? last + 1) - 1) : event.key === "Home" ? 0 : event.key === "End" ? last : null;
++    if (event.key === "Escape") { setActive(null); return; }
++    if (next === null) return;
++    event.preventDefault();
++    setActive(next);
++  };
++
++  const readout = active === null ? "" : `${formatDay(days[active]!)}: ${lines.map(line => `${line.label} ${line.values[active] === null || line.values[active] === undefined ? "no value" : formatValue(line.values[active]!, line.id)}`).join(", ")}`;
++  const tooltipLeft = active === null ? 0 : Math.min(Math.max(x(active), 90), width - 90);
++
++  return <div className="ui-chart" ref={hostRef}>
++    <div className="ui-chart__frame" role="group" aria-label={label} aria-describedby={hintId} tabIndex={0} onKeyDown={onKey} onBlur={() => setActive(null)}>
++      <svg width={width} height={chartHeight} viewBox={`0 0 ${width} ${chartHeight}`} role="img" aria-label={`${label}. ${summary}`} onPointerLeave={() => setActive(null)}>
++        {(separateScales ? [0, 1, 2, 3, 4] : scale.ticks).map((tick, index, all) => {
++          const position = separateScales ? margin.top + plotHeight - (index / (all.length - 1)) * plotHeight : margin.top + plotHeight - ((tick - scale.min) / (scale.max - scale.min || 1)) * plotHeight;
++          return <g key={`${tick}-${index}`}>
++            <line className="ui-chart__grid" x1={margin.left} x2={margin.left + plotWidth} y1={position} y2={position} />
++            {!separateScales && <text className="ui-chart__tick" x={margin.left - 8} y={position} textAnchor="end" dominantBaseline="middle">{formatAxis(tick)}</text>}
++          </g>;
++        })}
++        {xLabels.map(index => <text key={index} className="ui-chart__tick" x={x(index)} y={chartHeight - 8} textAnchor={index === 0 && xLabels.length > 1 ? "start" : index === days.length - 1 && xLabels.length > 1 ? "end" : "middle"}>{formatDay(days[index]!)}</text>)}
++        {[...lines].sort((a, b) => Number(Boolean(b.reference)) - Number(Boolean(a.reference))).map(line => {
++          const style = seriesStyle(line.slot);
++          const toY = yFor(line);
++          return <g key={line.id}>
++            <path d={linePath(line.values, x, toY)} fill="none" stroke={line.reference ? "var(--ink-faint)" : style.color} strokeWidth={line.reference ? 1.5 : 2.4} strokeDasharray={line.reference ? "3 4" : style.dash} strokeLinecap="round" strokeLinejoin="round" opacity={line.reference ? 0.8 : 1} />
++            {!line.reference && showMarkers && line.values.map((value, index) => value === null ? null : <Marker key={index} shape={style.shape} x={x(index)} y={toY(value)} color={style.color} size={days.length > 20 ? 2.6 : 3.6} />)}
++          </g>;
++        })}
++        {active !== null && <g>
++          <line className="ui-chart__guide" x1={x(active)} x2={x(active)} y1={margin.top} y2={margin.top + plotHeight} />
++          {lines.filter(line => !line.reference).map(line => { const value = line.values[active]; return value === null || value === undefined ? null : <Marker key={line.id} shape={seriesStyle(line.slot).shape} x={x(active)} y={yFor(line)(value)} color={seriesStyle(line.slot).color} size={5.5} />; })}
++        </g>}
++        <rect x={margin.left} y={margin.top} width={plotWidth} height={plotHeight} fill="transparent" onPointerMove={move} onPointerDown={move} />
++      </svg>
++      {active !== null && <div className="ui-chart__tooltip" style={{ left: tooltipLeft }} aria-hidden="true">
++        <strong>{formatDay(days[active]!)}</strong>
++        {lines.map(line => <span key={line.id}><svg width="22" height="10" aria-hidden="true"><line x1="1" x2="21" y1="5" y2="5" stroke={line.reference ? "var(--ink-faint)" : seriesStyle(line.slot).color} strokeWidth="2.4" strokeDasharray={line.reference ? "3 3" : seriesStyle(line.slot).dash} /></svg>{line.label}: <b>{line.values[active] === null || line.values[active] === undefined ? "—" : formatValue(line.values[active]!, line.id)}</b></span>)}
++      </div>}
++    </div>
++    <p id={hintId} className="ui-chart__hint">{separateScales ? "Each line has its own scale. " : ""}Use the left and right arrow keys, or hover, to read values. A table view is available.</p>
++    <p className="ui-visually-hidden" role="status" aria-live="polite">{readout}</p>
++  </div>;
++}
++
++export type LegendItem = { id: string; label: string; slot: number; active: boolean; detail?: string; reference?: boolean };
++
++/** Toggle buttons that double as the chart key: the swatch repeats the line's dash pattern and marker. */
++export function ChartLegend({ items, onToggle, label }: { items: LegendItem[]; onToggle?: (id: string) => void; label: string }) {
++  return <ul className="ui-chart-legend" aria-label={label}>
++    {items.map(item => {
++      const style = seriesStyle(item.slot);
++      const swatch = <svg width="30" height="12" aria-hidden="true"><line x1="1" x2="29" y1="6" y2="6" stroke={item.reference ? "var(--ink-faint)" : style.color} strokeWidth="2.4" strokeDasharray={item.reference ? "3 3" : style.dash} />{!item.reference && <Marker shape={style.shape} x={15} y={6} color={style.color} size={3.6} />}</svg>;
++      return <li key={item.id}>{onToggle
++        ? <button type="button" className="ui-chart-legend__item" aria-pressed={item.active} onClick={() => onToggle(item.id)}>{swatch}<span>{item.label}</span>{item.detail && <small>{item.detail}</small>}</button>
++        : <span className="ui-chart-legend__item">{swatch}<span>{item.label}</span>{item.detail && <small>{item.detail}</small>}</span>}</li>;
++    })}
++  </ul>;
++}
++
++/** A small decorative trend line. The numbers beside it carry the meaning. */
++export function Sparkline({ values, slot = 0 }: { values: Array<number | null>; slot?: number }) {
++  const width = 120; const height = 32; const pad = 3;
++  const extent = extentOf([values], false);
++  const span = extent.max - extent.min || 1;
++  const x = (index: number) => pad + (values.length <= 1 ? (width - pad * 2) / 2 : (index / (values.length - 1)) * (width - pad * 2));
++  const y = (value: number) => height - pad - ((value - extent.min) / span) * (height - pad * 2);
++  const last = values.reduce<number>((found, value, index) => (value === null ? found : index), -1);
++  const style = seriesStyle(slot);
++  return <svg className="ui-sparkline" viewBox={`0 0 ${width} ${height}`} aria-hidden="true" focusable="false">
++    <path d={linePath(values, x, y)} fill="none" stroke={style.color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
++    {last >= 0 && <circle cx={x(last)} cy={y(values[last]!)} r="2.6" fill={style.color} />}
++  </svg>;
++}
+diff --git a/rebuild/src/components/index.ts b/rebuild/src/components/index.ts
+index 634a7bd1..8fbfa786 100644
+--- a/rebuild/src/components/index.ts
++++ b/rebuild/src/components/index.ts
+@@ -5,3 +5,5 @@ export type { TableColumn } from "./DataTable";
+ export { FilterBar, FilterSelect } from "./Filters";
+ export type { FilterChoice } from "./Filters";
+ export { Dialog } from "./Dialog";
++export { LineChart, ChartLegend, Sparkline, Marker, seriesStyle, CHART_SLOTS } from "./LineChart";
++export type { ChartLine, LegendItem } from "./LineChart";
+diff --git a/rebuild/src/lib/analytics/chart-math.ts b/rebuild/src/lib/analytics/chart-math.ts
+index 41dea582..ee445ff0 100644
+--- a/rebuild/src/lib/analytics/chart-math.ts
++++ b/rebuild/src/lib/analytics/chart-math.ts
+@@ -2,14 +2,14 @@
+ 
+ export type Tick = { value: number; label?: string };
+ 
+-/** Round axis bounds and ticks: the smallest 1/2/5×10ⁿ step that gives at most `count` intervals. */
++/** Round axis bounds and ticks: a 1, 2 or 5 × 10ⁿ step giving about `count` intervals. */
+ export function niceScale(min: number, max: number, count = 4): { min: number; max: number; ticks: number[] } {
+   if (!Number.isFinite(min) || !Number.isFinite(max)) return { min: 0, max: 1, ticks: [0, 1] };
+   if (min === max) { max = min + (min === 0 ? 1 : Math.abs(min) * 0.1); }
+   const rough = (max - min) / Math.max(1, count);
+   const magnitude = 10 ** Math.floor(Math.log10(rough));
+   const residual = rough / magnitude;
+-  const step = (residual <= 1 ? 1 : residual <= 2 ? 2 : residual <= 5 ? 5 : 10) * magnitude;
++  const step = (residual <= 1.5 ? 1 : residual <= 3 ? 2 : residual <= 7 ? 5 : 10) * magnitude;
+   const lower = Math.floor(min / step) * step;
+   const upper = Math.ceil(max / step) * step;
+   const ticks: number[] = [];
+diff --git a/rebuild/src/lib/analytics/format.ts b/rebuild/src/lib/analytics/format.ts
+index 4e6cf873..3c639971 100644
+--- a/rebuild/src/lib/analytics/format.ts
++++ b/rebuild/src/lib/analytics/format.ts
+@@ -7,8 +7,9 @@ const numberFormat = new Intl.NumberFormat(LOCALE, { maximumFractionDigits: 1 })
+ const compactFormat = new Intl.NumberFormat(LOCALE, { notation: 'compact', maximumFractionDigits: 1 });
+ const wholeFormat = new Intl.NumberFormat(LOCALE, { maximumFractionDigits: 0 });
+ 
+-export function formatNumber(value: number, compact = false): string {
+-  if (compact && Math.abs(value) >= 10_000) return compactFormat.format(value);
++/** `compact: 'axis'` abbreviates from 1,000 so axis labels stay consistent (5K, 10K, 15K). */
++export function formatNumber(value: number, compact: boolean | 'axis' = false): string {
++  if (compact && Math.abs(value) >= (compact === 'axis' ? 1000 : 10_000)) return compactFormat.format(value);
+   return Math.abs(value) >= 1000 ? wholeFormat.format(value) : numberFormat.format(value);
+ }
+ 
+@@ -21,10 +22,10 @@ export function formatDuration(totalSeconds: number): string {
+   return minutes % 60 ? `${hours} h ${minutes % 60} min` : `${hours} h`;
+ }
+ 
+-function formatMoney(value: number, currency: string | null, compact: boolean): string {
++function formatMoney(value: number, currency: string | null, compact: boolean | 'axis'): string {
+   if (!currency) return Math.abs(value) >= 1000 ? wholeFormat.format(value) : new Intl.NumberFormat(LOCALE, { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
+   try {
+-    const big = compact && Math.abs(value) >= 10_000;
++    const big = compact && Math.abs(value) >= (compact === 'axis' ? 1000 : 10_000);
+     return new Intl.NumberFormat(LOCALE, { style: 'currency', currency, ...(big ? { notation: 'compact', maximumFractionDigits: 1 } : { maximumFractionDigits: Math.abs(value) >= 1000 ? 0 : 2 }) }).format(value);
+   } catch {
+     return `${currency} ${numberFormat.format(value)}`;
+@@ -32,7 +33,7 @@ function formatMoney(value: number, currency: string | null, compact: boolean):
+ }
+ 
+ /** Writes a value for its unit: counts and people with separators, rates with %, money with its currency. */
+-export function formatValue(value: number | null | undefined, format: ValueFormat, options: { compact?: boolean } = {}): string {
++export function formatValue(value: number | null | undefined, format: ValueFormat, options: { compact?: boolean | 'axis' } = {}): string {
+   if (value === null || value === undefined || !Number.isFinite(value)) return '—';
+   const compact = options.compact ?? false;
+   switch (format.unit) {
+diff --git a/rebuild/src/server/analytics/aggregate.ts b/rebuild/src/server/analytics/aggregate.ts
+index 4abf451b..2016f278 100644
+--- a/rebuild/src/server/analytics/aggregate.ts
++++ b/rebuild/src/server/analytics/aggregate.ts
+@@ -43,7 +43,8 @@ function metricSeries(key: string, source: 'page' | 'instagram' | 'ads', kind: A
+   return { key, label: metricLabel(key), source, unit, kind, total, latestAt, coverage: rows.length, available: selectedCount, points, rows };
+ }
+ 
+-export function buildAnalytics(pageRows: PageRow[], adRows: AdRow[], audienceRows: AudienceRow[], selectedTargets: Array<{ id: string; type: string; name: string; providerId?: string }>, adAvailableCount = new Set(adRows.map(row => row.adAccount.id)).size, instagramRows: InstagramRow[] = [], instagramAudienceRows: InstagramAudienceRow[] = []) {
++/** Latest stored audience count for each selected channel, added once per channel. */
++export function buildAudience(audienceRows: AudienceRow[], instagramAudienceRows: InstagramAudienceRow[], selectedTargets: Array<{ id: string; type: string; name: string; providerId?: string }>) {
+   const selectedPages = selectedTargets.filter(target => target.type === 'page');
+   const pageAudience = latestAudience(audienceRows, selectedPages.map(channel => channel.id));
+   const selectedInstagram = selectedTargets.filter(target => target.type === 'instagram');
+@@ -55,8 +56,14 @@ export function buildAnalytics(pageRows: PageRow[], adRows: AdRow[], audienceRow
+       ? [{ id: target.id, name: target.name, value: row.followersCount, asOf: observedAt, fetchedAt: observedAt, metric: 'instagram_followers' }]
+       : [];
+   });
+-  const audienceEntries = [...pageAudience.entries, ...instagramAudience];
+-  const audience = { entries: audienceEntries, total: audienceEntries.reduce((sum, row) => sum + row.value, 0), covered: audienceEntries.length, selected: selectedPages.length + selectedInstagram.length };
++  const entries = [...pageAudience.entries, ...instagramAudience];
++  return { entries, total: entries.reduce((sum, row) => sum + row.value, 0), covered: entries.length, selected: selectedPages.length + selectedInstagram.length };
++}
++
++export function buildAnalytics(pageRows: PageRow[], adRows: AdRow[], audienceRows: AudienceRow[], selectedTargets: Array<{ id: string; type: string; name: string; providerId?: string }>, adAvailableCount = new Set(adRows.map(row => row.adAccount.id)).size, instagramRows: InstagramRow[] = [], instagramAudienceRows: InstagramAudienceRow[] = []) {
++  const selectedPages = selectedTargets.filter(target => target.type === 'page');
++  const selectedInstagram = selectedTargets.filter(target => target.type === 'instagram');
++  const audience = buildAudience(audienceRows, instagramAudienceRows, selectedTargets);
+   const metrics: MetricView[] = [];
+   const pageGroups = new Map<string, PageRow[]>();
+   for (const row of pageRows) { const seriesKey = `${row.metric}::${row.period ?? 'day'}`; const group = pageGroups.get(seriesKey) ?? []; group.push(row); pageGroups.set(seriesKey, group); }
+diff --git a/rebuild/src/server/analytics/posts.ts b/rebuild/src/server/analytics/posts.ts
+new file mode 100644
+index 00000000..2d71b39b
+--- /dev/null
++++ b/rebuild/src/server/analytics/posts.ts
+@@ -0,0 +1,86 @@
++import { prisma } from '@/server/data';
++import type { TopPost } from '@/lib/analytics/types';
++
++export type TopPostInput = {
++  id: string;
++  text: string | null;
++  channelName: string;
++  publishedAt: Date;
++  url: string | null;
++  comments: number | null;
++  likes: number | null;
++};
++
++const EXCERPT_LENGTH = 140;
++
++/** Only web links are offered to customers. */
++export function safeWebUrl(value: string | null | undefined): string | null {
++  if (!value) return null;
++  try {
++    const url = new URL(value);
++    return url.protocol === 'https:' || url.protocol === 'http:' ? url.toString() : null;
++  } catch { return null; }
++}
++
++export function postExcerpt(text: string | null | undefined): string {
++  const clean = (text ?? '').replace(/\s+/g, ' ').trim();
++  if (!clean) return 'Post without text';
++  return clean.length > EXCERPT_LENGTH ? `${clean.slice(0, EXCERPT_LENGTH - 1).trimEnd()}…` : clean;
++}
++
++/**
++ * Orders posts by the reactions stored for them (comments plus likes), newest
++ * first among equals, and keeps the best `limit`. Posts nobody reacted to stay
++ * in the list so that a quiet period still shows what was published.
++ */
++export function rankTopPosts(rows: TopPostInput[], limit: number): TopPost[] {
++  return rows
++    .map<TopPost>(row => ({
++      id: row.id,
++      excerpt: postExcerpt(row.text),
++      channelName: row.channelName,
++      publishedAt: row.publishedAt.toISOString(),
++      url: safeWebUrl(row.url),
++      comments: row.comments,
++      likes: row.likes,
++      interactions: (row.comments ?? 0) + (row.likes ?? 0),
++    }))
++    .sort((a, b) => b.interactions - a.interactions || b.publishedAt.localeCompare(a.publishedAt) || a.id.localeCompare(b.id))
++    .slice(0, Math.max(0, limit));
++}
++
++type Range = { from: Date; to: Date };
++type SelectedChannel = { id: string; type: string; name: string; providerId?: string };
++
++/** Published posts for the selected channels in the range, with the reactions stored for them. */
++export async function loadTopPosts(workspaceId: string, channels: SelectedChannel[], range: Range, limit = 50): Promise<TopPost[]> {
++  if (!channels.length) return [];
++  const names = new Map(channels.map(channel => [channel.id, channel.name]));
++  const instagram = channels.filter(channel => channel.type === 'instagram' && channel.providerId);
++  const [published, media] = await Promise.all([
++    prisma.postTarget.findMany({
++      where: {
++        targetId: { in: channels.map(channel => channel.id) }, status: 'published', target: { workspaceId }, post: { workspaceId },
++        OR: [{ publishedAt: { gte: range.from, lte: range.to } }, { publishedAt: null, post: { publishedAt: { gte: range.from, lte: range.to } } }],
++      },
++      orderBy: { publishedAt: 'desc' }, take: 500,
++      select: { id: true, targetId: true, remoteUrl: true, publishedAt: true, post: { select: { message: true, publishedAt: true } }, _count: { select: { comments: true } } },
++    }),
++    instagram.length ? prisma.instagramMedia.findMany({
++      where: { account: { workspaceId, enabled: true, igUserId: { in: instagram.map(channel => channel.providerId!) } }, timestamp: { gte: range.from, lte: range.to } },
++      orderBy: { timestamp: 'desc' }, take: 500,
++      select: { id: true, caption: true, permalink: true, timestamp: true, likeCount: true, commentsCount: true, account: { select: { igUserId: true } } },
++    }) : Promise.resolve([]),
++  ]);
++  const inputs: TopPostInput[] = [
++    ...published.flatMap(item => {
++      const publishedAt = item.publishedAt ?? item.post.publishedAt;
++      return publishedAt ? [{ id: `post:${item.id}`, text: item.post.message, channelName: names.get(item.targetId) ?? 'Channel', publishedAt, url: item.remoteUrl, comments: item._count.comments, likes: null }] : [];
++    }),
++    ...media.map(item => ({
++      id: `media:${item.id}`, text: item.caption, channelName: instagram.find(channel => channel.providerId === item.account.igUserId)?.name ?? 'Channel',
++      publishedAt: item.timestamp, url: item.permalink, comments: item.commentsCount, likes: item.likeCount,
++    })),
++  ];
++  return rankTopPosts(inputs, limit);
++}
+diff --git a/rebuild/src/server/analytics/reports.ts b/rebuild/src/server/analytics/reports.ts
+index 4f07481e..29bf1f6d 100644
+--- a/rebuild/src/server/analytics/reports.ts
++++ b/rebuild/src/server/analytics/reports.ts
+@@ -1,12 +1,13 @@
+-import { buildAnalytics } from './aggregate';
+-import type { loadAnalytics } from './data';
++import type { AnalyticsOverview, OverviewSeries, TopPost } from '@/lib/analytics/types';
+ 
+-type AnalyticsData = Awaited<ReturnType<typeof loadAnalytics>>;
++/** What the export needs: the same objects the Analytics page shows. */
++export type ReportInput = {
++  overview: AnalyticsOverview;
++  audience: { entries: Array<{ name: string; label: string; value: number; asOf: Date }> };
++  topPosts: TopPost[];
++};
+ 
+-/** Builds one report view from the exact same scoped stored analytics snapshot as Analytics. */
+-export function buildReportOverview(data: AnalyticsData) {
+-  return buildAnalytics(data.pageRows, data.adRows, data.audienceRows, data.selectedTargets, data.adAccountCount, data.instagramRows, data.selectedInstagramAudience);
+-}
++export const REPORT_COLUMNS = ['record_type', 'metric', 'channel', 'date', 'value', 'previous_value', 'change_percent', 'unit', 'currency', 'note', 'link'] as const;
+ 
+ function csvCell(value: unknown): string {
+   let text = value === null || value === undefined ? '' : value instanceof Date ? value.toISOString() : String(value);
+@@ -15,16 +16,56 @@ function csvCell(value: unknown): string {
+   return `"${text.replaceAll('"', '""')}"`;
+ }
+ 
+-/** A stable long-form CSV; truncation is explicit and the row ceiling is shared by all callers. */
+-export function reportOverviewCsv(view: ReturnType<typeof buildReportOverview>, limit: number) {
++function unitLabel(series: OverviewSeries): string {
++  switch (series.format.unit) {
++    case 'rate': return series.format.style === 'multiple' ? 'times' : 'percent';
++    case 'currency': return 'money';
++    case 'duration': return 'seconds';
++    default: return series.format.unit;
++  }
++}
++
++function seriesNote(series: OverviewSeries): string {
++  const notes: string[] = [];
++  if (series.upTo) notes.push('Up to: distinct people are not added across days or channels');
++  if (series.approximate) notes.push('Estimate: uses distinct people counted per day');
++  if (series.windowLabel) notes.push(`Rolling window: ${series.windowLabel}`);
++  return notes.join('; ');
++}
++
++/**
++ * A stable long-form CSV of exactly what Analytics shows: key numbers with the
++ * previous-period comparison, each channel's value, audience, top posts,
++ * breakdowns, retired metrics and the daily values. Rows are ordered by
++ * importance so a truncated export drops the daily detail first; truncation is
++ * explicit.
++ */
++export function reportCsv(input: ReportInput, limit: number) {
+   const cap = Math.max(0, Math.floor(limit));
+-  const rows: unknown[][] = [['record_type', 'metric', 'source', 'channel', 'date', 'value', 'unit']];
+-  for (const entry of view.audience.entries) rows.push(['audience', entry.metric, entry.metric.startsWith('instagram') ? 'instagram' : 'page', entry.name, entry.asOf, entry.value, 'people']);
+-  for (const metric of view.metrics) {
+-    for (const point of metric.points) rows.push(['metric', metric.label, metric.source, '', point.date, point.value, metric.unit]);
+-    for (const row of metric.rows) rows.push(['channel', metric.label, metric.source, row.label, row.asOf, row.value, metric.unit]);
++  const { overview } = input;
++  const rows: unknown[][] = [];
++  const percent = (series: OverviewSeries) => series.change && series.change.percent !== null ? Number(series.change.percent.toFixed(2)) : '';
++
++  for (const series of overview.series) rows.push(['summary', series.name, '', '', series.total, series.previousTotal, percent(series), unitLabel(series), series.format.currency, seriesNote(series), '']);
++  for (const series of overview.series) for (const channel of series.channels) {
++    const change = channel.total !== null && channel.previousTotal ? Number(((channel.total - channel.previousTotal) / Math.abs(channel.previousTotal) * 100).toFixed(2)) : '';
++    rows.push(['channel', series.name, channel.name, '', channel.total, channel.previousTotal, change, unitLabel(series), series.format.currency, '', '']);
+   }
+-  const body = rows.slice(1, cap + 1).map(row => row.map(csvCell).join(','));
+-  const truncated = rows.length - 1 > cap;
+-  return { csv: [rows[0]!.map(csvCell).join(','), ...body, ...(truncated ? [csvCell('truncated') + ',' + csvCell('true')] : [])].join('\r\n') + '\r\n', rowCount: body.length, truncated };
++  for (const entry of input.audience.entries) rows.push(['audience', entry.label, entry.name, entry.asOf, entry.value, '', '', 'people', '', '', '']);
++  for (const post of input.topPosts) rows.push(['top_post', 'Interactions', post.channelName, post.publishedAt, post.interactions, '', '', 'count', '', post.excerpt, post.url ?? '']);
++  for (const breakdown of overview.breakdowns) for (const row of breakdown.rows) rows.push(['breakdown', breakdown.name, '', breakdown.asOf ?? '', row.value, '', '', 'count', '', row.label, '']);
++  for (const metric of overview.retired) rows.push(['unavailable', metric.name, '', '', '', '', '', '', '', `Retired on ${metric.retiredOn}${metric.replacedByName ? `; use ${metric.replacedByName}` : ''}`, '']);
++  for (const series of overview.series) overview.days.forEach((day, index) => {
++    const value = series.values[index];
++    if (value !== null && value !== undefined) rows.push(['daily', series.name, '', day, value, series.previousValues[index] ?? '', '', unitLabel(series), series.format.currency, '', '']);
++  });
++  for (const series of overview.series) for (const channel of series.channels) overview.days.forEach((day, index) => {
++    const value = channel.values[index];
++    if (value !== null && value !== undefined) rows.push(['channel_daily', series.name, channel.name, day, value, '', '', unitLabel(series), series.format.currency, '', '']);
++  });
++
++  const body = rows.slice(0, cap).map(row => row.map(csvCell).join(','));
++  const truncated = rows.length > cap;
++  const header = REPORT_COLUMNS.map(csvCell).join(',');
++  return { csv: [header, ...body, ...(truncated ? [csvCell('truncated') + ',' + csvCell('true')] : [])].join('\r\n') + '\r\n', rowCount: body.length, truncated };
+ }
+diff --git a/rebuild/src/server/analytics/view.ts b/rebuild/src/server/analytics/view.ts
+new file mode 100644
+index 00000000..51637ded
+--- /dev/null
++++ b/rebuild/src/server/analytics/view.ts
+@@ -0,0 +1,47 @@
++import type { AnalyticsOverview, TopPost } from '@/lib/analytics/types';
++import { findMetric } from '@/platforms';
++import { buildAudience } from './aggregate';
++import { analyticsRange, loadAnalytics } from './data';
++import { buildOverview } from './overview';
++import { loadTopPosts } from './posts';
++import { addDays, dayStartInstant, previousRange, type DayRange } from './time';
++
++export type AnalyticsQuery = {
++  start?: string;
++  end?: string;
++  filter?: string;
++  channel?: string[];
++  adFilter?: string;
++  adAccount?: string[];
++};
++
++/** One loaded view of Analytics: the page and the CSV export both come from this, so they cannot disagree. */
++export async function loadAnalyticsView(options: { workspaceId: string; allowedTargetIds?: readonly string[]; timeZone: string; query: AnalyticsQuery; now?: Date }) {
++  const { workspaceId, allowedTargetIds, timeZone, query } = options;
++  const range = analyticsRange(query.start, query.end, options.now ?? new Date(), timeZone);
++  const days = range.days as DayRange;
++  const zone = range.timeZone ?? 'UTC';
++  // One query window covers the range and the equal-length period before it, with a day of slack on each side
++  // so date-only advertising days are never cut off by the time zone; the overview filters by calendar day.
++  const window = { from: new Date(dayStartInstant(previousRange(days).start, zone).getTime() - 86_400_000), to: new Date(range.to.getTime() + 86_400_000) };
++  const available = await loadAnalytics(workspaceId, [], window, allowedTargetIds);
++  const requested = new Set(query.channel ?? []);
++  const selectedIds = available.targets.filter(target => query.filter !== '1' || requested.has(target.id)).map(target => target.id);
++  const data = await loadAnalytics(workspaceId, selectedIds, window, allowedTargetIds, query.adFilter === '1' ? query.adAccount ?? [] : undefined);
++  const channels = data.selectedTargets.map(target => ({ id: target.id, type: target.type, name: target.name, providerId: target.providerId }));
++  const overview: AnalyticsOverview = buildOverview({
++    range: days, timeZone: zone, channels, pageRows: data.pageRows, instagramRows: data.instagramRows, adRows: data.adRows, adAccountCount: data.adAccountCount,
++  });
++  const audience = buildAudience(data.audienceRows, data.selectedInstagramAudience, channels);
++  const pageLikes = findMetric('channel', 'page_fans').definition.name;
++  const audienceEntries = audience.entries.map(entry => ({ ...entry, label: entry.metric === 'page_fans' ? pageLikes : 'Followers' }));
++  const topPosts: TopPost[] = await loadTopPosts(workspaceId, channels, range);
++  return { range, days, timeZone: zone, data, channels, overview, audience: { ...audience, entries: audienceEntries }, topPosts };
++}
++
++export type AnalyticsView = Awaited<ReturnType<typeof loadAnalyticsView>>;
++
++/** Quick ranges for the sidebar, ending today in the workspace time zone. */
++export function presetRange(daysBack: number, today: string): DayRange {
++  return { start: addDays(today, -(daysBack - 1)), end: today };
++}
+diff --git a/rebuild/src/styles/tokens.css b/rebuild/src/styles/tokens.css
+index 1e0bf65e..63f9f51a 100644
+--- a/rebuild/src/styles/tokens.css
++++ b/rebuild/src/styles/tokens.css
+@@ -35,6 +35,8 @@
+   --space-5: 20px;
+   --space-6: 24px;
+   --space-8: 32px;
++  /* Chart series: six colours that stay apart in colour-blind vision and keep 3:1 against every surface. Lines also differ by dash and marker. */
++  --chart-1: #0072b2; --chart-2: #c44e00; --chart-3: #00805a; --chart-4: #b0457f; --chart-5: #8a6d00; --chart-6: #56606e;
+ }
+ 
+ :root[data-theme="coast"] {
+@@ -52,6 +54,7 @@
+   --canvas: #111a20; --surface: #18242c; --surface-muted: #22323c; --surface-raised: #1d2a33; --surface-hover: #22313a;
+   --ink: #edf4f6; --ink-soft: #bdcbd1; --ink-faint: #91a3ac; --line: #344750; --line-strong: #506570; --line-subtle: #2a3b44;
+   --accent: #79c8a2; --accent-hover: #9cdbba; --accent-soft: #24483b; --warning: #f0bd73; --warning-soft: #49371f; --danger: #f28a82; --on-danger: #351311; --danger-soft: #492d30;
++  --chart-1: #56b4e9; --chart-2: #f08a3c; --chart-3: #3ddba4; --chart-4: #e58fc0; --chart-5: #e6c84a; --chart-6: #a8b4c4;
+   --focus: #9ac5ff; --selection: #315d4c; --shadow-panel: 0 14px 38px rgb(0 0 0 / 28%); --scrim: rgb(0 0 0 / 58%);
+ }
+ 
+@@ -188,3 +191,27 @@ h1, h2, h3 { text-wrap: balance; scroll-margin-top: 88px; }
+ @media (max-width: 380px) {
+   .shell-topbar__user { display: none; }
+ }
++
++/* Charts */
++.ui-chart { min-width: 0; }
++.ui-chart__frame { position: relative; border-radius: var(--radius-sm); }
++.ui-chart__frame:focus-visible { outline-offset: -3px; }
++.ui-chart__frame svg { display: block; max-width: 100%; touch-action: pan-y; }
++.ui-chart__grid { stroke: var(--line); stroke-width: 1; }
++.ui-chart__guide { stroke: var(--ink-faint); stroke-width: 1; stroke-dasharray: 3 3; }
++.ui-chart__tick { fill: var(--ink-soft); font-size: 11px; font-variant-numeric: tabular-nums; }
++.ui-chart__tooltip { position: absolute; top: 6px; z-index: 2; display: grid; gap: 4px; min-width: 150px; max-width: 240px; padding: 9px 11px; transform: translateX(-50%); border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface); color: var(--ink); box-shadow: var(--shadow-panel); font-size: 12px; pointer-events: none; }
++.ui-chart__tooltip span { display: flex; align-items: center; gap: 6px; color: var(--ink-soft); }
++.ui-chart__tooltip b { margin-left: auto; color: var(--ink); font-variant-numeric: tabular-nums; }
++.ui-chart__hint { margin: 8px 0 0; color: var(--ink-faint); font-size: 12px; }
++.ui-chart-legend { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 12px; padding: 0; list-style: none; }
++.ui-chart-legend__item { display: inline-flex; align-items: center; gap: 8px; min-height: 36px; padding: 4px 12px 4px 8px; border: 1px solid var(--line-strong); border-radius: 999px; background: var(--surface); color: var(--ink); font-size: 12px; font-weight: 600; cursor: default; }
++button.ui-chart-legend__item { cursor: pointer; }
++button.ui-chart-legend__item[aria-pressed="false"] { border-style: dashed; background: transparent; color: var(--ink-soft); font-weight: 500; text-decoration: line-through; text-decoration-color: var(--ink-faint); }
++button.ui-chart-legend__item[aria-pressed="false"] svg { opacity: .45; }
++button.ui-chart-legend__item[aria-pressed="true"] { background: var(--accent-soft); }
++.ui-chart-legend__item small { color: var(--ink-soft); font-size: 11px; font-weight: 500; }
++.ui-sparkline { display: block; width: 100%; max-width: 140px; height: 32px; }
++.ui-segmented { display: inline-flex; padding: 3px; gap: 2px; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-muted); }
++.ui-segmented button { min-height: 36px; padding: 0 14px; border: 0; border-radius: 6px; background: transparent; color: var(--ink-soft); font-size: 12px; font-weight: 650; cursor: pointer; }
++.ui-segmented button[aria-pressed="true"] { background: var(--surface); color: var(--accent); box-shadow: 0 0 0 1px var(--line-strong); }
+diff --git a/rebuild/tests/analytics-presentation.test.ts b/rebuild/tests/analytics-presentation.test.ts
+new file mode 100644
+index 00000000..feb197c9
+--- /dev/null
++++ b/rebuild/tests/analytics-presentation.test.ts
+@@ -0,0 +1,110 @@
++import { describe, expect, it } from 'vitest';
++import { createElement } from 'react';
++import { renderToStaticMarkup } from 'react-dom/server';
++import { extentOf, labelIndexes, linePath, nearestIndex, niceScale } from '../src/lib/analytics/chart-math';
++import { describeChange, formatDay, formatDuration, formatTotal, formatValue } from '../src/lib/analytics/format';
++import { postExcerpt, rankTopPosts, safeWebUrl } from '../src/server/analytics/posts';
++import { buildOverview } from '../src/server/analytics/overview';
++import { AnalyticsOverview } from '../src/app/analytics/AnalyticsOverview';
++import { AnalyticsNotes } from '../src/app/analytics/AnalyticsNotes';
++import { TopPosts } from '../src/app/analytics/TopPosts';
++
++describe('chart maths', () => {
++  it('chooses round axis bounds', () => {
++    expect(niceScale(0, 97, 4)).toMatchObject({ min: 0, max: 100, ticks: [0, 20, 40, 60, 80, 100] });
++    expect(niceScale(18793, 19662, 4).ticks[0]).toBeLessThanOrEqual(18793);
++    expect(niceScale(5, 5).max).toBeGreaterThan(5);
++    expect(niceScale(0, 0).ticks.length).toBeGreaterThan(1);
++  });
++  it('picks readable x labels and breaks lines at gaps', () => {
++    expect(labelIndexes(3, 7)).toEqual([0, 1, 2]);
++    expect(labelIndexes(30, 4)).toEqual([0, 10, 19, 29]);
++    expect(linePath([1, null, 3, 4], i => i * 10, v => v)).toBe('M0.0 1.0M20.0 3.0L30.0 4.0');
++    expect(nearestIndex(55, 50, 100, 11)).toBe(1);
++    expect(nearestIndex(-20, 50, 100, 11)).toBe(0);
++    expect(extentOf([[null, 4], [2]], false)).toEqual({ min: 2, max: 4 });
++    expect(extentOf([[3, 4]])).toEqual({ min: 0, max: 4 });
++  });
++});
++
++describe('value formatting', () => {
++  it('writes each unit the way a customer reads it', () => {
++    expect(formatValue(1234567, { unit: 'count', currency: null })).toBe('1,234,567');
++    expect(formatValue(1234567, { unit: 'count', currency: null }, { compact: true })).toBe('1.2M');
++    expect(formatValue(1.684, { unit: 'rate', style: 'percent', currency: null })).toBe('1.68%');
++    expect(formatValue(1.4, { unit: 'rate', style: 'multiple', currency: null })).toBe('1.4×');
++    expect(formatValue(12.5, { unit: 'currency', currency: 'EUR' })).toBe('€12.50');
++    expect(formatValue(12.5, { unit: 'currency', currency: null })).toBe('12.50');
++    expect(formatValue(5400, { unit: 'duration', currency: null })).toBe('1 h 30 min');
++    expect(formatDuration(45)).toBe('45 s');
++    expect(formatValue(null, { unit: 'count', currency: null })).toBe('—');
++  });
++  it('words totals of distinct people as "up to" and changes with words and a sign', () => {
++    expect(formatTotal(120, { unit: 'people', currency: null }, true)).toBe('Up to 120');
++    expect(formatTotal(120, { unit: 'people', currency: null }, false)).toBe('120');
++    expect(describeChange({ absolute: 5, percent: 12.34, direction: 'up', favourable: true })).toMatchObject({ text: '+12.3%', arrow: '▲', words: 'Up 12.3% from the previous period' });
++    expect(describeChange({ absolute: -5, percent: -8, direction: 'down', favourable: false }).text).toBe('−8%');
++    expect(describeChange(null).text).toBe('No earlier data');
++    expect(describeChange({ absolute: 3, percent: null, direction: 'up', favourable: true }).text).toBe('New activity');
++    expect(formatDay('2026-10-09')).toBe('Oct 9');
++  });
++});
++
++describe('top posts', () => {
++  const row = (id: string, comments: number | null, likes: number | null, day: string, url: string | null = null) => ({ id, text: `Post ${id}`, channelName: 'Channel', publishedAt: new Date(`${day}T10:00:00Z`), url, comments, likes });
++  it('ranks by stored interactions, newest first among equals, and limits the list', () => {
++    const ranked = rankTopPosts([row('a', 2, null, '2026-10-01'), row('b', 1, 4, '2026-10-02'), row('c', 5, null, '2026-10-03'), row('d', 5, null, '2026-10-04'), row('e', null, null, '2026-10-05')], 4);
++    expect(ranked.map(post => post.id)).toEqual(['d', 'c', 'b', 'a']);
++    expect(ranked[2]).toMatchObject({ interactions: 5, comments: 1, likes: 4 });
++  });
++  it('shortens text, names empty posts and offers only web links', () => {
++    expect(postExcerpt('  Line one\n\nline two  ')).toBe('Line one line two');
++    expect(postExcerpt('x'.repeat(300))).toHaveLength(140);
++    expect(postExcerpt('   ')).toBe('Post without text');
++    expect(safeWebUrl('https://example.com/p/1')).toBe('https://example.com/p/1');
++    expect(safeWebUrl('javascript:alert(1)')).toBeNull();
++    expect(safeWebUrl('not a url')).toBeNull();
++    expect(rankTopPosts([row('a', 1, null, '2026-10-01', 'javascript:alert(1)')], 5)[0]!.url).toBeNull();
++  });
++});
++
++describe('analytics screens', () => {
++  const at = (day: string) => new Date(`${day}T12:00:00.000Z`);
++  const overview = buildOverview({
++    range: { start: '2026-10-08', end: '2026-10-14' }, timeZone: 'UTC', now: at('2026-10-15'),
++    channels: [{ id: 'a', type: 'page', name: 'Channel A' }, { id: 'b', type: 'page', name: 'Channel B' }],
++    pageRows: [
++      ...['a', 'b'].flatMap(id => ['2026-10-08', '2026-10-09', '2026-10-01'].map(day => ({ metric: 'page_total_media_view_unique', period: 'day', endTime: at(day), numeric: 10, value: 10, fetchedAt: at('2026-10-15'), target: { id, name: `Channel ${id.toUpperCase()}` } }))),
++      { metric: 'page_media_view', period: 'day', endTime: at('2026-10-09'), numeric: 30, value: 30, target: { id: 'a', name: 'Channel A' } },
++      { metric: 'page_impressions', period: 'day', endTime: at('2026-10-09'), numeric: 30, value: 30, target: { id: 'a', name: 'Channel A' } },
++    ],
++  });
++
++  it('renders plain names, "up to" wording and no stored metric names outside technical details', () => {
++    const html = renderToStaticMarkup(createElement(AnalyticsOverview, { overview }));
++    expect(html).toContain('Key numbers');
++    expect(html).toContain('Up to 40');
++    expect(html).toContain('Viewers');
++    expect(html).toContain('aria-pressed="true"');
++    expect(html).toContain('Compare channels');
++    expect(html).toContain('role="img"');
++    expect(html).not.toMatch(/page_[a-z_]+/);
++  });
++
++  it('keeps retired measures out of the key numbers and explains them, with stored names only in technical details', () => {
++    const html = renderToStaticMarkup(createElement(AnalyticsNotes, { overview }));
++    expect(html).toContain('No longer available');
++    expect(html).toContain('Facebook retired this measure on Nov 15, 2025. Use Views instead.');
++    const [visible, technical] = html.split('Technical details');
++    expect(visible).not.toMatch(/page_[a-z_]+/);
++    expect(technical).toContain('page_media_view');
++  });
++
++  it('renders a post table with a safe link and a stable empty state', () => {
++    const html = renderToStaticMarkup(createElement(TopPosts, { posts: [{ id: 'p', excerpt: 'Hello', channelName: 'Channel A', publishedAt: '2026-10-09T10:00:00.000Z', url: 'https://example.com/p', comments: 2, likes: null, interactions: 2 }] }));
++    expect(html).toContain('aria-sort="descending"');
++    expect(html).toContain('rel="noopener noreferrer"');
++    expect(html).not.toContain('>Likes<');
++    expect(renderToStaticMarkup(createElement(TopPosts, { posts: [] }))).toContain('No posts were published');
++  });
++});
+diff --git a/rebuild/tests/chart-tokens.test.ts b/rebuild/tests/chart-tokens.test.ts
+new file mode 100644
+index 00000000..6417fdf3
+--- /dev/null
++++ b/rebuild/tests/chart-tokens.test.ts
+@@ -0,0 +1,31 @@
++import { describe, expect, it } from 'vitest';
++import { readFileSync } from 'node:fs';
++import { join } from 'node:path';
++import { THEMES } from '@/lib/themes';
++
++const css = readFileSync(join(process.cwd(), 'src/styles/tokens.css'), 'utf8');
++const base = css.match(/:root\s*\{([^}]+)\}/)?.[1] ?? '';
++
++const token = (block: string, name: string) => block.match(new RegExp(`--${name}:\\s*(#[0-9a-fA-F]{6})`))?.[1];
++function luminance(hex: string) {
++  const [red, green, blue] = [1, 3, 5].map(index => parseInt(hex.slice(index, index + 2), 16) / 255).map(value => value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4);
++  return 0.2126 * red! + 0.7152 * green! + 0.0722 * blue!;
++}
++const contrast = (a: string, b: string) => { const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x); return (hi! + 0.05) / (lo! + 0.05); };
++
++describe('chart colour tokens', () => {
++  it('keeps every series colour at 3:1 against each shared surface in every theme', () => {
++    for (const theme of THEMES) {
++      const override = css.match(new RegExp(`:root\\[data-theme="${theme.id}"\\]\\s*\\{([^}]+)\\}`))?.[1] ?? '';
++      const value = (name: string) => token(override, name) ?? token(base, name);
++      for (let index = 1; index <= 6; index++) {
++        for (const surface of ['canvas', 'surface', 'surface-muted', 'surface-raised']) {
++          const series = value(`chart-${index}`);
++          const background = value(surface);
++          expect(series && background, `${theme.name}: chart-${index} and ${surface} are defined`).toBeTruthy();
++          expect(contrast(series!, background!), `${theme.name}: chart-${index} on ${surface}`).toBeGreaterThanOrEqual(3);
++        }
++      }
++    }
++  });
++});
+diff --git a/rebuild/tests/reports.test.ts b/rebuild/tests/reports.test.ts
+index 275cdba9..aad97129 100644
+--- a/rebuild/tests/reports.test.ts
++++ b/rebuild/tests/reports.test.ts
+@@ -1,38 +1,75 @@
+ import { describe, expect, it } from 'vitest';
+-import { buildReportOverview, reportOverviewCsv } from '../src/server/analytics/reports';
++import { buildAudience } from '../src/server/analytics/aggregate';
++import { buildOverview } from '../src/server/analytics/overview';
++import { reportCsv, type ReportInput } from '../src/server/analytics/reports';
+ 
+-describe('reports overview and CSV', () => {
++const at = (day: string) => new Date(`${day}T12:00:00.000Z`);
++const range = { start: '2026-10-01', end: '2026-10-03' };
++const channels = [{ id: 'page-a', type: 'page', name: 'Page A' }, { id: 'ig-a', type: 'instagram', name: '@account-a', providerId: 'ig-provider-a' }];
++
++describe('audience totals', () => {
+   it('adds audience once for each selected channel and excludes unselected audience', () => {
+-    const data = {
+-      targets: [], selectedTargets: [
+-        { id: 'page-a', type: 'page', name: 'Page A' },
+-        { id: 'ig-a', type: 'instagram', name: '@account-a', providerId: 'ig-provider-a' },
+-      ],
+-      pageRows: [], adRows: [],
+-      audienceRows: [{ metric: 'page_follows', numeric: 12, endTime: new Date('2026-10-14T00:00:00Z'), fetchedAt: new Date('2026-10-14T01:00:00Z'), target: { id: 'page-a', name: 'Page A' } }],
+-      instagramRows: [],
+-      selectedInstagramAudience: [{ igUserId: 'ig-provider-a', followersCount: 30, lastSyncedAt: new Date('2026-10-14T00:00:00Z'), updatedAt: new Date('2026-10-14T00:00:00Z') }],
+-      adAccountCount: 0,
+-      range: { from: new Date('2026-10-01T00:00:00Z'), to: new Date('2026-10-31T23:59:59Z') },
+-    } as unknown as Parameters<typeof buildReportOverview>[0];
+-    const view = buildReportOverview(data);
+-    expect(view.audience.total).toBe(42);
+-    expect(view.audience.entries.map(row => row.id)).toEqual(['page-a', 'ig-a']);
+-    expect(view.audience.selected).toBe(2);
++    const audience = buildAudience(
++      [{ metric: 'page_follows', numeric: 12, endTime: at('2026-10-14'), fetchedAt: at('2026-10-14'), target: { id: 'page-a', name: 'Page A' } }],
++      [{ igUserId: 'ig-provider-a', followersCount: 30, lastSyncedAt: at('2026-10-14'), updatedAt: at('2026-10-14') }, { igUserId: 'someone-else', followersCount: 500, lastSyncedAt: at('2026-10-14') }],
++      channels,
++    );
++    expect(audience.total).toBe(42);
++    expect(audience.entries.map(row => row.id)).toEqual(['page-a', 'ig-a']);
++    expect(audience.selected).toBe(2);
++  });
++});
++
++function input(extra: Partial<ReportInput> = {}): ReportInput {
++  const overview = buildOverview({
++    range, timeZone: 'UTC', now: at('2026-10-04'), channels,
++    pageRows: [
++      { metric: 'page_media_view', period: 'day', endTime: at('2026-10-01'), numeric: 5, value: 5, target: { id: 'page-a', name: '=Injected' } },
++      { metric: 'page_media_view', period: 'day', endTime: at('2026-10-02'), numeric: 6, value: 6, target: { id: 'page-a', name: '=Injected' } },
++      { metric: 'page_total_media_view_unique', period: 'day', endTime: at('2026-10-02'), numeric: 4, value: 4, target: { id: 'page-a', name: '=Injected' } },
++      { metric: 'page_impressions', period: 'day', endTime: at('2026-10-02'), numeric: 9, value: 9, target: { id: 'page-a', name: '=Injected' } },
++    ],
+   });
++  return { overview, audience: { entries: [{ name: 'Page A', label: 'Followers', value: 12, asOf: at('2026-10-03') }] }, topPosts: [{ id: 'p', excerpt: 'Hello', channelName: 'Page A', publishedAt: '2026-10-02T10:00:00.000Z', url: 'https://example.com/p', comments: 2, likes: null, interactions: 2 }], ...extra };
++}
+ 
+-  it('quotes provider text and caps large exports with an explicit truncation marker', () => {
+-    const view = {
+-      audience: { entries: [], total: 0, covered: 0, selected: 0 },
+-      metrics: [{ key: 'reach::day', label: '=Injected', source: 'page', unit: 'count', kind: 'flow', total: 5, latestAt: null, coverage: 1, available: 1,
+-        points: [{ date: '2026-10-01', label: 'Oct 1', value: 5 }, { date: '2026-10-02', label: 'Oct 2', value: 6 }], rows: [] }],
+-    } as ReturnType<typeof buildReportOverview>;
+-    const result = reportOverviewCsv(view, 1);
+-    expect(result.rowCount).toBe(1);
++describe('report CSV', () => {
++  it('shows plain names and the same numbers as the page, without stored metric names', () => {
++    const { csv, truncated } = reportCsv(input(), 5000);
++    expect(truncated).toBe(false);
++    const lines = csv.trim().split('\r\n');
++    expect(lines[0]).toBe('"record_type","metric","channel","date","value","previous_value","change_percent","unit","currency","note","link"');
++    expect(lines).toContain('"summary","Views","","","11","","","count","","",""');
++    expect(lines.some(line => line.startsWith('"summary","Viewers"') && line.includes('"people"') && line.includes('Up to'))).toBe(false); // one channel, one day: exact
++    expect(lines).toContain('"daily","Views","","2026-10-02","6","","","count","","",""');
++    expect(lines.some(line => line.startsWith('"audience","Followers","Page A"'))).toBe(true);
++    expect(lines.some(line => line.startsWith('"top_post"') && line.includes('https://example.com/p'))).toBe(true);
++    expect(lines.some(line => line.startsWith('"unavailable","Impressions"') && line.includes('use Views'))).toBe(true);
++    expect(csv).not.toContain('page_media_view');
++    expect(csv).not.toContain('page_impressions');
++  });
++
++  it('quotes provider text and puts summary rows before daily detail when capping', () => {
++    const view = input();
++    const result = reportCsv(view, 3);
++    expect(result.rowCount).toBe(3);
+     expect(result.truncated).toBe(true);
+-    expect(result.csv).toContain("'=Injected");
+     expect(result.csv).toContain('"truncated","true"');
+-    const capped = reportOverviewCsv(view, 5001);
+-    expect(capped.truncated).toBe(false);
++    expect(result.csv.split('\r\n').slice(1, 3).every(line => line.startsWith('"summary"'))).toBe(true);
++    expect(result.csv.split('\r\n')[3]).toMatch(/^"channel"/);
++    expect(result.csv).not.toContain('"daily"');
++    const all = reportCsv(view, 5000).csv;
++    expect(all).toContain("\"'=Injected\"");
++    expect(reportCsv(view, 5001).truncated).toBe(false);
++  });
++
++  it('labels totals of distinct people as upper bounds', () => {
++    const two = buildOverview({
++      range, timeZone: 'UTC', now: at('2026-10-04'), channels: [channels[0]!],
++      pageRows: [1, 2].map(day => ({ metric: 'page_total_media_view_unique', period: 'day', endTime: at(`2026-10-0${day}`), numeric: 10, value: 10, target: { id: 'page-a', name: 'Page A' } })),
++    });
++    const csv = reportCsv({ overview: two, audience: { entries: [] }, topPosts: [] }, 100).csv;
++    expect(csv).toContain('"summary","Viewers","","","20"');
++    expect(csv).toContain('Up to: distinct people are not added');
+   });
+ });

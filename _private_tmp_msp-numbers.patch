@@ -1,0 +1,303 @@
+diff --git a/rebuild/src/modules/analytics/server/aggregate.ts b/rebuild/src/modules/analytics/server/aggregate.ts
+index 36cda50b..7a7a55ec 100644
+--- a/rebuild/src/modules/analytics/server/aggregate.ts
++++ b/rebuild/src/modules/analytics/server/aggregate.ts
+@@ -29,14 +29,28 @@ const formatDay = (value: string) => new Date(`${value}T12:00:00.000Z`).toLocale
+ function metricView(input: AnalyticsMetricInput, copy: WorkspaceCopy, locale: 'en' | 'fr'): MetricView {
+   const t = workspaceText(copy, locale);
+   const byDay = new Map<string, number>();
++  const latestPerDay = new Map<string, AnalyticsMetricInput['observations'][number]>();
++  const snapshotRollup = input.kind === 'stock' || input.rollup === 'latest-per-channel';
+   const byChannel = new Map<string, { label: string; values: Array<{ date: Date; value: number }> }>();
+   for (const observation of input.observations) {
+     const day = isoDay(observation.date);
+-    byDay.set(day, (byDay.get(day) ?? 0) + observation.value);
++    if (snapshotRollup) {
++      const identity = JSON.stringify([day, observation.channelId]);
++      const previous = latestPerDay.get(identity);
++      if (!previous || observation.date >= previous.date) latestPerDay.set(identity, observation);
++    } else {
++      byDay.set(day, (byDay.get(day) ?? 0) + observation.value);
++    }
+     const channel = byChannel.get(observation.channelId) ?? { label: observation.channelLabel, values: [] };
+     channel.values.push({ date: observation.date, value: observation.value });
+     byChannel.set(observation.channelId, channel);
+   }
++  // A stock or overlapping-window snapshot replaces earlier snapshots for the
++  // same resource/day; only additive flows sum every observation.
++  for (const observation of latestPerDay.values()) {
++    const day = isoDay(observation.date);
++    byDay.set(day, (byDay.get(day) ?? 0) + observation.value);
++  }
+   const points = [...byDay].sort(([a], [b]) => a.localeCompare(b)).map(([date, value]) => ({ date, label: formatDay(date), value }));
+   const observedResourceIds = [...new Set(input.observations.map(observation => observation.channelId).filter(id => id !== 'total'))].sort();
+   const coveredResourceIds = input.coveredResourceIds ?? (observedResourceIds.length ? observedResourceIds : undefined);
+@@ -68,7 +82,7 @@ function metricView(input: AnalyticsMetricInput, copy: WorkspaceCopy, locale: 'e
+     unit: input.unit,
+     kind: input.kind,
+     total: input.totalOverride !== undefined ? input.totalOverride : input.kind === 'breakdown' ? null : input.kind === 'stock' || input.rollup === 'latest-per-channel'
+-      ? generatedRows.reduce((sum, row) => sum + row.value, 0)
++      ? generatedRows.length ? generatedRows.reduce((sum, row) => sum + row.value, 0) : null
+       : aggregateValues(totalValues, input.kind),
+     ...(input.displayTotal ? { displayTotal: input.displayTotal } : {}),
+     latestAt,
+diff --git a/rebuild/src/modules/home/server/NUMBERS_EVIDENCE.md b/rebuild/src/modules/home/server/NUMBERS_EVIDENCE.md
+new file mode 100644
+index 00000000..fff26c04
+--- /dev/null
++++ b/rebuild/src/modules/home/server/NUMBERS_EVIDENCE.md
+@@ -0,0 +1,57 @@
++# Reporting numbers: synthetic fixture evidence (2026-10-21)
++
++This lane changed the shared Analytics aggregator and tests only. No provider,
++production database, browser, server, deployment or remote Git operation ran.
++The fixtures model ten Pages, sparse Page insights, numeric post snapshots,
++provider decimal spend strings preserved in `fields`, normalized numeric spend,
++a USD account with retained daily insights through October 16, and four Ads
++hierarchy levels. They are not production records.
++
++| Card / metric | Before | After / verified behavior | Evidence |
++| --- | --- | --- | --- |
++| Analytics empty stock / latest-per-resource total | 0 despite no observations | null; a stored zero remains 0 | `analytics-numbers-production-shape` (failed before fix) |
++| Analytics stock / overlapping-window daily chart | Same-resource snapshots 100 + 120 plus another resource 30 = 250 | Latest snapshot per resource/day: 120 + 30 = 150 | `analytics-numbers-production-shape` (failed before fix) |
++| Analytics post views, unique views, reactions, comments, clicks | No change | 16,500; 13,200; 165; 30; 60 over 20 posts / 10 Pages; unique counts disclose overlap | `analytics-numbers-production-shape` |
++| Analytics / Home audience | No change | Latest snapshots: 2,800; 8/10 coverage, measured zero retained | `analytics-numbers-production-shape`, `home-overview-service` |
++| Home views / engagements / changes | No change | 3,600 / 360; prior comparable sums 1,680 / 168; changes 25%, 8 covered / 6 comparable | Same tests |
++| Home reaction mix / top channel | No change | 36 reactions; highest measured channel 80 engagements | `home-overview-service` |
++| Home heatmap average / measured posts | No change | Channel-relative scores averaged equally; 2x across 10 channels; 30 measured posts; Casablanca weekday/hour conversion | `analytics-numbers-production-shape`, `home-overview-pure` |
++| Home upcoming / inbox counts | No change | Shared-service totals 40 upcoming and 17 open; independent of rendered item count | `home-overview-service` |
++| Home spend / recorded days | No change | USD 31, two retained days, last October 16; absent later days not filled with zero | `home-ads-production-shape`, `home-overview-service` |
++| Ads spend / impressions / clicks / actions | No change | 31 / 1,000 / 100 / 100 independently at campaign, ad-set and ad levels; account spend counted once | `home-ads-production-shape` |
++| Ads / Analytics CPC / CPM / CTR | No change | 0.31 / 31 / 10%; calculated from sums instead of daily averages | `home-ads-production-shape`, `analytics-numbers-production-shape` |
++| Ads / Analytics reach / CPP / frequency | No change | Latest day: 600 / (20.75 / 600) / 1.5; not a deduplicated full-period measure | Same tests |
++| Currency / undefined ratios | No change | USD/EUR separate; denominator-zero CPC/CPM/CTR null | `home-ads-production-shape` |
++| Periods | No change | Inclusive UTC calendar dates; Ads reads exclusive next midnight; adjacent Analytics comparison periods disjoint | Same tests, `analytics-comparison` |
++
++## Integration work outside this lane
++
++- `src/platforms/facebook/goals.ts` reads only `page_insights`; it cannot supply
++  Home performance from the post insights used by Analytics when Page insights
++  are absent. Add an explicit, labelled post-cohort measure path in the Facebook
++  adapter, with the appropriate neutral service contract if needed. Do not
++  silently combine daily Page flows and lifetime post snapshots.
++- `src/platforms/facebook/destination-measures.ts` reads app post-target insights
++  only. It misses external-post snapshots (including app posts whose insights
++  are stored only on the linked remote copy). The provider owner needs a scoped,
++  deduplicated projection across `remotePostId` / remote id, with configurable
++  bounds and explicit coverage.
++- `src/platforms/facebook/post-performance.ts` already joins the remote snapshot
++  and excludes matching app posts from its external UNION. Existing tests check
++  SQL shape, not execution against PostgreSQL; this lane does not establish
++  actual join/deduplication behavior on database rows.
++- Home audience trend lookup compares unqualified audience metric names with
++  namespaced, period-qualified Analytics keys. The provider/shared data contract
++  needs an exact neutral series identity (and service tests), avoiding string
++  guessing in shared Home code. No trend is safer than a mismatched trend.
++- Post-series normalization in `src/platforms/facebook/analytics.ts` retains
++  scalar measures, not nested `post_reactions_by_type_total` categories. Retained
++  nested metrics need provider-owned breakdown mapping and coverage tests.
++- `docs/ARCHITECTURE.md` and `docs/AGENT_HANDOFF.md` should record these two shared
++  aggregation fixes and unresolved adapter gaps. They are outside owned paths.
++
++No Root keys or schema changes. No UI component/screen edits. User-visible
++changes are unknown stock totals and corrected daily stock/window charts;
++existing English/French labels continue to apply. Fixture/mock evidence does
++not establish exhaustive coverage of every dynamic provider metric, actual
++PostgreSQL bounds/deduplication, live-provider accuracy or production behavior.
+diff --git a/rebuild/tests/analytics-numbers-production-shape.test.ts b/rebuild/tests/analytics-numbers-production-shape.test.ts
+new file mode 100644
+index 00000000..bac66326
+--- /dev/null
++++ b/rebuild/tests/analytics-numbers-production-shape.test.ts
+@@ -0,0 +1,99 @@
++import { describe, expect, it, vi } from 'vitest';
++vi.mock('@/server/data', () => ({ prisma: {} }));
++vi.mock('@/server/config/store', () => ({ runtimeConfig: vi.fn(), runtimeConfigBatch: vi.fn() }));
++vi.mock('@/modules/analytics/server/error-copy', () => ({ analyticsLanguage: async () => 'en' }));
++import { buildAnalytics } from '@/modules/analytics/server/aggregate';
++import type { AnalyticsMetricInput } from '@/modules/analytics/server/catalog';
++import { normalizeFacebookAnalytics } from '@/platforms/facebook/analytics';
++import { analyticsDateRange } from '@/modules/analytics/server/comparison';
++import { periodTotals, engagementHeatmap } from '@/modules/home/server/overview-pure';
++const date = (day: string) => new Date(`${day}T00:00:00Z`);
++const targets = Array.from({ length: 10 }, (_, i) => ({ id: `page-${i}`, name: `Example Page ${i}`, type: 'page', providerId: 'facebook', socialAccountId: 'connection' }));
++const metric = (overrides: Partial<AnalyticsMetricInput>): AnalyticsMetricInput => ({ key: 'measure', label: 'Measure', sourceLabel: 'Community', kind: 'stock', unit: 'count', observations: [], available: 10, ...overrides });
++const posts = targets.flatMap((target, i) => [1, 2].map(n => ({ target, createdTime: date(`2026-10-${14 + n}`), insightsSyncedAt: date('2026-10-17'), insights: {
++  post_media_view: (i + 1) * n * 100, post_total_media_view_unique: (i + 1) * n * 80,
++  reactions: (i + 1) * n, comments: n, clicks: 2 * n,
++  post_reactions_by_type_total: { like: (i + 1) * n },
++} })));
++
++describe('ten-Page production-shaped numeric evidence', () => {
++  it('keeps unavailable stock and overlapping-window series unknown; preserves measured zero', () => {
++    const result = buildAnalytics([
++      metric({ key: 'audience' }), metric({ key: 'weekly', kind: 'flow', rollup: 'latest-per-channel' }),
++      metric({ key: 'zero', observations: [{ channelId: 'page-0', channelLabel: 'Example', date: date('2026-10-16'), value: 0 }] }),
++    ], [], 10);
++    expect(result.metrics.find(m => m.key === 'audience')).toMatchObject({ total: null, coverage: 0, available: 10, points: [] });
++    expect(result.metrics.find(m => m.key === 'weekly')?.total).toBeNull();
++    expect(result.metrics.find(m => m.key === 'zero')).toMatchObject({ total: 0, coverage: 1 });
++  });
++  it.each(['stock', 'flow'] as const)('uses latest per-resource snapshots in daily %s charts for latest-per-channel rollup', kind => {
++    const [result] = buildAnalytics([metric({ kind, ...(kind === 'flow' ? { rollup: 'latest-per-channel' as const } : {}), observations: [
++      { channelId: 'page-0', channelLabel: 'A', date: new Date('2026-10-16T20:00:00Z'), value: 120 },
++      { channelId: 'page-0', channelLabel: 'A', date: new Date('2026-10-16T01:00:00Z'), value: 100 },
++      { channelId: 'page-1', channelLabel: 'B', date: date('2026-10-16'), value: 30 },
++    ] })], [], 10).metrics;
++    expect(result).toMatchObject({ total: 150, coverage: 2, points: [{ date: '2026-10-16', value: 150 }] });
++  });
++  it('adds every numeric post measure once with sparse Page insights and retains overlap disclosure', () => {
++    const normalized = normalizeFacebookAnalytics({ pageRows: [], audienceRows: [], adRows: [], postRows: posts, selectedTargets: targets, selectedAdAccounts: [] });
++    const result = buildAnalytics(normalized.metrics, normalized.audienceEntries, normalized.audienceSelected);
++    for (const [key, total] of Object.entries({ post_media_view: 16500, post_total_media_view_unique: 13200, reactions: 165, comments: 30, clicks: 60 })) {
++      const found = result.metrics.find(m => m.key === `post:${key}`)!;
++      expect(found, key).toMatchObject({ total, coverage: 10, available: 10 });
++      expect(found.points.reduce((sum, point) => sum + point.value, 0)).toBe(total);
++      expect(found.rows.reduce((sum, row) => sum + row.value, 0)).toBe(total);
++    }
++    expect(result.metrics.find(m => m.key === 'post:post_total_media_view_unique')?.aggregationNote).toMatch(/overlap/);
++    expect(result.audience).toMatchObject({ total: 0, covered: 0, selected: 10 });
++  });
++  it('uses latest audience per Page, includes real zero and discloses missing Pages', () => {
++    const audienceRows = targets.slice(0, 8).flatMap((target, i) => [
++      { target, metric: 'page_follows', period: 'day', endTime: date('2026-10-15'), fetchedAt: date('2026-10-17'), numeric: 999, value: 999 },
++      { target, metric: 'page_follows', period: 'day', endTime: date('2026-10-16'), fetchedAt: date('2026-10-17'), numeric: i * 100, value: i * 100 },
++    ]);
++    const normalized = normalizeFacebookAnalytics({ pageRows: audienceRows, audienceRows, adRows: [], selectedTargets: targets, selectedAdAccounts: [], audienceAsOf: date('2026-10-16') });
++    const result = buildAnalytics(normalized.metrics, normalized.audienceEntries, normalized.audienceSelected);
++    expect(result.audience).toMatchObject({ total: 2800, covered: 8, selected: 10 });
++    expect(result.metrics[0]).toMatchObject({ total: 2800, coverage: 8, available: 10 });
++  });
++  it('Home compares matched sums and weights heatmap channels equally in the workspace timezone', () => {
++    expect(periodTotals(targets.map((_, i) => ({ current: i < 8 ? (i + 1) * 100 : null, previous: i < 6 ? (i + 1) * 80 : null }))))
++      .toEqual({ current: 3600, previous: 1680, change: 0.25, covered: 8, comparable: 6 });
++    const heatmap = engagementHeatmap(targets.map((_, i) => [
++      { postId: 'first', publishedAt: new Date('2026-10-19T23:30:00Z'), rankValue: (i + 1) * 2 },
++      { postId: 'second', publishedAt: new Date('2026-10-21T11:00:00Z'), rankValue: i + 1 },
++      { postId: 'third', publishedAt: new Date('2026-10-22T11:00:00Z'), rankValue: i + 1 },
++    ]), 'Africa/Casablanca', 10);
++    expect(heatmap.measuredPosts).toBe(30);
++    expect(heatmap.cells.find(cell => cell.day === 2 && cell.hour === 0)).toMatchObject({ value: 2, posts: 10 });
++  });
++  it('uses UTC calendar bounds and disjoint comparison periods', () => {
++    const result = analyticsDateRange({ start: '2026-10-01', end: '2026-10-21', compare: 'previous' }, { defaultDays: 28, maxDays: 90 });
++    expect(result.range).toEqual({ from: date('2026-10-01'), to: new Date('2026-10-21T23:59:59.999Z') });
++    expect(result.comparison).toMatchObject({ start: '2026-09-10', end: '2026-09-30' });
++    expect(result.comparison!.range.to.getTime() + 1).toBe(result.range.from.getTime());
++  });
++});
++
++
++it('Analytics keeps all Ads totals and weighted ratios with latest-day non-additive reach', () => {
++  const account = { id: 'usd', name: 'Example USD account', currency: 'USD' };
++  const adRows = [
++    { date: date('2026-10-15'), spend: 10.25, impressions: 100, clicks: 1, reach: 80 },
++    { date: date('2026-10-16'), spend: 20.75, impressions: 900, clicks: 99, reach: 600 },
++  ].map(row => ({ ...row, adAccount: account, fetchedAt: date('2026-10-17'), cpc: 999, cpm: 999, ctr: 999, cpp: 999, frequency: 999,
++    actions: [{ action_type: 'link_click', value: String(row.clicks) }], fields: { spend: String(row.spend), account_id: '123456789', account_currency: 'USD' } }));
++  const normalized = normalizeFacebookAnalytics({ pageRows: [], audienceRows: [], adRows, selectedTargets: [], selectedAdAccounts: [account] });
++  const result = buildAnalytics(normalized.metrics, [], 0);
++  const expected = { 'spend::USD': 31, impressions: 1000, clicks: 100, reach: 600,
++    'cpc::USD': 0.31, 'cpm::USD': 31, ctr: 10, 'cpp::USD': 20.75 / 600, frequency: 1.5, 'actions:link_click': 100 };
++  for (const [key, total] of Object.entries(expected)) {
++    const found = result.metrics.find(m => m.key === key);
++    expect(found, key).toBeDefined();
++    expect(found!.total, key).toBeCloseTo(total);
++    expect(found!.rows[0].value, key).toBeCloseTo(total);
++  }
++  expect(result.metrics.find(m => m.key === 'frequency')?.aggregationNote).toMatch(/latest stored day/);
++  expect(result.metrics.find(m => m.key === 'spend::USD')?.points.map(p => p.date)).toEqual(['2026-10-15', '2026-10-16']);
++  expect(result.metrics.some(m => m.key.includes('account_id'))).toBe(false);
++});
+diff --git a/rebuild/tests/home-ads-production-shape.test.ts b/rebuild/tests/home-ads-production-shape.test.ts
+index 7722283e..66b9176a 100644
+--- a/rebuild/tests/home-ads-production-shape.test.ts
++++ b/rebuild/tests/home-ads-production-shape.test.ts
+@@ -13,6 +13,8 @@ vi.mock('@/modules/ads/server/read-policy', () => ({ loadAdsReadPolicy: async ()
+ vi.mock('@/modules/ads/server/output-policy', () => ({ loadAdsOutputPolicy: async () => ({ detailMaxBytes: 1048576 }) }));
+ 
+ import { readAdsDailyRows } from '@/modules/ads/server/report-read';
++import { readAdsPerformance } from '@/modules/ads/server/performance';
++import { summarizeInsights } from '@/modules/ads/server/summary';
+ import { spendByCurrency } from '@/modules/home/server/overview-pure';
+ 
+ const account = { id: 'selected', actId: 'act_159977536979568', name: 'Example account', currency: 'USD' };
+@@ -64,3 +66,39 @@ describe('Home spend through the real Ads read and normalization services', () =
+     expect(spendByCurrency(page.rows)).toMatchObject([{ currency: 'EUR', total: 7.7 }, { currency: 'USD', total: 12.3 }]);
+   });
+ });
++
++
++describe('Ads performance on the same retained USD days at every hierarchy level', () => {
++  it('keeps hierarchy totals independent and recalculates ratios from sums, never stored daily averages', async () => {
++    const stored = ['account', 'campaign', 'adset', 'ad'].flatMap(level => [
++      { ...row(`${level}-older`, '2026-10-15', '10.25', level), impressions: 100, clicks: 1, reach: 80, cpc: 10.25, cpm: 102.5, ctr: 1, cpp: 0.128125, frequency: 1.25, actions: [{ action_type: 'link_click', value: '1' }] },
++      { ...row(`${level}-latest`, '2026-10-16', '20.75', level), impressions: 900, clicks: 99, reach: 600, cpc: 20.75 / 99, cpm: 20.75 * 1000 / 900, ctr: 11, cpp: 20.75 / 600, frequency: 1.5, actions: [{ action_type: 'link_click', value: '99' }] },
++    ]);
++    db.accounts.mockResolvedValue([account]);
++    db.insights.mockImplementation(async ({ where }: { where: { level: { in: string[] }; date: { gte: Date; lt: Date } } }) =>
++      stored.filter(item => where.level.in.includes(item.level) && item.date >= where.date.gte && item.date < where.date.lt));
++    for (const level of ['campaign', 'adset', 'ad']) {
++      const result = await readAdsPerformance({ userId: 'u', workspaceId: 'w' }, { start: '2026-10-15', end: '2026-10-21', level });
++      expect(result.resultCount).toBe(1);
++      expect(result.performance[0]).toMatchObject({ level, currency: 'USD', spend: 31, impressions: 1000, clicks: 100, reach: 600,
++        cpc: 0.31, cpm: 31, ctr: 10, frequency: 1.5, cpp: 20.75 / 600, reachDate: new Date('2026-10-16'),
++        actions: [{ name: 'link_click', value: 100 }], dailyRowCount: 2 });
++      expect(result.range).toEqual({ from: new Date('2026-10-15'), to: new Date('2026-10-22'), endExclusive: true });
++    }
++    const daily = await readAdsDailyRows({ userId: 'u', workspaceId: 'w' }, { start: '2026-10-15', end: '2026-10-21', level: 'account' });
++    expect(spendByCurrency(daily.rows)).toMatchObject([{ currency: 'USD', total: 31, daily: [{ date: '2026-10-15', value: 10.25 }, { date: '2026-10-16', value: 20.75 }] }]);
++    // A retained day is not evidence of zero spend on missing Oct 17–21 days.
++    expect(daily.rows).toHaveLength(2);
++    expect(daily.rows[0].fields).toMatchObject({ spend: '20.75' });
++  });
++
++  it('leaves denominator-zero ratios unknown and keeps different accounts/currencies apart', () => {
++    const summaries = summarizeInsights([
++      { ...row('usd', '2026-10-16', '10.00', 'campaign'), impressions: 0, clicks: 0, reach: 0 },
++      row('eur', '2026-10-16', '7.70', 'campaign', 'eur', 'EUR'),
++    ]);
++    expect(summaries).toHaveLength(2);
++    expect(summaries.find(summary => summary.currency === 'USD')).toMatchObject({ spend: 10, cpc: null, cpm: null, ctr: null });
++    expect(summaries.find(summary => summary.currency === 'EUR')).toMatchObject({ spend: 7.7, cpc: 3.85, cpm: 77, ctr: 2 });
++  });
++});
+diff --git a/rebuild/tests/home-overview-service.test.ts b/rebuild/tests/home-overview-service.test.ts
+index 46a9882c..e14c20fa 100644
+--- a/rebuild/tests/home-overview-service.test.ts
++++ b/rebuild/tests/home-overview-service.test.ts
+@@ -186,3 +186,34 @@ describe('readHomeOverview', () => {
+     expect(overview.inbox).toEqual({ state: 'ready', data: { open: 4 } });
+   });
+ });
++
++
++it('projects ten authorized Pages with partial coverage into every numeric Home card', async () => {
++  const channels = Array.from({ length: 10 }, (_, i) => ({ id: `example-${i}`, name: `Example ${i}` }));
++  mocks.snapshot.mockResolvedValue(snapshot({ options: { channels }, selected: { channelIds: channels.map(c => c.id) },
++    audience: { entries: channels.slice(0, 8).map(c => ({ id: c.id, metric: 'audience', asOf: new Date('2026-10-16') })), total: 2800, covered: 8, selected: 10 } }));
++  mocks.queryRaw.mockResolvedValue(channels.map(c => ({ id: c.id, provider: 'example' })));
++  mocks.host.mockResolvedValue({
++    channelMeasuresBatch: async () => channels.map((c, i) => ({ targetId: c.id,
++      current: { views: i < 8 ? (i + 1) * 100 : null, engagements: i < 8 ? (i + 1) * 10 : null },
++      previous: { views: i < 6 ? (i + 1) * 80 : null, engagements: i < 6 ? (i + 1) * 8 : null },
++      mix: [{ key: 'reactions', label: 'Reactions', value: i < 8 ? i + 1 : null }],
++    })), postPerformanceBatch: async () => [],
++  });
++  mocks.ads.mockResolvedValue({ rows: [{ currency: 'USD', spend: 10.25, date: '2026-10-15' }, { currency: 'USD', spend: 20.75, date: '2026-10-16' }], nextOffset: null });
++  mocks.posts.mockResolvedValue({ total: 40, posts: [{ id: 'upcoming', message: 'Example scheduled post', scheduledAt: new Date('2026-10-22'), targets: [] }] });
++  mocks.inbox.mockResolvedValue({ total: 17 });
++  const result = await readHomeOverview(actor, new Date('2026-10-21T12:00:00Z'));
++  expect(result.audience).toMatchObject({ state: 'ready', data: { total: 2800, covered: 8, selected: 10, asOf: '2026-10-16T00:00:00.000Z' } });
++  expect(result.performance).toMatchObject({ state: 'ready', data: {
++    channels: 10, truncated: false,
++    views: { current: 3600, previous: 1680, change: 0.25, covered: 8, comparable: 6 },
++    engagements: { current: 360, previous: 168, change: 0.25, covered: 8, comparable: 6 },
++    interactions: [{ key: 'reactions', value: 36 }],
++  } });
++  if (result.performance?.state !== 'ready') throw new Error('Missing performance fixture');
++  expect(result.performance.data.topChannels[0]).toEqual({ id: 'example-7', name: 'Example 7', engagements: 80 });
++  expect(result.upcoming).toMatchObject({ state: 'ready', data: { total: 40 } });
++  expect(result.inbox).toEqual({ state: 'ready', data: { open: 17 } });
++  expect(result.ads).toMatchObject({ state: 'ready', data: { start: '2026-09-24', end: '2026-10-21', spend: [{ currency: 'USD', total: 31, firstDay: '2026-10-15', lastDay: '2026-10-16', recordedDays: 2 }] } });
++});

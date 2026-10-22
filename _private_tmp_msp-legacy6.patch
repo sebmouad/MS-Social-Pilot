@@ -1,0 +1,451 @@
+diff --git a/rebuild/docs/LEGACY_CAPABILITY_PARITY.md b/rebuild/docs/LEGACY_CAPABILITY_PARITY.md
+index 1e73884f..f3a121fc 100644
+--- a/rebuild/docs/LEGACY_CAPABILITY_PARITY.md
++++ b/rebuild/docs/LEGACY_CAPABILITY_PARITY.md
+@@ -16,7 +16,7 @@ a manifest, saved setting or unit test is not complete workflow proof. See
+ | P0 | Eleven network connectors and publishing destinations in `src/lib/networks/index.ts` and `src/lib/networks/connect.ts` | Partial: Facebook is the only installed customer platform. Instagram and the other legacy destinations lack usable rebuild adapters. Removed provider APIs cannot be restored by configuration. | Adapter-level connection, discovery, publishing/status/delete, analytics, inbox, and ads where provider supports them; scoped UI/API/MCP and live tests. |
+ | P0 | Facebook feed, photo, carousel, video, Reel, Story, Group and native scheduling in `src/lib/facebook/publish.ts` | Partial: Page feed/photo and native video/Reel/Story source, proof/recovery and app versus Meta-native scheduling exist. Per-destination choices, queue and mix/recycle share Publishing services. Private/default-off native paths and mocked tests do not establish every format live. Group publishing is not advertised. | Provider fixture and live create/status/delete tests for each supported format; visible choices limited to available capabilities. |
+ | P0 | Analytics views, comparisons, post explorer, demographics, network analysis, pinned metrics and coverage in `src/app/(app)/analytics/AnalyticsScreen.tsx` and `src/lib/analytics-views.ts` | Partial: catalog/details/explorer, posts, comparisons, pins, goals, audience history/CSV and ad-object analysis have UI/REST/MCP. Shared charts now consume actual previous-period points. Facebook post history/reactions/hierarchy collection exists; live Graph v26.0 probe verifies five current post metrics and refuses three older ones (RELEASE_GATES_PLAN); exhaustive history/collection and dynamic labels remain incomplete. Root-editable EN/FR catalogs and validated-default fallback are integrated. | Shared metric catalog feeding full UI, export, and MCP with date/channel/ad-account scope, comparison, availability, and refresh evidence. |
+-| P0 | Reports and CSV exports in `src/app/(app)/reports/page.tsx`, `src/lib/reports.ts`, and `src/lib/analytics-export.ts` | Partial: templates/schedules/runs, CSV/JSON/printable artifacts, response time/business hours, top posts, goals, destinations/link counts and AI recap exist. Downloads/UI were refined in 0589ddd0. Response reports now include first direct replies to stored root comments, slowest calendar/business-hours first response, and business-hours resolution through the same report generator used by UI downloads, REST and MCP. Round-2 response reports retain pre-period conversation context, reconstruct recorded resolution/reopening cycles, and disclose stored-history coverage and incomplete boundary exclusions in bilingual artifacts through the existing shared generator. Round-3 reports separate comment/conversation answer shares, response and resolution durations, and member business-hours first-response medians through the shared generator. Round-5 member outcomes add slowest first replies, answered-wait resolution counts and calendar/business-hours resolution medians, with last-run first-responder attribution through the same report workflow. Per-channel reports retain member attribution and disclose source limits; complete provider history, actual mail delivery, volume and current-browser proof remain open.  Rounds 1–3 (`23b7be84`, `6ef753e4`, `b725c415`) have local arithmetic, bilingual artifact and mocked workflow tests; bounded history and concurrent-read consistency remain limits. | Complete relevant report sections and exports, schedule/template workflows, UI/API/MCP parity and provider-shaped tests. |
++| P0 | Reports and CSV exports in `src/app/(app)/reports/page.tsx`, `src/lib/reports.ts`, and `src/lib/analytics-export.ts` | Partial: templates/schedules/runs, CSV/JSON/printable artifacts, response time/business hours, top posts, goals, destinations/link counts and AI recap exist. Downloads/UI were refined in 0589ddd0. Round-6 Published posts adds three stored-data report views through the existing confirmed UI/REST/MCP generator: a destination-specific content log with attempt counts, daily UTC publication counts independent of log limits, and currently failed destinations last updated in the period (explicitly not historical failure attempts). EN/FR catalogs disclose excerpts, current-state semantics and clipping; Root `analytics.reports.publicationDetails` controls each log ceiling and excerpt length. Local verification: TypeScript 0 errors; 155 targeted tests across 10 files passed, including scoped SQL shapes, bilingual artifacts, row/byte limits and confirmed MCP generation/audit. PostgreSQL, browser, real-client and production evidence remain open. Response reports now include first direct replies to stored root comments, slowest calendar/business-hours first response, and business-hours resolution through the same report generator used by UI downloads, REST and MCP. Round-2 response reports retain pre-period conversation context, reconstruct recorded resolution/reopening cycles, and disclose stored-history coverage and incomplete boundary exclusions in bilingual artifacts through the existing shared generator. Round-3 reports separate comment/conversation answer shares, response and resolution durations, and member business-hours first-response medians through the shared generator. Round-5 member outcomes add slowest first replies, answered-wait resolution counts and calendar/business-hours resolution medians, with last-run first-responder attribution through the same report workflow. Per-channel reports retain member attribution and disclose source limits; complete provider history, actual mail delivery, volume and current-browser proof remain open.  Rounds 1–3 (`23b7be84`, `6ef753e4`, `b725c415`) have local arithmetic, bilingual artifact and mocked workflow tests; bounded history and concurrent-read consistency remain limits. | Complete relevant report sections and exports, schedule/template workflows, UI/API/MCP parity and provider-shaped tests. |
+ | P1 | Composer overrides, queue slots, approvals, labels, custom fields, notes, versions, templates, first-comment retries, and UTM/link preparation in `src/lib/posts.ts` and related API routes | Partial: composer, slots/approvals/templates/labels/fields/notes/version restore, delayed comments and rejected-only retry, best times, mix/recycle, UTM and shortening are integrated. Scheduling modes are per destination. Newest scheduling/restore/comment database/browser/provider checks remain open; unknown remote attempts stay held. | Full end-to-end tests on production-shaped staging, per-target behavior, provider create/status/delete and permission verification, bulk actions, scheduling rules, plus remaining legacy workflows. |
+ | P1 | Post list filters, saved views, pagination, bulk actions, retry/duplicate, CSV export and public Posts v1 API in `src/app/(app)/posts/page.tsx` and `src/app/api/posts` | Partial: scoped lists/search/paging/views/export and bulk actions share services; key REST v1 Posts includes scheduling. Large asynchronous Posts CSV is absent (workspace ZIP is different); draft aliases and v1 create now share confirmed lifecycle boundaries (`acb56bd7`); real client outcomes remain unverified. Missing-image fallback and saved-view expired-session feedback are source/unit fixes (`36946d9e`), without browser rerun. | Full list/action/API parity with workspace authorization and large-data pagination tests. |
+ | P1 | Publishing calendar navigation and month coverage in `src/app/(app)/calendar` | Partial: Month/Week/phone agenda, workspace-day grouping, previews, saved views and drag/keyboard moves exist. Shared lifecycle supports adapter-held cancel/reschedule. Calendar editing, queue-slot presentation, high-volume months and actual drag/remote-schedule browser/provider evidence remain open. | Browser and database tests with records on timezone and month boundaries, high-volume month, permissions, drag-and-drop E2E, and edit workflows. |
+diff --git a/rebuild/src/modules/analytics/reports/config.ts b/rebuild/src/modules/analytics/reports/config.ts
+index 481cae46..c53610a9 100644
+--- a/rebuild/src/modules/analytics/reports/config.ts
++++ b/rebuild/src/modules/analytics/reports/config.ts
+@@ -3,12 +3,20 @@ import { entry } from '@/lib/config/entry';
+ 
+ export const RESPONSE_ANALYSIS_LIMITS = { messages: { default: 20000, min: 100, max: 100000 }, events: { default: 20000, min: 100, max: 100000 }, members: { default: 25, min: 1, max: 500 } } as const;
+ 
++export const PUBLICATION_REPORT_POLICY_SCHEMA = z.object({
++  publishedRows: z.number().int().min(1).max(10000),
++  failedRows: z.number().int().min(1).max(10000),
++  excerptCharacters: z.number().int().min(20).max(2000),
++}).strict();
++export const PUBLICATION_REPORT_DEFAULTS = { publishedRows: 100, failedRows: 100, excerptCharacters: 240 };
++
+ const G = 'Analytics · Report workflows';
+ const num = (key: string, label: string, description: string, defaultValue: number, min: number, max: number) =>
+   entry({ key, group: G, label, kind: 'number', description, defaultValue, schema: z.number().int().min(min).max(max), consumption: 'active' });
+ 
+ /** Root-managed bounds for report templates and schedule definitions. */
+ export const REPORT_WORKFLOW_CONFIG = [
++  entry({ key: 'analytics.reports.publicationDetails', group: G, label: 'Publication report details', kind: 'json', description: 'Maximum published and currently failed destination rows and content excerpt length in the Published posts report section. Daily UTC totals are counted independently; clipped logs are disclosed.', defaultValue: PUBLICATION_REPORT_DEFAULTS, schema: PUBLICATION_REPORT_POLICY_SCHEMA, consumption: 'active' }),
+   num('analytics.reports.responseEventLimit', 'Response analysis workflow events', 'Maximum stored resolution and reopening events examined per channel report. Truncation suppresses resolution durations and is disclosed.', RESPONSE_ANALYSIS_LIMITS.events.default, RESPONSE_ANALYSIS_LIMITS.events.min, RESPONSE_ANALYSIS_LIMITS.events.max),
+   num('analytics.reports.responseMessageLimit', 'Response analysis records per source', 'Maximum stored messages and comments examined separately, including pre-period context. Incomplete boundary threads are excluded; truncation and stored-only coverage are disclosed.', RESPONSE_ANALYSIS_LIMITS.messages.default, RESPONSE_ANALYSIS_LIMITS.messages.min, RESPONSE_ANALYSIS_LIMITS.messages.max),
+   num('analytics.reports.responseMemberLimit', 'Response analysis member rows', 'Maximum replying members listed in each combined, comment and conversation summary of one channel report; including their slowest replies and saved-resolution outcomes; omitted members are disclosed separately.', RESPONSE_ANALYSIS_LIMITS.members.default, RESPONSE_ANALYSIS_LIMITS.members.min, RESPONSE_ANALYSIS_LIMITS.members.max),
+diff --git a/rebuild/src/modules/analytics/reports/generation/copy.ts b/rebuild/src/modules/analytics/reports/generation/copy.ts
+index cbd446cb..bf852386 100644
+--- a/rebuild/src/modules/analytics/reports/generation/copy.ts
++++ b/rebuild/src/modules/analytics/reports/generation/copy.ts
+@@ -1,5 +1,17 @@
+ import { z } from 'zod';
+ const en = {
++  "Publication log": "Publication log",
++  "Daily publications (UTC)": "Daily publications (UTC)",
++  "Currently failed destinations": "Currently failed destinations",
++  "Publication details are from stored destination state. Daily totals use UTC publication dates; days without publications are omitted.": "Publication details are from stored destination state. Daily totals use UTC publication dates; days without publications are omitted.",
++  "Failures are destinations currently marked failed and last updated in this period, not a history of every failed attempt. Review the post before retrying.": "Failures are destinations currently marked failed and last updated in this period, not a history of every failed attempt. Review the post before retrying.",
++  "The publication log reached its row limit; daily totals still cover the full period.": "The publication log reached its row limit; daily totals still cover the full period.",
++  "The failed destination list reached its row limit.": "The failed destination list reached its row limit.",
++  "No stored publications in this period.": "No stored publications in this period.",
++  "No currently failed destinations updated in this period.": "No currently failed destinations updated in this period.",
++  "Content excerpts may be shortened. Other destinations and provider error details are not included.": "Content excerpts may be shortened. Other destinations and provider error details are not included.",
++  "Attempts": "Attempts",
++
+   "Member slowest first response (calendar time)": "Member slowest first response (calendar time)",
+   "Member slowest first response (business hours)": "Member slowest first response (business hours)",
+   "Member answered waits resolved": "Member answered waits resolved",
+@@ -161,6 +173,18 @@ const en = {
+   "Channel": "Channel"
+ };
+ const fr: typeof en = {
++  "Publication log": "Journal des publications",
++  "Daily publications (UTC)": "Publications quotidiennes (UTC)",
++  "Currently failed destinations": "Destinations actuellement en échec",
++  "Publication details are from stored destination state. Daily totals use UTC publication dates; days without publications are omitted.": "Les détails proviennent de l’état enregistré des destinations. Les totaux quotidiens utilisent les dates UTC de publication ; les jours sans publication sont omis.",
++  "Failures are destinations currently marked failed and last updated in this period, not a history of every failed attempt. Review the post before retrying.": "Les échecs sont les destinations actuellement en échec et modifiées pendant cette période, pas un historique de chaque tentative échouée. Vérifiez la publication avant de réessayer.",
++  "The publication log reached its row limit; daily totals still cover the full period.": "Le journal des publications a atteint sa limite de lignes ; les totaux quotidiens couvrent toujours toute la période.",
++  "The failed destination list reached its row limit.": "La liste des destinations en échec a atteint sa limite de lignes.",
++  "No stored publications in this period.": "Aucune publication enregistrée pendant cette période.",
++  "No currently failed destinations updated in this period.": "Aucune destination actuellement en échec modifiée pendant cette période.",
++  "Content excerpts may be shortened. Other destinations and provider error details are not included.": "Les extraits peuvent être raccourcis. Les autres destinations et les détails des erreurs de la plateforme ne sont pas inclus.",
++  "Attempts": "Tentatives",
++
+   "Member slowest first response (calendar time)": "Première réponse la plus lente par membre (temps calendaire)",
+   "Member slowest first response (business hours)": "Première réponse la plus lente par membre (heures ouvrées)",
+   "Member answered waits resolved": "Attentes avec réponse résolues par membre",
+diff --git a/rebuild/src/modules/analytics/reports/generation/document.ts b/rebuild/src/modules/analytics/reports/generation/document.ts
+index f4e881fa..e9f1fec2 100644
+--- a/rebuild/src/modules/analytics/reports/generation/document.ts
++++ b/rebuild/src/modules/analytics/reports/generation/document.ts
+@@ -1,3 +1,5 @@
++import { readPublicationReport, type PublicationReport } from '../server/publication-report';
++import { publicationDetails } from './publication-details';
+ import { documentText, reportDocumentCopyDefaults, type ReportDocumentCopy } from './copy';
+ import { responseTimeCopyDefaults, type ResponseTimeCopy } from './response-copy';
+ import { loadReportDocumentCopy } from './copy-server';
+@@ -67,7 +69,7 @@ type Snapshot = Awaited<ReturnType<typeof readAnalyticsSnapshot>>;
+  * as-of times; a metric without data is "Not available", never zero. Every rendering is bounded in rows and UTF-8 bytes, and
+  * anything cut is marked; when even the fixed parts exceed the bound a minimal notice is returned instead of an overflowing page.
+  */
+-export function renderReport(snapshot: Snapshot, input: { channelName: string; sections: ReportSectionId[]; generatedAt: Date; responseTime?: ResponseTimeSummary | null; topPosts?: PostPerformance[] | null; destination?: DestinationSummary | null; goals?: { month: GoalMonth; goals: GoalProgress[] } | null; recap?: RecapState | null }, bounds: ReportBounds, copy: ReportDocumentCopy = reportDocumentCopyDefaults.en, locale: 'en' | 'fr' = 'en', responseCopy: ResponseTimeCopy = responseTimeCopyDefaults): ReportOutput {
++export function renderReport(snapshot: Snapshot, input: { channelName: string; sections: ReportSectionId[]; generatedAt: Date; publications?: PublicationReport | null; responseTime?: ResponseTimeSummary | null; topPosts?: PostPerformance[] | null; destination?: DestinationSummary | null; goals?: { month: GoalMonth; goals: GoalProgress[] } | null; recap?: RecapState | null }, bounds: ReportBounds, copy: ReportDocumentCopy = reportDocumentCopyDefaults.en, locale: 'en' | 'fr' = 'en', responseCopy: ResponseTimeCopy = responseTimeCopyDefaults): ReportOutput {
+   const t = documentText(copy);
+   const formatDuration = (ms: number | null) => responseDuration(ms, responseCopy, locale);
+   const describeBusinessHours = (hours: Parameters<typeof responseHours>[0]) => responseHours(hours, responseCopy, locale);
+@@ -76,6 +78,8 @@ export function renderReport(snapshot: Snapshot, input: { channelName: string; s
+   const coverageText = (m: Pick<MetricView, 'coverage' | 'available'>) => t("{v0} of {v1} channels", { v0: m.coverage, v1: m.available });
+   const valueText = (m: MetricView) => m.total === null ? t("Not available") : (m.displayTotal ?? String(m.total));
+   const asOf = (date: Date | null | undefined) => date ? date.toISOString().slice(0, 10) : t("unknown");
++  const publication = input.sections.includes('published') && input.publications ? publicationDetails(input.publications, copy) : null;
++  const sourceTruncated = publication?.truncated ?? false;
+   const wanted = new Set(input.sections);
+   // The recap is included only when the run produced it or recorded that it could not; otherwise (AI off or not permitted) it is not included.
+   const included = REPORT_SECTION_IDS.filter(s => wanted.has(s) && (REPORT_SUPPORTED_SECTIONS as readonly string[]).includes(s) && (s !== 'aiRecap' || Boolean(input.recap)));
+@@ -144,7 +148,7 @@ export function renderReport(snapshot: Snapshot, input: { channelName: string; s
+ 
+   // CSV: long form, one row per summary/point/resource, cut at the row and byte limits.
+   const header = ['record_type', 'metric_key', 'metric', 'source', 'resource', 'date', 'value', 'unit', 'coverage', 'aggregation'];
+-  const rows: unknown[][] = [];
++  const rows: unknown[][] = [...(publication?.rows ?? [])];
+   if (recap) rows.push(['ai_recap', 'ai_recap', t("AI recap (AI-generated)"), t("AI-generated"), '', '', recap.state === 'ready' ? recap.text : '', '', '', recap.state === 'ready' ? RECAP_LABEL : RECAP_UNAVAILABLE]);
+   if (audience) for (const e of audience.entries) rows.push(['audience', e.metric, e.metricLabel, e.sourceLabel, e.name, e.asOf, e.value, 'people', t("{v0} of {v1} channels", { v0: audience.covered, v1: audience.selected }), t("Latest value per channel; not unique people")]);
+   if (response) {
+@@ -245,7 +249,7 @@ export function renderReport(snapshot: Snapshot, input: { channelName: string; s
+   const csvOf = (count: number, marked: boolean) => [line(header), ...rows.slice(0, count).map(line), ...(marked ? [line(['truncated', 'true'])] : [])].join('\r\n') + '\r\n';
+   const rowCap = Math.min(rows.length, bounds.maxRows);
+   const csvRows = fit(rowCap, bounds.maxBytes, c => csvOf(c, true));
+-  const csvTruncated = csvRows < rows.length;
++  const csvTruncated = sourceTruncated || csvRows < rows.length;
+   // The header plus the marker alone may exceed a tiny bound: cut at a character boundary rather than overflow.
+   const csvRaw = csvOf(csvRows, csvTruncated);
+   const csv = cutBytes(csvRaw, bounds.maxBytes);
+@@ -254,13 +258,17 @@ export function renderReport(snapshot: Snapshot, input: { channelName: string; s
+   const records = (count: number) => rows.slice(0, count).map(row => Object.fromEntries(header.map((key, i) => [key, row[i] === '' || row[i] === undefined ? null : row[i]])));
+   const jsonOf = (count: number, marked: boolean) => JSON.stringify({ channel: channelName, period, generatedAt: input.generatedAt.toISOString(), sections: included, notIncluded, truncated: marked, columns: header, records: records(count) }) + '\n';
+   const jsonRows = fit(rowCap, bounds.maxBytes, c => jsonOf(c, true));
+-  let jsonTruncated = jsonRows < rows.length;
++  let jsonTruncated = sourceTruncated || jsonRows < rows.length;
+   let json = jsonOf(jsonRows, jsonTruncated);
+   if (bytes(json) > bounds.maxBytes) { json = '{"truncated":true}\n'; jsonTruncated = true; if (bytes(json) > bounds.maxBytes) json = ''; }
+ 
+   // Printable HTML and plain text show the summary tier only (one row per metric).
+   const title = t("Analytics report: {v0}, {v1} to {v2}", { v0: channelName, v1: period.start, v2: period.end });
+   const audienceHtml = audience ? `<h2>${esc(t("Audience"))}</h2><p>${esc(t("{v0} of {v1} selected channels have audience data{v2}. This sum is not unique people across networks.", { v0: audience.covered, v1: audience.selected, v2: audienceAsOf ? t(", as of {v0}", { v0: asOf(audienceAsOf) }) : '' }))}</p><p><strong>${audience.covered ? esc(audience.total) : esc(t("Not available"))}</strong></p>` : '';
++  const publicationRows = (publication?.rows ?? []).slice(0, bounds.maxRows);
++  const publicationCut = sourceTruncated || publicationRows.length < (publication?.rows.length ?? 0);
++  const publicationLines = publicationRows.map(row => `${row[3] || row[2]}: ${row[5] instanceof Date ? row[5].toISOString() : row[5]} · ${row[4]} · ${row[2]} · ${row[6]} ${row[7]}`);
++  const publicationHtml = publication ? `<h2>${esc(t('Publication log'))} / ${esc(t('Daily publications (UTC)'))} / ${esc(t('Currently failed destinations'))}</h2>${publication.notes.map(note => `<p>${esc(note)}</p>`).join('')}<ul>${publicationLines.map(line => `<li>${esc(line)}</li>`).join('')}</ul>` : '';
+   const htmlOf = (count: number, marked: boolean) => {
+     const shown = metrics.slice(0, count);
+     return `<!doctype html><html lang="${locale}"><head><meta charset="utf-8"><title>${esc(title)}</title><style>body{font:14px/1.5 system-ui,sans-serif;margin:2rem;color:#111}table{border-collapse:collapse;width:100%;margin:1rem 0}th,td{border:1px solid #bbb;padding:.35rem .5rem;text-align:left}small{color:#555}@media print{body{margin:0}}</style></head><body>`
+@@ -271,20 +279,21 @@ export function renderReport(snapshot: Snapshot, input: { channelName: string; s
+       + (goals ? `<h2>${esc(t("Goals"))}</h2>${goals.goals.length ? `<p><small>${esc(t("Month {v0} to {v1} ({v2}), up to generation for the current month.", { v0: goals.month.start, v1: goals.month.end, v2: goals.month.timeZone }))}</small></p><table><thead><tr><th>${esc(t("Goal"))}</th><th>${esc(t("Target"))}</th><th>${esc(t("This month"))}</th><th>${esc(t("Progress"))}</th><th>${esc(t("Pace"))}</th></tr></thead><tbody>${goals.goals.map(g => `<tr><td>${esc(g.label)}</td><td>${esc(g.target)}</td><td>${g.actual === null ? esc(t("No data")) : esc(g.actual)}</td><td>${esc(g.percent)}%</td><td>${esc(g.paceLabel)}</td></tr>`).join('')}</tbody></table>` : `<p>${esc(t("No goals are set for this channel."))}</p>`}` : '')
+       + (included.includes('destinations') ? `<h2>${esc(t("Destinations"))}</h2>${destination ? `<p><small>${esc(destinationNote)}</small></p><table><thead><tr><th>${esc(t("Destination"))}</th><th>${esc(t("Type"))}</th><th>${esc(t("Posts"))}</th>${destination.measures.map(m => `<th>${esc(m.label)}</th>`).join('')}<th>${esc(t("Link clicks (lifetime)"))}</th></tr></thead><tbody><tr><td>${esc(destination.name)}</td><td>${esc(destination.type)}</td><td>${esc(destination.posts)}</td>${destination.measures.map(m => `<td>${esc(measureText(m))}</td>`).join('')}<td>${esc(linkClicksText)}</td></tr></tbody></table><p><small>${esc(t("Link clicks are lifetime totals for links attributed to this channel. Legacy links without a destination count only when the post has a single published destination."))}</small></p>` : `<p>${esc(t("Destination summary not available."))}</p>`}` : '')
+       + (topPosts ? `<h2>${esc(t("Top posts"))}</h2>${topPosts.length ? `<table><thead><tr><th>#</th><th>${esc(t("Post"))}</th><th>${esc(t("Published"))}</th><th>${esc(topPosts[0]!.rankLabel)}</th>${topPosts[0]!.measures.map(m => `<th>${esc(m.label)}</th>`).join('')}</tr></thead><tbody>${topPosts.map((p, i) => `<tr><td>${i + 1}</td><td>${p.url ? `<a href="${esc(p.url)}">${esc(postTitle(p))}</a>` : esc(postTitle(p))}</td><td>${esc(asOf(p.publishedAt))}</td><td>${p.rankValue === null ? esc(t("Not available")) : esc(p.rankValue)}</td>${p.measures.map(m => `<td>${m.value === null ? esc(t("Not available")) : esc(m.value)}</td>`).join('')}</tr>`).join('')}</tbody></table>` : `<p>${esc(t("No published posts with stored measures in this period."))}</p>`}` : '')
++      + publicationHtml
+       + audienceHtml
+       + (metrics.length ? `<h2>${esc(t("Metrics"))}</h2><table><thead><tr><th>${esc(t("Metric"))}</th><th>${esc(t("Source"))}</th><th>${esc(t("Value"))}</th><th>${esc(t("Basis"))}</th><th>${esc(t("Coverage"))}</th><th>${esc(t("As of"))}</th></tr></thead><tbody>${shown.map(m => `<tr><td>${esc(m.label)}</td><td>${esc(m.sourceLabel)}</td><td>${esc(valueText(m))}</td><td>${esc([m.aggregationLabel, m.aggregationNote].filter(Boolean).join('. '))}</td><td>${esc(coverageText(m))}</td><td>${esc(asOf(m.latestAt))}</td></tr>`).join('')}</tbody></table>` : '')
+       + (marked ? `<p><strong>${esc(t("This report was shortened to fit its size limit."))}</strong></p>` : '')
+       + (notIncluded.length ? `<p><small>${esc(t("Not included: {v0} (not available in this report yet).", { v0: notIncluded.join(', ') }))}</small></p>` : '') + '</body></html>';
+   };
+-  const metricCap = Math.min(metrics.length, bounds.maxRows);
++  const metricCap = Math.min(metrics.length, Math.max(0, bounds.maxRows - publicationRows.length));
+   const htmlCount = fit(metricCap, bounds.maxBytes, c => htmlOf(c, true));
+-  let htmlTruncated = htmlCount < metrics.length;
++  let htmlTruncated = publicationCut || htmlCount < metrics.length;
+   let html = htmlOf(htmlCount, htmlTruncated);
+   if (bytes(html) > bounds.maxBytes) { // the fixed parts alone do not fit
+     html = cutBytes(`<!doctype html><html lang="${locale}"><body><p>${esc(clamp(title, 80))}</p><p><strong>${esc(t("This report was shortened to fit its size limit."))}</strong></p></body></html>`, bounds.maxBytes);
+     htmlTruncated = true;
+   }
+-  const baseLines = [title, '', ...(recap ? [t("AI recap (AI-generated; {v0})", { v0: RECAP_LABEL }), recapText, ''] : []), ...(included.includes('published') ? [t("Published {v0}, scheduled {v1}, failed {v2}.", { v0: snapshot.publishing.published, v1: snapshot.publishing.scheduled, v2: snapshot.publishing.failed })] : []),
++  const baseLines = [title, ...(publication ? [...publication.notes, ...publicationLines] : []), '', ...(recap ? [t("AI recap (AI-generated; {v0})", { v0: RECAP_LABEL }), recapText, ''] : []), ...(included.includes('published') ? [t("Published {v0}, scheduled {v1}, failed {v2}.", { v0: snapshot.publishing.published, v1: snapshot.publishing.scheduled, v2: snapshot.publishing.failed })] : []),
+     ...(response ? [t("Response time: {v0}", { v0: responseLine }), ...responseDetails, ...memberLines.map(l => `  ${l}`), ...(resolveLine ? [resolveLine] : [])] : []),
+     ...(goals ? [t("Goals (month {v0} to {v1}):", { v0: goals.month.start, v1: goals.month.end }), ...(goals.goals.length ? goals.goals.map(goalText) : [t("No goals are set for this channel.")])] : []),
+     ...(included.includes('destinations') ? [t("Destinations:"), ...(destination ? [t("{v0} ({v1}): {v2} posts; {v3}; link clicks (lifetime) {v4}", { v0: clamp(destination.name, 200), v1: destination.type, v2: destination.posts, v3: destination.measures.map(m => `${m.label} ${measureText(m)}`).join('; '), v4: linkClicksText })] : [t("Destination summary not available.")])] : []),
+@@ -294,7 +303,7 @@ export function renderReport(snapshot: Snapshot, input: { channelName: string; s
+   const tail = (cut: boolean) => [...(cut ? [t("Shortened to fit the size limit.")] : []), ...(notIncluded.length ? [t("Not included: {v0}", { v0: notIncluded.join(', ') })] : [])];
+   const textOf = (count: number, cut: boolean) => [...baseLines, ...metricLines.slice(0, count), ...tail(cut)].join('\n');
+   const textCount = fit(metricCap, bounds.maxBytes, c => textOf(c, true));
+-  let textTruncated = textCount < metricLines.length;
++  let textTruncated = publicationCut || textCount < metricLines.length;
+   let text = textOf(textCount, textTruncated);
+   if (bytes(text) > bounds.maxBytes) { text = cutBytes(text, bounds.maxBytes); textTruncated = true; }
+   return { channelName, period, generatedAt: input.generatedAt.toISOString(), sections: included, notIncluded, csv, html, text, json, rowCount: csvRows, bytes: bytes(csv), htmlBytes: bytes(html), textBytes: bytes(text), jsonBytes: bytes(json), truncated: csvTruncated || htmlTruncated || textTruncated || jsonTruncated || csv !== csvRaw };
+@@ -349,11 +358,12 @@ export function createReportGenerator(deps: { bounds: () => Promise<ReportBounds
+         const ceiling = resultCeiling(actor);
+         const bounds = { maxRows: ceiling === undefined ? base.maxRows : Math.min(base.maxRows, ceiling), maxBytes: base.maxBytes };
+         const responseTime = request.sections.includes('responseTime') ? await readResponseTime(actor.workspaceId, request.channelId, request.period, documentCopy.locale) : null;
++        const publications = request.sections.includes('published') ? await readPublicationReport(actor.workspaceId, request.channelId, request.period) : null;
+         const topPosts = request.sections.includes('topPosts') ? await readTopPosts(actor.workspaceId, request.channelId, request.period) : null;
+         const destination = request.sections.includes('destinations') ? await readDestination(actor.workspaceId, request.channelId, request.period) : null;
+         const goals = request.sections.includes('goals') ? await channelGoalProgress(actor.workspaceId, request.channelId, request.period.end, deps.now?.() ?? new Date(), documentCopy.locale) : null;
+         const recap = request.sections.includes('aiRecap') ? await makeRecap(deps.recap ?? defaultRecap, actor, channel?.name ?? documentText(documentCopy.copy)('Channel'), snapshot, { sections: request.sections, responseTime, topPosts, destination, goals }, documentCopy.locale) : null;
+-        return { ok: true, output: renderReport(snapshot, { channelName: channel?.name ?? documentText(documentCopy.copy)('Channel'), sections: request.sections, responseTime, topPosts, destination, goals, recap, generatedAt: deps.now?.() ?? new Date() }, bounds, documentCopy.copy, documentCopy.locale, documentCopy.responseCopy) };
++        return { ok: true, output: renderReport(snapshot, { channelName: channel?.name ?? documentText(documentCopy.copy)('Channel'), sections: request.sections, publications, responseTime, topPosts, destination, goals, recap, generatedAt: deps.now?.() ?? new Date() }, bounds, documentCopy.copy, documentCopy.locale, documentCopy.responseCopy) };
+       } catch (error) {
+         const code = error && typeof error === 'object' && 'code' in error ? String((error as { code: unknown }).code) : '';
+         return { ok: false, reason: code === 'unauthorized' || code === 'forbidden' ? 'access_unavailable' : 'generation_failed' };
+diff --git a/rebuild/src/modules/analytics/reports/generation/publication-details.ts b/rebuild/src/modules/analytics/reports/generation/publication-details.ts
+new file mode 100644
+index 00000000..3d478a8c
+--- /dev/null
++++ b/rebuild/src/modules/analytics/reports/generation/publication-details.ts
+@@ -0,0 +1,21 @@
++import type { PublicationReport } from '../server/publication-report';
++import { documentText, type ReportDocumentCopy } from './copy';
++
++/** Long-form rows are shared by the four downloadable renderings. */
++export function publicationDetails(report: PublicationReport, copy: ReportDocumentCopy) {
++  const t = documentText(copy);
++  const notes = [t('Publication details are from stored destination state. Daily totals use UTC publication dates; days without publications are omitted.'),
++    t('Failures are destinations currently marked failed and last updated in this period, not a history of every failed attempt. Review the post before retrying.'),
++    t('Content excerpts may be shortened. Other destinations and provider error details are not included.'),
++    ...(report.publishedTruncated ? [t('The publication log reached its row limit; daily totals still cover the full period.')] : []),
++    ...(report.failedTruncated ? [t('The failed destination list reached its row limit.')] : []),
++    ...(!report.published.length ? [t('No stored publications in this period.')] : []),
++    ...(!report.failed.length ? [t('No currently failed destinations updated in this period.')] : [])];
++  const rows: unknown[][] = [
++    ...report.days.map(day => ['publication_day', 'published_daily', t('Daily publications (UTC)'), '', '', day.day, day.published, 'posts', '', t('Count in period')]),
++    ...report.published.map(post => ['publication_log', 'published_post', post.text || t('(no text)'), t('Publication log'), post.postId, post.at, post.attempts, t('Attempts'), '', t('Published')]),
++    ...report.failed.map(post => ['publication_failure', 'failed_destination', post.text || t('(no text)'), t('Currently failed destinations'), post.postId, post.at, post.attempts, t('Attempts'), '', t('Failures are destinations currently marked failed and last updated in this period, not a history of every failed attempt. Review the post before retrying.')]),
++    ...notes.map(note => ['publication_coverage', 'publication_basis', note, '', '', '', '', '', '', '']),
++  ];
++  return { notes, rows, truncated: report.publishedTruncated || report.failedTruncated };
++}
+diff --git a/rebuild/src/modules/analytics/reports/mcp.ts b/rebuild/src/modules/analytics/reports/mcp.ts
+index eaca0fd2..e1f7bc98 100644
+--- a/rebuild/src/modules/analytics/reports/mcp.ts
++++ b/rebuild/src/modules/analytics/reports/mcp.ts
+@@ -17,7 +17,7 @@ export const analyticsReportToolDefinitions = [
+   { name: 'list_report_schedules', description: 'List scheduled report definitions within your channel scope. Recipient addresses are shown only to people (and keys) that can manage schedules. A key limited to selected channels cannot attach or change templates.', inputSchema: page },
+   { name: 'manage_report_schedule', description: 'Create, update or delete a weekly or monthly report schedule definition. Confirmations: CREATE REPORT SCHEDULE <channelId> <frequency>, UPDATE REPORT SCHEDULE <id>, DELETE REPORT SCHEDULE <id>. Saving a schedule does not send anything immediately.', inputSchema: { type: 'object', required: ['action', 'confirmation'], properties: { action: { type: 'string', enum: ['create', 'update', 'delete'] }, id, channelId: id, frequency: { type: 'string', enum: [...REPORT_FREQUENCIES] }, recipients: { type: 'array', items: { type: 'string' } }, templateId: { anyOf: [id, { type: 'null' }] }, confirmation: { type: 'string' } }, additionalProperties: false } },
+   { name: 'list_report_runs', description: 'List report run history (status, period, row count, per-recipient delivery status) within your channel scope.', inputSchema: page },
+-  { name: 'generate_report', description: 'Prepare a report as CSV, JSON and printable HTML for download (the result carries csv, json and html strings; older retained runs may lack json). The responseTime section includes separate stored comment and conversation answer shares, median/slowest first responses and resolution times, member first-reply counts and calendar/business-hours medians split by source, member slowest replies and saved-resolution counts/medians attributed to the first responder of the last visitor run (not the resolver), period-start context, historical resolution/reopening event counts and calendar/business-hours resolution cycles split by source with stored-history coverage; absent history is excluded and unset business hours never become zero. All renderings share the same row and byte bounds and truncation marking. Nothing is emailed; the run is recorded as Prepared, never Sent, and works without email delivery. Two forms. (1) A schedule\'s most recent complete period: scheduleId, confirmation "GENERATE REPORT <scheduleId>". (2) One channel over explicit inclusive UTC dates: channelId, start and end (YYYY-MM-DD, within the Analytics range limit), optional templateId (null = default sections), confirmation "GENERATE CHANNEL REPORT <channelId>". requestId is a fresh UUID; repeating the same requestId with the same input returns the already prepared result (while still retained and authorised) instead of regenerating, and a different input with that id is refused. Returned rows are bounded by this key\'s result ceiling.', inputSchema: { type: 'object', required: ['requestId', 'confirmation'], properties: { scheduleId: id, channelId: id, templateId: { anyOf: [id, { type: 'null' }] }, start: { type: 'string', pattern: '^\\d{4}-\\d{2}-\\d{2}$' }, end: { type: 'string', pattern: '^\\d{4}-\\d{2}-\\d{2}$' }, requestId: { type: 'string', format: 'uuid' }, confirmation: { type: 'string' } }, oneOf: [{ required: ['scheduleId'] }, { required: ['channelId', 'start', 'end'] }], additionalProperties: false } },
++  { name: 'generate_report', description: 'Prepare a report as CSV, JSON and printable HTML for download (the result carries csv, json and html strings; older retained runs may lack json). The published section includes a bounded content log, complete daily UTC publication counts and currently failed destinations last updated in the period, with scoped content excerpts and attempt counts. Failed rows are current state, not historical failures; provider errors are excluded. The responseTime section includes separate stored comment and conversation answer shares, median/slowest first responses and resolution times, member first-reply counts and calendar/business-hours medians split by source, member slowest replies and saved-resolution counts/medians attributed to the first responder of the last visitor run (not the resolver), period-start context, historical resolution/reopening event counts and calendar/business-hours resolution cycles split by source with stored-history coverage; absent history is excluded and unset business hours never become zero. All renderings share the same row and byte bounds and truncation marking. Nothing is emailed; the run is recorded as Prepared, never Sent, and works without email delivery. Two forms. (1) A schedule\'s most recent complete period: scheduleId, confirmation "GENERATE REPORT <scheduleId>". (2) One channel over explicit inclusive UTC dates: channelId, start and end (YYYY-MM-DD, within the Analytics range limit), optional templateId (null = default sections), confirmation "GENERATE CHANNEL REPORT <channelId>". requestId is a fresh UUID; repeating the same requestId with the same input returns the already prepared result (while still retained and authorised) instead of regenerating, and a different input with that id is refused. Returned rows are bounded by this key\'s result ceiling.', inputSchema: { type: 'object', required: ['requestId', 'confirmation'], properties: { scheduleId: id, channelId: id, templateId: { anyOf: [id, { type: 'null' }] }, start: { type: 'string', pattern: '^\\d{4}-\\d{2}-\\d{2}$' }, end: { type: 'string', pattern: '^\\d{4}-\\d{2}-\\d{2}$' }, requestId: { type: 'string', format: 'uuid' }, confirmation: { type: 'string' } }, oneOf: [{ required: ['scheduleId'] }, { required: ['channelId', 'start', 'end'] }], additionalProperties: false } },
+ ] as const;
+ /** Definitions to list now: generation tools appear only when generation is registered and its history exists. */
+ export async function analyticsReportAvailableToolDefinitions() {
+diff --git a/rebuild/src/modules/analytics/reports/server/publication-report.ts b/rebuild/src/modules/analytics/reports/server/publication-report.ts
+new file mode 100644
+index 00000000..a62b638b
+--- /dev/null
++++ b/rebuild/src/modules/analytics/reports/server/publication-report.ts
+@@ -0,0 +1,52 @@
++import { runtimeConfig } from '@/server/config/store';
++import { prisma } from '@/server/data';
++import { PUBLICATION_REPORT_POLICY_SCHEMA } from '../config';
++import type { ReportPeriod } from '../contracts';
++
++export type PublicationRecord = { postId: string; text: string; at: Date; attempts: number };
++export type PublicationReport = {
++  published: PublicationRecord[]; failed: PublicationRecord[];
++  days: Array<{ day: string; published: number }>;
++  publishedTruncated: boolean; failedTruncated: boolean;
++};
++
++/** Called only after the generator's current report/channel authorization. Reads
++ * neutral local publication state, never provider errors or other destinations.
++ * Failures describe currently failed destinations updated in the period, not an
++ * immutable history of failed attempts. Daily counts are independent of log limits. Prisma publication timestamps are
++ * UTC TIMESTAMP(3) without time zone; format them directly to avoid the database
++ * session timezone shifting a publication into a different day.
++ */
++export async function readPublicationReport(workspaceId: string, channelId: string, period: ReportPeriod): Promise<PublicationReport> {
++  const policy = PUBLICATION_REPORT_POLICY_SCHEMA.parse(await runtimeConfig('analytics.reports.publicationDetails'));
++  const from = new Date(`${period.start}T00:00:00.000Z`);
++  const to = new Date(`${period.end}T00:00:00.000Z`); to.setUTCDate(to.getUTCDate() + 1);
++  const [published, failed, days] = await Promise.all([
++    prisma.$queryRaw<PublicationRecord[]>`
++      SELECT p.id AS "postId", left(COALESCE(pt."messageOverride", p.message), ${policy.excerptCharacters}) AS text,
++        pt."publishedAt" AS at, pt.attempts
++      FROM post_targets pt JOIN posts p ON p.id = pt."postId"
++      JOIN targets t ON t.id = pt."targetId" AND t."workspaceId" = p."workspaceId"
++      WHERE p."workspaceId" = ${workspaceId} AND pt."targetId" = ${channelId}
++        AND pt.status = 'published' AND pt."publishedAt" >= ${from} AND pt."publishedAt" < ${to}
++      ORDER BY pt."publishedAt" DESC, p.id ASC LIMIT ${policy.publishedRows + 1}`,
++    prisma.$queryRaw<PublicationRecord[]>`
++      SELECT p.id AS "postId", left(COALESCE(pt."messageOverride", p.message), ${policy.excerptCharacters}) AS text,
++        pt."updatedAt" AS at, pt.attempts
++      FROM post_targets pt JOIN posts p ON p.id = pt."postId"
++      JOIN targets t ON t.id = pt."targetId" AND t."workspaceId" = p."workspaceId"
++      WHERE p."workspaceId" = ${workspaceId} AND pt."targetId" = ${channelId}
++        AND pt.status = 'failed' AND pt."updatedAt" >= ${from} AND pt."updatedAt" < ${to}
++      ORDER BY pt."updatedAt" DESC, p.id ASC LIMIT ${policy.failedRows + 1}`,
++    prisma.$queryRaw<Array<{ day: string; published: bigint | number }>>`
++      SELECT to_char(pt."publishedAt", 'YYYY-MM-DD') AS day, COUNT(*)::bigint AS published
++      FROM post_targets pt JOIN posts p ON p.id = pt."postId"
++      JOIN targets t ON t.id = pt."targetId" AND t."workspaceId" = p."workspaceId"
++      WHERE p."workspaceId" = ${workspaceId} AND pt."targetId" = ${channelId}
++        AND pt.status = 'published' AND pt."publishedAt" >= ${from} AND pt."publishedAt" < ${to}
++      GROUP BY day ORDER BY day ASC`,
++  ]);
++  return { published: published.slice(0, policy.publishedRows), failed: failed.slice(0, policy.failedRows),
++    days: days.map(row => ({ day: row.day, published: Number(row.published) })),
++    publishedTruncated: published.length > policy.publishedRows, failedTruncated: failed.length > policy.failedRows };
++}
+diff --git a/rebuild/src/modules/analytics/ui/reports/ReportsManager.tsx b/rebuild/src/modules/analytics/ui/reports/ReportsManager.tsx
+index e2c08b61..5fbe82f0 100644
+--- a/rebuild/src/modules/analytics/ui/reports/ReportsManager.tsx
++++ b/rebuild/src/modules/analytics/ui/reports/ReportsManager.tsx
+@@ -246,6 +246,7 @@ export function ReportsManager({ templates, templateOptions, schedules, runs, ca
+         ...(canManage ? [{ key: 'edit', label: t("Actions"), render: (row: ScheduleRow) => <div className={styles.actions}>{canGenerate && <Button size="sm" variant="secondary" disabled={busy} onClick={() => void prepare(row)}>{busy ? t("Preparing…") : t("Prepare now")}</Button>}<Button size="sm" variant="secondary" disabled={busy} onClick={() => openSchedule(row)}>{t("Edit")}</Button></div> }] : []),
+       ]} rowActions={canManage ? row => [{ key: 'delete', label: t("Delete"), icon: <IconTrash />, danger: true, disabled: busy, onSelect: () => removeSchedule(row) }] : undefined} rowActionsLabel={row => t("Actions for {0}", row.channelName ?? t("Unavailable channel"))} /> : <div className={styles.emptyState}><h3>{page > 1 ? t("No schedules on this page") : t("No scheduled reports")}</h3><p>{page > 1 ? t("Use Previous page to return to saved schedules.") : canSchedule && canManage ? t("Create a schedule to send reports to people who need them.") : canSchedule ? t("No report schedules are set up for channels you can access.") : t("No report schedules are set up for channels you can access.")}</p></div>}
+       {prepared && <div className={styles.prepared} role="region" aria-labelledby="prepared-title"><div><h3 id="prepared-title">{t("Report prepared")}</h3><p>{prepared.rowCount} {t("rows ·")} {prepared.bytes.toLocaleString(locale)} {t("bytes")}{prepared.truncated ? t(" · Shortened to fit the configured limit") : ''}</p>{prepared.notIncluded.length > 0 && <p>{t("Not included yet:")} {prepared.notIncluded.map(section => t(sectionLabels.get(section) ?? t("Some sections"))).join(', ')}.</p>}</div><ReportDownloads copy={downloadCopy} locale={locale} prepared={prepared} /></div>}
++      <p>{t("Published posts includes a content log, daily UTC publication totals and currently failed destinations updated in the period. Failed rows are current state, not attempt history. Logs may be shortened; daily totals cover the full period.")}</p>
+       <p className={styles.note}>{t("Reports use stored analytics. Missing data is shown as unavailable, not zero. “Prepare report” creates a download and does not email anyone; scheduled runs send to their saved recipients.")}</p>
+     </section>
+ 
+diff --git a/rebuild/src/modules/analytics/ui/reports/copy.ts b/rebuild/src/modules/analytics/ui/reports/copy.ts
+index 4c6a55dc..24a4cc23 100644
+--- a/rebuild/src/modules/analytics/ui/reports/copy.ts
++++ b/rebuild/src/modules/analytics/ui/reports/copy.ts
+@@ -1,6 +1,7 @@
+ /** Module-owned customer copy. Root catalog registration is coordinated by the host owner. */
+ export type UiLocale = 'en' | 'fr';
+ const french: Record<string, string> = {
++  "Published posts includes a content log, daily UTC publication totals and currently failed destinations updated in the period. Failed rows are current state, not attempt history. Logs may be shortened; daily totals cover the full period.": "La section Publications publiées comprend un journal de contenu, les totaux quotidiens UTC et les destinations actuellement en échec modifiées pendant la période. Les échecs reflètent l’état actuel, pas l’historique des tentatives. Les journaux peuvent être raccourcis ; les totaux quotidiens couvrent toute la période.",
+   "Member details include slowest replies, resolved answered waits and median resolution times. Resolution is credited to the first responder of the last visitor run, not the person who marked it resolved.": "Les détails par membre comprennent les réponses les plus lentes, les attentes avec réponse résolues et les délais médians de résolution. La résolution est attribuée au premier répondant de la dernière série de messages du visiteur, pas à la personne ayant marqué la résolution.",
+   "Response reports separate comments and conversations: answer shares, response and resolution times, member first replies, recorded resolution cycles and resolution/reopening counts. Business hours and saved-history limits remain explicit; events may concern waits missing from stored visitor history. Complete platform history is not guaranteed.": "Les rapports distinguent commentaires et conversations : parts traitées, délais de réponse et de résolution, premières réponses par membre, cycles de résolution enregistrés et nombres de résolutions/réouvertures. Les heures ouvrées et limites de l’historique restent explicites ; les événements peuvent concerner des attentes absentes de l’historique enregistré. L’historique complet de la plateforme n’est pas garanti.",
+   "{0} existing schedule": "{0} planification existante",
+diff --git a/rebuild/tests/report-publication-details.test.ts b/rebuild/tests/report-publication-details.test.ts
+new file mode 100644
+index 00000000..5f83cba1
+--- /dev/null
++++ b/rebuild/tests/report-publication-details.test.ts
+@@ -0,0 +1,64 @@
++import { beforeEach, describe, expect, it, vi } from 'vitest';
++const mocks = vi.hoisted(() => ({ query: vi.fn(), config: vi.fn() }));
++vi.mock('@/server/data', () => ({ prisma: { $queryRaw: mocks.query } }));
++vi.mock('@/server/config/store', () => ({ runtimeConfig: mocks.config }));
++import { readPublicationReport } from '../src/modules/analytics/reports/server/publication-report';
++import { renderReport } from '../src/modules/analytics/reports/generation/document';
++import { reportDocumentCopyDefaults } from '../src/modules/analytics/reports/generation/copy';
++import { PUBLICATION_REPORT_POLICY_SCHEMA } from '../src/modules/analytics/reports/config';
++
++const post = { postId: 'p1', text: '=SUM(1,2) <script>', at: new Date('2026-10-02T01:00Z'), attempts: 2 };
++const report = { published: [post], failed: [{ ...post, postId: 'p2' }], days: [{ day: '2026-10-02', published: 300 }], publishedTruncated: true, failedTruncated: false };
++const snapshot = { period: { start: '2026-10-01', end: '2026-10-03' }, allMetrics: [], audience: null, publishing: { published: 300, scheduled: 0, failed: 1 } };
++const render = (locale: 'en' | 'fr' = 'en', maxRows = 100, maxBytes = 30000) => renderReport(snapshot as never, { channelName: 'Channel', sections: ['published'], publications: report, generatedAt: new Date(0) }, { maxRows, maxBytes }, reportDocumentCopyDefaults[locale], locale);
++
++beforeEach(() => { vi.clearAllMocks(); mocks.config.mockResolvedValue({ publishedRows: 1, failedRows: 1, excerptCharacters: 100 }); });
++describe('publication detail reads', () => {
++  it('bounds each content log independently, keeps daily totals complete and tenant/channel/date predicates in all queries', async () => {
++    mocks.query.mockResolvedValueOnce([post, { ...post, postId: 'omitted' }]).mockResolvedValueOnce([post]).mockResolvedValueOnce([{ day: '2026-10-02', published: BigInt(300) }]);
++    const result = await readPublicationReport('workspace', 'channel', snapshot.period);
++    expect(result).toEqual({ ...report, failed: [post] });
++    expect(mocks.config).toHaveBeenCalledWith('analytics.reports.publicationDetails');
++    for (const [parts, ...values] of mocks.query.mock.calls) {
++      const sql = parts.join('?');
++      expect(sql).toContain('p."workspaceId" ='); expect(sql).toContain('pt."targetId" =');
++      expect(sql).toContain('t."workspaceId" = p."workspaceId"');
++      expect(values).toContain('workspace'); expect(values).toContain('channel');
++      expect(values).toContainEqual(new Date('2026-10-01T00:00Z'));
++      expect(values).toContainEqual(new Date('2026-10-04T00:00Z'));
++      expect(sql).not.toContain('errorMessage'); expect(sql).not.toContain('errorCode');
++    }
++    expect(mocks.query.mock.calls[0][0].join('?')).toContain('messageOverride');
++    expect(mocks.query.mock.calls[1][0].join('?')).toContain('pt."updatedAt"');
++    expect(mocks.query.mock.calls[2][0].join('?')).toContain('to_char(pt."publishedAt",');
++    expect(mocks.query.mock.calls[2][0].join('?')).not.toContain('LIMIT');
++  });
++  it('rejects unusable Root limits before reading content', async () => {
++    mocks.config.mockResolvedValue({ publishedRows: 0, failedRows: 1, excerptCharacters: 100 });
++    await expect(readPublicationReport('w', 'c', snapshot.period)).rejects.toThrow(); expect(mocks.query).not.toHaveBeenCalled();
++    expect(PUBLICATION_REPORT_POLICY_SCHEMA.safeParse({ publishedRows: 1, failedRows: 1, excerptCharacters: 2001 }).success).toBe(false);
++  });
++});
++describe('publication report artifacts', () => {
++  it.each(['en', 'fr'] as const)('includes all three views, precise scope notes, safe excerpts and source-limit marking in %s', locale => {
++    const output = render(locale);
++    const json = JSON.parse(output.json!);
++    expect(json.records.filter((r: { record_type: string }) => r.record_type === 'publication_day')[0].value).toBe(300);
++    expect(json.records.map((r: { record_type: string }) => r.record_type)).toEqual(expect.arrayContaining(['publication_day', 'publication_log', 'publication_failure']));
++    expect(output.csv).toContain('"\'=SUM(1,2) <script>"');
++    expect(output.html).toContain('&lt;script&gt;'); expect(output.html).not.toContain('<script>');
++    expect(output.text).toContain(locale === 'fr' ? 'pas un historique' : 'not a history');
++    expect(output.html).toContain(locale === 'fr' ? 'totaux quotidiens' : 'daily totals');
++    expect(output.truncated).toBe(true); expect(json.truncated).toBe(true); expect(output.csv).toContain('"truncated","true"');
++  });
++  it('respects row and byte ceilings in every artifact', () => {
++    const output = render('en', 1, 2500);
++    expect(output.rowCount).toBe(1); expect(JSON.parse(output.json!).records.length).toBe(1);
++    for (const artifact of [output.csv, output.json!, output.html, output.text]) expect(Buffer.byteLength(artifact)).toBeLessThanOrEqual(2500);
++    expect(output.truncated).toBe(true);
++  });
++  it('does not attach content when the published section was not selected', () => {
++    const output = renderReport(snapshot as never, { channelName: 'C', sections: ['audience'], publications: report, generatedAt: new Date(0) }, { maxRows: 100, maxBytes: 30000 });
++    expect(output.csv).not.toContain('publication_log'); expect(output.html).not.toContain('SUM');
++  });
++});
+diff --git a/rebuild/tests/report82-engine-harness.ts b/rebuild/tests/report82-engine-harness.ts
+index 0cf72798..dd452b62 100644
+--- a/rebuild/tests/report82-engine-harness.ts
++++ b/rebuild/tests/report82-engine-harness.ts
+@@ -1,3 +1,4 @@
++import { PUBLICATION_REPORT_DEFAULTS } from '@/modules/analytics/reports/config';
+ import { workspaceCopyDefaults } from '@/modules/analytics/workspace-copy';
+ import { goalsCopyDefaults } from '@/modules/analytics/goals/copy';
+ import { responseTimeCopyDefaults } from '@/modules/analytics/reports/generation/response-copy';
+@@ -7,6 +8,7 @@ import { vi } from 'vitest';
+ 
+ export type Call = { sql: string; values: unknown[] };
+ export const defaults = () => ({
++  publicationRows: [] as unknown[], failedPublicationRows: [] as unknown[], publicationDays: [] as unknown[],
+   role: 'editor', member: true, disabled: false, suspended: false, purge: null as string | null,
+   entitled: true, canAccess: true, scope: null as string[] | null, providers: ['p1'], usable: true,
+   lockMember: true, lockRole: null as string | null, lockSuspended: false, freshScope: null as string[] | null, freshDeny: [] as string[],
+@@ -27,6 +29,7 @@ const nextDue = () => {
+   return state.due[dueIndex++];
+ };
+ const CONFIG: Record<string, unknown> = {
++  'analytics.reports.publicationDetails': PUBLICATION_REPORT_DEFAULTS,
+   'analytics.reports.pageSize': 2, 'analytics.reports.maxTemplates': 3, 'analytics.reports.templateNameMaxCharacters': 20, 'analytics.reports.maxSchedules': 3,
+   'analytics.reports.maxRecipients': 3, 'analytics.reports.dueBatchSize': 10, 'analytics.reports.transactionTimeoutMs': 5000, 'analytics.reports.transactionMaxWaitMs': 2000,
+   'analytics.reports.sendTime': '08:00', 'analytics.reports.maxOutputRows': 100, 'analytics.reports.maxOutputBytes': 20000, 'analytics.reports.runLeaseSeconds': 600,
+@@ -38,6 +41,9 @@ export const configValue = (key: string) => (key === 'analytics.workspaceCopy' ?
+ export const db = {
+   $queryRaw: vi.fn(async (s: TemplateStringsArray, ...v: unknown[]) => {
+     const sql = text(s); state.queries.push({ sql, values: v });
++    if (sql.includes('FROM post_targets pt JOIN posts p') && sql.includes('GROUP BY day')) return state.publicationDays;
++    if (sql.includes('FROM post_targets pt JOIN posts p') && sql.includes("pt.status = 'published'")) return state.publicationRows;
++    if (sql.includes('FROM post_targets pt JOIN posts p') && sql.includes("pt.status = 'failed'")) return state.failedPublicationRows;
+     if (sql.includes('to_regclass')) return [{ present: state.tablePresent }];
+     if (sql.includes('FROM memberships m JOIN users u') && sql.includes('FOR SHARE OF m, u, w')) {
+       const role = state.lockRole ?? state.role;
+diff --git a/rebuild/tests/report82-engine-manual.test.ts b/rebuild/tests/report82-engine-manual.test.ts
+index bab47fff..52593698 100644
+--- a/rebuild/tests/report82-engine-manual.test.ts
++++ b/rebuild/tests/report82-engine-manual.test.ts
+@@ -405,3 +405,27 @@ describe('current release bounds and lease clock', () => {
+     } finally {vi.useRealTimers();}
+   });
+ });
++
++
++describe('published report details through the confirmed MCP workflow', () => {
++  it('prepares the same three publication views, persists their artifact and audits once', async () => {
++    state.publicationRows = [{ postId: 'post-visible', text: 'Published example', at: new Date('2026-10-02T12:00Z'), attempts: 1 }];
++    state.failedPublicationRows = [{ postId: 'post-failed', text: 'Review this example', at: new Date('2026-10-03T12:00Z'), attempts: 2 }];
++    state.publicationDays = [{ day: '2026-10-02', published: BigInt(1) }];
++    const output = await executeAnalyticsReportTool(actor, 'generate_report', channelInput());
++    if (!('csv' in output)) throw new Error('Expected prepared report');
++    expect(output.csv).toContain('publication_log');
++    expect(output.csv).toContain('publication_day');
++    expect(output.csv).toContain('publication_failure');
++    expect(output.html).toContain('Review this example');
++    expect(JSON.stringify(finishedWrites())).toContain('post-visible');
++    expect(execs('activity_logs').filter(call => call.values.includes('analytics.report_run_started'))).toHaveLength(1);
++    expect(mailPort.send).not.toHaveBeenCalled();
++  });
++  it('refuses missing exact consent or changed channel scope before reading excerpts', async () => {
++    await expect(executeAnalyticsReportTool(actor, 'generate_report', channelInput({ confirmation: '' }))).rejects.toMatchObject({ code: 'invalid_request' });
++    state.scope = ['elsewhere'];
++    await expect(executeAnalyticsReportTool(actor, 'generate_report', channelInput())).rejects.toBeDefined();
++    expect(state.queries.filter(call => call.sql.includes('FROM post_targets pt JOIN posts p'))).toHaveLength(0);
++  });
++});

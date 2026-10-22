@@ -1,0 +1,389 @@
+diff --git a/rebuild/src/modules/feeds/server/wordpress-planner.ts b/rebuild/src/modules/feeds/server/wordpress-planner.ts
+index 87cdebb5..34c1f59b 100644
+--- a/rebuild/src/modules/feeds/server/wordpress-planner.ts
++++ b/rebuild/src/modules/feeds/server/wordpress-planner.ts
+@@ -19,7 +19,7 @@ export type PlannerPorts = {
+   createPost(actor: FeedActor, input: PlannedPostInput): Promise<{ id: string }>;
+   /** Publishing's own cancel of a queued post (back to draft); throws when the post can no longer be cancelled. */
+   cancelPost(actor: FeedActor, postId: string): Promise<void>;
+-  /** The post Publishing holds for this channel and time, whatever its state; null when none exists. */
++  /** Resolve durable recipe identity regardless of current post state/time; throw when identity is unknown. */
+   postForSlot(workspaceId: string, targetId: string, slotAt: Date): Promise<{ id: string } | null>;
+   image: ImagePorts;
+   qualify(workspaceId: string): Promise<FeedAuthorization | null>;
+@@ -44,7 +44,16 @@ export function defaultPlannerPorts(net: FetchDeps = defaultFetchDeps()): Planne
+       const { cancelScheduledPost } = await import('@/modules/publishing/server/lifecycle');
+       await cancelScheduledPost({ userId: actor.userId, workspaceId: actor.workspaceId, ...(actor.allowedTargetIds === undefined ? {} : { allowedTargetIds: actor.allowedTargetIds }) }, postId);
+     },
+-    postForSlot: (workspaceId, targetId, slotAt) => prisma.post.findFirst({ where: { workspaceId, scheduledAt: slotAt, targets: { some: { targetId } } }, select: { id: true }, orderBy: { createdAt: 'asc' } }),
++    async postForSlot(workspaceId, targetId, slotAt) {
++      const rows = await prisma.$queryRaw<Array<{ postId: string | null }>>`SELECT "postId" FROM wordpress_recipe_plans
++        WHERE "workspaceId" = ${workspaceId} AND "targetId" = ${targetId} AND "slotAt" = ${slotAt}`;
++      // A time/channel match is not provenance. In particular, cancellation clears scheduledAt.
++      // Old interrupted creates without a saved identity require reconciliation, never a blind resend.
++      if (rows.length !== 1 || !rows[0]!.postId) throw new Error('Recipe post identity is unconfirmed');
++      const post = await prisma.post.findFirst({ where: { id: rows[0]!.postId, workspaceId }, select: { id: true } });
++      if (!post) throw new Error('Recipe post identity is unconfirmed');
++      return post;
++    },
+     image: defaultImagePorts(net),
+     qualify: workspaceId => qualifyingOwner(workspaceId),
+     store: prismaRecipeStore,
+diff --git a/rebuild/src/modules/feeds/server/wordpress-recovery.ts b/rebuild/src/modules/feeds/server/wordpress-recovery.ts
+index 26f120c9..138beb26 100644
+--- a/rebuild/src/modules/feeds/server/wordpress-recovery.ts
++++ b/rebuild/src/modules/feeds/server/wordpress-recovery.ts
+@@ -25,9 +25,9 @@ export type RetryOutcome = {
+ 
+ /**
+  * Re-plan the upcoming slots whose post is definitively not created. A failed slot never produced a post. An uncertain
+- * slot is first checked against Publishing: when a post exists for that channel and time it is recorded (never
+- * duplicated); only when none exists, and the claim is older than its lease so nothing can still be in flight, is the slot
+- * released. Slots that cannot be confirmed stay uncertain. The planner then fills only the released and failed slots.
++ * slot is first checked against Publishing using durable recipe identity, regardless of the post
++ * state or current time. Unknown identity or absence proof stays uncertain. Only definitive absence from the port,
++ * after the claim lease ends, permits release. Slots that cannot be confirmed stay uncertain. The planner then fills only the released and failed slots.
+  */
+ export async function retryRecipeSlots(ctx: { settings: WordpressSettings; ports: PlannerPorts; db: WpDb; now: Date }, source: SourceRow, auth: FeedAuthorization): Promise<RetryOutcome> {
+   const { settings, ports, now } = ctx;
+@@ -44,8 +44,8 @@ export async function retryRecipeSlots(ctx: { settings: WordpressSettings; ports
+     let post: { id: string } | null;
+     try { post = await ports.postForSlot(source.workspaceId, row.targetId, row.slotAt); } catch { out.unconfirmed += 1; continue; }
+     if (post) {
+-      if (await ports.store.settleIf(source.workspaceId, row.id, 'uncertain', { state: 'planned', postId: post.id, reason: RECONCILED })) out.reconciled += 1;
+-    } else if (await ports.store.settleIf(source.workspaceId, row.id, 'uncertain', { state: 'failed', reason: NOT_CREATED })) {
++      if (await ports.store.settleIf(source.workspaceId, row.id, 'uncertain', { state: 'planned', postId: post.id, reason: RECONCILED, expectedPostId: row.postId })) out.reconciled += 1;
++    } else if (await ports.store.settleIf(source.workspaceId, row.id, 'uncertain', { state: 'failed', reason: NOT_CREATED, expectedPostId: row.postId })) {
+       out.released += 1; retry.add(key);
+     }
+   }
+@@ -73,11 +73,14 @@ export async function cancelPlannedPosts(ctx: { settings: WordpressSettings; por
+   const rows = (await ports.store.plannedUpcoming(source.id, now, limit + 1)).filter(row => inScope(auth, row));
+   const out: CancelOutcome = { cancelled: 0, notCancelled: 0, remaining: rows.length > limit };
+   for (const row of rows.slice(0, limit)) {
+-    try { await ports.cancelPost(auth.actor, row.postId!); } catch { out.notCancelled += 1; continue; }
++    try { await ports.cancelPost(auth.actor, row.postId!); } catch {
++      out.notCancelled += 1;
++      // Retain the held post and state, but rotate this attempted row behind untouched work.
++      await ports.store.deferCancellation?.(source.workspaceId, row.id, row.postId!);
++      continue;
++    }
+     out.cancelled += 1;
+     await ports.store.settleIf(source.workspaceId, row.id, 'planned', { state: 'failed', reason: CANCELLED, expectedPostId: row.postId }).catch(() => false);
+   }
+-  // Posts that were refused stay scheduled, so a further request would meet them again: more work only when new ones remain.
+-  if (out.remaining && out.cancelled === 0) out.remaining = false;
+   return out;
+ }
+diff --git a/rebuild/src/modules/feeds/server/wordpress-store.ts b/rebuild/src/modules/feeds/server/wordpress-store.ts
+index 699d16d4..950e93a3 100644
+--- a/rebuild/src/modules/feeds/server/wordpress-store.ts
++++ b/rebuild/src/modules/feeds/server/wordpress-store.ts
+@@ -25,8 +25,10 @@ export interface RecipeStore {
+   recordRun(workspaceId: string, sourceId: string, run: RunRecord): Promise<void>;
+   /** Failed and uncertain slots at or after `from`, soonest first. */
+   unresolved(sourceId: string, from: Date, limit: number): Promise<LedgerRow[]>;
+-  /** Scheduled slots after `from` that hold a post, soonest first. */
++  /** Scheduled slots after `from` that hold a post, least recently attempted first. */
+   plannedUpcoming(sourceId: string, from: Date, limit: number): Promise<LedgerRow[]>;
++  /** Record a refused cancellation without changing its state, receipt or reason. */
++  deferCancellation?(workspaceId: string, id: string, postId: string): Promise<void>;
+   /** Settle a slot only while it is still in `expected`; false when another actor already changed it. */
+   settleIf(workspaceId: string, id: string, expected: PlanState, settlement: Settlement & { expectedPostId?: string | null }): Promise<boolean>;
+ }
+@@ -88,13 +90,17 @@ export const prismaRecipeStore: RecipeStore = {
+     return rows.map(toLedger);
+   },
+   async plannedUpcoming(sourceId, from, limit) {
+-    const rows = await prisma.$queryRawUnsafe<RawLedger[]>(`SELECT ${LEDGER_COLUMNS} FROM wordpress_recipe_plans WHERE "sourceId" = $1 AND "slotAt" > $2 AND state = 'planned' AND "postId" IS NOT NULL ORDER BY "slotAt" ASC, id ASC LIMIT $3`, sourceId, from, limit);
++    const rows = await prisma.$queryRawUnsafe<RawLedger[]>(`SELECT ${LEDGER_COLUMNS} FROM wordpress_recipe_plans WHERE "sourceId" = $1 AND "slotAt" > $2 AND state = 'planned' AND "postId" IS NOT NULL ORDER BY "updatedAt" ASC, "slotAt" ASC, id ASC LIMIT $3`, sourceId, from, limit);
+     return rows.map(toLedger);
+   },
+   async settleIf(workspaceId, id, expected, s) {
+     const changed = await prisma.$executeRaw`UPDATE wordpress_recipe_plans SET state = ${s.state}, "postId" = ${s.postId ?? null}, reason = ${s.reason ?? null}, "updatedAt" = NOW() WHERE id = ${id} AND "workspaceId" = ${workspaceId} AND state = ${expected} AND ("postId" IS NOT DISTINCT FROM ${s.expectedPostId ?? null}::text)`;
+     return changed === 1;
+   },
++  async deferCancellation(workspaceId, id, postId) {
++    await prisma.$executeRaw`UPDATE wordpress_recipe_plans SET "updatedAt" = NOW()
++      WHERE "workspaceId" = ${workspaceId} AND id = ${id} AND state = 'planned' AND "postId" = ${postId}`;
++  },
+   async recordRun(workspaceId, sourceId, run) {
+     await prisma.$executeRaw`UPDATE wordpress_recipe_sources SET "lastRunAt" = ${run.at}, "lastError" = ${run.error}, "lastSummary" = ${JSON.stringify(run.summary)}::jsonb WHERE id = ${sourceId} AND "workspaceId" = ${workspaceId}`;
+   },
+diff --git a/rebuild/tests/feeds-recipe-recovery-verification.test.ts b/rebuild/tests/feeds-recipe-recovery-verification.test.ts
+new file mode 100644
+index 00000000..11b079fd
+--- /dev/null
++++ b/rebuild/tests/feeds-recipe-recovery-verification.test.ts
+@@ -0,0 +1,115 @@
++import { beforeEach, describe, expect, it, vi } from 'vitest';
++const db = vi.hoisted(() => ({ $queryRaw: vi.fn(), $queryRawUnsafe: vi.fn(), $executeRaw: vi.fn(), post: { findFirst: vi.fn() } }));
++vi.mock('@/server/data', () => ({ prisma: db }));
++import { defaultPlannerPorts, type PlannerPorts } from '../src/modules/feeds/server/wordpress-planner';
++import { cancelPlannedPosts, retryRecipeSlots } from '../src/modules/feeds/server/wordpress-recovery';
++import { prismaRecipeStore, type LedgerRow, type SourceRow, type RecipeStore } from '../src/modules/feeds/server/wordpress-store';
++import type { WordpressSettings } from '../src/modules/feeds/server/wordpress-settings';
++import type { FeedAuthorization } from '../src/modules/feeds/server/access';
++
++const now = new Date('2026-10-21T09:30:00Z');
++const slotAt = new Date('2026-10-22T10:00:00Z');
++const auth = { actor: { userId: 'owner', workspaceId: 'w1' } } as FeedAuthorization;
++const source = { id: 'source', workspaceId: 'w1' } as SourceRow;
++// No case enters candidate planning: only recovery settings and ledger fields are consumed.
++const settings = { claimLeaseSeconds: 300, runBudget: 10, pauseCancel: { batchSize: 2 } } as WordpressSettings;
++const row = (n: number, patch: Partial<LedgerRow> = {}): LedgerRow => ({ id: `plan${n}`, sourceId: 'source', targetId: 'channel', wpPostId: `${n}`, slotAt, state: 'planned', postId: `post${n}`, title: 'Recipe', permalink: null, reason: null, skipped: [], claimedAt: new Date('2026-10-21T08:00:00Z'), ...patch });
++function recovery(rows: LedgerRow[]) {
++  const attempted: string[] = [];
++  const store: RecipeStore = {
++    enabledSources: async () => [], pages: async () => [], ledgerSince: async () => rows,
++    claim: async () => { throw new Error('Unexpected planning'); },
++    settle: async () => { throw new Error('Unexpected planning'); }, recordRun: async () => undefined,
++    expireStale: async () => 0,
++    unresolved: async () => rows.filter(r => r.state === 'uncertain'),
++    plannedUpcoming: async (_source: string, _from: Date, limit: number) => rows.filter(r => r.state === 'planned').sort((a, b) => Number(attempted.includes(a.id)) - Number(attempted.includes(b.id))).slice(0, limit),
++    deferCancellation: async (_workspace: string, id: string) => { attempted.push(id); },
++    settleIf: async (_workspace: string, id: string, expected: string, s: { state: LedgerRow['state']; postId?: string | null; reason?: string | null; expectedPostId?: string | null }) => {
++      const r = rows.find(r => r.id === id)!;
++      if (r.state !== expected || r.postId !== (s.expectedPostId ?? null)) return false;
++      attempted.push(id); Object.assign(r, { state: s.state, postId: s.postId ?? null, reason: s.reason ?? null }); return true;
++    },
++  };
++  const ports = { store, postForSlot: defaultPlannerPorts().postForSlot, cancelPost: vi.fn(async (_actor: unknown, id: string) => { if (id !== 'post3') throw new Error('Cannot cancel'); }), createPost: vi.fn() } as unknown as PlannerPorts;
++  return { ports, attempted };
++}
++beforeEach(() => { vi.resetAllMocks(); db.$executeRaw.mockResolvedValue(1); });
++
++describe('recipe cancellation progression', () => {
++  it('keeps later work visible after an entirely refused batch, and reaches it on repeat', async () => {
++    const rows = [row(1), row(2), row(3)]; const h = recovery(rows);
++    const first = await cancelPlannedPosts({ settings, ports: h.ports, now }, source, auth);
++    expect(first).toEqual({ cancelled: 0, notCancelled: 2, remaining: true });
++    expect(rows[0]).toMatchObject({ state: 'planned', postId: 'post1' });
++    const second = await cancelPlannedPosts({ settings, ports: h.ports, now }, source, auth);
++    expect(second.cancelled).toBe(1);
++    expect(rows[2]).toMatchObject({ state: 'failed', postId: null, reason: 'cancelled' });
++  });
++  it('orders the cancellation query by attempt age before slot time, within the source', async () => {
++    db.$queryRawUnsafe.mockResolvedValue([]);
++    await prismaRecipeStore.plannedUpcoming('source', now, 3);
++    const [sql, ...values] = db.$queryRawUnsafe.mock.calls[0]!;
++    expect(sql).toMatch(/ORDER BY "updatedAt" ASC, "slotAt" ASC, id ASC/);
++    expect(values).toEqual(['source', now, 3]);
++  });
++});
++
++describe('uncertain recipe identity', () => {
++  it('never adopts a manual post at the same channel and time without a durable recipe identity', async () => {
++    db.post.findFirst.mockResolvedValue({ id: 'manual-post' });
++    db.$queryRaw.mockResolvedValue([{ postId: null }]);
++    const uncertain = row(1, { state: 'uncertain', postId: null }); const h = recovery([uncertain]);
++    const result = await retryRecipeSlots({ settings, ports: h.ports, now, db: {} as never }, source, auth);
++    expect(result).toMatchObject({ unconfirmed: 1, released: 0, reconciled: 0, planned: 0 });
++    expect(uncertain).toMatchObject({ state: 'uncertain', postId: null });
++    expect(h.ports.createPost).not.toHaveBeenCalled();
++  });
++  it('reconciles a known recipe post even after cancellation cleared its time', async () => {
++    db.$queryRaw.mockResolvedValue([{ postId: 'recipe-draft' }]);
++    db.post.findFirst.mockImplementation(async ({ where }: { where: { id?: string; scheduledAt?: Date } }) => where.id === 'recipe-draft' && where.scheduledAt === undefined ? { id: 'recipe-draft' } : null);
++    const uncertain = row(1, { state: 'uncertain', postId: 'recipe-draft' }); const h = recovery([uncertain]);
++    const result = await retryRecipeSlots({ settings, ports: h.ports, now, db: {} as never }, source, auth);
++    expect(result).toMatchObject({ reconciled: 1, released: 0, planned: 0 });
++    expect(uncertain).toMatchObject({ state: 'planned', postId: 'recipe-draft' });
++    expect(db.post.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: { id: 'recipe-draft', workspaceId: 'w1' } }));
++  });
++  it('keeps a claim uncertain when identity storage cannot be read', async () => {
++    db.$queryRaw.mockRejectedValue(new Error('Unavailable'));
++    db.post.findFirst.mockResolvedValue({ id: 'manual-post' });
++    const uncertain = row(1, { state: 'uncertain', postId: null }); const h = recovery([uncertain]);
++    const result = await retryRecipeSlots({ settings, ports: h.ports, now, db: {} as never }, source, auth);
++    expect(result).toMatchObject({ unconfirmed: 1, reconciled: 0, released: 0 });
++    expect(uncertain.state).toBe('uncertain');
++  });
++});
++
++it('does not treat a missing local record as proof that the platform has no held copy', async () => {
++  db.$queryRaw.mockResolvedValue([{ postId: 'missing-recipe' }]);
++  db.post.findFirst.mockResolvedValue(null);
++  await expect(defaultPlannerPorts().postForSlot('w1', 'channel', slotAt)).rejects.toThrow();
++});
++
++it('never looks up or releases a claim within its lease', async () => {
++  const uncertain = row(1, { state: 'uncertain', postId: null, claimedAt: new Date('2026-10-21T09:29:00Z') }); const h = recovery([uncertain]);
++  const result = await retryRecipeSlots({ settings, ports: h.ports, now, db: {} as never }, source, auth);
++  expect(result).toMatchObject({ unconfirmed: 1, released: 0, reconciled: 0 });
++  expect(db.$queryRaw).not.toHaveBeenCalled();
++});
++
++it('does not overwrite a concurrent settlement after resolving identity', async () => {
++  const uncertain = row(1, { state: 'uncertain', postId: null }); const h = recovery([uncertain]);
++  h.ports.postForSlot = async () => { uncertain.state = 'planned'; uncertain.postId = 'concurrent'; return { id: 'stale' }; };
++  const result = await retryRecipeSlots({ settings, ports: h.ports, now, db: {} as never }, source, auth);
++  expect(result).toMatchObject({ reconciled: 0, released: 0, planned: 0 });
++  expect(uncertain).toMatchObject({ state: 'planned', postId: 'concurrent' });
++});
++
++it('rotates a refused cancellation with a guarded timestamp-only write', async () => {
++  await prismaRecipeStore.deferCancellation!('w1', 'plan1', 'post1');
++  const [parts, ...values] = db.$executeRaw.mock.calls[0]!;
++  const sql = (parts as TemplateStringsArray).join('?');
++  expect(sql).toMatch(/SET "updatedAt" = NOW\(\)/);
++  expect(sql).toMatch(/WHERE "workspaceId" = \? AND id = \? AND state = 'planned' AND "postId" = \?/);
++  expect(sql).not.toMatch(/SET (?:state|"postId"|reason)/);
++  expect(values).toEqual(['w1', 'plan1', 'post1']);
++});
+diff --git a/rebuild/tests/publishing-scheduling-verification.test.ts b/rebuild/tests/publishing-scheduling-verification.test.ts
+new file mode 100644
+index 00000000..8df27ee2
+--- /dev/null
++++ b/rebuild/tests/publishing-scheduling-verification.test.ts
+@@ -0,0 +1,150 @@
++vi.mock('@/modules/settings/notifications/producers', () => ({ emitWorkspaceAlert: vi.fn().mockResolvedValue(undefined), enqueueEmptyQueueNotifications: vi.fn().mockResolvedValue(undefined) }));
++vi.mock('@/modules/publishing/server/guard', () => ({
++  withPublishingTransaction: (_signal: AbortSignal, work: (tx: unknown) => Promise<unknown>) => db.$transaction(work),
++  withPublishingOperation: (actor: unknown, _options: unknown, work: (context: unknown) => Promise<unknown>) => work({ actor, signal: new AbortController().signal, lockTargets: async () => {} }),
++}));
++vi.mock('@/modules/publishing/server/publication', async importOriginal => ({
++  ...(await importOriginal<object>()),
++  publishDestinationInOperation: vi.fn(async (_context: unknown, input: { dispatch(operationId: string): Promise<unknown> }) => { await input.dispatch('op-1'); return 'published'; }),
++}));
++import { beforeEach, describe, expect, it, vi } from 'vitest';
++
++const db = vi.hoisted(() => ({
++  membership: { findUnique: vi.fn() },
++  target: { findMany: vi.fn() },
++  postTarget: { findMany: vi.fn(), deleteMany: vi.fn(), create: vi.fn() },
++  post: { create: vi.fn(), findFirst: vi.fn(), update: vi.fn(), updateMany: vi.fn() },
++  $transaction: vi.fn(),
++  $executeRaw: vi.fn(),
++  $queryRaw: vi.fn(),
++}));
++const adapters = vi.hoisted(() => ({ holding: { publish: vi.fn(), getRemoteStatus: vi.fn(), deleteRemote: vi.fn(), rescheduleRemote: vi.fn() }, plain: { publish: vi.fn() } }));
++vi.mock('../src/server/data', () => ({ prisma: db }));
++vi.mock('../src/server/config/store', () => ({ runtimeConfig: async (key: string) => ({
++  'publishing.collab.versionRetention': 50, 'publishing.maxMessageCharacters': 10000, 'publishing.maxTargetsPerPost': 20, 'publishing.maxRemoteMediaPerPost': 4, 'publishing.maxImageAltCharacters': 500,
++  'publishing.remoteScheduling.leadMarginSeconds': 60, 'publishing.remoteScheduling.offered': true, 'publishing.remoteScheduling.defaultMode': 'application',
++})[key] }));
++vi.mock('../src/server/entitlements', () => ({ loadEntitlements: async () => ({}), hasPlatformCapability: () => true }));
++const media = { kinds: ['image', 'video'], maxImages: null, maxVideos: 1, mixedKinds: false, linkWithMedia: false, imageAltText: true };
++const format = (scheduling: object) => [{ id: 'post', label: 'Post', media, firstComment: true, remoteStatus: true, remoteDelete: true, scheduling }];
++vi.mock('../src/server/platforms/registry', () => ({ platformFor: async (provider: string) => provider === 'holding'
++  ? { ...adapters.holding, publishFirstComment: vi.fn(), publishingMedia: media, publishingFormats: format({ application: true, native: true, nativeLeadSeconds: { min: 600, max: 6480000 } }), defaultPublishingFormatId: 'post', supportsTargetKind: () => true }
++  : { ...adapters.plain, publishFirstComment: vi.fn(), publishingMedia: media, publishingFormats: format({ application: true, native: false }), defaultPublishingFormatId: 'post', supportsTargetKind: () => true } }));
++vi.mock('@/modules/settings/server/workspace-operations', () => ({ loadWorkspaceOperations: async () => ({ utmSource: '', utmMedium: '', utmCampaignTemplate: '' }) }));
++vi.mock('@/modules/publishing/server/credentials', () => ({ readPublishingCredential: () => ({ accessToken: 'tok', grantedScopes: [] }) }));
++const attemptFirstComment = vi.hoisted(() => vi.fn());
++vi.mock('@/modules/publishing/server/first-comment', () => ({ attemptFirstCommentInOperation: attemptFirstComment }));
++
++import { holdScheduledPostAtProvider, publishPost, schedulePost, cancelScheduledPost, reschedulePostToInstant } from '@/modules/publishing/server/lifecycle';
++import { cancelHeldDestinations, rescheduleHeldDestinations } from '@/modules/publishing/server/remote-hold';
++import { parseScheduleMode, remoteHoldDecision } from '@/modules/publishing/remote-scheduling';
++import { publishDestinationInOperation } from '@/modules/publishing/server/publication';
++
++const actor = { userId: 'u1', workspaceId: 'w1' };
++const target = (id: string, provider: string) => ({ id, name: `Page ${id}`, type: 'page', providerId: `page-${id}`, canPublish: true, enabled: true, accessToken: 'token', socialAccount: { provider, invalidatedAt: null, tokenExpiresAt: null, scopes: 'publish' } });
++const row = (id: string, provider: string) => ({ id: `pt-${id}`, formatId: 'post', status: 'pending', remotePostId: null, target: target(id, provider) });
++const at = (seconds: number) => new Date(Date.now() + seconds * 1000);
++const scheduled = (when: Date) => ({ id: 'p1', authorId: 'u1', format: 'post', message: 'Hello', firstComment: 'First', link: null, media: [], status: 'scheduled', scheduledAt: when, targets: [row('a', 'holding'), row('b', 'plain')] });
++
++beforeEach(() => {
++  vi.clearAllMocks();
++  attemptFirstComment.mockResolvedValue({ state: 'sent' });
++  db.membership.findUnique.mockResolvedValue({ role: 'owner' });
++  db.post.update.mockResolvedValue({});
++  db.$executeRaw.mockResolvedValue(1);
++  db.$queryRaw.mockResolvedValue([]);
++  db.postTarget.findMany.mockResolvedValue([]);
++  db.post.updateMany.mockResolvedValue({ count: 1 });
++  db.$transaction.mockImplementation(async (work: (tx: typeof db) => Promise<unknown>) => work(db));
++});
++
++const heldRow = () => ({ id: 'pt-a', targetId: 'a', formatId: 'post', remotePostId: 'remote-a', post: { format: 'post' }, target: target('a', 'holding') });
++const mixed = (when: Date) => ({ ...scheduled(when), targets: [
++  { ...row('a', 'holding'), status: 'scheduled_remote', remotePostId: 'remote-a' }, row('b', 'plain'),
++] });
++
++describe('mixed application and platform scheduling recovery', () => {
++  it('does not resend held destinations on repeated handoff', async () => {
++    db.post.findFirst.mockResolvedValue(mixed(at(10800)));
++    db.$queryRaw.mockResolvedValue([{ id: 'pt-a', scheduleMode: 'remote' }, { id: 'pt-b', scheduleMode: 'application' }]);
++    const result = await publishPost(actor, 'p1', undefined, { nativeSchedule: true, nativeFallback: true });
++    expect(result).toMatchObject({ published: 0, remoteHold: { held: 0, deferred: 0 } });
++    expect(publishDestinationInOperation).not.toHaveBeenCalled();
++    expect(attemptFirstComment).not.toHaveBeenCalled();
++    expect(db.post.update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ status: 'scheduled' }) }));
++  });
++  it('publishes only the application destination when due, and starts only its comment', async () => {
++    const when = at(-60); db.post.findFirst.mockResolvedValue(mixed(when));
++    const result = await publishPost(actor, 'p1', when);
++    expect(result).toMatchObject({ published: 1, needsReconciliation: 0 });
++    expect(adapters.holding.publish).not.toHaveBeenCalled();
++    expect(adapters.plain.publish).toHaveBeenCalledTimes(1);
++    expect(adapters.plain.publish.mock.calls[0]![0]).not.toHaveProperty('scheduledAt');
++    expect(attemptFirstComment).toHaveBeenCalledWith(expect.objectContaining({ automatic: true }), { postId: 'p1', postTargetId: 'pt-b' });
++    expect(db.post.update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ status: 'scheduled' }) }));
++  });
++  it('skips a stale due-worker claim after the post was moved', async () => {
++    db.post.findFirst.mockResolvedValue(mixed(at(10800)));
++    expect(await publishPost(actor, 'p1', at(-60))).toMatchObject({ skipped: true });
++    expect(publishDestinationInOperation).not.toHaveBeenCalled();
++    expect(db.post.update).not.toHaveBeenCalled();
++  });
++  it('preserves confirmed publication if its first comment fails', async () => {
++    const when = at(-60); db.post.findFirst.mockResolvedValue({ ...scheduled(when), targets: [row('b', 'plain')] });
++    attemptFirstComment.mockRejectedValueOnce(new Error('Comment outcome unknown'));
++    const result = await publishPost(actor, 'p1', when);
++    expect(result).toMatchObject({ published: 1, failed: 0, firstCommentsNeedingReview: 1 });
++    expect(db.post.update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ status: 'published' }) }));
++  });
++  it.each(['pending', 'rejected'])('never hands a contributor post to a provider with %s approval', async approvalStatus => {
++    db.membership.findUnique.mockResolvedValue({ role: 'contributor' });
++    db.post.findFirst.mockResolvedValue(scheduled(at(10800)));
++    db.$queryRaw.mockImplementation(async (sql: TemplateStringsArray) => sql.join('').includes('requiresApproval') ? [{ requiresApproval: true }] : [{ approvalStatus }]);
++    await expect(publishPost(actor, 'p1', undefined, { nativeSchedule: true, nativeFallback: true })).rejects.toMatchObject({ code: 'conflict' });
++    expect(publishDestinationInOperation).not.toHaveBeenCalled();
++    expect(attemptFirstComment).not.toHaveBeenCalled();
++  });
++  it('saves contributor scheduling for approval without platform handoff', async () => {
++    db.membership.findUnique.mockResolvedValue({ role: 'contributor' });
++    db.post.findFirst.mockResolvedValue({ ...scheduled(at(10800)), status: 'draft', targets: [{ ...row('a', 'holding'), targetId: 'a' }] });
++    db.$queryRaw.mockImplementation(async (sql: TemplateStringsArray) => sql.join('').includes('requiresApproval') ? [{ requiresApproval: true }] : []);
++    const result = await schedulePost(actor, 'p1', at(10800), { scheduleMode: 'remote' });
++    expect(result.remoteHold.held).toBe(0);
++    expect(db.post.update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ status: 'pending_approval' }) }));
++    expect(publishDestinationInOperation).not.toHaveBeenCalled();
++  });
++  it('returns a mixed post to draft only after removing its scheduled platform copy', async () => {
++    const before = mixed(at(10800));
++    db.post.findFirst.mockResolvedValueOnce(before).mockResolvedValueOnce({ ...before, targets: [row('a', 'holding'), row('b', 'plain')] });
++    db.postTarget.findMany.mockResolvedValue([heldRow()]);
++    adapters.holding.getRemoteStatus.mockResolvedValue({ state: 'scheduled' });
++    await cancelScheduledPost(actor, 'p1');
++    expect(adapters.holding.deleteRemote).toHaveBeenCalledTimes(1);
++    expect(db.post.updateMany).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ status: 'draft', scheduledAt: null }) }));
++    expect(adapters.holding.deleteRemote.mock.invocationCallOrder[0]).toBeLessThan(db.post.updateMany.mock.invocationCallOrder[0]!);
++  });
++  it.each(['published', 'unknown'])('keeps the local schedule when the held destination reports %s', async state => {
++    db.post.findFirst.mockResolvedValue(mixed(at(10800)));
++    db.postTarget.findMany.mockResolvedValue([heldRow()]);
++    adapters.holding.getRemoteStatus.mockResolvedValue({ state });
++    await expect(cancelScheduledPost(actor, 'p1')).rejects.toMatchObject({ code: 'conflict' });
++    expect(adapters.holding.deleteRemote).not.toHaveBeenCalled();
++    expect(db.post.updateMany).not.toHaveBeenCalled();
++  });
++  it('moves the held copy before updating the shared instant for mixed destinations', async () => {
++    db.post.findFirst.mockResolvedValue(mixed(at(10800)));
++    db.postTarget.findMany.mockResolvedValue([heldRow()]);
++    const when = at(18000); await reschedulePostToInstant(actor, 'p1', when);
++    expect(adapters.holding.rescheduleRemote).toHaveBeenCalledWith(expect.objectContaining({ scheduledAt: when }));
++    expect(db.post.updateMany).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ scheduledAt: when }) }));
++    expect(adapters.holding.rescheduleRemote.mock.invocationCallOrder[0]).toBeLessThan(db.post.updateMany.mock.invocationCallOrder[0]!);
++  });
++  it('does not move the local schedule when the remote reschedule times out', async () => {
++    db.post.findFirst.mockResolvedValue(mixed(at(10800)));
++    db.postTarget.findMany.mockResolvedValue([heldRow()]);
++    adapters.holding.rescheduleRemote.mockRejectedValueOnce(new Error('Timeout'));
++    await expect(reschedulePostToInstant(actor, 'p1', at(18000))).rejects.toMatchObject({ code: 'conflict' });
++    expect(db.post.updateMany).not.toHaveBeenCalled();
++    expect(attemptFirstComment).not.toHaveBeenCalled();
++  });
++});
