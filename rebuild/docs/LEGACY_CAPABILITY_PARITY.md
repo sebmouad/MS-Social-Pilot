@@ -41,7 +41,7 @@ a manifest, saved setting or unit test is not complete workflow proof. See
 | P1 | Scheduled AI agent runs (`aiAgents`), AI image, video (`aiVideos` polling) and voice | Missing; Agents module is on-demand only. | Shared service, UI/REST/MCP, budget metering, live provider checks. |
 | P1 | Caption tests, chart notes, key dates, seasons, holidays and trends, engagement outlook, spam check | Missing at 25c3ea53; no rebuild routes or tables read. | Per-feature module owner decision (build or retire), data kept until recorded. |
 | P1 | ICS calendar feeds (`calendar_feeds`, `/api/calendar-feed/[token]`) | Missing at 25c3ea53. | Tokenised feed, rotation, scope and expiry tests. |
-| P1 | Slack and Telegram alert channels (`chat_channels`) | Missing at 25c3ea53; `notifications.*` covers in-app and email only. | Shared notification channel service with test button. |
+| P1 | Slack and Telegram alert channels (`chat_channels`) | Lane 43 source: bilingual shared UI/REST/MCP destination management/test; transactional publication/inbox/operator events, durable per-destination idempotency and leased worker delivery. Operator events require Root-selected owner-workspace routing. | Apply/rehearse chat-delivery migration and verify real Slack/Telegram delivery, pause/delete/scope boundaries and held uncertain sends. |
 | P1 | Composer link preview (`/api/link-preview`, Open Graph) and structured-data fetch | Missing at 25c3ea53. | Safe-fetch service owned by Publishing; Facebook-specific parts in the platform module. |
 | P1 | Translated posts and translation fields in the composer | Partial: `modules/ai` has a translate kind; no per-language post variants. | Composer, REST and MCP parity. |
 | P1 | Legacy REST `api_tokens` | Missing by design: replaced by MCP keys, person keys and `/api/v1`; existing tokens are not migrated. | Owner decision on migration or retirement. |
@@ -408,3 +408,18 @@ use synthetic data and mocked transport only. No server, whole suite, live Graph
 deployment, production action or push. Changes remain in the working tree for
 integration. Shared architecture/goal/plan/handoff files are outside this lane;
 the integrator must record this batch and its unfinished activation dependencies.
+
+## Lane 43 caption/chat/operator follow-up — 2026-10-22
+
+Caption tests accept raw variants as well as existing posts. Variant posts are
+created atomically through Publishing's service and remain drafts until an
+explicit Publishing action. The same start service serves the bilingual screen,
+REST and MCP with exact mode-specific consent, current channel scope and audit.
+
+Root Alerts is consolidated into Root Operations monitoring: a single incident
+writer, existing email outbox, selected owner-workspace chat subscriptions and
+confirmed test operation. The old `notifications.systemAlert*` configuration and
+duplicate private MCP tools are removed. Registry schema 131 captures this lane.
+Local evidence and remaining database/browser/live delivery gates are recorded in
+[LANE_43_FOLLOWUPS.md](LANE_43_FOLLOWUPS.md); these changes do not establish full
+rebuild or provider parity.

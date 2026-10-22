@@ -51,7 +51,7 @@ describe('page smoke', { timeout: 60_000 }, () => {
         const outcome = await visit(file, role, locale);
         if (outcome.kind === 'threw') throw outcome.error;
         if (outcome.kind === 'rendered') expect(outcome.html).not.toMatch(RAW_ERROR_PATTERN);
-        if (outcome.kind === 'redirect') expect(['/sign-in', '/access-limited', '/no-workspace', '/home', '/two-step', '/', '/publishing/posts', '/analytics', '/root']).toContain(outcome.to.split('?')[0]);
+        if (outcome.kind === 'redirect') expect(['/sign-in', '/access-limited', '/no-workspace', '/home', '/two-step', '/', '/publishing/posts', '/analytics', '/root', '/root/operations']).toContain(outcome.to.split('?')[0]);
         // A signed-in owner never bounces to sign-in or access-limited on a customer or Root page.
         if (role === 'owner' && !PUBLIC.has(route)) expect(outcome.kind === 'redirect' ? outcome.to : 'ok').not.toMatch(/^\/(sign-in|access-limited|no-workspace)/);
         if (role === 'anonymous' && !PUBLIC.has(route)) {

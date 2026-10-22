@@ -5,6 +5,8 @@
 export const CAPTION_TESTS_COPY = {
   en: {
     title: 'Caption tests',
+    channelLimitHint: 'Choose up to {max} channels.', noChannels: 'No channels are available. Add a channel in Settings before creating these drafts.',
+    source: 'Start from', existingPosts: 'Existing posts', rawCaptions: 'New captions', addCaption: 'Add caption', channels: 'Channels', link: 'Shared link (optional)', rawHint: 'Write different captions for the same link. This creates drafts only; review and publish each one in Content. The comparison begins after publication.', rawConfirm: 'Create one draft per caption and start this test? Nothing is published yet. Review and publish each draft in Content.',
     intro: 'The same content with different captions. Once the posts have had time to reach people, the caption that got the most engagement per view wins, but only when every caption had enough views to say so.',
     emptyTitle: 'No caption tests yet',
     emptyHint: 'Start a test from two to four posts that carry the same content with different captions. The result shows up here.',
@@ -28,6 +30,8 @@ export const CAPTION_TESTS_COPY = {
   },
   fr: {
     title: 'Tests de légendes',
+    channelLimitHint: 'Choisissez jusqu’à {max} canaux.', noChannels: 'Aucun canal disponible. Ajoutez un canal dans les réglages avant de créer ces brouillons.',
+    source: 'Créer à partir de', existingPosts: 'Publications existantes', rawCaptions: 'Nouvelles légendes', addCaption: 'Ajouter une légende', channels: 'Canaux', link: 'Lien commun (facultatif)', rawHint: 'Rédigez différentes légendes pour le même lien. Seuls des brouillons sont créés ; vérifiez et publiez chacun dans Contenu. La comparaison commence après publication.', rawConfirm: 'Créer un brouillon par légende et lancer ce test ? Rien n’est encore publié. Vérifiez et publiez chaque brouillon dans Contenu.',
     intro: 'Le même contenu avec des légendes différentes. Une fois que les publications ont eu le temps de toucher les gens, la légende qui obtient le plus d’interactions par vue l’emporte, seulement si chaque légende a eu assez de vues pour le dire.',
     emptyTitle: 'Aucun test de légendes pour l’instant',
     emptyHint: 'Lancez un test à partir de deux à quatre publications qui portent le même contenu avec des légendes différentes. Le résultat s’affiche ici.',

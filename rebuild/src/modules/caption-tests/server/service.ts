@@ -1,3 +1,4 @@
+import { createPublishingDraftBatch } from '@/modules/publishing/server/lifecycle';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { OperationError, type OperationErrorCode } from '@/lib/operation-error';
@@ -79,7 +80,7 @@ export type CaptionTestView = {
 type TestRow = { id: string; name: string; hours: number; minViews: number; status: string; reason: string | null; winnerLabel: string | null; lift: number | null; results: unknown; decidedAt: Date | null; learnedAt: Date | null; createdAt: Date };
 type PostRow = { id: string; testId: string; label: string | null; message: string; channels: Array<{ id: string; name: string; publishedAt: string | null }> };
 
-export async function listCaptionTests(actor: CaptionActor, deps: CaptionDeps = {}): Promise<{ tests: CaptionTestView[]; canLearn: boolean; canStart: boolean; limits: { minCaptions: number; maxCaptions: number; defaultHours: number; minHours: number; maxHours: number; defaultMinViews: number; maxMinViews: number } }> {
+export async function listCaptionTests(actor: CaptionActor, deps: CaptionDeps = {}): Promise<{ tests: CaptionTestView[]; canLearn: boolean; canStart: boolean; limits: { minCaptions: number; maxCaptions: number; defaultHours: number; minHours: number; maxHours: number; defaultMinViews: number; maxMinViews: number; captionMaxCharacters: number; nameMaxCharacters: number; targetLimit: number } }> {
   const locale = deps.locale ?? 'en';
   try {
     const auth = await authorizeAi(actor, LIST_FEATURE, 'read');
@@ -109,8 +110,8 @@ export async function listCaptionTests(actor: CaptionActor, deps: CaptionDeps = 
     }
     const can = async (feature: string) => { try { await authorizeAi(actor, feature, 'write'); return true; } catch { return false; } };
     const [canLearn, canStart] = await Promise.all([can(LEARN_FEATURE), can(START_FEATURE)]);
-    const { minCaptions, maxCaptions, defaultHours, minHours, maxHours, defaultMinViews, maxMinViews } = policy;
-    return { tests, canLearn, canStart, limits: { minCaptions, maxCaptions, defaultHours, minHours, maxHours, defaultMinViews, maxMinViews } };
+    const { minCaptions, maxCaptions, defaultHours, minHours, maxHours, defaultMinViews, maxMinViews, captionMaxCharacters, nameMaxCharacters, targetLimit } = policy;
+    return { tests, canLearn, canStart, limits: { minCaptions, maxCaptions, defaultHours, minHours, maxHours, defaultMinViews, maxMinViews, captionMaxCharacters, nameMaxCharacters, targetLimit } };
   } catch (error) { return localised(error, locale); }
 }
 
@@ -164,6 +165,46 @@ export async function startCaptionTest(actor: CaptionActor, raw: unknown, deps: 
     }, { timeout: policy.transactionTimeoutMs, maxWait: policy.transactionMaxWaitMs }));
     return { id, ok: true };
   } catch (error) { return localised(error, locale); }
+}
+
+export const VARIANTS_CONFIRMATION = 'CREATE CAPTION TEST DRAFTS';
+
+/** Drafts, test membership and both modules' audits commit atomically; publication stays an explicit Publishing action. */
+export async function startCaptionVariants(actor: CaptionActor, raw: unknown, deps: CaptionDeps = {}): Promise<{ id: string; ok: true; postIds: string[] }> {
+  const locale = deps.locale ?? 'en';
+  try {
+    const policy = await policyOf();
+    const parsed = z.object({
+      name: z.string().trim().max(policy.nameMaxCharacters).optional(), hours: z.number().int().min(policy.minHours).max(policy.maxHours).optional(), minViews: z.number().int().min(1).max(policy.maxMinViews).optional(),
+      captions: z.array(z.string().trim().min(1).max(policy.captionMaxCharacters)).min(policy.minCaptions).max(policy.maxCaptions),
+      targetIds: z.array(z.string().min(1).max(200)).min(1).max(policy.targetLimit),
+      link: z.string().url().optional(), confirmation: z.literal(VARIANTS_CONFIRMATION),
+    }).strict().safeParse(raw);
+    if (!parsed.success) throw fail('invalid_request');
+    const input = parsed.data;
+    if (new Set(input.captions).size !== input.captions.length || new Set(input.targetIds).size !== input.targetIds.length) throw fail('invalid_request');
+    const auth = await authorizeAi(actor, START_FEATURE, 'write');
+    if (auth.allowedTargetIds && input.targetIds.some(id => !auth.allowedTargetIds!.includes(id))) throw fail('forbidden');
+    const id = randomUUID(); const now = (deps.now ?? (() => new Date()))();
+    return await createPublishingDraftBatch({ userId: actor.userId, workspaceId: actor.workspaceId, allowedTargetIds: auth.allowedTargetIds }, input.captions.map(message => ({ message, firstComment: '', targetIds: input.targetIds, ...(input.link ? { link: input.link } : {}) })), async (tx, postIds) => {
+      await lockActor(tx, actor);
+      const current = await authorizeAi(actor, START_FEATURE, 'write');
+      if (current.allowedTargetIds && input.targetIds.some(target => !current.allowedTargetIds!.includes(target))) throw fail('forbidden');
+      const name = (input.name || input.captions[0]!).slice(0, policy.nameMaxCharacters);
+      await tx.$executeRaw`INSERT INTO caption_tests (id, "workspaceId", name, hours, "minViews", status, "createdById", "createdAt") VALUES (${id}, ${actor.workspaceId}, ${name}, ${input.hours ?? policy.defaultHours}, ${input.minViews ?? policy.defaultMinViews}, 'running', ${actor.userId}, ${now})`;
+      for (const [index, postId] of postIds.entries()) {
+        const changed = await tx.$executeRaw`UPDATE posts SET "captionTestId" = ${id}, "captionLabel" = ${LABELS[index]!} WHERE id = ${postId} AND "workspaceId" = ${actor.workspaceId} AND "captionTestId" IS NULL`;
+        if (changed !== 1) throw fail('conflict');
+      }
+      await audit(tx, actor.workspaceId, actor, 'captionTest.started', { testId: id, captions: postIds.length, source: 'variants', postIds }, now);
+      return { id, ok: true as const, postIds };
+    });
+  } catch (error) { return localised(error, locale); }
+}
+
+/** Both transports expose the same mutually exclusive input modes. */
+export function startCaptionTestInput(actor: CaptionActor, raw: unknown, deps: CaptionDeps = {}) {
+  return raw && typeof raw === 'object' && 'captions' in raw ? startCaptionVariants(actor, raw, deps) : startCaptionTest(actor, raw, deps);
 }
 
 // ------------------------------------------------------------------ learn

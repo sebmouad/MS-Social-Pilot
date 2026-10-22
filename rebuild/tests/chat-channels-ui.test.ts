@@ -2,10 +2,10 @@
 import { act, createElement } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { CHAT_COPY, CHAT_POLICY } from '../config';
+import { CHAT_COPY, CHAT_POLICY } from '@/modules/notifications/chat-channels/config';
 const mocks = vi.hoisted(() => ({ refresh: vi.fn() }));
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: mocks.refresh }) }));
-import { ChatChannels } from '../ui/ChatChannels';
+import { ChatChannels } from '@/modules/notifications/chat-channels/ui/ChatChannels';
 
 let root: ReturnType<typeof createRoot>; let container: HTMLDivElement;
 beforeEach(() => {

@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+vi.mock('@/modules/notifications/chat-channels/server/delivery', () => ({ enqueueOperatorIncident: vi.fn() }));
 const m = vi.hoisted(() => ({ query: vi.fn(), execute: vi.fn(), auth: vi.fn(), audit: vi.fn(), config: vi.fn(), disk: vi.fn(), mail: vi.fn(), runAllowed: true }));
 vi.mock('@/server/jobs/runtime', () => ({ createWorkerDependencies: () => ({}) }));
 vi.mock('@/server/jobs/worker', () => ({ createWorker: (deps: { execute: (name: string) => Promise<unknown> }) => ({ runNow: async (name: string) => { if (!m.runAllowed) return false; await deps.execute(name); return true; } }) }));
@@ -54,4 +55,13 @@ describe('installation monitoring', () => {
   it('requires exact confirmation before measuring', async () => { await expect(runRootOperatorMonitoring('root', 'yes')).rejects.toThrow('confirmation'); expect(m.query).not.toHaveBeenCalled(); expect(fetch).not.toHaveBeenCalled(); });
   it('refuses a manual run while the shared monitoring lease is occupied', async () => { m.runAllowed = false; await expect(runRootOperatorMonitoring('root', 'EVALUATE ROOT MONITORING')).rejects.toMatchObject({ code: 'conflict' }); expect(fetch).not.toHaveBeenCalled(); expect(m.audit).not.toHaveBeenCalled(); });
   it('audits confirmed evaluation atomically', async () => { await runRootOperatorMonitoring('root', 'EVALUATE ROOT MONITORING'); expect(m.audit).toHaveBeenCalledWith(expect.anything(), 'root', 'root.monitoring_evaluated', expect.anything()); });
+});
+
+it('retains bounded resolved incident history without exposing stored raw detail', async () => {
+  m.query.mockImplementation(async (strings: TemplateStringsArray) => strings.join('').includes('"resolvedAt" FROM system_alerts') ? [{ id: 'history', key: 'worker.down', openedAt: now, resolvedAt: now }] : []);
+  const result = await readRootOperatorMonitoring('root', 2);
+  expect(result.incidentHistory).toEqual([{ id: 'history', key: 'worker.down', openedAt: now.toISOString(), resolvedAt: now.toISOString() }]);
+  const history = m.query.mock.calls.find(c => c[0].join('').includes('"resolvedAt" FROM system_alerts'))!;
+  expect(history.at(-1)).toBe(2);
+  expect(history[0].join('')).not.toContain('detail');
 });

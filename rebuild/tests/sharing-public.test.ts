@@ -1,3 +1,5 @@
+import { enqueueChatEvent } from '@/modules/notifications/chat-channels/server/delivery';
+vi.mock('@/modules/notifications/chat-channels/server/delivery', () => ({ enqueueChatEvent: vi.fn(async () => 1) }));
 import { readFileSync } from 'node:fs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { db, defaults, install, state } from './sharing-helpers';
@@ -196,6 +198,8 @@ describe('public share links', () => {
     expect(JSON.stringify(audited.values)).not.toContain('Pat');
     const insert = state.executions.find(e => e.sql.includes('INSERT INTO review_decisions'))!;
     expect(insert.values).toEqual(expect.arrayContaining(['shl_1', 'p1', 'approved', 'Pat']));
+    expect(enqueueChatEvent).toHaveBeenCalledWith(db, expect.objectContaining({ eventId: insert.values[0], workspaceId: 'workspace-a', event: 'reviewDecision', source: expect.objectContaining({postId:'p1'}) }));
+    expect(JSON.stringify(vi.mocked(enqueueChatEvent).mock.calls)).not.toContain('Pat');
     expect(JSON.stringify(state.executions)).not.toContain(TOKEN);
     // The pool is never held by sharing while the lifecycle runs.
     expect(state.transactions).toBe(0);

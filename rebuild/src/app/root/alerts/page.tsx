@@ -1,2 +1,6 @@
-export { default } from '@/modules/notifications/chat-channels/ui/SystemAlertsScreen';
-export const dynamic = 'force-dynamic';
+import { redirect } from 'next/navigation';
+import { requireRootPage } from '@/server/config/access';
+export default async function AlertsPage() {
+  await requireRootPage();
+  redirect('/root/operations');
+}

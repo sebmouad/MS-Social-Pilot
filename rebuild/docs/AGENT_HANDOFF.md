@@ -518,3 +518,37 @@ one failed, 49 skipped; 10,174 tests passed, five failed, 2,159 skipped. All fiv
 failures are loopback `facebook-native-http` tests blocked by sandbox
 `listen EPERM ::1`; the full suite is not green. Both release scripts pass
 `bash -n`; whitespace checks pass. Work remains uncommitted as requested.
+
+## Lane 43 follow-ups — 2026-10-22
+
+Caption tests now accept raw caption variants through an atomic Publishing draft
+batch, alongside existing-post tests. The bilingual source picker, channel
+selection and exact confirmation dialog call the same caption service as REST
+and MCP. Variants remain drafts until an explicit Publishing action.
+
+Chat subscriptions receive transactional content-free workspace events through
+the existing leased notifications job, with durable per-destination claims,
+current workspace/access/subscription checks and no automatic replay of uncertain
+sends. Root Operations owns the single installation incident evaluator and
+email outbox, plus a confirmed test operation and explicitly selected
+owner-workspace chat routing. The duplicate Root Alerts screen/config/tools are
+removed; its old screen redirects to Operations and REST aliases delegate to the
+canonical monitoring service.
+
+Registry schema is 131. Existing caption, chat and Root monitoring policy/copy
+objects gain fields; three `notifications.systemAlert*` keys are removed. Apply
+and rehearse `20261022190000_rebuild_chat_deliveries` before delivery. Historical
+saved duplicate alert settings are not imported automatically; review the Root
+monitoring thresholds and configure its chat workspace deliberately.
+
+See [LANE_43_FOLLOWUPS.md](LANE_43_FOLLOWUPS.md) for exact verification and remaining
+gates. No browser, real PostgreSQL, provider/chat/mail delivery or production
+verification is claimed. Changes remain uncommitted as requested for this lane.
+
+Final lane-43 verification: rebuild `npm run typecheck` and explicit
+`npx tsc --noEmit -p .` pass with zero errors. All 22 targeted files pass
+(1,019 tests). Full requested suite, cache disabled: 700 passed files, one failed,
+49 skipped; 11,373 passed tests, five failed, 2,525 skipped. Only
+`facebook-native-http.test.ts` fails, because sandbox localhost binding returns
+`listen EPERM ::1`, matching the baseline. No claim of a green full suite.
+Changes are uncommitted; migration/browser/real delivery checks remain open.

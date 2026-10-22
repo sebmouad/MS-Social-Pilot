@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const CHAT_EVENTS = ['publishFailure', 'connectionExpired', 'approvalRequest', 'approvalDecision', 'reviewDecision'] as const;
+export const CHAT_EVENTS = ['publishFailure', 'inboxAlert', 'operatorIncident', 'connectionExpired', 'approvalRequest', 'approvalDecision', 'reviewDecision'] as const;
 export type ChatEvent = typeof CHAT_EVENTS[number];
 export type ChatActor = { userId: string; workspaceId: string; allowedChannelIds?: readonly string[] };
 const text = z.string().trim().min(1);

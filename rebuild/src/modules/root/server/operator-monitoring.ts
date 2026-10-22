@@ -1,7 +1,8 @@
 import { REBUILD_WORKER_PREFIX } from '@/server/jobs/identity';
 import { randomUUID } from 'node:crypto';
 import { sendTransactionalMail } from '@/server/mail';
-import { monitoringMailCopy } from '../config';
+import { mailCopySchema } from '../config';
+import { enqueueOperatorIncident } from '@/modules/notifications/chat-channels/server/delivery';
 import { statfs } from 'node:fs/promises';
 import { prisma } from '@/server/data';
 import { runtimeConfig } from '@/server/config/store';
@@ -11,6 +12,7 @@ import { rootResultLimit, rootTransaction } from '@/server/root/legacy/policy';
 import { writeRootAudit } from '@/server/root/legacy/audit';
 import { OperationError } from '@/lib/operation-error';
 
+export const MONITORING_TEST_CONFIRMATION = 'TEST ROOT MONITORING';
 export const MONITORING_CONFIRMATION = 'EVALUATE ROOT MONITORING';
 type Check = { key: string; firing: boolean; detail: Record<string, number | string> };
 const policyFor = async () => monitoringPolicySchema.parse(await runtimeConfig('root.monitoringPolicy'));
@@ -46,11 +48,15 @@ export async function runOperatorMonitoring(now: Date = new Date(), actorId?: st
       const existing = await tx.$queryRaw<Array<{ id: string }>>`SELECT id FROM system_alerts WHERE key = ${check.key} AND "resolvedAt" IS NULL FOR UPDATE`;
       if (check.firing && !existing.length) {
         await tx.$executeRaw`INSERT INTO system_alerts (id, key, detail, "openedAt") VALUES (${randomUUID()}, ${check.key}, ${JSON.stringify(check.detail)}::jsonb, ${now})`;
-        await tx.$executeRaw`INSERT INTO rebuild_monitoring_deliveries (id, key, state, status) VALUES (${randomUUID()}, ${check.key}, 'open', 'pending')`;
+        const eventId = randomUUID();
+        await tx.$executeRaw`INSERT INTO rebuild_monitoring_deliveries (id, key, state, status) VALUES (${eventId}, ${check.key}, 'open', 'pending')`;
+        await enqueueOperatorIncident(tx, { eventId, state: 'open', workspaceId: policy.chatWorkspaceId });
         opened.push(check.key);
       } else if (!check.firing && existing.length) {
         await tx.$executeRaw`UPDATE system_alerts SET "resolvedAt" = ${now} WHERE key = ${check.key} AND "resolvedAt" IS NULL`;
-        await tx.$executeRaw`INSERT INTO rebuild_monitoring_deliveries (id, key, state, status) VALUES (${randomUUID()}, ${check.key}, 'resolved', 'pending')`;
+        const eventId = randomUUID();
+        await tx.$executeRaw`INSERT INTO rebuild_monitoring_deliveries (id, key, state, status) VALUES (${eventId}, ${check.key}, 'resolved', 'pending')`;
+        await enqueueOperatorIncident(tx, { eventId, state: 'resolved', workspaceId: policy.chatWorkspaceId });
         resolved.push(check.key);
       }
     }
@@ -95,17 +101,35 @@ export async function readRootOperatorMonitoring(actorId: string, resultCap?: nu
   const policy = await policyFor();
   const limit = rootResultLimit(policy.alertLimit, resultCap);
   const firstDay = new Date(Date.now() - (policy.historyDays - 1) * 86400000).toISOString().slice(0, 10);
-  const [alerts, uptime, deliveries] = await Promise.all([
+  const [alerts, uptime, deliveries, incidentHistory] = await Promise.all([
     prisma.$queryRaw<Array<{ id: string; key: string; openedAt: Date }>>`SELECT id, key, "openedAt" FROM system_alerts WHERE "resolvedAt" IS NULL ORDER BY "openedAt" DESC, id LIMIT ${limit}`,
     prisma.$queryRaw<Array<{ day: string; component: string; minutes: number }>>`SELECT day, component, minutes FROM uptime_days WHERE day >= ${firstDay} AND component IN ('app', 'worker') ORDER BY day, component LIMIT ${Math.min(policy.historyDays * 2, resultCap ?? policy.historyDays * 2)}`,
     prisma.$queryRaw<Array<{ id: string; key: string; state: string; status: string; createdAt: Date; finishedAt: Date | null }>>`SELECT id, key, state, status, "createdAt", "finishedAt" FROM rebuild_monitoring_deliveries ORDER BY "createdAt" DESC, id LIMIT ${limit}`,
+    prisma.$queryRaw<Array<{ id: string; key: string; openedAt: Date; resolvedAt: Date | null }>>`SELECT id, key, "openedAt", "resolvedAt" FROM system_alerts ORDER BY "openedAt" DESC, id LIMIT ${limit}`,
   ]);
-  return { alerts: alerts.map(row => ({ ...row, openedAt: row.openedAt.toISOString() })), uptime, deliveries: deliveries.map(row => ({ ...row, createdAt: row.createdAt.toISOString(), finishedAt: row.finishedAt?.toISOString() ?? null })), policy, confirmation: MONITORING_CONFIRMATION };
+  return { incidentHistory: incidentHistory.map(row => ({ ...row, openedAt: row.openedAt.toISOString(), resolvedAt: row.resolvedAt?.toISOString() ?? null })), alerts: alerts.map(row => ({ ...row, openedAt: row.openedAt.toISOString() })), uptime, deliveries: deliveries.map(row => ({ ...row, createdAt: row.createdAt.toISOString(), finishedAt: row.finishedAt?.toISOString() ?? null })), policy, confirmation: MONITORING_CONFIRMATION, testConfirmation: MONITORING_TEST_CONFIRMATION };
+}
+
+/** Exact consent creates one durable intent shared by email and chat delivery.
+ * The worker drains pending mail; uncertain sends remain held for review.
+ */
+export async function testRootOperatorMonitoring(actorId: string, confirmation: unknown) {
+  await assertRootActor(prisma, actorId);
+  if (confirmation !== MONITORING_TEST_CONFIRMATION) throw new OperationError('invalid_request', 'Enter the exact monitoring test confirmation.');
+  const policy = await policyFor();
+  const id = randomUUID();
+  await rootTransaction(async tx => {
+    await lockRootActor(tx, actorId);
+    await tx.$executeRaw`INSERT INTO rebuild_monitoring_deliveries (id, key, state, status) VALUES (${id}, ${'monitoring.test'}, 'open', 'pending')`;
+    await enqueueOperatorIncident(tx, { eventId: id, state: 'test', workspaceId: policy.chatWorkspaceId });
+    await writeRootAudit(tx, actorId, 'root.monitoring_test_queued', { id });
+  });
+  return { id, queued: true as const };
 }
 
 /** Claims are committed before transport. Uncertain sends are never automatically replayed. */
 async function deliverMonitoringAlerts(policy: Awaited<ReturnType<typeof policyFor>>) {
-  const copy = await runtimeConfig('root.monitoringMailCopy') as typeof monitoringMailCopy;
+  const copy = mailCopySchema.parse(await runtimeConfig('root.monitoringMailCopy'));
   const rows = await rootTransaction(async tx => {
     await tx.$executeRaw`UPDATE rebuild_monitoring_deliveries SET status = 'uncertain' WHERE status = 'sending' AND "claimedAt" < NOW() - ${policy.deliveryLeaseSeconds} * INTERVAL '1 second'`;
     return tx.$queryRaw<Array<{ id: string; key: string; state: 'open' | 'resolved' }>>`WITH candidates AS (SELECT id FROM rebuild_monitoring_deliveries WHERE status = 'pending' ORDER BY "createdAt", id LIMIT ${policy.deliveryBatchSize} FOR UPDATE SKIP LOCKED) UPDATE rebuild_monitoring_deliveries d SET status = 'sending', "claimedAt" = NOW() FROM candidates c WHERE d.id = c.id RETURNING d.id, d.key, d.state`;
@@ -115,7 +139,7 @@ async function deliverMonitoringAlerts(policy: Awaited<ReturnType<typeof policyF
     let status = 'unavailable';
     if (recipients[0]) {
       const recipient = recipients[0]; const text = copy[recipient.locale === 'fr' ? 'fr' : 'en'];
-      try { status = (await sendTransactionalMail({ to: recipient.email, subject: text[row.state], text: text.body.replace('{key}', row.key), template: 'system-alert' })).status; } catch { status = 'uncertain'; }
+      try { status = (await sendTransactionalMail({ to: recipient.email, subject: row.key === 'monitoring.test' ? text.test : text[row.state], text: text.body.replace('{key}', row.key), template: 'system-alert' })).status; } catch { status = 'uncertain'; }
     }
     await prisma.$executeRaw`UPDATE rebuild_monitoring_deliveries SET status = ${status}, "finishedAt" = NOW() WHERE id = ${row.id} AND status = 'sending'`;
   }

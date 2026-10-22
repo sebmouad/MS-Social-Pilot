@@ -138,6 +138,7 @@ claimed. No server, deploy, push or production operation belongs to this lane.
 | `rebuild_writing_agent_runs` | Workspace content-free generation history; deleted agent reference is nulled. |
 | `rebuild_post_exports` | Workspace/user private CSV with expiry and current-access download checks; cascades on workspace/user deletion. |
 | `rebuild_post_export_runs` | Content-free export attempt history; cascades with its export/workspace/user. |
+| `rebuild_chat_deliveries` | Notifications-owned content-free event outbox. Direct workspace FK enables catalog-driven export and children-first erasure; channel deletion cascades delivery rows. Unique workspace/channel/event identity suppresses duplicate intents. Sending claims become uncertain after expiry and are never automatically replayed. Migration `20261022190000_rebuild_chat_deliveries` is authored, not applied by lane 43. |
 
 Portability and retained-account erasure coverage require integration by the data-control owner; table registration alone is not proof of full coverage.
 

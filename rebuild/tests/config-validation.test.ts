@@ -7,6 +7,15 @@ import { configAuditDetail } from '../src/server/config/store';
 import { publishingManifest } from '../src/modules/publishing/manifest';
 
 describe('configuration registry', () => {
+  it('keeps operator alerts in the single Root monitoring system', () => {
+    expect(CONFIG_SCHEMA_VERSION).toBe(131);
+    for (const key of ['notifications.systemAlertPolicy', 'notifications.systemAlertCopy', 'notifications.systemAlertTelegramToken']) {
+      expect(CONFIG_BY_KEY.has(key)).toBe(false);
+    }
+    for (const key of ['root.monitoringPolicy', 'root.monitoringCopy', 'root.monitoringMailCopy']) {
+      expect(CONFIG_BY_KEY.get(key)).toMatchObject({ consumption: 'active' });
+    }
+  });
   it('has unique keys and public metadata never contains secret values', () => {
     const keys = CONFIG_REGISTRY.map((item) => item.key);
     expect(new Set(keys).size).toBe(keys.length);
@@ -44,7 +53,7 @@ describe('configuration registry', () => {
   });
 
   it('covers the operational configuration areas with explicit consumption status', () => {
-    expect(CONFIG_SCHEMA_VERSION).toBe(130);
+    expect(CONFIG_SCHEMA_VERSION).toBe(131);
     expect(safeConfigShape().find(setting => setting.key === 'settings.teamDefaultRole')).toMatchObject({ defaultValue: 'contributor', consumption: 'active', owner: { kind: 'product', id: 'settings' } });
     expect(safeConfigShape().find(setting => setting.key === 'settings.teamDefaultAllChannels')).toMatchObject({ defaultValue: false, consumption: 'active', owner: { kind: 'product', id: 'settings' } });
     expect(CONFIG_BY_KEY.get('settings.teamDefaultRole')!.schema.safeParse('owner').success).toBe(false);

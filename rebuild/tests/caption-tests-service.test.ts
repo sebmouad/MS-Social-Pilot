@@ -6,7 +6,8 @@ const state = vi.hoisted(() => ({
   running: [] as unknown[], settlePosts: [] as unknown[], settleTargets: [] as unknown[], claimed: 1, updatedPosts: 1, overrides: {} as Record<string, unknown>,
 }));
 const db = vi.hoisted(() => ({ $queryRaw: vi.fn(), $executeRaw: vi.fn(), $transaction: vi.fn() }));
-const mocks = vi.hoisted(() => ({ entitlements: vi.fn(), permissions: vi.fn(), purge: vi.fn() }));
+const mocks = vi.hoisted(() => ({ entitlements: vi.fn(), permissions: vi.fn(), purge: vi.fn(), draftBatch: vi.fn() }));
+vi.mock('@/modules/publishing/server/lifecycle', () => ({ createPublishingDraftBatch: mocks.draftBatch }));
 vi.mock('@/server/data', () => ({ prisma: db }));
 vi.mock('@/server/entitlements', () => ({ loadEntitlements: mocks.entitlements, canUseFeature: (e: { features: Record<string, boolean> }, f: string) => e.features[f] === true }));
 vi.mock('@/server/permissions/loader', () => ({ loadPermissions: mocks.permissions }));
@@ -19,9 +20,9 @@ vi.mock('@/server/config/store', async () => {
 });
 
 import { resolvePermissions } from '../src/server/permissions';
-import { learnCaptionTest, listCaptionTests, listTestablePosts, settleCaptionTests, startCaptionTest } from '../src/modules/caption-tests/server/service';
+import { learnCaptionTest, listCaptionTests, listTestablePosts, settleCaptionTests, startCaptionTest, startCaptionVariants } from '../src/modules/caption-tests/server/service';
 import { executeCaptionTestTool } from '../src/modules/caption-tests/mcp';
-import { CAPTION_TESTS_DEFAULTS } from '../src/modules/caption-tests/config';
+import { CAPTION_TESTS_DEFAULTS, captionTestsPolicySchema, captionTestsCopySchema } from '../src/modules/caption-tests/config';
 
 const actor = { userId: 'u1', workspaceId: 'w1' };
 const sql = (s: TemplateStringsArray, v: unknown[]) => ({ sql: s.join('?'), values: v });
@@ -237,5 +238,59 @@ describe('settling due tests', () => {
     await settleCaptionTests({ workspaceId: 'w1', now, performance: reader({}) });
     const call = db.$queryRaw.mock.calls.find(([s]) => (s as TemplateStringsArray).join('').includes("status = 'running'"))!;
     expect(call.slice(1)).toContain('w1');
+  });
+});
+
+
+describe('raw caption variants', () => {
+  const input = { captions: ['Thoughtful caption', 'Brighter caption'], targetIds: ['c1'], confirmation: 'CREATE CAPTION TEST DRAFTS' };
+  beforeEach(() => { mocks.draftBatch.mockImplementation(async (_actor, _inputs, complete) => complete(db, ['new-a', 'new-b'])); });
+  it('uses Publishing drafts and writes the test, labels and audit in its transaction', async () => {
+    expect(await startCaptionVariants(actor, input)).toMatchObject({ ok: true, postIds: ['new-a', 'new-b'] });
+    expect(mocks.draftBatch).toHaveBeenCalledWith(expect.objectContaining({ workspaceId: 'w1' }), input.captions.map(message => expect.objectContaining({ message, targetIds: ['c1'], firstComment: '' })), expect.any(Function));
+    expect(state.exec.filter(e => e.sql.includes('UPDATE posts SET "captionTestId"')).map(e => e.values[1])).toEqual(['A', 'B']);
+    expect(state.exec.at(-1)?.values).toContain('captionTest.started');
+  });
+  it('rejects wrong consent, duplicate captions and blank destinations before drafts', async () => {
+    for (const bad of [{ ...input, confirmation: 'yes' }, { ...input, captions: ['same', 'same'] }, { ...input, captions: [' ', 'other'] }, { ...input, targetIds: [] }]) await expect(startCaptionVariants(actor, bad)).rejects.toMatchObject({ code: 'invalid_request' });
+    expect(mocks.draftBatch).not.toHaveBeenCalled();
+  });
+  it('denies viewers, foreign workspaces and channels outside member scope before drafts', async () => {
+    state.role = 'viewer'; await expect(startCaptionVariants(actor, input)).rejects.toMatchObject({ code: 'forbidden' });
+    state.role = 'owner'; await expect(startCaptionVariants({ ...actor, workspaceId: 'foreign' }, input)).rejects.toMatchObject({ code: 'forbidden' });
+    state.role = 'editor'; state.scope = { allPages: false, pageAccess: [{ targetId: 'c2' }] };
+    await expect(startCaptionVariants(actor, input)).rejects.toMatchObject({ code: 'forbidden' });
+    expect(mocks.draftBatch).not.toHaveBeenCalled();
+  });
+  it('MCP raw mode uses service authorization and the credential permission ceiling', async () => {
+    const viewer = { userId: 'u1', workspaceId: 'w1', permissions: resolvePermissions({ role: 'viewer', workspaceDisabledModules: [], memberDisabledModules: [], clientAccess: [], allPages: true, pageAccess: [] }) } as never;
+    await expect(executeCaptionTestTool(viewer, 'start_caption_test', input)).rejects.toMatchObject({ code: 'forbidden' });
+    expect(mocks.draftBatch).not.toHaveBeenCalled();
+  });
+  it('Root limits raw caption length and returns a French validation message', async () => {
+    state.overrides['captionTests.policy'] = { ...CAPTION_TESTS_DEFAULTS, captionMaxCharacters: 8 };
+    await expect(startCaptionVariants(actor, input, { locale: 'fr' })).rejects.toMatchObject({ code: 'invalid_request', message: 'Vérifiez les informations et réessayez.' });
+    expect(mocks.draftBatch).not.toHaveBeenCalled();
+  });
+  it('accepts an authorized editor and rechecks role under the transaction', async () => {
+    state.role = 'editor'; state.scope = { allPages: false, pageAccess: [{ targetId: 'c1' }] };
+    await expect(startCaptionVariants(actor, input)).resolves.toMatchObject({ ok: true });
+    mocks.draftBatch.mockImplementation(async (_actor, _inputs, complete) => { state.member = false; return complete(db, ['new-a','new-b']); });
+    await expect(startCaptionVariants(actor, input)).rejects.toMatchObject({ code: 'forbidden' });
+  });
+});
+
+
+describe('caption setting compatibility', () => {
+  it('fills new variant policy fields without losing existing Root overrides', () => {
+    const { captionMaxCharacters, targetLimit, requestMaxBytes, ...legacy } = CAPTION_TESTS_DEFAULTS;
+    expect(captionTestsPolicySchema.parse({ ...legacy, defaultHours: 72 })).toMatchObject({ captionMaxCharacters, targetLimit, requestMaxBytes, defaultHours: 72 });
+  });
+  it('fills new localized copy while preserving saved customized labels', async () => {
+    const { CAPTION_TESTS_COPY } = await import('../src/modules/caption-tests/copy');
+    const oldEn: Record<string, string> = { ...CAPTION_TESTS_COPY.en, title: 'Our caption lab' };
+    const oldFr: Record<string, string> = { ...CAPTION_TESTS_COPY.fr, title: 'Notre atelier' };
+    delete oldEn.rawHint; delete oldFr.rawHint;
+    expect(captionTestsCopySchema.parse({ en: oldEn, fr: oldFr })).toMatchObject({ en: { title: 'Our caption lab', rawHint: CAPTION_TESTS_COPY.en.rawHint }, fr: { title: 'Notre atelier', rawHint: CAPTION_TESTS_COPY.fr.rawHint } });
   });
 });

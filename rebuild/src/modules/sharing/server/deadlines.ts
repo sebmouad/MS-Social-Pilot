@@ -1,3 +1,4 @@
+import { enqueueChatEvent } from '@/modules/notifications/chat-channels/server/delivery';
 import { randomUUID } from 'node:crypto';
 import type { Prisma } from '../../../../generated/client';
 import { OperationError } from '@/lib/operation-error';
@@ -55,6 +56,7 @@ export async function runShareLinkDeadlines(now = new Date()): Promise<string> {
           const authorName = (await autoText(link.workspaceId, 'Automatic approval')).slice(0, 200);
           const stored = await tx.$executeRaw`INSERT INTO review_decisions (id, "shareLinkId", "postId", decision, comment, "authorName", "createdAt") VALUES (${answerId}, ${link.id}, ${post.id}, 'approved', NULL, ${authorName}, NOW())`;
           if (stored !== 1) throw new OperationError('unavailable', 'The answer could not be stored.');
+          await enqueueChatEvent(tx, { workspaceId: link.workspaceId, eventId: answerId, event: 'reviewDecision', source: { workspaceId: link.workspaceId, eventId: answerId, kind: 'approval_decision', postId: post.id } });
           await audit(tx, { userId: link.createdById, workspaceId: link.workspaceId }, 'sharing.client_answer_recorded', { linkId: link.id, postId: post.id, decision: 'approved', applied: true, via: 'deadline', publishAnywayHours: link.publishAnywayHours });
         },
       };

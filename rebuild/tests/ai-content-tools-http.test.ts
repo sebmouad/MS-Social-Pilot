@@ -4,6 +4,7 @@ const mocks = vi.hoisted(() => ({
   viewer: vi.fn(), image: vi.fn(), voice: vi.fn(), status: vi.fn(), videos: vi.fn(), start: vi.fn(), preview: vi.fn(), outlook: vi.fn(), spam: vi.fn(),
   list: vi.fn(), testable: vi.fn(), startTest: vi.fn(), learn: vi.fn(),
 }));
+vi.mock('@/server/config/store', async () => { const { CAPTION_TESTS_DEFAULTS } = await import('../src/modules/caption-tests/config'); return { runtimeConfig: async () => CAPTION_TESTS_DEFAULTS }; });
 vi.mock('@/server/context', () => ({ requireViewer: mocks.viewer }));
 vi.mock('@/server/request-origin', () => ({ requestOrigin: () => 'https://app.example.com' }));
 vi.mock('@/server/config/config-or-default', async () => {
@@ -13,7 +14,7 @@ vi.mock('@/server/config/config-or-default', async () => {
 });
 vi.mock('../src/modules/ai/content-tools/server/media', () => ({ aiMediaStatus: mocks.status, generateImage: mocks.image, generateVoice: mocks.voice, listVideos: mocks.videos, startVideo: mocks.start }));
 vi.mock('../src/modules/ai/content-tools/server/checks', () => ({ linkPreview: mocks.preview, engagementOutlook: mocks.outlook, spamCheck: mocks.spam }));
-vi.mock('../src/modules/caption-tests/server/service', () => ({ listCaptionTests: mocks.list, listTestablePosts: mocks.testable, startCaptionTest: mocks.startTest, learnCaptionTest: mocks.learn }));
+vi.mock('../src/modules/caption-tests/server/service', () => ({ listCaptionTests: mocks.list, listTestablePosts: mocks.testable, startCaptionTestInput: mocks.startTest, learnCaptionTest: mocks.learn }));
 
 import { aiImageHttp, aiMediaStatusHttp, aiVideoHttp, aiVoiceHttp, linkPreviewHttp, outlookHttp, spamCheckHttp } from '../src/modules/ai/content-tools/server/http';
 import { captionTestLearnHttp, captionTestsListHttp, captionTestsStartHttp } from '../src/modules/caption-tests/server/http';
@@ -88,6 +89,13 @@ describe('caption test REST entry points', () => {
     expect((await captionTestsStartHttp(post('/api/caption-tests', { postIds: ['a', 'b'], confirmation: 'START CAPTION TEST' }, { origin: 'https://evil.example.net' }))).status).toBe(403);
     expect((await captionTestsStartHttp(post('/api/caption-tests', { postIds: ['a', 'b'], confirmation: 'START CAPTION TEST' }))).status).toBe(200);
     expect(mocks.startTest).toHaveBeenCalledTimes(1);
+  });
+  it('passes raw captions, destinations and exact confirmation to the same start service', async () => {
+    mocks.startTest.mockResolvedValue({ id: 't2', ok: true, postIds: ['a','b'] });
+    const input = { captions: ['Fresh spring recipes', 'A taste of spring'], targetIds: ['garden'], confirmation: 'CREATE CAPTION TEST DRAFTS' };
+    const response = await captionTestsStartHttp(post('/api/caption-tests', input, { 'accept-language': 'fr' }));
+    expect(response.status).toBe(200);
+    expect(mocks.startTest).toHaveBeenCalledWith({ userId: 'u1', workspaceId: 'w1' }, input, { locale: 'fr' });
   });
   it('takes the test id from the route, never from the body, and gates on workspace settings', async () => {
     mocks.learn.mockResolvedValue({ saved: true, already: false });

@@ -46,13 +46,14 @@ describe('caption tests screen', () => {
     await act(async () => root.render(screen({ execute })));
     await click('Add to workspace voice');
     expect(execute).not.toHaveBeenCalled();
+    await type(document.querySelector('dialog input')!, 'LEARN t1');
     await click('Confirm');
-    expect(execute).toHaveBeenCalledWith({ type: 'learn', id: 't1' });
+    expect(execute).toHaveBeenCalledWith({ type: 'learn', id: 't1', confirmation: 'LEARN t1' });
     expect(container.textContent).toContain('Added to the workspace voice.'); expect(button('Add to workspace voice')).toBeUndefined();
   });
   it('keeps the page and shows the safe message when learning fails', async () => {
     await act(async () => root.render(screen({ execute: async () => ({ error: 'The result could not be added. Try again.' }) })));
-    await click('Add to workspace voice'); await click('Confirm');
+    await click('Add to workspace voice'); await type(document.querySelector('dialog input')!, 'LEARN t1'); await click('Confirm');
     expect(container.querySelector('[role="alert"]')!.textContent).toContain('could not be added'); expect(container.textContent).toContain('Spring offer');
   });
   it('hides learning and starting from people who cannot do them, and explains an empty list', async () => {
@@ -73,11 +74,29 @@ describe('caption tests screen', () => {
     const submit = [...container.querySelectorAll('button[type="submit"]')].find(b => b.textContent === 'Start test') as HTMLButtonElement;
     expect(submit.disabled).toBe(true);
     const selects = container.querySelectorAll('select');
-    for (const [index, id] of ['p1', 'p2'].entries()) await act(async () => { const select = selects[index]!; Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value')!.set!.call(select, id); select.dispatchEvent(new Event('change', { bubbles: true })); });
+    for (const [index, id] of ['p1', 'p2'].entries()) await act(async () => { const select = selects[index + 1]!; Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value')!.set!.call(select, id); select.dispatchEvent(new Event('change', { bubbles: true })); });
     expect((container.querySelector('button[type="submit"]') as HTMLButtonElement).disabled).toBe(false);
     await submitForm();
+    await type(document.querySelector('dialog input')!, 'START CAPTION TEST');
     await click('Confirm');
-    expect(execute).toHaveBeenCalledWith({ type: 'start', input: { hours: 48, minViews: 500, postIds: ['p1', 'p2'] } });
+    expect(execute).toHaveBeenCalledWith({ type: 'start', input: { hours: 48, minViews: 500, postIds: ['p1', 'p2'], confirmation: 'START CAPTION TEST' } });
+  });
+  it('creates raw-caption drafts only after exact consent and retains inputs on failure', async () => {
+    const execute = vi.fn(async (_: CaptionAction) => ({ error: 'Please review your channels.' }));
+    await act(async () => root.render(screen({ execute, channels: [{ id: 'c1', name: 'Garden Studio' }], limits: { ...limits, captionMaxCharacters: 120, nameMaxCharacters: 45 } })));
+    await click('Start a test');
+    await act(async () => { const source = container.querySelector('select')!; source.value = 'variants'; source.dispatchEvent(new Event('change', { bubbles: true })); });
+    const captions = container.querySelectorAll('textarea');
+    expect(captions[0]!.maxLength).toBe(120);
+    await type(captions[0]!, 'A bright new collection'); await type(captions[1]!, 'Meet your next favourite');
+    await act(async () => { const channel = container.querySelector('select[multiple]')! as HTMLSelectElement; channel.options[0]!.selected = true; channel.dispatchEvent(new Event('change', { bubbles: true })); });
+    expect(container.textContent).toContain('drafts only');
+    await submitForm(); await click('Confirm'); expect(execute).not.toHaveBeenCalled();
+    await type(document.querySelector('dialog input')!, 'CREATE CAPTION TEST DRAFTS'); await click('Confirm');
+    expect(execute).toHaveBeenCalledWith({ type: 'start', input: { captions: ['A bright new collection', 'Meet your next favourite'], targetIds: ['c1'], hours: 48, minViews: 500, confirmation: 'CREATE CAPTION TEST DRAFTS' } });
+    expect(document.querySelector('dialog [role="alert"]')!.textContent).toContain('Please review');
+    expect(captions[0]!.value).toBe('A bright new collection');
+    expect((document.querySelector('dialog input') as HTMLInputElement).value).toBe('CREATE CAPTION TEST DRAFTS');
   });
   it('renders French copy', async () => {
     await act(async () => root.render(screen({ copy: CAPTION_TESTS_COPY.fr, locale: 'fr' })));

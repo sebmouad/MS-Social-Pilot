@@ -1,6 +1,8 @@
 'use client';
-import { useRef, useState, useTransition, type ReactNode } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import { IconBulb, IconCheck, IconFlask, IconPlus, IconTrophy } from '@tabler/icons-react';
+import { AutoTextarea } from '@/components/AutoTextarea';
+import { FieldError, useFormValidation } from '@/components/FormValidation';
 import { Badge } from '@/components/Badge';
 import { Button } from '@/components/Button';
 import { EmptyState } from '@/components/EmptyState';
@@ -12,9 +14,9 @@ import type { CaptionTestView } from '../server/service';
 import styles from './caption-tests.module.css';
 
 type Post = { id: string; message: string; status: string };
-export type CaptionAction = { type: 'start'; input: { name?: string; hours?: number; minViews?: number; postIds: string[] } } | { type: 'learn'; id: string };
+export type CaptionAction = { type: 'start'; input: { name?: string; hours?: number; minViews?: number; confirmation: string } & ({ postIds: string[] } | { captions: string[]; targetIds: string[]; link?: string }) } | { type: 'learn'; id: string; confirmation: string };
 export type CaptionActionResult = { ok?: true; error?: string; tests?: CaptionTestView[]; posts?: Post[] };
-type Limits = { minCaptions: number; maxCaptions: number; defaultHours: number; minHours: number; maxHours: number; defaultMinViews: number; maxMinViews: number };
+type Limits = { minCaptions: number; maxCaptions: number; defaultHours: number; minHours: number; maxHours: number; defaultMinViews: number; maxMinViews: number; captionMaxCharacters?: number; nameMaxCharacters?: number; targetLimit?: number };
 
 /** Place a date component inside a catalog sentence written with a {date} placeholder. */
 function withDate(template: string, date: ReactNode) {
@@ -31,12 +33,16 @@ function statusOf(test: CaptionTestView, t: CaptionTestsCopy, numberFormat: Intl
 }
 
 /** Results of every caption test, with a start form and the "add to workspace voice" action. */
-export function CaptionTestsScreen({ tests: initialTests, posts: initialPosts, canLearn, canStart, limits, copy: t, locale, execute }: {
-  tests: CaptionTestView[]; posts: Post[]; canLearn: boolean; canStart: boolean; limits: Limits; copy: CaptionTestsCopy; locale: 'en' | 'fr'; execute: (action: CaptionAction) => Promise<CaptionActionResult>;
+export function CaptionTestsScreen({ tests: initialTests, posts: initialPosts, channels = [], canLearn, canStart, limits, copy: t, locale, execute }: {
+  tests: CaptionTestView[]; posts: Post[]; channels?: Array<{ id: string; name: string }>; canLearn: boolean; canStart: boolean; limits: Limits; copy: CaptionTestsCopy; locale: 'en' | 'fr'; execute: (action: CaptionAction) => Promise<CaptionActionResult>;
 }) {
-  const [pending, start] = useTransition();
+  const validation = useFormValidation();
+  const [pending, setPending] = useState(false);
   const [tests, setTests] = useState(initialTests); const [posts, setPosts] = useState(initialPosts);
   const [feedback, setFeedback] = useState(''); const [error, setError] = useState('');
+  const [source, setSource] = useState('posts');
+  const [captions, setCaptions] = useState<string[]>(() => Array.from({ length: limits.minCaptions }, () => ''));
+  const [targetIds, setTargetIds] = useState<string[]>([]); const [link, setLink] = useState('');
   const [open, setOpen] = useState(false);
   const [picked, setPicked] = useState<string[]>(() => Array.from({ length: limits.minCaptions }, () => ''));
   const [name, setName] = useState(''); const [hours, setHours] = useState(String(limits.defaultHours)); const [minViews, setMinViews] = useState(String(limits.defaultMinViews));
@@ -46,19 +52,24 @@ export function CaptionTestsScreen({ tests: initialTests, posts: initialPosts, c
   const [ask, dialog] = useConfirm({ title: t.confirm, cancel: t.cancel, confirm: t.confirm, danger: false });
 
   const chosen = picked.filter(Boolean);
-  const startable = chosen.length >= limits.minCaptions && new Set(chosen).size === chosen.length;
-  /** Ask first, outside the transition: an update made inside a pending async action is not shown until the action ends. */
+  const startable = source === 'variants' ? captions.every(caption => caption.trim()) && new Set(captions.map(caption => caption.trim())).size === captions.length && targetIds.length > 0 : chosen.length >= limits.minCaptions && new Set(chosen).size === chosen.length;
+  /** Keep confirmation and recoverable errors together in the shared dialog. */
   async function run(action: CaptionAction, question: string, success: string, failure: string, after?: () => void) {
     setError(''); setFeedback('');
-    if (pending || !await ask(question)) return;
-    start(async () => {
-      const result = await execute(action);
-      if (result.error) setError(result.error || failure);
-      else { if (result.tests) setTests(result.tests); if (result.posts) setPosts(result.posts); setFeedback(success); after?.(); }
-      status.current?.focus();
-    });
+    if (pending) return;
+    const exactConfirmation = action.type === 'learn' ? `LEARN ${action.id}` : 'captions' in action.input ? 'CREATE CAPTION TEST DRAFTS' : 'START CAPTION TEST';
+    await ask(question, { exactConfirmation, confirmationLabel: t.confirmation, pendingLabel: t.busy, failureLabel: failure, onConfirm: async () => {
+      setPending(true);
+      try {
+        const result = await execute(action);
+        if (result.error) return result.error || failure;
+        if (result.tests) setTests(result.tests); if (result.posts) setPosts(result.posts);
+        setFeedback(success); after?.(); status.current?.focus(); return null;
+      } catch { return failure; } finally { setPending(false); }
+    } });
   }
-  const submit = () => run({ type: 'start', input: { ...(name.trim() ? { name: name.trim() } : {}), hours: Number(hours), minViews: Number(minViews), postIds: chosen } }, t.startConfirm, t.startedDone, t.errUpstream, () => { setOpen(false); setPicked(Array.from({ length: limits.minCaptions }, () => '')); setName(''); });
+
+  const submit = () => run({ type: 'start', input: { ...(name.trim() ? { name: name.trim() } : {}), hours: Number(hours), minViews: Number(minViews), ...(source === 'variants' ? { captions, targetIds, ...(link.trim() ? { link: link.trim() } : {}) } : { postIds: chosen }), confirmation: source === 'variants' ? 'CREATE CAPTION TEST DRAFTS' : 'START CAPTION TEST' } }, source === 'variants' ? t.rawConfirm : t.startConfirm, t.startedDone, t.errUpstream, () => { setOpen(false); setPicked(Array.from({ length: limits.minCaptions }, () => '')); setName(''); setCaptions(Array.from({ length: limits.minCaptions }, () => '')); setTargetIds([]); setLink(''); validation.clearAll(); });
 
   return <section className={styles.root} data-module="analytics" aria-busy={pending}>
     <PageHeader module="analytics" title={t.title} description={t.intro}
@@ -66,24 +77,33 @@ export function CaptionTestsScreen({ tests: initialTests, posts: initialPosts, c
     <p ref={status} tabIndex={-1} role="status" className={feedback ? styles.ok : styles.hidden}>{feedback ? <><IconCheck size={16} aria-hidden="true" /> {feedback}</> : null}</p>
     {error ? <p role="alert" className={styles.error}>{error}</p> : null}
 
-    {canStart && open ? <form id="caption-start" className={styles.panel} onSubmit={event => { event.preventDefault(); if (startable) submit(); }}>
+    {canStart && open ? <form id="caption-start" className={styles.panel} noValidate onSubmit={event => { event.preventDefault(); if (validation.validate(event.currentTarget) && startable) submit(); }}>
       <h2><IconFlask size={20} aria-hidden="true" /> {t.startHeading}</h2>
-      <p className={styles.hint}>{t.startHint}</p>
-      {posts.length === 0 ? <p>{t.noPosts}</p> : <>
+      <label className="ui-field"><span>{t.source}</span><select className="ui-input" value={source} onChange={event => setSource(event.target.value)}><option value="posts">{t.existingPosts}</option><option value="variants">{t.rawCaptions}</option></select></label>
+      <p className={styles.hint}>{source === 'variants' ? t.rawHint : t.startHint}</p>
+      {source === 'posts' && posts.length === 0 ? <p>{t.noPosts}</p> : <>
+        {source === 'variants' ? <>
+          <div className={styles.pickers}>{captions.map((caption, index) => <label key={index} className="ui-field"><span>{t.colCaption} · {'ABCD'[index]}</span><AutoTextarea {...validation.fieldProps(`caption-${index}`)} name={`caption-${index}`} disabled={pending} className="ui-input" rows={4} maxLength={limits.captionMaxCharacters} value={caption} onChange={event => setCaptions(list => list.map((value, at) => at === index ? event.target.value : value))} required /><FieldError {...validation.errorProps(`caption-${index}`)} /></label>)}</div>
+          {captions.length < limits.maxCaptions ? <Button type="button" size="sm" disabled={pending} leading={<IconPlus size={14} />} onClick={() => setCaptions(list => [...list, ''])}>{t.addCaption}</Button> : null}
+          <p className={styles.hint}>{channels.length ? fill(t.channelLimitHint, { max: limits.targetLimit ?? channels.length }) : t.noChannels}</p>
+          <label className="ui-field"><span>{t.channels}</span><select {...validation.fieldProps("targetIds")} disabled={pending} name="targetIds" className="ui-input" multiple value={targetIds} onChange={event => setTargetIds(Array.from(event.target.selectedOptions, option => option.value).slice(0, limits.targetLimit))} required>{channels.map(channel => <option key={channel.id} value={channel.id} disabled={!targetIds.includes(channel.id) && limits.targetLimit !== undefined && targetIds.length >= limits.targetLimit}>{channel.name}</option>)}</select><FieldError {...validation.errorProps("targetIds")} /></label>
+          <label className="ui-field"><span>{t.link}</span><input {...validation.fieldProps("link")} disabled={pending} name="link" className="ui-input" type="url" value={link} onChange={event => setLink(event.target.value)} /><FieldError {...validation.errorProps("link")} /></label>
+        </> : <>
         <div className={styles.pickers}>
           {picked.map((value, index) => <label key={index} className="ui-field">
             <span><span className={styles.letter} aria-hidden="true">{'ABCD'[index]}</span> {t.posts} · {'ABCD'[index]}</span>
-            <select className="ui-input" value={value} disabled={pending} onChange={event => setPicked(list => list.map((item, position) => position === index ? event.target.value : item))} required={index < limits.minCaptions}>
+            <select {...validation.fieldProps(`post-${index}`)} name={`post-${index}`} className="ui-input" value={value} disabled={pending} onChange={event => setPicked(list => list.map((item, position) => position === index ? event.target.value : item))} required={index < limits.minCaptions}>
               <option value="">—</option>
               {posts.filter(post => post.id === value || !picked.includes(post.id)).map(post => <option key={post.id} value={post.id}>{post.message.trim().slice(0, 90) || post.id}</option>)}
-            </select>
+            </select><FieldError {...validation.errorProps(`post-${index}`)} />
           </label>)}
         </div>
         {picked.length < limits.maxCaptions ? <Button size="sm" leading={<IconPlus size={14} />} disabled={pending} onClick={() => setPicked(list => [...list, ''])}>{t.posts}</Button> : null}
+        </>}
         <div className={styles.fields}>
-          <label className="ui-field"><span>{t.name}</span><input className="ui-input" value={name} maxLength={80} disabled={pending} onChange={event => setName(event.target.value)} autoComplete="off" /></label>
-          <label className="ui-field"><span>{t.hours}</span><input className="ui-input" type="number" inputMode="numeric" min={limits.minHours} max={limits.maxHours} value={hours} disabled={pending} onChange={event => setHours(event.target.value)} required /></label>
-          <label className="ui-field"><span>{t.minViews}</span><input className="ui-input" type="number" inputMode="numeric" min={1} max={limits.maxMinViews} value={minViews} disabled={pending} onChange={event => setMinViews(event.target.value)} required /></label>
+          <label className="ui-field"><span>{t.name}</span><input {...validation.fieldProps("name")} name="name" className="ui-input" value={name} maxLength={limits.nameMaxCharacters} disabled={pending} onChange={event => setName(event.target.value)} autoComplete="off" /><FieldError {...validation.errorProps("name")} /></label>
+          <label className="ui-field"><span>{t.hours}</span><input {...validation.fieldProps("hours")} name="hours" className="ui-input" type="number" inputMode="numeric" min={limits.minHours} max={limits.maxHours} value={hours} disabled={pending} onChange={event => setHours(event.target.value)} required /><FieldError {...validation.errorProps("hours")} /></label>
+          <label className="ui-field"><span>{t.minViews}</span><input {...validation.fieldProps("minViews")} name="minViews" className="ui-input" type="number" inputMode="numeric" min={1} max={limits.maxMinViews} value={minViews} disabled={pending} onChange={event => setMinViews(event.target.value)} required /><FieldError {...validation.errorProps("minViews")} /></label>
         </div>
         {!startable && chosen.length ? <p className={styles.hint}>{chosen.length < limits.minCaptions ? t.pickTwo : fill(t.pickMost, { max: limits.maxCaptions })}</p> : null}
         <div className={styles.actions}><Button type="submit" variant="primary" busy={pending} disabled={!startable}>{pending ? t.busy : t.startRun}</Button></div>
@@ -121,7 +141,7 @@ export function CaptionTestsScreen({ tests: initialTests, posts: initialPosts, c
             })}
           </ol>
           {test.status === 'decided' ? test.learnedAt ? <p className={styles.learned}><IconCheck size={16} aria-hidden="true" /> {t.learned}</p>
-            : canLearn ? <div className={styles.learn}><Button leading={<IconBulb size={16} />} disabled={pending} onClick={() => run({ type: 'learn', id: test.id }, t.learnConfirm, t.learned, t.learnFailed)}>{t.learn}</Button><span>{t.learnHint}</span></div> : null : null}
+            : canLearn ? <div className={styles.learn}><Button leading={<IconBulb size={16} />} disabled={pending} onClick={() => run({ type: 'learn', id: test.id, confirmation: `LEARN ${test.id}` }, t.learnConfirm, t.learned, t.learnFailed)}>{t.learn}</Button><span>{t.learnHint}</span></div> : null : null}
         </li>;
       })}
     </ul>}

@@ -1,3 +1,4 @@
+import { enqueueChatEvent } from '@/modules/notifications/chat-channels/server/delivery';
 import { emitWorkspaceAlert } from '@/modules/settings/notifications/producers';
 import { sharingPresentationPolicy, publicWorkspaceLogo } from './presentation';
 import { randomUUID, timingSafeEqual } from 'node:crypto';
@@ -208,9 +209,10 @@ export async function submitDecision(token: string, address: string | null, inpu
   if (!post) return notFound;
   const presentation = await sharingPresentationPolicy();
   const answerId = randomUUID();
-  const insert = async (tx: Pick<Prisma.TransactionClient, '$executeRaw'>) => {
+  const insert = async (tx: Prisma.TransactionClient) => {
     const stored = await tx.$executeRaw`INSERT INTO review_decisions (id, "shareLinkId", "postId", decision, comment, "authorName", "createdAt") VALUES (${answerId}, ${link.id}, ${post.id}, ${data.decision}, ${comment}, ${data.authorName}, NOW())`;
     if (stored !== 1) throw await sharingError('unavailable', 'Your answer could not be stored.');
+    await enqueueChatEvent(tx, { workspaceId: link.workspaceId, eventId: answerId, event: 'reviewDecision', source: { workspaceId: link.workspaceId, eventId: answerId, kind: 'approval_decision', postId: post.id } });
   };
   const unconfirmed = () => sharingError('upstream_failure', 'Your answer could not be confirmed. Reload the page to see whether it was received before trying again.');
   /** Why an answer was kept as advice instead of settling the post. Audited by code only, never with the body. */

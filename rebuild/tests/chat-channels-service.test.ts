@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { CHAT_COPY, CHAT_POLICY } from '../config';
-import { chatConfirmation } from '../contracts';
+import { CHAT_COPY, CHAT_POLICY } from '@/modules/notifications/chat-channels/config';
+import { chatConfirmation } from '@/modules/notifications/chat-channels/contracts';
 
 const mocks = vi.hoisted(() => ({
   user: vi.fn(), member: vi.fn(), query: vi.fn(), txQuery: vi.fn(), execute: vi.fn(), purge: vi.fn(), transaction: vi.fn(),
@@ -12,9 +12,9 @@ vi.mock('@/server/permissions/loader', () => ({ loadPermissions: mocks.permissio
 vi.mock('@/server/permissions', () => ({ canAccessFeature: mocks.access }));
 vi.mock('@/server/config/store', () => ({ runtimeConfig: mocks.config }));
 vi.mock('@/server/secret-crypto', () => ({ encryptSecret: mocks.encrypt, decryptSecret: mocks.decrypt }));
-vi.mock('../server/transport', async original => ({ ...await original<typeof import('../server/transport')>(), deliverChat: mocks.deliver }));
-import { createChatChannel, deleteChatChannel, listChatChannels, testChatChannel, updateChatChannel } from '../server/service';
-import { executeChatTool } from '../mcp';
+vi.mock('@/modules/notifications/chat-channels/server/transport', async original => ({ ...await original<typeof import('@/modules/notifications/chat-channels/server/transport')>(), deliverChat: mocks.deliver }));
+import { createChatChannel, deleteChatChannel, listChatChannels, testChatChannel, updateChatChannel } from '@/modules/notifications/chat-channels/server/service';
+import { executeChatTool } from '@/modules/notifications/chat-channels/mcp';
 
 const actor = { userId: 'owner', workspaceId: 'workspace-a' };
 const row = { id: 'destination-a', kind: 'slack', name: 'Team', enabled: true, events: ['publishFailure'], lastSentAt: null, hasError: true };

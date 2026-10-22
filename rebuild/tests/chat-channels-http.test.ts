@@ -2,8 +2,8 @@ import { beforeEach, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({ viewer: vi.fn(), read: vi.fn(), create: vi.fn(), update: vi.fn(), remove: vi.fn(), test: vi.fn() }));
 vi.mock('@/server/context', () => ({ requireViewer: mocks.viewer }));
 vi.mock('@/server/request-origin', () => ({ requestOrigin: () => 'https://app.example.test' }));
-vi.mock('../server/service', () => ({ listChatChannels: mocks.read, createChatChannel: mocks.create, updateChatChannel: mocks.update, deleteChatChannel: mocks.remove, testChatChannel: mocks.test }));
-import { GET, POST, PATCH, DELETE, TEST } from '../http';
+vi.mock('@/modules/notifications/chat-channels/server/service', () => ({ listChatChannels: mocks.read, createChatChannel: mocks.create, updateChatChannel: mocks.update, deleteChatChannel: mocks.remove, testChatChannel: mocks.test }));
+import { GET, POST, PATCH, DELETE, TEST } from '@/modules/notifications/chat-channels/http';
 beforeEach(() => { vi.resetAllMocks(); mocks.viewer.mockResolvedValue({ user: { id: 'owner' }, workspaceId: 'tenant-a' }); mocks.read.mockResolvedValue({ channels: [] }); mocks.create.mockResolvedValue({ id: 'chat-a', saved: true }); mocks.update.mockResolvedValue({ id: 'chat-a', saved: true }); mocks.remove.mockResolvedValue({ id: 'chat-a', deleted: true }); mocks.test.mockResolvedValue({ id: 'chat-a', outcome: 'accepted' }); });
 const request = (path: string, method: string, body?: unknown, origin = 'https://app.example.test') => new Request(`https://app.example.test${path}`, { method, headers: { origin, 'content-type': 'application/json' }, ...(body ? { body: JSON.stringify(body) } : {}) });
 it('routes list and create to the shared service with session tenant', async () => {

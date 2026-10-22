@@ -75,3 +75,13 @@ one failed, 49 skipped; 10,174 tests passed, five failed, 2,159 skipped. All fiv
 failures are loopback `facebook-native-http` tests blocked by sandbox
 `listen EPERM ::1`; the full suite is not green. Both release scripts pass
 `bash -n`; whitespace checks pass. Work remains uncommitted as requested.
+
+## Lane 43 next checks
+
+Source follow-ups for raw-caption tests, subscribed chat events and the single
+Root monitoring/test flow are described in [LANE_43_FOLLOWUPS.md](LANE_43_FOLLOWUPS.md).
+Before enabling delivery, rehearse/apply the chat outbox migration, review Root
+monitoring settings after duplicate-key removal, select the owner workspace for
+operator chat alerts, and verify real email/Slack/Telegram outcomes. Browser
+checks for the new caption controls and Root test dialog remain open. No commit,
+push, server or production action is authorized in this lane.

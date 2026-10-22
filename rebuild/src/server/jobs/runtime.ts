@@ -64,7 +64,9 @@ return {
       const { scanConnectionAlerts } = await import('@/modules/settings/notifications/connection-alerts');
       await scanConnectionAlerts(now);
       const result = await deliverNotifications(now);
-      return `examined=${result.examined} sent=${result.sent} cancelled=${result.cancelled} failed=${result.failed} uncertain=${result.uncertain} skipped=${result.skipped} purged=${result.purged}`;
+      const { runChatDeliveries } = await import('@/modules/notifications/chat-channels/server/delivery');
+      const chat = await runChatDeliveries(now);
+      return `examined=${result.examined} sent=${result.sent} cancelled=${result.cancelled} failed=${result.failed} uncertain=${result.uncertain} skipped=${result.skipped} purged=${result.purged} chatAccepted=${chat.accepted} chatRejected=${chat.rejected} chatUncertain=${chat.uncertain} chatCancelled=${chat.cancelled}`;
     }
     if (job === 'webhooks') {
       const { deliverDueWebhooks } = await import('@/modules/integrations/server/webhooks');

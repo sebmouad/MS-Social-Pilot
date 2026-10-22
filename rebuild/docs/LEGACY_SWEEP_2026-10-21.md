@@ -138,7 +138,7 @@ Rebuild paths are relative to `rebuild/src/app/`.
 | `(root)/root` | `root` | done |
 | `root/activity` | `root/activity` | done |
 | `root/agency` | `agency` module + `root/workspaces` | partial: client invitations (`client_invitations`) unread |
-| `root/alerts` | `root/operations` monitoring | evaluation/incidents/uptime/email outcomes done at source (2026-10-22); legacy test-alert button and Telegram parity remain open |
+| `root/alerts` | redirects to `root/operations` monitoring | One incident evaluator and Root screen; email plus explicitly selected owner-workspace Slack/Telegram subscriptions, with confirmed test UI/REST/MCP. Source and mocked evidence only. |
 | `root/backups` | `root/backups` | partial: read-only; writers are legacy host scripts |
 | `root/changelog` | `root/changelog` | done (source + mocked tests): `src/app/root/changelog/page.tsx`, `ui/ChangelogManager.tsx`, `server/changelog.ts`, `/api/root/changelog*`, Root MCP `list/add/remove_root_changelog_*` |
 | `root/config`, `config/[section]` | `root/config`, `root/modules/[id]`, `root/platforms/[id]` | done |
@@ -186,7 +186,7 @@ Rebuild paths are relative to `rebuild/src/app/`.
 | `api/calendar-feed/[token]`, `calendar-feeds`, `[id]` | same paths | done at source (token ICS, revocable; parity exception row for the bearer read; no real calendar-client run) |
 | `api/caption-tests/[id]/learn` | `api/caption-tests/[id]/learn` → `modules/caption-tests/server/service.ts` `learnCaptionTest`; MCP `learn_from_caption_test` | done (2026-10-22: appends the winner to the workspace voice, not per-channel voice; `tests/caption-tests-service.test.ts`) |
 | `api/chart-notes`, `[id]` | none | missing |
-| `api/chat-channels`, `[id]`, `[id]/test` | none | missing (Slack/Telegram) |
+| `api/chat-channels`, `[id]`, `[id]/test` | `modules/notifications/chat-channels` UI/REST/MCP service; transactional event outbox drained by leased notifications worker | Implemented at source in lane 43 for subscribed publication, inbox and operator events; migration and real chat delivery unverified. |
 | `api/connections/ads/[id]`, `instagram/[id]` | `api/settings/connections` | done |
 | `api/content-mix` | `api/publishing/content-mix` | done |
 | `api/cron/tick` | worker `scripts/worker.ts` | obsolete: external cron trigger replaced by worker |
@@ -217,7 +217,7 @@ Rebuild paths are relative to `rebuild/src/app/`.
 | `api/posts/outlook`, `spam-check` | `api/publishing/outlook`, `api/publishing/spam-check` → `modules/ai/content-tools/server/checks.ts`; MCP `get_engagement_outlook`, `check_post_spam_risk` | done (2026-10-22: outlook reads platform-module `postPerformance`; spam uses workspace `spamGapMinutes`; both inside channel grants; composer embed pending, screen at `/publishing/ai-studio`; `tests/ai-composer-checks.test.ts`) |
 | `api/queue`, `queue-slots` | `api/publishing/queue`, `queue-slots` | done |
 | `api/report-schedules*`, `report-templates*`, `reports` | `api/analytics/report-workflows/*`, `api/reports/export` | done |
-| `api/root/alerts/test` | none | missing |
+| `api/root/alerts/test` | alias of `api/root/monitoring/test`, `test_root_monitoring`, `testRootOperatorMonitoring` | One Root monitor, exact TEST ROOT MONITORING and audited durable test intent; real email/chat delivery unverified. |
 | `api/root/app-check` | `api/root/diagnostics` | partial |
 | `api/root/changelog*` | `api/root/changelog`, `api/root/changelog/[id]` | done (source + mocked tests): exact confirmations, Root actor recheck and transactional audit |
 | `api/root/client-invitations*` | none | missing |
@@ -252,7 +252,7 @@ Rebuild evidence paths under `rebuild/src/`.
 | `inbox`, `inbox-notes`, `inbox-response`, `moderation*`, `reply-template`, `response-time`, `negative-comments`, `mentions` | `modules/inbox/**`, `modules/ai/server/sentiment.ts` | done |
 | `analytics*`, `audience*`, `aggregate`, `channel-figures*`, `page-analysis*`, `network-analytics`, `network-rules`, `pinned-metrics`, `page-goals`, `goals`, `label-report`, `link-analytics`, `reports`, `report-*`, `analytics-export`, `ads-analysis` | `modules/analytics/**`, `modules/ads/**` | done / partial |
 | `engagement-prediction`, `engagement-outlook` | `modules/ai/content-tools/pure.ts` `predictEngagement`, `server/checks.ts` | done (2026-10-22) |
-| `caption-test` | `modules/caption-tests/{pure.ts,server/service.ts}` | done (2026-10-22; composer A/B creation still belongs to Publishing, tests start from existing posts) |
+| `caption-test` | `modules/caption-tests/{pure.ts,server/service.ts}` | done (2026-10-22; lane 43 adds raw variants through atomic Publishing draft creation; tests also accept existing posts) |
 | `engagement` | none | missing |
 | `chart-notes`, `chart-note-colors` | `modules/calendar-extras` (notes service, `/analytics/notes`, chart marks) | done at source |
 | `key-dates*`, `seasons`, `holidays`, `trends` | `modules/calendar-extras` (+ queue allocator season hook in `executors.ts`) | done at source |
@@ -262,7 +262,7 @@ Rebuild evidence paths under `rebuild/src/`.
 | `ai`, `ai-providers`, `ai-models`, `ai-prices`, `ai-agents` | `modules/ai/**` (providers/models/limits); prices/monthly budget now in `modules/ai/server/usage.ts` (source); agents none | partial |
 | `ai-image`, `ai-video`, `ai-voice`, `voice-names` | `modules/ai/content-tools/server/{media,media-openai,media-gemini,media-ports}.ts`; voice names are the Root `ai.voicePolicy.voices` list | done (2026-10-22) |
 | `text-backgrounds`, `alt-text`, `translation`, `translated-posts` | `modules/ai` translate kind only | missing / partial |
-| `chat` | none | missing |
+| `chat` | `modules/notifications/chat-channels/server/{service,delivery,transport}.ts` | Source/UI/REST/MCP plus leased, idempotent event delivery. Uncertain sends are held; real transport outcomes remain unverified. |
 | `system-alerts`, `error-tracking`, `uptime`, `health`, `housekeeping`, `background-refresh` | `modules/root/server/operator-monitoring.ts`, shared runner, error recorder; alerts + sampled uptime + worker errors implemented | done at source for writers and health probes (2026-10-22); Telegram/provider-usage parity and live evidence remain |
 | `media`, `image-format`, `image-variants`, `media-links`, `zip`, `workspace-export` | `modules/media/**`, `server/data-control/**`, `modules/settings/server/exports.ts` | done / partial |
 | `bio`, `share-links`, `agency*`, `tasks`, `task-workflow`, `team`, `role-access`, `scope-abilities`, `page-access`, `page-groups`, `page-filter`, `selection`, `custom-fields`, `feeds`, `rss/*`, `webhooks`, `api`, `public-api`, `api-tokens` | corresponding modules; `api-tokens` replaced by MCP/person keys | done; `api-tokens` partial |
@@ -309,7 +309,7 @@ Legacy `app_settings` keys (`src/lib/settings/definitions.ts`) vs rebuild regist
 | `ai.provider/apiKey/model/openaiKey/geminiKey` | `ai.provider`, `ai.apiKey`, `ai.model`, `ai.openaiApiKey`, `ai.geminiApiKey` (+ models/endpoints) | done (imported) |
 | `ai.rateLimitPerHour` | `ai.hourlyRequestsPerWorkspace` | done |
 | `ai.monthlyBudgetUsd`, `ai.priceOverrides` | `ai.monthlyBudgetUsd`, `ai.priceOverrides`, `ai.fallbackInputPricePerMillionUsd`, `ai.fallbackOutputPricePerMillionUsd`, `ai.charactersPerToken` | done in source (mocked tests; estimated tokens, not provider-reported; no live run) |
-| `alerts.email/telegramBotToken/telegramChatId/publishFailures/diskPercent` | `notifications.*` (in-app/email) | partial: no Telegram, disk alerts |
+| `alerts.email/telegramBotToken/telegramChatId/publishFailures/diskPercent` | `root.monitoringPolicy`, `root.monitoringMailCopy`, `notifications.chatPolicy` and encrypted workspace chat destinations | One Root monitor supplies email and selected workspace chat subscriptions; publish/disk thresholds are Root-owned. Old duplicate notifications.systemAlert* keys removed in lane 43. Legacy settings are not automatically migrated by this lane. |
 | `email.provider/smtp*/apiKey/from` | `mail.*` | partial: HTTP API provider (`email.apiKey`) not carried |
 | `links.shortenerDomain` | `publishing.shortLinkBaseUrl` | done |
 | `retention.activityDays/emailDays/clickDays/aiDays/sweepHours` | `retention.auditDays/syncLogDays/analyticsDays`, `root.auditRetention*` | partial |
@@ -392,3 +392,16 @@ This closes the requested evaluation/writer/health-probe source gaps, not all
 legacy alert delivery parity: Telegram, provider-specific usage alerts and the
 standalone legacy test-alert endpoint remain open. No migrations, browser,
 mail delivery, production scripts or deployment were executed by this lane.
+
+## Lane 43 reconciliation — 2026-10-22
+
+The historical missing rows above retain their original baseline. Current source
+adds raw-caption test creation through Publishing, transactional chat-event
+production and one Root operator-monitoring system with email/chat delivery and
+a confirmed test operation. See [LANE_43_FOLLOWUPS.md](LANE_43_FOLLOWUPS.md) for
+verification and remaining gates. Chat tests now run under `rebuild/tests`.
+`rebuild_chat_deliveries` is a new workspace-owned outbox; apply and rehearse its
+repository-root migration before worker delivery. No data migration, live
+transport, provider, browser or production outcome is asserted. Provider usage
+alerts and unrelated legacy capabilities remain separate open work. Facebook
+Groups remain dropped by the owner's decision.

@@ -35,7 +35,7 @@ vi.mock('../src/server/platforms/registry', () => ({ platformFor: async () => ({
   defaultPublishingFormatId: capabilities.defaultFormatId, supportsTargetKind: () => true,
 }) }));
 
-import { cancelScheduledPost, createPost, publishPost, reschedulePost, restorePostVersion, reviewPost, schedulePost, submitPostForApproval, updatePost } from '@/modules/publishing/server/lifecycle';
+import { cancelScheduledPost, createPost, createPublishingDraftBatch, publishPost, reschedulePost, restorePostVersion, reviewPost, schedulePost, submitPostForApproval, updatePost } from '@/modules/publishing/server/lifecycle';
 
 import { emitWorkspaceAlert } from '@/modules/settings/notifications/producers';
 const actor = { userId: 'u1', workspaceId: 'w1' };
@@ -313,3 +313,26 @@ describe('publishing lifecycle transitions', () => {
     expect(emitWorkspaceAlert).toHaveBeenCalledWith(db, expect.objectContaining({ kind: 'draft_updated', postId: 'p1' }));
   });
  });
+
+
+describe('atomic publishing draft composition', () => {
+  const inputs = ['Caption A', 'Caption B'].map(message => ({ message, firstComment: '', targetIds: ['target-1'] }));
+  it('validates every draft before saving any and shares the transaction with the owning module', async () => {
+    const complete = vi.fn(async (tx, ids) => { expect(tx).toBe(db); expect(ids).toHaveLength(2); return { test: 'created' }; });
+    await expect(createPublishingDraftBatch(actor, inputs, complete)).resolves.toEqual({ test: 'created' });
+    expect(db.$transaction).toHaveBeenCalledTimes(1);
+    expect(db.post.create.mock.calls.map(([args]) => args.data.message)).toEqual(['Caption A', 'Caption B']);
+    expect(db.post.create.mock.calls.every(([args]) => args.data.status === 'draft' && args.data.scheduledAt === null)).toBe(true);
+    expect(provider.publish).not.toHaveBeenCalled();
+  });
+  it('rejects invalid later captions before persisting the earlier draft', async () => {
+    await expect(createPublishingDraftBatch(actor, [inputs[0]!, { ...inputs[1]!, message: ' ' }], async () => null)).rejects.toMatchObject({ code: 'invalid_request' });
+    expect(db.post.create).not.toHaveBeenCalled();
+  });
+  it('propagates owning-module failures through the transaction', async () => {
+    const failure = new Error('test linking failed');
+    await expect(createPublishingDraftBatch(actor, inputs, async () => { throw failure; })).rejects.toBe(failure);
+    expect(db.$transaction).toHaveBeenCalledTimes(1);
+    expect(provider.publish).not.toHaveBeenCalled();
+  });
+});

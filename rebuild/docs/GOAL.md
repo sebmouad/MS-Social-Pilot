@@ -62,3 +62,12 @@ one failed, 49 skipped; 10,174 tests passed, five failed, 2,159 skipped. All fiv
 failures are loopback `facebook-native-http` tests blocked by sandbox
 `listen EPERM ::1`; the full suite is not green. Both release scripts pass
 `bash -n`; whitespace checks pass. Work remains uncommitted as requested.
+
+## Lane 43 local follow-up evidence
+
+Raw caption variants, transactional chat event delivery and consolidated Root
+monitoring are implemented at source with schema 131. See
+[LANE_43_FOLLOWUPS.md](LANE_43_FOLLOWUPS.md) for files, settings and verification.
+The latest full suite has 11,373 passing tests and five sandbox-blocked localhost
+transport tests; it is not green. Migration, browser and real delivery gates stay
+open. The overall rebuild goal remains incomplete.

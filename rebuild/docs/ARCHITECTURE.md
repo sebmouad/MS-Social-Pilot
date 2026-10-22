@@ -594,3 +594,29 @@ New Root keys are listed in the operator lane verification note. Schema version
 is deliberately unchanged for the integrator. Telegram, provider usage alerts,
 test-alert parity and real database/browser/mail/release evidence remain open.
 See `OPERATOR_MONITORING_2026-10-22.md` for scope and current verification.
+
+## Lane 43 follow-ups — 2026-10-22
+
+Caption tests now accept raw caption variants through an atomic Publishing draft
+batch, alongside existing-post tests. The bilingual source picker, channel
+selection and exact confirmation dialog call the same caption service as REST
+and MCP. Variants remain drafts until an explicit Publishing action.
+
+Chat subscriptions receive transactional content-free workspace events through
+the existing leased notifications job, with durable per-destination claims,
+current workspace/access/subscription checks and no automatic replay of uncertain
+sends. Root Operations owns the single installation incident evaluator and
+email outbox, plus a confirmed test operation and explicitly selected
+owner-workspace chat routing. The duplicate Root Alerts screen/config/tools are
+removed; its old screen redirects to Operations and REST aliases delegate to the
+canonical monitoring service.
+
+Registry schema is 131. Existing caption, chat and Root monitoring policy/copy
+objects gain fields; three `notifications.systemAlert*` keys are removed. Apply
+and rehearse `20261022190000_rebuild_chat_deliveries` before delivery. Historical
+saved duplicate alert settings are not imported automatically; review the Root
+monitoring thresholds and configure its chat workspace deliberately.
+
+See [LANE_43_FOLLOWUPS.md](LANE_43_FOLLOWUPS.md) for exact verification and remaining
+gates. No browser, real PostgreSQL, provider/chat/mail delivery or production
+verification is claimed. Changes remain uncommitted as requested for this lane.

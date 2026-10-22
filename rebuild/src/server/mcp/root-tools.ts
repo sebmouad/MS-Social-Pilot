@@ -1,4 +1,3 @@
-import { executeSystemAlertTool, systemAlertToolDefinitions } from '@/modules/notifications/chat-channels/alerts-mcp';
 import { rootMonitoringToolDefinitions, rootMonitoringTools, rootMonitoringResources, executeRootMonitoringTool } from '@/modules/root/mcp';
 import { readRootConfig, saveRootConfig } from '@/modules/root/server/configuration';
 import { listRootInboxDeletions, confirmRootInboxDeletion } from '../root/inbox-deletions';
@@ -29,7 +28,6 @@ export const rootToolDefinitions = [
   ...rootLegacyToolDefinitions,
   ...rootMonitoringToolDefinitions,
   ...rootChangelogToolDefinitions,
-  ...systemAlertToolDefinitions,
   { name: 'list_root_inbox_deletions', description: 'Private bounded Inbox deletion recovery history. Includes remote object identity for operator verification, never credentials or comment content. Workspace keys cannot use this tool.', inputSchema: { type: 'object', properties: {}, additionalProperties: false } },
   { name: 'confirm_root_inbox_deletion', description: 'Record an operator attestation only after separately verifying actual remote deletion. This is not an automatic provider check; it never contacts the platform or removes local rows. Require verifiedOnPlatform:true and exact CONFIRM REMOTE DELETION <operationId>. Workspace keys cannot use this tool.', inputSchema: { type: 'object', required: ['operationId', 'verifiedOnPlatform', 'confirmation'], properties: { operationId: { type: 'string' }, verifiedOnPlatform: { const: true, type: 'boolean' }, confirmation: { type: 'string' } }, additionalProperties: false } },
   { name: 'list_root_post_deletions', description: 'Private bounded recent Publishing post deletion history. Shows remote and local post identities to installation owners only; excludes post content, credentials and provider errors.', inputSchema: { type: 'object', properties: {}, additionalProperties: false } },
@@ -64,7 +62,6 @@ const resourceDefinitions = [
   { uri: 'msp://root/post-deletions', name: 'Publishing post deletion recovery', description: 'Private bounded operator deletion history and remote identity; post content and credentials excluded.', tool: 'list_root_post_deletions' },
   { uri: 'msp://root/publication-attempts', name: 'Publication attempt recovery', description: 'Private bounded publication receipts and safe attempt state; post content and credentials excluded.', tool: 'list_root_publication_attempts' },
   { uri: 'msp://root/platform-publication-evidence', name: 'Platform publication evidence', description: 'Private bounded publication receipt evidence and available action metadata aggregated across installed platform modules. Reading this resource never executes actions.', tool: 'get_root_platform_publication_evidence_resource' },
-  { uri: 'msp://root/alerts', name: 'Installation alerts', description: 'Private incident history for this installation; no raw detail.', tool: 'list_root_system_alerts' },
   { uri: 'msp://root/operations', name: 'Replacement operations', description: 'Private replacement-only worker health; no raw errors.', tool: 'get_root_operations' },
   { uri: 'msp://root/diagnostics', name: 'Shared diagnostics', description: 'Private shared diagnostic history and configuration.', tool: 'get_root_diagnostics' },
   { uri: 'msp://root/users', name: 'Installation users', description: 'Private bounded user directory, access and verification status; credentials excluded.', tool: 'list_root_users' },
@@ -86,7 +83,6 @@ export async function runRootTool(viewer: RootMcpActor, name: string, args: Reco
     if (!args || typeof args !== 'object' || Array.isArray(args)) throw new OperationError('invalid_request', 'Tool arguments must be an object.');
     if (rootMonitoringTools.has(name)) return await executeRootMonitoringTool(viewer.userId, name, args, viewer.maxResultItems ?? Number(await runtimeConfig('mcp.maxResultItems')));
     if (rootLegacyTools.has(name)) return await callRootLegacyTool({ ...viewer, maxResultItems: viewer.maxResultItems ?? Number(await runtimeConfig('mcp.maxResultItems')) }, name, args);
-    if (systemAlertToolDefinitions.some(tool => tool.name === name)) return await executeSystemAlertTool({ ...viewer, isInstanceOwner: true }, name, args);
     if (rootChangelogTools.has(name)) return await executeRootChangelogTool(viewer.userId, name, args, viewer.maxResultItems ?? Number(await runtimeConfig('mcp.maxResultItems')));
     switch (name) {
       case 'list_root_inbox_deletions':

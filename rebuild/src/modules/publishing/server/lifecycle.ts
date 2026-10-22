@@ -384,45 +384,68 @@ export async function cancelScheduledPost(actor: PublishingActor, postId: string
   });
 }
 
-export async function createPost(actor: PublishingActor, input: { message: string; firstComment: string; targetIds: string[]; scheduledAt?: Date; scheduleMode?: ScheduleMode; destinationScheduleModes?: DestinationScheduleModes; labelId?: string | null } & PostAttachments) {
+type CreatePostInput = { message: string; firstComment: string; targetIds: string[]; scheduledAt?: Date; scheduleMode?: ScheduleMode; destinationScheduleModes?: DestinationScheduleModes; labelId?: string | null } & PostAttachments;
+
+/** Shared validation and persistence for single posts and atomic draft batches. */
+async function preparePostCreation(actor: PublishingActor, input: CreatePostInput) {
+  const errorText = await loadPublishingErrorText();
+  const member = await membership(actor);
+  if (input.labelId !== undefined && input.labelId !== null && (!/^[A-Za-z0-9_-]{1,200}$/.test(input.labelId))) throw new PublishingOperationError('invalid_request', 'chooseAValidPostLabel', {}, errorText);
+  const holdForApproval = Boolean(input.scheduledAt) && !MANAGERS.has(member.role) && needsContributorApproval(await workspaceRequiresApproval(actor.workspaceId), member.role);
+  const config = await limits();
+  const firstComment = validFirstComment(input.firstComment, config.maxText, errorText);
+  const firstCommentDelayMinutes = input.firstCommentDelayMinutes === undefined ? undefined : parseFirstCommentDelay(input.firstCommentDelayMinutes, await runtimeConfig('publishing.maxFirstCommentDelayMinutes'));
+  const attachments = validatePostAttachments(input, config.maxMedia, config.maxAlt, errorText);
+  const text = validatePostContent(input.message, config.maxText, attachments, errorText);
+  const uploadMedia = await resolvePublishMedia(actor.workspaceId, attachments.media);
+  const targets = await validateTargets(actor, input.targetIds, config.maxTargets, uploadMedia, Boolean(firstComment), attachments.link);
+  if (input.scheduledAt && (!Number.isFinite(input.scheduledAt.getTime()) || input.scheduledAt.getTime() <= Date.now() || !targets.length)) throw new PublishingOperationError('invalid_request', 'chooseAFuturePublishingTimeAndAtLeastOne', {}, errorText);
+  const destinationFormats = await resolveAuthorizedDestinationFormats(targets, input.destinationFormats, config.maxTargets, { media: uploadMedia, link: attachments.link, firstComment, scheduled: Boolean(input.scheduledAt) });
+  const modes = input.scheduledAt ? await resolveScheduleModes(targets.map(target => target.id), input.scheduleMode, input.destinationScheduleModes) : null;
+  const retention = await loadVersionRetention();
+  const now = new Date();
+  const id = randomUUID();
+  const persist = async (tx: Prisma.TransactionClient) => {
+    if (input.labelId) {
+      const labels = await tx.$queryRaw<Array<{ id: string }>>`SELECT id FROM labels WHERE id = ${input.labelId} AND "workspaceId" = ${actor.workspaceId} FOR SHARE`;
+      if (!labels.length) throw new PublishingOperationError('not_found', 'thisPostLabelIsUnavailableInTheCurrentWorkspace', {}, errorText);
+    }
+    await tx.post.create({ data: { id, workspaceId: actor.workspaceId, authorId: actor.userId, message: text, firstComment, firstCommentDelayMinutes: firstCommentDelayMinutes ?? 0, link: attachments.link, media: attachments.media, status: holdForApproval ? 'pending_approval' : input.scheduledAt ? 'scheduled' : 'draft', scheduledAt: input.scheduledAt ?? null, publishedAt: null, createdAt: now, updatedAt: now,
+      targets: { create: targets.map(target => ({ id: randomUUID(), targetId: target.id, formatId: destinationFormats[target.id], status: 'pending' as const })) } } });
+    if (input.labelId) await tx.$executeRaw`INSERT INTO post_labels ("postId", "labelId") VALUES (${id}, ${input.labelId})`;
+    if (modes) await storeScheduleModes(tx, actor.workspaceId, id, modes.byTarget);
+    if (holdForApproval) await setApprovalPending(tx, actor, id);
+    await recordPostVersion(tx, id, actor.userId, retention);
+    await audit(tx, actor, 'publishing.post_created', { postId: id, targetCount: targets.length });
+    if (input.scheduledAt && modes) await audit(tx, actor, 'publishing.post_scheduled', { postId: id, scheduledAt: input.scheduledAt.toISOString(), scheduleMode: summaryMode(modes.byTarget), ...(input.destinationScheduleModes ? { destinationScheduleModes: Object.fromEntries(modes.byTarget) } : {}) });
+    return { id, holdForApproval, modes: modes?.byTarget ?? null };
+  };
+  return persist;
+}
+
+export async function createPost(actor: PublishingActor, input: CreatePostInput) {
   const errorText = await loadPublishingErrorText();
   if (!input.scheduledAt && input.destinationScheduleModes && Object.keys(input.destinationScheduleModes).length) throw new PublishingOperationError('invalid_request', 'chooseAPublishingTimeBeforeChoosingWhereEachDestination', {}, errorText);
-  const created = await withPublishingOperation(actor, { targetIds: input.targetIds }, async ({ actor, signal, lockTargets }) => {
-    const member = await membership(actor);
-    if (input.labelId !== undefined && input.labelId !== null && (!/^[A-Za-z0-9_-]{1,200}$/.test(input.labelId))) throw new PublishingOperationError('invalid_request', 'chooseAValidPostLabel', {}, errorText);
-    const holdForApproval = Boolean(input.scheduledAt) && !MANAGERS.has(member.role) && needsContributorApproval(await workspaceRequiresApproval(actor.workspaceId), member.role);
-    const config = await limits();
-    const firstComment = validFirstComment(input.firstComment, config.maxText, errorText);
-    const firstCommentDelayMinutes = input.firstCommentDelayMinutes === undefined ? undefined : parseFirstCommentDelay(input.firstCommentDelayMinutes, await runtimeConfig('publishing.maxFirstCommentDelayMinutes'));
-    const attachments = validatePostAttachments(input, config.maxMedia, config.maxAlt, errorText);
-    const text = validatePostContent(input.message, config.maxText, attachments, errorText);
-    const uploadMedia = await resolvePublishMedia(actor.workspaceId, attachments.media);
-    const targets = await validateTargets(actor, input.targetIds, config.maxTargets, uploadMedia, Boolean(firstComment), attachments.link);
-    if (input.scheduledAt && (!Number.isFinite(input.scheduledAt.getTime()) || input.scheduledAt.getTime() <= Date.now() || !targets.length)) throw new PublishingOperationError('invalid_request', 'chooseAFuturePublishingTimeAndAtLeastOne', {}, errorText);
-    const destinationFormats = await resolveAuthorizedDestinationFormats(targets, input.destinationFormats, config.maxTargets, { media: uploadMedia, link: attachments.link, firstComment, scheduled: Boolean(input.scheduledAt) });
-    const modes = input.scheduledAt ? await resolveScheduleModes(targets.map(target => target.id), input.scheduleMode, input.destinationScheduleModes) : null;
-    const retention = await loadVersionRetention();
-    const now = new Date();
-    const id = randomUUID();
-    await publishingTransaction(signal, async tx => {
-      if (input.labelId) {
-        const labels = await tx.$queryRaw<Array<{ id: string }>>`SELECT id FROM labels WHERE id = ${input.labelId} AND "workspaceId" = ${actor.workspaceId} FOR SHARE`;
-        if (!labels.length) throw new PublishingOperationError('not_found', 'thisPostLabelIsUnavailableInTheCurrentWorkspace', {}, errorText);
-      }
-      await tx.post.create({ data: { id, workspaceId: actor.workspaceId, authorId: actor.userId, message: text, firstComment, firstCommentDelayMinutes: firstCommentDelayMinutes ?? 0, link: attachments.link, media: attachments.media, status: holdForApproval ? 'pending_approval' : input.scheduledAt ? 'scheduled' : 'draft', scheduledAt: input.scheduledAt ?? null, publishedAt: null, createdAt: now, updatedAt: now,
-        targets: { create: targets.map(target => ({ id: randomUUID(), targetId: target.id, formatId: destinationFormats[target.id], status: 'pending' as const })) } } });
-      if (input.labelId) await tx.$executeRaw`INSERT INTO post_labels ("postId", "labelId") VALUES (${id}, ${input.labelId})`;
-      if (modes) await storeScheduleModes(tx, actor.workspaceId, id, modes.byTarget);
-      if (holdForApproval) await setApprovalPending(tx, actor, id);
-      await recordPostVersion(tx, id, actor.userId, retention);
-      await audit(tx, actor, 'publishing.post_created', { postId: id, targetCount: targets.length });
-      if (input.scheduledAt && modes) await audit(tx, actor, 'publishing.post_scheduled', { postId: id, scheduledAt: input.scheduledAt.toISOString(), scheduleMode: summaryMode(modes.byTarget), ...(input.destinationScheduleModes ? { destinationScheduleModes: Object.fromEntries(modes.byTarget) } : {}) });
-    });
-    return { id, holdForApproval, modes: modes?.byTarget ?? null };
+  const created = await withPublishingOperation(actor, { targetIds: input.targetIds }, async ({ actor, signal }) => {
+    const persist = await preparePostCreation(actor, input);
+    return publishingTransaction(signal, persist);
   });
   const remote = created.modes ? anyRemote(created.modes) : false;
   const remoteHold = remote && !created.holdForApproval ? await holdScheduledPostAtProvider(actor, created.id).then(result => result?.remoteHold ?? NO_HOLD, () => NO_HOLD) : NO_HOLD;
   return { id: created.id, scheduleMode: created.modes ? summaryMode(created.modes) : 'application' as ScheduleMode, ...(created.modes ? { destinationScheduleModes: Object.fromEntries(created.modes) } : {}), remoteHold };
+}
+
+/** Internal application composition: validated drafts and the caller's records commit together. No scheduling or provider writes. */
+export async function createPublishingDraftBatch<T>(actor: PublishingActor, inputs: Array<Omit<CreatePostInput, 'scheduledAt' | 'scheduleMode' | 'destinationScheduleModes'>>, complete: (tx: Prisma.TransactionClient, postIds: string[]) => Promise<T>): Promise<T> {
+  return withPublishingOperation(actor, { targetIds: [...new Set(inputs.flatMap(input => input.targetIds))] }, async ({ actor, signal }) => {
+    const prepared: Array<Awaited<ReturnType<typeof preparePostCreation>>> = [];
+    for (const input of inputs) prepared.push(await preparePostCreation(actor, { ...input, scheduledAt: undefined, scheduleMode: undefined, destinationScheduleModes: undefined }));
+    return publishingTransaction(signal, async tx => {
+      const postIds: string[] = [];
+      for (const persist of prepared) postIds.push((await persist(tx)).id);
+      return complete(tx, postIds);
+    });
+  });
 }
 
 export async function updatePost(actor: PublishingActor, input: { postId: string; message: string; firstComment: string; targetIds: string[] } & PostAttachments, restoreLabelIds?: readonly string[]) {

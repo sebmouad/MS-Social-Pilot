@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { deliverChat, validChatSecret } from '../server/transport';
-import { CHAT_POLICY, CHAT_COPY, chatCopySchema, chatPolicySchema } from '../config';
+import { deliverChat, validChatSecret } from '@/modules/notifications/chat-channels/server/transport';
+import { CHAT_POLICY, CHAT_COPY, chatCopySchema, chatPolicySchema } from '@/modules/notifications/chat-channels/config';
 
 const slack = { url: 'https://hooks.slack.com/services/T00000000/B00000000/abcdefghijklmnopqrstuv' };
 const telegram = { botToken: `12345678:${'a'.repeat(35)}`, chatId: '-1001234567890' };
@@ -43,4 +43,17 @@ describe('chat service transport and Root policy', () => {
     expect(chatCopySchema.safeParse(CHAT_COPY).success).toBe(true);
     expect(chatCopySchema.safeParse({ ...CHAT_COPY, fr: { title: '' } }).success).toBe(false);
   });
+});
+
+it('upgrades saved chat policy and localized catalogs while preserving Root overrides', () => {
+  const {deliveryBatchSize:_batch,deliveryLeaseSeconds:_lease,ownerLimit:_owners,...oldPolicy}=CHAT_POLICY;
+  expect(chatPolicySchema.parse(oldPolicy)).toMatchObject({deliveryBatchSize:25,deliveryLeaseSeconds:300,ownerLimit:50});
+  const oldCopy=JSON.parse(JSON.stringify(CHAT_COPY));
+  for(const locale of ['en','fr']) {
+    oldCopy[locale].title='Customized '+locale;
+    for(const key of ['inboxAlert','inboxAlertMessage','operatorIncident','operatorIncidentMessage']) delete oldCopy[locale][key];
+  }
+  const upgraded=chatCopySchema.parse(oldCopy);
+  expect(upgraded.fr.title).toBe('Customized fr'); expect(upgraded.en.title).toBe('Customized en');
+  expect(upgraded.fr.inboxAlert).toBe(CHAT_COPY.fr.inboxAlert); expect(upgraded.en.operatorIncidentMessage).toBe(CHAT_COPY.en.operatorIncidentMessage);
 });

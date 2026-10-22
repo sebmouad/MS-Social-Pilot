@@ -1,3 +1,5 @@
+import { enqueueChatEvent } from '@/modules/notifications/chat-channels/server/delivery';
+vi.mock('@/modules/notifications/chat-channels/server/delivery', () => ({ enqueueChatEvent: vi.fn(async () => 1) }));
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { db, defaults, install, state } from './sharing-helpers';
 
@@ -66,6 +68,7 @@ describe('share-link publish-anyway', () => {
     };
     const summary = await runShareLinkDeadlines(new Date('2026-10-22T12:00:00Z'));
     expect(summary).toBe('links=1 approved=1 skipped=0 failed=0');
+    expect(enqueueChatEvent).toHaveBeenCalledWith(db, expect.objectContaining({workspaceId:'workspace-a',event:'reviewDecision',source:expect.objectContaining({postId:'post-a'})}));
     expect(review).toHaveBeenCalledTimes(1);
     expect(review.mock.calls[0]?.[0]).toMatchObject({ userId: 'user-a', workspaceId: 'workspace-a' });
     expect(review.mock.calls[0]?.[2]).toBe('approve');
