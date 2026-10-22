@@ -245,3 +245,15 @@ Final validation from `rebuild/`:
 - Scoped taste lint: **0 failures, 1 existing shadow warning**. Chromium visual
   fixture: **BLOCKED before render**, as described above.
 - `git diff --check`: **PASS**. No source outside the Inbox module or tests changed.
+
+## Design v2 B4: Inbox screen (2026-10-22, source only)
+
+Supersedes the sidebar wording above. Filters, quick filters, shortcuts and the moderation page moved as follows; services, REST routes and MCP tools are unchanged.
+
+- **Header:** `InboxHeader` (no icon chip) shows the waiting count (open view only), an ⓘ with the page description, the Sync now button with "Last sync" inside an ⓘ, Saved replies, a keyboard-shortcuts icon button, the **Conversations | Rules** `LinkTabs` and the filter row: the page's single `FilterButton` (channel, type, status, hidden comments, page size; `InboxFilterRow`, one GET form), the search box and the removable chips. `InboxScreen` passes no `sidebar`, so there is no Page tools sheet.
+- **List pane:** quick filters (Unread, Unanswered, Negative, Mentions) are links in a horizontally scrolling row above the rows (current one marked `aria-current`); Older/Latest/Newer sit under the list; history paging sits in the thread's history header.
+- **Thread pane:** the header row holds the title and tags, Resolve/Hide/Delete (`ThreadToolbar`, durable deletion flow unchanged) and a details toggle. `ThreadDetailsLayout` shows the 320 px details pane beside the thread from 1280 px (collapsible) and as a drawer below it (Escape or scrim closes). Below 1024 px list and thread are separate pages; the reply box (`replyDock`) is sticky at the bottom.
+- **Keyboard:** J/K, R, E, X, `/` and `?` are unchanged (`InboxShortcuts`); the always-visible legend is removed.
+- **Rules:** `/inbox/rules` (tab) replaces `/inbox/moderation`, which redirects with 308 (declared in `inbox/manifest.ts`).
+- **Copy:** new `round3Copy.screen.*` keys (EN/FR, Root catalog keys `round3Copy.screen.*`). No new Root setting names beyond those catalog entries.
+- **Not done:** per-message moderation menu (actions stay as buttons in the thread header); the sidebar channel scope is not applied to the Inbox (it keeps its own single-channel `channel` filter); no browser, screenshot, keyboard-in-browser or screen-reader run.

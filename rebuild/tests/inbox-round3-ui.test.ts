@@ -11,6 +11,7 @@ const state = vi.hoisted(() => ({
 vi.mock('next/headers', () => ({ headers: async () => new Headers({ 'accept-language': state.language }) }));
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: state.refresh, replace: vi.fn() }) }));
 vi.mock('../src/modules/inbox/ui/bulk-action', () => ({ runBulkInboxAction: state.bulk }));
+vi.mock('@/modules/shell/server/chrome', () => ({ shellChrome: async () => ({ copy: { moreTabs: 'More' }, policy: {}, locale: 'en' }) }));
 vi.mock('@/server/config/store', () => ({ runtimeConfig: async (key: string) => key === 'inbox.progressivePageLimit' ? 3 : 180 }));
 vi.mock('@/modules/inbox/server/customer-copy', async () => ({ loadInboxCustomerCopy: async () => (await import('../src/modules/inbox/customer-copy')).inboxCustomerCopy }));
 vi.mock('../src/server/context', () => ({ requireViewer: state.viewer }));
@@ -294,12 +295,15 @@ describe('Inbox screen: quick filters, selection and details', () => {
     state.list.mockResolvedValue(page([item('comment:1')]));
   });
 
-  it('offers the four quick filters in the sidebar with their pressed state', async () => {
+  it('offers the four quick filters as a row of links above the list, with the applied one marked current', async () => {
     state.list.mockResolvedValue(page([item('comment:1')], { quick: ['negative'] }));
     const html = await render({ quick: 'negative' });
-    for (const label of ['Unread', 'Unanswered', 'Negative', 'Mentions']) expect(html).toContain(`>${label}</button>`);
-    expect(html).toMatch(/aria-pressed="true"[^>]*>Negative</);
-    expect(html).toMatch(/aria-pressed="false"[^>]*>Unread</);
+    for (const label of ['Unread', 'Unanswered', 'Negative', 'Mentions']) expect(html).toContain(`>${label}</a>`);
+    expect(html).toMatch(/aria-current="true"[^>]*>Negative</);
+    expect(html).not.toMatch(/aria-current="true"[^>]*>Unread</);
+    // Choosing another keeps the applied one; choosing the applied one removes it.
+    expect(html).toMatch(/href="\/inbox\?[^"]*quick=negative%2Cunread"[^>]*>Unread</);
+    expect(html).toMatch(/href="\/inbox\?limit=25"[^>]*aria-current="true"/);
     expect(html).toContain('name="quick" value="negative"');
     expect(state.list.mock.calls[0]![1]).toMatchObject({ quick: ['negative'] });
   });

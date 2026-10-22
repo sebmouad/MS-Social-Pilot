@@ -56,6 +56,6 @@ describe('inbox message history scrolling', () => {
     expect(css).toMatch(/\.listPane > \.list \{[^}]*min-height: 0/);
     expect(css).toMatch(/\.threadPane \{[^}]*flex-direction: column[^}]*overflow: hidden/);
     expect(css).toMatch(/\.threadScroll \{[^}]*overflow-y: auto/);
-    expect(css).toMatch(/@media \(max-width: 900px\)[\s\S]*\.split \{ height: auto; \}/);
+    expect(css).toMatch(/@media \(max-width: 1023px\)[\s\S]*\.split \{ height: auto; \}/);
   });
 });

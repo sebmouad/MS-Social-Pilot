@@ -69,7 +69,7 @@ export function InboxShortcuts({ locale = 'en' }: { locale?: InboxLocale }) {
     [copy.groups.select, [['x', copy.keys.select], ['escape', copy.keys.clear]]],
   ];
   return <>
-    <Button variant="quiet" leading={<IconKeyboard size={18} stroke={1.75} />} trailing={<ShortcutHint chord="?" />} onClick={() => setGuide(true)}>{copy.open}</Button>
+    <Button variant="quiet" size="sm" leading={<IconKeyboard size={18} stroke={1.75} aria-hidden="true" />} aria-label={copy.open} title={copy.open} onClick={() => setGuide(true)} />
     <Dialog open={guide} title={copy.title} description={copy.description} closeLabel={copy.close} onClose={() => setGuide(false)}>
       <div className={styles.keys}>
         {rows.map(([group, entries]) => <section key={group}><h3>{group}</h3><dl>

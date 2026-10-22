@@ -656,3 +656,7 @@ parity/config guards. Required full suite: 711 files pass, one fails, 49 skip;
 11,511 tests pass, five fail, 2,553 skip. All failures are unchanged Facebook
 loopback probes blocked by sandbox `listen EPERM ::1`; full suite is not green. No production
 action or live-provider claim. Changes remain uncommitted as requested.
+
+## Design v2 B4: Inbox (2026-10-22, source only)
+
+The Inbox is one screen with a Filter button, quick-filter row, three panes from 1280 px (list, thread, collapsible details) and two pages below 1024 px; Rules is its second tab at `/inbox/rules` (`/inbox/moderation` redirects, 308). Ownership, services, REST and MCP are unchanged. Details in `src/modules/inbox/ui/IMPLEMENTATION.md` and AGENT_HANDOFF "Design v2 B4". Nothing here is browser-verified.

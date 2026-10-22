@@ -4,24 +4,27 @@ import { createRoot } from 'react-dom/client';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { act } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { InboxHeader, PersonAvatar, ShortcutHint } from '@/modules/inbox/ui/InboxChrome';
+import { InboxHeader, PersonAvatar } from '@/modules/inbox/ui/InboxChrome';
 import { InboxShortcuts } from '@/modules/inbox/ui/InboxShortcuts';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 describe('inbox chrome', () => {
   it('renders the inbox module header and a stable initials avatar', () => {
-    const header = renderToStaticMarkup(createElement(InboxHeader, { eyebrow: 'Inbox', title: 'Conversations', description: 'All activity.' }));
+    const header = renderToStaticMarkup(createElement(InboxHeader, { title: 'Conversations', count: 12 }));
     expect(header).toContain('data-module="inbox"');
     expect(header).toContain('Conversations');
+    expect(header).toContain('>12<');
     const avatar = renderToStaticMarkup(createElement(PersonAvatar, { name: 'Amina Benali' }));
     expect(avatar).toContain('>AB<');
     expect(avatar).toBe(renderToStaticMarkup(createElement(PersonAvatar, { name: 'Amina Benali' })));
   });
 
-  it('documents the keyboard shortcuts in both languages', () => {
-    expect(renderToStaticMarkup(createElement(ShortcutHint, {}))).toContain('resolve or reopen');
-    expect(renderToStaticMarkup(createElement(ShortcutHint, { locale: 'fr' }))).toContain('résoudre ou rouvrir');
+  it('keeps the shortcut copy in both languages, but no always-visible legend', async () => {
+    const chrome = await import('@/modules/inbox/ui/InboxChrome');
+    expect('ShortcutHint' in chrome).toBe(false);
+    expect(chrome.SHORTCUT_COPY.en.resolve).toContain('esolve or reopen');
+    expect(chrome.SHORTCUT_COPY.fr.resolve).toContain('résoudre ou rouvrir');
   });
 });
 

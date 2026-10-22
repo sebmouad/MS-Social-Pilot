@@ -612,3 +612,10 @@ parity/config guards. Required full suite: 711 files pass, one fails, 49 skip;
 11,511 tests pass, five fail, 2,553 skip. All failures are unchanged Facebook
 loopback probes blocked by sandbox `listen EPERM ::1`; full suite is not green. No production
 action or live-provider claim. Changes remain uncommitted as requested.
+
+## Design v2 B4 (Inbox) (2026-10-22, source only, uncommitted)
+
+Built per [design-v2/08-BUILD_PLAN.md](design-v2/08-BUILD_PLAN.md) B4 / [04-SCREENS.md](design-v2/04-SCREENS.md) S8. Files: `src/modules/inbox/ui/{InboxScreen,InboxChrome,InboxFilterRow,ThreadDetailsLayout,InboxActions,InboxShortcuts,moderation/ModerationScreen}.tsx`, the two inbox CSS modules, `round3-copy.ts` (`screen` block), `manifest.ts` (redirect), `src/app/inbox/rules/page.tsx` (moved from `inbox/moderation`). Deleted: `InboxFilterPanel.tsx`, the always-visible `ShortcutHint` legend. Tests: new `inbox-v2-b4`; updated `inbox-{browsing-page,round2-ui,round3-ui,screens-redesign,write-receipts-ui,thread-scroll,analytics-ux-polish}`, `instagram-customer-filters-ui`, `browser-matrix`. Evidence: unit/jsdom/server-render only; no browser, FR screenshot, keyboard-in-browser or phone-keyboard run.
+
+- **New Root keys:** none declared. The Root-editable Inbox catalog gains entries `round3Copy.screen.*` (12 keys); the integrator may need to bump `CONFIG_SCHEMA_VERSION` if the catalog key set is versioned (unchanged here).
+- **Open:** (1) moderation actions are still buttons in the thread header, not a per-message menu; (2) the sidebar channel scope (`pageChannelScope`) is not read by the Inbox; (3) Saved replies are managed from the header and inserted via the existing productivity bar, not a menu inside the reply box or a phone bottom sheet; (4) BulkBar still offers its existing actions (no separate Assign); (5) the 2-tap phone path and the sticky reply box need a real phone browser; (6) legacy `scripts/verify-*` selectors for the inbox sidebar filters are not updated.

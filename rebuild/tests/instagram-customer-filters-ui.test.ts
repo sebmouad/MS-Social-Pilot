@@ -4,7 +4,7 @@ import { createRoot } from 'react-dom/client';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { AnalyticsChannelChoices } from '../src/modules/analytics/ui/AnalyticsFilters';
-import { InboxFilterPanel } from '../src/modules/inbox/ui/InboxFilterPanel';
+import { InboxFilterRow } from '../src/modules/inbox/ui/InboxFilterRow';
 
 const channels = [{ id: 'ig-atlas', name: 'Atelier Atlas · Instagram' }, { id: 'other', name: 'Atlas Updates' }];
 describe('neutral customer channel choices', () => {
@@ -21,8 +21,10 @@ describe('neutral customer channel choices', () => {
     (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
     const host = document.createElement('div'); document.body.append(host); const root = createRoot(host);
     try {
-      await act(async () => root.render(createElement(InboxFilterPanel, { action: '/inbox', resetHref: '/inbox', channels, locale, disabledLimit: false,
+      await act(async () => root.render(createElement(InboxFilterRow, { action: '/inbox', resetHref: '/inbox', channels, locale, disabledLimit: false, activeCount: 1,
         filters: { channelId: 'ig-atlas', kind: 'all', state: 'open', hidden: 'visible', q: '' } })));
+      // The channel list lives behind the page's single Filter button.
+      await act(async () => host.querySelector<HTMLButtonElement>('button.ui-filter-button')!.click());
       expect(host.querySelector<HTMLInputElement>('input[name=channel]')?.value).toBe('ig-atlas');
       const picker = [...host.querySelectorAll<HTMLElement>('[role=combobox]')].find(el => el.textContent?.includes(channels[0]!.name))!;
       expect(picker).toBeTruthy();

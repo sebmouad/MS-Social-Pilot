@@ -2,6 +2,7 @@ import { createElement, isValidElement, type ReactNode } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 const state = vi.hoisted(() => ({ viewer: vi.fn(), list: vi.fn(), thread: vi.fn(), manage: vi.fn(), workflow: vi.fn(), toolbar: vi.fn() }));
+vi.mock('@/modules/shell/server/chrome', () => ({ shellChrome: async () => ({ copy: { moreTabs: 'More' }, policy: {}, locale: 'en' }) }));
 vi.mock('@/server/config/store', () => ({ runtimeConfig: async (key: string) => key === 'inbox.progressivePageLimit' ? 3 : 180 }));
 vi.mock('@/modules/inbox/server/details', () => ({ readInboxContactDetails: async () => null }));
 vi.mock('@/modules/inbox/server/customer-copy', async () => ({ loadInboxCustomerCopy: async () => (await import('../src/modules/inbox/customer-copy')).inboxCustomerCopy }));
@@ -28,7 +29,7 @@ describe('Inbox paging and recoverable route context', () => {
     expect(html).toContain('data-scoped-access="true"');
     expect(state.thread).toHaveBeenCalledWith({ userId: 'reader', workspaceId: 'workspace' }, { key: 'message:conversation', cursor: 'history-position' }, { allowedChannelIds: ['channel'] });
     expect(html).toContain('name="thread" value="message:conversation"'); expect(html).toContain('1 of 305 stored messages shown');
-    expect(html).toContain('outside the current list page'); const limitField = html.match(/<input\b[^>]*name="limit"[^>]*>/)?.[0]; expect(limitField).toContain('min="1"'); expect(limitField).toContain('max="25"');
+    expect(html).toContain('outside the current list page'); expect(html).toContain('maxLength="200"');
     const links = [...html.matchAll(/href="([^"]+)"/g)].map(match => new URL(match[1].replaceAll('&amp;', '&'), 'http://preview.test'));
     expect(links.some(url => url.searchParams.get('cursor') === 'list-older' && url.searchParams.get('historyCursor') === 'history-position')).toBe(true);
     expect(links.some(url => url.searchParams.get('historyCursor') === 'history-older' && url.searchParams.get('cursor') === 'list-position')).toBe(true);

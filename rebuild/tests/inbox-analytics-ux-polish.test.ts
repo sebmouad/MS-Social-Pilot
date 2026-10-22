@@ -40,7 +40,7 @@ describe('Inbox and Analytics stylesheets', () => {
     expect(bulk).toContain('.selectBox:focus-visible');
   });
   it('gives phone Inbox rows, bulk actions and pagination 44px targets and a stacking bulk bar', () => {
-    expect(inbox).toMatch(/@media \(max-width: 900px\), \(pointer: coarse\) \{\s*\.pagination a[^}]*min-height: 44px/);
+    expect(inbox).toMatch(/@media \(max-width: 1023px\), \(pointer: coarse\) \{\s*\.pagination a[^}]*min-height: 44px/);
     expect(bulk).toMatch(/\.bulkActions > button \{[^}]*min-height: 44px/);
   });
   it('marks selected Inbox rows without relying on colour alone being the only state', () => {

@@ -10,6 +10,7 @@ const state = vi.hoisted(() => ({
 }));
 vi.mock('next/headers', () => ({ headers: async () => new Headers({ 'accept-language': state.language }) }));
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: state.refresh, replace: state.replace }) }));
+vi.mock('@/modules/shell/server/chrome', () => ({ shellChrome: async () => ({ copy: { moreTabs: 'More' }, policy: {}, locale: 'en' }) }));
 vi.mock('@/server/config/store', () => ({ runtimeConfig: async (key: string) => key === 'inbox.progressivePageLimit' ? 3 : 180 }));
 vi.mock('@/modules/inbox/server/details', () => ({ readInboxContactDetails: async () => null }));
 vi.mock('@/modules/inbox/server/customer-copy', async () => ({ loadInboxCustomerCopy: async () => (await import('../src/modules/inbox/customer-copy')).inboxCustomerCopy }));
@@ -78,7 +79,8 @@ describe('Inbox language and shared components', () => {
     state.language = 'fr-FR,fr;q=0.9';
     state.list.mockResolvedValue(listPage([], { kind: 'comment' }));
     const html = await render();
-    expect(html).toContain('Messages, commentaires et avis');
+    expect(html).toContain('Règles');
+    expect(html).toContain('Filtres rapides');
     expect(html).toContain('Réinitialiser les filtres');
     expect(html).toContain('Aucun résultat pour ces filtres');
     expect(html).toContain('Filtres actifs');
@@ -92,8 +94,9 @@ describe('Inbox language and shared components', () => {
     expect(html).toContain('aria-label="Remove filter: Type Comments"');
     expect(html).toContain('aria-label="Remove filter: Search refund"');
     expect(html).toMatch(/<form[^>]*method="get"/);
-    expect(html).toContain('name="type"');
-    expect(html).toContain('ui-filter-panel');
+    // The one Filter button carries the count; its fields open from it.
+    expect(html).toContain('ui-filter-button is-active');
+    expect(html).toContain('name="q" value="refund"');
   });
 
   it('has an English and a French string for every screen and action key', () => {

@@ -4,7 +4,7 @@ import { AutoTextarea } from '@/components/AutoTextarea';
 
 import { useId, useRef, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
-import { Button, Dialog } from '@/components';
+import { Button, Dialog, InfoTip } from '@/components';
 import { useToast } from '@/components/Toast';
 import { FieldError, useFormValidation } from '@/components/FormValidation';
 import { isOperationErrorCode } from '@/lib/operation-error';
@@ -87,9 +87,9 @@ export function InboxSyncBar({ targetId, lastSynced, timeZone, disabled = false,
 
   const shown = syncedNow ?? lastSynced;
   return <div className={styles.sync}>
-    <p className={styles.syncTime}>{shown ? <>{copy.lastSynced} <strong>{shown}</strong></> : copy.notSynced}</p>
     <Button variant="secondary" disabled={disabled || busy} aria-busy={busy} onClick={() => void sync()}>{busy ? copy.syncing : copy.syncNow}</Button>
-    <div role="status" aria-live="polite" className={styles.syncResult}>{result?.kind === 'ok' ? <span>{result.text}</span> : null}</div>
+    <InfoTip name={copy.lastSynced}>{shown ? <>{copy.lastSynced} <strong>{shown}</strong></> : copy.notSynced}</InfoTip>
+    <div role="status" aria-live="polite" className="ui-visually-hidden">{result?.kind === 'ok' ? <span>{result.text}</span> : null}</div>
     {result?.kind === 'error' ? <p role="alert" className={styles.error}>{result.text}</p> : null}
   </div>;
 }

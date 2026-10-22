@@ -90,7 +90,7 @@
 .empty p { margin: 0; max-width: 46ch; color: var(--ink-soft); font-size: 14px; line-height: 1.55; }
 .pick { align-content: center; min-height: 260px; }
 
-@media (max-width: 900px) {
+@media (max-width: 1023px) {
   .split { grid-template-columns: minmax(0, 1fr); }
   .split[data-open="true"] .listPane { display: none; }
   .split[data-open="false"] .threadPane { display: none; }
@@ -132,7 +132,7 @@
 .entry[data-reply] { background: var(--surface); }
 .alert { border-inline-start-width: 4px; }
 @media (prefers-reduced-motion: reduce) { .item { transition: none; } }
-@media (max-width: 900px) {
+@media (max-width: 1023px) {
   .threadPane { padding: 14px; gap: 14px; }
   .back { position: sticky; top: 0; z-index: 1; margin: -4px 0 0; background: var(--surface); }
   .entry, .entry[data-from="channel"] { max-width: 100%; justify-self: stretch; }
@@ -140,7 +140,7 @@
   .item { padding: 14px; }
   .listHead { position: static; }
 }
-@media (max-width: 900px), (pointer: coarse) {
+@media (max-width: 1023px), (pointer: coarse) {
   .pagination a, .pagination span, .filters a { min-height: 44px; }
 }
 @media (forced-colors: active) {
@@ -159,7 +159,32 @@
 .loadMore a { display: inline-flex; align-items: center; min-height: 44px; color: var(--ink-soft); font-size: 13px; text-decoration: underline; }
 .loadMore a:hover { color: var(--ink); }
 .loadMore a:focus-visible, .listScroll:focus-visible { outline: 3px solid var(--focus); outline-offset: -3px; border-radius: var(--radius-sm); }
-@media (max-width: 900px) { .listScroll { max-height: 70dvh; } }
+@media (max-width: 1023px) { .listScroll { max-height: 70dvh; } }
 /* Keep long, progressively loaded lists cheap to paint without removing rows
    from keyboard navigation or changing their stored order. */
 .listScroll .list > li { content-visibility: auto; contain-intrinsic-size: auto 8rem; }
+
+/* Design v2 S8: header row of the open thread (title, Resolve, details toggle), quick filter row, list paging and the reply dock. */
+.threadHeadRow { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 10px 14px; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
+.threadHeadRow .threadHead { flex: 1 1 260px; min-width: 0; padding-bottom: 0; border-bottom: 0; }
+.threadHeadActions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.detailsToggle { display: inline-flex; align-items: center; gap: 6px; min-height: var(--control-h, 36px); padding: 0 10px; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface); color: var(--ink); font: inherit; font-size: 13px; cursor: pointer; }
+.detailsToggle:hover { background: var(--surface-muted); }
+.detailsToggle:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.filterTools { display: grid; gap: 8px; min-width: 0; }
+.quickRow { display: flex; flex: 0 0 auto; gap: 6px; padding: 10px 12px; overflow-x: auto; border-bottom: 1px solid var(--line-subtle, var(--line)); scrollbar-width: thin; }
+.quickChip { flex: 0 0 auto; display: inline-flex; align-items: center; min-height: 32px; padding: 0 12px; border: 1px solid var(--line-strong); border-radius: 999px; background: var(--surface); color: var(--ink); font-size: 13px; font-weight: 600; text-decoration: none; white-space: nowrap; }
+.quickChip:hover { background: var(--surface-muted); }
+.quickChip[aria-current="true"] { border-color: var(--mod, var(--accent)); background: var(--mod-soft, var(--accent-soft)); color: var(--ink); }
+.quickChip:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.listPaging { display: flex; flex: 0 0 auto; justify-content: space-between; gap: 8px; padding: 8px 12px; border-top: 1px solid var(--line-subtle, var(--line)); font-size: 12.5px; }
+.listPaging a { color: var(--accent); font-weight: 650; }
+.listPaging span[aria-disabled="true"] { color: var(--ink-faint); }
+.listPaging a:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; border-radius: var(--radius-sm); }
+.historyHead .pagination { margin-inline-start: auto; }
+.replyDock { flex: 0 0 auto; min-width: 0; }
+@media (max-width: 1023px) {
+  .replyDock { position: sticky; bottom: 0; z-index: 2; padding-block: 8px calc(8px + env(safe-area-inset-bottom, 0px)); background: var(--surface); border-top: 1px solid var(--line); }
+  .threadHeadRow { position: sticky; top: 0; z-index: 2; background: var(--surface); }
+  .detailsToggle span { display: none; }
+}

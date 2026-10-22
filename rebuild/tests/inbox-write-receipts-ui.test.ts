@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const router = vi.hoisted(() => ({ replace: vi.fn(), refresh: vi.fn() }));
 vi.mock('next/navigation', () => ({ useRouter: () => router }));
 vi.mock('../src/modules/inbox/ui/inbox.module.css', () => ({ default: {} }));
-vi.mock('../src/components', async () => ({ ...await import('../src/components/Button'), ...await import('../src/components/Dialog') }));
+vi.mock('../src/components', async () => ({ ...await import('../src/components/Button'), ...await import('../src/components/Dialog'), InfoTip: ({ children }: { children?: unknown }) => children }));
 import { InboxSyncBar, ReplyBox, ThreadToolbar } from '../src/modules/inbox/ui/InboxActions';
 
 let root: ReturnType<typeof createRoot>;

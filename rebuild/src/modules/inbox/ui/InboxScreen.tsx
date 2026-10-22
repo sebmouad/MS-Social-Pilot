@@ -3,12 +3,13 @@ import { loadInboxCustomerCopy } from '@/modules/inbox/server/customer-copy';
 import { resolveInboxCatalog } from '@/modules/inbox/customer-copy';
 import { InboxCopyProvider } from '@/modules/inbox/ui/copy-context';
 import { IconInbox, IconInboxOff, IconMessages, IconPlugConnected } from '@tabler/icons-react';
-import { ChannelBadge, EmptyState } from '@/components';
+import { ChannelBadge, EmptyState, InfoTip, LinkTabs } from '@/components';
+import { shellChrome } from '@/modules/shell/server/chrome';
 import { OperationError, operationFailure } from '@/lib/operation-error';
 import { channelBadgeInfo } from '@/lib/channel-badge';
 import { inboxHref, inboxListInput, type InboxLocation, type InboxSearchParams } from '@/modules/inbox/query';
 import type { ReactNode } from 'react';
-import type { InboxFilters, InboxListPage, InboxThreadPage, OpenThread, ThreadEntry } from '@/modules/inbox/server/types';
+import { INBOX_QUICK_FILTERS, type InboxFilters, type InboxListPage, type InboxThreadPage, type OpenThread, type ThreadEntry } from '@/modules/inbox/server/types';
 import { readInboxList, readInboxThread } from '@/modules/inbox/server/read';
 import { PageFrame } from '@/server/PageFrame';
 import { requireViewer } from '@/server/context';
@@ -22,8 +23,9 @@ import { reviewSummary, reviewText } from '@/modules/inbox/reviews-copy';
 import { ThreadTools } from './ThreadTools';
 import { NestedReply } from './NestedReply';
 import { InboxTag } from './InboxTags';
-import { InboxHeader, ShortcutHint } from './InboxChrome';
-import { InboxFilterPanel } from './InboxFilterPanel';
+import { InboxHeader } from './InboxChrome';
+import { InboxFilterRow } from './InboxFilterRow';
+import { ThreadDetailsLayout } from './ThreadDetailsLayout';
 import { InboxShortcuts } from './InboxShortcuts';
 import { ContactDetails } from './ContactDetails';
 import { ThreadScroll } from './ThreadScroll';
@@ -36,7 +38,6 @@ import { readInboxContactDetails } from '@/modules/inbox/server/details';
 import type { InboxContactDetails } from '@/modules/inbox/details';
 import { inboxLocale } from './locale';
 import styles from './inbox.module.css';
-import r3 from './inbox-round3.module.css';
 
 const DEFAULT_FILTERS: InboxFilters = { channelId: null, kind: 'all', state: 'open', hidden: 'visible', q: '' };
 const singleValue = (value: string | string[] | undefined) => typeof value === 'string' ? value : undefined;
@@ -68,6 +69,7 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
   const reviews = resolveInboxCatalog('reviewCopy', catalog);
   const reviewLabel = (language: Parameters<typeof reviewText>[0], key: Parameters<typeof reviewText>[1], values?: Record<string, string | number>) => reviewText(language, key, values, reviews);
   const extra = resolveInboxCatalog('round3Copy', catalog)[locale];
+  const { copy: shell } = await shellChrome();
   const actor ={ userId: viewer.user.id, workspaceId: viewer.workspaceId };
   const constraints = viewer.permissions.pageScope.all ? undefined : { allowedChannelIds: viewer.permissions.pageScope.ids };
 
@@ -138,39 +140,48 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
     };
     const historyNoun = thread.kind === 'comment' ? copy.replies : copy.messagesNoun;
     const openingItemPresent = Boolean(listPage?.items.some(item => item.key === `${thread.kind}:${thread.id}`));
-    threadView = <section className={styles.threadPane} aria-label={thread.kind === 'message' ? copy.openConversation : thread.kind === 'review' ? reviewLabel(locale, 'openReview') : copy.openComment}>
-      <a className={styles.back} href={clearThreadHref}>{copy.back}</a>
-      {!openingItemPresent && listPage ? <p className={styles.contextNote}>{copy.outsideList}</p> : null}
-      <header className={styles.threadHead}>
-        <h2>{thread.kind === 'message' ? copy.conversationWith(first?.author ?? copy.aVisitor) : thread.kind === 'review' ? reviewLabel(locale, 'reviewBy', { name: thread.entries[0]?.author ?? copy.aVisitor }) : copy.commentBy(thread.entries[0]?.author ?? copy.aVisitor)}</h2>
-        <div className={styles.threadTags}>
-          <ChannelBadge name={thread.target.name} platformName={badge.platformName} mark={badge.mark} />
-          <InboxTag icon={thread.kind === 'message' ? 'message' : 'comment'}>{thread.kind === 'message' ? copy.message : thread.kind === 'review' ? reviewLabel(locale, 'review') : copy.comment}</InboxTag>
-          {thread.kind === 'review' ? <InboxTag icon="comment">{reviewSummary(locale, thread, reviews)}</InboxTag> : null}
-          {thread.resolved ? <InboxTag icon="resolved" tone="ok">{copy.resolvedTag}</InboxTag> : <InboxTag icon="needsReply" tone="warn">{copy.openTag}</InboxTag>}
-          {thread.hidden ? <InboxTag icon="hidden">{copy.hidden}</InboxTag> : null}
-        </div>
-      </header>
-      <div className={r3.threadGrid}><div className={r3.threadMain}>
+    const historyBase = { ...baseLocation, ...(listPage?.cursor ? { cursor: listPage.cursor } : {}), thread: `${thread.kind}:${thread.id}` };
+    const historyNav = <nav className={styles.pagination} aria-label={catalog['navigation.historyPages'][locale]}>
+      {history.olderCursor ? <a href={inboxHref({ ...historyBase, historyCursor: history.olderCursor })}>{copy.earlier}</a> : <span aria-disabled="true">{copy.earlier}</span>}
+      {history.cursor ? <a href={inboxHref(historyBase)}>{copy.latest}</a> : <span aria-disabled="true">{copy.latest}</span>}
+      {history.newerCursor ? <a href={inboxHref({ ...historyBase, historyCursor: history.newerCursor })}>{copy.newer}</a> : <span aria-disabled="true">{copy.newer}</span>}
+    </nav>;
+    const head = <header className={styles.threadHead}>
+      <h2>{thread.kind === 'message' ? copy.conversationWith(first?.author ?? copy.aVisitor) : thread.kind === 'review' ? reviewLabel(locale, 'reviewBy', { name: thread.entries[0]?.author ?? copy.aVisitor }) : copy.commentBy(thread.entries[0]?.author ?? copy.aVisitor)}</h2>
+      <div className={styles.threadTags}>
+        <ChannelBadge name={thread.target.name} platformName={badge.platformName} mark={badge.mark} />
+        <InboxTag icon={thread.kind === 'message' ? 'message' : 'comment'}>{thread.kind === 'message' ? copy.message : thread.kind === 'review' ? reviewLabel(locale, 'review') : copy.comment}</InboxTag>
+        {thread.kind === 'review' ? <InboxTag icon="comment">{reviewSummary(locale, thread, reviews)}</InboxTag> : null}
+        {thread.resolved ? <InboxTag icon="resolved" tone="ok">{copy.resolvedTag}</InboxTag> : <InboxTag icon="needsReply" tone="warn">{copy.openTag}</InboxTag>}
+        {thread.hidden ? <InboxTag icon="hidden">{copy.hidden}</InboxTag> : null}
+      </div>
+    </header>;
+    // Resolve and the moderation buttons sit in the thread header, so they stay in reach on a phone.
+    const headActions = canResolve ? <ThreadToolbar id={thread.id} kind={thread.kind} resolved={thread.resolved} hidden={thread.hidden} canResolve={canResolve} canHide={canWrite && capabilities.hide} canDelete={canWrite && capabilities.remove} platformName={badge.platformName} listHref={clearThreadHref} locale={locale} /> : null;
+    const main = <>
       <ThreadScroll label={copy.historyLabel} resetKey={`${thread.kind}:${thread.id}:${requestedHistoryCursor ?? ''}`}>
       {thread.postText ?<p className={styles.postContext}><strong>{copy.onYourPost}</strong>{thread.postText.length > 280 ? `${thread.postText.slice(0, 280)}…` : thread.postText}</p> : null}
       <p className={styles.contextNote}>{thread.kind === 'review' ? reviewLabel(locale, 'note') : copy.syncedNote}</p>
       <div className={styles.historyHead}>
         <h3>{thread.kind === 'comment' ? copy.commentHistory : thread.kind === 'review' ? reviewLabel(locale, 'reviewHistory') : copy.conversationHistory}</h3>
         <span>{copy.historyShown(history.shown, history.total, historyNoun)}</span>
+        {historyNav}
       </div>
       {history.cursor && history.shown === 0 ? <p className={styles.contextNote}>{copy.noHistory}</p> : null}
       <ol className={styles.entries} aria-label={copy.historyLabel}>
         {(thread.kind === 'comment' ? thread.entries.filter(entry => entry.parentId === null) : thread.entries).map(entry => renderEntry(entry))}
       </ol>
       </ThreadScroll>
-      {canResolve ? <ThreadToolbar id={thread.id} kind={thread.kind} resolved={thread.resolved} hidden={thread.hidden} canResolve={canResolve} canHide={canWrite && capabilities.hide} canDelete={canWrite && capabilities.remove} platformName={badge.platformName} listHref={clearThreadHref} locale={locale} /> : null}
-      {thread.kind === 'review'
-        ? (canWrite && capabilities.replyToReviews ? <ReplyBox key={thread.id} id={thread.id} kind="review" locale={locale} allowed headline="" /> : <p>{reviewLabel(locale, 'replyUnavailable')}</p>)
-        : <ThreadTools kind={thread.kind} id={thread.id} canWrite={canWrite} canReply={capabilities.reply} allowed={rule.allowed} headline={rule.headline} detail={rule.detail} locale={locale} />}
+      <div className={styles.replyDock}>
+        {thread.kind === 'review'
+          ? (canWrite && capabilities.replyToReviews ? <ReplyBox key={thread.id} id={thread.id} kind="review" locale={locale} allowed headline="" /> : <p>{reviewLabel(locale, 'replyUnavailable')}</p>)
+          : <ThreadTools kind={thread.kind} id={thread.id} canWrite={canWrite} canReply={capabilities.reply} allowed={rule.allowed} headline={rule.headline} detail={rule.detail} locale={locale} />}
       </div>
-      <ContactDetails catalog={catalog} details={details} locale={locale} timeZone={timeZone} />
-      </div>
+    </>;
+    threadView = <section className={styles.threadPane} aria-label={thread.kind === 'message' ? copy.openConversation : thread.kind === 'review' ? reviewLabel(locale, 'openReview') : copy.openComment}>
+      <a className={styles.back} href={clearThreadHref}>{copy.back}</a>
+      {!openingItemPresent && listPage ? <p className={styles.contextNote}>{copy.outsideList}</p> : null}
+      <ThreadDetailsLayout head={head} actions={headActions} main={main} details={<ContactDetails catalog={catalog} details={details} locale={locale} timeZone={timeZone} />} locale={locale} />
     </section>;
   }
 
@@ -187,30 +198,19 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
   const listRevision = createHash('sha256').update(JSON.stringify({ actor, constraints, channels: listPage?.channels, locale, baseLocation, cursor: listPage?.cursor, thread: requestedThread, items: listPage?.items, abilities: [...abilities], total: listPage?.total, progressivePageLimit, previewMaxCharacters })).digest('hex');
   const syncTarget = channel === 'all' ? undefined : channel;
 
-  const sidebar = <aside className={styles.filters} aria-label={copy.filtersLabel}>
-    <InboxFilterPanel action={inboxHref()} filters={filters} channels={visibleChannels} locale={locale} thread={requestedThread} limit={listPage?.limit} maxLimit={listPage?.limits.listPageSize}
-      searchMaxCharacters={listPage?.limits.searchMaxCharacters} resetHref="/inbox" disabledLimit={!listPage} quick={listPage?.quick ?? []} />
-    <div className={styles.navigationGroup}>
-      <p className={styles.filterHeading}>{copy.automation}</p>
-      <a href="/inbox/moderation">{copy.moderationRules}</a>
-    </div>
-    {listPage ? <div className={styles.navigationGroup}>
-      <p className={styles.filterHeading}>{copy.conversations}</p>
-      <nav className={styles.pagination} aria-label={catalog['navigation.listPages'][locale]}>
-        {listPage.olderCursor ? <a href={inboxHref({ ...listPagingLocation, cursor: listPage.olderCursor })}>{copy.older}</a> : <span aria-disabled="true">{copy.older}</span>}
-        {listPage.cursor ? <a href={inboxHref({ ...listPagingLocation, cursor: undefined })}>{copy.latest}</a> : <span aria-disabled="true">{copy.latest}</span>}
-        {listPage.newerCursor ? <a href={inboxHref({ ...listPagingLocation, cursor: listPage.newerCursor })}>{copy.newer}</a> : <span aria-disabled="true">{copy.newer}</span>}
-      </nav>
-    </div> : null}
-    {threadPage ? <div className={styles.navigationGroup}>
-      <p className={styles.filterHeading}>{thread?.kind === 'comment' ? copy.replyHistory : copy.messageHistory}</p>
-      <nav className={styles.pagination} aria-label={catalog['navigation.historyPages'][locale]}>
-        {threadPage.history.olderCursor ? <a href={inboxHref({ ...baseLocation, ...(listPage?.cursor ? { cursor: listPage.cursor } : {}), thread: `${thread!.kind}:${thread!.id}`, historyCursor: threadPage.history.olderCursor })}>{copy.earlier}</a> : <span aria-disabled="true">{copy.earlier}</span>}
-        {threadPage.history.cursor ? <a href={inboxHref({ ...baseLocation, ...(listPage?.cursor ? { cursor: listPage.cursor } : {}), thread: `${thread!.kind}:${thread!.id}` })}>{copy.latest}</a> : <span aria-disabled="true">{copy.latest}</span>}
-        {threadPage.history.newerCursor ? <a href={inboxHref({ ...baseLocation, ...(listPage?.cursor ? { cursor: listPage.cursor } : {}), thread: `${thread!.kind}:${thread!.id}`, historyCursor: threadPage.history.newerCursor })}>{copy.newer}</a> : <span aria-disabled="true">{copy.newer}</span>}
-      </nav>
-    </div> : null}
-  </aside>;
+  const listNav = listPage ? <nav className={styles.listPaging} aria-label={catalog['navigation.listPages'][locale]}>
+    {listPage.olderCursor ? <a href={inboxHref({ ...listPagingLocation, cursor: listPage.olderCursor })}>{copy.older}</a> : <span aria-disabled="true">{copy.older}</span>}
+    {listPage.cursor ? <a href={inboxHref({ ...listPagingLocation, cursor: undefined })}>{copy.latest}</a> : <span aria-disabled="true">{copy.latest}</span>}
+    {listPage.newerCursor ? <a href={inboxHref({ ...listPagingLocation, cursor: listPage.newerCursor })}>{copy.newer}</a> : <span aria-disabled="true">{copy.newer}</span>}
+  </nav> : null;
+  // Quick filters are links, so they work without script and keep every other filter; each one toggles itself.
+  const quickHref = (filter: (typeof INBOX_QUICK_FILTERS)[number]) => {
+    const next = quickApplied.includes(filter) ? quickApplied.filter(item => item !== filter) : [...quickApplied, filter];
+    return inboxHref({ ...Object.fromEntries(Object.entries(baseLocation).filter(([key]) => key !== 'quick' && key !== 'cursor')), ...(next.length ? { quick: next.join(',') } : {}), ...(requestedThread ? { thread: requestedThread } : {}) });
+  };
+  const quickRow = listPage ? <div className={styles.quickRow} role="group" aria-label={extra.screen.quickRow}>
+    {INBOX_QUICK_FILTERS.map(filter => <a key={filter} href={quickHref(filter)} className={styles.quickChip} aria-current={quickApplied.includes(filter) ? 'true' : undefined} title={extra.quick.hint[filter]}>{extra.quick[filter]}</a>)}
+  </div> : null;
 
   // Applied filters stay visible in the content header; each chip links to the same view without that one filter.
   const without = (...keys: Array<keyof InboxLocation>) => inboxHref({ ...Object.fromEntries(Object.entries(baseLocation).filter(([key]) => !keys.includes(key as keyof InboxLocation))), ...(requestedThread ? { thread: requestedThread } : {}) });
@@ -229,18 +229,26 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
   const lastSynced = listPage?.lastSynced ?? null;
   const noChannels = listPage !== null && visibleChannels.length === 0;
 
-  return <InboxCopyProvider catalog={catalog}><PageFrame module="inbox" scopedAccess sidebar={sidebar}><div className={styles.page}>
-    <InboxHeader eyebrow={copy.eyebrow} title={copy.title} description={copy.description} actions={visibleChannels.length > 0 ? <InboxSyncBar targetId={syncTarget} lastSynced={lastSynced ? formatInboxTime(lastSynced, timeZone, true, locale) : null} timeZone={timeZone} locale={locale} /> : undefined} />
-    <div className={r3.tools}>
-      {visibleChannels.length > 0 ? <SavedRepliesManager locale={locale} canWrite={canWriteReplies} /> : null}
-      <InboxShortcuts locale={locale} />
-    </div>
-    {listPage && listPage.items.length > 0 ? <ShortcutHint catalog={catalog} locale={locale} /> : null}
+  const tabs = <LinkTabs label={extra.screen.tabsLabel} moreLabel={shell.moreTabs} activeId="conversations"
+    items={[{ id: 'conversations', href: '/inbox', label: extra.screen.tabConversations }, { id: 'rules', href: '/inbox/rules', label: extra.screen.tabRules }]} />;
+  const filterRow = <div className={styles.filterTools}>
+    <InboxFilterRow action={inboxHref()} filters={filters} channels={visibleChannels} locale={locale} thread={requestedThread} limit={listPage?.limit} maxLimit={listPage?.limits.listPageSize}
+      searchMaxCharacters={listPage?.limits.searchMaxCharacters} resetHref={resetHref} disabledLimit={!listPage} quick={quickApplied} activeCount={chips.length} />
     <UrlFilterChips chips={chips} resetHref={resetHref} labels={{ active: copy.activeFilters, remove: copy.removeFilter, reset: copy.resetFilters }} />
+  </div>;
+
+  return <InboxCopyProvider catalog={catalog}><PageFrame module="inbox" scopedAccess><div className={styles.page}>
+    <InboxHeader title={copy.title} count={listPage && filters.state === 'open' ? listPage.total : undefined} info={<InfoTip name={copy.title}>{copy.description}</InfoTip>} tabs={tabs} filters={filterRow}
+      actions={<>
+        {visibleChannels.length > 0 ? <InboxSyncBar targetId={syncTarget} lastSynced={lastSynced ? formatInboxTime(lastSynced, timeZone, true, locale) : null} timeZone={timeZone} locale={locale} /> : null}
+        {visibleChannels.length > 0 ? <SavedRepliesManager locale={locale} canWrite={canWriteReplies} /> : null}
+        <InboxShortcuts locale={locale} />
+      </>} />
     {listError ? <div role="alert" className={styles.alert}><p>{listError.error}</p><a href={resetHref}>{copy.resetAndReturn}</a></div> : null}
     {threadOutcome.error ? <div role="alert" className={styles.alert}><p>{threadOutcome.error.error}</p><a href={clearThreadHref}>{copy.returnToList}</a></div> : null}
     {noChannels ? <section className="panel"><EmptyState icon={<IconPlugConnected size={26} />} title={copy.noChannelsTitle} action={<a className="ui-button ui-button--primary" href="/settings/connections">{copy.goConnections}</a>}>{copy.noChannelsBody}</EmptyState></section> : listPage ? <div className={styles.split} data-open={thread ? 'true' : 'false'}>
       <section className={styles.listPane} aria-label={copy.conversationsAndComments}>
+        {quickRow}
         {!listPage.items.length ? <div className={styles.listHead}><h2>{filters.state === 'resolved' ? copy.resolved : filters.state === 'all' ? copy.allActivity : copy.open}</h2><span>{copy.items(0, listPage.total)}</span></div> : null}
         {listPage.items.length ? <InboxList key={listRevision} rows={rows} total={listPage.total} olderCursor={listPage.olderCursor} location={{ ...baseLocation, ...(requestedThread ? { thread: requestedThread } : {}) }}
           locale={locale} title={filters.state === 'resolved' ? copy.resolved : filters.state === 'all' ? copy.allActivity : copy.open}
@@ -253,6 +261,7 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
             : lastSynced
               ? <EmptyState icon={<IconInbox size={26} />} title={copy.noOpenTitle} action={<a className="ui-button ui-button--secondary" href="/inbox?status=resolved">{copy.showResolved}</a>}>{copy.noOpenBody}</EmptyState>
               : <EmptyState icon={<IconInbox size={26} />} title={copy.emptyTitle}>{copy.emptyBody}</EmptyState>}
+        {listNav}
       </section>
       {threadView ?? <section className={`${styles.threadPane} ${styles.pick}`} aria-label={copy.openConversation}><EmptyState icon={<IconMessages size={26} />} title={copy.selectTitle}>{copy.selectBody}</EmptyState></section>}
     </div> : null}

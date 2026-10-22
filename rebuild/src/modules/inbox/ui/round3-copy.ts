@@ -3,6 +3,11 @@ import type { InboxLocale } from './copy';
 /** Customer copy for the details panel, quick filters, bulk moderation, saved-reply management and the shortcut guide. */
 export const round3Copy = {
   en: {
+    screen: {
+      tabsLabel: 'Inbox sections', tabConversations: 'Conversations', tabRules: 'Rules', waiting: 'waiting for a reply', syncInfo: 'Last sync', search: 'Search the Inbox',
+      quickRow: 'Quick filters', listPaging: 'More conversations', detailsShow: 'Show details', detailsHide: 'Hide details', detailsDrawerClose: 'Close details', shortcutsIcon: 'Keyboard shortcuts',
+      filterTitle: 'Filter conversations', apply: 'Apply filters', syncDone: 'Sync finished',
+    },
     quick: {
       title: 'Quick filters', chip: 'Quick filter', unread: 'Unread', unanswered: 'Unanswered', negative: 'Negative', mentions: 'Mentions',
       hint: { unread: 'Conversations with unread messages', unanswered: 'Open items nobody on your team has answered', negative: 'Comments classified as negative (unclassified comments are not included)', mentions: 'Items that mention the channel by name' },
@@ -53,6 +58,11 @@ export const round3Copy = {
     },
   },
   fr: {
+    screen: {
+      tabsLabel: 'Sections de la boîte de réception', tabConversations: 'Conversations', tabRules: 'Règles', waiting: 'en attente de réponse', syncInfo: 'Dernière synchronisation', search: 'Rechercher dans la boîte de réception',
+      quickRow: 'Filtres rapides', listPaging: 'Plus de conversations', detailsShow: 'Afficher les détails', detailsHide: 'Masquer les détails', detailsDrawerClose: 'Fermer les détails', shortcutsIcon: 'Raccourcis clavier',
+      filterTitle: 'Filtrer les conversations', apply: 'Appliquer les filtres', syncDone: 'Synchronisation terminée',
+    },
     quick: {
       title: 'Filtres rapides', chip: 'Filtre rapide', unread: 'Non lus', unanswered: 'Sans réponse', negative: 'Négatifs', mentions: 'Mentions',
       hint: { unread: 'Conversations avec des messages non lus', unanswered: 'Éléments ouverts auxquels personne de votre équipe n’a répondu', negative: 'Commentaires classés comme négatifs (les commentaires non classés ne sont pas inclus)', mentions: 'Éléments qui citent le nom du canal' },
