@@ -952,3 +952,19 @@ shell-v2, ads-filter-ui, module-manifests, browser-matrix, config-validation,
 home-inventory, ads-management-ui74, ads-creation-recovery, ads-ad-create-ui
 plus neighboring ads UI files). No full suite, browser matrix run, provider
 or production verification in this batch.
+
+## Planned-vs-published surfacing — 2026-10-22 (source/unit only, uncommitted)
+
+Owner directive: planned vs published must be unmistakable. No model or
+route changes. `src/lib/post-groups.ts` owns the grouping; `StatusChip`
+marks post-level statuses with `data-group` (dashed = outcome);
+`readPublishingStatusCounts` counts planned/published/failed over the
+shared authorized scoped query. Posts header, Calendar toolbar and Queue
+header render "X planned · Y published" from ten new EN/FR keys in the
+existing `publishing.uiCopy` catalog; Calendar gained a legend and Queue
+a Sent block. Home renders no mixed count and is unchanged.
+`CONFIG_SCHEMA_VERSION` stays **137** (config-validation passes).
+Evidence: `npm run typecheck` 0 errors; touched suites pass (content-v2,
+content-v2-server, calendar-board-ui, publishing-customer-copy,
+publishing-read-service) plus config-validation. No browser, provider or
+production verification in this batch.

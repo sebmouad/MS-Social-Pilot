@@ -8,6 +8,7 @@ import { CalendarToolbar } from './CalendarToolbar';
 import { CalendarMore } from './CalendarMore';
 import { calendarExtrasLinks } from '@/modules/calendar-extras/server/links';
 import { pageChannelScope } from '@/modules/shell/server/scope';
+import { postGroup } from '@/lib/post-groups';
 import { readQueueSlots } from '../../collaboration/server/queue-slots';
 import { freeQueueSlots } from './free-slots';
 import { canUseFeature } from '@/server/entitlements';
@@ -157,7 +158,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
     <PageHeader module="publishing" title={copy.calendarTitle} info={<InfoTip name={copy.calendarTitle}>{content.copy.calendarInfo}</InfoTip>}
       actions={<><CalendarMore links={extraCalendars} />{canCreate ? <a className="ui-button ui-button--primary" href="/create">{copy.newPost}</a> : undefined}</>} />
     {channelUnavailable ? <p role="status">{copy.unavailableChannel}</p> : null}
-    <CalendarToolbar navigation={{ previous: href(view, previous), today: href(view, today), next: href(view, next), unit }} rangeLabel={rangeLabel} view={view}
+    <CalendarToolbar navigation={{ previous: href(view, previous), today: href(view, today), next: href(view, next), unit }} rangeLabel={rangeLabel} view={view} counts={{ planned: posts.filter(post => postGroup(post.status) === 'planned').length, published: posts.filter(post => post.status === 'published').length }}
       viewHrefs={{ month: href("month", anchor), week: href("week", anchor) }} statuses={STATUSES.map(value => ({ value, label: value === "pending_approval" || value === "partially_failed" ? copy[`calendarStatus_${value}`] : copy[`status_${value}`] }))}
       origins={originOptions} chips={chips} resetHref={`/content/calendar?view=${view}&date=${anchor}${params.channel ? `&channel=${encodeURIComponent(params.channel)}` : ""}`} />
     <CalendarBoard view={view} days={days} timeZone={timeZone} nowIso={now.toISOString()} canCreate={canCreate} filterQuery={filterQuery} defaultScheduleTime={defaultScheduleTime} />

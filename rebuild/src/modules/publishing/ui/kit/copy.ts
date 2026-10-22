@@ -519,6 +519,46 @@ export const publishingCopyDefaults = {
   "perPage.variant0": {
     "en": "{v0} per page",
     "fr": "{v0} par page"
+  },
+  "groupPlanned": {
+    "en": "Planned",
+    "fr": "Prévues"
+  },
+  "groupPlannedHint": {
+    "en": "Not yet sent",
+    "fr": "Pas encore envoyées"
+  },
+  "groupOutcome": {
+    "en": "Outcome",
+    "fr": "Résultats"
+  },
+  "groupOutcomeHint": {
+    "en": "Sent or resolved",
+    "fr": "Envoyées ou traitées"
+  },
+  "plannedPublished.variant0": {
+    "en": "{v0} planned · {v1} published",
+    "fr": "{v0} prévues · {v1} publiées"
+  },
+  "calendarLegend": {
+    "en": "Legend",
+    "fr": "Légende"
+  },
+  "queueSentTitle": {
+    "en": "Sent",
+    "fr": "Envoyées"
+  },
+  "queueSentBody": {
+    "en": "Sent and failed posts stay under Posts.",
+    "fr": "Les publications envoyées et en échec restent sous Publications."
+  },
+  "queueReviewSent": {
+    "en": "Review sent posts",
+    "fr": "Voir les publications envoyées"
+  },
+  "queueReviewFailed": {
+    "en": "Review failed posts",
+    "fr": "Voir les publications en échec"
   }
 };
 export type PublishingCopyCatalog = typeof publishingCopyDefaults;
@@ -766,7 +806,17 @@ export function resolvePublishingCopy(catalog: PublishingCopyCatalog) { return {
 "templatesTitle": catalog["templatesTitle"].en,
 "templatesDescription": catalog["templatesDescription"].en,
 "templatesPrivate": catalog["templatesPrivate"].en,
-"perPage": (n: number) => fillCopy(catalog["perPage.variant0"].en, {v0: (n)})},
+"perPage": (n: number) => fillCopy(catalog["perPage.variant0"].en, {v0: (n)}),
+"groupPlanned": catalog["groupPlanned"].en,
+"groupPlannedHint": catalog["groupPlannedHint"].en,
+"groupOutcome": catalog["groupOutcome"].en,
+"groupOutcomeHint": catalog["groupOutcomeHint"].en,
+"plannedPublished": (planned: number | string, published: number | string) => fillCopy(catalog["plannedPublished.variant0"].en, {v0: (planned),v1: (published)}),
+"calendarLegend": catalog["calendarLegend"].en,
+"queueSentTitle": catalog["queueSentTitle"].en,
+"queueSentBody": catalog["queueSentBody"].en,
+"queueReviewSent": catalog["queueReviewSent"].en,
+"queueReviewFailed": catalog["queueReviewFailed"].en},
 "fr": {
 "firstComment_not_requested":catalog["firstComment_not_requested"].fr,
 "firstComment_awaiting_post":catalog["firstComment_awaiting_post"].fr,
@@ -1009,5 +1059,15 @@ export function resolvePublishingCopy(catalog: PublishingCopyCatalog) { return {
 "templatesTitle": catalog["templatesTitle"].fr,
 "templatesDescription": catalog["templatesDescription"].fr,
 "templatesPrivate": catalog["templatesPrivate"].fr,
-"perPage": (n: number) => fillCopy(catalog["perPage.variant0"].fr, {v0: (n)})}}; }
+"perPage": (n: number) => fillCopy(catalog["perPage.variant0"].fr, {v0: (n)}),
+"groupPlanned": catalog["groupPlanned"].fr,
+"groupPlannedHint": catalog["groupPlannedHint"].fr,
+"groupOutcome": catalog["groupOutcome"].fr,
+"groupOutcomeHint": catalog["groupOutcomeHint"].fr,
+"plannedPublished": (planned: number | string, published: number | string) => fillCopy(catalog["plannedPublished.variant0"].fr, {v0: (planned),v1: (published)}),
+"calendarLegend": catalog["calendarLegend"].fr,
+"queueSentTitle": catalog["queueSentTitle"].fr,
+"queueSentBody": catalog["queueSentBody"].fr,
+"queueReviewSent": catalog["queueReviewSent"].fr,
+"queueReviewFailed": catalog["queueReviewFailed"].fr}}; }
 export const kitCopy = resolvePublishingCopy(publishingCopyDefaults);

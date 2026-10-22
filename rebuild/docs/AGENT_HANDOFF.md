@@ -929,3 +929,35 @@ ai-content-tools-ui, ai-content-tools-http, config-validation,
 contract-audit-shell, smoke-guard-redirect, caption-tests-service).
 No browser run; full suite owned by the verifier. Next: mobile pass, then
 browser-matrix v2 run and release per CUTOVER.
+
+## Planned-vs-published surfacing — 2026-10-22 (no commit/push/deploy)
+
+Owner directive (authoritative): content planned vs published must be
+clear. Surfacing/UX batch, no remodel: PostStatus unchanged; Planned =
+draft/pending_approval/scheduled/publishing, Outcome = published +
+partially_failed/failed/cancelled/rejected (`src/lib/post-groups.ts`).
+
+- Posts: status filter grouped into Planned/Outcome optgroups (values
+  unchanged); row chips carry `data-group` (dashed outline = outcome) on
+  desktop and phone; header says "X planned · Y published" (FR "X
+  prévues · Y publiées") over the list scope minus the status filter.
+- Calendar: month/week cards and the phone agenda share the solid-edge
+  (planned) vs dashed-edge (outcome) rule with a small legend; toolbar
+  shows the range counts; status filter grouped the same way.
+- Queue: header pairs the scheduled total with the published count; a
+  Sent block links sent/failed posts under Posts (only when any exist);
+  empty states still name the next action.
+- New `readPublishingStatusCounts` service (planned/published/failed)
+  reuses the shared scoped query; new strings live in the existing
+  `publishing.uiCopy` catalog (schema derived, no registry change).
+- Home verified unchanged: it renders no mixed planned/published count
+  (upcoming is scheduled-only; attention rows are per-state).
+- Honesty preserved: post-level status distinct from per-destination
+  outcomes; no new success claims. No CONFIG_SCHEMA_VERSION bump
+  (config-validation pins 137 and passes; copy-only catalog growth).
+
+Evidence: `npm run typecheck` 0 errors; 6 files pass (content-v2,
+content-v2-server, calendar-board-ui, publishing-customer-copy,
+publishing-read-service, config-validation). No browser run; full suite
+owned by the verifier. Next: browser-matrix v2 run and release per
+CUTOVER.

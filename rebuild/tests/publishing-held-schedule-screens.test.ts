@@ -15,6 +15,7 @@ vi.mock('@/server/config/store', () => ({ runtimeConfig: async (key: string) => 
 vi.mock('@/modules/publishing/server/read', () => ({
   readPublishingPostPage: async () => ({ posts: state.rows, total: state.rows.length, page: 1, pages: 1 }),
   readPublishingCalendar: async () => ({ posts: state.rows, channels: [], channelUnavailable: false }),
+  readPublishingStatusCounts: async () => ({ planned: state.rows.length, published: 0, failed: 0, channelUnavailable: false }),
 }));
 vi.mock('@/modules/publishing/ui/kit/locale', () => ({ pageLocale: async () => 'fr' }));
 vi.mock('@/modules/publishing/server/customer-copy', async () => {

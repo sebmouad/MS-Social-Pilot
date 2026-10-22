@@ -20,6 +20,11 @@
 .automation > summary { min-height: 36px; color: var(--ink); font-size: var(--text-md); font-weight: 700; cursor: pointer; }
 .automation > summary:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: var(--radius-xs); }
 .muted { margin: 0; color: var(--ink-soft); font-size: var(--text-md); }
+/* Planned vs outcome (2026-10-22): the Sent block separates what went out from the "up next" queue above it. */
+.sent { display: grid; gap: var(--space-2); padding: var(--space-4); border: 1px dashed var(--line-strong); border-radius: var(--radius-lg); background: var(--surface); }
+.sent h2 { margin: 0; font-size: var(--text-md); }
+.sent p { margin: 0; color: var(--ink-soft); font-size: var(--text-sm); }
+.sent ul { display: flex; flex-wrap: wrap; gap: 8px 16px; margin: 0; padding: 0; list-style: none; }
 @media (max-width: 1023px) { .layout { grid-template-columns: minmax(0, 1fr); } .side { position: static; } }
 /* The queue-times editor sits flat inside the side panel: dividers instead of cards within a card. */
 .sidePanel section { padding: 0; border: 0; border-radius: 0; background: none; box-shadow: none; }

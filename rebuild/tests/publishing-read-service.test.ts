@@ -20,7 +20,7 @@ vi.mock('../src/server/data', () => ({
 }));
 vi.mock('../src/server/config/store', () => ({ runtimeConfig: state.config }));
 
-import { readPublishingCalendar, readPublishingPostList, readPublishingPostPage, readPublishingSummary } from '../src/modules/publishing/server/read';
+import { readPublishingCalendar, readPublishingPostList, readPublishingPostPage, readPublishingStatusCounts, readPublishingSummary } from '../src/modules/publishing/server/read';
 
 const actor = { userId: 'reader', workspaceId: 'workspace' };
 const allowedActor = { ...actor, allowedTargetIds: ['selected-a', 'selected-b'] };
@@ -81,6 +81,28 @@ describe('shared Publishing read service', () => {
     expect(state.count).toHaveBeenNthCalledWith(1, { where: { AND: [expect.objectContaining({ workspaceId: 'workspace', OR: expect.any(Array) }), { status: 'published' }] } });
     expect(state.count.mock.calls[0]?.[0].where.AND[0].OR[0].targets.every.targetId.in).toEqual(['selected-a', 'selected-b']);
     expect(state.count).toHaveBeenNthCalledWith(2, expect.objectContaining({ where: expect.objectContaining({ AND: expect.arrayContaining([{ status: 'scheduled' }]) }) }));
+  });
+
+  it('counts planned, published and failed posts over the shared scoped query without a status filter', async () => {
+    state.count.mockReset();
+    state.count.mockResolvedValueOnce(3).mockResolvedValueOnce(7).mockResolvedValueOnce(1);
+    const result = await readPublishingStatusCounts(allowedActor, { channelId: 'selected-a', q: 'launch' });
+    expect(result).toEqual({ planned: 3, published: 7, failed: 1, channelUnavailable: false });
+    expect(state.authorize).toHaveBeenCalledWith(allowedActor, 'publishing/posts', 'read');
+    expect(state.count).toHaveBeenCalledTimes(3);
+    expect(state.count.mock.calls[0]?.[0].where.AND[1]).toEqual({ status: { in: ['draft', 'pending_approval', 'scheduled', 'publishing'] } });
+    expect(state.count.mock.calls[1]?.[0].where.AND[1]).toEqual({ status: 'published' });
+    expect(state.count.mock.calls[2]?.[0].where.AND[1]).toEqual({ status: { in: ['partially_failed', 'failed'] } });
+    // Every count shares the same visibility, channel and search scope as the list.
+    for (const call of state.count.mock.calls) {
+      expect(call[0].where.AND[0].AND).toEqual(expect.arrayContaining([expect.objectContaining({ workspaceId: 'workspace' })]));
+    }
+  });
+
+  it('rejects invalid count filters before database reads', async () => {
+    state.count.mockReset();
+    await expect(readPublishingStatusCounts(actor, { channelId: ' selected-a' })).rejects.toMatchObject({ code: 'invalid_request' });
+    expect(state.count).not.toHaveBeenCalled();
   });
 
   it.each(['publishing/calendar', 'publishing/posts'])('denies unavailable %s before selected content reads', async feature => {

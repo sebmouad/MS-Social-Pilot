@@ -11,7 +11,7 @@ import { InfoTip, PageHeader, statusLabel } from "@/components";
 import { IconPlus } from "@tabler/icons-react";
 import { redirect } from 'next/navigation';
 import { requireViewer } from "@/server/context";
-import { readPublishingPostPage } from "@/modules/publishing/server/read";
+import { readPublishingPostPage, readPublishingStatusCounts } from "@/modules/publishing/server/read";
 import { publishingDestinationChoices } from '@/modules/publishing/server/destinations';
 import { formatDate } from "@/modules/publishing/ui/publishing-ui";
 import { EmptyPanel, type FilterChip } from "../kit/kit";
@@ -75,6 +75,8 @@ export default async function PostsPage({ searchParams }: { searchParams: Promis
   </ContentProvider>;
   // A shared `?post=` link to a post that is not on this page opens the post's own page instead.
   if (postParam && POST_ID.test(postParam) && !listing.posts.some(post => post.id === postParam)) redirect(`/content/post/${encodeURIComponent(postParam)}`);
+  // Header counts use the same channel/search/origin scope as the list but ignore the status filter, so they always split planned vs published. A failed count hides instead of showing a bare total.
+  const counts = await readPublishingStatusCounts({ userId: viewer.user.id, workspaceId: viewer.workspaceId }, { ...(selectedChannel === undefined ? {} : { channelId: selectedChannel }), ...(q === undefined ? {} : { q }), ...(originKind === undefined ? {} : { origin: originKind }) }).catch(() => null);
   const targetChoices = await publishingDestinationChoices(viewer);
   const undoSendSeconds = await loadWorkspaceOperations(viewer.workspaceId).then(value => value.undoSendSeconds, () => 0);
   const timeZone = viewer.membership.workspace.timezone;
@@ -123,7 +125,7 @@ export default async function PostsPage({ searchParams }: { searchParams: Promis
   const statuses = STATUS_FILTERS.map(value => ({ value, label: copy[`status_${value}`] }));
   const headerActions = <>{canManageDrafts ? <ImportCsv targets={targetChoices} locale={locale} /> : null}{newPostLink}</>;
   return <ContentProvider {...content}><PublishingCopyProvider catalog={catalog} locale={locale}><PublishingActionCopyProvider catalog={actionCatalog} locale={locale}><ComposerCopyProvider catalog={composerCatalog} locale={locale}>
-    <PageHeader module="publishing" title={copy.postsTitle} count={listing.total.toLocaleString(locale)} info={pageInfo} actions={headerActions}
+    <PageHeader module="publishing" title={copy.postsTitle} count={counts ? copy.plannedPublished(counts.planned.toLocaleString(locale), counts.published.toLocaleString(locale)) : undefined} info={pageInfo} actions={headerActions}
       filters={<PostsHeaderTools statuses={statuses} origins={originOptions} chips={chips} resetHref={resetHref} searchMaxCharacters={Number(searchMaxCharacters)} exportMaxPosts={Number(exportMaxPosts)} exportMaxBytes={Number(exportMaxBytes)} locale={locale} canExport={canAuthorDrafts} />} />
     {listing.channelUnavailable ? <p className={styles.errorNotice} role="status">{content.copy.contentChannelUnavailable}</p> : null}
     {noticeText ? <RouteNotice className={notice?.startsWith('failed') ? styles.errorNotice : styles.successNotice} error={notice?.startsWith('failed')} focusKey={`${notice}:${recovery ?? ''}`}>{noticeText}</RouteNotice> : null}

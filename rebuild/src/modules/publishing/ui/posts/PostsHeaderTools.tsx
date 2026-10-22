@@ -7,6 +7,7 @@ import { PostExport } from './PostExport';
 import { SavedViews } from '../SavedViews';
 import { useContent } from '../ContentProvider';
 import { UrlFilterChips, type UrlFilterChip } from '../kit/UrlFilterChips';
+import { postGroup } from '@/lib/post-groups';
 import { usePublishingCopy } from '../kit/CopyProvider';
 import type { KitLocale } from '../kit/copy';
 import styles from './posts-table.module.css';
@@ -53,7 +54,12 @@ export function PostsHeaderTools({ statuses, origins, chips, resetHref, searchMa
         <label>{copy.contentFilterStatus}
           <select value={status} onChange={event => go('status', event.currentTarget.value)}>
             <option value="">{copy.contentFilterAnyStatus}</option>
-            {statuses.map(item => <option key={item.value} value={item.value}>{item.label}</option>)}
+            <optgroup label={labels.groupPlanned}>
+              {statuses.filter(item => postGroup(item.value) === 'planned').map(item => <option key={item.value} value={item.value}>{item.label}</option>)}
+            </optgroup>
+            <optgroup label={labels.groupOutcome}>
+              {statuses.filter(item => postGroup(item.value) === 'outcome').map(item => <option key={item.value} value={item.value}>{item.label}</option>)}
+            </optgroup>
           </select>
         </label>
         {origins.length ? <label>{copy.contentFilterOrigin}

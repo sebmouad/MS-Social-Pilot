@@ -849,6 +849,9 @@ select.ui-input { appearance: none; padding-right: 36px; background-image: linea
 .ui-chip--warn { background: var(--warning-soft); color: var(--warning); }
 .ui-chip--danger { background: var(--danger-soft); color: var(--danger); }
 .ui-chip--compact { padding: 2px 7px 2px 5px; font-size: var(--text-2xs); }
+/* Planned vs outcome (2026-10-22): a dashed outline marks a resolved outcome; planned keeps a quiet solid edge. Shape, never colour alone. */
+.ui-chip[data-group="planned"] { border: 1.5px solid transparent; }
+.ui-chip[data-group="outcome"] { border: 1.5px dashed currentColor; }
 .ui-channel { display: inline-flex; align-items: center; gap: 6px; min-width: 0; max-width: 100%; color: var(--ink-soft); font-size: var(--text-xs); }
 .ui-channel__mark { flex: 0 0 auto; display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: var(--radius-xs); color: #fff; font-size: var(--text-2xs); font-weight: 800; line-height: 1; }
 .ui-channel__name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

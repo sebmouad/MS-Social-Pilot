@@ -668,3 +668,41 @@ Source/DOM evidence only (typecheck + touched vitest files); no browser run.
   palette; they are reached from their parent screen.
 - AI studio's no-channel empty state links to Manage channels. Feeds and
   caption tests keep their one next action beside their empty states.
+
+## Planned/outcome display rule (2026-10-22)
+
+Owner directive: content planned vs published must be clear at a glance.
+This is a surfacing rule; the PostStatus model is unchanged. Planned means
+nothing was sent yet (`draft`, `pending_approval`, `scheduled` and the
+transient `publishing`); outcome means sent or resolved (`published`,
+`partially_failed`, `failed`, `cancelled`, `rejected`). See
+`src/lib/post-groups.ts`.
+
+- Posts and Calendar status filters group options into Planned vs Outcome
+  (`optgroup`); every filter value keeps working.
+- Post-level status chips carry `data-group` (dashed outline = outcome) on
+  top of their existing label, shape and tone; destination chips keep
+  their wording (resolved destination outcomes share the dashed group
+  edge). Calendar month/week cards and the phone agenda
+  share the solid-edge (planned) vs dashed-edge (outcome) rule, with a
+  small legend naming both groups.
+- Every header/summary that mixes both states says "X planned · Y
+  published" (FR "X prévues · Y publiées") from the Root-editable
+  `publishing.uiCopy` catalog: the Posts header (same channel/search/origin
+  scope as the list, ignoring the status filter), the Calendar toolbar
+  (visible range after filters) and the Queue header (scheduled total plus
+  the published count in scope). A failed count hides rather than showing
+  a bare total.
+- Queue keeps "up next" separate: sent and failed posts stay under Posts,
+  linked from a Sent block that appears only when at least one exists; the
+  empty queue keeps naming its next action (Create a post, Open the
+  calendar).
+- Contract section 5 honesty is preserved: post-level status stays
+  distinct from per-destination outcomes, partial/uncertain destination
+  results keep their explicit copy and reconciliation paths, and no
+  full-success claim is made from partial outcomes. Home renders no mixed
+  planned/published count (its upcoming card is scheduled-only), so it
+  needed no change.
+
+Source/DOM evidence only (typecheck + touched vitest files); no browser,
+keyboard-in-browser or screen-reader run.

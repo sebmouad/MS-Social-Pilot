@@ -23,6 +23,8 @@ vi.mock('../src/modules/publishing/server/content-copy', async () => {
 import { pendingApprovalCount } from '../src/modules/publishing/server/approvals-badge';
 import { pageChannelScope } from '../src/modules/shell/server/scope';
 import { LibraryHeader } from '../src/modules/publishing/ui/library/LibraryHeader';
+import { QueueSent } from '../src/modules/publishing/ui/queue/QueueSent';
+import { publishingCopyDefaults, resolvePublishingCopy } from '../src/modules/publishing/ui/kit/copy';
 
 beforeEach(() => { vi.clearAllMocks(); h.allowed = new Set(); });
 
@@ -84,5 +86,28 @@ describe('Library header', () => {
     // A lone section needs no tab row.
     h.allowed = new Set();
     expect(await html('labels')).not.toContain('ui-tabs');
+  });
+});
+
+describe('Queue sent block', () => {
+  const en = resolvePublishingCopy(publishingCopyDefaults).en;
+  const copy = { title: en.queueSentTitle, body: en.queueSentBody, reviewSent: en.queueReviewSent, reviewFailed: en.queueReviewFailed };
+  const show = (published: number, failed: number) => renderToStaticMarkup(createElement(QueueSent, {
+    copy, published, failed, sentHref: '/content?status=published&channel=c1', failedHref: '/content?status=failed&channel=c1',
+  }));
+  it('separates sent and failed posts from the up-next queue and keeps the channel scope in both links', () => {
+    const markup = show(4, 1);
+    expect(markup).toContain('>Sent</h2>');
+    expect(markup).toContain('stay under Posts');
+    expect(markup).toContain('href="/content?status=published&amp;channel=c1"');
+    expect(markup).toContain('href="/content?status=failed&amp;channel=c1"');
+    expect(markup).toContain('Review sent posts');
+    expect(markup).toContain('Review failed posts');
+  });
+  it('hides the failed link when nothing failed, and the whole block when nothing went out', () => {
+    const sentOnly = show(2, 0);
+    expect(sentOnly).toContain('Review sent posts');
+    expect(sentOnly).not.toContain('Review failed posts');
+    expect(show(0, 0)).toBe('');
   });
 });

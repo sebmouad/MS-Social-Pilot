@@ -13,7 +13,8 @@ import { pageChannelScope } from '@/modules/shell/server/scope';
 import { PostPreview } from "@/components/PostPreview";
 import { requireViewer } from "@/server/context";
 import { runtimeConfig } from '@/server/config/store';
-import { readPublishingPostPage } from "@/modules/publishing/server/read";
+import { readPublishingPostPage, readPublishingStatusCounts } from "@/modules/publishing/server/read";
+import { QueueSent } from "./QueueSent";
 import { addDaysToKey, instantToWall, workspaceDateKey } from "@/lib/calendar-dates";
 import { PublishingPagination } from "@/modules/publishing/ui/publishing-ui";
 import { EmptyPanel } from "../kit/kit";
@@ -41,10 +42,13 @@ export default async function QueuePage({ searchParams }: { searchParams: Promis
   const content = await loadContent();
   const composerCatalog = await loadComposerCopy();
   const scope = await pageChannelScope(viewer, params).catch(() => null);
+  const channelId = scope?.ids.length ? scope.ids.join(",") : undefined;
   const [listing, slotsPerChannel] = await Promise.all([
-    readPublishingPostPage({ userId: viewer.user.id, workspaceId: viewer.workspaceId }, { page: requestedPage, status: "scheduled", order: "scheduled_asc", channelId: scope?.ids.length ? scope.ids.join(",") : undefined }, "publishing/queue"),
+    readPublishingPostPage({ userId: viewer.user.id, workspaceId: viewer.workspaceId }, { page: requestedPage, status: "scheduled", order: "scheduled_asc", channelId }, "publishing/queue"),
     runtimeConfig('publishing.queueTimelineSlotsPerChannel'),
   ]);
+  // Published/failed context for the header and the Sent block, in the same channel scope. A failed count falls back to the scheduled-only total, which never mixes states.
+  const counts = await readPublishingStatusCounts({ userId: viewer.user.id, workspaceId: viewer.workspaceId }, { ...(channelId === undefined ? {} : { channelId }) }, "publishing/queue").catch(() => null);
   const now = new Date();
   const slotFormat = new Intl.DateTimeFormat(locale, { timeZone, weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
   const today = workspaceDateKey(now, timeZone);
@@ -78,8 +82,14 @@ export default async function QueuePage({ searchParams }: { searchParams: Promis
   </>;
 
   const canAdd = viewer.permissions.features["publishing/posts"].write;
+  // The queue lists scheduled posts only; the header pairs that planned count with the published count and the Sent block links out to both outcomes.
+  const channelSuffix = params.channel ? `&channel=${encodeURIComponent(params.channel)}` : "";
+  const sentCopy = { title: copy.queueSentTitle, body: copy.queueSentBody, reviewSent: copy.queueReviewSent, reviewFailed: copy.queueReviewFailed };
+  const sentBlock = counts && (counts.published > 0 || counts.failed > 0)
+    ? <QueueSent copy={sentCopy} published={counts.published} failed={counts.failed} sentHref={`/content?status=published${channelSuffix}`} failedHref={`/content?status=failed${channelSuffix}`} />
+    : null;
   return <ContentProvider {...content}><PublishingCopyProvider catalog={catalog} locale={locale}><PublishingActionCopyProvider catalog={actionCatalog} locale={locale}><ComposerCopyProvider catalog={composerCatalog} locale={locale}>
-    <PageHeader module="publishing" title={copy.queueTitle} count={listing.total.toLocaleString(locale)}
+    <PageHeader module="publishing" title={copy.queueTitle} count={counts ? copy.plannedPublished(listing.total.toLocaleString(locale), counts.published.toLocaleString(locale)) : listing.total.toLocaleString(locale)}
       info={<InfoTip name={copy.queueTitle}>{`${content.copy.queueInfo} ${copy.queueDescription(timeZone.replaceAll("_", " "))}`}</InfoTip>}
       actions={canAdd ? <a className="ui-button ui-button--primary" href="/create">{content.copy.queueAdd}</a> : undefined} />
     <div className={styles.layout}>
@@ -94,6 +104,7 @@ export default async function QueuePage({ searchParams }: { searchParams: Promis
             ]} />
             <PublishingPagination path="/content/queue" page={listing.page} pages={listing.pages} locale={locale} copy={copy} />
           </>}
+        {sentBlock}
       </section>
       <QueueSidePanel actor={{ userId: viewer.user.id, workspaceId: viewer.workspaceId }} timeZone={timeZone} copy={content.copy} />
     </div>

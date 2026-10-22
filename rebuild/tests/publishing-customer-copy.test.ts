@@ -58,6 +58,24 @@ describe('Publishing Root customer catalogs', () => {
     expect(resolveTemplateCopy(templates).en.deleteBody('Launch')).toBe('Remove Launch?');
   });
 
+  it('splits planned vs published headers and groups in English and French', () => {
+    const copy = resolvePublishingCopy(publishingCopyDefaults);
+    expect(copy.en.plannedPublished(2, 5)).toBe('2 planned · 5 published');
+    expect(copy.fr.plannedPublished(2, 5)).toBe('2 prévues · 5 publiées');
+    expect([copy.en.groupPlanned, copy.en.groupPlannedHint, copy.en.groupOutcome, copy.en.groupOutcomeHint]).toEqual(['Planned', 'Not yet sent', 'Outcome', 'Sent or resolved']);
+    expect([copy.fr.groupPlanned, copy.fr.groupPlannedHint, copy.fr.groupOutcome, copy.fr.groupOutcomeHint]).toEqual(['Prévues', 'Pas encore envoyées', 'Résultats', 'Envoyées ou traitées']);
+    expect(copy.en.calendarLegend).toBe('Legend');
+    expect(copy.fr.calendarLegend).toBe('Légende');
+    expect([copy.en.queueSentTitle, copy.en.queueReviewSent, copy.en.queueReviewFailed]).toEqual(['Sent', 'Review sent posts', 'Review failed posts']);
+    expect([copy.fr.queueSentTitle, copy.fr.queueReviewSent, copy.fr.queueReviewFailed]).toEqual(['Envoyées', 'Voir les publications envoyées', 'Voir les publications en échec']);
+    // Root rewrites keep the two count placeholders.
+    const edited = structuredClone(publishingCopyDefaults);
+    edited['plannedPublished.variant0'] = { en: '{v0} planned · {v1} published!', fr: '{v0} prévues · {v1} publiées !' };
+    expect(publishingCopySchema.safeParse(edited).success).toBe(true);
+    edited['plannedPublished.variant0'] = { en: 'planned and published', fr: '{v0} prévues · {v1} publiées' };
+    expect(publishingCopySchema.safeParse(edited).success).toBe(false);
+  });
+
   it('uses configured notices while retaining unknown-code handling', () => {
     const catalog = structuredClone(publishingNoticeDefaults);
     catalog.created.fr = 'Texte personnalisé';

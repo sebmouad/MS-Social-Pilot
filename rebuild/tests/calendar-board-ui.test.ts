@@ -134,6 +134,42 @@ describe('calendar post preview and navigation', () => {
   });
 });
 
+describe('planned vs outcome display', () => {
+  const monthPosts = (overrides: Array<Partial<BoardPost>>): BoardDay[] =>
+    [{ ...days[0]!, posts: overrides.map((override, index) => ({ ...samplePost, ...override, id: `post-${index}` })) }];
+  const renderMonth = (posts: BoardPost[], locale: 'en' | 'fr' = 'en') => act(async () => root.render(createElement(PublishingCopyProvider, {
+    catalog: publishingCopyDefaults, locale, children: createElement(CalendarBoard, {
+      view: 'month', days: monthPosts(posts), timeZone: 'UTC', nowIso: '2026-10-14T09:00:00.000Z', canCreate: false, filterQuery: '', defaultScheduleTime: '09:00',
+    }),
+  })));
+  it('explains the two groups in a legend, in English and French', async () => {
+    await render();
+    const legend = container.querySelector('[aria-label="Legend"]')!;
+    expect(legend.textContent).toContain('Planned');
+    expect(legend.textContent).toContain('Not yet sent');
+    expect(legend.textContent).toContain('Outcome');
+    expect(legend.textContent).toContain('Sent or resolved');
+    expect([...legend.querySelectorAll('[data-group]')].map(item => item.getAttribute('data-group'))).toEqual(['planned', 'outcome']);
+    await act(async () => root.unmount());
+    root = createRoot(container);
+    await renderMonth([{ ...samplePost, status: 'scheduled' }], 'fr');
+    expect(container.querySelector('[aria-label="Légende"]')?.textContent).toContain('Prévues');
+    expect(container.querySelector('[aria-label="Légende"]')?.textContent).toContain('Résultats');
+  });
+  it('marks scheduled and published cards distinctly in the month grid and the phone agenda', async () => {
+    await renderMonth([{ ...samplePost, status: 'scheduled' }, { ...samplePost, status: 'published', movable: false }]);
+    const monthCards = [...container.querySelectorAll('ol > li div[data-group]')].filter(node => (node as HTMLElement).dataset.status !== undefined);
+    expect(monthCards.map(node => [(node as HTMLElement).dataset.status, (node as HTMLElement).dataset.group])).toEqual([
+      ['scheduled', 'planned'], ['published', 'outcome'],
+    ]);
+    // The status chips keep their label and shape and carry the same group.
+    const chips = [...container.querySelectorAll('ol > li [data-status="scheduled"] [data-group="planned"]')];
+    expect(chips.length).toBeGreaterThan(0);
+    const agenda = [...container.querySelectorAll('section[aria-label="Agenda"] div[data-group]')].filter(node => (node as HTMLElement).dataset.status !== undefined);
+    expect(agenda.map(node => (node as HTMLElement).dataset.group).sort()).toEqual(['outcome', 'planned']);
+  });
+});
+
 it('keeps French calendar controls and custom Root copy in the move dialog', async () => {
   const catalog = structuredClone(publishingCopyDefaults);
   catalog.moveScheduled.fr = 'Changer l’horaire';

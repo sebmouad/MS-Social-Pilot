@@ -107,6 +107,15 @@
 .post:hover { box-shadow: 0 3px 10px color-mix(in srgb, var(--ink) 14%, transparent); }
 /* Published posts are marked by a dashed edge and a quieter fill, never by opacity, so text keeps full contrast. */
 .post[data-status="published"] { border-left-style: dashed; background: color-mix(in srgb, var(--chip, var(--mod, var(--accent))) 4%, var(--surface)); }
+/* Planned vs outcome (2026-10-22): solid edge = still to go out, dashed edge = sent or resolved. Month, week and the phone agenda share the rule. */
+.post[data-group="planned"] { border-left-style: solid; }
+.post[data-group="outcome"] { border-left-style: dashed; }
+.legend { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 0; color: var(--ink-soft); font-size: 12px; }
+.legendItem { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 999px; background: var(--surface); }
+.legendItem strong { color: var(--ink); }
+.legendItem[data-group="planned"] { border: 1.5px solid var(--line-strong); }
+.legendItem[data-group="outcome"] { border: 1.5px dashed var(--line-strong); }
+.toolbarCounts { margin: 0; color: var(--ink-soft); font-size: var(--text-sm); font-variant-numeric: tabular-nums; }
 .day[data-today] { background: color-mix(in srgb, var(--mod, var(--accent)) 6%, var(--surface)); box-shadow: inset 0 3px 0 var(--mod, var(--accent)); }
 .day[data-today] .dayHead time { display: inline-grid; place-items: center; min-width: 24px; height: 24px; border-radius: 50%; background: color-mix(in srgb, var(--mod, var(--accent)) 45%, black); color: #fff; }
 .weekHead[data-today] { background: color-mix(in srgb, var(--mod, var(--accent)) 6%, var(--surface)); box-shadow: inset 0 3px 0 var(--mod, var(--accent)); }

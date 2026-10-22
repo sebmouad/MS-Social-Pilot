@@ -12,6 +12,7 @@ import { PostPreview } from "@/components/PostPreview";
 import { PostThumb } from "@/components/PostThumb";
 import { postThumbnail } from "@/components/post-thumbnail";
 import { useContent } from "../ContentProvider";
+import { postGroup } from "@/lib/post-groups";
 import { instantToWall, wallTimeToInstant } from "@/lib/calendar-dates";
 import { moveCandidates } from "@/lib/reschedule";
 import { reschedulePostAction } from "./actions";
@@ -52,7 +53,7 @@ export function CalendarBoard({ view, days, timeZone, nowIso, canCreate, filterQ
     onDrop: (event: DragEvent) => dropOn(event, date, time),
   };
 
-  const postCard = (post: BoardPost) => <div key={post.id} className={styles.post} data-status={post.status} data-movable={post.movable || undefined} style={post.channels[0] ? { ["--chip" as string]: post.channels[0].mark.color } : undefined}
+  const postCard = (post: BoardPost) => <div key={post.id} className={styles.post} data-status={post.status} data-group={postGroup(post.status)} data-movable={post.movable || undefined} style={post.channels[0] ? { ["--chip" as string]: post.channels[0].mark.color } : undefined}
     draggable={post.movable} onDragStart={event => { dragged.current = post; event.dataTransfer.effectAllowed = "move"; event.dataTransfer.setData("text/plain", post.id); }} onDragEnd={() => { dragged.current = null; setOver(null); }}>
     <div className={styles.postMeta}><time dateTime={post.whenIso}>{timeOf(post)}</time><StatusChip status={post.status} compact /></div>
     <div className={styles.postBody}>
@@ -92,6 +93,10 @@ export function CalendarBoard({ view, days, timeZone, nowIso, canCreate, filterQ
     <div className={styles.live} role="status" aria-live="polite">{notice?.kind === "ok" ? <p className={styles.noticeOk}>{notice.text}</p> : null}</div>
     {notice?.kind === "error" ? <p className={styles.noticeError} role="alert">{notice.text}</p> : null}
     <p className={styles.hint}>{canCreate ? copy.startNew : ""}{fillCopy(copy.dragHint, {slot:view === "week" ? copy.timeSlot : copy.daySlot,zone:timeZone.replaceAll("_", " ")})}{view === "week" && firstHour > 0 ? copy.earlierHours : ""}</p>
+    <p className={styles.legend} aria-label={copy.calendarLegend}>
+      <span className={styles.legendItem} data-group="planned"><strong>{copy.groupPlanned}</strong> · {copy.groupPlannedHint}</span>
+      <span className={styles.legendItem} data-group="outcome"><strong>{copy.groupOutcome}</strong> · {copy.groupOutcomeHint}</span>
+    </p>
 
     {view === "month" ? <div className={styles.monthWrap}>
       <div className={styles.weekdays} aria-hidden="true">{days.slice(0, 7).map(day => <span key={day.key}>{new Intl.DateTimeFormat(locale === "fr" ? "fr-FR" : "en-US", { weekday: "short", timeZone: "UTC" }).format(new Date(`${day.key}T12:00:00Z`))}</span>)}</div>

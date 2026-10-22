@@ -11,6 +11,8 @@ vi.mock('../src/modules/publishing/ui/SavedViews', () => ({ SavedViews: ({ scree
 import { ApprovalsList, type ApprovalRow } from '../src/modules/publishing/ui/approvals/ApprovalsList';
 import { CalendarToolbar } from '../src/modules/publishing/ui/calendar/CalendarToolbar';
 import { PostsHeaderTools } from '../src/modules/publishing/ui/posts/PostsHeaderTools';
+import { StatusChip } from '../src/components/StatusChip';
+import { postGroup } from '../src/lib/post-groups';
 import { freeQueueSlots } from '../src/modules/publishing/ui/calendar/free-slots';
 import { contentCopyDefaults, contentCopySchema, contentPolicyDefaults, contentPolicySchema, fillContent } from '../src/modules/publishing/ui/content-copy';
 import { ContentProvider } from '../src/modules/publishing/ui/ContentProvider';
@@ -174,5 +176,80 @@ describe('approvals review cards', () => {
     await press(container.querySelector('article')!, 'r');
     expect(container.querySelector('textarea')).toBeNull();
     expect(container.textContent).not.toContain('press A');
+  });
+});
+
+describe('planned vs outcome grouping', () => {
+  it('splits draft/pending/scheduled/publishing from published and every resolved state', () => {
+    for (const status of ['draft', 'pending_approval', 'scheduled', 'publishing']) expect(postGroup(status)).toBe('planned');
+    for (const status of ['published', 'partially_failed', 'failed', 'cancelled', 'rejected']) expect(postGroup(status)).toBe('outcome');
+  });
+  it('marks post-level chips with their group and leaves other marks ungrouped', async () => {
+    await act(async () => root.render(createElement('div', null,
+      createElement(StatusChip, { status: 'scheduled' }),
+      createElement(StatusChip, { status: 'published' }),
+      createElement(StatusChip, { status: 'active' }))));
+    const chips = [...container.querySelectorAll('[data-status]')];
+    expect(chips.map(chip => chip.getAttribute('data-group'))).toEqual(['planned', 'outcome', null]);
+    // The label and shape stay: grouping only adds the group marker.
+    expect(chips[0]!.textContent).toContain('Scheduled');
+    expect(chips[1]!.querySelector('svg')).not.toBeNull();
+  });
+});
+
+describe('planned vs outcome status filters', () => {
+  const all = [
+    { value: 'draft', label: 'Draft' }, { value: 'pending_approval', label: 'Pending Approval' },
+    { value: 'scheduled', label: 'Scheduled' }, { value: 'publishing', label: 'Publishing' },
+    { value: 'published', label: 'Published' }, { value: 'partially_failed', label: 'Partially Failed' },
+    { value: 'failed', label: 'Failed' }, { value: 'cancelled', label: 'Cancelled' }, { value: 'rejected', label: 'Rejected' },
+  ];
+  const groups = () => [...document.querySelectorAll('.ui-filter-pop optgroup')].map(group => ({
+    label: group.getAttribute('label'),
+    values: [...group.querySelectorAll('option')].map(option => (option as HTMLOptionElement).value),
+  }));
+  it('groups the Posts statuses into Planned vs Outcome without dropping or renaming a value', async () => {
+    await act(async () => root.render(withContent(createElement(PostsHeaderTools, { statuses: all, origins: [], chips: [], resetHref: '/content', searchMaxCharacters: 120, exportMaxPosts: 100, exportMaxBytes: 1000, canExport: false }))));
+    await act(async () => container.querySelector<HTMLButtonElement>('.ui-filter-button')!.click());
+    expect(groups()).toEqual([
+      { label: 'Planned', values: ['draft', 'pending_approval', 'scheduled', 'publishing'] },
+      { label: 'Outcome', values: ['published', 'partially_failed', 'failed', 'cancelled', 'rejected'] },
+    ]);
+    // Every filter value still works from its group.
+    await setSelect(document.querySelector<HTMLSelectElement>('.ui-filter-pop select')!, 'cancelled');
+    expect(nav.push).toHaveBeenCalledWith('/content?status=cancelled');
+  });
+  it('groups the Calendar statuses the same way and names the groups in French', async () => {
+    const props = {
+      navigation: { previous: '/p', today: '/t', next: '/n', unit: 'month' as const }, rangeLabel: 'October 2026', view: 'month' as const,
+      viewHrefs: { month: '/m', week: '/w' }, statuses: all, origins: [], chips: [], resetHref: '/content/calendar',
+    };
+    nav.path = '/content/calendar';
+    await act(async () => root.render(withContent(createElement(CalendarToolbar, props), 'fr')));
+    await act(async () => container.querySelector<HTMLButtonElement>('.ui-filter-button')!.click());
+    expect(groups()).toEqual([
+      { label: 'Prévues', values: ['draft', 'pending_approval', 'scheduled', 'publishing'] },
+      { label: 'Résultats', values: ['published', 'partially_failed', 'failed', 'cancelled', 'rejected'] },
+    ]);
+  });
+});
+
+describe('planned vs published counts', () => {
+  const toolbar = (counts?: { planned: number; published: number }) => ({
+    navigation: { previous: '/p', today: '/t', next: '/n', unit: 'month' as const }, rangeLabel: 'October 2026', view: 'month' as const,
+    viewHrefs: { month: '/m', week: '/w' }, statuses: [{ value: 'failed', label: 'Failed' }], origins: [], chips: [], resetHref: '/content/calendar',
+    ...(counts ? { counts } : {}),
+  });
+  it('says "X planned · Y published" on the calendar toolbar, never a bare total', async () => {
+    nav.path = '/content/calendar';
+    await act(async () => root.render(withContent(createElement(CalendarToolbar, toolbar({ planned: 3, published: 12 })))));
+    expect(container.textContent).toContain('3 planned · 12 published');
+  });
+  it('writes the counts in French and hides them when unknown', async () => {
+    nav.path = '/content/calendar';
+    await act(async () => root.render(withContent(createElement(CalendarToolbar, toolbar({ planned: 3, published: 12 })), 'fr')));
+    expect(container.textContent).toContain('3 prévues · 12 publiées');
+    await act(async () => root.render(withContent(createElement(CalendarToolbar, toolbar()))));
+    expect(container.textContent).not.toContain('planned');
   });
 });
