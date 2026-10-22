@@ -2,6 +2,8 @@ import type { PlatformId } from '@/platforms';
 import type { PlatformHost } from './host';
 import { instagramHost } from '@/platforms/instagram/host';
 import { facebookHost } from '@/platforms/facebook/host';
+import { youtubeHost } from '@/platforms/youtube/host';
+import { tiktokHost } from '@/platforms/tiktok/host';
 
 export type { ConnectionViewer, PlatformHost, PlatformInboxHost, PlatformAdsHost, PlatformAnalyticsHost } from './host';
 
@@ -9,4 +11,6 @@ export type { ConnectionViewer, PlatformHost, PlatformInboxHost, PlatformAdsHost
 export const PLATFORM_HOSTS: Readonly<Record<PlatformId, PlatformHost>> = {
   facebook: facebookHost,
   instagram: instagramHost,
+  youtube: youtubeHost,
+  tiktok: tiktokHost,
 };

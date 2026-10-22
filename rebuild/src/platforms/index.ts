@@ -9,6 +9,10 @@ import { instagramModule } from './instagram/module';
 export { instagramModule };
 import { FACEBOOK_ADS_CREATION_CONFIG } from './facebook/ads-ui-config';
 import { FACEBOOK_CONFIG, facebookModule } from './facebook/module';
+import { YOUTUBE_CONFIG } from './youtube/config';
+import { youtubeModule } from './youtube/module';
+import { TIKTOK_CONFIG } from './tiktok/config';
+import { tiktokModule } from './tiktok/module';
 import type { PlatformModule } from './module';
 import { MASTODON_CONFIG } from './mastodon/config';
 import { mastodonModule } from './mastodon/module';
@@ -29,10 +33,10 @@ import { xModule } from './x/module';
 export const STAGED_PLATFORM_MODULES = [mastodonModule, threadsModule, xModule] as const satisfies readonly PlatformModule[];
 export const STAGED_PLATFORM_IDS: readonly string[] = [...STAGED_PLATFORM_MODULES.map(module => module.id), 'bluesky', 'telegram', 'linkedin', 'pinterest'];
 
-export const PLATFORM_MODULES = [facebookModule, instagramModule] as const satisfies readonly PlatformModule[];
+export const PLATFORM_MODULES = [facebookModule, instagramModule, youtubeModule, tiktokModule] as const satisfies readonly PlatformModule[];
 
 /** Every module's Root settings, merged into the configuration registry. */
-export const PLATFORM_CONFIG = [...LINKEDIN_CONFIG, ...PINTEREST_CONFIG, ...BLUESKY_CONFIG, ...TELEGRAM_CONFIG, ...MASTODON_CONFIG, ...THREADS_CONFIG, ...X_CONFIG, ...INSTAGRAM_CONFIG, ...FACEBOOK_CONFIG, ...FACEBOOK_ADS_CREATION_CONFIG.map(setting => ({ ...setting, owner: { kind: 'platform' as const, id: facebookModule.id } }))] as const;
+export const PLATFORM_CONFIG = [...LINKEDIN_CONFIG, ...PINTEREST_CONFIG, ...BLUESKY_CONFIG, ...TELEGRAM_CONFIG, ...MASTODON_CONFIG, ...THREADS_CONFIG, ...X_CONFIG, ...INSTAGRAM_CONFIG, ...YOUTUBE_CONFIG, ...TIKTOK_CONFIG, ...FACEBOOK_CONFIG, ...FACEBOOK_ADS_CREATION_CONFIG.map(setting => ({ ...setting, owner: { kind: 'platform' as const, id: facebookModule.id } }))] as const;
 
 export type PlatformId = (typeof PLATFORM_MODULES)[number]['id'];
 

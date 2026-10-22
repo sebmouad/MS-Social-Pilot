@@ -121,8 +121,15 @@ that boundary. The remaining deviations are tracked in [MCP_PARITY.md](MCP_PARIT
 | `src/server/` | Shared authentication, authorization, jobs, mail, audit, configuration, data control and private Root infrastructure |
 | `src/app/` | Thin pages, HTTP entry points and shared/authentication shell |
 
-Facebook is the only installed customer platform. Instagram/other legacy connector
-code does not establish usable rebuild support. Shared services consume adapter
+Installed platform modules are Facebook, Instagram, YouTube and TikTok (all but
+Facebook disabled by default, fixture evidence only). YouTube and TikTok
+(`src/platforms/youtube`, `src/platforms/tiktok`) are plain OAuth-with-refresh
+modules: the neutral parts (sealed state cookie, destination persistence,
+compare-and-set token store, renewal job, bounded JSON/media HTTP) live in
+`src/server/platforms/{token-connection,token-renewal-job,provider-http,request-locale}.ts`
+and name no provider; each module owns its endpoints, scopes, protocol and copy.
+Legacy connector code for the other seven networks does not establish usable
+rebuild support. Shared services consume adapter
 capabilities, format catalogs and normalized measures, never provider branches.
 Encapsulation is not complete: shared legacy storage reads in `src/server/data.ts`
 still need coordinated moves. Account policy has moved to Settings; the shared
