@@ -18,7 +18,7 @@ const overview: AgencyOverview = {
 beforeEach(() => { vi.clearAllMocks(); m.language = 'en'; m.overview.mockResolvedValue(overview); });
 it('renders shared phone-card tables, module metrics, an honest comparison chart and withheld-data explanations', async () => {
   const html = renderToStaticMarkup(await AgencyScreen({ searchParams: Promise.resolve({}) }));
-  expect(html).toContain('ui-page-header__chip'); expect(html).toContain('ui-table--stack'); expect(html).toContain('Studio client');
+  expect(html).toContain('ui-page-header__titleline'); expect(html).toContain('ui-table--stack'); expect(html).toContain('Studio client');
   expect(html.match(/class="ui-metric"/g)).toHaveLength(6);
   expect(html).toContain('Counted in 0 of 1 workspaces'); expect(html).toContain('Not shown for workspaces where you lack access');
   expect(html).toContain('Scheduled posts · Failed posts'); expect(html).toContain('Needs attention');

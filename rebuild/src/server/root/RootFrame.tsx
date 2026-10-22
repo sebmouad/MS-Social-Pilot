@@ -6,6 +6,7 @@ import { RootInterfaceProvider } from './RootInterface';
 import type { ReactNode } from 'react';
 import { AppShell } from '@/components';
 import { requireRootPage } from '@/server/config/access';
+import { shellChrome } from '@/modules/shell/server/chrome';
 import { rootManifest } from '@/modules/root/manifest';
 import { RootPageGlyph } from '../../app/root/root-nav-icons';
 import './root-directory.css';
@@ -23,7 +24,8 @@ export async function RootFrame({ active, children, controls }: { active: string
       {section.pages.map(page => <a key={page.href} href={page.href} aria-current={active === page.href ? 'page' : undefined} className={active === page.href ? 'is-active' : undefined}><span className="root-nav-glyph"><RootPageGlyph href={page.href} /></span>{page.title}</a>)}
     </details>)}
   </nav>;
-  return <RootInterfaceProvider copy={catalog[locale]}><AppShell activeModule="settings" enabledModules={[]} enabledFeatures={[]} rootAccess installationMode userName={actor.name} workspaceName="Installation" sidebar={<>{sidebar}{controls}</>}>
+  const { copy, policy } = await shellChrome();
+  return <RootInterfaceProvider copy={catalog[locale]}><AppShell activeModule="settings" enabledModules={[]} enabledFeatures={[]} rootAccess installationMode copy={copy} policy={policy} userName={actor.name} workspaceName={copy.installation} sidebar={<>{sidebar}{controls}</>}>
     <div className="root-directory">{children}</div>
   </AppShell></RootInterfaceProvider>;
 }

@@ -5,6 +5,10 @@ const state = vi.hoisted(() => ({ actor: vi.fn() }));
 vi.mock('../src/server/config/access', () => ({ currentRootActor: state.actor }));
 vi.mock('next/navigation', () => ({ redirect: (path: string) => { throw new Error(`redirect:${path}`); } }));
 vi.mock('../src/components/AppShell', () => ({ AppShell: ({ children }: { children: ReactNode }) => createElement('main', null, children) }));
+vi.mock('../src/modules/shell/server/chrome', async () => {
+  const { SHELL_COPY, SHELL_POLICY } = await import('../src/modules/shell/copy');
+  return { shellChrome: async () => ({ copy: SHELL_COPY.en, policy: SHELL_POLICY, locale: 'en' }) };
+});
 import Page from '../src/app/no-workspace/page';
 beforeEach(() => { vi.clearAllMocks(); });
 it('redirects anonymous users to sign in and installation owners to their private control center', async () => {

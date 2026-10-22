@@ -60,7 +60,9 @@ describe('shared responsive CSS (phone 390px, tablet 768px)', () => {
     expect(globals).toContain('@media (max-width: 850px) { .metric-grid { grid-template-columns: repeat(2');
     expect(responsive).toContain('@media (max-width: 340px) { .metric-grid { grid-template-columns: minmax(0, 1fr)');
   });
-  it('turns the module rail into bottom navigation with safe-area padding below 760px', () => {
-    expect(tokens).toMatch(/\.shell-module-rail \{ position: fixed[^}]*env\(safe-area-inset-bottom\)/);
+  it('shows the bottom bar with safe-area padding below 760px', () => {
+    const shell = read('src/styles/shell.css');
+    expect(shell).toMatch(/\.ui-bottombar \{ position: fixed[^}]*env\(safe-area-inset-bottom\)/);
+    expect(shell).toMatch(/\.shell-sidebar \{ display: none; \}/);
   });
 });

@@ -8,6 +8,7 @@ import { CALENDAR_EXTRAS_JOBS } from '../calendar-extras/manifest';
 
 export const publishingManifest = {
   id: 'publishing',
+  area: 'content',
   health: { configuration: true, jobHistory: true, pendingQueues: ['scheduledPosts', 'publicationAttempts'] },
   jobs: [
     { name: 'posts', label: 'Post delivery and status', configKey: 'sync.posts.schedule' },

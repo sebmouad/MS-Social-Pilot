@@ -6,6 +6,7 @@ import { PageHeader } from '@/components/PageHeader';
 import { authCopy } from '@/modules/home/auth/copy';
 import { authLocale } from '@/modules/home/auth/locale';
 import { requireViewer } from '@/server/context';
+import { shellChrome } from '@/modules/shell/server/chrome';
 
 export const metadata: Metadata = { title: 'Access unavailable' };
 
@@ -13,7 +14,8 @@ export default async function AccessLimitedPage() {
   // Authenticate membership without requiring the feature that led here.
   const viewer = await requireViewer({ channelScoped: true });
   const t = authCopy(await authLocale()).accessLimited;
-  return <AppShell activeModule="home" enabledModules={[]} enabledFeatures={[]} rootAccess={viewer.user.isInstanceOwner}
+  const { copy, policy } = await shellChrome();
+  return <AppShell activeModule="home" enabledModules={[]} enabledFeatures={[]} rootAccess={viewer.user.isInstanceOwner} copy={copy} policy={policy}
     userName={viewer.user.name} workspaceName={viewer.membership.workspace.name} workspaceId={viewer.workspaceId}
     workspaces={viewer.workspaces.map(item => ({ id: item.workspace.id, name: item.workspace.name }))}>
     <PageHeader title={t.title} module="home" />

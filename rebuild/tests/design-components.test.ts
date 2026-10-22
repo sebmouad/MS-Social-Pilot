@@ -230,11 +230,11 @@ describe('Filters', () => {
 });
 
 describe('Display components', () => {
-  it('PageHeader renders a module chip, one h1, description and actions', async () => {
+  it('PageHeader renders one h1 with no icon chip, description and actions', async () => {
     await render(h(PageHeader, { title: 'Posts', description: 'All your posts', module: 'publishing', actions: h('button', null, 'New post') }));
     expect(container.querySelectorAll('h1').length).toBe(1);
     expect(q('header').getAttribute('data-module')).toBe('publishing');
-    expect(q('.ui-mod-chip svg')).not.toBeNull();
+    expect(container.querySelector('.ui-page-header__chip')).toBeNull();
     expect(container.textContent).toContain('New post');
   });
   it('Breadcrumbs mark the last item as the current page and link the rest', async () => {

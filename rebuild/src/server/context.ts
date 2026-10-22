@@ -6,6 +6,7 @@ import { loadEntitlements, requireFeature, requireModule } from './entitlements'
 import { PERMISSION_MODULES, canAccessFeature, canAccessModule } from './permissions';
 import { loadPermissions } from './permissions/loader';
 import { assertWorkspaceNotPurging } from './data-control/guard';
+import { parseChannelScope, type ChannelScope } from '@/lib/channel-scope';
 
 /** Each request starts with a validated user and a current workspace membership. */
 export async function requireViewer(access?: { module?: string; feature?: string; channelScoped?: boolean; write?: boolean }) {
@@ -37,4 +38,15 @@ export async function requireViewer(access?: { module?: string; feature?: string
     redirect('/access-limited');
   }
   return { user, membership, workspaces, workspaceId: membership.workspace.id, entitlements, permissions };
+}
+
+export { parseChannelScope, type ChannelScope };
+
+/**
+ * The channel scope of a request for channel-aware pages: the `channel` URL parameter (older names mapped), else the
+ * remembered cookie, reduced to channels in `allowedIds`. Display filter only; the page's service still authorizes every read.
+ */
+export async function requestChannelScope(viewer: { workspaceId: string }, searchParams: Record<string, string | string[] | undefined>, allowedIds: readonly string[], cookiePrefix: string) {
+  const remembered = (await cookies()).get(`${cookiePrefix}${viewer.workspaceId}`)?.value;
+  return parseChannelScope({ search: searchParams, cookie: remembered, allowed: allowedIds });
 }

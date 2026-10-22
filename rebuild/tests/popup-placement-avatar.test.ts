@@ -2,28 +2,31 @@
 import { act, createElement as h, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { Avatar, AvatarStack, Menu, Select, avatarInitials, avatarSlot, computePopupPlacement } from '../src/components';
+import { Avatar, AvatarStack, Menu, Select, avatarInitials, avatarSlot, placePopover } from '../src/components';
 
 const viewport = { width: 1000, height: 700 };
+const anchor = (top: number, bottom: number, left = 100, right = 200) => ({ top, bottom, left, right });
 
-describe('computePopupPlacement', () => {
-  it('stays below when it fits', () => {
-    expect(computePopupPlacement({ top: 100, bottom: 140 }, { left: 100, right: 300, height: 200 }, viewport)).toEqual({ flip: false, shiftX: 0, maxHeight: 552 });
+describe('placePopover', () => {
+  it('opens below the anchor when it fits', () => {
+    expect(placePopover(anchor(100, 140), { width: 200, height: 200 }, viewport)).toEqual({ left: 100, top: 148, maxHeight: 552, flipped: false });
   });
   it('flips above when it does not fit below and there is more room above', () => {
-    const result = computePopupPlacement({ top: 500, bottom: 540 }, { left: 100, right: 300, height: 300 }, viewport);
-    expect(result.flip).toBe(true);
+    const result = placePopover(anchor(500, 540), { width: 200, height: 300 }, viewport);
+    expect(result.flipped).toBe(true);
     expect(result.maxHeight).toBe(492);
+    expect(result.top).toBe(500 - 8 - 300);
   });
   it('stays below when both sides are tight but below is larger', () => {
-    expect(computePopupPlacement({ top: 200, bottom: 240 }, { left: 0, right: 100, height: 900 }, viewport).flip).toBe(false);
+    expect(placePopover(anchor(200, 240), { width: 100, height: 900 }, viewport).flipped).toBe(false);
   });
-  it('shifts left when it overflows the right edge and right when it overflows the left edge', () => {
-    expect(computePopupPlacement({ top: 0, bottom: 40 }, { left: 900, right: 1100, height: 100 }, viewport).shiftX).toBe(-108);
-    expect(computePopupPlacement({ top: 0, bottom: 40 }, { left: -60, right: 140, height: 100 }, viewport).shiftX).toBe(68);
+  it('aligns to the anchor end and shifts inside the viewport on either edge', () => {
+    expect(placePopover(anchor(0, 40, 800, 980), { width: 300, height: 100 }, viewport, 'end').left).toBe(680);
+    expect(placePopover(anchor(0, 40, 900, 990), { width: 300, height: 100 }, viewport).left).toBe(692);
+    expect(placePopover(anchor(0, 40, -60, 40), { width: 300, height: 100 }, viewport).left).toBe(8);
   });
   it('never returns a max height below a usable minimum', () => {
-    expect(computePopupPlacement({ top: 20, bottom: 690 }, { left: 0, right: 10, height: 500 }, viewport).maxHeight).toBe(120);
+    expect(placePopover(anchor(20, 690), { width: 10, height: 500 }, viewport).maxHeight).toBe(120);
   });
 });
 
@@ -38,46 +41,66 @@ const render = (node: ReactNode) => act(async () => root.render(node));
 const click = (target: Element) => act(async () => { (target as HTMLElement).click(); });
 
 /** jsdom has no layout: report fixed rectangles for the trigger and the popup. */
-function stubRects(trigger: { top: number; bottom: number }, popup: { left: number; right: number; height: number }) {
+function stubRects(trigger: { top: number; bottom: number }, popup: { width: number; height: number }) {
   const original = Element.prototype.getBoundingClientRect;
+  const originalHeight = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'scrollHeight');
+  const originalWidth = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'offsetWidth');
   Element.prototype.getBoundingClientRect = function (this: Element) {
-    const rect = (top: number, bottom: number, left: number, right: number) => ({ top, bottom, left, right, width: right - left, height: bottom - top, x: left, y: top, toJSON: () => ({}) }) as DOMRect;
-    if (this.matches('.ui-select__popup, .ui-menu__list')) return rect(trigger.bottom, trigger.bottom + popup.height, popup.left, popup.right);
-    return rect(trigger.top, trigger.bottom, 0, 100);
+    return { top: trigger.top, bottom: trigger.bottom, left: 20, right: 120, width: 100, height: trigger.bottom - trigger.top, x: 20, y: trigger.top, toJSON: () => ({}) } as DOMRect;
   };
-  return () => { Element.prototype.getBoundingClientRect = original; };
+  Object.defineProperty(HTMLElement.prototype, 'scrollHeight', { configurable: true, get: () => popup.height });
+  Object.defineProperty(HTMLElement.prototype, 'offsetWidth', { configurable: true, get: () => popup.width });
+  return () => {
+    Element.prototype.getBoundingClientRect = original;
+    if (originalHeight) Object.defineProperty(HTMLElement.prototype, 'scrollHeight', originalHeight);
+    if (originalWidth) Object.defineProperty(HTMLElement.prototype, 'offsetWidth', originalWidth);
+  };
 }
 
-describe('Select and Menu viewport placement', () => {
-  it('flips a Select popup that would run off the bottom of the viewport', async () => {
-    const restore = stubRects({ top: 640, bottom: 680 }, { left: 20, right: 220, height: 300 });
+describe('Select and Menu popover placement', () => {
+  it('flips a Select popup that would run off the bottom of the viewport and fixes it to the viewport', async () => {
+    const restore = stubRects({ top: 640, bottom: 680 }, { width: 200, height: 300 });
     try {
       Object.defineProperty(window, 'innerHeight', { value: 700, configurable: true });
       await render(h(Select, { 'aria-label': 'Channel', value: 'a', onChange: () => {}, options: [{ value: 'a', label: 'Alpha' }, { value: 'b', label: 'Beta' }] }));
       await click(container.querySelector('button[role=combobox]')!);
-      const popup = container.querySelector<HTMLElement>('.ui-select__popup')!;
+      const popup = document.querySelector<HTMLElement>('.ui-select__popup')!;
       expect(popup.getAttribute('data-flip')).toBe('top');
-      expect(popup.style.getPropertyValue('--ui-max-h')).toBe('632px');
+      expect(popup.style.maxHeight).toBe('632px');
+      expect(popup.className).toContain('ui-popover');
     } finally { restore(); }
   });
 
   it('leaves a Select popup below the trigger when there is room', async () => {
-    const restore = stubRects({ top: 100, bottom: 140 }, { left: 20, right: 220, height: 200 });
+    const restore = stubRects({ top: 100, bottom: 140 }, { width: 200, height: 200 });
     try {
       await render(h(Select, { 'aria-label': 'Channel', value: 'a', onChange: () => {}, options: [{ value: 'a', label: 'Alpha' }] }));
       await click(container.querySelector('button[role=combobox]')!);
-      expect(container.querySelector('.ui-select__popup')!.hasAttribute('data-flip')).toBe(false);
+      expect(document.querySelector('.ui-select__popup')!.hasAttribute('data-flip')).toBe(false);
     } finally { restore(); }
   });
 
-  it('shifts a Menu list left when it overflows the right edge', async () => {
-    const restore = stubRects({ top: 100, bottom: 140 }, { left: 900, right: 1100, height: 120 });
+  it('keeps a Menu list inside the right edge of the viewport', async () => {
+    const restore = stubRects({ top: 100, bottom: 140 }, { width: 400, height: 120 });
     try {
-      Object.defineProperty(document.documentElement, 'clientWidth', { value: 1000, configurable: true });
-      await render(h(Menu, { label: 'Actions', items: [{ key: 'a', label: 'Edit', onSelect: () => {} }] }));
+      Object.defineProperty(document.documentElement, 'clientWidth', { value: 300, configurable: true });
+      await render(h(Menu, { label: 'Actions', align: 'start', items: [{ key: 'a', label: 'Edit', onSelect: () => {} }] }));
       await click(container.querySelector('button[aria-haspopup=menu]')!);
-      expect(container.querySelector<HTMLElement>('[role=menu]')!.style.getPropertyValue('--ui-shift-x')).toBe('-108px');
+      expect(document.querySelector<HTMLElement>('[role=menu]')!.style.left).toBe('8px');
     } finally { restore(); }
+  });
+
+  it('closes the Select on an outside press and on Escape, returning focus to the trigger', async () => {
+    await render(h(Select, { 'aria-label': 'Channel', value: 'a', onChange: () => {}, options: [{ value: 'a', label: 'Alpha' }] }));
+    const trigger = container.querySelector<HTMLButtonElement>('button[role=combobox]')!;
+    await click(trigger);
+    expect(document.querySelector('.ui-select__popup')).not.toBeNull();
+    await act(async () => { document.body.dispatchEvent(new Event('pointerdown', { bubbles: true })); });
+    expect(document.querySelector('.ui-select__popup')).toBeNull();
+    await click(trigger);
+    await act(async () => { document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })); });
+    expect(document.querySelector('.ui-select__popup')).toBeNull();
+    expect(document.activeElement).toBe(trigger);
   });
 });
 

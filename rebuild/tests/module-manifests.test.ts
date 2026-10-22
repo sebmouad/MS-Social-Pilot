@@ -23,7 +23,9 @@ describe('customer module manifests', () => {
 
   it('generates the shared catalog from the independent module manifests', () => {
     expect(MODULES.map(({ id }) => id)).toEqual(moduleManifests.map(({ id }) => id));
-    expect(PAGES).toEqual(moduleManifests.flatMap(({ id: module, pages }) => pages.map((page) => ({ ...page, module }))));
+    expect(PAGES).toEqual(moduleManifests.flatMap((manifest) => manifest.pages.map((page) => ({ ...page, module: manifest.id, area: (manifest as { area?: string }).area }))));
+    // Every module places its pages in a sidebar area (design v2).
+    expect(PAGES.every(({ area }) => ['home', 'content', 'inbox', 'insights', 'tasks', 'agency', 'settings'].includes(area))).toBe(true);
   });
 
   it('does not expose internal Root routes as customer features', () => {

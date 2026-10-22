@@ -1,6 +1,6 @@
 "use client";
 import { IconDotsVertical } from "@tabler/icons-react";
-import { usePopupPlacement } from "./usePopupPlacement";
+import { Popover } from "./Popover";
 import { useCallback, useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 
 export type MenuItem = {
@@ -26,24 +26,18 @@ type MenuProps = {
   className?: string;
 };
 
-/** Dropdown / kebab menu. Arrow keys move, Home/End jump, Escape closes and returns focus to the trigger. */
+/** Dropdown / kebab menu on the shared Popover (never clipped). Arrow keys move, Home/End jump, Escape closes and returns focus to the trigger. */
 export function Menu({ items, label, trigger, align = "end", className = "" }: MenuProps) {
   const [open, setOpen] = useState(false);
-  const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const menuId = useId();
-  usePopupPlacement(open, triggerRef, menuRef);
 
   const enabled = () => Array.from(menuRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"]:not([aria-disabled="true"])') ?? []);
   const close = useCallback((restoreFocus: boolean) => { setOpen(false); if (restoreFocus) triggerRef.current?.focus(); }, []);
 
   useEffect(() => {
-    if (!open) return;
-    menuRef.current?.querySelector<HTMLElement>('[role="menuitem"]:not([aria-disabled="true"])')?.focus();
-    const onPointer = (event: PointerEvent) => { if (!rootRef.current?.contains(event.target as Node)) setOpen(false); };
-    document.addEventListener("pointerdown", onPointer);
-    return () => document.removeEventListener("pointerdown", onPointer);
+    if (open) menuRef.current?.querySelector<HTMLElement>('[role="menuitem"]:not([aria-disabled="true"])')?.focus();
   }, [open]);
 
   const move = (delta: number | "first" | "last") => {
@@ -63,20 +57,22 @@ export function Menu({ items, label, trigger, align = "end", className = "" }: M
     else if (event.key === "Tab") setOpen(false);
   };
 
-  return <div className={`ui-menu ${className}`.trim()} ref={rootRef}>
+  return <div className={`ui-menu ${className}`.trim()}>
     <button ref={triggerRef} type="button" className={`ui-menu__trigger${trigger ? "" : " is-icon"}`} aria-haspopup="menu" aria-expanded={open} aria-controls={open ? menuId : undefined} aria-label={label}
       onClick={() => setOpen(value => !value)}
       onKeyDown={event => { if (event.key === "ArrowDown" || event.key === "ArrowUp") { event.preventDefault(); setOpen(true); } }}>
       {trigger ?? <IconDotsVertical size={18} stroke={1.75} aria-hidden="true" />}
     </button>
-    {open && <div ref={menuRef} id={menuId} role="menu" aria-label={label} className={`ui-menu__list ui-menu__list--${align}`} onKeyDown={onMenuKey}>
-      {items.map(item => <button key={item.key} type="button" role="menuitem" tabIndex={-1} aria-disabled={item.disabled || undefined} title={item.disabled ? item.disabledReason : undefined}
-        className={`ui-menu__item${item.danger ? " is-danger" : ""}`}
-        onClick={() => { if (item.disabled) return; close(true); item.onSelect(); }}>
-        {item.icon && <span className="ui-menu__icon" aria-hidden="true">{item.icon}</span>}
-        <span className="ui-menu__label">{item.label}</span>
-        {item.shortcut && <kbd className="ui-kbd">{item.shortcut}</kbd>}
-      </button>)}
-    </div>}
+    <Popover open={open} anchorRef={triggerRef} onClose={close} align={align} className="ui-menu__list" role="menu" id={menuId} label={label} onKeyDown={onMenuKey}>
+      <div ref={menuRef} className="ui-menu__items">
+        {items.map(item => <button key={item.key} type="button" role="menuitem" tabIndex={-1} aria-disabled={item.disabled || undefined} title={item.disabled ? item.disabledReason : undefined}
+          className={`ui-menu__item${item.danger ? " is-danger" : ""}`}
+          onClick={() => { if (item.disabled) return; close(true); item.onSelect(); }}>
+          {item.icon && <span className="ui-menu__icon" aria-hidden="true">{item.icon}</span>}
+          <span className="ui-menu__label">{item.label}</span>
+          {item.shortcut && <kbd className="ui-kbd">{item.shortcut}</kbd>}
+        </button>)}
+      </div>
+    </Popover>
   </div>;
 }

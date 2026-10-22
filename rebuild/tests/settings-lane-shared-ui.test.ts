@@ -38,7 +38,7 @@ it('uses one shared title and colored module chip for Settings and Agency', () =
   const agency = renderToStaticMarkup(createElement(AgencyHeading, { description: 'Client workspaces' }));
   for (const html of [settings, agency]) {
     expect(html.match(/<h1>/g)).toHaveLength(1);
-    expect(html).toContain('ui-page-header__chip'); expect(html).toContain('<svg');
+    expect(html).toContain('ui-page-header__titleline');
   }
 });
 

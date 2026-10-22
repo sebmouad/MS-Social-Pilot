@@ -22,7 +22,7 @@ beforeEach(() => {
 it('renders shared metrics, a Root icon header, truthful job failure and stored counts chart', async () => {
   const html = renderToStaticMarkup(await Page());
   expect(html.match(/<h1>/g)).toHaveLength(1);
-  expect(html).toContain('ui-page-header__chip'); expect(html).toContain('data-module="root"');
+  expect(html).toContain('ui-page-header__titleline'); expect(html).toContain('data-module="root"');
   expect(html).toContain('ui-metric'); expect(html).toContain('Open errors · last 24 hours');
   expect(html).toContain('Needs attention'); expect(html).toContain('ui-badge--danger');
   expect(html).toContain('2 posts are failed or partially failed');

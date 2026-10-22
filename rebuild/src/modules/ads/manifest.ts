@@ -2,6 +2,7 @@ import type { ModuleManifest } from '../types';
 
 export const adsManifest = {
   id: 'ads',
+  area: 'insights',
   health: { configuration: true, jobHistory: true, pendingQueues: [] },
   jobs: [],
   rootSettingsPrefixes: ['ads.'],

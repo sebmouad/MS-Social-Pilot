@@ -29,7 +29,7 @@ it.each([
 ] as const)('renders %s as a shared phone-card table with an icon heading', async (_name, Page) => {
   const html = renderToStaticMarkup(await Page({ searchParams: Promise.resolve({}) }));
   expect(html).toContain('ui-table--stack'); expect(html).toContain('data-label=');
-  expect(html).toContain('ui-page-header__chip'); expect(html.match(/<h1>/g)).toHaveLength(1);
+  expect(html).toContain('ui-page-header__titleline'); expect(html.match(/<h1>/g)).toHaveLength(1);
   expect(html).toContain('ui-filter-panel');
   if (_name === 'connections') { expect(html).toContain('Refresh token'); expect(html).toContain('Disconnect'); expect(html).toContain('Demo source'); }
   if (_name === 'sessions') expect(html).toContain('Sign out');

@@ -12,13 +12,13 @@ const row = (overrides: Record<string, unknown> = {}) => ({
 }) as Parameters<typeof PostCell>[0]['post'];
 
 describe('publishing screen kit', () => {
-  it('renders the module header with its icon chip, module token and actions', () => {
+  it('renders the module header with its module token and actions, without an icon chip', () => {
     const html = renderToStaticMarkup(createElement(PageHeading, { title: 'Posts', description: 'Review delivery.', href: '/publishing/posts', summary: '3 posts', actions: createElement('a', { href: '/publishing/compose' }, 'New post') }));
     expect(html).toContain('data-module="publishing"');
     expect(html).toContain('<h1>Posts</h1>');
     expect(html).toContain('3 posts');
     expect(html).toContain('New post');
-    expect(html).toContain('<svg');
+    expect(html).not.toContain('ui-page-header__chip');
   });
 
   it('renders an empty panel with one next action', () => {

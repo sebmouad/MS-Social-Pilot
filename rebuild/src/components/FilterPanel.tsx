@@ -1,8 +1,37 @@
 "use client";
-import { IconFilterOff, IconX } from "@tabler/icons-react";
-import type { ReactNode } from "react";
+import { IconAdjustmentsHorizontal, IconFilterOff, IconX } from "@tabler/icons-react";
+import { useCallback, useId, useRef, useState, type ReactNode } from "react";
 import { Button } from "./Button";
 import { SegmentedControl } from "./Forms";
+import { Popover } from "./Popover";
+import { useShellCopy } from "./ShellCopy";
+import { fill } from "@/modules/shell/copy";
+
+/**
+ * The one Filter button in a page header. Opens a 360 px popover on desktop and a bottom sheet on phones.
+ * Callers put `FilterSection`s inside and apply changes themselves; "Clear all" and "Done" sit in the footer.
+ */
+export function FilterButton({ activeCount = 0, title, children, onClear, label, closeOnDone = true }: { activeCount?: number; title?: string; children: ReactNode; onClear?: () => void; label?: string; closeOnDone?: boolean }) {
+  const copy = useShellCopy();
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLButtonElement>(null);
+  const id = useId();
+  const close = useCallback((restore: boolean) => { setOpen(false); if (restore) ref.current?.focus(); }, []);
+  return <>
+    <button ref={ref} type="button" className={`ui-filter-button${activeCount > 0 ? " is-active" : ""}`} aria-haspopup="dialog" aria-expanded={open} aria-controls={open ? id : undefined}
+      aria-label={activeCount > 0 ? fill(copy.filterActive, { count: activeCount }) : label ?? copy.filter} onClick={() => setOpen(value => !value)}>
+      <IconAdjustmentsHorizontal size={16} stroke={1.9} aria-hidden="true" /><span>{label ?? copy.filter}</span>{activeCount > 0 && <span className="ui-filter-button__count" aria-hidden="true">{activeCount}</span>}
+    </button>
+    <Popover open={open} anchorRef={ref} onClose={close} sheetOnPhone className="ui-filter-pop" role="dialog" id={id} label={title ?? copy.filterTitle}>
+      <div className="ui-filter-pop__head"><h2>{title ?? copy.filterTitle}</h2><button type="button" className="ui-filter-pop__close" aria-label={copy.close} onClick={() => close(true)}><IconX size={18} stroke={1.75} aria-hidden="true" /></button></div>
+      <div className="ui-filter-pop__body">{children}</div>
+      <div className="ui-filter-pop__foot">
+        {onClear ? <Button variant="quiet" size="sm" disabled={activeCount === 0} onClick={onClear}>{copy.clearAll}</Button> : <span />}
+        <Button variant="primary" size="sm" onClick={() => closeOnDone ? close(true) : undefined}>{copy.done}</Button>
+      </div>
+    </Popover>
+  </>;
+}
 
 /** Sidebar filter block: labelled sections, active-filter chips and one reset. Lives in the contextual sidebar, never in the content area. */
 export function FilterPanel({ title, children, onReset, resetLabel = "Reset filters", activeCount = 0, summary }: { title: string; children: ReactNode; onReset?: () => void; resetLabel?: string; activeCount?: number; summary?: ReactNode }) {

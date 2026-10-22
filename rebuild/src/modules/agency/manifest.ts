@@ -6,6 +6,7 @@ import type { ModuleManifest } from '../types';
  */
 export const agencyManifest = {
   id: 'agency',
+  area: 'agency',
   health: { configuration: true, jobHistory: true, pendingQueues: [] },
   jobs: [],
   rootSettingsPrefixes: ['agency.'],

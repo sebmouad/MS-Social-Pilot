@@ -9,6 +9,7 @@ import { CAPTION_TESTS_CONFIG } from './caption-tests/config';
 import { FEEDS_CONFIG } from './feeds/config';
 import { HISTORY_CONFIG } from './history/config';
 import { HOME_CONFIG } from './home/config';
+import { SHELL_CONFIG } from './shell/config';
 import { INBOX_MODULE_CONFIG } from './inbox/config';
 import { INTEGRATIONS_CONFIG } from './integrations/config';
 import { MEDIA_CONFIG } from './media/config';
@@ -29,6 +30,7 @@ import { CHAT_CHANNELS_CONFIG } from './notifications/chat-channels/config';
 export const INSTALLED_MODULE_CONFIG = [
   ...ROOT_MONITORING_CONFIG,
   ...HOME_CONFIG,
+  ...SHELL_CONFIG,
   ...CALENDAR_EXTRAS_CONFIG,
   ...ADS_MODULE_CONFIG,
   ...ANALYTICS_MODULE_CONFIG,

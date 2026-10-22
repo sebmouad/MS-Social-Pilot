@@ -4,6 +4,7 @@ import { HISTORY_PAGES, HISTORY_ROOT_PREFIX } from '../history/manifest';
 
 export const settingsManifest = {
   id: 'settings',
+  area: 'settings',
   health: { configuration: true, jobHistory: true, pendingQueues: ['workspaceExports'] },
   jobs: [
     { name: 'workspaceExports', label: 'Workspace ZIP exports', configKey: 'data.exportSchedule' },

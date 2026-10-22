@@ -21,6 +21,8 @@ type MetricCardProps = {
   delta?: MetricDelta;
   /** Coverage / period / source line. Keep ambiguous totals honest. */
   hint?: ReactNode;
+  /** ⓘ (an InfoTip) that carries the caveats so the number leads. */
+  info?: ReactNode;
   /** Trend values; null marks unknown (not zero). */
   sparkline?: Array<number | null>;
   sparklineLabel?: string;
@@ -36,11 +38,12 @@ function tone(delta: MetricDelta) {
 }
 
 /** KPI tile: module-colored icon chip, label, value, colored delta and optional sparkline. */
-export function MetricCard({ label, value, module, icon, delta, hint, sparkline, sparklineLabel, unavailable, loading = false, loadingLabel = "Loading…" }: MetricCardProps) {
+export function MetricCard({ label, value, module, icon, delta, hint, info, sparkline, sparklineLabel, unavailable, loading = false, loadingLabel = "Loading…" }: MetricCardProps) {
   const DeltaIcon = delta?.direction === "up" ? IconArrowUpRight : delta?.direction === "down" ? IconArrowDownRight : IconMinus;
   return <article className="ui-metric" data-module={module} aria-busy={loading || undefined}>
     <div className="ui-metric__top">
       <h3 className="ui-metric__label">{label}</h3>
+      {info}
       {icon && <span className="ui-mod-chip ui-metric__chip" aria-hidden="true">{icon}</span>}
     </div>
     {loading
