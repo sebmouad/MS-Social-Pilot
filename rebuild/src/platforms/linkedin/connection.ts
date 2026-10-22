@@ -4,7 +4,7 @@ import type { PlatformHost, ConnectionViewer } from '@/server/platforms/host';
 import type { PlatformTarget } from '../types';
 import { prisma } from '@/server/data';
 import { encryptSecret } from '@/server/secret-crypto';
-import { requestOrigin } from '@/server/request-origin';
+import { runtimeConfig } from '@/server/config/store';
 import { OperationError } from '@/lib/operation-error';
 import { loadEntitlements, canUseFeature, hasPlatformCapability } from '@/server/entitlements';
 import { loadPermissions } from '@/server/permissions/loader';
@@ -35,12 +35,15 @@ export async function persistDiscovery(viewer: ConnectionViewer, input: { user: 
     const existing = await tx.socialAccount.findUnique({ where: { workspaceId_provider_providerUserId: { workspaceId: viewer.workspaceId, provider: 'linkedin', providerUserId: input.user.id } }, select: { id: true } });
     const targets = await tx.target.findMany({ where: { workspaceId: viewer.workspaceId, OR: [{ providerId: { in: input.targets.map(target => target.id) } }, ...(existing ? [{ socialAccountId: existing.id }] : [])] }, select: { id: true } });
     await lockSelectedResources(tx, viewer.workspaceId, targets.map(target => ({ kind: 'target', id: target.id })));
-    const credentials = { accessToken: encryptSecret(input.accessToken), refreshToken: input.refreshToken ? encryptSecret(input.refreshToken) : null, tokenExpiresAt: input.expiresAt, scopes: input.scopes.join(','), invalidatedAt: null, invalidReason: null };
+    const credentials = { accessToken: encryptSecret(input.accessToken), refreshToken: input.refreshToken ? encryptSecret(input.refreshToken) : null, tokenExpiresAt: input.refreshToken ? null : input.expiresAt, scopes: input.scopes.join(','), invalidatedAt: null, invalidReason: null };
     const source = await tx.socialAccount.upsert({
       where: { workspaceId_provider_providerUserId: { workspaceId: viewer.workspaceId, provider: 'linkedin', providerUserId: input.user.id } },
       create: { id: randomUUID(), workspaceId: viewer.workspaceId, provider: 'linkedin', providerUserId: input.user.id, name: input.user.name, pictureUrl: input.user.pictureUrl, ...credentials },
       update: { name: input.user.name, pictureUrl: input.user.pictureUrl, ...credentials }, select: { id: true },
     });
+    // Access expiry differs from grant expiry when a renewable credential was returned.
+    const expiryMetadata = JSON.stringify({ accessTokenExpiresAt: input.expiresAt.toISOString() });
+    await tx.$executeRaw`UPDATE social_accounts SET meta = COALESCE(meta, '{}'::jsonb) || ${expiryMetadata}::jsonb WHERE id = ${source.id} AND "workspaceId" = ${viewer.workspaceId}`;
     let saved = 0, skipped = 0;
     for (const target of input.targets) {
       const previous = await tx.target.findUnique({ where: { workspaceId_providerId: { workspaceId: viewer.workspaceId, providerId: target.id } }, select: { id: true, socialAccountId: true, type: true } });
@@ -59,11 +62,18 @@ export async function persistDiscovery(viewer: ConnectionViewer, input: { user: 
   });
 }
 export const linkedinConnection: PlatformHost['connection'] = {
+  async renewToken(input) {
+    if (!input.refreshToken) return null;
+    const [credentials, engine] = await Promise.all([configuredCredentials(), configuredEngine()]);
+    const renewed = await engine.renew(credentials.appId, credentials.appSecret, input.refreshToken, input.signal);
+    return { accessToken: renewed.accessToken, expiresAt: renewed.expiresAt, refreshToken: renewed.refreshToken ?? input.refreshToken };
+  },
   async isReady() { try { await Promise.all([configuredCredentials(), configuredPolicy()]); return true; } catch { return false; } },
   async start(request, viewer) {
     await authorizeConnection(viewer);
     const [policy, credentials, engine] = await Promise.all([configuredPolicy(), configuredCredentials(), configuredEngine()]);
-    const redirectUri = new URL(CALLBACK_PATH, requestOrigin(request)).toString();
+    const publicOrigin = String(await runtimeConfig('app.publicOrigin'));
+    const redirectUri = new URL(CALLBACK_PATH, publicOrigin).toString();
     const pending = createState(viewer.user.id, viewer.workspaceId, redirectUri, policy.stateTtlSeconds);
     const scopes = [...new Set([...policy.scopes, ...(policy.organizationsEnabled ? policy.organizationScopes : [])])];
     const response = NextResponse.json({ authorizationUrl: engine.adapter.getAuthorizationUrl!({ appId: credentials.appId, redirectUri, state: pending.state, scopes }) }, { headers: { 'cache-control': 'no-store' } });
@@ -71,9 +81,10 @@ export const linkedinConnection: PlatformHost['connection'] = {
     return response;
   },
   async callback(request, viewer) {
-    const redirectUri = new URL(CALLBACK_PATH, requestOrigin(request)).toString();
+    const publicOrigin = String(await runtimeConfig('app.publicOrigin'));
+    const redirectUri = new URL(CALLBACK_PATH, publicOrigin).toString();
     const finish = (notice: string) => {
-      const response = NextResponse.redirect(new URL(`/settings/connections?notice=${notice}${notice === 'connected' || notice === 'connected_partial' ? '&select=1' : ''}`, requestOrigin(request)), { status: 303, headers: { 'cache-control': 'no-store', 'referrer-policy': 'no-referrer' } });
+      const response = NextResponse.redirect(new URL(`/settings/connections?notice=${notice}${notice === 'connected' || notice === 'connected_partial' ? '&select=1' : ''}`, publicOrigin), { status: 303, headers: { 'cache-control': 'no-store', 'referrer-policy': 'no-referrer' } });
       response.cookies.set(STATE_COOKIE, '', { httpOnly: true, sameSite: 'lax', secure: new URL(redirectUri).protocol === 'https:', path: CALLBACK_PATH, maxAge: 0 });
       return response;
     };

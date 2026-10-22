@@ -34,33 +34,29 @@ selected-resource, person-key and installation authority remain distinct.
 
 ## Current execution and missing-capability boundaries
 
-### Networks lane q-31: Mastodon, Threads and X (2026-10-22)
+### OAuth connectors lane 46 (2026-10-22; source installation)
 
-Provider-owned adapters and Root settings are staged in `src/platforms/{mastodon,threads,x}`.
-They are **not customer capabilities**: no shared connection persistence/host is
-installed, and enabling a staged Root switch cannot expose one. Fixture adapter
-tests are not UI/REST/MCP, tenant-authorization or live-provider evidence.
+Mastodon, LinkedIn, Threads, X and Pinterest now join the installed platform
+modules and host dispatch. All five remain off by default through
+`platforms.<id>.enabled`. Installation is source coverage, not live-provider or
+release evidence. See [CONNECTORS_LANE_46.md](CONNECTORS_LANE_46.md) for credential
+mapping, lifecycle scope and remaining gates. This supersedes q-31's staged-host
+status; its historical fixture counts are not lane-46 verification.
 
-| Capability | UI | REST | MCP | Shared-service integration status |
+| Capability | UI | REST | MCP | Shared service / authority |
 | --- | --- | --- | --- | --- |
-| Connect and select Mastodon, Threads or X | Not available | Existing generic start/callback routes refuse staged providers | Existing `start_connection` refuses staged providers | Pending provider connection hosts, authenticated OAuth state, tenant-bound encrypted discovery persistence and selection rechecks |
-| Publish and inspect status on Mastodon, Threads or X | Not available | Existing Publishing routes cannot dispatch staged providers | Existing `publish_post` cannot dispatch staged providers | Pending host installation, credential lifecycle and cross-interface authorization/confirmation/audit verification |
+| Begin OAuth for each of the five installed connectors | Settings Connections connect action | POST /api/connections/[platform]/start; OAuth compatibility start delegates | start_connection | startConnection; exact START CONNECTION <platform> confirmation, current role/tenant/entitlement/module checks and audit; callback origin is app.publicOrigin |
+| Complete consent and discover resources | Browser OAuth callback then existing selection modal | GET /api/connections/[platform]/callback | Interactive callback follows start_connection; no autonomous callback tool | Provider-owned LinkedIn/Pinterest connection handlers; neutral token flow configured by Mastodon/Threads/X modules; authenticated state and encrypted tenant-bound persistence; discovered resources remain disabled until selected |
+| Select discovered resources | Connections selection checkboxes | PATCH /api/connections | set_connection_selection / batch selection | changeConnectionSelections; same exact consent, authorization and audit as other installed platforms |
+| Publish and inspect/delete where declared | Existing Publishing workflow and destination actions | Existing Publishing REST routes | Existing Publishing tools | Existing shared Publishing services dispatch module capability descriptors; unsupported operations stay unavailable |
+| Disconnect and retain/delete related data | Connections review dialog with explicit choice | DELETE /api/connections | disconnect_connection | changeConnectionDisconnect; same exact named RETAIN / DELETE RELATED DATA consent, tenant checks and audit; local removal does not imply remote revocation |
 
-No new tool or route is declared for adapter-only work. Reuse the existing shared
-Settings and Publishing services when completing installation; never expose a
-parallel provider route or tool that bypasses their confirmations and audit.
-Per-provider READMEs list the remaining protocol and integration work. The legacy
-sweep remains partial rather than treating transport fixtures as completed parity.
-
-Local verification for this batch: `npx tsc --noEmit -p .` exits 0; targeted
-provider/staging/config/parity/Root-ownership tests pass 71/71 (seven files).
-`npx vitest run --cache=false --exclude "**/facebook-diagnostic-transport.test.ts"`
-finishes with 656 files passed, 49 skipped and one failed; 10,167 tests passed,
-2,153 skipped and five failed. All five failures are existing
-`facebook-native-http.test.ts` loopback probes refused by the sandbox
-(`listen EPERM ::1`). The full suite is therefore **not green**. Cache is disabled
-because node_modules links to a read-only dependency installation. No live-provider,
-browser, deployment or production checks were run; changes remain uncommitted.
+No provider-specific customer route, screen or MCP tool is added. Token lifecycle
+runs through module-owned host jobs and shared bounded credential renewal where
+applicable. Verification: TypeScript zero errors, 183 focused tests pass (including 22
+parity guards and nine config checks). Required full suite has only five unchanged
+Facebook loopback failures (`listen EPERM ::1`), so is not green. Synthetic fixtures
+cannot establish real consent, refresh, publishing or remote cleanup.
 
 Ads inventory uses the existing directory/management mappings below; no new
 route/tool is needed. Common management services preserve ownership, exact
@@ -252,7 +248,7 @@ live catalog inside the test or add a blanket exclusion to make it pass.
 | update_appearance | settings/appearance | write | PATCH /api/settings/appearance | Shared customer operation; transport arguments may differ. |
 | reveal_webhook_secret | settings/webhooks | write | POST /api/webhooks/[id]/secret/reveal | Shared customer operation; transport arguments may differ. |
 | rotate_webhook_secret_once | settings/webhooks | write | POST /api/webhooks/[id]/secret | Shared customer operation; transport arguments may differ. |
-| start_connection | settings/connections | write | POST /api/connections/[platform]/start | Shared customer operation; transport arguments may differ. |
+| start_connection | settings/connections | write | POST /api/connections/[platform]/start | startConnection; exact START CONNECTION <platform> confirmation, service authorization and audit. Installed OAuth modules include Mastodon, LinkedIn, Threads, X and Pinterest; callback uses app.publicOrigin. |
 | get_connection_credential_form | settings/connections | read | GET /api/oauth/connections/[platform]/credentials | readConnectionCredentialForm; module-worded credential fields for platforms connected by entering a credential. Session only; owner/admin, entitlement and enabled module rechecked. |
 | connect_with_credentials | settings/connections | write | POST /api/oauth/connections/[platform]/credentials | connectWithCredentials; exact CONNECT WITH CREDENTIALS <platform>, session only, module verifies the credential, encrypted persistence, no auto-selection, audit. |
 | list_agency_clients | agency/clients | read | GET /api/agency | GET view=clients; browser sessions only, separate from person overview credentials. |

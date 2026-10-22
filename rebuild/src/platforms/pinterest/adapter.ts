@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import type { PlatformAdapter, OAuthExchangeRequest, PlatformCredential } from '../types';
 import type { Policy } from './config';
-import { pinterestModule } from './manifest';
+import { pinterestModule } from './module';
 import { ProviderError, transport } from './transport';
 
 const tokenSchema = z.object({ access_token: z.string().min(1), expires_in: z.number().positive(), refresh_token: z.string().optional(), scope: z.string().optional() });

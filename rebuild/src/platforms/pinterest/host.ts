@@ -1,4 +1,5 @@
 import type { PlatformHost } from '@/server/platforms/host';
+import { renewPinterestTokens } from './jobs';
 import { configuredEngine } from './runtime';
 import { pinterestConnection } from './connection';
-export const pinterestHost = { adapter: async () => (await configuredEngine()).adapter, connection: pinterestConnection } satisfies PlatformHost;
+export const pinterestHost = { adapter: async () => (await configuredEngine()).adapter, connection: pinterestConnection, jobs: { posts: renewPinterestTokens } } satisfies PlatformHost;

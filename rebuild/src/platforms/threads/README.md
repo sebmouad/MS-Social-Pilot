@@ -1,42 +1,13 @@
-# Threads (staged, unavailable to customers)
+# Threads installed connector
 
-The module is provider-owned and preserves legacy text/link, photo, video and
-carousel container creation, bounded processing checks, token exchange/refresh,
-and profile discovery. Root policy owns endpoints, scopes, polling, limits and
-EN/FR feedback. Protocol field names, grant names and processing states are
-adapter invariants. Requests do not follow redirects or retry. Lost write
-responses are uncertain; processing exhaustion never restarts container creation.
-Successful publication receipts survive later permalink lookup failure.
+Installed source supports OAuth connection, authenticated profile discovery and text/image/video/carousel publishing. Root keeps the connector off by default. Remote status, remote deletion, inbox, analytics and ads remain unsupported.
 
-Alt text is unsupported: any media item supplying `altText` is rejected before
-network access, so descriptions are never silently discarded.
+Root uses `threads.appId`, `threads.appSecret`, existing `threads.policy` and new `threads.connectionPolicy` (state lifetime, callback code size, renewal lead time and bilingual publication label). The neutral OAuth host derives callback origin from `app.publicOrigin`, consumes actor/workspace-bound state once, encrypts credentials, audits and persists discovery without selecting destinations. Shared Settings exposes selection and retain/delete disconnect through UI/REST/MCP services.
 
-No usable customer capability is declared. Fixture-tested adapter functions are
-not a complete connection or publishing integration. No UI screen changed.
-`configuredThreadsOAuth` derives the callback from `requestOrigin`; its caller
-must supply previously authorized one-use user/workspace-bound state. Secrets
-stay server-side. Token renewal is exposed but not scheduled or persisted.
+The code exchanges a short token for the long-lived token, checks that discovered profile identity matches the OAuth user, records token expiry and stores the access token as its refresh credential. The provider-owned renewal job refreshes that long-lived access token using the neutral locked persistence service. Disconnect removes local credentials; remote revocation is not claimed.
 
-## Integration dependencies outside this lane
+Publishing accepts provider-fetchable public HTTPS media; it refuses local-byte uploads, alt text and unsupported native schedules. Polling is bounded by Root policy. Lost or ambiguous publish receipts remain uncertain and cannot be resent automatically. Runtime descriptors expose EN/FR labels, media bounds and supported operations consistently to shared authoring.
 
-- `src/platforms/index.ts` registers THREADS_CONFIG and staged module metadata.
-  Do not put it in the customer installed list until the dependencies below pass.
-- Module-owned OAuth state/callback and encrypted discovery persistence, selection,
-  owner/admin authorization, workspace/actor binding, member/viewer/cross-tenant
-  denial, exact confirmations and audit must be implemented and tested through
-  one service used by Settings UI, REST and MCP.
-- `src/server/platforms/index.ts` must register that completed module-owned host.
-- Publishing needs durable tenant-bound creation/publish intents and receipts;
-  recovery must retain uncertain requests and never automatically resend them.
-  Persist refreshed credentials atomically before subsequent work. Public media
-  delivery, content scope grants and selected-resource checks require host tests.
-- Remote ownership/status is deliberately absent pending official API field and
-  live evidence; do not infer publication from a container identifier.
-- Update MCP_PARITY, LEGACY_SWEEP, architecture and handoff with honest staged
-  status; legacy sweep cannot be marked done from these fixtures.
-- Live OAuth, provider processing, token renewal and publish verification with
-  cleanup remain release gates. No production, server, deploy or push occurred.
+Synthetic evidence: `threads-platform.test.ts` and `oauth-three-install.test.ts`. Live gates remain: app approval, OAuth callback, long-token exchange and renewal timing, persisted token rotation, discovery selection, text/media/carousel delivery and cleanup, retain/delete, browser and real HTTP/MCP role/tenant verification. No live or production claim is made.
 
-Root keys: platforms.threads.enabled, platforms.threads.includedByDefault,
-platforms.threads.planFeatures, threads.policy, threads.appId, threads.appSecret.
-CONFIG_SCHEMA_VERSION is intentionally unchanged.
+The callback path is the installed protocol route `/api/connections/threads/callback`; the policy schema refuses alternate paths because no alternate route is shipped. Host credential checks require every configured scope. Threads does not return a scope list in this exchange; persisted scope coverage reflects the requested grant and still requires live app-permission verification.

@@ -26,6 +26,8 @@ afterEach(() => vi.unstubAllEnvs());
 describe('LinkedIn and Pinterest module fixtures', () => {
   it.each([[liSchema, li, LINKEDIN_CONFIG], [pinSchema, pin, PINTEREST_CONFIG]] as const)('validates Root policy and defaults off', (schema, defaults, config) => {
     expect(schema.parse(defaults)).toEqual(defaults);
+    const { renewLeadSeconds: _lead, ...savedBeforeInstallation } = defaults;
+    expect(schema.parse(savedBeforeInstallation).renewLeadSeconds).toBe(defaults.renewLeadSeconds);
     expect(config.find(row => row.key.endsWith('.enabled'))?.defaultValue).toBe(false);
     expect(() => schema.parse({ ...defaults, apiBaseUrl: 'https://user:secret@example.test' })).toThrow();
     expect(() => schema.parse({ ...defaults, maxImages: 99 })).toThrow();

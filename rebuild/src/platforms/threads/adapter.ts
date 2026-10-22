@@ -1,9 +1,10 @@
+import { ProviderHttpError } from '@/server/platforms/provider-http';
 import type { DiscoveryRequest, OAuthExchangeRequest, OAuthStartRequest, PublishRequest, PlatformAdapter } from '../types';
 import { threadsModule } from './module';
 import { threadsPolicySchema, type ThreadsPolicy } from './config';
 /** Failure messages never contain response bodies, URLs or credentials. */
-export class ThreadsError extends Error {
-    constructor(message: string, readonly state: 'rejected' | 'uncertain' | 'processing') { super(message); }
+export class ThreadsError extends ProviderHttpError {
+    constructor(message: string, readonly state: 'rejected' | 'uncertain' | 'processing', status?: number) { super(message, state === 'rejected' ? 'rejected' : 'uncertain', false, status); }
 }
 export function createThreadsAdapter(input: ThreadsPolicy, dependencies: {
     fetch?: typeof fetch;
@@ -24,7 +25,7 @@ export function createThreadsAdapter(input: ThreadsPolicy, dependencies: {
             const response = await transport(target, { method, redirect: 'error', signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(policy.timeoutMs)]) : AbortSignal.timeout(policy.timeoutMs), headers: { ...(token ? { authorization: `Bearer ${token}` } : {}), ...(method === 'POST' ? { 'content-type': 'application/x-www-form-urlencoded' } : {}) }, ...(method === 'POST' ? { body: new URLSearchParams(params) } : {}) });
             const data: unknown = await response.json();
             if (!response.ok || !data || typeof data !== 'object' || 'error' in data)
-                throw new ThreadsError(copy(method === 'POST' ? 'uncertain' : 'unavailable'), method === 'POST' ? 'uncertain' : 'rejected');
+                throw new ThreadsError(copy(method === 'POST' ? 'uncertain' : 'unavailable'), method === 'POST' ? 'uncertain' : 'rejected', response.status);
             return data as Record<string, unknown>;
         }
         catch (error) {
@@ -74,7 +75,7 @@ export function createThreadsAdapter(input: ThreadsPolicy, dependencies: {
             catch {
                 return false;
             } };
-            if (request.scheduledAt || request.target.kind !== 'threads' || request.formatId || request.text.length > policy.maxTextCharacters || media.length > policy.maxMedia || (!request.text.trim() && !media.length) || media.some(item => item.localFile || item.altText !== undefined || !validUrl(item.url)) || (request.link && (!validUrl(request.link) || media.length)))
+            if (request.scheduledAt || request.target.kind !== 'threads' || (request.formatId && request.formatId !== 'post') || request.text.length > policy.maxTextCharacters || media.length > policy.maxMedia || (!request.text.trim() && !media.length) || media.some(item => item.localFile || item.altText !== undefined || !validUrl(item.url)) || (request.link && (!validUrl(request.link) || media.length)))
                 throw new ThreadsError(copy('invalid'), 'rejected');
             const user = id(request.target.id);
             const token = request.credential.accessToken;

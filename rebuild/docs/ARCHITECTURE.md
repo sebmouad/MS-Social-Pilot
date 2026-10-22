@@ -635,3 +635,20 @@ Root naming follow-up: live probes merge Root configuration in the Facebook modu
 - **Mail API (G6):** `mail.provider=api` with `mail.apiEndpoint`/`mail.apiKey` (`server/mail/api-transport.ts`).
 - **Media retention (G7):** leased job `mediaRetention`, policy `media.retentionPolicy`.
 - Decisions recorded: G2 legacy `api_tokens` retired, G4 text backgrounds dropped (2026-10-22). Evidence is unit/mocked only; see `LEGACY_SWEEP_2026-10-21.md` section 0.4 for live gates.
+
+
+## Lane 46 OAuth connector installation — 2026-10-22
+
+Mastodon, LinkedIn, Threads, X and Pinterest move from staged adapters to installed
+module/host dispatch, disabled by default. Shared Settings/Publishing services retain
+UI/REST/MCP authorization, exact confirmation and audit; OAuth uses app.publicOrigin
+and discovered resources require explicit selection. G3 is done at source, with
+live consent/refresh/publishing/cleanup, browser/client and release gates open.
+See [CONNECTORS_LANE_46.md](CONNECTORS_LANE_46.md) for legacy credential mappings,
+Mastodon single-instance limitation and the outside-owned Root manual-refresh
+credential-consistency gap. Schema bump belongs to the integrator; this lane
+leaves CONFIG_SCHEMA_VERSION unchanged. Final TypeScript: zero errors; 11 focused files / 183 tests pass, including
+parity/config guards. Required full suite: 711 files pass, one fails, 49 skip;
+11,511 tests pass, five fail, 2,553 skip. All failures are unchanged Facebook
+loopback probes blocked by sandbox `listen EPERM ::1`; full suite is not green. No production
+action or live-provider claim. Changes remain uncommitted as requested.

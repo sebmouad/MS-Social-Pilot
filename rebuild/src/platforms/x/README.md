@@ -1,53 +1,13 @@
-# X staged protocol module
+# X installed connector
 
-This module is **not a usable customer integration**. Every manifest capability is
-unsupported, even when Root enables the module. The parent registry may expose
-its settings for operator preparation; no server host is installed.
+Installed source supports confidential OAuth 2 authorization-code exchange with S256 PKCE, authenticated-user discovery, text/image publishing, author-matched remote status and remote deletion. Root keeps the connector off by default. Inbox, analytics and ads remain unsupported.
 
-Implemented and fixture-tested: confidential OAuth 2.0 authorization-code exchange
-with S256 PKCE; authenticated-user discovery; single text/image post submission;
-post status with author matching; explicit deletion receipts; single-use refresh
-rotation with an awaited credential-persistence callback. Runtime construction
-loads Root policy and encrypted application credentials. `startConfiguredXOAuth`
-uses the shared trusted `requestOrigin(request)` resolver and the configured
-callback path. It does not create a connection or authenticate an actor.
+Root credentials are `x.clientId` and `x.clientSecret`. `x.policy` owns API/authorization/public URLs, scopes, image/text limits and request timeout. `x.connectionPolicy` owns state lifetime, callback code size, renewal lead time and bilingual publication label. Callback origin comes from `app.publicOrigin` through the neutral OAuth host, never forwarded headers. The shared host binds the verifier to actor/workspace and consumes state once. Actual token-granted scopes, expiry and rotating refresh token are persisted encrypted.
 
-Requests have a Root timeout, reject redirects, redact provider errors and never
-retry writes. Failed/malformed write receipts are uncertain. The host must retain
-an unresolved publication claim and must not automatically submit it again. No
-provider idempotency is assumed; `operationId` does not create idempotency.
+The provider-owned renewal job uses the shared authorized, selected-resource, serialized refresh service and stores rotated credentials before further writes. Shared Settings supplies discover/select and retain/delete disconnect through common UI/REST/MCP services. Disconnect is local; remote grant revocation is not claimed. Text validation is conservative codepoint counting; weighted URL shortening is not implemented. Uploaded images require inspected local bytes; alt text and videos are refused.
 
-Protocol literals (OAuth grant names, S256, field names, decimal X identifiers,
-media category and `/2` resource paths) are provider invariants. Deployment values,
-endpoints, scopes, credentials, media/text limits, timeout, expiry threshold,
-callback path and English/French errors are declared in `config.ts`.
+Publishing failures after a possible write remain uncertain; no automatic duplicate submission is allowed. Protocol fields/grants/S256 and resource paths are provider invariants. Deployment limits and credentials are Root settings.
 
-## Required integration outside this module
+Synthetic evidence: `x-platform.test.ts` and `oauth-three-install.test.ts`. Live gates remain: application permissions/paid-tier access, OAuth callback, token rotation persistence, discovery selection, image/text publication, remote status/delete and cleanup, retain/delete, browser and real HTTP/MCP role/tenant verification. This is source integration, not live or production verification.
 
-- Install an X-owned host through `src/server/platforms/index.ts`, following its
-  neutral host interface. Settings and manifest are registered as staged in
-  `src/platforms/index.ts`.
-- Shared connection service must authorize owner/member/viewer and workspace
-  boundaries; bind state/verifier to actor, workspace, expiry and trusted callback
-  origin; consume state once. Store access/refresh credentials encrypted.
-- Serialize refresh per connection (lease/CAS), atomically persist rotated tokens
-  **before** publishing, and recheck selection/access at the operation boundary.
-  An unsuccessful storage write must stop subsequent provider operations.
-- UI, REST and MCP must invoke the same authorized/audited service, with exact
-  confirmations for writes. Complete parity documentation and role/tenant tests
-  before changing capability declarations. No customer surfaces were added here.
-- Shared media resolution must supply bounded ephemeral image bytes; no remote
-  URL is fetched by this adapter. Implement weighted X text/URL validation,
-  image alternative-text delivery, chunked video and remote processing journals
-  before advertising these options. Current behavior deliberately rejects video,
-  alternative text and native scheduling, rather than silently dropping them.
-- Legacy public-metrics statistics still need a module collector and shared
-  analytics persistence/semantics wiring. No analytics capability is advertised.
-- Live X permissions, access tier, refresh, publish/status/delete and cleanup have
-  not been verified. Fixture results are not provider or production evidence.
-
-Root keys: `platforms.x.enabled`, `platforms.x.includedByDefault`,
-`platforms.x.planFeatures`, `x.policy`, `x.clientId`, `x.clientSecret`.
-The shared schema version must be advanced by the integrator, not this module.
-
-Protocol reference: [X official upload sample](https://github.com/xdevplatform/samples/blob/main/python/media/media_upload_v2.py).
+The callback path is the installed protocol route `/api/connections/x/callback`; the policy schema refuses alternate paths because no alternate route is shipped. Host credential checks require every configured scope. X records the token response scope list; missing grants prevent use.

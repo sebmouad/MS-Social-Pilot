@@ -4,8 +4,10 @@ import { TELEGRAM_CONFIG } from './telegram/config';
 import { telegramModule } from './telegram/module';
 import { LINKEDIN_CONFIG } from './linkedin/config';
 import { PINTEREST_CONFIG } from './pinterest/config';
-export { linkedinModule } from './linkedin/manifest';
-export { pinterestModule } from './pinterest/manifest';
+import { linkedinModule } from './linkedin/module';
+export { linkedinModule };
+import { pinterestModule } from './pinterest/module';
+export { pinterestModule };
 import { INSTAGRAM_CONFIG } from './instagram/config';
 import { instagramModule } from './instagram/module';
 export { instagramModule };
@@ -32,10 +34,10 @@ import { xModule } from './x/module';
  * screen with its on/off switch, and customers see it once it is on and set up.
  */
 /** Platform modules whose settings are registered while host wiring is pending; not customer-visible (enabled defaults to false). */
-export const STAGED_PLATFORM_MODULES = [mastodonModule, threadsModule, xModule] as const satisfies readonly PlatformModule[];
-export const STAGED_PLATFORM_IDS: readonly string[] = [...STAGED_PLATFORM_MODULES.map(module => module.id), 'linkedin', 'pinterest'];
+export const STAGED_PLATFORM_MODULES = [] as const satisfies readonly PlatformModule[];
+export const STAGED_PLATFORM_IDS: readonly string[] = [];
 
-export const PLATFORM_MODULES = [facebookModule, instagramModule, youtubeModule, tiktokModule, blueskyModule, telegramModule] as const satisfies readonly PlatformModule[];
+export const PLATFORM_MODULES = [facebookModule, instagramModule, youtubeModule, tiktokModule, blueskyModule, telegramModule, mastodonModule, linkedinModule, threadsModule, xModule, pinterestModule] as const satisfies readonly PlatformModule[];
 
 /** Every module's Root settings, merged into the configuration registry. */
 export const PLATFORM_CONFIG = [...LINKEDIN_CONFIG, ...PINTEREST_CONFIG, ...BLUESKY_CONFIG, ...TELEGRAM_CONFIG, ...MASTODON_CONFIG, ...THREADS_CONFIG, ...X_CONFIG, ...INSTAGRAM_CONFIG, ...YOUTUBE_CONFIG, ...TIKTOK_CONFIG, ...FACEBOOK_CONFIG, ...FACEBOOK_ADS_CREATION_CONFIG.map(setting => ({ ...setting, owner: { kind: 'platform' as const, id: facebookModule.id } }))] as const;

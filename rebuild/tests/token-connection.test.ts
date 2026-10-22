@@ -9,16 +9,22 @@ const mocks = vi.hoisted(() => {
     $executeRaw: vi.fn(),
   };
   return {
+    membership: vi.fn(), access: vi.fn(), permissions: vi.fn(), enabled: vi.fn(), origin: vi.fn(),
     tx, audit: vi.fn(), lock: vi.fn(),
     prisma: {
       $transaction: vi.fn(async (run: (client: typeof tx) => unknown) => run(tx)),
+      membership: { findUnique: vi.fn() },
       $queryRaw: vi.fn(), $executeRaw: vi.fn(),
       socialAccount: { updateMany: vi.fn(), findMany: vi.fn() }, target: { findFirst: vi.fn() },
     },
   };
 });
 vi.mock('../src/server/data', () => ({ prisma: mocks.prisma }));
-vi.mock('../src/server/request-origin', () => ({ requestOrigin: () => 'https://app.example.test' }));
+vi.mock('../src/server/config/store', () => ({ runtimeConfig: mocks.origin }));
+vi.mock('../src/server/entitlements', () => ({ loadEntitlements: mocks.access, canUseFeature: () => true, hasPlatformCapability: () => true }));
+vi.mock('../src/server/permissions/loader', () => ({ loadPermissions: mocks.permissions }));
+vi.mock('../src/server/permissions', () => ({ canAccessFeature: () => true }));
+vi.mock('../src/server/platforms/registry', () => ({ isPlatformEnabled: mocks.enabled }));
 vi.mock('../src/server/data-control/guard', () => ({ assertWorkspaceNotPurging: vi.fn(), withWorkspaceOperation: async (_id: string, run: () => unknown) => run() }));
 vi.mock('../src/server/connection-mutations', () => ({ auditConnectionEvent: mocks.audit }));
 vi.mock('../src/server/platforms/resource-lock', () => ({ lockSelectedResources: mocks.lock }));
@@ -40,6 +46,11 @@ const result = {
 beforeEach(() => {
   process.env.ENCRYPTION_KEY = Buffer.alloc(32, 9).toString('base64');
   vi.clearAllMocks();
+  mocks.origin.mockResolvedValue('https://app.example.test');
+  mocks.prisma.membership.findUnique.mockResolvedValue({ role: 'owner' });
+  mocks.access.mockResolvedValue({ workspaceId: 'ws-1' });
+  mocks.permissions.mockResolvedValue({});
+  mocks.enabled.mockResolvedValue(true);
   mocks.prisma.$transaction.mockImplementation(async (run: (client: typeof mocks.tx) => unknown) => run(mocks.tx));
 });
 
@@ -83,6 +94,19 @@ describe('connection start and finish', () => {
     expect(openTokenOAuthState(cookie.value, url.searchParams.get('s'), 'user-1', 'ws-1')).not.toBeNull();
     expect(response.headers.get('cache-control')).toBe('no-store');
   });
+  it.each(['member', 'viewer', 'editor'])('refuses %s before contacting the provider', async role => {
+    mocks.prisma.membership.findUnique.mockResolvedValue({ role });
+    const authorizationUrl = vi.fn();
+    const response = await startTokenOAuth(flow({ authorizationUrl }), new Request('https://internal.invalid/start'), viewer);
+    expect(response.status).toBe(503);
+    expect(authorizationUrl).not.toHaveBeenCalled();
+  });
+  it('refuses a cross-workspace entitlement before contacting the provider', async () => {
+    mocks.access.mockResolvedValue({ workspaceId: 'another-workspace' });
+    const authorizationUrl = vi.fn();
+    expect((await startTokenOAuth(flow({ authorizationUrl }), new Request('https://internal.invalid/start'), viewer)).status).toBe(503);
+    expect(authorizationUrl).not.toHaveBeenCalled();
+  });
   it('answers 503 without a cookie when the module is not configured', async () => {
     const response = await startTokenOAuth(flow({ authorizationUrl: async () => null }), new Request('https://app.example.test/x', { method: 'POST' }), viewer);
     expect(response.status).toBe(503);
@@ -94,6 +118,14 @@ describe('connection start and finish', () => {
     const started = createTokenOAuthState({ userId: 'other', workspaceId: 'ws-1', ttlSeconds: 60, pkce: false });
     const response = await finishTokenOAuth(flow({ complete }), callback(`code=c&state=${started.state}`, started.cookieValue), viewer);
     expect(response.headers.get('location')).toContain('notice=oauth_invalid_state');
+    expect(complete).not.toHaveBeenCalled();
+  });
+  it.each(['member', 'viewer'])('rechecks %s authority before exchanging a valid callback', async role => {
+    const started = createTokenOAuthState({ userId: 'user-1', workspaceId: 'ws-1', ttlSeconds: 60, pkce: false });
+    mocks.prisma.membership.findUnique.mockResolvedValue({ role });
+    const complete = vi.fn(async () => result);
+    const response = await finishTokenOAuth(flow({ complete }), callback(`code=c&state=${started.state}`, started.cookieValue), viewer);
+    expect(response.headers.get('location')).toContain('notice=connect_failed');
     expect(complete).not.toHaveBeenCalled();
   });
   it('treats a provider error as a cancellation and clears the state cookie', async () => {
@@ -141,6 +173,13 @@ describe('persistTokenConnection', () => {
     mocks.tx.membership.findUnique.mockResolvedValue(null);
     await expect(persistTokenConnection(actor, 'youtube', result)).rejects.toThrow();
     expect(mocks.tx.socialAccount.upsert).not.toHaveBeenCalled();
+  });
+  it('disables destinations missing on reconnect without deleting their retained data', async () => {
+    await persistTokenConnection(actor, 'youtube', result);
+    expect(mocks.tx.target.updateMany).toHaveBeenCalledWith({
+      where: { workspaceId: 'ws-1', socialAccountId: 'sa-1', type: 'youtube', providerId: { notIn: ['dest-1'] } },
+      data: { enabled: false, canPublish: false },
+    });
   });
   it('stores credentials encrypted and creates new destinations switched off', async () => {
     mocks.tx.target.findUnique.mockResolvedValue(null);

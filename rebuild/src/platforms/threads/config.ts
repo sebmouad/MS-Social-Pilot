@@ -4,7 +4,7 @@ const endpoint = z.string().url().refine(value => { const u = new URL(value); re
 const bilingual = z.object({ en: z.string().min(1), fr: z.string().min(1) });
 export const threadsPolicySchema = z.object({
   graphUrl: endpoint, authorizationUrl: endpoint, tokenUrl: endpoint, exchangeUrl: endpoint, refreshUrl: endpoint,
-  callbackPath: z.string().startsWith('/api/connections/').refine(v => !v.includes('?') && !v.includes('#') && !v.includes('..') && !v.startsWith('//')),
+  callbackPath: z.literal('/api/connections/threads/callback'),
   scopes: z.array(z.string().regex(/^threads_[a-z_]+$/)).min(1), timeoutMs: z.number().int().min(1).max(120000),
   maxTextCharacters: z.number().int().min(1).max(500), maxMedia: z.number().int().min(1).max(20),
   pollAttempts: z.number().int().min(1).max(300), pollIntervalMs: z.number().int().min(1).max(60000),
@@ -23,9 +23,10 @@ export const THREADS_POLICY_DEFAULTS: ThreadsPolicy = {
   },
 };
 export const THREADS_CONFIG = [
-  entry({ key: 'platforms.threads.enabled', group: 'Threads · Engine', label: 'Threads enabled', kind: 'boolean', description: 'Staged adapter; connection host and durable publication journal are not integrated.', defaultValue: false, schema: z.boolean(), consumption: 'planned' }),
-  entry({ key: 'platforms.threads.includedByDefault', group: 'Threads · Access', label: 'Included by default', kind: 'boolean', description: 'Workspace default access once integrated.', defaultValue: false, schema: z.boolean(), consumption: 'planned' }),
-  entry({ key: 'platforms.threads.planFeatures', group: 'Threads · Access', label: 'Plan feature keys', kind: 'json', description: 'Plan access once integrated.', defaultValue: ['platform_threads'], schema: z.array(z.string().min(1)), consumption: 'planned' }),
+  entry({ key: 'threads.connectionPolicy', group: 'Threads · Connection', label: 'Connection policy', kind: 'json', description: 'OAuth state lifetime and callback size limit.', defaultValue: { renewLeadSeconds: 3600, stateTtlSeconds: 600, codeMaxLength: 4096, postLabel: { en: 'Post', fr: 'Publication' } }, schema: z.object({ renewLeadSeconds: z.number().int().min(1).max(86400), stateTtlSeconds: z.number().int().min(60).max(3600), codeMaxLength: z.number().int().min(1).max(16384), postLabel: z.object({ en: z.string().min(1), fr: z.string().min(1) }) }), consumption: 'active' }),
+  entry({ key: 'platforms.threads.enabled', group: 'Threads · Engine', label: 'Threads enabled', kind: 'boolean', description: 'Installed connector; enable after live verification.', defaultValue: false, schema: z.boolean(), consumption: 'active' }),
+  entry({ key: 'platforms.threads.includedByDefault', group: 'Threads · Access', label: 'Included by default', kind: 'boolean', description: 'Default workspace access.', defaultValue: false, schema: z.boolean(), consumption: 'active' }),
+  entry({ key: 'platforms.threads.planFeatures', group: 'Threads · Access', label: 'Plan feature keys', kind: 'json', description: 'Plan access keys.', defaultValue: ['platform_threads'], schema: z.array(z.string().min(1)), consumption: 'active' }),
   entry({ key: 'threads.policy', group: 'Threads · API', label: 'Threads policy', kind: 'json', description: 'Endpoints, scopes, polling, media limits and bilingual feedback.', defaultValue: THREADS_POLICY_DEFAULTS, schema: threadsPolicySchema, consumption: 'active' }),
   entry({ key: 'threads.appId', group: 'Threads · Credentials', label: 'Application ID', kind: 'text', description: 'Threads application identifier.', defaultValue: '', schema: z.string(), consumption: 'active' }),
   entry({ key: 'threads.appSecret', group: 'Threads · Credentials', label: 'Application secret', kind: 'secret', description: 'Threads application secret.', defaultValue: '', schema: z.string(), consumption: 'active' }),

@@ -100,3 +100,20 @@ passed a synthetic SQLite collision/idempotence/metadata check, but PostgreSQL
 rehearsal and real live-probe execution remain open. No servers, deploy or push.
 
 Root naming final continuation: module-owned probe configuration now clears bundled signing secrets when Root has none; three regression tests cover policy and credential fallback. The saved-key SQL collision/idempotence/metadata check is now an automated test (built-in SQLite, not PostgreSQL). Unused historical mapping exports and a residual plans comment are removed. Typecheck and explicit tsc pass; 10 focused files / 164 tests pass. Full cache-disabled suite excluding diagnostic transport: 701 files passed, one failed, 49 skipped; 11,374 tests passed, five failed, 2,525 skipped. All five failures are unchanged sandbox `listen EPERM ::1` in facebook-native-http. No server, live probe, database migration, deploy, push or staging was performed. Source changes remain uncommitted.
+
+
+## Lane 46 OAuth connector installation — 2026-10-22
+
+Mastodon, LinkedIn, Threads, X and Pinterest move from staged adapters to installed
+module/host dispatch, disabled by default. Shared Settings/Publishing services retain
+UI/REST/MCP authorization, exact confirmation and audit; OAuth uses app.publicOrigin
+and discovered resources require explicit selection. G3 is done at source, with
+live consent/refresh/publishing/cleanup, browser/client and release gates open.
+See [CONNECTORS_LANE_46.md](CONNECTORS_LANE_46.md) for legacy credential mappings,
+Mastodon single-instance limitation and the outside-owned Root manual-refresh
+credential-consistency gap. Schema bump belongs to the integrator; this lane
+leaves CONFIG_SCHEMA_VERSION unchanged. Final TypeScript: zero errors; 11 focused files / 183 tests pass, including
+parity/config guards. Required full suite: 711 files pass, one fails, 49 skip;
+11,511 tests pass, five fail, 2,553 skip. All failures are unchanged Facebook
+loopback probes blocked by sandbox `listen EPERM ::1`; full suite is not green. No production
+action or live-provider claim. Changes remain uncommitted as requested.

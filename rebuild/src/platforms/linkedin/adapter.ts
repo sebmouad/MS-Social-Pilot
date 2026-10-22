@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import type { PlatformAdapter, PlatformCredential, OAuthExchangeRequest, PublishRequest } from '../types';
 import type { Policy } from './config';
-import { linkedinModule } from './manifest';
+import { linkedinModule } from './module';
 import { ProviderError, transport } from './transport';
 
 const tokenSchema = z.object({ access_token: z.string().min(1), expires_in: z.number().positive(), refresh_token: z.string().optional(), scope: z.string().optional() });
@@ -86,5 +86,10 @@ export function createLinkedinAdapter(policy: Policy, fetcher: typeof fetch = fe
     },
     classifyPublishingFailure: error => error instanceof ProviderError && error.rejected ? 'rejected' : 'uncertain',
   };
-  return { adapter, exchange, currentUser };
+  async function renew(appId: string, appSecret: string, refreshToken: string, signal?: AbortSignal) {
+    const response = await send(policy.tokenUrl, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ grant_type: 'refresh_token', refresh_token: refreshToken, client_id: appId, client_secret: appSecret }), signal });
+    const token = tokenSchema.parse(await response.json());
+    return { accessToken: token.access_token, refreshToken: token.refresh_token ?? null, expiresAt: new Date(Date.now() + token.expires_in * 1000), scopes: token.scope?.split(/[\s,]+/).filter(Boolean) ?? [] };
+  }
+  return { adapter, exchange, currentUser, renew };
 }

@@ -30,10 +30,10 @@ export function createMastodonAdapter(input: MastodonPolicy, context: { instance
     id: 'mastodon', capabilities: mastodonModule.capabilities,
     publishingMedia: { kinds: ['image', 'video'], maxImages: policy.maxImages, maxVideos: policy.maxVideos, mixedKinds: false, linkWithMedia: true, imageAltText: true },
     getAuthorizationUrl(request) { const url = new URL(`${instance}${policy.paths.authorize}`); url.search = new URLSearchParams({ client_id: request.appId, redirect_uri: request.redirectUri, response_type: 'code', scope: policy.scopes.join(' '), state: request.state }).toString(); return url.href; },
-    async exchangeCode(request) { const data = await call(policy.paths.token, { method: 'POST', headers: { 'content-type': 'application/json' }, body: json({ grant_type: 'authorization_code', client_id: request.appId, client_secret: request.appSecret, code: request.code, redirect_uri: request.redirectUri, scope: policy.scopes.join(' ') }) }); if (typeof data.access_token !== 'string' || !data.access_token) throw new Error('Missing Mastodon token'); return { accessToken: data.access_token }; },
+    async exchangeCode(request) { const data = await call(policy.paths.token, { method: 'POST', headers: { 'content-type': 'application/json' }, body: json({ grant_type: 'authorization_code', client_id: request.appId, client_secret: request.appSecret, code: request.code, redirect_uri: request.redirectUri, scope: policy.scopes.join(' ') }) }); if (typeof data.access_token !== 'string' || !data.access_token) throw new Error('Missing Mastodon token'); return { accessToken: data.access_token, grantedScopes: typeof data.scope === 'string' ? data.scope.split(/\s+/).filter(Boolean) : policy.scopes }; },
     async discover(request) { const me = await account(request.credential); return { targets: [{ id: `${id(me.id)}@${new URL(instance).host}`, name: String(me.display_name || me.acct || me.username), kind: 'mastodon-account' }] }; },
     async publish(request) {
-      if (request.scheduledAt || request.formatId) throw new Error('Unsupported Mastodon format');
+      if (request.scheduledAt || (request.formatId && request.formatId !== 'post')) throw new Error('Unsupported Mastodon format');
       const me = await account(request.credential);
       if (request.target.id !== `${id(me.id)}@${new URL(instance).host}`) throw new Error('Mastodon target ownership mismatch');
       const text = [request.text, request.link].filter(Boolean).join('\n\n');

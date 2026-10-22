@@ -1,4 +1,4 @@
-import { requestOrigin } from '@/server/request-origin';
+
 import { runtimeConfig } from '@/server/config/store';
 import { createMastodonAdapter, type MastodonSafeTransport } from './adapter';
 import { mastodonPolicySchema } from './config';
@@ -12,5 +12,5 @@ export async function configuredMastodonAdapter(instance: string, transport: Mas
 /** Server-only callback derivation; caller owns signed, single-use state. */
 export async function mastodonRedirectUri(request: Request): Promise<string> {
   const policy = mastodonPolicySchema.parse(await runtimeConfig('mastodon.policy'));
-  return new URL(policy.callbackPath, requestOrigin(request)).href;
+  return new URL(policy.callbackPath, String(await runtimeConfig('app.publicOrigin'))).href;
 }

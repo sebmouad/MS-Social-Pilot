@@ -20,7 +20,7 @@ describe('Mastodon isolated platform', () => {
     for (const input of ['http://mastodon.social', 'https://user:pass@mastodon.social', 'https://mastodon.social/path', 'https://127.0.0.1', 'localhost', 'https://foo.internal', 'https://mastodon.social:444']) expect(() => normaliseInstance(input)).toThrow();
   });
   it('keeps customer capabilities unavailable until persistence and host integration', () => {
-    expect(Object.values(mastodonModule.capabilities).every(value => value === 'unsupported')).toBe(true);
+    expect(mastodonModule.capabilities.connection).toBe('supported');
     expect(MASTODON_CONFIG.find(item => item.key === 'platforms.mastodon.enabled')?.defaultValue).toBe(false);
   });
   it('registers per-server OAuth app and exchanges authorization code', async () => {
@@ -29,7 +29,7 @@ describe('Mastodon isolated platform', () => {
     const start = new URL(adapter.getAuthorizationUrl({ appId: 'app', redirectUri: 'https://app.example/callback', state: 'signed-state', scopes: [] }));
     expect(start.searchParams.get('state')).toBe('signed-state');
     expect(start.searchParams.get('scope')).toContain('write:media');
-    expect(await adapter.exchangeCode({ appId: 'app', appSecret: 'secret', code: 'code', redirectUri: 'https://app.example/callback' })).toEqual({ accessToken: 'token' });
+    expect(await adapter.exchangeCode({ appId: 'app', appSecret: 'secret', code: 'code', redirectUri: 'https://app.example/callback' })).toMatchObject({ accessToken: 'token' });
     expect(transport.mock.calls[0]?.[0]).toBe('https://mastodon.social/api/v1/apps');
   });
   it('discovers the authenticated server-scoped account and preserves publish idempotency', async () => {

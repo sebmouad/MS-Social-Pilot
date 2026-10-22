@@ -2,10 +2,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import { POLICY_DEFAULTS as linkedinPolicy } from '../src/platforms/linkedin/config';
 import { POLICY_DEFAULTS as pinterestPolicy } from '../src/platforms/pinterest/config';
-const m = vi.hoisted(() => ({ membership: vi.fn(), permissions: vi.fn(), access: vi.fn(), enabled: vi.fn(), existing: vi.fn(), findTargets: vi.fn(), target: vi.fn(), upsert: vi.fn(), create: vi.fn(), update: vi.fn(), updateMany: vi.fn(), audit: vi.fn(), lock: vi.fn(), exchange: vi.fn(), currentUser: vi.fn(), discover: vi.fn(), authUrl: vi.fn(), renew: vi.fn() }));
+const m = vi.hoisted(() => ({ membership: vi.fn(), permissions: vi.fn(), access: vi.fn(), enabled: vi.fn(), existing: vi.fn(), findTargets: vi.fn(), target: vi.fn(), upsert: vi.fn(), create: vi.fn(), update: vi.fn(), updateMany: vi.fn(), audit: vi.fn(), lock: vi.fn(), exchange: vi.fn(), currentUser: vi.fn(), discover: vi.fn(), authUrl: vi.fn(), renew: vi.fn(), raw: vi.fn(), runtime: vi.fn() }));
 vi.mock('@/server/data', () => ({ prisma: {
   membership: { findUnique: m.membership },
-  $transaction: (run: (tx: unknown) => unknown) => run({ membership: { findUnique: m.membership }, socialAccount: { findUnique: m.existing, upsert: m.upsert }, target: { findMany: m.findTargets, findUnique: m.target, create: m.create, update: m.update, updateMany: m.updateMany } }),
+  $transaction: (run: (tx: unknown) => unknown) => run({ $executeRaw: m.raw, membership: { findUnique: m.membership }, socialAccount: { findUnique: m.existing, upsert: m.upsert }, target: { findMany: m.findTargets, findUnique: m.target, create: m.create, update: m.update, updateMany: m.updateMany } }),
 } }));
 vi.mock('@/server/entitlements', () => ({ loadEntitlements: m.access, canUseFeature: (access: { feature: boolean }) => access.feature, hasPlatformCapability: (access: { platform: boolean }) => access.platform }));
 vi.mock('@/server/permissions/loader', () => ({ loadPermissions: m.permissions }));
@@ -14,7 +14,7 @@ vi.mock('@/server/platforms/registry', () => ({ isPlatformEnabled: m.enabled }))
 vi.mock('@/server/platforms/resource-lock', () => ({ lockSelectedResources: m.lock }));
 vi.mock('@/server/data-control/guard', () => ({ withWorkspaceOperation: (_workspaceId: string, run: () => unknown) => run() }));
 vi.mock('@/modules/settings/server/connection-mutations', () => ({ auditConnectionEvent: m.audit }));
-vi.mock('@/server/request-origin', () => ({ requestOrigin: () => 'https://app.example.test' }));
+vi.mock('@/server/config/store', () => ({ runtimeConfig: m.runtime }));
 vi.mock('@/platforms/linkedin/runtime', async () => {
   const { POLICY_DEFAULTS } = await import('../src/platforms/linkedin/config');
   return { configuredPolicy: async () => POLICY_DEFAULTS, configuredCredentials: async () => ({ appId: 'app', appSecret: 'synthetic-secret' }), configuredEngine: async () => ({ exchange: m.exchange, currentUser: m.currentUser, adapter: { discover: m.discover, getAuthorizationUrl: m.authUrl } }) };
@@ -35,6 +35,7 @@ const lanes = [
 beforeEach(() => {
   vi.resetAllMocks();
   vi.stubEnv('ENCRYPTION_KEY', Buffer.alloc(32, 4).toString('base64'));
+  m.runtime.mockResolvedValue('https://app.example.test');
   m.membership.mockResolvedValue({ role: 'owner' }); m.permissions.mockResolvedValue({ write: true });
   m.access.mockResolvedValue({ workspaceId: 'workspace', feature: true, platform: true }); m.enabled.mockResolvedValue(true);
   m.findTargets.mockResolvedValue([]); m.existing.mockResolvedValue(null); m.target.mockResolvedValue(null); m.upsert.mockResolvedValue({ id: 'source' });
@@ -93,7 +94,7 @@ for (const lane of lanes) describe(`${lane.id} connection service`, () => {
     expect(m.update.mock.calls[0]![0].data).not.toHaveProperty('enabled');
     expect(m.create).not.toHaveBeenCalled();
   });
-  it('derives callback and secure cookie from requestOrigin behind a proxy', async () => {
+  it('derives callback and secure cookie from Root publicOrigin behind a proxy', async () => {
     const response = await lane.connection.start(new Request('http://localhost:3200/api/start'), viewer);
     expect(m.authUrl.mock.calls[0]![0].redirectUri).toBe(`https://app.example.test/api/connections/${lane.id}/callback`);
     const cookie = response.cookies.get(`msp_${lane.id}_oauth`)!;

@@ -1,11 +1,11 @@
 import { createHash, randomBytes } from 'node:crypto';
-import { PlatformApiError } from '../errors';
+import { ProviderHttpError } from '@/server/platforms/provider-http';
 import type { PlatformAdapter, PlatformCredential } from '../types';
 import { xModule } from './manifest';
 import { xPolicySchema, type XPolicy } from './config';
 export interface XTokens { accessToken: string; refreshToken?: string; expiresAt: Date; grantedScopes: string[] }
-export class XProtocolError extends PlatformApiError {
-  constructor(message: string, readonly uncertain: boolean) { super(message, false); }
+export class XProtocolError extends ProviderHttpError {
+  constructor(message: string, readonly uncertain: boolean, status?: number) { super(message, uncertain ? 'uncertain' : 'rejected', false, status); }
 }
 /** Protocol-only adapter. No customer capability is advertised until the shared host is implemented. */
 export function createXAdapter(input: XPolicy, credentials: { clientId: string; clientSecret: string }, options: { fetch?: typeof fetch; now?: () => number; locale?: 'en' | 'fr' } = {}) {
@@ -16,7 +16,7 @@ export function createXAdapter(input: XPolicy, credentials: { clientId: string; 
     const write = init.method === 'POST' || init.method === 'DELETE';
     try {
       const response = await send(url(path), { ...init, redirect: 'error', signal: init.signal ? AbortSignal.any([init.signal, AbortSignal.timeout(policy.requestTimeoutMs)]) : AbortSignal.timeout(policy.requestTimeoutMs), headers: { ...(token ? { authorization: `Bearer ${token}` } : {}), ...init.headers } });
-      if (!response.ok) throw new XProtocolError(policy.copy.unavailable[locale], write && response.status >= 500);
+      if (!response.ok) throw new XProtocolError(policy.copy.unavailable[locale], write && response.status >= 500, response.status);
       return await response.json();
     } catch (error) { if (error instanceof XProtocolError) throw error; throw new XProtocolError(policy.copy.unavailable[locale], write); }
   }
@@ -39,7 +39,7 @@ export function createXAdapter(input: XPolicy, credentials: { clientId: string; 
     async publish(requested) {
       const text = [requested.text, requested.link].filter(Boolean).join('\n\n'), media = requested.media ?? [];
       // Conservative character count; weighted URL shortening remains a host integration gap.
-      if (requested.target.kind !== 'x' || !id(requested.target.id) || requested.scheduledAt || requested.formatId || !text.trim() && !media.length || [...text].length > policy.maxCharacters || media.length > policy.maxImages || media.some(item => item.kind !== 'image' || !item.localFile || !policy.imageMimeTypes.includes(item.localFile.mimeType) || item.localFile.bytes.byteLength > policy.maxImageBytes || !item.localFile.bytes.byteLength || item.altText)) throw invalid();
+      if (requested.target.kind !== 'x' || !id(requested.target.id) || requested.scheduledAt || (requested.formatId && requested.formatId !== 'post') || !text.trim() && !media.length || [...text].length > policy.maxCharacters || media.length > policy.maxImages || media.some(item => item.kind !== 'image' || !item.localFile || !policy.imageMimeTypes.includes(item.localFile.mimeType) || item.localFile.bytes.byteLength > policy.maxImageBytes || !item.localFile.bytes.byteLength || item.altText)) throw invalid();
       const mediaIds: string[] = [];
       for (const image of media) {
         const file = image.localFile!;
@@ -66,6 +66,7 @@ export function createXAdapter(input: XPolicy, credentials: { clientId: string; 
   };
   return {
     ...adapter,
+    refreshToken(refreshToken: string) { return token(new URLSearchParams({ grant_type: 'refresh_token', refresh_token: refreshToken })); },
     startOAuth(request: { requestOrigin: string; state: string }) {
       if (!request.state) throw invalid();
       const origin = new URL(request.requestOrigin); if (origin.origin !== request.requestOrigin || !['https:', 'http:'].includes(origin.protocol)) throw invalid();

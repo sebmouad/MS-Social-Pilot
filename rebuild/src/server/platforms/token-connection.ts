@@ -3,7 +3,11 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { Prisma, type TargetType } from '../../../generated/client';
 import { prisma } from '@/server/data';
 import { encryptSecret, decryptSecret } from '@/server/secret-crypto';
-import { requestOrigin } from '@/server/request-origin';
+import { runtimeConfig } from '@/server/config/store';
+import { loadEntitlements, canUseFeature, hasPlatformCapability } from '@/server/entitlements';
+import { loadPermissions } from '@/server/permissions/loader';
+import { canAccessFeature } from '@/server/permissions';
+import { isPlatformEnabled } from './registry';
 import { assertWorkspaceNotPurging, withWorkspaceOperation } from '@/server/data-control/guard';
 import { auditConnectionEvent, type ConnectionMutationActor } from '@/server/connection-mutations';
 import { lockSelectedResources } from './resource-lock';
@@ -58,26 +62,46 @@ export interface TokenOAuthFlow {
   provider: string;
   pkce: boolean;
   stateTtlSeconds(): Promise<number>;
+  /** Module-owned Root bound; omitted by older installed flows. */
+  codeMaxLength?(): Promise<number>;
   /** Null when Root has not filled in the credentials. */
   authorizationUrl(input: { redirectUri: string; state: string; challenge: string | null }): Promise<string | null>;
   /** Exchange the code and discover every destination the account can publish to. */
   complete(input: { code: string; redirectUri: string; verifier: string | null; signal?: AbortSignal }): Promise<TokenConnectionResult>;
 }
 
+async function publicOrigin(): Promise<string> {
+  const origin = await runtimeConfig('app.publicOrigin');
+  const parsed = new URL(origin);
+  if (parsed.origin !== origin || parsed.username || parsed.password || !['https:', 'http:'].includes(parsed.protocol)) throw new Error('Public origin is not configured.');
+  return origin;
+}
+
+/** Recheck current service authority before exchanging provider codes, independently of the route. */
+export async function authorizeTokenOAuth(viewer: ConnectionViewer, provider: string): Promise<void> {
+  const [membership, permissions, access] = await Promise.all([
+    prisma.membership.findUnique({ where: { userId_workspaceId: { userId: viewer.user.id, workspaceId: viewer.workspaceId } }, select: { role: true } }),
+    loadPermissions(viewer.user.id, viewer.workspaceId),
+    loadEntitlements(viewer.user.id, viewer.workspaceId, { allowInstallationInspection: false }),
+  ]);
+  if (!membership || !['owner', 'admin'].includes(membership.role) || !permissions || !canAccessFeature(permissions, 'settings/connections', 'write') || !access || access.workspaceId !== viewer.workspaceId || !canUseFeature(access, 'settings/connections') || !hasPlatformCapability(access, provider) || !await isPlatformEnabled(provider)) throw new Error('Connection is unavailable.');
+}
+
 const unavailable = () => NextResponse.json({ error: 'Connection unavailable. Try again or contact support.' }, { status: 503 });
 
 export async function startTokenOAuth(flow: TokenOAuthFlow, request: Request, viewer: ConnectionViewer): Promise<NextResponse> {
   try {
+    await authorizeTokenOAuth(viewer, flow.provider);
     await assertWorkspaceNotPurging(viewer.workspaceId);
     const ttlSeconds = await flow.stateTtlSeconds();
     const pending = createTokenOAuthState({ userId: viewer.user.id, workspaceId: viewer.workspaceId, ttlSeconds, pkce: flow.pkce });
     if (pending.cookieValue.length > 3000) return unavailable();
-    const redirectUri = new URL(tokenCallbackPath(flow.provider), requestOrigin(request)).toString();
+    const redirectUri = new URL(tokenCallbackPath(flow.provider), await publicOrigin()).toString();
     const authorizationUrl = await flow.authorizationUrl({ redirectUri, state: pending.state, challenge: pending.verifier ? pkceChallenge(pending.verifier) : null });
     if (!authorizationUrl) return unavailable();
     const response = NextResponse.json({ authorizationUrl }, { headers: { 'cache-control': 'no-store' } });
     response.cookies.set(tokenOAuthCookie(flow.provider), pending.cookieValue, {
-      httpOnly: true, secure: new URL(requestOrigin(request)).protocol === 'https:', sameSite: 'lax', path: tokenCallbackPath(flow.provider), maxAge: ttlSeconds,
+      httpOnly: true, secure: new URL(await publicOrigin()).protocol === 'https:', sameSite: 'lax', path: tokenCallbackPath(flow.provider), maxAge: ttlSeconds,
     });
     return response;
   } catch { return unavailable(); }
@@ -89,12 +113,13 @@ export async function finishTokenOAuth(flow: TokenOAuthFlow, request: NextReques
   if (!pending) return finish(flow, request, 'oauth_invalid_state');
   if (params.has('error')) return finish(flow, request, 'oauth_cancelled');
   const code = params.get('code');
-  if (!code || code.length > 4096) return finish(flow, request, 'connect_failed');
+  if (!code || code.length > (flow.codeMaxLength ? await flow.codeMaxLength() : 4096)) return finish(flow, request, 'connect_failed');
   const actor = { userId: viewer.user.id, workspaceId: viewer.workspaceId };
   let stage = 'exchange';
   try {
     return await withWorkspaceOperation(viewer.workspaceId, async () => {
-      const redirectUri = new URL(tokenCallbackPath(flow.provider), requestOrigin(request)).toString();
+      await authorizeTokenOAuth(viewer, flow.provider);
+      const redirectUri = new URL(tokenCallbackPath(flow.provider), await publicOrigin()).toString();
       const result = await flow.complete({ code, redirectUri, verifier: pending.verifier });
       stage = 'persist';
       const saved = await persistTokenConnection(actor, flow.provider, result);
@@ -108,11 +133,11 @@ export async function finishTokenOAuth(flow: TokenOAuthFlow, request: NextReques
   }
 }
 
-function finish(flow: TokenOAuthFlow, request: NextRequest, notice: string, openSelection = false) {
-  const location = new URL(`/settings/connections?notice=${encodeURIComponent(notice)}${openSelection ? '&select=1' : ''}`, requestOrigin(request));
+async function finish(flow: TokenOAuthFlow, request: NextRequest, notice: string, openSelection = false) {
+  const location = new URL(`/settings/connections?notice=${encodeURIComponent(notice)}${openSelection ? '&select=1' : ''}`, await publicOrigin());
   const response = NextResponse.redirect(location, { status: 303, headers: { 'cache-control': 'no-store', 'referrer-policy': 'no-referrer' } });
   response.cookies.set(tokenOAuthCookie(flow.provider), '', {
-    httpOnly: true, secure: new URL(requestOrigin(request)).protocol === 'https:', sameSite: 'lax', path: tokenCallbackPath(flow.provider), maxAge: 0,
+    httpOnly: true, secure: new URL(await publicOrigin()).protocol === 'https:', sameSite: 'lax', path: tokenCallbackPath(flow.provider), maxAge: 0,
   });
   return response;
 }
@@ -149,6 +174,7 @@ export async function persistTokenConnection(actor: ConnectionMutationActor, pro
         await tx.target.update({ where: { id: current.id }, data: { ...data, ...(current.socialAccountId === null ? { enabled: false } : {}) } }); saved++;
       } else skipped++; // Never take another connection's destination or inherit its selection.
     }
+    await tx.target.updateMany({ where: { workspaceId: actor.workspaceId, socialAccountId: account.id, type, providerId: { notIn: input.destinations.map(item => item.providerId) } }, data: { enabled: false, canPublish: false } });
     await auditConnectionEvent(tx, actor, `connection.${provider}_connected`, { providerUserId: input.providerUserId, destinations: saved, skipped });
     return { saved, skipped };
   });

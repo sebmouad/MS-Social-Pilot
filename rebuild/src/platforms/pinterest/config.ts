@@ -6,6 +6,7 @@ export const policySchema = z.object({
   apiBaseUrl: https, authorizationUrl: https, tokenUrl: https, publicPostUrl: https,
   scopes: z.array(z.string().min(1)).min(1), requestTimeoutMs: z.number().int().min(1).max(120000),
   pageSize: z.number().int().min(1).max(100), maxPages: z.number().int().min(1).max(1000),
+  renewLeadSeconds: z.number().int().min(1).max(2592000).default(86400),
   stateTtlSeconds: z.number().int().min(60).max(3600), codeMaxLength: z.number().int().min(1).max(16384),
   maxImages: z.number().int().min(1).max(5), textLength: z.number().int().min(1).max(500),
   publishScopes: z.array(z.string().min(1)).min(1), readScopes: z.array(z.string().min(1)).min(1), titleLength: z.number().int().min(1).max(100), altTextLength: z.number().int().min(1).max(500),
@@ -16,7 +17,7 @@ export const POLICY_DEFAULTS: Policy = {
   apiBaseUrl: 'https://api.pinterest.com/v5', authorizationUrl: 'https://www.pinterest.com/oauth/', tokenUrl: 'https://api.pinterest.com/v5/oauth/token',
   publicPostUrl: 'https://www.pinterest.com/pin/',
   scopes: ['boards:read', 'boards:write', 'pins:read', 'pins:write', 'user_accounts:read'], requestTimeoutMs: 15000, pageSize: 100, maxPages: 20,
-  stateTtlSeconds: 600, codeMaxLength: 4096, maxImages: 5, textLength: 500,
+  renewLeadSeconds: 86400, stateTtlSeconds: 600, codeMaxLength: 4096, maxImages: 5, textLength: 500,
   publishScopes: ['pins:write'], readScopes: ['pins:read'], titleLength: 100, altTextLength: 500,
   copy: {
     invalid: { en: 'Check the selected channel, text and pictures before trying again.', fr: 'Vérifiez le canal, le texte et les images avant de réessayer.' },

@@ -6,6 +6,7 @@ export const policySchema = z.object({
   apiBaseUrl: https, authorizationUrl: https, tokenUrl: https, publicPostUrl: https,
   scopes: z.array(z.string().min(1)).min(1), requestTimeoutMs: z.number().int().min(1).max(120000),
   pageSize: z.number().int().min(1).max(100), maxPages: z.number().int().min(1).max(1000),
+  renewLeadSeconds: z.number().int().min(1).max(2592000).default(86400),
   stateTtlSeconds: z.number().int().min(60).max(3600), codeMaxLength: z.number().int().min(1).max(16384),
   maxImages: z.number().int().min(1).max(9), textLength: z.number().int().min(1).max(3000),
   memberPublishScopes: z.array(z.string().min(1)).min(1), organizationPublishScopes: z.array(z.string().min(1)).min(1), memberReadScopes: z.array(z.string().min(1)).min(1), organizationReadScopes: z.array(z.string().min(1)).min(1), version: z.string().regex(/^\d{6}$/), organizationScopes: z.array(z.string().min(1)), organizationsEnabled: z.boolean(), uploadHosts: z.array(z.string().min(1)), maxUploadBytes: z.number().int().positive(), uploadMimeTypes: z.array(z.string().min(1)),
@@ -16,7 +17,7 @@ export const POLICY_DEFAULTS: Policy = {
   apiBaseUrl: 'https://api.linkedin.com', authorizationUrl: 'https://www.linkedin.com/oauth/v2/authorization', tokenUrl: 'https://www.linkedin.com/oauth/v2/accessToken',
   publicPostUrl: 'https://www.linkedin.com/feed/update/',
   scopes: ['openid', 'profile', 'w_member_social'], requestTimeoutMs: 15000, pageSize: 100, maxPages: 20,
-  stateTtlSeconds: 600, codeMaxLength: 4096, maxImages: 9, textLength: 3000,
+  renewLeadSeconds: 86400, stateTtlSeconds: 600, codeMaxLength: 4096, maxImages: 9, textLength: 3000,
   memberPublishScopes: ['w_member_social'], organizationPublishScopes: ['w_organization_social'], memberReadScopes: ['r_member_social'], organizationReadScopes: ['r_organization_social'], version: '202608', organizationScopes: ['r_organization_social', 'w_organization_social', 'rw_organization_admin'], organizationsEnabled: false, uploadHosts: ['www.linkedin.com', 'api.linkedin.com'], maxUploadBytes: 10485760, uploadMimeTypes: ['image/jpeg', 'image/png', 'image/gif'],
   copy: {
     invalid: { en: 'Check the selected channel, text and pictures before trying again.', fr: 'Vérifiez le canal, le texte et les images avant de réessayer.' },

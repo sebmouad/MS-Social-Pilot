@@ -17,7 +17,7 @@ describe('configuration registry', () => {
     }
   });
   it('keeps operator alerts in the single Root monitoring system', () => {
-    expect(CONFIG_SCHEMA_VERSION).toBe(134);
+    expect(CONFIG_SCHEMA_VERSION).toBe(135);
     for (const key of ['notifications.systemAlertPolicy', 'notifications.systemAlertCopy', 'notifications.systemAlertTelegramToken']) {
       expect(CONFIG_BY_KEY.has(key)).toBe(false);
     }
@@ -62,7 +62,7 @@ describe('configuration registry', () => {
   });
 
   it('covers the operational configuration areas with explicit consumption status', () => {
-    expect(CONFIG_SCHEMA_VERSION).toBe(134);
+    expect(CONFIG_SCHEMA_VERSION).toBe(135);
     expect(safeConfigShape().find(setting => setting.key === 'settings.teamDefaultRole')).toMatchObject({ defaultValue: 'contributor', consumption: 'active', owner: { kind: 'product', id: 'settings' } });
     expect(safeConfigShape().find(setting => setting.key === 'settings.teamDefaultAllChannels')).toMatchObject({ defaultValue: false, consumption: 'active', owner: { kind: 'product', id: 'settings' } });
     expect(CONFIG_BY_KEY.get('settings.teamDefaultRole')!.schema.safeParse('owner').success).toBe(false);

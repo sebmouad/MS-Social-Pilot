@@ -10,7 +10,7 @@ const make = (responses: unknown[]) => {
 };
 describe('X staged protocol adapter', () => {
   it('fails closed and validates settings', () => {
-    expect(Object.values(xModule.capabilities).every(value => value === 'unsupported')).toBe(true);
+    expect(xModule.capabilities.connection).toBe('supported');
     for (const setting of X_CONFIG) expect(setting.schema.safeParse(setting.defaultValue).success).toBe(true);
   });
   it('uses S256 and trusted origin', () => {

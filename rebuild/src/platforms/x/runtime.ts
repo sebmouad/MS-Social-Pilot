@@ -1,4 +1,4 @@
-import { requestOrigin } from '@/server/request-origin';
+
 import { runtimeConfig, runtimeSecret } from '@/server/config/store';
 import { createXAdapter } from './adapter';
 import { xPolicySchema } from './config';
@@ -12,5 +12,5 @@ export async function configuredXAdapter(locale: 'en' | 'fr' = 'en') {
 /** Origin is resolved through the same trusted host policy as other connections. */
 export async function startConfiguredXOAuth(request: Request, state: string) {
   const adapter = await configuredXAdapter();
-  return adapter.startOAuth({ requestOrigin: requestOrigin(request), state });
+  return adapter.startOAuth({ requestOrigin: String(await runtimeConfig('app.publicOrigin')), state });
 }

@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { createThreadsAdapter } from '../src/platforms/threads/adapter';
 import { THREADS_POLICY_DEFAULTS, THREADS_CONFIG, threadsPolicySchema } from '../src/platforms/threads/config';
 import { threadsModule } from '../src/platforms/threads/module';
-vi.mock('@/server/config/store', () => ({ runtimeConfig: vi.fn(async (key: string) => key === 'threads.policy' ? THREADS_POLICY_DEFAULTS : 'test-app'), runtimeSecret: vi.fn(async () => 'test-secret') }));
+vi.mock('@/server/config/store', () => ({ runtimeConfig: vi.fn(async (key: string) => key === 'threads.policy' ? THREADS_POLICY_DEFAULTS : key === 'app.publicOrigin' ? 'https://public.example' : 'test-app'), runtimeSecret: vi.fn(async () => 'test-secret') }));
 const credential = { accessToken: 'private-token' };
 const target = { id: '123', name: 'example', kind: 'threads' };
 function fixture(rows: unknown[]) {
@@ -12,16 +12,11 @@ function fixture(rows: unknown[]) {
 describe('Threads staged provider', () => {
   it('derives callback from trusted Root public origin and ignores untrusted forwarded hosts', async () => {
     const { configuredThreadsOAuth } = await import('../src/platforms/threads/runtime');
-    const state = (globalThis as unknown as { __mspPublicOrigin: { value: string; development: string[] } }).__mspPublicOrigin;
-    const previous = state.value;
-    state.value = 'https://public.example';
-    try {
-      const result = await configuredThreadsOAuth(new Request('http://localhost:3100/start', { headers: { 'x-forwarded-host': 'attacker.example' } }), 'nonce');
-      expect(new URL(result.authorizationUrl).searchParams.get('redirect_uri')).toBe('https://public.example/api/connections/threads/callback');
-    } finally { state.value = previous; }
+    const result = await configuredThreadsOAuth(new Request('http://localhost:3100/start', { headers: { 'x-forwarded-host': 'attacker.example' } }), 'nonce');
+    expect(new URL(result.authorizationUrl).searchParams.get('redirect_uri')).toBe('https://public.example/api/connections/threads/callback');
   });
-  it('keeps all customer operations unavailable and validates Root settings', () => {
-    expect(Object.values(threadsModule.capabilities).every(v => v === 'unsupported')).toBe(true);
+  it('declares installed operations and validates Root settings', () => {
+    expect(threadsModule.capabilities.connection).toBe('supported');
     for (const setting of THREADS_CONFIG) expect(setting.schema.safeParse(setting.defaultValue).success).toBe(true);
     expect(threadsPolicySchema.safeParse({ ...THREADS_POLICY_DEFAULTS, graphUrl: 'http://unsafe.test' }).success).toBe(false);
   });

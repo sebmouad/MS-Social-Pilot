@@ -39,20 +39,19 @@ describe('platform modules', () => {
     }
   });
 
-  it('registers staged settings without exposing unfinished providers even if Root enables their switch', async () => {
-    expect(STAGED_PLATFORM_IDS).toEqual(['mastodon', 'threads', 'x', 'linkedin', 'pinterest']);
-    for (const module of STAGED_PLATFORM_MODULES) {
+  it('installs all OAuth connectors with valid settings and keeps them off by default', async () => {
+    expect(STAGED_PLATFORM_IDS).toEqual([]);
+    expect(STAGED_PLATFORM_MODULES).toEqual([]);
+    for (const id of ['mastodon', 'linkedin', 'threads', 'x', 'pinterest']) {
+      const module = PLATFORM_MODULES.find(module => module.id === id)!;
+      expect(module).toBeDefined();
       expect(CONFIG_BY_KEY.get(module.enabledKey)?.defaultValue).toBe(false);
-      for (const key of module.requiredSettings) expect(CONFIG_BY_KEY.has(key)).toBe(true);
-      const entries = PLATFORM_CONFIG.filter(entry => entry.owner.id === module.id);
-      expect(entries.length).toBeGreaterThan(0);
+      const entries = PLATFORM_CONFIG.filter(entry => entry.owner.id === id);
       for (const entry of entries) expect(entry.schema.safeParse(entry.defaultValue).success).toBe(true);
-      enabled.set(module.enabledKey, true);
-      expect(await isPlatformEnabled(module.id)).toBe(false);
-      expect(await connectionFlow(module.id)).toBeNull();
-      expect(await platformFor(module.id, 'publishing')).toBeNull();
+      expect(await isPlatformEnabled(id)).toBe(false);
+      expect(await connectionFlow(id)).toBeNull();
+      expect(await platformFor(id, 'publishing')).toBeNull();
     }
-    expect(await connectablePlatforms(STAGED_PLATFORM_IDS)).toEqual([]);
   });
 
   it('a switched-off module behaves as if it were not installed', async () => {
