@@ -4,7 +4,7 @@ import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 const deps = vi.hoisted(() => ({ push: vi.fn() }));
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: deps.push }) }));
-import { RootFilters, RootFilterSelect } from '../src/server/root/RootFilters';
+import { RootFilters, RootFilterSelect } from '../src/modules/root/ui/RootFilters';
 let root: ReturnType<typeof createRoot>; let container: HTMLDivElement;
 beforeEach(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;

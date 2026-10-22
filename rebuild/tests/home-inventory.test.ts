@@ -7,7 +7,7 @@ import { createRoot } from 'react-dom/client';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const state = vi.hoisted(() => ({ viewer: vi.fn(), selectedTargets: vi.fn(), permitted: vi.fn(), overview: vi.fn(), locale: vi.fn(), config: vi.fn() }));
+const state = vi.hoisted(() => ({ viewer: vi.fn(), selectedTargets: vi.fn(), permitted: vi.fn(), overview: vi.fn(), locale: vi.fn(), config: vi.fn(), scope: vi.fn() }));
 vi.mock('@/server/config/store', () => ({ runtimeConfig: state.config }));
 vi.mock('../src/server/context', () => ({ requireViewer: state.viewer }));
 vi.mock('../src/server/PageFrame', () => ({ PageFrame: ({ children }: { children: unknown }) => children }));
@@ -16,6 +16,7 @@ vi.mock('../src/server/permissions', () => ({ canAccessFeature: state.permitted 
 vi.mock('../src/server/data', () => ({ getTargets: state.selectedTargets }));
 vi.mock('../src/modules/home/server/overview', () => ({ readHomeOverview: state.overview }));
 vi.mock('../src/modules/home/auth/locale', () => ({ authLocale: state.locale }));
+vi.mock('../src/modules/shell/server/scope', () => ({ pageChannelScope: state.scope }));
 vi.mock('@/components/charts', () => {
   const stub = (name: string) => ({ label }: { label: string }) => `[${name}:${label}]`;
   return { BarChart: stub('bar'), DonutChart: stub('donut'), HeatmapChart: stub('heatmap'), Sparkline: stub('spark') };
@@ -37,15 +38,17 @@ const workspaceId = 'workspace-a';
 const totals = (current: number | null, change: number | null) => ({ current, previous: current, change, covered: 2, comparable: 2 });
 const full = () => ({
   generatedAt: '2026-10-20T12:00:00.000Z', lookbackDays: 28, timeZone: 'UTC', channelCount: 2,
-  audience: { state: 'ready', data: { total: 12345, covered: 2, selected: 3, asOf: '2026-10-19T00:00:00.000Z', trend: [{ t: '2026-10-18', v: 1 }, { t: '2026-10-19', v: 2 }] } },
-  performance: { state: 'ready', data: { views: totals(5000, 0.25), engagements: totals(300, -0.1), channels: 2, truncated: false,
+  audience: { state: 'ready', data: { total: 12345, covered: 2, selected: 3, asOf: '2026-10-19T00:00:00.000Z', trend: [{ t: '2026-10-18', v: 1 }, { t: '2026-10-19', v: 2 }], delta: { value: 120, since: '2026-10-18' } } },
+  performance: { state: 'ready', data: { views: totals(5000, 0.25), engagements: totals(300, -0.1), linkClicks: totals(42, 0.05), channels: 2, truncated: false,
     topChannels: [{ id: 'c1', name: 'Alpha', engagements: 200 }], interactions: [{ key: 'reactions', label: 'Reactions', value: 10 }] } },
   bestTimes: { state: 'ready', data: { cells: [{ day: 1, hour: 9, value: 1.4, posts: 3 }], measuredPosts: 12 } },
   upcoming: { state: 'ready', data: { total: 3, items: [
     { id: 'p1', text: 'Launch day', scheduledAt: '2026-10-21T09:00:00.000Z', channels: ['Alpha'], mode: 'platform' },
     { id: 'p2', text: 'Recap', scheduledAt: '2026-10-22T09:00:00.000Z', channels: ['Beta'], mode: 'app' }] } },
-  inbox: { state: 'ready', data: { open: 7 } },
+  inbox: { state: 'ready', data: { open: 7, recent: [
+    { key: 'message:a', author: 'Sam', preview: 'Hello there', time: '2026-10-20T10:00:00.000Z', channel: 'Alpha', unread: 2 }] } },
   ads: { state: 'ready', data: { start: '2026-09-23', end: '2026-10-20', spend: [{ currency: 'EUR', total: 250, firstDay: '2026-10-18', lastDay: '2026-10-19', recordedDays: 2, daily: [{ t: '2026-10-18', v: 100 }, { t: '2026-10-19', v: 150 }] }] } },
+  attention: { state: 'ready', data: { failedPosts: 2, partiallyFailedPosts: 0, pendingApprovals: 3, waitingConversations: 7, reconnect: [{ id: 'c2', name: 'Beta', platform: 'Example' }], partial: false } },
 });
 
 beforeEach(() => {
@@ -56,21 +59,22 @@ beforeEach(() => {
   state.selectedTargets.mockResolvedValue([{ id: 'channel-0' }]);
   state.permitted.mockReturnValue(true);
   state.locale.mockResolvedValue('en');
+  state.scope.mockResolvedValue({ ids: [], dropped: 0, source: 'none', channels: [] });
   state.overview.mockResolvedValue(full());
 });
 
 describe('Home overview screen', () => {
   it('renders current Root copy without changing the selected data or links', async () => {
     state.config.mockResolvedValue({ ...homeCopyCatalogDefaults, greeting: { ...homeCopyCatalogDefaults.greeting, en: 'Hello team' }, upcoming: { ...homeCopyCatalogDefaults.upcoming, en: 'Your next posts' } });
-    const html = await disclosedMarkup(await HomePage());
+    const html = await disclosedMarkup(await HomePage({ searchParams: Promise.resolve({}) }));
     expect(html).toContain('Hello team, Preview');
     expect(html).toContain('Your next posts');
     expect(html).toContain('Launch day');
     expect(state.config).toHaveBeenCalledTimes(1);
   });
   it('reads the overview as the current member and renders every card with its module link', async () => {
-    const html = await disclosedMarkup(await HomePage());
-    expect(state.overview).toHaveBeenCalledWith({ userId: 'owner', workspaceId });
+    const html = await disclosedMarkup(await HomePage({ searchParams: Promise.resolve({}) }));
+    expect(state.overview).toHaveBeenCalledWith({ userId: 'owner', workspaceId }, expect.any(Date), {});
     expect(html).toContain('12,345');
     expect(html).toContain('5,000');
     expect(html).toContain('<strong>+25%</strong><span>vs the previous 28 days</span>');
@@ -90,8 +94,8 @@ describe('Home overview screen', () => {
   });
 
   it('only shows cards for modules the member can use', async () => {
-    state.overview.mockResolvedValue({ ...full(), audience: null, performance: null, bestTimes: null, inbox: null, ads: null });
-    const html = await disclosedMarkup(await HomePage());
+    state.overview.mockResolvedValue({ ...full(), audience: null, performance: null, bestTimes: null, inbox: null, ads: null, attention: null });
+    const html = await disclosedMarkup(await HomePage({ searchParams: Promise.resolve({}) }));
     expect(html).not.toContain('href="/insights/ads"');
     expect(html).not.toContain('href="/inbox"');
     expect(html).not.toContain('href="/insights"');
@@ -100,7 +104,7 @@ describe('Home overview screen', () => {
 
   it('invites the next action when a card has nothing to show', async () => {
     state.overview.mockResolvedValue({ ...full(), audience: { state: 'empty' }, upcoming: { state: 'empty' }, bestTimes: { state: 'empty' }, ads: { state: 'empty' } });
-    const html = await disclosedMarkup(await HomePage());
+    const html = await disclosedMarkup(await HomePage({ searchParams: Promise.resolve({}) }));
     expect(html).toContain('No audience counts yet');
     expect(html).toContain('Nothing scheduled');
     expect(html).toContain('href="/create"');
@@ -110,14 +114,14 @@ describe('Home overview screen', () => {
 
   it('shows a calm unavailable state for one failed card and keeps the rest', async () => {
     state.overview.mockResolvedValue({ ...full(), inbox: { state: 'unavailable' } });
-    const html = await disclosedMarkup(await HomePage());
+    const html = await disclosedMarkup(await HomePage({ searchParams: Promise.resolve({}) }));
     expect(html).toContain('Not available right now');
     expect(html).toContain('12,345');
   });
 
   it('never presents an unknown figure as zero', async () => {
     state.overview.mockResolvedValue({ ...full(), performance: { state: 'ready', data: { views: totals(null, null), engagements: totals(null, null), channels: 2, truncated: false, topChannels: [], interactions: [] } } });
-    const html = await disclosedMarkup(await HomePage());
+    const html = await disclosedMarkup(await HomePage({ searchParams: Promise.resolve({}) }));
     expect(html).toContain('Not available');
     expect(html).toContain('No comparison yet');
     expect(html).toContain('aria-label="About Views"');
@@ -126,7 +130,7 @@ describe('Home overview screen', () => {
   it('renders French copy and the connect prompt when no channel is selected', async () => {
     state.locale.mockResolvedValue('fr');
     state.selectedTargets.mockResolvedValue([]);
-    const html = await disclosedMarkup(await HomePage());
+    const html = await disclosedMarkup(await HomePage({ searchParams: Promise.resolve({}) }));
     expect(html).toContain('Bon retour');
     expect(html).toContain('Connecter des canaux');
     expect(html).not.toContain('Launch day');
@@ -136,8 +140,47 @@ describe('Home overview screen', () => {
 
   it('uses the member channel scope for the connect prompt check', async () => {
     state.viewer.mockResolvedValue({ user: { id: 'member' }, workspaceId, membership: { workspace: { name: 'Example workspace' } }, entitlements: { platformCapabilities: { facebook: true } }, permissions: { pageScope: { all: false, ids: ['channel-allowed'] } } });
-    await HomePage();
+    await HomePage({ searchParams: Promise.resolve({}) });
     expect(state.selectedTargets).toHaveBeenCalledWith(workspaceId, ['channel-allowed'], ['facebook']);
+  });
+
+  it('renders the needs-attention strip with a link to each fix', async () => {
+    const html = await disclosedMarkup(await HomePage({ searchParams: Promise.resolve({}) }));
+    expect(html).toContain('Needs attention');
+    expect(html).toContain('2 posts failed — Review');
+    expect(html).toContain('href="/content?status=failed"');
+    expect(html).toContain('3 posts waiting for your approval');
+    expect(html).toContain('href="/content/approvals"');
+    expect(html).toContain('Reconnect Beta');
+    expect(html).toContain('href="/settings/channels"');
+    expect(html).toContain('7 conversations waiting');
+    expect(html).toContain('href="/inbox"');
+    expect(html).not.toContain('partly failed');
+  });
+
+  it('hides the strip when nothing needs attention and warns when counts are partial', async () => {
+    state.overview.mockResolvedValue({ ...full(), attention: { state: 'ready', data: { failedPosts: 0, partiallyFailedPosts: 0, pendingApprovals: 0, waitingConversations: 0, reconnect: [], partial: false } } });
+    expect(await disclosedMarkup(await HomePage({ searchParams: Promise.resolve({}) }))).not.toContain('Needs attention');
+    state.overview.mockResolvedValue({ ...full(), attention: { state: 'ready', data: { failedPosts: 1, partiallyFailedPosts: null, pendingApprovals: null, waitingConversations: null, reconnect: null, partial: true } } });
+    const html = await disclosedMarkup(await HomePage({ searchParams: Promise.resolve({}) }));
+    expect(html).toContain('1 posts failed');
+    expect(html).toContain('Some counts could not be loaded.');
+  });
+
+  it('renders link clicks, the audience delta and recent conversations', async () => {
+    const html = await disclosedMarkup(await HomePage({ searchParams: Promise.resolve({}) }));
+    expect(html).toContain('Link clicks');
+    expect(html).toContain('+120');
+    expect(html).toContain('since Oct 18, 2026');
+    expect(html).toContain('Hello there');
+    expect(html).toContain('href="/inbox?thread=message%3Aa"');
+    expect(html).toContain('Open calendar');
+  });
+
+  it('carries the sidebar scope into the overview service', async () => {
+    state.scope.mockResolvedValue({ ids: ['c1'], dropped: 0, source: 'url', channels: [] });
+    await HomePage({ searchParams: Promise.resolve({ channel: 'c1' }) });
+    expect(state.overview).toHaveBeenCalledWith({ userId: 'owner', workspaceId }, expect.any(Date), { channelIds: ['c1'] });
   });
 
   it.each(['en', 'fr'])('labels USD and the actual stored-data period in %s', async locale => {
@@ -145,7 +188,7 @@ describe('Home overview screen', () => {
     const data = full();
     data.ads.data.spend[0] = { currency: 'USD', total: 13, firstDay: '2026-10-15', lastDay: '2026-10-16', recordedDays: 2, daily: [] };
     state.overview.mockResolvedValue(data);
-    const html = await disclosedMarkup(await HomePage());
+    const html = await disclosedMarkup(await HomePage({ searchParams: Promise.resolve({}) }));
     expect(html).toContain('USD');
     expect(html).toContain(locale === 'en' ? 'Latest stored day: Oct 16, 2026' : 'Dernier jour enregistré : 16 oct. 2026');
     expect(html).toContain(locale === 'en' ? '2 of 28 days' : '2 jours sur 28');
@@ -155,5 +198,5 @@ describe('Home overview screen', () => {
 
 
 it.runIf(Boolean(process.env.B7_FIXTURE_DIR))('exports the Home synthetic component fixture when requested', async () => {
-  writeB7Fixture('home', renderToStaticMarkup(await HomePage()), 'home', fixtureStyles);
+  writeB7Fixture('home', renderToStaticMarkup(await HomePage({ searchParams: Promise.resolve({}) })), 'home', fixtureStyles);
 });

@@ -2,7 +2,7 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { GrantChips } from '@/modules/settings/ui/connections/GrantChips';
-import { rootPageIcon } from '@/app/root/root-nav-icons';
+import { rootPageIcon } from '@/modules/root/ui/RootNavIcons';
 import { rootManifest } from '@/modules/root/manifest';
 import { buildBarModel } from '@/components/charts/BarChart';
 

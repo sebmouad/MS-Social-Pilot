@@ -1,5 +1,5 @@
 'use client';
-import { useRootActionFeedback } from '@/server/root/RootActionFeedback';
+import { useRootActionFeedback } from '@/modules/root/ui/RootActionFeedback';
 
 import { useRef, useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';

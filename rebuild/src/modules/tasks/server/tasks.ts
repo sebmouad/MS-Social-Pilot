@@ -5,7 +5,7 @@ import { prisma } from '@/server/data';
 import { runtimeConfig } from '@/server/config/store';
 import { copyError, copyText, withCustomerCopy } from './copy';
 import {
-  TASK_ACTION_SCHEMA, TASK_FILTER_SCHEMA, TASK_POST_CHOICE_SCHEMA, TASK_TRANSITIONS, addCalendarDays, taskConfirmations,
+  TASK_ACTION_SCHEMA, TASK_FILTER_SCHEMA, TASK_POST_CHOICE_SCHEMA, TASK_TRANSITIONS, addCalendarDays, taskConfirmations, type TaskChecklistItemView,
   type TaskAction, type TaskCommentView, type TaskLimits, type TaskPostChoice, type TaskStatus, type TaskSummary, type TaskView, type TasksActor, type TasksReadOptions,
 } from '../tasks';
 import { TASK_COMMENT_MODERATOR_ROLES, TASK_MANAGER_ROLES, TASK_WRITE_ROLES, TASKS_FEATURE_ID } from '../semantics';
@@ -18,7 +18,7 @@ const missing = () => copyError('not_found', 'This task is unavailable in the cu
 const unavailable = () => copyError('unavailable', 'Tasks are currently unavailable.');
 const identifier = z.string().regex(/^[A-Za-z0-9_-]{1,200}$/);
 
-const LIMIT_KEYS = ['tasks.titleMaxCharacters', 'tasks.notesMaxCharacters', 'tasks.commentMaxCharacters', 'tasks.pageLimit', 'tasks.commentHistoryLimit', 'tasks.assigneeLimit', 'tasks.postChoiceLimit', 'tasks.workflowRowLimit', 'tasks.workflowGapMaxDays'] as const;
+const LIMIT_KEYS = ['tasks.titleMaxCharacters', 'tasks.notesMaxCharacters', 'tasks.commentMaxCharacters', 'tasks.pageLimit', 'tasks.commentHistoryLimit', 'tasks.assigneeLimit', 'tasks.postChoiceLimit', 'tasks.workflowRowLimit', 'tasks.workflowGapMaxDays', 'tasks.checklistLimit', 'tasks.checklistItemMaxCharacters'] as const;
 type Bounds = TaskLimits & { commentHistoryLimit: number; assigneeLimit: number; postChoiceLimit: number };
 
 /** Live Root-managed bounds. A missing or invalid value makes Tasks unavailable rather than guessing. */
@@ -27,10 +27,11 @@ async function limits(): Promise<Bounds> {
   const checked = z.tuple([
     z.number().int().min(1).max(20000), z.number().int().min(1).max(20000), z.number().int().min(1).max(20000), z.number().int().min(1).max(1000),
     z.number().int().min(1).max(2000), z.number().int().min(1).max(5000), z.number().int().min(1).max(500), z.number().int().min(1).max(200), z.number().int().min(0).max(3650),
+    z.number().int().min(1).max(200), z.number().int().min(1).max(20000),
   ]).safeParse(values);
   if (!checked.success) throw unavailable();
-  const [titleMaxCharacters, notesMaxCharacters, commentMaxCharacters, pageLimit, commentHistoryLimit, assigneeLimit, postChoiceLimit, workflowRowLimit, workflowGapMaxDays] = checked.data;
-  return { titleMaxCharacters, notesMaxCharacters, commentMaxCharacters, pageLimit, commentHistoryLimit, assigneeLimit, postChoiceLimit, workflowRowLimit, workflowGapMaxDays };
+  const [titleMaxCharacters, notesMaxCharacters, commentMaxCharacters, pageLimit, commentHistoryLimit, assigneeLimit, postChoiceLimit, workflowRowLimit, workflowGapMaxDays, checklistLimit, checklistItemMaxCharacters] = checked.data;
+  return { titleMaxCharacters, notesMaxCharacters, commentMaxCharacters, pageLimit, commentHistoryLimit, assigneeLimit, postChoiceLimit, workflowRowLimit, workflowGapMaxDays, checklistLimit, checklistItemMaxCharacters };
 }
 async function timeout() {
   const values = await Promise.all([runtimeConfig('tasks.transactionTimeoutMs'), runtimeConfig('tasks.transactionMaxWaitMs')]);
@@ -65,7 +66,7 @@ function canChange(userId: string, role: string, row: { createdById: string | nu
 function canRemove(userId: string, role: string, row: { createdById: string | null }) {
   return TASK_MANAGER_ROLES.includes(role) || (role === 'contributor' && row.createdById === userId);
 }
-function view(row: TaskRow, actor: TasksActor, access: TasksAccess, today: string, posts: Map<string, { id: string; preview: string; status: string }>): TaskView {
+function view(row: TaskRow, actor: TasksActor, access: TasksAccess, today: string, posts: Map<string, { id: string; preview: string; status: string }>, checklist?: { done: number; total: number }): TaskView {
   const status = (['todo', 'doing', 'done'] as const).includes(row.status as TaskStatus) ? row.status as TaskStatus : 'todo';
   const post = row.postId ? posts.get(row.postId) ?? null : null;
   return {
@@ -75,6 +76,7 @@ function view(row: TaskRow, actor: TasksActor, access: TasksAccess, today: strin
     post, postHidden: Boolean(row.postId && !post),
     createdBy: row.createdById ? { id: row.createdById, name: row.createdByName ?? 'Former member' } : null,
     createdAt: iso(row.createdAt), updatedAt: iso(row.updatedAt), commentCount: Number(row.commentCount ?? 0),
+    checklist: checklist ?? { done: 0, total: 0 },
     canEdit: access.canWrite && canChange(actor.userId, access.role, row), canDelete: access.canWrite && canRemove(actor.userId, access.role, row),
   };
 }
@@ -105,21 +107,32 @@ async function listTasksImpl(actor: TasksActor, rawFilters: unknown = {}, option
   else if (filters.assignee) where.push(Prisma.sql`t."assigneeId" = ${filters.assignee}`);
   if (filters.overdue) where.push(Prisma.sql`t."dueOn" IS NOT NULL AND t."dueOn" < ${today} AND t.status <> 'done'`);
   if (filters.q) { const pattern = '%' + escapeLike(filters.q) + '%'; where.push(Prisma.sql`(t.title ILIKE ${pattern} ESCAPE '\\' OR COALESCE(t.notes, '') ILIKE ${pattern} ESCAPE '\\')`); }
-  const [rows, people, counts] = await Promise.all([
-    prisma.$queryRaw<TaskRow[]>(Prisma.sql`${SELECT} ${JOINS} WHERE ${Prisma.join(where, ' AND ')} ORDER BY t."dueOn" ASC NULLS LAST, t."createdAt" ASC, t.id ASC LIMIT ${take + 1} OFFSET ${filters.offset}`),
+  // Design v2 01 section 5: Tasks obeys the sidebar channel scope through linked posts. A task without a linked
+  // post has no channel to match, so the scope hides it and reports how many it hid (scopeHiddenUnlinked).
+  const scoped = filters.channelIds?.length ? [...where,
+    Prisma.sql`t."postId" IS NOT NULL`,
+    Prisma.sql`EXISTS (SELECT 1 FROM post_targets pt JOIN targets g ON g.id = pt."targetId" WHERE pt."postId" = t."postId" AND g."workspaceId" = t."workspaceId" AND g.id = ANY(${[...filters.channelIds]}::text[]))`,
+  ] : where;
+  const [rows, people, counts, hidden] = await Promise.all([
+    prisma.$queryRaw<TaskRow[]>(Prisma.sql`${SELECT} ${JOINS} WHERE ${Prisma.join(scoped, ' AND ')} ORDER BY t."dueOn" ASC NULLS LAST, t."createdAt" ASC, t.id ASC LIMIT ${take + 1} OFFSET ${filters.offset}`),
     assigneesFor(actor, bounds, options),
     prisma.$queryRaw<Array<{ status: string; total: number; overdue: number }>>`SELECT t.status, COUNT(*)::int AS total, COUNT(*) FILTER (WHERE t."dueOn" IS NOT NULL AND t."dueOn" < ${today} AND t.status <> 'done')::int AS overdue FROM tasks t WHERE t."workspaceId" = ${actor.workspaceId} GROUP BY t.status`,
+    filters.channelIds?.length
+      ? prisma.$queryRaw<Array<{ total: number }>>(Prisma.sql`SELECT COUNT(*)::int AS total FROM tasks t WHERE ${Prisma.join(where, ' AND ')} AND t."postId" IS NULL`).then(found => found[0]?.total ?? 0)
+      : Promise.resolve(0),
   ]);
   const page = rows.slice(0, take);
   const visibility = await postVisibility(actor, access);
   const posts = await visiblePosts(prisma, visibility, page.flatMap(row => row.postId ? [row.postId] : []));
+  const checklistRows = page.length ? await prisma.$queryRaw<Array<{ taskId: string; done: number; total: number }>>`SELECT "taskId", COUNT(*) FILTER (WHERE done)::int AS done, COUNT(*)::int AS total FROM task_checklist_items WHERE "workspaceId" = ${actor.workspaceId} AND "taskId" = ANY(${page.map(row => row.id)}::text[]) GROUP BY "taskId"` : [];
+  const checklistByTask = new Map(checklistRows.map(row => [row.taskId, { done: Number(row.done), total: Number(row.total) }]));
   const summary: TaskSummary = { todo: 0, doing: 0, done: 0, overdue: 0 };
   for (const item of counts) { if (item.status in summary) summary[item.status as TaskStatus] = Number(item.total); summary.overdue += Number(item.overdue); }
   return {
-    ok: true as const, today, hasMore: rows.length > take, offset: filters.offset, pageSize: take,
-    tasks: page.map(row => view(row, actor, access, today, posts)),
+    ok: true as const, today, hasMore: rows.length > take, offset: filters.offset, pageSize: take, scopeHiddenUnlinked: Number(hidden),
+    tasks: page.map(row => view(row, actor, access, today, posts, checklistByTask.get(row.id))),
     summary, ...people, canCreate: access.canWrite,
-    limits: { titleMaxCharacters: bounds.titleMaxCharacters, notesMaxCharacters: bounds.notesMaxCharacters, commentMaxCharacters: bounds.commentMaxCharacters, pageLimit: bounds.pageLimit, workflowRowLimit: bounds.workflowRowLimit, workflowGapMaxDays: bounds.workflowGapMaxDays } satisfies TaskLimits,
+    limits: { titleMaxCharacters: bounds.titleMaxCharacters, notesMaxCharacters: bounds.notesMaxCharacters, commentMaxCharacters: bounds.commentMaxCharacters, pageLimit: bounds.pageLimit, workflowRowLimit: bounds.workflowRowLimit, workflowGapMaxDays: bounds.workflowGapMaxDays, checklistLimit: bounds.checklistLimit, checklistItemMaxCharacters: bounds.checklistItemMaxCharacters } satisfies TaskLimits,
   };
 }
 
@@ -141,7 +154,11 @@ async function getTaskImpl(actor: TasksActor, id: unknown, options?: TasksReadOp
     id: row.id, author: row.authorId ? { id: row.authorId, name: row.authorName ?? 'Former member' } : null, body: row.body, createdAt: iso(row.createdAt),
     canDelete: access.canWrite && (row.authorId === actor.userId || TASK_COMMENT_MODERATOR_ROLES.includes(access.role)),
   }));
-  return { ok: true as const, task: view(rows[0], actor, access, today, posts), comments: commentViews, commentsHasMore: comments.length > take, commentOffset: offset, canComment: access.canWrite };
+  const canChangeItems = access.canWrite && canChange(actor.userId, access.role, rows[0]);
+  const itemTake = pageSize(bounds.checklistLimit, options);
+  const items = await prisma.$queryRaw<Array<{ id: string; text: string; done: boolean; position: number; createdAt: Date }>>`SELECT id, text, done, position, "createdAt" FROM task_checklist_items WHERE "taskId" = ${parsed.data} AND "workspaceId" = ${actor.workspaceId} ORDER BY position ASC, id ASC LIMIT ${itemTake + 1}`;
+  const checklist: TaskChecklistItemView[] = items.slice(0, itemTake).map(row => ({ id: row.id, text: row.text, done: Boolean(row.done), position: Number(row.position), createdAt: iso(row.createdAt), canChange: canChangeItems }));
+  return { ok: true as const, task: view(rows[0], actor, access, today, posts, { done: checklist.filter(item => item.done).length, total: checklist.length }), comments: commentViews, commentsHasMore: comments.length > take, commentOffset: offset, canComment: access.canWrite, checklist, checklistHasMore: items.length > itemTake, canChangeChecklist: canChangeItems };
 }
 
 /** Posts the actor may link to a task: Publishing's visibility, searchable by text, one bounded page at a time. */
@@ -154,7 +171,8 @@ async function listTaskPostChoicesImpl(actor: TasksActor, rawQuery: unknown = {}
   const visibility = await postVisibility(actor, access);
   if (!visibility) return { ok: true as const, posts: [] as TaskPostChoice[], hasMore: false, offset: parsed.data.offset, available: false };
   const rows = await prisma.post.findMany({
-    where: { AND: [visibility, ...(parsed.data.q ? [{ message: { contains: parsed.data.q, mode: 'insensitive' as const } }] : [])] },
+    where: { AND: [visibility, ...(parsed.data.q ? [{ message: { contains: parsed.data.q, mode: 'insensitive' as const } }] : []),
+      ...(parsed.data.channelIds?.length ? [{ targets: { some: { targetId: { in: [...parsed.data.channelIds] } } } }] : [])] },
     orderBy: [{ createdAt: 'desc' }, { id: 'asc' }], skip: parsed.data.offset, take: take + 1, select: { id: true, message: true, status: true },
   });
   return { ok: true as const, available: true, hasMore: rows.length > take, offset: parsed.data.offset, posts: rows.slice(0, take).map(row => ({ id: row.id, preview: row.message.slice(0, 140), status: String(row.status) })) };
@@ -209,6 +227,9 @@ async function performTaskActionImpl(actor: TasksActor, raw: unknown, options?: 
     case 'comment.add': expect(value.confirmation, taskConfirmations.comment(value.taskId)); break;
     case 'task.delete': expect(value.confirmation, taskConfirmations.delete(value.id)); break;
     case 'comment.delete': expect(value.confirmation, taskConfirmations.deleteComment(value.id)); break;
+    case 'checklist.add': expect(value.confirmation, taskConfirmations.checklistAdd(value.taskId)); break;
+    case 'checklist.set': expect(value.confirmation, taskConfirmations.checklistSet(value.id)); break;
+    case 'checklist.delete': expect(value.confirmation, taskConfirmations.checklistDelete(value.id)); break;
   }
   // The result returns every created id, so a batch larger than the key's result ceiling is refused whole, never truncated.
   const ceiling = options?.maxItems;
@@ -275,6 +296,36 @@ async function performTaskActionImpl(actor: TasksActor, raw: unknown, options?: 
       return { ok: true as const, action: value.action, id: value.id };
     }
 
+    if (value.action === 'checklist.add') {
+      const item = text(value.text, bounds.checklistItemMaxCharacters, 'checklist item', true)!;
+      const owner = await tx.$queryRaw<Array<{ createdById: string | null; assigneeId: string | null }>>`SELECT "createdById", "assigneeId" FROM tasks WHERE id = ${value.taskId} AND "workspaceId" = ${actor.workspaceId} FOR SHARE`;
+      if (!owner[0]) throw missing();
+      if (!canChange(actor.userId, role, owner[0])) throw copyError('forbidden', 'You can only change tasks you created or that are assigned to you.');
+      const existing = await tx.$queryRaw<Array<{ total: number; top: number | null }>>`SELECT COUNT(*)::int AS total, COALESCE(MAX(position), -1) AS top FROM task_checklist_items WHERE "taskId" = ${value.taskId} AND "workspaceId" = ${actor.workspaceId}`;
+      if ((existing[0]?.total ?? 0) >= bounds.checklistLimit) throw invalid(copyText("A task can hold at most {0} checklist items.", bounds.checklistLimit));
+      const id = randomUUID();
+      const inserted = await tx.$executeRaw`INSERT INTO task_checklist_items (id, "taskId", "workspaceId", text, done, position, "createdById", "createdAt") VALUES (${id}, ${value.taskId}, ${actor.workspaceId}, ${item}, false, ${(existing[0]?.top ?? -1) + 1}, ${actor.userId}, NOW())`;
+      if (inserted !== 1) throw unavailable();
+      await audit(tx, actor, 'tasks.checklist_added', { taskId: value.taskId, itemId: id });
+      return { ok: true as const, action: value.action, id };
+    }
+
+    if (value.action === 'checklist.set' || value.action === 'checklist.delete') {
+      const found = await tx.$queryRaw<Array<{ taskId: string; createdById: string | null; assigneeId: string | null }>>`SELECT i."taskId", t."createdById", t."assigneeId" FROM task_checklist_items i JOIN tasks t ON t.id = i."taskId" AND t."workspaceId" = i."workspaceId" WHERE i.id = ${value.id} AND i."workspaceId" = ${actor.workspaceId} FOR UPDATE OF i, t`;
+      if (!found[0]) throw missing();
+      if (!canChange(actor.userId, role, found[0])) throw copyError('forbidden', 'You can only change tasks you created or that are assigned to you.');
+      if (value.action === 'checklist.delete') {
+        const removed = await tx.$executeRaw`DELETE FROM task_checklist_items WHERE id = ${value.id} AND "workspaceId" = ${actor.workspaceId}`;
+        if (removed !== 1) throw missing();
+        await audit(tx, actor, 'tasks.checklist_deleted', { taskId: found[0].taskId, itemId: value.id });
+        return { ok: true as const, action: value.action, id: value.id };
+      }
+      const changed = await tx.$executeRaw`UPDATE task_checklist_items SET done = ${value.done} WHERE id = ${value.id} AND "workspaceId" = ${actor.workspaceId}`;
+      if (changed !== 1) throw missing();
+      await audit(tx, actor, 'tasks.checklist_set', { taskId: found[0].taskId, itemId: value.id, done: value.done });
+      return { ok: true as const, action: value.action, id: value.id };
+    }
+
     const rows = await tx.$queryRaw<Row[]>`SELECT id, title, notes, status, "assigneeId", "dueOn", "postId", "createdById", "updatedAt" FROM tasks WHERE id = ${value.id} AND "workspaceId" = ${actor.workspaceId} FOR UPDATE`;
     const current = rows[0];
     if (!current) throw missing();
@@ -282,9 +333,10 @@ async function performTaskActionImpl(actor: TasksActor, raw: unknown, options?: 
     if (value.action === 'task.delete') {
       if (!canRemove(actor.userId, role, current)) throw copyError('forbidden', 'You can only delete tasks you created, unless you manage the workspace.');
       const comments = await tx.$executeRaw`DELETE FROM task_comments WHERE "taskId" = ${value.id} AND "workspaceId" = ${actor.workspaceId}`;
+      const checklist = await tx.$executeRaw`DELETE FROM task_checklist_items WHERE "taskId" = ${value.id} AND "workspaceId" = ${actor.workspaceId}`;
       const removed = await tx.$executeRaw`DELETE FROM tasks WHERE id = ${value.id} AND "workspaceId" = ${actor.workspaceId}`;
       if (removed !== 1) throw missing();
-      await audit(tx, actor, 'tasks.deleted', { taskId: value.id, comments });
+      await audit(tx, actor, 'tasks.deleted', { taskId: value.id, comments, checklist });
       return { ok: true as const, action: value.action, id: value.id };
     }
 

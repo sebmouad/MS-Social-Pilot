@@ -1,6 +1,7 @@
 'use client';
 import { ROOT_RECOVERY_LIMITS, type RootRecoveryLimits } from '@/lib/config/root-recovery-policy';
-import { useRootActionFeedback } from '@/server/root/RootActionFeedback';
+import { useRootActionFeedback } from '@/modules/root/ui/RootActionFeedback';
+import { useRootInterface } from './RootInterface';
 
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
@@ -30,6 +31,7 @@ export function RootPostDeletionControls({ row, limits = ROOT_RECOVERY_LIMITS }:
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   useRootActionFeedback(error, notice, () => router.refresh());
+  const copy = useRootInterface();
   const phrase = outcome ? `ROOT RECORD POST DELETION ${row.operationId} ${outcome === 'deleted' ? 'DELETED' : 'NOT DELETED'}` : '';
   const recoverable = row.state === 'started' || row.state === 'uncertain';
   const confirmationField = validation.fieldProps('confirmation');
@@ -85,34 +87,34 @@ export function RootPostDeletionControls({ row, limits = ROOT_RECOVERY_LIMITS }:
   }
 
   return <>
-    {recoverable ? <Button size="sm" variant="secondary" disabled={reviewRequired} onClick={begin}>Review</Button> : <span>{row.state === 'remote_confirmed' ? 'Awaiting local cleanup' : 'No operator action'}</span>}
+    {recoverable ? <Button size="sm" variant="secondary" disabled={reviewRequired} onClick={begin}>{copy.reviewAction}</Button> : <span>{row.state === 'remote_confirmed' ? copy.awaitingCleanup : copy.noOperatorAction}</span>}
     {notice && <p role="status" ref={noticeRef} tabIndex={-1}>{notice}</p>}
     {open && <ModalDialog className="ui-dialog" labelledBy={`root-post-delete-${row.operationId}`} busy={busy} initialFocus="[data-post-deletion-cancel]" onDismiss={dismiss}>
-      <div className="ui-dialog__header"><h2 id={`root-post-delete-${row.operationId}`}>Record verified post deletion outcome</h2></div>
+      <div className="ui-dialog__header"><h2 id={`root-post-delete-${row.operationId}`}>{copy.postRecoveryTitle}</h2></div>
       <form method="post" noValidate onSubmit={event => void submit(event)}>
         <div className="ui-dialog__body">
-          <p>Check the actual platform before recording either result. This is a human attestation, not a provider check. A pending request may still take effect later, including after “not deleted” is recorded; check again before starting another attempt.</p>
-          <p><strong>Workspace:</strong> {row.workspaceName} · {row.workspaceId}</p>
-          <p><strong>Channel:</strong> {row.targetName || 'Channel removed'} · {row.targetId}</p>
-          <p><strong>Platform:</strong> {row.provider} · <strong>Remote post ID:</strong> <code>{row.remotePostId}</code></p>
-          <p><strong>Local post IDs:</strong> {row.localPostIds.map(id => <code key={id}>{id} </code>)}</p>
+          <p>{copy.postRecoveryAttestation}</p>
+          <p><strong>{copy.recoveryWorkspace}</strong> {row.workspaceName} · {row.workspaceId}</p>
+          <p><strong>{copy.recoveryChannel}</strong> {row.targetName || copy.recoveryChannelRemoved} · {row.targetId}</p>
+          <p><strong>{copy.recoveryPlatform}</strong> {row.provider} · <strong>{copy.postRecoveryRemotePost}</strong> <code>{row.remotePostId}</code></p>
+          <p><strong>{copy.postRecoveryLocalPosts}</strong> {row.localPostIds.map(id => <code key={id}>{id} </code>)}</p>
           <fieldset className="ui-field" disabled={busy}>
-            <legend>Verified result on platform</legend>
-            <label><input type="radio" name="outcome" value="deleted" checked={outcome === 'deleted'} onChange={() => { setOutcome('deleted'); validation.clear('outcome'); setConfirmation(''); validation.clear('confirmation'); }} /> Deleted</label>
-            <label><input type="radio" name="outcome" value="not_deleted" checked={outcome === 'not_deleted'} onChange={() => { setOutcome('not_deleted'); validation.clear('outcome'); setConfirmation(''); validation.clear('confirmation'); }} /> Not deleted</label>
+            <legend>{copy.postRecoveryLegend}</legend>
+            <label><input type="radio" name="outcome" value="deleted" checked={outcome === 'deleted'} onChange={() => { setOutcome('deleted'); validation.clear('outcome'); setConfirmation(''); validation.clear('confirmation'); }} /> {copy.postRecoveryDeleted}</label>
+            <label><input type="radio" name="outcome" value="not_deleted" checked={outcome === 'not_deleted'} onChange={() => { setOutcome('not_deleted'); validation.clear('outcome'); setConfirmation(''); validation.clear('confirmation'); }} /> {copy.postRecoveryNotDeleted}</label>
           </fieldset>
           <FieldError {...validation.errorProps('outcome')} />
-          <label className="ui-field" htmlFor={confirmationField.id}><span>Type <strong>{phrase || 'choose a verified result'}</strong> to confirm</span>
+          <label className="ui-field" htmlFor={confirmationField.id}><span>{copy.recoveryType} <strong>{phrase || copy.recoveryChooseResult}</strong> {copy.recoveryToConfirm}</span>
             <input {...confirmationField} className="ui-input" name="confirmation" value={confirmation} maxLength={limits.confirmationMaxCharacters} autoComplete="off" disabled={busy || !outcome} onChange={event => { setConfirmation(event.target.value); validation.clear('confirmation'); }} />
           </label>
           <FieldError {...validation.errorProps('confirmation')} />
-          <label className="ui-field"><span><input type="checkbox" name="verifiedOnPlatform" checked={verified} required disabled={busy} onChange={event => { setVerified(event.target.checked); validation.clear('verifiedOnPlatform'); }} /> I checked the actual platform for this exact post.</span></label>
+          <label className="ui-field"><span><input type="checkbox" name="verifiedOnPlatform" checked={verified} required disabled={busy} onChange={event => { setVerified(event.target.checked); validation.clear('verifiedOnPlatform'); }} /> {copy.postRecoveryChecked}</span></label>
           <FieldError {...validation.errorProps('verifiedOnPlatform')} />
           {error && <p ref={errorRef} tabIndex={-1} role="alert" className="ui-error">{error}</p>}
         </div>
         <div className="ui-dialog__actions">
-          <Button type="button" data-dialog-cancel data-post-deletion-cancel disabled={busy} onClick={dismiss}>{reviewRequired ? 'Close and review' : 'Cancel'}</Button>
-          <Button type="submit" variant="danger" disabled={busy || reviewRequired || !outcome || confirmation !== phrase || !verified}>{busy ? 'Recording…' : 'Record verified outcome'}</Button>
+          <Button type="button" data-dialog-cancel data-post-deletion-cancel disabled={busy} onClick={dismiss}>{reviewRequired ? copy.postRecoveryCloseReview : copy.cancel}</Button>
+          <Button type="submit" variant="danger" disabled={busy || reviewRequired || !outcome || confirmation !== phrase || !verified}>{busy ? copy.recoveryRecording : copy.postRecoveryRecord}</Button>
         </div>
       </form>
     </ModalDialog>}

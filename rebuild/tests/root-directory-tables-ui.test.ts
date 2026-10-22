@@ -5,13 +5,14 @@ const deps = vi.hoisted(() => ({ connections: vi.fn(), sessions: vi.fn(), errors
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push() {}, refresh() {} }) }));
 vi.mock('next/headers', () => ({ headers: async () => new Headers(), cookies: async () => ({ get: () => undefined }) }));
 vi.mock('@/server/config/access', () => ({ requireRootPage: async () => ({ id: 'root' }) }));
-vi.mock('@/server/config/store', () => ({ runtimeConfig: async () => 100 }));
+vi.mock('@/server/config/store', () => ({ runtimeConfig: async (key: string) => key === 'root.interfaceCopy' ? ROOT_INTERFACE_COPY : 100 }));
 vi.mock('@/modules/root/server/admin/connections', () => ({ listRootConnections: deps.connections }));
 vi.mock('@/modules/root/server/admin/sessions', () => ({ listRootSessions: deps.sessions }));
 vi.mock('@/modules/root/server/admin/errors', () => ({ listRootErrors: deps.errors }));
 vi.mock('@/server/root/directory', () => ({ listRootWorkspaces: deps.workspaces }));
-vi.mock('@/server/root/RootFrame', () => ({ RootFrame: ({ controls, children }: { controls: ReactNode; children: ReactNode }) => createElement('main', null, createElement('aside', null, controls), children) }));
+vi.mock('@/modules/root/ui/RootFrame', () => ({ RootFrame: ({ controls, children }: { controls: ReactNode; children: ReactNode }) => createElement('main', null, createElement('aside', null, controls), children) }));
 vi.mock('@/components/SidebarDock', () => ({ SidebarDock: 'aside' }));
+import { ROOT_INTERFACE_COPY } from '@/lib/config/root-interface-copy';
 import Connections from '../src/app/root/connections/page';
 import Sessions from '../src/app/root/sessions/page';
 import Errors from '../src/app/root/errors/page';

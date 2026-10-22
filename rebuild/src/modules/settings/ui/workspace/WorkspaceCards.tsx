@@ -120,5 +120,8 @@ export function WorkspaceCards({ locale, copy, workspaceId, workspaceName, canMa
     <Card id="ws-moderation" copy={copy} title={copy.moderation.title} detail={copy.moderation.detail} canSave={canManage} dirty={dirtyOf(['watchNegativeComments'])} onSave={() => saveOps(['watchNegativeComments'])}>
       <Switch checked={value('watchNegativeComments')} onChange={next => set('watchNegativeComments', next)} label={copy.moderation.switchLabel} />
     </Card>
+    <Card id="ws-areas" copy={copy} title={copy.areas.title} detail={copy.areas.detail} canSave={canManage} dirty={dirtyOf(['tasksAreaEnabled'])} onSave={() => saveOps(['tasksAreaEnabled'])}>
+      <Switch checked={value('tasksAreaEnabled')} onChange={next => set('tasksAreaEnabled', next)} label={copy.areas.switchLabel} />
+    </Card>
   </div>;
 }

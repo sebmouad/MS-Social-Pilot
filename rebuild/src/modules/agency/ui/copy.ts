@@ -58,6 +58,22 @@ export const customerCopy = {
     "en": "Overdue tasks",
     "fr": "Tâches en retard"
   },
+  "Waiting conversations": {
+    "en": "Waiting conversations",
+    "fr": "Conversations en attente"
+  },
+  "Open inbox": {
+    "en": "Open inbox",
+    "fr": "Ouvrir la boîte de réception"
+  },
+  "Unresolved messages, comments and reviews.": {
+    "en": "Unresolved messages, comments and reviews.",
+    "fr": "Messages, commentaires et avis non résolus."
+  },
+  "Agency compares every workspace you manage; the channel scope does not filter it.": {
+    "en": "Agency compares every workspace you manage; the channel scope does not filter it.",
+    "fr": "L’agence compare tous les espaces que vous gérez ; la sélection des canaux ne la filtre pas."
+  },
   "Counted in": {
     "en": "Counted in",
     "fr": "Comptabilisé dans"

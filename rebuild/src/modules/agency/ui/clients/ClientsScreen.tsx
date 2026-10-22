@@ -10,6 +10,7 @@ import { AgencyHeading, AgencyShell, formatDate } from '@/modules/agency/ui/Agen
 import { WorkspaceAction } from '@/modules/agency/ui/WorkspaceAction';
 import { DataTable, Badge, EmptyState } from '@/components';
 import { IconUsersGroup } from '@tabler/icons-react';
+import { pageChannelScope } from '@/modules/shell/server/scope';
 import styles from '@/modules/agency/ui/agency.module.css';
 
 export default async function AgencyClientsPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
@@ -18,15 +19,18 @@ export default async function AgencyClientsPage({ searchParams }: { searchParams
   const copy = await loadCustomerCopy();
   const t = uiCopy(locale, copy);
   const params = await searchParams;
-  if (Object.entries(params).some(([key, value]) => key !== 'q' || typeof value !== 'string')) {
+  if (Object.entries(params).some(([key, value]) => (key !== 'q' && key !== 'channel') || typeof value !== 'string')) {
     return <AgencyShell><AgencyHeading title={t("Clients")} locale={locale} copy={copy} description={t("Review your filters.")} /><RouteNotice error focusKey="agency-filter-error">{t("Choose valid filters and try again.")}</RouteNotice><a href="/agency/clients">{t("Reset filters")}</a></AgencyShell>;
   }
   const q = String(params.q ?? '');
+  // Person-wide like the overview: the channel parameter is validated centrally and clarified, never applied.
+  const scope = typeof params.channel === 'string' && params.channel ? await pageChannelScope(viewer, params).catch(() => null) : null;
   try {
     const searchLimit = await agencySearchLimit();
     const result = await listAgencyClients({ userId: viewer.user.id }, q ? { q } : {});
     return <AgencyShell>
       <AgencyHeading title={t("Clients")} locale={locale} copy={copy} description={t("Client accounts and pending client invitations in workspaces you own or administer.")} filters={<ClientFilters key={q} locale={locale} copy={copy} q={q} searchLimit={searchLimit} />} />
+      {scope && <RouteNotice focusKey="agency-scope-notice">{t("Agency compares every workspace you manage; the channel scope does not filter it.")}</RouteNotice>}
       {result.truncated && <RouteNotice focusKey="agency-truncated">
         {result.filtered ? t("More than {0} workspaces match this search; only the first {1} by name are shown. Search for more of the name to narrow them.", result.limit, result.limit)
           : t("You manage more than {0} workspaces; only the first {1} by name are shown. Search by workspace name to find another.", result.limit, result.limit)}

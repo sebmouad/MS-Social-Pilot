@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Switch } from '@/components/Forms';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { useToast } from '@/components/Toast';
-import { useRootInterface } from '@/server/root/RootInterface';
+import { useRootInterface } from '@/modules/root/ui/RootInterface';
 
 /** Applies through the same audited configuration service used by HTTP and MCP. */
 export function PlatformSwitch({ settingKey, name, enabled }: { settingKey: string; name: string; enabled: boolean }) {

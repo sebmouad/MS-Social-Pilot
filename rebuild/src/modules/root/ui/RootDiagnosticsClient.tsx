@@ -10,7 +10,7 @@ import { SidebarDock } from '@/components/SidebarDock';
 import { Button } from '@/components/Button';
 import { formatRootTimestamp } from '@/lib/root-time';
 import { diagnosticConfirmation, diagnosticRunSchema, type DiagnosticReceipt } from '@/lib/diagnostics';
-import type { listRootDiagnostics } from './diagnostics';
+import type { listRootDiagnostics } from '@/server/root/diagnostics';
 import { diagnosticsCopyText, type RootDiagnosticsCopy } from '@/lib/config/root-diagnostics-copy';
 
 type Snapshot = Awaited<ReturnType<typeof listRootDiagnostics>>;

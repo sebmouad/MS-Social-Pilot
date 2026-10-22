@@ -3,7 +3,7 @@ import { Breadcrumbs } from '@/components/Breadcrumbs';
 import { PageHeader } from '@/components/PageHeader';
 import { notFound } from 'next/navigation';
 import { requireRootPage } from '@/server/config/access';
-import { RootFrame } from '@/server/root/RootFrame';
+import { RootFrame } from '@/modules/root/ui/RootFrame';
 import { OperationError } from '@/lib/operation-error';
 import { getRootError } from '@/modules/root/server/admin/errors';
 import { ResolveError } from '../ResolveError';

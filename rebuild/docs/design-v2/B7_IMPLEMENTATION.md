@@ -1,5 +1,9 @@
 # Design v2 B7 — Home, Tasks and Agency (2026-10-22)
 
+> Follow-up (lane 56, 2026-10-22, uncommitted): outside-owned leftovers 1–4
+> are implemented (see "Design v2 B8" in `../AGENT_HANDOFF.md`). Leftover 5 was
+> already fixed on `main` (`b2ac77b2`); leftover 6 is unchanged.
+
 Status: **partial source implementation, uncommitted; not release-ready**. This
 lane owns the three modules’ UI, related tests and docs. No services, REST/MCP
 handlers, authorization, audit, migrations, provider modules, configuration

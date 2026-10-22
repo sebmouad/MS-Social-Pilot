@@ -13,7 +13,7 @@ import { loadRootModuleHealth } from '@/server/root/module-health';
 import { rootCopyLocale } from '@/modules/root/server/admin/copy';
 import { ROOT_INTERFACE_COPY } from '@/lib/config/root-interface-copy';
 import { configCopyText } from '@/lib/config/root-config-copy';
-import { RootFrame } from '@/server/root/RootFrame';
+import { RootFrame } from '@/modules/root/ui/RootFrame';
 import { RootMcpConnection } from '@/components/RootMcpConnection';
 
 export const dynamic = 'force-dynamic';

@@ -15,11 +15,11 @@ const actor = { userId: 'agency-owner' };
 function overview() {
   return {
     ok: true, windowDays: 30, limit: 2, truncated: true, filtered: true,
-    totals: { workspaces: 2, needingAttention: 1, channels: null, disconnected: null, scheduled: 0, failed: 0, openTasks: 0, overdueTasks: 0,
-      coverage: { channels: { covered: 0, of: 1 }, publishing: { covered: 1, of: 1 }, tasks: { covered: 1, of: 1 }, team: { covered: 1, of: 1 } } },
+    totals: { workspaces: 2, needingAttention: 1, channels: null, disconnected: null, scheduled: 0, failed: 0, waitingConversations: 3, openTasks: 0, overdueTasks: 0,
+      coverage: { channels: { covered: 0, of: 1 }, publishing: { covered: 1, of: 1 }, inbox: { covered: 1, of: 1 }, tasks: { covered: 1, of: 1 }, team: { covered: 1, of: 1 } } },
     workspaces: [
       { id: 'owned', name: ' =HYPERLINK("https://example.test")\r\nStudio', role: 'owner', state: 'available', needsAttention: false,
-        metrics: { channels: null, disconnected: null, scheduled: 0, failed: 0, openTasks: 0, overdueTasks: 0, members: 1, clients: 0 } },
+        metrics: { channels: null, disconnected: null, scheduled: 0, failed: 0, waitingConversations: 3, openTasks: 0, overdueTasks: 0, members: 1, clients: 0 } },
       { id: 'paused', name: 'Paused', role: 'admin', state: 'suspended', metrics: null, needsAttention: true },
     ],
   };
@@ -45,6 +45,8 @@ describe('agency overview exports', () => {
     expect(result.contents).toContain('"\' =HYPERLINK(""https://example.test"")\r\nStudio"');
     expect(result.contents).toContain('"Channels","Not available"');
     expect(result.contents).toContain('"Scheduled posts","0"');
+    expect(result.contents).toContain('"Waiting conversations","3"');
+    expect(result.contents).toContain('"Coverage","","","Inbox","1","1"');
     expect(result.contents).toContain('"Workspace","paused","Paused","Channels","Not available"');
     expect(result.contents).toContain('"Workspace scan truncated","Yes"');
     expect(result.contents).toContain('"Coverage","","","Channels","0","1"');

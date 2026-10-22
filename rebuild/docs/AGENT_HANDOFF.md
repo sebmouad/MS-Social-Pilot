@@ -729,3 +729,49 @@ only diagnostic transport excluded: 718 files passed, 1 failed, 49 skipped;
 `facebook-native-http` sandbox `listen EPERM ::1`. Build fails on font DNS and
 an outside-owned Settings/Sharing client import of server-only code. Chrome
 launch was sandbox-blocked; no screenshots. `git diff --check` passes.
+
+## Design v2 B8 — lane 56 (2026-10-22, uncommitted, source/unit/jsdom only)
+
+Implements batch B8 (S15 Root) and finishes the B7 outside-owned leftovers 1–4
+(Home attention/link-click/recent-Inbox data and copy, Agency waiting counts,
+optional-area activation, per-task checklists). B7 leftover 5 (Settings/Sharing
+production build chain) was already fixed on `main` (`b2ac77b2`); leftover 6
+(integration environment) is unchanged: this lane ran unit/jsdom only.
+
+Root: sidebar regrouped into Overview/People/Modules/Operations/Activity with
+area icons; module detail pages split into Settings·Availability·Diagnostics·Health
+tabs (platforms omit Availability); Operations into Jobs·Diagnostics; Shared
+configuration into Settings·Availability. All routes kept. Moved
+`src/server/root/*.tsx`, `src/server/jobs/RootJobHealth.tsx` and
+`src/app/root/root-nav-icons.tsx` into `src/modules/root/ui/` (no outside-owned
+importer needed a shim). The move put 128 pre-existing Root operator literals
+under `tests/ui-copy-coverage.test.ts`; they are now catalogued in
+`root.interfaceCopy` (EN/FR) with `useRootInterface()` (client) and a cached
+`loadRootInterfaceCopy()` (server); only the `ms` unit is allowlisted.
+
+Services: Home overview gains attention counts, link-click totals from the
+snapshot metric, an audience delta between known trend days, recent open
+conversations, non-throwing setup and a `channelIds` display filter through
+UI/REST/MCP. Agency gains an `inbox` capability group (waiting conversations
+with coverage) in the overview and exports, plus a clarified `channel` parameter
+on Agency/Clients. `workspaces.tasksAreaEnabled` (migration
+`20261103020000_workspace_tasks_area`) lets Settings › Workspace show Tasks
+early through the existing workspace-operations service; Agency appears for
+>1 administered workspace; Tasks obeys the scope through linked posts and
+reports hidden unlinked tasks. Per-task checklists: new `task_checklist_items`
+table (migration `20261103010000_task_checklist_items`), confirmed/audited
+service actions, UI/REST/MCP and Root limits. New MCP tools:
+`add_task_checklist_item`, `set_task_checklist_item`,
+`delete_task_checklist_item` (parity rows added). New Root keys (integrator
+bumps `CONFIG_SCHEMA_VERSION`): `home.linkClickMeasureWords`,
+`home.recentInboxLimit`, `home.recentInboxPreviewCharacters`,
+`home.attentionReconnectLimit`, `tasks.checklistLimit`,
+`tasks.checklistItemMaxCharacters`.
+
+Evidence: `npx tsc --noEmit -p .` 0 errors; `npx next build` passes;
+`npx vitest run --exclude "**/facebook-diagnostic-transport.test.ts"`: 720 files
+passed, 11683 tests passed, 5 failed — all 5 are the pre-existing
+`tests/facebook-native-http.test.ts` sandbox `listen EPERM ::1` failures (same
+as B7). Agency module suite: 183 passed; 7 failed, all verified pre-existing on
+the clean tree (`export-ui` ×3, `person-account` ×2, `person-ui` ×2). No browser
+run, screenshots, live-provider or production verification.

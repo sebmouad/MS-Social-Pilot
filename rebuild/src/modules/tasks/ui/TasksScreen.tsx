@@ -5,6 +5,7 @@ import { uiCopy, uiLocale, type CustomerCopy, type UiLocale } from './copy';
 import { requireViewer } from '@/server/context';
 import { OperationError } from '@/lib/operation-error';
 import { RouteNotice } from '@/components/RouteNotice';
+import { pageChannelScope } from '@/modules/shell/server/scope';
 import { listTasks } from '@/modules/tasks/server/tasks';
 import { TASKS_FEATURE_ID, TASKS_MODULE_ID } from '@/modules/tasks/semantics';
 import { TaskBoard } from './TaskBoard';
@@ -13,7 +14,7 @@ import { InfoTip } from '@/components/InfoTip';
 import { PageHeader } from '@/components/PageHeader';
 import styles from './tasks.module.css';
 
-const KEYS = ['q', 'status', 'assignee', 'overdue', 'offset', 'view'];
+const KEYS = ['q', 'status', 'assignee', 'overdue', 'offset', 'view', 'channel'];
 const Heading = ({ description, locale, copy, filters }: { description: string; locale: UiLocale; copy?: CustomerCopy; filters?: ReactNode }) => <PageHeader module="tasks" title={uiCopy(locale, copy)('Tasks')} info={<InfoTip name={uiCopy(locale, copy)('Tasks')}><p>{description}</p></InfoTip>} filters={filters} />;
 
 export default async function TasksPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
@@ -28,11 +29,14 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
     q: String(params.q ?? ''), status: String(params.status ?? ''), assignee: String(params.assignee ?? ''), overdue: params.overdue === 'true', offset: Number(params.offset ?? 0),
     view: params.view === 'board' ? 'board' : 'table',
   };
+  // Design v2 01 section 5: the board obeys the sidebar channel scope through linked posts (service-side).
+  const scope = await pageChannelScope(viewer, params).catch(() => null);
   let result;
   try {
     result = await listTasks({ userId: viewer.user.id, workspaceId: viewer.workspaceId }, {
       ...(filters.q ? { q: filters.q } : {}), ...(filters.status ? { status: filters.status } : {}), ...(filters.assignee ? { assignee: filters.assignee } : {}),
       ...(filters.overdue ? { overdue: true } : {}), offset: filters.offset,
+      ...(scope?.ids.length ? { channelIds: scope.ids } : {}),
     });
   } catch (error) {
     return <div className={styles.root} data-module="tasks"><Heading locale={locale} copy={copy} description={t("Assign work, set due dates and follow progress.")} /><RouteNotice error focusKey="tasks-load-error">{error instanceof OperationError ? t(error.message) : t("Tasks could not be loaded. Refresh and try again.")}</RouteNotice></div>;
@@ -42,6 +46,7 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
   const filtered = Boolean(filters.q || filters.status || filters.assignee || filters.overdue);
   return <div className={styles.root} data-module="tasks">
     <Heading locale={locale} copy={copy} description={t("Assign work, set due dates and follow progress for this workspace.")} filters={<TaskFilters key={JSON.stringify(filters)} locale={locale} copy={copy} values={filters} assignees={result.assignees} assigneesHasMore={result.assigneesHasMore} />} />
+    {scope?.ids.length ? <RouteNotice focusKey="tasks-scope-notice">{`${t("Showing only tasks linked to the selected channels.")}${result.scopeHiddenUnlinked > 0 ? ` ${t("{0} tasks without a linked post are hidden by the channel scope.", result.scopeHiddenUnlinked)}` : ''}`}</RouteNotice> : null}
     <TaskBoard locale={locale} copy={copy} key={`${viewer.workspaceId}:${filters.offset}:${filters.view}`} tasks={result.tasks} assignees={result.assignees} canCreate={result.canCreate} limits={result.limits} today={result.today} summary={result.summary} view={filters.view as 'table' | 'board'} filtered={filtered} />
     {(filters.offset > 0 || result.hasMore) && <nav className={styles.pagination} aria-label={t("Task pages")}>
       {filters.offset > 0 ? <a href={pageHref(Math.max(0, filters.offset - result.pageSize))}>{t("Previous tasks")}</a> : <span />}

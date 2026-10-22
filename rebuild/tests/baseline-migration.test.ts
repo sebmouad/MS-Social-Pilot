@@ -287,9 +287,10 @@ const EXPECTED_TABLES: ReadonlyArray<string> = [
 const baseline = readFileSync(`prisma/migrations/${BASELINE}/migration.sql`, 'utf8');
 
 describe('baseline migration', () => {
-  it('is the only migration in the directory', () => {
-    const entries = readdirSync('prisma/migrations').filter(e => e !== 'migration_lock.toml');
-    expect(entries).toEqual([BASELINE]);
+  it('holds only the baseline and reviewed follow-up migrations', () => {
+    const entries = readdirSync('prisma/migrations').filter(e => e !== 'migration_lock.toml').sort();
+    expect(entries).toEqual([BASELINE, '20261103010000_task_checklist_items', '20261103020000_workspace_tasks_area']);
+    for (const name of entries.slice(1)) expect(readFileSync(`prisma/migrations/${name}/migration.sql`, 'utf8')).toContain('lane 56');
   });
 
   it('contains every reviewed source block verbatim, in deploy order', () => {

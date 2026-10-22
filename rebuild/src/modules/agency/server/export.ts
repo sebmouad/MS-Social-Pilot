@@ -36,13 +36,13 @@ async function exportAgencyOverviewImpl(actor: AgencyActor, raw: unknown, now: D
       [t.q, filters.q ?? ''], [t.sort, filters.sort], [t.order, filters.order], [t.attentionOnly, filters.attentionOnly], [t.exported, overview.workspaces.length],
     ] as const) add(t.metadata, '', label, value);
     const labels = { ...t, failed: t.failedPosts };
-    for (const key of ['workspaces', 'needingAttention', 'channels', 'disconnected', 'scheduled', 'failed', 'openTasks', 'overdueTasks'] as const) add(t.total, '', labels[key], overview.totals[key]);
+    for (const key of ['workspaces', 'needingAttention', 'channels', 'disconnected', 'scheduled', 'failed', 'waitingConversations', 'openTasks', 'overdueTasks'] as const) add(t.total, '', labels[key], overview.totals[key]);
     for (const group of AGENCY_GROUPS) add(t.coverage, '', t[group], overview.totals.coverage[group].covered, overview.totals.coverage[group].of);
     for (const item of overview.workspaces) {
       const own = (measure: string, value: unknown) => add(t.row, item.name, measure, value, '', item.id);
       own(t.role, t[item.role]); own(t.state, t[item.state]);
       own(t.needsAttention, item.needsAttention);
-      for (const key of ['channels', 'disconnected', 'scheduled', 'failed', 'openTasks', 'overdueTasks', 'members', 'clients'] satisfies Array<keyof AgencyMetrics>) own(labels[key], item.metrics?.[key]);
+      for (const key of ['channels', 'disconnected', 'scheduled', 'failed', 'waitingConversations', 'openTasks', 'overdueTasks', 'members', 'clients'] satisfies Array<keyof AgencyMetrics>) own(labels[key], item.metrics?.[key]);
     }
     contents = '\uFEFF' + rows.map(row => row.map(cell).join(',')).join('\r\n') + '\r\n';
   }

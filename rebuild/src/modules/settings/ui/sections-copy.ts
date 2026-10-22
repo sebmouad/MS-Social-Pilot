@@ -18,6 +18,7 @@ const en = {
   links: { title: 'Links', detail: 'Tag and shorten the links in your posts.', more: 'Link tagging (UTM)', shortenLabel: 'Shorten links in posts' },
   voice: { title: 'AI voice', detail: 'How the writing assistant should sound for this workspace.', enabledLabel: 'Allow the AI writing assistant' },
   moderation: { title: 'Moderation alerts', detail: 'Get alerted when new comments look negative.', switchLabel: 'Alert me about negative comments' },
+  areas: { title: 'Tasks area', detail: 'Show Tasks in the sidebar for everyone in this workspace, even before the first task exists.', switchLabel: 'Show the Tasks area' },
   channels: {
     inUse: '{enabled} of {total} channels in use', noneInUse: 'No channels in use', manage: 'Manage channels', reconnect: 'Reconnect', more: 'More actions', disconnect: 'Disconnect…',
     permissions: 'Permissions', permissionsOk: 'All permissions are granted.', permissionsMissing: 'Missing: {labels}', permissionsAll: 'Show all permissions', permissionsNone: 'This account does not report its permissions.',
@@ -42,6 +43,7 @@ const fr: typeof en = {
   links: { title: 'Liens', detail: 'Étiquetez et raccourcissez les liens de vos publications.', more: 'Étiquetage des liens (UTM)', shortenLabel: 'Raccourcir les liens des publications' },
   voice: { title: 'Voix de l’IA', detail: 'Le ton de l’assistant de rédaction pour cet espace.', enabledLabel: 'Autoriser l’assistant de rédaction IA' },
   moderation: { title: 'Alertes de modération', detail: 'Soyez alerté quand de nouveaux commentaires semblent négatifs.', switchLabel: 'M’alerter pour les commentaires négatifs' },
+  areas: { title: 'Espace Tâches', detail: 'Afficher Tâches dans la barre latérale pour tout l’espace, même avant la première tâche.', switchLabel: 'Afficher l’espace Tâches' },
   channels: {
     inUse: '{enabled} canaux sur {total} utilisés', noneInUse: 'Aucun canal utilisé', manage: 'Gérer les canaux', reconnect: 'Reconnecter', more: 'Autres actions', disconnect: 'Déconnecter…',
     permissions: 'Autorisations', permissionsOk: 'Toutes les autorisations sont accordées.', permissionsMissing: 'Manquantes : {labels}', permissionsAll: 'Afficher toutes les autorisations', permissionsNone: 'Ce compte ne communique pas ses autorisations.',

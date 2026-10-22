@@ -6,7 +6,7 @@ vi.mock('next/headers', () => ({ headers: async () => new Headers({ 'accept-lang
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
 vi.mock('../src/server/config/access', () => ({ requireRootPage: async () => ({ id: 'root' }) }));
 vi.mock('../src/server/root/registration-admin', () => ({ listRootRegistration: h.load }));
-vi.mock('../src/server/root/RootFrame', () => ({ RootFrame: ({ controls, children }: { controls: React.ReactNode; children: React.ReactNode }) => createElement('main', {}, createElement('aside', {}, controls), children) }));
+vi.mock('../src/modules/root/ui/RootFrame', () => ({ RootFrame: ({ controls, children }: { controls: React.ReactNode; children: React.ReactNode }) => createElement('main', {}, createElement('aside', {}, controls), children) }));
 import Page from '../src/app/root/registration/page';
 const when = new Date('2026-10-20T10:00:00Z');
 const data = {

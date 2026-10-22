@@ -31,6 +31,8 @@ const operationsShape = z.object({
   aiBrandVoice: optionalText(WORKSPACE_OPERATION_BOUNDS.aiBrandVoice),
   aiAvoidWords: optionalText(WORKSPACE_OPERATION_BOUNDS.aiAvoidWords),
   watchNegativeComments: z.boolean(),
+  /** Design v2 optional area: show Tasks in the sidebar before the workspace has any task. */
+  tasksAreaEnabled: z.boolean(),
 }).strict();
 export const workspaceOperationsValueSchema = operationsShape.refine(value => value.businessEnd > value.businessStart, { message: 'Business hours must end after they start.', path: ['businessEnd'] });
 
@@ -42,6 +44,7 @@ export const WORKSPACE_OPERATIONS_DEFAULTS: WorkspaceOperations = {
   weekStartsOn: 1, businessDays: [], businessStart: 9, businessEnd: 18, bestTimeMode: 'suggest',
   utmSource: null, utmMedium: null, utmCampaignTemplate: null, shortenerEnabled: false,
   spamGapMinutes: 20, undoSendSeconds: 30, aiEnabled: true, aiTone: null, aiBrandVoice: null, aiAvoidWords: null, watchNegativeComments: false,
+  tasksAreaEnabled: false,
 };
 
 /** Normalizes a stored legacy row; anything out of range falls back to the legacy default. */

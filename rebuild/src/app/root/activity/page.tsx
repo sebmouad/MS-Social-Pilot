@@ -1,4 +1,4 @@
-import { RootEmptyState } from '@/server/root/RootEmptyState';
+import { RootEmptyState } from '@/modules/root/ui/RootEmptyState';
 import { DataTable } from '@/components/DataTable';
 import { PageHeader } from '@/components/PageHeader';
 import { ROOT_AUDIT_BOUNDS, auditControlsText } from '@/lib/config/root-audit-controls';
@@ -7,9 +7,9 @@ import { revalidatePath } from 'next/cache';
 import { readAuditConfig, saveAuditSettings } from '@/server/root/audit-config';
 import { requireRootPage } from '@/server/config/access';
 import { runtimeConfig } from '@/server/config/store';
-import { RootFrame } from '@/server/root/RootFrame';
+import { RootFrame } from '@/modules/root/ui/RootFrame';
 import { listRootActivity } from '@/server/root/activity';
-import { RootActivityFilters } from '@/server/root/RootActivityFilters';
+import { RootActivityFilters } from '@/modules/root/ui/RootActivityFilters';
 import { rootActivitySearchParams, type RootActivitySearch } from '@/lib/root-activity';
 import { OperationError } from '@/lib/operation-error';
 
@@ -44,7 +44,7 @@ export default async function RootActivityPage({ searchParams }: { searchParams:
     <PageHeader module="root" title="Activity" description={<>Recorded changes across this installation. Dates and times use UTC. Sensitive audit details are omitted.</>} />
     {activities && <AuditExport href={`/api/root/activity/export?${new URLSearchParams(Object.entries(activities.filters).filter(([, value]) => Boolean(value)))}`} limit={auditPolicy.exportMaxRows} copy={auditCopy} downloadPolicy={downloadPolicy} />}
     <AuditRetention days={auditPolicy.retentionDays} exportRows={auditPolicy.exportMaxRows} batchSize={auditPolicy.batchSize} save={saveRetention} copy={auditCopy} />
-    <RootActivityFilters values={params} page={activities} policy={policy} />
+    {await RootActivityFilters({ values: params, page: activities, policy })}
     {activities === null ? <section className="root-control__notice" role="alert"><h2>{invalid ? 'Check activity filters' : 'Activity is unavailable'}</h2><p>{invalid ? 'A date, search or page link is invalid. Adjust the sidebar filters or reset to the latest activity.' : 'The audit store could not be read. Please retry, or check database availability.'}</p><a href="/root/activity">Reset to latest activity</a></section> : activities.items.length === 0 ? <RootEmptyState route="/root/activity" title={params.cursor ? 'No activity on this page' : filtered ? 'No activity matches these filters' : 'No activity recorded'}>{params.cursor ? 'Recorded events may have changed. Open the latest matching activity from the sidebar.' : filtered ? 'Try another action, person, workspace or date range.' : 'Installation and workspace actions will appear here when recorded.'}</RootEmptyState> : <><p className="root-activity__summary">Showing {activities.items.length} {filtered ? 'matching ' : ''}recorded {activities.items.length === 1 ? 'event' : 'events'}.</p><DataTable caption="Activity" rows={activities.items} rowKey={item => item.id} columns={[
       { key: 'action', label: 'Action', render: item => <strong>{item.action.replaceAll('.', ' · ').replaceAll('_', ' ')}</strong> },
       { key: 'time', label: 'Recorded (UTC)', render: item => <time dateTime={item.createdAt.toISOString()}>{item.createdAt.toISOString().replace('T', ' ').replace('.000Z', ' UTC').replace(/Z$/, ' UTC')}</time> },

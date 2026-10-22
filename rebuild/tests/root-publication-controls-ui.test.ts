@@ -4,7 +4,7 @@ import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const router = vi.hoisted(() => ({ refresh: vi.fn() }));
 vi.mock('next/navigation', () => ({ useRouter: () => router }));
-import { RootPublicationControls } from '../src/server/root/RootPublicationControls';
+import { RootPublicationControls } from '../src/modules/root/ui/RootPublicationControls';
 let root: ReturnType<typeof createRoot>; let container: HTMLDivElement;
 const row = { operationId: 'op-1', state: 'uncertain', remotePostId: null, remoteUrl: null, workspaceId: 'workspace-1', workspaceName: 'Example workspace', targetId: 'target-1', targetName: 'Example channel', postId: 'post-1' };
 async function click(text: string) { const button = Array.from((container.querySelector('dialog') ?? container).querySelectorAll('button')).find(button => button.textContent === text); expect(button).toBeTruthy(); await act(async () => { button!.focus(); button!.click(); }); }

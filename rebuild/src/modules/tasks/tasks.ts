@@ -49,6 +49,10 @@ export const TASK_ACTION_SCHEMA = z.discriminatedUnion('action', [
   z.object({ action: z.literal('task.createMany'), confirmation: z.string(), titles: z.array(text).min(1).max(1000), assigneeId: identifier.nullish(), startOn: calendarDay.nullish(), gapDays: z.number().int().min(0).max(3650).default(1) }).strict(),
   z.object({ action: z.literal('comment.add'), confirmation: z.string(), taskId: identifier, body: text }).strict(),
   z.object({ action: z.literal('comment.delete'), id: identifier, confirmation: z.string().max(400) }).strict(),
+  /** Per-task checklist items: small ordered steps with their own done state, written through the same confirmed service. */
+  z.object({ action: z.literal('checklist.add'), confirmation: z.string(), taskId: identifier, text }).strict(),
+  z.object({ action: z.literal('checklist.set'), confirmation: z.string(), id: identifier, done: z.boolean() }).strict(),
+  z.object({ action: z.literal('checklist.delete'), id: identifier, confirmation: z.string().max(400) }).strict(),
 ]);
 export type TaskAction = z.infer<typeof TASK_ACTION_SCHEMA>;
 
@@ -60,12 +64,15 @@ export const TASK_FILTER_SCHEMA = z.object({
   q: z.string().trim().max(200).optional(),
   offset: z.number().int().min(0).max(1_000_000).default(0),
   limit: z.number().int().min(1).max(1000).optional(),
+  /** Shared sidebar channel scope: a display filter only; the service still authorizes every row. */
+  channelIds: z.array(identifier).max(500).optional(),
 }).strict();
 export type TaskFilters = z.infer<typeof TASK_FILTER_SCHEMA>;
 
 export const TASK_POST_CHOICE_SCHEMA = z.object({
   q: z.string().trim().max(200).optional(),
   offset: z.number().int().min(0).max(1_000_000).default(0),
+  channelIds: z.array(identifier).max(500).optional(),
 }).strict();
 
 export const taskConfirmations = {
@@ -77,6 +84,9 @@ export const taskConfirmations = {
   update: (id: string) => `UPDATE TASK ${id}`,
   transition: (id: string, status: TaskStatus) => `MOVE TASK ${id} TO ${status}`,
   comment: (taskId: string) => `COMMENT ON TASK ${taskId}`,
+  checklistAdd: (taskId: string) => `ADD CHECKLIST ITEM ${taskId}`,
+  checklistSet: (id: string) => `SET CHECKLIST ITEM ${id}`,
+  checklistDelete: (id: string) => `DELETE CHECKLIST ITEM ${id}`,
 };
 
 /** `YYYY-MM-DD` plus whole days, calendar arithmetic only (no time zone). Returns null outside years 0001-9999. */
@@ -97,10 +107,13 @@ export type TaskView = {
   postHidden: boolean;
   createdBy: { id: string; name: string } | null; createdAt: string; updatedAt: string;
   commentCount: number;
+  /** Done/total checklist items; the items themselves come from get_task. */
+  checklist: { done: number; total: number };
   canEdit: boolean; canDelete: boolean;
 };
 export type TaskCommentView = { id: string; author: { id: string; name: string } | null; body: string; createdAt: string; canDelete: boolean };
-export type TaskLimits = { titleMaxCharacters: number; notesMaxCharacters: number; commentMaxCharacters: number; pageLimit: number; workflowRowLimit: number; workflowGapMaxDays: number };
-export const TASK_DEFAULT_LIMITS: TaskLimits = { titleMaxCharacters: 200, notesMaxCharacters: 2000, commentMaxCharacters: 2000, pageLimit: 100, workflowRowLimit: 30, workflowGapMaxDays: 30 };
+export type TaskChecklistItemView = { id: string; text: string; done: boolean; position: number; createdAt: string; canChange: boolean };
+export type TaskLimits = { titleMaxCharacters: number; notesMaxCharacters: number; commentMaxCharacters: number; pageLimit: number; workflowRowLimit: number; workflowGapMaxDays: number; checklistLimit: number; checklistItemMaxCharacters: number };
+export const TASK_DEFAULT_LIMITS: TaskLimits = { titleMaxCharacters: 200, notesMaxCharacters: 2000, commentMaxCharacters: 2000, pageLimit: 100, workflowRowLimit: 30, workflowGapMaxDays: 30, checklistLimit: 30, checklistItemMaxCharacters: 280 };
 export type TaskSummary = { todo: number; doing: number; done: number; overdue: number };
 export type TaskPostChoice = { id: string; preview: string; status: string };

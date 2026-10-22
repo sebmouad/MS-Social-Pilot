@@ -1,6 +1,7 @@
 'use client';
 import { ROOT_RECOVERY_LIMITS, type RootRecoveryLimits } from '@/lib/config/root-recovery-policy';
-import { useRootActionFeedback } from '@/server/root/RootActionFeedback';
+import { useRootActionFeedback } from '@/modules/root/ui/RootActionFeedback';
+import { useRootInterface } from './RootInterface';
 
 import { useRef, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
@@ -26,6 +27,7 @@ export function RootInboxDeletionControls({ row, limits = ROOT_RECOVERY_LIMITS }
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   useRootActionFeedback(error, notice, () => router.refresh());
+  const copy = useRootInterface();
   const phrase = `CONFIRM REMOTE DELETION ${row.operationId}`;
   const recoverable = row.state === 'started' || row.state === 'uncertain';
   const confirmationField = validation.fieldProps('confirmation');
@@ -58,29 +60,29 @@ export function RootInboxDeletionControls({ row, limits = ROOT_RECOVERY_LIMITS }
   }
 
   return <>
-    {recoverable ? <Button size="sm" variant="secondary" onClick={begin}>Review</Button> : <span>{row.state === 'remote_confirmed' ? 'Awaiting local cleanup' : 'No operator action'}</span>}
+    {recoverable ? <Button size="sm" variant="secondary" onClick={begin}>{copy.reviewAction}</Button> : <span>{row.state === 'remote_confirmed' ? copy.awaitingCleanup : copy.noOperatorAction}</span>}
     {notice && <p role="status">{notice}</p>}
     {open && <ModalDialog className="ui-dialog" labelledBy={`root-inbox-delete-${row.operationId}`} busy={busy} onDismiss={() => { if (!busy) setOpen(false); }}>
-      <div className="ui-dialog__header"><h2 id={`root-inbox-delete-${row.operationId}`}>Confirm remote deletion</h2></div>
+      <div className="ui-dialog__header"><h2 id={`root-inbox-delete-${row.operationId}`}>{copy.inboxRecoveryTitle}</h2></div>
       <form method="post" noValidate onSubmit={event => void submit(event)}>
         <div className="ui-dialog__body">
-          <p>Verify the comment and its replies are deleted on the actual platform before continuing. This is an operator attestation, not an automatic provider check.</p>
-          <p><strong>Workspace:</strong> {row.workspaceName} · {row.workspaceId}</p>
-          <p><strong>Channel:</strong> {row.targetName || 'Channel removed'} · {row.targetId}</p>
-          <p><strong>Platform:</strong> {row.provider}</p>
-          <p><strong>Remote comment ID:</strong> <code>{row.remoteObjectId}</code></p>
-          <p><strong>Inbox item:</strong> {row.localItemId}</p>
-          <label className="ui-field" htmlFor={confirmationField.id}><span>Type <strong>{phrase}</strong> to confirm</span>
+          <p>{copy.inboxRecoveryAttestation}</p>
+          <p><strong>{copy.recoveryWorkspace}</strong> {row.workspaceName} · {row.workspaceId}</p>
+          <p><strong>{copy.recoveryChannel}</strong> {row.targetName || copy.recoveryChannelRemoved} · {row.targetId}</p>
+          <p><strong>{copy.recoveryPlatform}</strong> {row.provider}</p>
+          <p><strong>{copy.inboxRecoveryRemoteComment}</strong> <code>{row.remoteObjectId}</code></p>
+          <p><strong>{copy.inboxRecoveryItem}</strong> {row.localItemId}</p>
+          <label className="ui-field" htmlFor={confirmationField.id}><span>{copy.recoveryType} <strong>{phrase}</strong> {copy.recoveryToConfirm}</span>
             <input {...confirmationField} className="ui-input" name="confirmation" value={confirmation} maxLength={limits.confirmationMaxCharacters} autoComplete="off" disabled={busy} onChange={event => { setConfirmation(event.target.value); validation.clear('confirmation'); }} />
           </label>
           <FieldError {...validation.errorProps('confirmation')} />
-          <label className="ui-field"><span><input {...validation.fieldProps('verifiedOnPlatform')} type="checkbox" name="verifiedOnPlatform" checked={verified} required disabled={busy} onChange={event => { setVerified(event.target.checked); validation.clear('verifiedOnPlatform'); }} /> I verified the deletion on the platform.</span></label>
+          <label className="ui-field"><span><input {...validation.fieldProps('verifiedOnPlatform')} type="checkbox" name="verifiedOnPlatform" checked={verified} required disabled={busy} onChange={event => { setVerified(event.target.checked); validation.clear('verifiedOnPlatform'); }} /> {copy.inboxRecoveryVerified}</span></label>
           <FieldError {...validation.errorProps('verifiedOnPlatform')} />
           {error && <p role="alert" className="ui-error">{error}</p>}
         </div>
         <div className="ui-dialog__actions">
-          <Button type="button" data-dialog-cancel disabled={busy} onClick={() => setOpen(false)}>Cancel</Button>
-          <Button type="submit" variant="danger" disabled={busy || confirmation !== phrase || !verified}>{busy ? 'Recording…' : 'Confirm remote deletion'}</Button>
+          <Button type="button" data-dialog-cancel disabled={busy} onClick={() => setOpen(false)}>{copy.cancel}</Button>
+          <Button type="submit" variant="danger" disabled={busy || confirmation !== phrase || !verified}>{busy ? copy.recoveryRecording : copy.inboxRecoveryTitle}</Button>
         </div>
       </form>
     </ModalDialog>}

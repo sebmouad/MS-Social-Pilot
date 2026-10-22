@@ -12,6 +12,7 @@ import { COMMAND_COPY, commandCopySchema } from '@/modules/home/command-copy';
 import { shellChrome } from '@/modules/shell/server/chrome';
 import { shellChannels } from '@/modules/shell/server/channels';
 import { workspaceUsesTasks } from '@/modules/tasks/server/usage';
+import { loadWorkspaceOperations } from '@/modules/settings/server/workspace-operations';
 import { pendingApprovalCount } from '@/modules/publishing/server/approvals-badge';
 
 export async function PageFrame({ module, children, sidebar, sidebarWhen, scopedAccess = false }: { module: ModuleId; children: ReactNode; sidebar?: ReactNode; sidebarWhen?: readonly string[]; scopedAccess?: boolean }) {
@@ -29,8 +30,14 @@ export async function PageFrame({ module, children, sidebar, sidebarWhen, scoped
   const remembered = parseChannelScope({ cookie: decodeURIComponent(jar.get(`${policy.scopeCookiePrefix}${viewer.workspaceId}`)?.value ?? ''), allowed: channels.map(channel => channel.id) });
   // Tasks and Agency appear only when used; their routes keep working while hidden.
   const optionalAreas: AreaId[] = [];
-  if (enabledFeatures.includes('tasks/board') && await workspaceUsesTasks(viewer.workspaceId).catch(() => false)) optionalAreas.push('tasks');
-  if (viewer.workspaces.length > 1) optionalAreas.push('agency');
+  // Tasks shows once the workspace has a task, or a manager turned it on in Settings › Workspace.
+  const [usesTasks, tasksArea] = await Promise.all([
+    enabledFeatures.includes('tasks/board') ? workspaceUsesTasks(viewer.workspaceId).catch(() => false) : false,
+    enabledFeatures.includes('tasks/board') ? loadWorkspaceOperations(viewer.workspaceId).then(operations => operations.tasksAreaEnabled, () => false) : false,
+  ]);
+  if (usesTasks || tasksArea) optionalAreas.push('tasks');
+  // Agency compares administered (client) workspaces, so plain memberships never summon it.
+  if (viewer.workspaces.filter(entry => entry.role === 'owner' || entry.role === 'admin').length > 1) optionalAreas.push('agency');
   // Pending Approvals show as a badge on the Content tabs.
   const tabCounts: Record<string, number> = {};
   if (module === 'publishing' && enabledFeatures.includes('publishing/approvals')) tabCounts['publishing/approvals'] = await pendingApprovalCount({ userId: viewer.user.id, workspaceId: viewer.workspaceId });

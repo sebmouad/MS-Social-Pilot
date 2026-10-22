@@ -1,5 +1,5 @@
 import { requireRootPage } from '@/server/config/access';
-import { listRootDiagnostics } from './diagnostics';
+import { listRootDiagnostics } from '@/server/root/diagnostics';
 import { RootDiagnosticsClient } from './RootDiagnosticsClient';
 import { runtimeConfig } from '@/server/config/store';
 import { ROOT_DIAGNOSTICS_COPY } from '@/lib/config/root-diagnostics-copy';

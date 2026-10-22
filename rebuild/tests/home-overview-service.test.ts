@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   entitlements: vi.fn(), permissions: vi.fn(), canUse: vi.fn(), canAccess: vi.fn(), batch: vi.fn(), config: vi.fn(), workspace: vi.fn(), queryRaw: vi.fn(),
-  snapshot: vi.fn(), inbox: vi.fn(), ads: vi.fn(), posts: vi.fn(), host: vi.fn(),
+  snapshot: vi.fn(), inbox: vi.fn(), ads: vi.fn(), posts: vi.fn(), host: vi.fn(), approvals: vi.fn(), shell: vi.fn(),
 }));
 vi.mock('@/server/data', () => ({ prisma: { workspace: { findUnique: mocks.workspace }, $queryRaw: mocks.queryRaw } }));
 vi.mock('@/server/config/store', () => ({ runtimeConfigBatch: mocks.batch, runtimeConfig: mocks.config }));
@@ -14,6 +14,8 @@ vi.mock('@/modules/analytics/server/read', () => ({ readAnalyticsSnapshot: mocks
 vi.mock('@/modules/inbox/server/read', () => ({ readInboxList: mocks.inbox }));
 vi.mock('@/modules/ads/server/report-read', () => ({ readAdsDailyRows: mocks.ads }));
 vi.mock('@/modules/publishing/server/read', () => ({ readPublishingPostPage: mocks.posts }));
+vi.mock('@/modules/publishing/server/approvals-badge', () => ({ pendingApprovalCount: mocks.approvals }));
+vi.mock('@/modules/shell/server/channels', () => ({ shellChannels: mocks.shell }));
 
 import { readHomeOverview } from '@/modules/home/server/overview';
 import { HOME_CONFIG } from '@/modules/home/config';
@@ -34,9 +36,11 @@ beforeEach(() => {
   mocks.batch.mockResolvedValue(config); mocks.config.mockImplementation(async (key: string) => config[key]); mocks.workspace.mockResolvedValue({ timezone: 'UTC' });
   mocks.queryRaw.mockResolvedValue([{ id: 'c1', provider: 'p' }, { id: 'c2', provider: 'p' }]);
   mocks.snapshot.mockResolvedValue(snapshot());
-  mocks.inbox.mockResolvedValue({ total: 4 });
+  mocks.inbox.mockResolvedValue({ total: 4, items: [] });
   mocks.posts.mockResolvedValue({ total: 0, posts: [] });
   mocks.ads.mockResolvedValue({ rows: [], nextOffset: null });
+  mocks.approvals.mockResolvedValue(0);
+  mocks.shell.mockResolvedValue([]);
   mocks.host.mockResolvedValue({
     goalMeasures: vi.fn(async (request: { from: Date; targetId: string }) => request.from < new Date('2026-09-01') ? { audienceGained: null, views: 100, engagements: 10 }
       : request.from < new Date('2026-09-23') ? { audienceGained: null, views: 100, engagements: 10 } : { audienceGained: null, views: request.targetId === 'c1' ? 150 : 50, engagements: request.targetId === 'c1' ? 30 : 10 }),
@@ -102,8 +106,8 @@ describe('readHomeOverview', () => {
     try {
       await vi.waitFor(() => {
         expect(started).toHaveBeenCalled();
-        expect(mocks.posts).toHaveBeenCalledTimes(1);
-        expect(mocks.inbox).toHaveBeenCalledTimes(1);
+        expect(mocks.posts).toHaveBeenCalledTimes(3);
+        expect(mocks.inbox).toHaveBeenCalledTimes(2);
         expect(mocks.ads).toHaveBeenCalledTimes(1);
       });
     } finally { finish({ views: 1, engagements: 1 }); }
@@ -118,6 +122,8 @@ describe('readHomeOverview', () => {
     expect(overview.inbox).toBeNull();
     expect(overview.ads).toBeNull();
     expect(overview.upcoming).toEqual({ state: 'empty' });
+    // Attention keeps the permitted failure counts and withholds the rest, never zeroing them.
+    expect(overview.attention).toEqual({ state: 'ready', data: { failedPosts: 0, partiallyFailedPosts: 0, pendingApprovals: 0, waitingConversations: null, reconnect: null, partial: false } });
     expect(mocks.snapshot).not.toHaveBeenCalled();
     expect(mocks.inbox).not.toHaveBeenCalled();
   });
@@ -183,7 +189,106 @@ describe('readHomeOverview', () => {
     mocks.ads.mockResolvedValue({ rows: [{ currency: null, spend: 12, date: '2026-10-16' }], nextOffset: null });
     const overview = await readHomeOverview(actor, now);
     expect(overview.ads).toEqual({ state: 'unavailable' });
-    expect(overview.inbox).toEqual({ state: 'ready', data: { open: 4 } });
+    expect(overview.inbox).toEqual({ state: 'ready', data: { open: 4, recent: [] } });
+  });
+
+  it('reads attention counts through each owning service with the member scope', async () => {
+    mocks.posts.mockImplementation(async (_actor: unknown, input: { status?: string }) => ({ total: input.status === 'failed' ? 2 : input.status === 'partially_failed' ? 1 : 0, posts: [] }));
+    mocks.approvals.mockResolvedValue(3);
+    mocks.shell.mockResolvedValue([
+      { id: 'c1', name: 'Alpha', platformName: 'Example', health: 'connected' },
+      { id: 'c2', name: 'Beta', platformName: 'Example', health: 'expired' },
+    ]);
+    const overview = await readHomeOverview(actor, now);
+    expect(overview.attention).toEqual({ state: 'ready', data: {
+      failedPosts: 2, partiallyFailedPosts: 1, pendingApprovals: 3, waitingConversations: 4,
+      reconnect: [{ id: 'c2', name: 'Beta', platform: 'Example' }], partial: false,
+    } });
+    expect(mocks.posts).toHaveBeenCalledWith(expect.objectContaining({ userId: 'u1', workspaceId: 'w1' }), { status: 'failed' });
+    expect(mocks.posts).toHaveBeenCalledWith(expect.objectContaining({ userId: 'u1', workspaceId: 'w1' }), { status: 'partially_failed' });
+    expect(mocks.approvals).toHaveBeenCalledWith({ userId: 'u1', workspaceId: 'w1' });
+  });
+
+  it('withholds only the failed attention counts and reports the strip as partial', async () => {
+    mocks.posts.mockRejectedValue(new Error('down'));
+    mocks.inbox.mockRejectedValue(new Error('down'));
+    const overview = await readHomeOverview(actor, now);
+    // The inbox card retries nothing, and its own read failed too, so the strip also loses that count.
+    expect(overview.inbox).toEqual({ state: 'unavailable' });
+    expect(overview.attention).toEqual({ state: 'ready', data: {
+      failedPosts: null, partiallyFailedPosts: null, pendingApprovals: 0, waitingConversations: null, reconnect: [], partial: true,
+    } });
+  });
+
+  it('reports attention unavailable only when every permitted read fails', async () => {
+    mocks.posts.mockRejectedValue(new Error('down'));
+    mocks.inbox.mockRejectedValue(new Error('down'));
+    mocks.shell.mockRejectedValue(new Error('down'));
+    const overview = await readHomeOverview(actor, now);
+    // Approvals resolve to 0 through their badge, so the strip stays readable.
+    expect(overview.attention?.state).toBe('ready');
+    mocks.approvals.mockRejectedValue(new Error('down'));
+    expect((await readHomeOverview(actor, now)).attention).toEqual({ state: 'unavailable' });
+  });
+
+  it('omits the attention strip when no owning module is usable', async () => {
+    mocks.canUse.mockImplementation((_e: unknown, feature: string) => feature === 'analytics/overview');
+    const overview = await readHomeOverview(actor, now);
+    expect(overview.attention).toBeNull();
+  });
+
+  it('keeps other cards up when the channel provider lookup fails', async () => {
+    mocks.queryRaw.mockRejectedValue(new Error('down'));
+    const overview = await readHomeOverview(actor, now);
+    expect(overview.performance).toEqual({ state: 'unavailable' });
+    expect(overview.bestTimes).toEqual({ state: 'unavailable' });
+    expect(overview.audience?.state).toBe('ready');
+    expect(overview.inbox).toEqual({ state: 'ready', data: { open: 4, recent: [] } });
+  });
+
+  it('narrows every figure to the requested sidebar scope without widening member grants', async () => {
+    mocks.permissions.mockResolvedValue({ pageScope: { all: false, ids: ['c1', 'c2'] } });
+    await readHomeOverview(actor, now, { channelIds: ['c2', 'unknown'] });
+    expect(mocks.snapshot).toHaveBeenCalledWith(expect.anything(), expect.anything(), expect.objectContaining({ allowedChannelIds: ['c2'] }));
+    expect(mocks.posts).toHaveBeenCalledWith(expect.objectContaining({ allowedTargetIds: ['c2'] }), expect.anything());
+    expect(mocks.inbox).toHaveBeenCalledWith(expect.objectContaining({ allowedChannelIds: ['c2'] }), expect.anything());
+  });
+
+  it('reads link clicks from the matching stored metric with its previous-period comparison', async () => {
+    mocks.snapshot.mockResolvedValue(snapshot({
+      allMetrics: [{ key: 'm', kind: 'stock', resourceKind: 'channel', points: [] },
+        { key: 'clicks', kind: 'flow', resourceKind: 'channel', label: 'Post link clicks', total: 120, coverage: 2, points: [] }],
+      comparisons: { clicks: { previous: 100, delta: 20, percent: 20, status: 'comparable' } },
+    }));
+    const performance = (await readHomeOverview(actor, now)).performance as { data: { linkClicks: { current: number; previous: number; change: number; covered: number; comparable: number } | null } };
+    expect(performance.data.linkClicks).toEqual({ current: 120, previous: 100, change: 0.2, covered: 2, comparable: 2 });
+  });
+
+  it('leaves link clicks out when no stored metric matches, without failing the card', async () => {
+    mocks.snapshot.mockResolvedValue(snapshot({ allMetrics: [{ key: 'm', kind: 'stock', resourceKind: 'channel', points: [] }], comparisons: {} }));
+    const performance = (await readHomeOverview(actor, now)).performance as { data: { linkClicks: unknown } };
+    expect(performance.data.linkClicks).toBeNull();
+  });
+
+  it('reports an honest audience delta between the oldest and newest known trend days', async () => {
+    const audience = (await readHomeOverview(actor, now)).audience as { data: { delta: { value: number; since: string } | null } };
+    expect(audience.data.delta).toEqual({ value: 10, since: '2026-10-18' });
+    mocks.snapshot.mockResolvedValue(snapshot({ allMetrics: [{ key: 'm', kind: 'stock', resourceKind: 'channel', points: [{ date: '2026-10-19', value: 300 }] }] }));
+    expect(((await readHomeOverview(actor, now)).audience as { data: { delta: unknown } }).data.delta).toBeNull();
+  });
+
+  it('lists recent open conversations with bounded previews', async () => {
+    mocks.inbox.mockResolvedValue({ total: 9, items: [
+      { key: 'message:a', author: 'Sam', preview: 'Hello    there', time: new Date('2026-10-20T10:00:00Z'), target: { name: 'Alpha' }, unread: 2 },
+      { key: 'comment:b', author: 'Jo', preview: 'Nice post', time: new Date('2026-10-20T09:00:00Z'), target: { name: 'Beta' }, unread: 0 },
+    ] });
+    const inbox = (await readHomeOverview(actor, now)).inbox as { data: { open: number; recent: Array<{ key: string; preview: string; time: string }> } };
+    expect(inbox.data.open).toBe(9);
+    expect(inbox.data.recent).toEqual([
+      { key: 'message:a', author: 'Sam', preview: 'Hello there', time: '2026-10-20T10:00:00.000Z', channel: 'Alpha', unread: 2 },
+      { key: 'comment:b', author: 'Jo', preview: 'Nice post', time: '2026-10-20T09:00:00.000Z', channel: 'Beta', unread: 0 },
+    ]);
+    expect(mocks.inbox).toHaveBeenCalledWith(expect.anything(), { state: 'open', limit: config['home.recentInboxLimit'] });
   });
 });
 
@@ -202,7 +307,7 @@ it('projects ten authorized Pages with partial coverage into every numeric Home 
   });
   mocks.ads.mockResolvedValue({ rows: [{ currency: 'USD', spend: 10.25, date: '2026-10-15' }, { currency: 'USD', spend: 20.75, date: '2026-10-16' }], nextOffset: null });
   mocks.posts.mockResolvedValue({ total: 40, posts: [{ id: 'upcoming', message: 'Example scheduled post', scheduledAt: new Date('2026-10-22'), targets: [] }] });
-  mocks.inbox.mockResolvedValue({ total: 17 });
+  mocks.inbox.mockResolvedValue({ total: 17, items: [] });
   const result = await readHomeOverview(actor, new Date('2026-10-21T12:00:00Z'));
   expect(result.audience).toMatchObject({ state: 'ready', data: { total: 2800, covered: 8, selected: 10, asOf: '2026-10-16T00:00:00.000Z' } });
   expect(result.performance).toMatchObject({ state: 'ready', data: {
@@ -214,6 +319,6 @@ it('projects ten authorized Pages with partial coverage into every numeric Home 
   if (result.performance?.state !== 'ready') throw new Error('Missing performance fixture');
   expect(result.performance.data.topChannels[0]).toEqual({ id: 'example-7', name: 'Example 7', engagements: 80 });
   expect(result.upcoming).toMatchObject({ state: 'ready', data: { total: 40 } });
-  expect(result.inbox).toEqual({ state: 'ready', data: { open: 17 } });
+  expect(result.inbox).toEqual({ state: 'ready', data: { open: 17, recent: [] } });
   expect(result.ads).toMatchObject({ state: 'ready', data: { start: '2026-09-24', end: '2026-10-21', spend: [{ currency: 'USD', total: 31, firstDay: '2026-10-15', lastDay: '2026-10-16', recordedDays: 2 }] } });
 });

@@ -9,7 +9,7 @@ vi.mock('@/server/config/store', () => ({ runtimeConfig: async () => ROOT_INTERF
 vi.mock('@/server/root/read-model', () => ({ getRootOverview: deps.counts }));
 vi.mock('@/modules/root/server/admin/backups', () => ({ readRootDiagnosticsSummary: deps.diagnostics }));
 vi.mock('@/server/root/module-health', () => ({ loadRootModuleHealth: deps.health }));
-vi.mock('@/server/root/RootFrame', () => ({ RootFrame: 'main' }));
+vi.mock('@/modules/root/ui/RootFrame', () => ({ RootFrame: 'main' }));
 vi.mock('@/components/RootMcpConnection', () => ({ RootMcpConnection: () => null }));
 vi.mock('@/components/charts', () => ({ BarChart: ({ label }: { label: string }) => createElement('div', { role: 'img', 'aria-label': label }) }));
 import Page from '../src/app/root/page';

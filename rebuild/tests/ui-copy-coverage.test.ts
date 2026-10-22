@@ -117,6 +117,7 @@ function collectLiterals(expr: ts.Node | undefined, emit: (text: string) => void
 /** Reviewed non-copy literals that may appear in customer UI source; every entry needs a reason. */
 const LITERAL_ALLOWLIST: Array<{ file: RegExp; text: string; reason: string }> = [
   { file: /analytics\/ui\/demographics\/DemographicsScreen\.tsx$/, text: 'UTC', reason: 'Time-standard abbreviation after a stored UTC period; identical in English and French.' },
+  { file: /root\/ui\/RootDiagnosticsClient\.tsx$/, text: 'ms', reason: 'SI unit suffix after a measured duration; identical in English and French.' },
   { file: /feeds\/ui\/FeedManager\.tsx$/, text: 'https://example.com/feed', reason: 'Input-format example for a URL field (the reserved example.com domain); not translatable copy.' },
   { file: /feeds\/ui\/RecipeSource\.tsx$/, text: 'https://', reason: 'URL scheme prefix used as an input-format hint; not translatable copy.' },
   { file: /media\/ui\/MediaLibrary\.tsx$/, text: 'https://example.com/photo.jpg', reason: 'Input-format example for an image URL field (the reserved example.com domain); not translatable copy.' },

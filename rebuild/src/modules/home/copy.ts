@@ -33,6 +33,10 @@ const en = {
   inbox: 'Inbox', inboxOpen: 'conversations waiting', inboxZero: 'You are all caught up.', inboxAction: 'Open inbox',
   adSpend: 'Ad spend', adSpendNote: '{from}–{to} (UTC). Stored results on {recorded} of {n} days. Latest stored day: {latest}. Missing results are not zero spend; account coverage may vary.', adSpendTrend: 'Stored daily ad spend, last {n} days',
   adsEmptyTitle: 'No ad spend yet', adsEmptyBody: 'Spend shows here once your ad accounts have stored results.', adsEmptyAction: 'Open ads',
+  attention: 'Needs attention', attentionFailed: '{n} posts failed', attentionPartial: '{n} posts partly failed',
+  attentionApprovals: '{n} posts waiting for your approval', attentionReconnect: 'Reconnect {name}', attentionReconnectMany: '{n} connections need reconnecting',
+  attentionConversations: '{n} conversations waiting', attentionReview: 'Review', attentionPartialNote: 'Some counts could not be loaded.',
+  linkClicks: 'Link clicks', openCalendar: 'Open calendar', retry: 'Retry', audienceDeltaSince: 'since {date}',
 };
 
 const fr: typeof en = {
@@ -65,6 +69,10 @@ const fr: typeof en = {
   inbox: 'Boîte de réception', inboxOpen: 'conversations en attente', inboxZero: 'Tout est à jour.', inboxAction: 'Ouvrir la boîte de réception',
   adSpend: 'Dépenses publicitaires', adSpendNote: '{from}–{to} (UTC). Résultats enregistrés pour {recorded} jours sur {n}. Dernier jour enregistré : {latest}. Les résultats manquants ne sont pas des dépenses nulles ; la couverture des comptes peut varier.', adSpendTrend: 'Dépenses quotidiennes enregistrées, {n} derniers jours',
   adsEmptyTitle: 'Pas encore de dépenses', adsEmptyBody: 'Les dépenses apparaissent dès que vos comptes publicitaires ont des résultats enregistrés.', adsEmptyAction: 'Ouvrir les publicités',
+  attention: 'À traiter', attentionFailed: '{n} publications en échec', attentionPartial: '{n} publications partiellement en échec',
+  attentionApprovals: '{n} publications en attente de votre approbation', attentionReconnect: 'Reconnecter {name}', attentionReconnectMany: '{n} connexions à reconnecter',
+  attentionConversations: '{n} conversations en attente', attentionReview: 'Voir', attentionPartialNote: 'Certains chiffres n’ont pas pu être chargés.',
+  linkClicks: 'Clics sur les liens', openCalendar: 'Ouvrir le calendrier', retry: 'Réessayer', audienceDeltaSince: 'depuis le {date}',
 };
 
 /** Replace `{name}` placeholders in a copy string. */

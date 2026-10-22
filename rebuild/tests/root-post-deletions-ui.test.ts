@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const deps = vi.hoisted(() => ({ refresh: vi.fn() }));
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: deps.refresh }) }));
-import { RootPostDeletionControls } from '../src/server/root/RootPostDeletionControls';
+import { RootPostDeletionControls } from '../src/modules/root/ui/RootPostDeletionControls';
 
 let root: ReturnType<typeof createRoot>;
 let container: HTMLDivElement;

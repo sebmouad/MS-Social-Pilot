@@ -8,7 +8,7 @@ import styles from './agency.module.css';
 
 export const AGENCY_SORT_LABELS: Record<(typeof AGENCY_SORTS)[number], string> = {
   name: 'Workspace name', channels: 'Channels', attention: 'Needs attention', scheduled: 'Scheduled posts', failed: 'Failed posts',
-  openTasks: 'Open tasks', overdueTasks: 'Overdue tasks', members: 'Team members',
+  waitingConversations: 'Waiting conversations', openTasks: 'Open tasks', overdueTasks: 'Overdue tasks', members: 'Team members',
 };
 
 /**

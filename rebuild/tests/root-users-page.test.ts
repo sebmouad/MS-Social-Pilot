@@ -3,13 +3,15 @@ import { renderToStaticMarkup } from 'react-dom/server';
 
 const state = vi.hoisted(() => ({ load: vi.fn(), runtime: vi.fn() }));
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh() {} }) }));
+vi.mock('next/headers', () => ({ headers: async () => new Headers() }));
 vi.mock('../src/server/config/access', () => ({ requireRootPage: async () => ({ id: 'root-user' }) }));
 vi.mock('../src/server/config/store', () => ({ runtimeConfig: state.runtime }));
 vi.mock('../src/server/root/users', () => ({ loadRootUsers: state.load }));
-vi.mock('../src/server/root/RootFrame', () => ({ RootFrame: 'main' }));
+vi.mock('../src/modules/root/ui/RootFrame', () => ({ RootFrame: 'main' }));
 vi.mock('../src/components/SidebarDock', () => ({ SidebarDock: 'aside' }));
 import Page from '../src/app/root/users/page';
 import { OperationError } from '../src/lib/operation-error';
+import { ROOT_INTERFACE_COPY } from '../src/lib/config/root-interface-copy';
 
 const user = {
   id: 'user-2', name: 'Casey Example', email: 'casey@example.test', isInstanceOwner: false,
@@ -20,7 +22,7 @@ const directory = { users: [user], total: 1, installationTotal: 14, query: 'case
 
 beforeEach(() => {
   vi.clearAllMocks();
-  state.runtime.mockResolvedValue(180);
+  state.runtime.mockImplementation(async (key: string) => key === 'root.interfaceCopy' ? ROOT_INTERFACE_COPY : 180);
   state.load.mockResolvedValue(directory);
 });
 

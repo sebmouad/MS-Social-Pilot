@@ -1,5 +1,5 @@
-import { RootEmptyState } from '@/server/root/RootEmptyState';
-import { RootFilters } from '@/server/root/RootFilters';
+import { RootEmptyState } from '@/modules/root/ui/RootEmptyState';
+import { RootFilters } from '@/modules/root/ui/RootFilters';
 import { DataTable } from '@/components/DataTable';
 import { PageHeader } from '@/components/PageHeader';
 import { cookies, headers } from 'next/headers';
@@ -7,7 +7,7 @@ import { requireRootPage } from '@/server/config/access';
 import { hashSessionToken, SESSION_COOKIE } from '@/server/auth';
 import { prisma } from '@/server/data';
 import { pageSearchParamsObject } from '@/modules/root/server/admin/http';
-import { RootFrame } from '@/server/root/RootFrame';
+import { RootFrame } from '@/modules/root/ui/RootFrame';
 import { OperationError } from '@/lib/operation-error';
 import { listRootSessions } from '@/modules/root/server/admin/sessions';
 import { fill, rootCopy, rootCopyLocale } from '@/modules/root/server/admin/copy';

@@ -58,7 +58,7 @@ async function scope(actor: AgencyActor, featureId: string, config: Awaited<Retu
   return { items, truncated };
 }
 
-const EMPTY: AgencyMetrics = { channels: null, disconnected: null, scheduled: null, failed: null, openTasks: null, overdueTasks: null, members: null, clients: null };
+const EMPTY: AgencyMetrics = { channels: null, disconnected: null, scheduled: null, failed: null, waitingConversations: null, openTasks: null, overdueTasks: null, members: null, clients: null };
 
 /**
  * Counts per capability group, each read only for the workspaces whose owning module the person may use.
@@ -68,7 +68,7 @@ async function metricsFor(items: readonly Classified[], since: Date): Promise<Ma
   const available = items.filter(item => item.state === 'available');
   const out = new Map(available.map(item => [item.id, { ...EMPTY }]));
   const idsFor = (group: AgencyGroup) => available.filter(item => item.access[group]).map(item => item.id);
-  const [channels, publishing, tasks, team] = AGENCY_GROUPS.map(idsFor);
+  const [channels, publishing, inbox, tasks, team] = AGENCY_GROUPS.map(idsFor);
   const merge = (rows: Array<Record<string, unknown> & { id: string }>) => { for (const { id, ...values } of rows) Object.assign(out.get(id) ?? {}, values); };
   await Promise.all([
     channels!.length && prisma.$queryRaw<Array<{ id: string; channels: number; disconnected: number }>>`
@@ -81,6 +81,14 @@ async function metricsFor(items: readonly Classified[], since: Date): Promise<Ma
         (SELECT COUNT(*) FROM posts p WHERE p."workspaceId" = w.id AND p.status::text = 'scheduled')::int AS scheduled,
         (SELECT COUNT(*) FROM posts p WHERE p."workspaceId" = w.id AND p.status::text IN ('failed', 'partially_failed') AND p."updatedAt" >= ${since})::int AS failed
       FROM workspaces w WHERE w.id = ANY(${publishing!}::text[])`.then(merge),
+    // Waiting work mirrors the Inbox list defaults: unresolved items of every kind, top-level visible comments only.
+    inbox!.length && prisma.$queryRaw<Array<{ id: string; waitingConversations: number }>>`
+      SELECT w.id,
+        ((SELECT COUNT(*) FROM conversations c JOIN targets t ON t.id = c."targetId" WHERE t."workspaceId" = w.id AND t.enabled AND c."resolvedAt" IS NULL)
+          + (SELECT COUNT(*) FROM post_comments pc JOIN post_targets pt ON pt.id = pc."postTargetId" JOIN targets t ON t.id = pt."targetId" JOIN posts p ON p.id = pt."postId"
+            WHERE t."workspaceId" = w.id AND p."workspaceId" = w.id AND t.enabled AND pc."parentRemoteId" IS NULL AND pc."isHidden" = false AND pc."resolvedAt" IS NULL)
+          + (SELECT COUNT(*) FROM page_reviews r JOIN targets t ON t.id = r."targetId" WHERE t."workspaceId" = w.id AND t.enabled AND r."resolvedAt" IS NULL))::int AS "waitingConversations"
+      FROM workspaces w WHERE w.id = ANY(${inbox!}::text[])`.then(merge),
     tasks!.length && prisma.$queryRaw<Array<{ id: string; openTasks: number; overdueTasks: number }>>`
       SELECT w.id,
         (SELECT COUNT(*) FROM tasks k WHERE k."workspaceId" = w.id AND k.status <> 'done')::int AS "openTasks",
@@ -103,17 +111,17 @@ const score = (item: AgencyWorkspace, weights: Weights) =>
   + (item.metrics ? (item.metrics.disconnected ?? 0) * weights.disconnected + (item.metrics.failed ?? 0) * weights.failed + (item.metrics.overdueTasks ?? 0) * weights.overdue : 0);
 
 const SUMMED: Record<AgencyGroup, readonly (keyof AgencyMetrics & keyof AgencyTotals)[]> = {
-  channels: ['channels', 'disconnected'], publishing: ['scheduled', 'failed'], tasks: ['openTasks', 'overdueTasks'], team: [],
+  channels: ['channels', 'disconnected'], publishing: ['scheduled', 'failed'], inbox: ['waitingConversations'], tasks: ['openTasks', 'overdueTasks'], team: [],
 };
-const COVERAGE_FIELD: Record<AgencyGroup, keyof AgencyMetrics> = { channels: 'channels', publishing: 'scheduled', tasks: 'openTasks', team: 'members' };
+const COVERAGE_FIELD: Record<AgencyGroup, keyof AgencyMetrics> = { channels: 'channels', publishing: 'scheduled', inbox: 'waitingConversations', tasks: 'openTasks', team: 'members' };
 
 /** A group total sums only the workspaces that contributed; coverage says how many, and no contribution is null, not zero. */
 function totalsOf(workspaces: readonly AgencyWorkspace[]): AgencyTotals {
   const available = workspaces.filter(item => item.metrics);
   const totals: AgencyTotals = {
     workspaces: workspaces.length, needingAttention: workspaces.filter(item => item.needsAttention).length,
-    channels: null, disconnected: null, scheduled: null, failed: null, openTasks: null, overdueTasks: null,
-    coverage: { channels: { covered: 0, of: 0 }, publishing: { covered: 0, of: 0 }, tasks: { covered: 0, of: 0 }, team: { covered: 0, of: 0 } },
+    channels: null, disconnected: null, scheduled: null, failed: null, waitingConversations: null, openTasks: null, overdueTasks: null,
+    coverage: { channels: { covered: 0, of: 0 }, publishing: { covered: 0, of: 0 }, inbox: { covered: 0, of: 0 }, tasks: { covered: 0, of: 0 }, team: { covered: 0, of: 0 } },
   };
   for (const group of AGENCY_GROUPS) {
     const contributing = available.filter(item => item.metrics![COVERAGE_FIELD[group]] !== null);

@@ -4,11 +4,11 @@ export const AGENCY_OVERVIEW_FEATURE_ID = 'agency/overview';
 export const AGENCY_CLIENTS_FEATURE_ID = 'agency/clients';
 
 export type AgencyActor = { userId: string };
-export const AGENCY_SORTS = ['name', 'channels', 'attention', 'scheduled', 'failed', 'openTasks', 'overdueTasks', 'members'] as const;
+export const AGENCY_SORTS = ['name', 'channels', 'attention', 'scheduled', 'failed', 'waitingConversations', 'openTasks', 'overdueTasks', 'members'] as const;
 export type AgencySort = (typeof AGENCY_SORTS)[number];
 
 /** Capability groups. Each is counted only where the person holds that feature's permission and entitlement in that workspace. */
-export const AGENCY_GROUPS = ['channels', 'publishing', 'tasks', 'team'] as const;
+export const AGENCY_GROUPS = ['channels', 'publishing', 'inbox', 'tasks', 'team'] as const;
 export type AgencyGroup = (typeof AGENCY_GROUPS)[number];
 export type AgencyAccess = Record<AgencyGroup, boolean>;
 
@@ -17,6 +17,8 @@ export type AgencyMetrics = {
   /** Enabled channels that cannot currently publish. Never includes credentials or provider detail. */
   channels: number | null; disconnected: number | null;
   scheduled: number | null; failed: number | null;
+  /** Unresolved conversations, top-level visible comments and reviews. Never confused with open Tasks. */
+  waitingConversations: number | null;
   openTasks: number | null; overdueTasks: number | null;
   members: number | null; clients: number | null;
 };
@@ -34,7 +36,8 @@ export type AgencyWorkspace = {
 export type AgencyCoverage = Record<AgencyGroup, { covered: number; of: number }>;
 export type AgencyTotals = {
   workspaces: number; needingAttention: number; channels: number | null; disconnected: number | null;
-  scheduled: number | null; failed: number | null; openTasks: number | null; overdueTasks: number | null;
+  scheduled: number | null; failed: number | null; waitingConversations: number | null;
+  openTasks: number | null; overdueTasks: number | null;
   coverage: AgencyCoverage;
 };
 /** `filtered`: the name search narrowed the workspaces, so totals describe the matching workspaces only. */

@@ -1,7 +1,7 @@
 import { PageHeader } from '@/components/PageHeader';
 import { headers } from 'next/headers';
 import { requireRootPage } from '@/server/config/access';
-import { RootFrame } from '@/server/root/RootFrame';
+import { RootFrame } from '@/modules/root/ui/RootFrame';
 import { listRootRegistration } from '@/server/root/registration-admin';
 import { pageSearchParamsObject } from '@/modules/root/server/admin/http';
 import { DataTable } from '@/components/DataTable';

@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { IconArrowUpRight, IconCalendarEvent, IconClockHour4, IconEye, IconHeart, IconInbox, IconPlugConnected, IconSpeakerphone, IconUsers } from '@tabler/icons-react';
+import { IconAlertTriangle, IconArrowUpRight, IconCalendarEvent, IconClockHour4, IconEye, IconHeart, IconInbox, IconLink, IconPlugConnected, IconSpeakerphone, IconUsers } from '@tabler/icons-react';
 import { InfoTip } from '@/components/InfoTip';
 import { ListRow } from '@/components/ListRow';
 import { HomeRetry } from './HomeRetry';
@@ -12,6 +12,7 @@ import type { PostThumbnail } from '@/components/post-thumbnail';
 import { HeatmapChart } from '@/components/charts';
 import { PageFrame } from '@/server/PageFrame';
 import { requireViewer } from '@/server/context';
+import { pageChannelScope } from '@/modules/shell/server/scope';
 import { getTargets } from '@/server/data';
 import { canUseFeature, entitledPlatformIds } from '@/server/entitlements';
 import { canAccessFeature } from '@/server/permissions';
@@ -45,7 +46,7 @@ function Empty({ title, body, action, href }: { title: string; body: string; act
 }
 
 function Unavailable({ t }: { t: Copy }) {
-  return <EmptyState tone="error" title={t.unavailableTitle} action={<HomeRetry label={t.unavailableBody} />}>{t.unavailableBody}</EmptyState>;
+  return <EmptyState tone="error" title={t.unavailableTitle} action={<HomeRetry label={t.retry} />}>{t.unavailableBody}</EmptyState>;
 }
 
 /** A card body for a section state; `ready` content is supplied by the caller. */
@@ -78,7 +79,7 @@ function Kpi({ title, icon, totals, overview, t, locale }: { title: string; icon
 
 const MODE_COPY: Record<ScheduleMode, 'modeApp' | 'modePlatform' | 'modeMixed'> = { app: 'modeApp', platform: 'modePlatform', mixed: 'modeMixed' };
 
-export default async function HomePage() {
+export default async function HomePage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const viewer = await requireViewer({ feature: 'home/overview' });
   const locale = await authLocale();
   const t = await loadHomeCopy(locale);
@@ -86,7 +87,10 @@ export default async function HomePage() {
   const scope = viewer.permissions.pageScope;
   const visibleTargets = await getTargets(viewer.workspaceId, scope.all ? undefined : scope.ids, entitledPlatformIds(viewer.entitlements));
   if (visibleTargets.length === 0) return <PageFrame module="home"><div className={styles.root}><PageHeader module="home" title={viewer.user.name ? `${t.greeting}, ${viewer.user.name}` : t.greeting} /><EmptyState icon={<IconPlugConnected size={22} />} title={t.startTitle} action={showConnections ? <a className={CTA} href="/settings/connections"><span>{t.startAction}</span></a> : undefined}>{t.startBody}</EmptyState></div></PageFrame>;
-  const overview = await readHomeOverview({ userId: viewer.user.id, workspaceId: viewer.workspaceId });
+  const params = (await searchParams) ?? {};
+  // The sidebar scope narrows the figures through the service, together with REST and MCP; never in the UI.
+  const channelScope = await pageChannelScope(viewer, params).catch(() => null);
+  const overview = await readHomeOverview({ userId: viewer.user.id, workspaceId: viewer.workspaceId }, new Date(), channelScope?.ids.length ? { channelIds: channelScope.ids } : {});
   const number = new Intl.NumberFormat(locale);
   const dayFormat = new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeZone: 'UTC' });
   const timeFormat = new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short', timeZone: overview.timeZone });
@@ -97,17 +101,29 @@ export default async function HomePage() {
   const performance = overview.performance;
   const ready = performance?.state === 'ready' ? performance.data : null;
   const readyAds = overview.ads?.state === 'ready' ? overview.ads.data : null;
+  const attention = overview.attention?.state === 'ready' ? overview.attention.data : null;
+  const attentionRows: Array<{ key: string; icon: ReactNode; title: string; href: string }> = attention ? [
+    ...(attention.failedPosts ? [{ key: 'failed', icon: <IconAlertTriangle size={20} aria-hidden="true" />, title: `${fill(t.attentionFailed, { n: number.format(attention.failedPosts) })} — ${t.attentionReview}`, href: '/content?status=failed' }] : []),
+    ...(attention.partiallyFailedPosts ? [{ key: 'partial', icon: <IconAlertTriangle size={20} aria-hidden="true" />, title: `${fill(t.attentionPartial, { n: number.format(attention.partiallyFailedPosts) })} — ${t.attentionReview}`, href: '/content?status=partially_failed' }] : []),
+    ...(attention.pendingApprovals ? [{ key: 'approvals', icon: <IconClockHour4 size={20} aria-hidden="true" />, title: fill(t.attentionApprovals, { n: number.format(attention.pendingApprovals) }), href: '/content/approvals' }] : []),
+    ...(attention.reconnect?.length ? [{ key: 'reconnect', icon: <IconPlugConnected size={20} aria-hidden="true" />,
+      title: attention.reconnect.length === 1 ? fill(t.attentionReconnect, { name: attention.reconnect[0]!.name }) : fill(t.attentionReconnectMany, { n: number.format(attention.reconnect.length) }),
+      href: '/settings/channels' }] : []),
+    ...(attention.waitingConversations ? [{ key: 'inbox', icon: <IconInbox size={20} aria-hidden="true" />, title: fill(t.attentionConversations, { n: number.format(attention.waitingConversations) }), href: '/inbox' }] : []),
+  ] : [];
 
   return <PageFrame module="home"><div className={styles.root}>
     <PageHeader module="home" title={viewer.user.name ? `${t.greeting}, ${viewer.user.name}` : t.greeting}
       actions={<><Badge tone="neutral" icon={<IconCalendarEvent size={14} />}>{dayFormat.format(periodStart)} – {dayFormat.format(periodEnd)}</Badge><InfoTip name={t.metrics}><p>{fill(t.period, { n: days })}</p></InfoTip></>} />
-    {overview.inbox?.state === 'ready' && overview.inbox.data.open > 0 && <section className={styles.attention} aria-label={t.continueTitle}>
-      <h2>{t.continueTitle}</h2><ListRow leading={<IconInbox size={20} aria-hidden="true" />} title={`${number.format(overview.inbox.data.open)} ${t.inboxOpen}`} href="/inbox" trailing={<IconArrowUpRight size={16} aria-hidden="true" />} />
+    {attentionRows.length > 0 && <section className={styles.attention} aria-label={t.attention}>
+      <h2>{t.attention}{attention?.partial ? <InfoTip name={t.attention} warning><p>{t.attentionPartialNote}</p></InfoTip> : null}</h2>
+      {attentionRows.map(row => <ListRow key={row.key} leading={row.icon} title={row.title} href={row.href} trailing={<IconArrowUpRight size={16} aria-hidden="true" />} />)}
     </section>}
     <div className={styles.grid}>
       {overview.audience && (overview.audience.state === 'ready'
         ? <Tile module="analytics" span="span4" href={HREF.analytics} linkLabel={fill(t.openModule, { name: t.moduleNames.analytics })}>
           <MetricCard module="analytics" icon={<IconUsers size={20} />} label={t.audience} value={number.format(overview.audience.data.total)}
+            delta={overview.audience.data.delta ? { label: `${overview.audience.data.delta.value > 0 ? '+' : overview.audience.data.delta.value < 0 ? '−' : ''}${number.format(Math.abs(overview.audience.data.delta.value))}`, direction: overview.audience.data.delta.value > 0 ? 'up' : overview.audience.data.delta.value < 0 ? 'down' : 'flat', comparedTo: fill(t.audienceDeltaSince, { date: dayFormat.format(new Date(`${overview.audience.data.delta.since}T00:00:00Z`)) }) } : undefined}
             info={<InfoTip name={t.audience} warning={overview.audience.data.covered < overview.audience.data.selected}><p>{fill(t.audienceOf, { covered: overview.audience.data.covered, selected: overview.audience.data.selected })}{overview.audience.data.asOf ? ` · ${fill(t.audienceAsOf, { date: dayFormat.format(new Date(overview.audience.data.asOf)) })}` : ''}</p><p>{t.audienceNote}</p></InfoTip>}
             sparkline={overview.audience.data.trend.length > 1 ? overview.audience.data.trend.map(point => point.v) : undefined} sparklineLabel={fill(t.audienceTrend, { n: days })} />
         </Tile>
@@ -118,6 +134,7 @@ export default async function HomePage() {
       {performance && (ready ? <>
         <Kpi title={t.views} icon={<IconEye size={20} />} totals={ready.views} overview={overview} t={t} locale={locale} />
         <Kpi title={t.engagements} icon={<IconHeart size={20} />} totals={ready.engagements} overview={overview} t={t} locale={locale} />
+        {ready.linkClicks && <Kpi title={t.linkClicks} icon={<IconLink size={20} />} totals={ready.linkClicks} overview={overview} t={t} locale={locale} />}
       </> : <Card module="analytics" icon={<IconEye size={20} />} title={`${t.views} · ${t.engagements}`} t={t} span="span8" id="home-performance">
         <Body section={performance} t={t} empty={<Empty title={t.perfEmptyTitle} body={t.perfEmptyBody} action={t.perfEmptyAction} href={HREF.analytics} />}>{() => null}</Body>
       </Card>)}
@@ -132,7 +149,7 @@ export default async function HomePage() {
               meta={<><time dateTime={item.scheduledAt}>{Number.isNaN(new Date(item.scheduledAt).getTime()) ? item.scheduledAt : timeFormat.format(new Date(item.scheduledAt))}</time> · {item.channels.join(', ')}</>}
               trailing={<InfoTip name={t.upcoming}><p>{t[MODE_COPY[item.mode]]}</p><p>{overview.timeZone}</p></InfoTip>} />)}</div>
             {upcoming.total > upcoming.items.length && <p className={styles.note}>{fill(t.upcomingMore, { n: upcoming.total })}</p>}
-            <a className={styles.link} href="/content/calendar">{t.viewQueue}</a>
+            <a className={styles.link} href="/content/calendar">{t.openCalendar}</a>
           </>}
         </Body>
       </Card>}
@@ -141,6 +158,9 @@ export default async function HomePage() {
       {overview.inbox && (overview.inbox.state === 'ready'
         ? <Tile module="inbox" span="span4" href={HREF.inbox} linkLabel={t.inboxAction}>
           <MetricCard module="inbox" icon={<IconInbox size={20} />} label={t.inbox} value={number.format(overview.inbox.data.open)} info={<InfoTip name={t.inbox}><p>{overview.inbox.data.open > 0 ? t.inboxOpen : t.inboxZero}</p></InfoTip>} />
+          {overview.inbox.data.recent.length > 0 && <div className={styles.list}>{overview.inbox.data.recent.map(row => <ListRow key={row.key}
+            href={`/inbox?thread=${encodeURIComponent(row.key)}`} title={row.preview || row.author}
+            meta={<><span>{row.author}</span> · <span>{row.channel}</span> · <time dateTime={row.time}>{Number.isNaN(new Date(row.time).getTime()) ? row.time : timeFormat.format(new Date(row.time))}</time>{row.unread > 0 ? <> · <Badge tone="brand">{number.format(row.unread)}</Badge></> : null}</>} />)}</div>}
         </Tile>
         : overview.inbox.state === 'unavailable' ? <Card module="inbox" icon={<IconInbox size={20} />} title={t.inbox} t={t} span="span4" id="home-inbox"><Unavailable t={t} /></Card> : null)}
 

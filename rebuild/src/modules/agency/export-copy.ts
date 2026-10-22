@@ -11,8 +11,8 @@ export const agencyExportCopy = {
     q: 'Workspace name search', sort: 'Sort', order: 'Order', attentionOnly: 'Attention filter', exported: 'Exported workspaces',
     workspaces: 'Matching workspaces', needingAttention: 'Workspaces needing attention',
     channels: 'Channels', disconnected: 'Channels that cannot publish', scheduled: 'Scheduled posts', failedPosts: 'Failed posts',
-    openTasks: 'Open tasks', overdueTasks: 'Overdue tasks', members: 'Team members', clients: 'Clients',
-    publishing: 'Publishing', tasks: 'Tasks', team: 'Team', role: 'Role', state: 'Status', needsAttention: 'Needs attention',
+    waitingConversations: 'Waiting conversations', openTasks: 'Open tasks', overdueTasks: 'Overdue tasks', members: 'Team members', clients: 'Clients',
+    publishing: 'Publishing', inbox: 'Inbox', tasks: 'Tasks', team: 'Team', role: 'Role', state: 'Status', needsAttention: 'Needs attention',
     available: 'Available', suspended: 'Suspended', deleting: 'Data deletion in progress', owner: 'Owner', admin: 'Admin', yes: 'Yes', no: 'No',
   },
   fr: {
@@ -25,8 +25,8 @@ export const agencyExportCopy = {
     q: 'Recherche par nom d’espace', sort: 'Tri', order: 'Ordre', attentionOnly: 'Filtre d’attention', exported: 'Espaces exportés',
     workspaces: 'Espaces correspondants', needingAttention: 'Espaces nécessitant une attention',
     channels: 'Canaux', disconnected: 'Canaux ne pouvant pas publier', scheduled: 'Publications planifiées', failedPosts: 'Publications en échec',
-    openTasks: 'Tâches ouvertes', overdueTasks: 'Tâches en retard', members: 'Membres de l’équipe', clients: 'Clients',
-    publishing: 'Publication', tasks: 'Tâches', team: 'Équipe', role: 'Rôle', state: 'État', needsAttention: 'Attention requise',
+    waitingConversations: 'Conversations en attente', openTasks: 'Tâches ouvertes', overdueTasks: 'Tâches en retard', members: 'Membres de l’équipe', clients: 'Clients',
+    publishing: 'Publication', inbox: 'Boîte de réception', tasks: 'Tâches', team: 'Équipe', role: 'Rôle', state: 'État', needsAttention: 'Attention requise',
     available: 'Disponible', suspended: 'Suspendu', deleting: 'Suppression des données en cours', owner: 'Propriétaire', admin: 'Admin', yes: 'Oui', no: 'Non',
   },
 } as const;

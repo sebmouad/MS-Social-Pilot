@@ -1,10 +1,10 @@
-import { RootEmptyState } from '@/server/root/RootEmptyState';
-import { RootFilters, RootFilterSelect } from '@/server/root/RootFilters';
+import { RootEmptyState } from '@/modules/root/ui/RootEmptyState';
+import { RootFilters, RootFilterSelect } from '@/modules/root/ui/RootFilters';
 import { DataTable } from '@/components/DataTable';
 import { PageHeader } from '@/components/PageHeader';
 import { requireRootPage } from '@/server/config/access';
 import { pageSearchParamsObject } from '@/modules/root/server/admin/http';
-import { RootFrame } from '@/server/root/RootFrame';
+import { RootFrame } from '@/modules/root/ui/RootFrame';
 import { OperationError } from '@/lib/operation-error';
 import { listRootPrivileges } from '@/modules/root/server/admin/privileges';
 import { CsvExportButton } from '@/components/CsvExportButton';

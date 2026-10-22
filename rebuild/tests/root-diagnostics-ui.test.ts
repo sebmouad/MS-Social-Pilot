@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const deps = vi.hoisted(() => ({ refresh: vi.fn() }));
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: deps.refresh }) }));
 vi.mock('../src/components/SidebarDock', () => ({ SidebarDock: ({ children }: { children: import('react').ReactNode }) => children }));
-import { RootDiagnosticsClient } from '../src/server/root/RootDiagnosticsClient';
+import { RootDiagnosticsClient } from '../src/modules/root/ui/RootDiagnosticsClient';
 import { ROOT_DIAGNOSTICS_COPY } from '../src/lib/config/root-diagnostics-copy';
 let root: ReturnType<typeof createRoot>;
 let container: HTMLDivElement;

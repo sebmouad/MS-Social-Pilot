@@ -7,7 +7,7 @@ import { ChangelogManager } from '@/modules/history/ui/ChangelogManager';
 import styles from '@/modules/history/ui/history.module.css';
 import { requireRootPage } from '@/server/config/access';
 import { configOrDefault } from '@/server/config/config-or-default';
-import { RootFrame } from '@/server/root/RootFrame';
+import { RootFrame } from '@/modules/root/ui/RootFrame';
 import { z } from 'zod';
 
 export const dynamic = 'force-dynamic';

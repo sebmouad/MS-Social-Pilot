@@ -135,6 +135,9 @@ beforeEach(() => {
     if (text.includes('FROM task_comments c LEFT JOIN')) return [];
     if (text.includes('FROM task_comments WHERE id')) return bound.includes('foreign-comment') ? [] : [{ taskId: 'task-a', authorId: 'user-a' }];
     if (text.includes('FROM tasks WHERE id')) return bound.includes('foreign-task') ? [] : [task];
+    if (text.includes('FROM task_checklist_items i JOIN tasks')) return [{ taskId: 'task-a', createdById: 'user-a', assigneeId: null }];
+    if (text.includes('FROM task_checklist_items') && text.includes('COUNT(*)') && !text.includes('GROUP BY')) return [{ total: 0, top: -1 }];
+    if (text.includes('FROM task_checklist_items')) return [];
     throw new Error(`Unhandled synthetic query: ${text}`);
   });
   fixture.execute.mockImplementation(async (query: unknown) => {
@@ -194,6 +197,9 @@ const actions = [
   { name: 'delete_task', action: 'task.delete', args: { id: 'task-a' }, confirmation: 'DELETE TASK task-a', audit: 'tasks.deleted' },
   { name: 'add_task_comment', action: 'comment.add', args: { taskId: 'task-a', body: 'Synthetic private comment' }, confirmation: 'COMMENT ON TASK task-a', audit: 'tasks.comment_added' },
   { name: 'delete_task_comment', action: 'comment.delete', args: { id: 'comment-a' }, confirmation: 'DELETE TASK COMMENT comment-a', audit: 'tasks.comment_deleted' },
+  { name: 'add_task_checklist_item', action: 'checklist.add', args: { taskId: 'task-a', text: 'Synthetic item' }, confirmation: 'ADD CHECKLIST ITEM task-a', audit: 'tasks.checklist_added' },
+  { name: 'set_task_checklist_item', action: 'checklist.set', args: { id: 'item-a', done: true }, confirmation: 'SET CHECKLIST ITEM item-a', audit: 'tasks.checklist_set' },
+  { name: 'delete_task_checklist_item', action: 'checklist.delete', args: { id: 'item-a' }, confirmation: 'DELETE CHECKLIST ITEM item-a', audit: 'tasks.checklist_deleted' },
 ];
 const actorFor = (viewer: McpViewer) => ({ userId: viewer.userId, workspaceId: viewer.workspaceId, permissionCeiling: viewer.permissions });
 const auditCalls = () => fixture.execute.mock.calls.filter(([query]) => sql(query).includes('INSERT INTO activity_logs'));

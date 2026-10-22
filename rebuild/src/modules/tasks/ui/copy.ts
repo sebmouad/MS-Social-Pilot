@@ -630,6 +630,78 @@ export const customerCopy = {
     "en": "comment",
     "fr": "commentaire"
   },
+  "checklist item": {
+    "en": "checklist item",
+    "fr": "point de la liste"
+  },
+  "Checklist": {
+    "en": "Checklist",
+    "fr": "Liste de contrôle"
+  },
+  "Checklist item": {
+    "en": "Checklist item",
+    "fr": "Point de la liste"
+  },
+  "Add a checklist item": {
+    "en": "Add a checklist item",
+    "fr": "Ajouter un point"
+  },
+  "Type the item, then press Enter.": {
+    "en": "Type the item, then press Enter.",
+    "fr": "Saisissez le point, puis appuyez sur Entrée."
+  },
+  "No checklist items yet.": {
+    "en": "No checklist items yet.",
+    "fr": "Aucun point pour le moment."
+  },
+  "Mark not done": {
+    "en": "Mark not done",
+    "fr": "Marquer comme non terminé"
+  },
+  "Delete item": {
+    "en": "Delete item",
+    "fr": "Supprimer ce point"
+  },
+  "{0} of {1} done": {
+    "en": "{0} of {1} done",
+    "fr": "{0} sur {1} terminés"
+  },
+  "Only the first {0} checklist items are shown.": {
+    "en": "Only the first {0} checklist items are shown.",
+    "fr": "Seuls les {0} premiers points sont affichés."
+  },
+  "Enter a checklist item.": {
+    "en": "Enter a checklist item.",
+    "fr": "Saisissez un point de la liste."
+  },
+  "The checklist item is longer than {0} characters.": {
+    "en": "The checklist item is longer than {0} characters.",
+    "fr": "Le point de la liste dépasse {0} caractères."
+  },
+  "Checklist item added.": {
+    "en": "Checklist item added.",
+    "fr": "Point ajouté à la liste."
+  },
+  "Checklist item deleted.": {
+    "en": "Checklist item deleted.",
+    "fr": "Point supprimé de la liste."
+  },
+  "Delete checklist item": {
+    "en": "Delete checklist item",
+    "fr": "Supprimer le point"
+  },
+  "This item is permanently removed from the task.": {
+    "en": "This item is permanently removed from the task.",
+    "fr": "Ce point est définitivement supprimé de la tâche."
+  },
+  "Loading checklist...": {
+    "en": "Loading checklist...",
+    "fr": "Chargement de la liste..."
+  },
+  "The task, its comments and its checklist are permanently removed for everyone in this workspace.": {
+    "en": "The task, its comments and its checklist are permanently removed for everyone in this workspace.",
+    "fr": "La tâche, ses commentaires et sa liste de contrôle sont définitivement supprimés pour tout l’espace."
+  },
   "Choose a valid task.": {
     "en": "Choose a valid task.",
     "fr": "Choisissez une tâche valide."
@@ -657,6 +729,14 @@ export const customerCopy = {
   "cancelled": {
     "en": "cancelled",
     "fr": "annulée"
+  },
+  "Showing only tasks linked to the selected channels.": {
+    "en": "Showing only tasks linked to the selected channels.",
+    "fr": "Seules les tâches liées aux canaux sélectionnés sont affichées."
+  },
+  "{0} tasks without a linked post are hidden by the channel scope.": {
+    "en": "{0} tasks without a linked post are hidden by the channel scope.",
+    "fr": "{0} tâches sans publication liée sont masquées par la sélection des canaux."
   }
 };
 export type CustomerCopy = { [K in keyof typeof customerCopy]: { en: string; fr: string } };
@@ -677,7 +757,7 @@ export const uiCopy = (locale: UiLocale, catalog: CustomerCopy = customerCopy) =
       if (match) {
         result = row.fr.replace(/\{(\d+)\}/g, (token, index: string) => {
           const value = match[indices.indexOf(index) + 1];
-          const field = (['task title', 'task notes', 'comment'] as const).find(key => catalog[key].en === value);
+          const field = (['task title', 'task notes', 'comment', 'checklist item'] as const).find(key => catalog[key].en === value);
           return field ? catalog[field].fr : value ?? token;
         });
         break;

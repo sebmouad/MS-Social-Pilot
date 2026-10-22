@@ -2,7 +2,7 @@ import { DataTable } from '@/components/DataTable';
 import { PageHeader } from '@/components/PageHeader';
 import { synchronousPolicy } from '@/lib/config/synchronous-policy';
 import { requireRootPage } from '@/server/config/access';
-import { RootFrame } from '@/server/root/RootFrame';
+import { RootFrame } from '@/modules/root/ui/RootFrame';
 import { listRootPlanHistory, listRootPlans, listRootSubscribers } from '@/modules/root/server/admin/plans';
 import { PlanEditor } from './PlanEditor';
 import { AssignPlan } from './AssignPlan';

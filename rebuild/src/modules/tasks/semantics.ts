@@ -20,4 +20,5 @@ export const TASKS_TOOL_ACCESS = {
   list_tasks: 'read', get_task: 'read', list_task_post_choices: 'read',
   create_task: 'write', create_task_checklist: 'write', update_task: 'write', move_task: 'write',
   delete_task: 'write', add_task_comment: 'write', delete_task_comment: 'write',
+  add_task_checklist_item: 'write', set_task_checklist_item: 'write', delete_task_checklist_item: 'write',
 } as const;

@@ -1,7 +1,7 @@
 import { Badge } from '@/components/Badge';
 import { IconPlugConnected, IconCircleCheck } from '@tabler/icons-react';
 import { PageHeader } from '@/components/PageHeader';
-import { RootFrame } from '@/server/root/RootFrame';
+import { RootFrame } from '@/modules/root/ui/RootFrame';
 import { requireRootPage } from '@/server/config/access';
 import { platformStatuses } from '@/server/platforms/registry';
 import type { CapabilityDeclaration } from '@/platforms/types';

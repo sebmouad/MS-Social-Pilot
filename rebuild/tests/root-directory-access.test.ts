@@ -5,7 +5,7 @@ vi.mock('@/server/config/access', () => ({ requireRootPage: state.requireRootPag
 vi.mock('@/server/root/users', () => ({ loadRootUsers: state.listRootUsers }));
 vi.mock('@/server/root/directory', () => ({ listRootUsers: state.listRootUsers, listRootWorkspaces: state.listRootWorkspaces }));
 vi.mock('@/server/config/store', () => ({ runtimeConfig: state.runtimeConfig }));
-vi.mock('@/server/root/RootFrame', () => ({ RootFrame: 'div' }));
+vi.mock('@/modules/root/ui/RootFrame', () => ({ RootFrame: 'div' }));
 
 import RootUsersPage from '../src/app/root/users/page';
 import RootWorkspacesPage from '../src/app/root/workspaces/page';

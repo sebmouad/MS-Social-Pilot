@@ -717,3 +717,29 @@ B7 remains partial: Home attention/click/audience-comparison/recent-Inbox data,
 Agency waiting counts, optional-area activation and actual browser proof are open.
 See [design-v2/B7_IMPLEMENTATION.md](design-v2/B7_IMPLEMENTATION.md) for scoped
 evidence, build/environment blockers and exact outside-owned edits.
+
+## Design v2 B8 — 2026-10-22, Root UI source plus finished B7 leftovers (lane 56, uncommitted)
+
+Root is restructured into the S15 areas (Overview, People, Modules, Operations,
+Activity) with all routes kept; module pages split into Settings, Availability,
+Diagnostics and Health tabs (platform modules omit Availability, which has no
+per-module matrix), Operations into Jobs and Diagnostics, Shared configuration
+into Settings and Availability. All `src/server/root/*.tsx`,
+`src/server/jobs/RootJobHealth.tsx` and the Root nav icons moved to
+`src/modules/root/ui/`; Root operator text moved into `root.interfaceCopy`
+(`src/lib/config/root-interface-copy.ts`). The B7 leftovers are finished: Home
+has a Needs attention strip (failed/partly-failed posts, approvals, waiting
+conversations, reconnect), a Link clicks tile, an honest audience delta, recent
+conversations and sidebar-scope narrowing through the shared service;
+Agency counts waiting conversations with coverage in the overview and exports;
+Settings › Workspace can show the Tasks area before the first task, Agency
+appears for administered workspaces only, Tasks obeys the channel scope through
+linked posts, and tasks have checklist items (new `task_checklist_items` table,
+UI/REST/MCP, Root limits). New Root keys: `home.linkClickMeasureWords`,
+`home.recentInboxLimit`, `home.recentInboxPreviewCharacters`,
+`home.attentionReconnectLimit`, `tasks.checklistLimit`,
+`tasks.checklistItemMaxCharacters` (registry bump left to the integrator); new
+MCP tools `add_task_checklist_item`, `set_task_checklist_item`,
+`delete_task_checklist_item`. Migrations live in `rebuild/prisma/migrations/`
+next to the baseline (the legacy root `prisma/` is gone since lane 47).
+Nothing here is browser- or provider-verified.

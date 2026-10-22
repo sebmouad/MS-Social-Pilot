@@ -16,7 +16,7 @@ async function actor(write: boolean) {
   return { userId: viewer.user.id, workspaceId: viewer.workspaceId };
 }
 const UNSIGNED = () => reply({ error: 'Sign in to an authorized workspace.', code: 'unauthorized' }, 401);
-const KEYS = ['status', 'assignee', 'overdue', 'q', 'offset', 'limit'];
+const KEYS = ['status', 'assignee', 'overdue', 'q', 'offset', 'limit', 'channel'];
 
 export async function GET(request: Request) {
   let current; try { current = await actor(false); } catch { return UNSIGNED(); }
@@ -24,11 +24,13 @@ export async function GET(request: Request) {
     const query = new URL(request.url).searchParams;
     if ([...query.keys()].some(key => !KEYS.includes(key) || query.getAll(key).length > 1)) throw new OperationError('invalid_request', 'Choose valid task filters.');
     const number = (key: string) => { const value = query.get(key); if (value === null) return {}; if (!/^\d+$/.test(value)) throw new OperationError('invalid_request', 'Choose valid task filters.'); return { [key]: Number(value) }; };
-    const overdue = query.get('overdue');
+    const overdue = query.get('overdue'), channel = query.get('channel');
     if (overdue !== null && overdue !== 'true' && overdue !== 'false') throw new OperationError('invalid_request', 'Choose valid task filters.');
+    if (channel !== null && !/^[A-Za-z0-9_.,-]{1,2000}$/.test(channel)) throw new OperationError('invalid_request', 'Choose valid task filters.');
     return reply(await listTasks(current, {
       ...(query.get('status') ? { status: query.get('status') } : {}), ...(query.get('assignee') ? { assignee: query.get('assignee') } : {}),
       ...(overdue !== null ? { overdue: overdue === 'true' } : {}), ...(query.get('q') ? { q: query.get('q') } : {}), ...number('offset'), ...number('limit'),
+      ...(channel ? { channelIds: channel.split(',').map(id => id.trim()).filter(Boolean) } : {}),
     }));
   } catch (error) { const failure = operationFailure(error, 'Tasks could not be loaded. Please try again.'); return reply({ error: failure.error, code: failure.code }, failure.status); }
 }

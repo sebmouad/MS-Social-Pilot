@@ -1,9 +1,9 @@
-/* Design round 2: Root sidebar with icon chips, grouped by owner (shared / product / platform). */
+/* Design v2 B8: Root sidebar with icon chips, grouped by area (overview / people / modules / operations / activity). */
 .root-directory-nav { gap: 14px; }
 .root-directory-nav details { padding: 6px; border-radius: var(--radius-md); background: color-mix(in srgb, var(--surface-muted) 55%, transparent); }
-.root-directory-nav summary { display: flex; align-items: center; justify-content: space-between; min-height: 32px; padding: 4px 8px; font-size: 11px; letter-spacing: .04em; list-style: none; }
+.root-directory-nav summary { display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 4px 8px; font-size: 11px; letter-spacing: .04em; list-style: none; }
 .root-directory-nav summary::-webkit-details-marker { display: none; }
-.root-directory-nav summary::after { content: ""; width: 7px; height: 7px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(45deg); transition: transform .15s ease; opacity: .6; }
+.root-directory-nav summary::after { content: ""; width: 7px; height: 7px; margin-left: auto; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(45deg); transition: transform .15s ease; opacity: .6; }
 .root-directory-nav details[open] > summary::after { transform: rotate(-135deg); }
 .root-directory-nav details > a { display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 6px 10px; font-size: 13.5px; font-weight: 550; transition: background .15s ease, color .15s ease; }
 .root-directory-nav details > a:hover { background: var(--surface); color: var(--ink); }

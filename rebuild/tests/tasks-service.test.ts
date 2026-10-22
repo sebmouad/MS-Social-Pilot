@@ -23,12 +23,13 @@ const actor = { userId: 'user-a', workspaceId: 'workspace-a' };
 const caps: Record<string, number> = {
   'tasks.titleMaxCharacters': 20, 'tasks.notesMaxCharacters': 50, 'tasks.commentMaxCharacters': 30, 'tasks.pageLimit': 2,
   'tasks.commentHistoryLimit': 50, 'tasks.assigneeLimit': 10, 'tasks.postChoiceLimit': 2, 'tasks.workflowRowLimit': 3, 'tasks.workflowGapMaxDays': 7,
-  'tasks.transactionTimeoutMs': 5000, 'tasks.transactionMaxWaitMs': 500,
+  'tasks.transactionTimeoutMs': 5000, 'tasks.transactionMaxWaitMs': 500, 'tasks.checklistLimit': 3, 'tasks.checklistItemMaxCharacters': 40,
 };
 const sqlText = (query: unknown) => typeof query === 'string' ? query : (query as { sql?: string; strings?: string[] })?.sql ?? (query as { strings?: string[] })?.strings?.join('?') ?? (query as string[])?.join('?') ?? '';
 const valuesOf = (query: unknown): unknown[] => (query as { values?: unknown[] })?.values ?? [];
 let role: string | null = 'editor'; let suspended: Date | null = null; let taskRow: Record<string, unknown> | null = null; let taskRows: Record<string, unknown>[] = [];
 let assignable = true; let postFound = true; let commentRow: Record<string, unknown> | null = null; let auditCount = 1; let scope: { all: boolean; ids: string[] } = { all: true, ids: [] };
+let itemRow: Record<string, unknown> | null = null; let itemRows: Record<string, unknown>[] = []; let checklistRows: Record<string, unknown>[] = []; let checklistTotal = 0; let hiddenUnlinked = 0;
 let purgeStatus: string | null = null;
 let freshWrite = true; let moduleOn = true; let featureOn = true; let access = { read: true, write: true }; let commentRows: Record<string, unknown>[] = [];
 const audits: string[] = []; const writes: Array<{ sql: string; values: unknown[] }> = [];
@@ -37,6 +38,7 @@ const updatedAt = new Date('2026-10-18T10:00:00.000Z');
 beforeEach(() => {
   vi.clearAllMocks(); purgeStatus = null; role = 'editor'; suspended = null; taskRow = { id: 't1', title: 'Old', notes: null, status: 'todo', assigneeId: null, dueOn: null, postId: null, createdById: 'someone', updatedAt };
   taskRows = []; commentRows = []; assignable = true; postFound = true; commentRow = null; auditCount = 1; scope = { all: true, ids: [] }; moduleOn = true; featureOn = true; access = { read: true, write: true };
+  itemRow = null; itemRows = []; checklistRows = []; checklistTotal = 0; hiddenUnlinked = 0;
   audits.length = 0; writes.length = 0;
   mocks.config.mockImplementation(async (key: string) => key === 'tasks.customerCopy' ? customerCopy : caps[key]);
   mocks.purging.mockResolvedValue(undefined);
@@ -68,9 +70,14 @@ beforeEach(() => {
     if (sql.includes('FROM tasks t LEFT JOIN')) return taskRows;
     if (sql.includes('FROM task_comments c')) return commentRows;
     if (sql.includes('FROM task_comments WHERE id')) return commentRow ? [commentRow] : [];
+    if (sql.includes('FROM task_checklist_items i JOIN tasks')) return itemRow ? [itemRow] : [];
+    if (sql.includes('FROM task_checklist_items') && sql.includes('COUNT(*)') && !sql.includes('GROUP BY')) return [{ total: checklistTotal, top: checklistTotal - 1 }];
+    if (sql.includes('GROUP BY "taskId"')) return checklistRows;
+    if (sql.includes('FROM task_checklist_items')) return itemRows;
     if (sql.includes('SELECT id FROM tasks')) return taskRow ? [{ id: 't1' }] : [];
     if (sql.includes('FROM tasks WHERE id')) return taskRow ? [taskRow] : [];
     if (sql.includes('SELECT u.id, u.name')) return [{ id: 'user-b', name: 'Bea' }];
+    if (sql.includes('t."postId" IS NULL')) return [{ total: hiddenUnlinked }];
     if (sql.includes('FROM tasks t')) return taskRows;
     return [];
   });
@@ -268,11 +275,11 @@ describe('task writes', () => {
     await expect(performTaskAction(actor, { action: 'task.update', id: 't1', confirmation: 'UPDATE TASK t1', title: 'New', expectedUpdatedAt: updatedAt.toISOString() })).resolves.toMatchObject({ ok: true });
     await expect(performTaskAction(actor, { action: 'task.update', id: 't1', confirmation: 'UPDATE TASK t1', title: 'Newer' })).resolves.toMatchObject({ ok: true });
   });
-  it('requires the exact confirmation to delete and removes comments with the task', async () => {
+  it('requires the exact confirmation to delete and removes comments and checklist items with the task', async () => {
     await expect(performTaskAction(actor, { action: 'task.delete', id: 't1', confirmation: 'delete' })).rejects.toMatchObject({ code: 'invalid_request' });
     expect(writes).toHaveLength(0);
     await performTaskAction(actor, { action: 'task.delete', id: 't1', confirmation: taskConfirmations.delete('t1') });
-    expect(writes[0]!.sql).toContain('DELETE FROM task_comments'); expect(writes[1]!.sql).toContain('DELETE FROM tasks'); expect(audits).toHaveLength(1);
+    expect(writes[0]!.sql).toContain('DELETE FROM task_comments'); expect(writes[1]!.sql).toContain('DELETE FROM task_checklist_items'); expect(writes[2]!.sql).toContain('DELETE FROM tasks'); expect(audits).toHaveLength(1);
   });
   it('keeps comment text out of the audit trail and protects other authors', async () => {
     await performTaskAction(actor, { action: 'comment.add', taskId: 't1', confirmation: 'COMMENT ON TASK t1', body: 'secret words' });
@@ -377,6 +384,9 @@ describe('shared task confirmation boundary', () => {
     { action: 'comment.add', taskId: 't1', body: 'Hello', confirmation: 'COMMENT ON TASK t1' },
     { action: 'task.delete', id: 't1', confirmation: 'DELETE TASK t1' },
     { action: 'comment.delete', id: 'c1', confirmation: 'DELETE TASK COMMENT c1' },
+    { action: 'checklist.add', taskId: 't1', text: 'First', confirmation: 'ADD CHECKLIST ITEM t1' },
+    { action: 'checklist.set', id: 'i1', done: true, confirmation: 'SET CHECKLIST ITEM i1' },
+    { action: 'checklist.delete', id: 'i1', confirmation: 'DELETE CHECKLIST ITEM i1' },
   ];
   it.each(actions)('requires confirmation in the shared schema: $action', async value => {
     const { confirmation: _confirmation, ...missing } = value;
@@ -386,5 +396,89 @@ describe('shared task confirmation boundary', () => {
   it.each(actions)('refuses mismatched confirmation before writes: $action', async value => {
     await expect(performTaskAction(actor, { ...value, confirmation: 'yes' })).rejects.toMatchObject({ code: 'invalid_request' });
     expect(writes).toHaveLength(0); expect(audits).toHaveLength(0); expect(mocks.prisma.$transaction).not.toHaveBeenCalled();
+  });
+});
+
+describe('task channel scope', () => {
+  it('narrows the board to tasks linked to scoped channels and counts hidden unlinked tasks', async () => {
+    taskRows = listed(1);
+    const result = await listTasks(actor, { channelIds: ['channel-1'] });
+    const queries = mocks.prisma.$queryRaw.mock.calls.map(call => sqlText(call[0]));
+    expect(queries.some(sql => sql.includes('post_targets') && sql.includes('"postId" IS NOT NULL'))).toBe(true);
+    expect(queries.some(sql => sql.includes('t."postId" IS NULL'))).toBe(true);
+    expect(result.scopeHiddenUnlinked).toBe(0);
+    expect(result.tasks).toHaveLength(1);
+  });
+  it('reports unlinked tasks hidden by the scope without hiding linked ones', async () => {
+    hiddenUnlinked = 4;
+    const result = await listTasks(actor, { channelIds: ['channel-1'] });
+    expect(result.scopeHiddenUnlinked).toBe(4);
+    const result2 = await listTasks(actor);
+    expect(result2.scopeHiddenUnlinked).toBe(0);
+    expect(mocks.prisma.$queryRaw.mock.calls.map(call => sqlText(call[0])).filter(sql => sql.includes('t."postId" IS NULL'))).toHaveLength(1);
+  });
+  it('narrows the link picker to posts on scoped channels', async () => {
+    await listTaskPostChoices(actor, { channelIds: ['channel-1'] });
+    expect(mocks.prisma.post.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ AND: expect.arrayContaining([{ targets: { some: { targetId: { in: ['channel-1'] } } } }]) }),
+    }));
+  });
+  it('rejects malformed scope ids', async () => {
+    await expect(listTasks(actor, { channelIds: ['bad id!'] })).rejects.toMatchObject({ code: 'invalid_request' });
+  });
+});
+
+describe('task checklists', () => {
+  it('summarizes checklist progress on every listed task', async () => {
+    taskRows = listed(2);
+    checklistRows = [{ taskId: 't0', done: 1, total: 2 }];
+    const result = await listTasks(actor);
+    expect(result.tasks.map(task => task.checklist)).toEqual([{ done: 1, total: 2 }, { done: 0, total: 0 }]);
+  });
+  it('reads one task with its ordered items and change rights', async () => {
+    taskRows = listed(1);
+    itemRows = [
+      { id: 'i1', text: 'First', done: false, position: 0, createdAt: updatedAt },
+      { id: 'i2', text: 'Second', done: true, position: 1, createdAt: updatedAt },
+    ];
+    const result = await getTask(actor, 't1');
+    expect(result.checklist.map(item => [item.id, item.done])).toEqual([['i1', false], ['i2', true]]);
+    expect(result.checklistHasMore).toBe(false);
+    expect(result.canChangeChecklist).toBe(true);
+    expect(result.task.checklist).toEqual({ done: 1, total: 2 });
+  });
+  it('adds an item at the end with audit, within the Root limit', async () => {
+    checklistTotal = 2;
+    const result = await performTaskAction(actor, { action: 'checklist.add', taskId: 't1', text: '  Third ', confirmation: 'ADD CHECKLIST ITEM t1' });
+    expect(result).toMatchObject({ ok: true });
+    expect(writes[0]!.sql).toContain('INSERT INTO task_checklist_items');
+    expect(audits).toHaveLength(1);
+    checklistTotal = 3;
+    await expect(performTaskAction(actor, { action: 'checklist.add', taskId: 't1', text: 'Fourth', confirmation: 'ADD CHECKLIST ITEM t1' })).rejects.toMatchObject({ code: 'invalid_request' });
+    await expect(performTaskAction(actor, { action: 'checklist.add', taskId: 't1', text: 'x'.repeat(41), confirmation: 'ADD CHECKLIST ITEM t1' })).rejects.toMatchObject({ code: 'invalid_request' });
+  });
+  it('sets and deletes only through the owning task access, with audit', async () => {
+    itemRow = { taskId: 't1', createdById: 'someone', assigneeId: null };
+    await performTaskAction(actor, { action: 'checklist.set', id: 'i1', done: true, confirmation: 'SET CHECKLIST ITEM i1' });
+    expect(writes[0]!.sql).toContain('UPDATE task_checklist_items');
+    await performTaskAction(actor, { action: 'checklist.delete', id: 'i1', confirmation: 'DELETE CHECKLIST ITEM i1' });
+    expect(writes[1]!.sql).toContain('DELETE FROM task_checklist_items');
+    expect(audits).toHaveLength(2);
+    itemRow = null;
+    await expect(performTaskAction(actor, { action: 'checklist.set', id: 'i1', done: true, confirmation: 'SET CHECKLIST ITEM i1' })).rejects.toMatchObject({ code: 'not_found' });
+  });
+  it('limits contributors to items of tasks they created or hold', async () => {
+    role = 'contributor';
+    itemRow = { taskId: 't1', createdById: 'other', assigneeId: 'other' };
+    await expect(performTaskAction(actor, { action: 'checklist.set', id: 'i1', done: true, confirmation: 'SET CHECKLIST ITEM i1' })).rejects.toMatchObject({ code: 'forbidden' });
+    itemRow = { taskId: 't1', createdById: actor.userId, assigneeId: null };
+    await expect(performTaskAction(actor, { action: 'checklist.set', id: 'i1', done: true, confirmation: 'SET CHECKLIST ITEM i1' })).resolves.toMatchObject({ ok: true });
+  });
+  it('reaches checklist writes through the MCP tools with the same service', async () => {
+    itemRow = { taskId: 't1', createdById: 'someone', assigneeId: null };
+    await expect(executeTasksTool(actor, 'add_task_checklist_item', { taskId: 't1', text: 'MCP', confirmation: 'ADD CHECKLIST ITEM t1' })).resolves.toMatchObject({ ok: true });
+    await expect(executeTasksTool(actor, 'set_task_checklist_item', { id: 'i1', done: false, confirmation: 'SET CHECKLIST ITEM i1' })).resolves.toMatchObject({ ok: true });
+    await expect(executeTasksTool(actor, 'delete_task_checklist_item', { id: 'i1', confirmation: 'DELETE CHECKLIST ITEM i1' })).resolves.toMatchObject({ ok: true });
+    await expect(executeTasksTool(actor, 'add_task_checklist_item', { taskId: 't1', text: 'MCP' })).rejects.toMatchObject({ code: 'invalid_request' });
   });
 });

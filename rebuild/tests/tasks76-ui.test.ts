@@ -10,7 +10,7 @@ import { TASK_DEFAULT_LIMITS, type TaskView } from '../src/modules/tasks/tasks';
 const refresh=vi.hoisted(()=>vi.fn());
 vi.mock('next/navigation',()=>({useRouter:()=>({refresh})}));
 let root:ReturnType<typeof createRoot>,container:HTMLDivElement;
-const task:TaskView={id:'task-a',title:'Review campaign',notes:'Keep this note',status:'todo',assignee:null,dueOn:null,overdue:false,post:null,postHidden:false,createdBy:null,createdAt:'2026-10-18T10:00:00.000Z',updatedAt:'2026-10-18T10:00:00.000Z',commentCount:1,canEdit:true,canDelete:true};
+const task:TaskView={id:'task-a',title:'Review campaign',notes:'Keep this note',status:'todo',assignee:null,dueOn:null,overdue:false,post:null,postHidden:false,createdBy:null,createdAt:'2026-10-18T10:00:00.000Z',updatedAt:'2026-10-18T10:00:00.000Z',commentCount:1,checklist:{done:1,total:2},canEdit:true,canDelete:true};
 const button=(label:string,parent:ParentNode=container)=>{const b=[...parent.querySelectorAll<HTMLButtonElement>('button')].find(b=>b.textContent?.trim()===label);if(!b)throw Error(`Missing ${label}`);return b;};
 const click=async(b:HTMLElement)=>act(async()=>{b.click();});
 beforeEach(async()=>{

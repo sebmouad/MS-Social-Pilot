@@ -3,19 +3,19 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 const state = vi.hoisted(() => ({ access: vi.fn(), read: vi.fn(), form: vi.fn(), config: vi.fn(), health: vi.fn() }));
 vi.mock('../src/app/root/modules/ModuleHealth', () => ({ ModuleHealth: async (props: { scope?: string }) => { state.health(props); return createElement('section', null, 'Stored module health'); } }));
-vi.mock('../src/server/root/RootDiagnostics', () => ({ RootDiagnostics: async () => null }));
-vi.mock('../src/server/root/RootInboxDeletions', () => ({ RootInboxDeletions: async () => createElement('section', null, 'Inbox deletion recovery') }));
-vi.mock('../src/server/root/RootPostDeletions', () => ({ RootPostDeletions: async () => createElement('section', null, 'Post deletion recovery') }));
-vi.mock('../src/server/root/RootPublicationAttempts', () => ({ RootPublicationAttempts: async () => createElement('section', null, 'Publication attempt recovery') }));
-vi.mock('../src/server/jobs/RootJobHealth', () => ({ RootJobHealth: async () => null }));
+vi.mock('../src/modules/root/ui/RootDiagnostics', () => ({ RootDiagnostics: async () => null }));
+vi.mock('../src/modules/root/ui/RootInboxDeletions', () => ({ RootInboxDeletions: async () => createElement('section', null, 'Inbox deletion recovery') }));
+vi.mock('../src/modules/root/ui/RootPostDeletions', () => ({ RootPostDeletions: async () => createElement('section', null, 'Post deletion recovery') }));
+vi.mock('../src/modules/root/ui/RootPublicationAttempts', () => ({ RootPublicationAttempts: async () => createElement('section', null, 'Publication attempt recovery') }));
+vi.mock('../src/modules/root/ui/RootJobHealth', () => ({ RootJobHealth: async () => null }));
 vi.mock('../src/server/config/access', () => ({ requireRootPage: state.access }));
 vi.mock('../src/server/config/store', () => ({ readConfig: state.read, runtimeConfig: state.config }));
-vi.mock('../src/server/root/RootFrame', () => ({ RootFrame: 'main' }));
+vi.mock('../src/modules/root/ui/RootFrame', () => ({ RootFrame: 'main' }));
 vi.mock('../src/app/root/config/root-config-form', () => ({ RootConfigForm: state.form }));
 vi.mock('next/headers', () => ({ headers: async () => new Headers() }));
 vi.mock('next/navigation', () => ({ notFound: () => { throw new Error('Not found'); } }));
 vi.mock('../src/server/data', () => ({ prisma: { user: { findUnique: async () => ({ isInstanceOwner: true, disabledAt: null }) } } }));
-import { RootModuleSettings } from '../src/server/root/RootModuleSettings';
+import { RootModuleSettings } from '../src/modules/root/ui/RootModuleSettings';
 import ProductPage from '../src/app/root/modules/[id]/page';
 import PlatformPage from '../src/app/root/platforms/[id]/page';
 import ModulesPage from '../src/app/root/modules/page';
@@ -47,7 +47,24 @@ describe('Root module screens', () => {
     expect(props.definitions.length).toBeGreaterThan(5);
     expect(props.definitions.every((setting: { owner: { kind: string; id: string } }) => setting.owner.kind === 'product' && setting.owner.id === 'publishing')).toBe(true);
     expect(props.initialValues.map((setting: { key: string }) => setting.key)).toEqual(['publishing.maxMessageCharacters', 'entitlements.modules.publishing']);
-    expect(props.availability.modules.map((module: { id: string }) => module.id)).toEqual(['publishing']);
+    expect(props.hideInventory).toBe(true);
+    const inventory = renderToStaticMarkup(await RootModuleSettings({ kind: 'product', id: 'publishing', title: 'Publishing', description: 'Publishing controls', tab: 'availability' }));
+    expect(inventory).toContain('publishing');
+    expect(inventory).toContain('publishing/posts');
+    expect(state.form).toHaveBeenCalledTimes(1);
+  });
+  it('splits module controls into settings, availability, diagnostics and health tabs', async () => {
+    const settings = renderToStaticMarkup(await RootModuleSettings({ kind: 'product', id: 'publishing', title: 'Publishing', description: 'Publishing controls', tab: 'nope' }));
+    expect(settings).toContain('Owned settings');
+    expect(settings).toContain('?tab=availability');
+    expect(settings).toContain('?tab=diagnostics');
+    expect(settings).toContain('?tab=health');
+    const health = renderToStaticMarkup(await RootModuleSettings({ kind: 'product', id: 'publishing', title: 'Publishing', description: 'Publishing controls', tab: 'health', children: 'Stored module health' }));
+    expect(health).toContain('Stored module health');
+    expect(health).not.toContain('Owned settings');
+    const platform = renderToStaticMarkup(await RootModuleSettings({ kind: 'platform', id: 'facebook', title: 'Facebook', description: 'Provider controls' }));
+    expect(platform).toContain('?tab=diagnostics');
+    expect(platform).not.toContain('?tab=availability');
   });
   it('keeps provider-owned credentials and reply policy together', async () => {
     renderToStaticMarkup(await RootModuleSettings({ kind: 'platform', id: 'facebook', title: 'Facebook', description: 'Provider controls' }));
@@ -65,7 +82,7 @@ describe('Root module screens', () => {
   it('keeps navigation and safe recovery copy when the settings store fails', async () => {
     state.read.mockRejectedValueOnce(new Error('postgres://private-password@db'));
     const html = renderToStaticMarkup(await RootModuleSettings({ kind: 'product', id: 'publishing', title: 'Publishing', description: 'Publishing controls' }));
-    expect(html).toContain('Module settings unavailable');
+    expect(html).toContain('Settings could not be loaded. Reload to try again.');
     expect(html).not.toContain('private-password'); expect(state.form).not.toHaveBeenCalled();
   });
   it('authenticates all module entry routes before exposing controls', async () => {

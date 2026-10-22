@@ -1,12 +1,12 @@
 import { DataTable } from '@/components/DataTable';
 import { PageHeader } from '@/components/PageHeader';
-import { RootFrame } from '@/server/root/RootFrame';
+import { RootFrame } from '@/modules/root/ui/RootFrame';
 import { listRootWorkspaces } from '@/server/root/directory';
 import { runtimeConfig } from '@/server/config/store';
 import { requireRootPage } from '@/server/config/access';
 import { CreateRootWorkspace, RenameRootWorkspace } from './RootWorkspaceControls';
 import { WorkspaceAccessControl } from './WorkspaceAccessControl';
-import { RootDirectorySearch } from '@/server/root/RootDirectorySearch';
+import { RootDirectorySearch } from '@/modules/root/ui/RootDirectorySearch';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Workspaces · Root' };
@@ -17,7 +17,7 @@ export default async function RootWorkspacesPage({ searchParams }: { searchParam
   const [defaultTimezone, maxName] = await Promise.all([runtimeConfig('root.defaultWorkspaceTimezone'), runtimeConfig('root.workspaceNameMaxCharacters')]);
   const data = await listRootWorkspaces(actor.id, params);
   const url = (page: number) => `/root/workspaces?${new URLSearchParams({ ...(data.query ? { q: data.query } : {}), page: String(page) })}`;
-  return <RootFrame active="/root/workspaces"><PageHeader module="root" title="Workspaces" description={<>{data.total} {data.query ? 'matching workspaces' : 'workspaces across this installation'}.</>} /><RootDirectorySearch kind="workspaces" query={data.query} />
+  return <RootFrame active="/root/workspaces"><PageHeader module="root" title="Workspaces" description={<>{data.total} {data.query ? 'matching workspaces' : 'workspaces across this installation'}.</>} />{await RootDirectorySearch({ kind: 'workspaces', query: data.query })}
     <CreateRootWorkspace defaultTimezone={defaultTimezone} maxName={maxName} />
     <DataTable caption={'Workspaces in this installation'} rows={data.workspaces} rowKey={workspace => workspace.id} emptyMessage="No workspaces match this search." emptyAction={<a href="/root/workspaces">Reset search</a>} columns={[
           { key: 'column0', label: 'Workspace', render: (workspace) => <><strong>{workspace.name}</strong><br />{workspace.slug}</> },

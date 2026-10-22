@@ -11,28 +11,39 @@ import { readChannelMeasures, readChannelPostHistory } from '@/modules/analytics
 import { readInboxList } from '@/modules/inbox/server/read';
 import { readAdsDailyRows } from '@/modules/ads/server/report-read';
 import { readPublishingPostPage } from '@/modules/publishing/server/read';
+import { pendingApprovalCount } from '@/modules/publishing/server/approvals-badge';
+import { shellChannels } from '@/modules/shell/server/channels';
 import { engagementHeatmap, lastDays, periodTotals, scheduleMode, snippet, spendByCurrency, sumKnown, type HeatmapCell, type Known, type ScheduleMode } from './overview-pure';
 
 /** A card's data: ready, nothing to show yet, or temporarily unreadable. Cards never fail the page together. */
 export type Section<T> = { state: 'ready'; data: T } | { state: 'empty' } | { state: 'unavailable' };
 export type TrendPoint = { t: string; v: number | null };
 
+export type HomeAttention = {
+  /** Null when the viewer may not use the owning module, or that read failed while others succeeded. */
+  failedPosts: number | null; partiallyFailedPosts: number | null; pendingApprovals: number | null; waitingConversations: number | null;
+  reconnect: Array<{ id: string; name: string; platform: string | null }> | null;
+  /** True when at least one permitted read failed; the strip shows what is known with a warning. */
+  partial: boolean;
+};
 export type HomeOverview = {
   generatedAt: string;
   lookbackDays: number;
   timeZone: string;
   channelCount: number;
   /** Cards appear only for enabled, permitted modules; null means the viewer cannot use that module. */
-  audience: Section<{ total: number; covered: number; selected: number; asOf: string | null; trend: TrendPoint[] }> | null;
+  audience: Section<{ total: number; covered: number; selected: number; asOf: string | null; trend: TrendPoint[]; delta: { value: number; since: string } | null }> | null;
   performance: Section<{
-    views: ReturnType<typeof periodTotals>; engagements: ReturnType<typeof periodTotals>; channels: number; truncated: boolean;
+    views: ReturnType<typeof periodTotals>; engagements: ReturnType<typeof periodTotals>; linkClicks: ReturnType<typeof periodTotals> | null;
+    channels: number; truncated: boolean;
     topChannels: Array<{ id: string; name: string; engagements: number }>;
     interactions: Array<{ key: string; label: string; value: number }>;
   }> | null;
   bestTimes: Section<{ cells: HeatmapCell[]; measuredPosts: number }> | null;
   upcoming: Section<{ total: number; items: Array<{ id: string; text: string; scheduledAt: string; channels: string[]; mode: ScheduleMode }> }> | null;
-  inbox: Section<{ open: number }> | null;
+  inbox: Section<{ open: number; recent: Array<{ key: string; author: string; preview: string; time: string; channel: string; unread: number }> }> | null;
   ads: Section<{ start: string; end: string; spend: Array<{ currency: string | null; total: number; firstDay: string; lastDay: string; recordedDays: number; daily: TrendPoint[] }> }> | null;
+  attention: Section<HomeAttention> | null;
 };
 
 /** Payload of one card, without its state wrapper. */
@@ -41,7 +52,8 @@ type Data<K extends keyof HomeOverview> = Exclude<HomeOverview[K], null> extends
 export type HomeActor = { userId: string; workspaceId: string };
 
 const KEYS = ['home.lookbackDays', 'home.maxChannels', 'home.topChannelsLimit', 'home.upcomingLimit', 'home.snippetCharacters', 'home.interactionMeasureKeys',
-  'home.heatmapLookbackDays', 'home.heatmapMaxPostsPerChannel', 'home.heatmapMinPosts', 'home.adsMaxPages'] as const;
+  'home.heatmapLookbackDays', 'home.heatmapMaxPostsPerChannel', 'home.heatmapMinPosts', 'home.adsMaxPages',
+  'home.linkClickMeasureWords', 'home.recentInboxLimit', 'home.recentInboxPreviewCharacters', 'home.attentionReconnectLimit'] as const;
 const DAY = 86_400_000;
 /** Calendar day key (YYYY-MM-DD) from a day string, ISO timestamp or Date. */
 const dayKey = (value: unknown): string => { if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}/.test(value)) return value.slice(0, 10); const date = value instanceof Date ? value : new Date(String(value)); return Number.isNaN(date.getTime()) ? '' : date.toISOString().slice(0, 10); }; // Fixed UTC calendar duration, not an operational setting.
@@ -53,14 +65,18 @@ async function settled<T>(read: () => Promise<Section<T>>): Promise<Section<T>> 
 /**
  * The Home overview: one read of stored figures through each product module's own service, so every figure follows the same
  * authorization, selection and entitlement rules as the module's screen. No provider request is made.
+ * `channelIds` is the shared sidebar scope; it only narrows the member's current grants, never widens them.
  */
-export async function readHomeOverview(actor: HomeActor, now = new Date()): Promise<HomeOverview> {
+export async function readHomeOverview(actor: HomeActor, now = new Date(), options: { channelIds?: readonly string[] } = {}): Promise<HomeOverview> {
   const [entitlements, permissions] = await Promise.all([loadEntitlements(actor.userId, actor.workspaceId, { allowInstallationInspection: false }), loadPermissions(actor.userId, actor.workspaceId)]);
   if (!entitlements || !permissions) throw new OperationError('forbidden', (await homeErrorCopy()).homeUnavailable);
   const allowed = (feature: string) => canUseFeature(entitlements, feature) && canAccessFeature(permissions, feature, 'read');
   const config = await runtimeConfigBatch(KEYS) as Record<(typeof KEYS)[number], unknown>;
   const lookbackDays = Number(config['home.lookbackDays']), maxChannels = Number(config['home.maxChannels']);
-  const channelScope = permissions.pageScope.all ? undefined : permissions.pageScope.ids;
+  const memberScope = permissions.pageScope.all ? undefined : [...permissions.pageScope.ids];
+  const requested = options.channelIds?.filter(id => typeof id === 'string' && id.length > 0);
+  // Unknown or ungranted ids are dropped: the scope is a display filter, and every service re-authorizes below.
+  const channelScope = requested?.length ? requested.filter(id => !memberScope || memberScope.includes(id)) : memberScope;
   const workspace = await prisma.workspace.findUnique({ where: { id: actor.workspaceId }, select: { timezone: true } });
   const timeZone = workspace?.timezone ?? 'UTC';
   const period = lastDays(now, lookbackDays);
@@ -70,14 +86,18 @@ export async function readHomeOverview(actor: HomeActor, now = new Date()): Prom
     { feature: 'analytics/overview', ...(channelScope ? { allowedChannelIds: channelScope } : {}) }).catch(() => null) : null;
   const channels = snapshot ? snapshot.options.channels.filter(channel => snapshot.selected.channelIds.includes(channel.id)) : [];
   const readChannels = channels.slice(0, maxChannels);
-  const providers = readChannels.length ? new Map((await prisma.$queryRaw<Array<{ id: string; provider: string }>>`SELECT t.id, a.provider FROM targets t JOIN social_accounts a ON a.id = t."socialAccountId" AND a."workspaceId" = t."workspaceId" WHERE t."workspaceId" = ${actor.workspaceId} AND t.id = ANY(${readChannels.map(channel => channel.id)}::text[])`).map(row => [row.id, row.provider])) : new Map<string, string>();
+  // The provider lookup must not reject the whole overview; dependents report unavailable instead of empty.
+  let providerChannels = new Map<string, typeof readChannels>();
+  let channelsFailed = false;
+  try {
+    const providers = readChannels.length ? new Map((await prisma.$queryRaw<Array<{ id: string; provider: string }>>`SELECT t.id, a.provider FROM targets t JOIN social_accounts a ON a.id = t."socialAccountId" AND a."workspaceId" = t."workspaceId" WHERE t."workspaceId" = ${actor.workspaceId} AND t.id = ANY(${readChannels.map(channel => channel.id)}::text[])`).map(row => [row.id, row.provider])) : new Map<string, string>();
+    for (const channel of readChannels) {
+      const provider = providers.get(channel.id);
+      if (provider) providerChannels.set(provider, [...(providerChannels.get(provider) ?? []), channel]);
+    }
+  } catch { channelsFailed = true; }
   // Keep host/configuration promises inside this request; never retain tenant reads across requests.
   const hosts = new Map<string, ReturnType<typeof platformAnalytics>>();
-  const providerChannels = new Map<string, typeof readChannels>();
-  for (const channel of readChannels) {
-    const provider = providers.get(channel.id);
-    if (provider) providerChannels.set(provider, [...(providerChannels.get(provider) ?? []), channel]);
-  }
   const hostFor = (provider: string) => {
     if (!hosts.has(provider)) hosts.set(provider, platformAnalytics(provider));
     return hosts.get(provider)!;
@@ -93,12 +113,16 @@ export async function readHomeOverview(actor: HomeActor, now = new Date()): Prom
     const metricKeys = new Set(snapshot.audience.entries.map(entry => entry.metric));
     const series = metricKeys.size === 1 ? snapshot.allMetrics.find(metric => metric.key === [...metricKeys][0] && metric.kind === 'stock' && metric.resourceKind === 'channel') : undefined;
     const asOf = snapshot.audience.entries.reduce<Date | null>((latest, entry) => !latest || entry.asOf > latest ? entry.asOf : latest, null);
-    return { state: 'ready', data: { total: snapshot.audience.total, covered: snapshot.audience.covered, selected: snapshot.audience.selected, asOf: asOf?.toISOString() ?? null,
-      trend: series && series.points.length > 1 ? series.points.map(point => ({ t: dayKey(point.date), v: point.value })) : [] } };
+    const trend = series && series.points.length > 1 ? series.points.map(point => ({ t: dayKey(point.date), v: point.value })) : [];
+    // The delta is the net change between the oldest and newest known trend days, with its start day; null without two known days.
+    const known = trend.filter(point => typeof point.v === 'number' && Number.isFinite(point.v));
+    const delta = known.length > 1 ? { value: known[known.length - 1]!.v! - known[0]!.v!, since: known[0]!.t } : null;
+    return { state: 'ready', data: { total: snapshot.audience.total, covered: snapshot.audience.covered, selected: snapshot.audience.selected, asOf: asOf?.toISOString() ?? null, trend, delta } };
   });
 
   const performance = !wantsAnalytics ? null : settled<Data<'performance'>>(async () => {
     if (!snapshot) return { state: 'unavailable' };
+    if (channelsFailed) return { state: 'unavailable' };
     if (!readChannels.length) return { state: 'empty' };
     const interactionKeys = (config['home.interactionMeasureKeys'] as string[]);
     const groups = await Promise.all([...providerChannels].map(async ([provider, channels]) => {
@@ -113,18 +137,29 @@ export async function readHomeOverview(actor: HomeActor, now = new Date()): Prom
     });
     const views = periodTotals(rows.map(row => ({ current: row.current?.views ?? null, previous: row.previous?.views ?? null })));
     const engagements = periodTotals(rows.map(row => ({ current: row.current?.engagements ?? null, previous: row.previous?.engagements ?? null })));
-    if (views.current === null && engagements.current === null) return { state: 'empty' };
+    // Link clicks come from the same snapshot as the Insights tile: the first stored channel metric whose label
+    // matches a Root word, with its snapshot comparison. No match, or no stored total, means no tile, not zero.
+    const clickWords = (config['home.linkClickMeasureWords'] as string[]).map(word => word.toLowerCase());
+    const clickMetric = snapshot.allMetrics.find(metric => metric.resourceKind === 'channel' && metric.kind !== 'breakdown' && metric.total !== null && typeof metric.label === 'string' && clickWords.some(word => metric.label.toLowerCase().includes(word)));
+    const clickComparison = clickMetric ? snapshot.comparisons[clickMetric.key] : undefined;
+    const clickPrevious = clickMetric && clickComparison?.status === 'comparable' ? clickComparison.previous : null;
+    const linkClicks = clickMetric ? {
+      current: clickMetric.total, previous: clickPrevious,
+      change: clickMetric.total !== null && clickPrevious !== null && clickPrevious > 0 ? (clickMetric.total - clickPrevious) / clickPrevious : null,
+      covered: clickMetric.coverage, comparable: clickComparison?.status === 'comparable' ? clickMetric.coverage : 0,
+    } : null;
+    if (views.current === null && engagements.current === null && (linkClicks === null || linkClicks.current === null)) return { state: 'empty' };
     const topLimit = Number(config['home.topChannelsLimit']);
     const topChannels = rows.flatMap(row => row.current?.engagements != null && Number.isFinite(row.current.engagements) ? [{ id: row.channel.id, name: row.channel.name, engagements: row.current.engagements }] : [])
       .sort((a, b) => b.engagements - a.engagements || a.name.localeCompare(b.name)).slice(0, topLimit);
     const mixByKey = new Map<string, { label: string; values: Known[] }>();
     for (const row of rows) for (const measure of row.mix) { const entry = mixByKey.get(measure.key) ?? { label: measure.label, values: [] }; entry.values.push(measure.value); mixByKey.set(measure.key, entry); }
     const interactions = interactionKeys.flatMap(key => { const entry = mixByKey.get(key); const value = entry ? sumKnown(entry.values) : null; return entry && value !== null ? [{ key, label: entry.label, value }] : []; });
-    return { state: 'ready', data: { views, engagements, channels: readChannels.length, truncated: channels.length > readChannels.length, topChannels, interactions } };
+    return { state: 'ready', data: { views, engagements, linkClicks, channels: readChannels.length, truncated: channels.length > readChannels.length, topChannels, interactions } };
   });
 
   const bestTimes = !allowed('analytics/posts') || !wantsAnalytics ? null : settled<Data<'bestTimes'>>(async () => {
-    if (!snapshot) return { state: 'unavailable' };
+    if (!snapshot || channelsFailed) return { state: 'unavailable' };
     const from = new Date(now.getTime() - Number(config['home.heatmapLookbackDays']) * DAY);
     const groups = await Promise.all([...providerChannels].map(async ([provider, channels]) => {
       const host = await hostFor(provider);
@@ -148,8 +183,41 @@ export async function readHomeOverview(actor: HomeActor, now = new Date()): Prom
   });
 
   const inbox = !allowed('inbox/conversations') ? null : settled<Data<'inbox'>>(async () => {
-    const page = await readInboxList({ userId: actor.userId, workspaceId: actor.workspaceId, ...(channelScope ? { allowedChannelIds: channelScope } : {}) }, { state: 'open', limit: 1 });
-    return { state: 'ready', data: { open: page.total } };
+    const recentLimit = Number(config['home.recentInboxLimit']);
+    const previewLength = Number(config['home.recentInboxPreviewCharacters']);
+    const page = await readInboxList({ userId: actor.userId, workspaceId: actor.workspaceId, ...(channelScope ? { allowedChannelIds: channelScope } : {}) }, { state: 'open', limit: recentLimit });
+    return { state: 'ready', data: { open: page.total, recent: page.items.slice(0, recentLimit).map(item => ({
+      key: item.key, author: item.author, preview: snippet(item.preview, previewLength),
+      time: item.time instanceof Date ? item.time.toISOString() : new Date(item.time).toISOString(),
+      channel: item.target.name, unread: item.unread,
+    })) } };
+  });
+
+  const wantsAttention = allowed('publishing/posts') || allowed('publishing/approvals') || allowed('inbox/conversations') || allowed('settings/connections');
+  const attention = !wantsAttention ? null : settled<Data<'attention'>>(async () => {
+    const publishingActor = { userId: actor.userId, workspaceId: actor.workspaceId, ...(channelScope ? { allowedTargetIds: channelScope } : {}) };
+    const inboxActor = { userId: actor.userId, workspaceId: actor.workspaceId, ...(channelScope ? { allowedChannelIds: channelScope } : {}) };
+    const reconnectLimit = Number(config['home.attentionReconnectLimit']);
+    // Each count is read through its own module's service with the same authorization as the module's screen.
+    // A failed count is withheld (null) while the others still show; all failing together is unavailable.
+    const [failed, partial, approvals, waiting, reconnect] = await Promise.all([
+      allowed('publishing/posts') ? readPublishingPostPage(publishingActor, { status: 'failed' }).then(page => page.total, () => null) : null,
+      allowed('publishing/posts') ? readPublishingPostPage(publishingActor, { status: 'partially_failed' }).then(page => page.total, () => null) : null,
+      allowed('publishing/approvals') ? pendingApprovalCount({ userId: actor.userId, workspaceId: actor.workspaceId }) : null,
+      allowed('inbox/conversations') ? readInboxList(inboxActor, { state: 'open', limit: 1 }).then(page => page.total, () => null) : null,
+      allowed('settings/connections')
+        ? shellChannels(actor.workspaceId, channelScope ? [...channelScope] : undefined, maxChannels, now)
+          .then(rows => rows.filter(row => row.health !== 'connected').slice(0, reconnectLimit).map(row => ({ id: row.id, name: row.name, platform: row.platformName })), () => null)
+        : null,
+    ]);
+    const attempts: Array<{ want: boolean; value: unknown }> = [
+      { want: allowed('publishing/posts'), value: failed }, { want: allowed('publishing/posts'), value: partial },
+      { want: allowed('publishing/approvals'), value: approvals }, { want: allowed('inbox/conversations'), value: waiting },
+      { want: allowed('settings/connections'), value: reconnect },
+    ];
+    const wanted = attempts.filter(attempt => attempt.want);
+    if (wanted.length && wanted.every(attempt => attempt.value === null)) return { state: 'unavailable' };
+    return { state: 'ready', data: { failedPosts: failed, partiallyFailedPosts: partial, pendingApprovals: approvals, waitingConversations: waiting, reconnect, partial: wanted.some(attempt => attempt.value === null) } };
   });
 
   const ads = !(allowed('ads/overview') && allowed('ads/campaigns')) ? null : settled<Data<'ads'>>(async () => {
@@ -171,6 +239,6 @@ export async function readHomeOverview(actor: HomeActor, now = new Date()): Prom
   });
 
   // Each card still isolates its own failure, while independent stored-data reads overlap.
-  const [audienceData, performanceData, bestTimesData, upcomingData, inboxData, adsData] = await Promise.all([audience, performance, bestTimes, upcoming, inbox, ads]);
-  return { generatedAt: now.toISOString(), lookbackDays, timeZone, channelCount: channels.length, audience: audienceData, performance: performanceData, bestTimes: bestTimesData, upcoming: upcomingData, inbox: inboxData, ads: adsData };
+  const [audienceData, performanceData, bestTimesData, upcomingData, inboxData, adsData, attentionData] = await Promise.all([audience, performance, bestTimes, upcoming, inbox, ads, attention]);
+  return { generatedAt: now.toISOString(), lookbackDays, timeZone, channelCount: channels.length, audience: audienceData, performance: performanceData, bestTimes: bestTimesData, upcoming: upcomingData, inbox: inboxData, ads: adsData, attention: attentionData };
 }

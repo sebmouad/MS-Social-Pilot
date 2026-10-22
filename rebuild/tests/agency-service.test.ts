@@ -30,8 +30,8 @@ const defaults: Record<string, number> = {
 let caps: Record<string, number>;
 const sqlText = (query: unknown) => (Array.isArray(query) ? query.join('?') : '');
 const admin = (id: string, name: string, extra: Record<string, unknown> = {}) => ({ id, name, role: 'owner', suspendedAt: null, timezone: 'UTC', ...extra });
-const metric = (id: string, extra: Record<string, unknown> = {}) => ({ id, channels: 2, disconnected: 0, scheduled: 1, failed: 0, openTasks: 0, overdueTasks: 0, members: 1, clients: 0, ...extra });
-const FEATURES = ['agency/overview', 'agency/clients', 'settings/connections', 'publishing/posts', 'tasks/board', 'settings/team'];
+const metric = (id: string, extra: Record<string, unknown> = {}) => ({ id, channels: 2, disconnected: 0, scheduled: 1, failed: 0, waitingConversations: 0, openTasks: 0, overdueTasks: 0, members: 1, clients: 0, ...extra });
+const FEATURES = ['agency/overview', 'agency/clients', 'settings/connections', 'publishing/posts', 'inbox/conversations', 'tasks/board', 'settings/team'];
 const grant = (ids: string[]) => Object.fromEntries(ids.map(id => [id, true]));
 let administered: ReturnType<typeof admin>[] = [];
 let metrics: ReturnType<typeof metric>[] = [];
@@ -62,6 +62,7 @@ beforeEach(() => {
     if (text.includes('FROM workspaces w WHERE w.id = ANY')) {
       // Each group query returns only its own columns, as the real SQL does.
       const columns = text.includes('FROM targets') ? ['channels', 'disconnected'] : text.includes('FROM posts') ? ['scheduled', 'failed']
+        : text.includes('FROM conversations') ? ['waitingConversations']
         : text.includes('FROM tasks k') ? ['openTasks', 'overdueTasks'] : ['members', 'clients'];
       const ids = (values.find(Array.isArray) as string[]) ?? [];
       return metrics.filter(row => ids.includes(row.id)).map(row => Object.fromEntries([['id', row.id], ...columns.map(column => [column, (row as Record<string, unknown>)[column]])]));
@@ -83,13 +84,13 @@ describe('agency overview', () => {
 
   it('sorts by attention, filters, truncates to the configured limit, totals and never exposes tokens', async () => {
     administered = [admin('w1', 'Calm'), admin('w2', 'Broken'), admin('w3', 'Quiet'), admin('w4', 'Extra')];
-    metrics = [metric('w1'), metric('w2', { disconnected: 1, failed: 2, overdueTasks: 3, openTasks: 4 }), metric('w3')];
+    metrics = [metric('w1'), metric('w2', { disconnected: 1, failed: 2, overdueTasks: 3, openTasks: 4, waitingConversations: 6 }), metric('w3')];
     const result = await agencyOverview(actor);
     expect(result).toMatchObject({ truncated: true, filtered: false, limit: 3 });
     expect(result.workspaces.map(item => item.id)).toEqual(['w2', 'w1', 'w3']);
     expect(result.workspaces[0]).toMatchObject({ needsAttention: true, state: 'available' });
-    expect(result.totals).toMatchObject({ workspaces: 3, needingAttention: 1, channels: 6, disconnected: 1, scheduled: 3, failed: 2, openTasks: 4, overdueTasks: 3 });
-    expect(result.totals.coverage).toEqual({ channels: { covered: 3, of: 3 }, publishing: { covered: 3, of: 3 }, tasks: { covered: 3, of: 3 }, team: { covered: 3, of: 3 } });
+    expect(result.totals).toMatchObject({ workspaces: 3, needingAttention: 1, channels: 6, disconnected: 1, scheduled: 3, failed: 2, waitingConversations: 6, openTasks: 4, overdueTasks: 3 });
+    expect(result.totals.coverage).toEqual({ channels: { covered: 3, of: 3 }, publishing: { covered: 3, of: 3 }, inbox: { covered: 3, of: 3 }, tasks: { covered: 3, of: 3 }, team: { covered: 3, of: 3 } });
     expect(JSON.stringify(result)).not.toMatch(/accessToken/i);
     expect((await agencyOverview(actor, { attentionOnly: true })).workspaces.map(item => item.id)).toEqual(['w2']);
     expect((await agencyOverview(actor, { sort: 'name', order: 'asc' })).workspaces.map(item => item.id)).toEqual(['w2', 'w1', 'w3']);
@@ -134,7 +135,7 @@ describe('agency overview', () => {
     const result = await agencyOverview(actor);
     expect(result.workspaces.map(item => [item.id, item.state])).toEqual([['w3', 'suspended'], ['w1', 'available']]);
     expect(result.workspaces[0]).toMatchObject({ metrics: null, needsAttention: true });
-    for (const token of ['FROM targets', 'FROM posts', 'FROM tasks k', 'FROM memberships x']) expect(ownedBy(metricCalls(token)[0]!)).toEqual(['w1']);
+    for (const token of ['FROM targets', 'FROM posts', 'FROM conversations', 'FROM tasks k', 'FROM memberships x']) expect(ownedBy(metricCalls(token)[0]!)).toEqual(['w1']);
     expect(mocks.entitlements).toHaveBeenCalledWith('user-a', 'w1', { allowInstallationInspection: false });
     expect(mocks.entitlements).not.toHaveBeenCalledWith('user-a', 'w3', expect.anything());
   });
@@ -142,19 +143,34 @@ describe('agency overview', () => {
   it('withholds counts of modules the person cannot use in a workspace and never shows them as zero', async () => {
     administered = [admin('w1', 'Full'), admin('w2', 'No tasks or team'), admin('w3', 'Limited channels')];
     withheld.w2 = ['tasks/board', 'settings/team']; limited.add('w3');
-    metrics = [metric('w1', { openTasks: 5, overdueTasks: 2, failed: 1 }), metric('w2', { openTasks: 99, overdueTasks: 99, members: 99, clients: 99 }), metric('w3', { channels: 9, scheduled: 9, failed: 9, disconnected: 9 })];
+    metrics = [metric('w1', { openTasks: 5, overdueTasks: 2, failed: 1 }), metric('w2', { openTasks: 99, overdueTasks: 99, members: 99, clients: 99 }), metric('w3', { channels: 9, scheduled: 9, failed: 9, disconnected: 9, waitingConversations: 9 })];
     const result = await agencyOverview(actor, { sort: 'name', order: 'asc' });
     const byId = Object.fromEntries(result.workspaces.map(item => [item.id, item.metrics!]));
     expect(byId.w2).toMatchObject({ channels: 2, scheduled: 1, openTasks: null, overdueTasks: null, members: null, clients: null });
-    expect(byId.w3).toMatchObject({ channels: null, disconnected: null, scheduled: null, failed: null, openTasks: 0, members: 1 });
+    expect(byId.w3).toMatchObject({ channels: null, disconnected: null, scheduled: null, failed: null, waitingConversations: null, openTasks: 0, members: 1 });
     expect(JSON.stringify(result)).not.toContain('99');
     // The withheld groups were not even queried for those workspaces.
     expect(ownedBy(metricCalls('FROM tasks k')[0]!)).toEqual(['w1', 'w3']);
     expect(ownedBy(metricCalls('FROM memberships x')[0]!)).toEqual(['w1', 'w3']);
     expect(ownedBy(metricCalls('FROM targets')[0]!)).toEqual(['w1', 'w2']);
     expect(ownedBy(metricCalls('FROM posts')[0]!)).toEqual(['w1', 'w2']);
-    expect(result.totals).toMatchObject({ openTasks: 5, overdueTasks: 2, channels: 4, scheduled: 2 });
-    expect(result.totals.coverage).toEqual({ channels: { covered: 2, of: 3 }, publishing: { covered: 2, of: 3 }, tasks: { covered: 2, of: 3 }, team: { covered: 2, of: 3 } });
+    // Inbox is channel-scoped like publishing: a limited scope withholds it whole.
+    expect(ownedBy(metricCalls('FROM conversations')[0]!)).toEqual(['w1', 'w2']);
+    expect(result.totals).toMatchObject({ openTasks: 5, overdueTasks: 2, channels: 4, scheduled: 2, waitingConversations: 0 });
+    expect(result.totals.coverage).toEqual({ channels: { covered: 2, of: 3 }, publishing: { covered: 2, of: 3 }, inbox: { covered: 2, of: 3 }, tasks: { covered: 2, of: 3 }, team: { covered: 2, of: 3 } });
+  });
+
+  it('counts waiting conversations only where the inbox grant holds and sorts by them', async () => {
+    administered = [admin('w1', 'Full'), admin('w2', 'No inbox')];
+    withheld.w2 = ['inbox/conversations'];
+    metrics = [metric('w1', { waitingConversations: 5 }), metric('w2', { waitingConversations: 9 })];
+    const result = await agencyOverview(actor, { sort: 'waitingConversations', order: 'desc' });
+    expect(result.workspaces.map(item => [item.id, item.metrics!.waitingConversations])).toEqual([['w1', 5], ['w2', null]]);
+    expect(result.totals).toMatchObject({ waitingConversations: 5 });
+    expect(result.totals.coverage.inbox).toEqual({ covered: 1, of: 2 });
+    expect(ownedBy(metricCalls('FROM conversations')[0]!)).toEqual(['w1']);
+    // The withheld workspace's conversations never leak into output.
+    expect(JSON.stringify(result)).not.toContain('9');
   });
 
   it('reports a total as unknown, not zero, when nobody contributed and sorts withheld values last', async () => {

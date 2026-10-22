@@ -5,8 +5,8 @@ vi.mock('@/server/config/access', () => ({ requireRootPage: state.requireRootPag
 vi.mock('@/server/root/read-model', () => ({ getRootOverview: state.getRootOverview }));
 vi.mock('@/server/root/activity', () => ({ listRootActivity: state.listRootActivity }));
 vi.mock('@/server/config/store', () => ({ runtimeConfig: state.runtimeConfig }));
-vi.mock('@/server/root/RootFrame', () => ({ RootFrame: 'div' }));
-vi.mock('@/server/jobs/RootJobHealth', () => ({ RootJobHealth: 'section' }));
+vi.mock('@/modules/root/ui/RootFrame', () => ({ RootFrame: 'div' }));
+vi.mock('@/modules/root/ui/RootJobHealth', () => ({ RootJobHealth: 'section' }));
 vi.mock('../src/app/root/root-control-center.css', () => ({}));
 vi.mock('../src/app/root/config/root-config.css', () => ({}));
 
@@ -23,7 +23,7 @@ describe('Root control center access ordering', () => {
   });
 
   it('checks Root access before rendering operations', async () => {
-    await expect(RootOperationsPage()).rejects.toThrow('root access required');
+    await expect(RootOperationsPage({ searchParams: Promise.resolve({}) })).rejects.toThrow('root access required');
   });
 
   it('checks Root access before loading activity', async () => {

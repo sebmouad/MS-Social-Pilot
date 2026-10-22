@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const state = vi.hoisted(() => ({ refresh: vi.fn() }));
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: state.refresh }) }));
-import { RootPlatformPublicationAction } from '../src/server/root/RootPlatformPublicationAction';
+import { RootPlatformPublicationAction } from '../src/modules/root/ui/RootPlatformPublicationAction';
 import { ROOT_EVIDENCE_POLICY } from '../src/lib/config/root-evidence-policy';
 import { ROOT_EVIDENCE_COPY } from '../src/lib/config/root-evidence-copy';
 

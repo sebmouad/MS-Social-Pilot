@@ -21,7 +21,7 @@ type Definition = ReturnType<typeof safeConfigShape>[number];
 type Values = Array<{ key: string; value: unknown; isSet: boolean; source: string }>;
 type Catalog = typeof AVAILABILITY_CATALOG;
 
-export function RootConfigForm({ definitions, initialValues, availability, groupPrefix, initialSearch = '', groupByOwner = false, copy = ROOT_CONFIG_COPY, interfaceCopy = ROOT_INTERFACE_COPY.en, searchMaxCharacters }: { definitions: Definition[]; initialValues: Values; availability: Catalog; groupPrefix?: string; initialSearch?: string; groupByOwner?: boolean; copy?: RootConfigCopy; interfaceCopy?: RootInterfaceCopy; searchMaxCharacters?: number }) {
+export function RootConfigForm({ definitions, initialValues, availability, groupPrefix, initialSearch = '', groupByOwner = false, copy = ROOT_CONFIG_COPY, interfaceCopy = ROOT_INTERFACE_COPY.en, searchMaxCharacters, hideInventory = false }: { definitions: Definition[]; initialValues: Values; availability: Catalog; groupPrefix?: string; initialSearch?: string; groupByOwner?: boolean; copy?: RootConfigCopy; interfaceCopy?: RootInterfaceCopy; searchMaxCharacters?: number; hideInventory?: boolean }) {
   const toast = useToast();
   const errorsRef = useRef<HTMLDivElement>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
@@ -160,7 +160,7 @@ export function RootConfigForm({ definitions, initialValues, availability, group
         <small>{copy.source} {current?.source === 'database' ? copy.databaseSource : copy.defaultSource} · <Badge tone={definition.consumption === 'active' ? 'success' : 'warning'}>{definition.consumption === 'active' ? copy.active : definition.consumption === 'configured' ? copy.configured : copy.planned}</Badge>{definition.kind === 'secret' && current?.isSet ? ` · ${copy.concealed}` : ''}</small>
       </section>;
     })}
-    {!search && visible.some(item => item.key.startsWith('entitlements.')) && <section className="root-config__catalog">
+    {!hideInventory && !search && visible.some(item => item.key.startsWith('entitlements.')) && <section className="root-config__catalog">
       <h2>{copy.inventory}</h2>
       <p>{copy.inventoryDescription}</p>
       <h3>{copy.modules}</h3><ul>{availability.modules.map((module) => <li key={module.id}>{module.title} <code>{module.id}</code></li>)}</ul>

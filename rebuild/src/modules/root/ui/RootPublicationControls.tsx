@@ -1,6 +1,7 @@
 'use client';
 import { ROOT_RECOVERY_LIMITS, type RootRecoveryLimits } from '@/lib/config/root-recovery-policy';
-import { useRootActionFeedback } from '@/server/root/RootActionFeedback';
+import { useRootActionFeedback } from '@/modules/root/ui/RootActionFeedback';
+import { useRootInterface } from './RootInterface';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/Button';
@@ -36,8 +37,9 @@ function RecoveryControl({ limits, mode, context, identity, available = true, kn
   const [notice, setNotice] = useState('');
   useRootActionFeedback(error, notice, () => router.refresh());
   const [pending, setPending] = useState(false);
+  const copy = useRootInterface();
   const phrase = mode === 'record' ? outcome ? `ROOT RECORD PUBLICATION ${identity} ${outcome}` : '' : `ROOT ${mode === 'finish' ? 'FINISH' : 'ADOPT'} PUBLICATION ${identity}`;
-  const label = mode === 'record' ? knownRemoteId ? 'Verify submitted publication' : 'Record external check' : mode === 'finish' ? 'Finish local record' : 'Adopt for recovery';
+  const label = mode === 'record' ? knownRemoteId ? copy.pubRecoveryVerify : copy.pubRecoveryRecord : mode === 'finish' ? copy.pubRecoveryFinish : copy.pubRecoveryAdopt;
   useEffect(() => { if (error) errorRef.current?.focus(); }, [error]);
   useEffect(() => { if (notice && !open) noticeRef.current?.focus(); }, [notice, open]);
   function begin() {
@@ -70,31 +72,31 @@ function RecoveryControl({ limits, mode, context, identity, available = true, kn
   const remoteIdField = validation.fieldProps('remotePostId');
   const remoteUrlField = validation.fieldProps('remoteUrl');
   return <>
-    {available ? <Button variant="secondary" size="sm" onClick={begin}>{label}</Button> : <span>No operator action</span>}
+    {available ? <Button variant="secondary" size="sm" onClick={begin}>{label}</Button> : <span>{copy.noOperatorAction}</span>}
     {notice && <p ref={noticeRef} tabIndex={-1} role="status">{notice}</p>}
     {open && <ModalDialog className="ui-dialog root-platform-action-dialog" labelledBy={`root-publication-${identity}`} busy={pending} initialFocus="[data-publication-cancel]" onDismiss={() => { if (!pending) setOpen(false); }}>
       <div className="ui-dialog__header"><h2 id={`root-publication-${identity}`}>{label}</h2></div>
       <form method="post" noValidate onSubmit={event => void submit(event)}>
         <div className="ui-dialog__body">
-          <p><strong>Workspace:</strong> {context.workspaceName} · {context.workspaceId}</p>
-          <p><strong>Channel:</strong> {context.targetName || 'Channel removed'} · {context.targetId}</p>
-          <p><strong>Local post:</strong> <code>{context.postId}</code></p>
-          <p>{mode === 'finish' ? 'This only updates local records from the saved receipt. It sends no publication or first comment.' : knownRemoteId ? 'Check that this exact submitted publication is live. This records your external check without contacting the platform or finishing the local record.' : 'Check the destination directly first. This records a human external check and never contacts the platform. A delayed request may still complete after absence is recorded; check again before retrying.'}</p>
+          <p><strong>{copy.recoveryWorkspace}</strong> {context.workspaceName} · {context.workspaceId}</p>
+          <p><strong>{copy.recoveryChannel}</strong> {context.targetName || copy.recoveryChannelRemoved} · {context.targetId}</p>
+          <p><strong>{copy.pubRecoveryLocalPost}</strong> <code>{context.postId}</code></p>
+          <p>{mode === 'finish' ? copy.pubRecoveryFinishNote : knownRemoteId ? copy.pubRecoveryCheckLive : copy.pubRecoveryCheckDirect}</p>
       {mode === 'record' && <>
-            <fieldset className="ui-field" disabled={pending}><legend>Verified result on destination</legend>
-              {!knownRemoteId && <label><input type="radio" name="outcome" value="ABSENT" checked={outcome === 'ABSENT'} onChange={() => { setOutcome('ABSENT'); setConfirmation(''); validation.clear('outcome'); validation.clear('confirmation'); }} /> The publication is absent</label>}
-              <label><input type="radio" name="outcome" value="PUBLISHED" checked={outcome === 'PUBLISHED'} onChange={() => { setOutcome('PUBLISHED'); setConfirmation(''); validation.clear('outcome'); validation.clear('confirmation'); }} /> The publication exists</label>
+            <fieldset className="ui-field" disabled={pending}><legend>{copy.pubRecoveryLegend}</legend>
+              {!knownRemoteId && <label><input type="radio" name="outcome" value="ABSENT" checked={outcome === 'ABSENT'} onChange={() => { setOutcome('ABSENT'); setConfirmation(''); validation.clear('outcome'); validation.clear('confirmation'); }} /> {copy.pubRecoveryAbsent}</label>}
+              <label><input type="radio" name="outcome" value="PUBLISHED" checked={outcome === 'PUBLISHED'} onChange={() => { setOutcome('PUBLISHED'); setConfirmation(''); validation.clear('outcome'); validation.clear('confirmation'); }} /> {copy.pubRecoveryExists}</label>
             </fieldset><FieldError {...validation.errorProps('outcome')} />
             {outcome === 'PUBLISHED' && <>
-              <label className="ui-field" htmlFor={remoteIdField.id}><span>Remote post ID</span><input {...remoteIdField} className="ui-input" name="remotePostId" value={remotePostId} disabled={pending} readOnly={Boolean(knownRemoteId)} required onChange={event => { setRemotePostId(event.target.value); validation.clear('remotePostId'); }} /></label><FieldError {...validation.errorProps('remotePostId')} />
-              <label className="ui-field" htmlFor={remoteUrlField.id}><span>Public post link, if available</span><input {...remoteUrlField} className="ui-input" name="remoteUrl" type="url" value={remoteUrl} disabled={pending} onChange={event => { setRemoteUrl(event.target.value); validation.clear('remoteUrl'); }} /></label><FieldError {...validation.errorProps('remoteUrl')} />
+              <label className="ui-field" htmlFor={remoteIdField.id}><span>{copy.pubRecoveryRemoteId}</span><input {...remoteIdField} className="ui-input" name="remotePostId" value={remotePostId} disabled={pending} readOnly={Boolean(knownRemoteId)} required onChange={event => { setRemotePostId(event.target.value); validation.clear('remotePostId'); }} /></label><FieldError {...validation.errorProps('remotePostId')} />
+              <label className="ui-field" htmlFor={remoteUrlField.id}><span>{copy.pubRecoveryRemoteUrl}</span><input {...remoteUrlField} className="ui-input" name="remoteUrl" type="url" value={remoteUrl} disabled={pending} onChange={event => { setRemoteUrl(event.target.value); validation.clear('remoteUrl'); }} /></label><FieldError {...validation.errorProps('remoteUrl')} />
             </>}
           </>}
-          <label className="ui-field" htmlFor={confirmationField.id}><span>Type <strong>{phrase || 'choose a verified result'}</strong> to confirm</span><input {...confirmationField} className="ui-input" name="confirmation" maxLength={limits.confirmationMaxCharacters} value={confirmation} autoComplete="off" disabled={pending || !phrase} onChange={event => { setConfirmation(event.target.value); validation.clear('confirmation'); }} /></label><FieldError {...validation.errorProps('confirmation')} />
-          {mode !== 'finish' && <><label className="ui-field"><span><input type="checkbox" name="verifiedExternally" checked={verified} required disabled={pending} onChange={event => { setVerified(event.target.checked); validation.clear('verifiedExternally'); }} /> I checked this exact destination. This is not automated verification.</span></label><FieldError {...validation.errorProps('verifiedExternally')} /></>}
-          {error && <><p ref={errorRef} tabIndex={-1} role="alert" className="ui-error">{error}</p><Button type="button" size="sm" disabled={pending} onClick={() => { setOpen(false); router.refresh(); }}>Refresh attempt status</Button></>}
+          <label className="ui-field" htmlFor={confirmationField.id}><span>{copy.recoveryType} <strong>{phrase || copy.recoveryChooseResult}</strong> {copy.recoveryToConfirm}</span><input {...confirmationField} className="ui-input" name="confirmation" maxLength={limits.confirmationMaxCharacters} value={confirmation} autoComplete="off" disabled={pending || !phrase} onChange={event => { setConfirmation(event.target.value); validation.clear('confirmation'); }} /></label><FieldError {...validation.errorProps('confirmation')} />
+          {mode !== 'finish' && <><label className="ui-field"><span><input type="checkbox" name="verifiedExternally" checked={verified} required disabled={pending} onChange={event => { setVerified(event.target.checked); validation.clear('verifiedExternally'); }} /> {copy.pubRecoveryCheckedExact}</span></label><FieldError {...validation.errorProps('verifiedExternally')} /></>}
+          {error && <><p ref={errorRef} tabIndex={-1} role="alert" className="ui-error">{error}</p><Button type="button" size="sm" disabled={pending} onClick={() => { setOpen(false); router.refresh(); }}>{copy.recoveryRefreshStatus}</Button></>}
         </div>
-        <div className="ui-dialog__actions"><Button type="button" data-publication-cancel disabled={pending} onClick={() => setOpen(false)}>Cancel</Button><Button variant="primary" type="submit" aria-busy={pending} disabled={pending || !phrase || confirmation !== phrase || mode !== 'finish' && !verified || mode === 'record' && outcome === 'PUBLISHED' && !remotePostId.trim()}>{label}</Button></div>
+        <div className="ui-dialog__actions"><Button type="button" data-publication-cancel disabled={pending} onClick={() => setOpen(false)}>{copy.cancel}</Button><Button variant="primary" type="submit" aria-busy={pending} disabled={pending || !phrase || confirmation !== phrase || mode !== 'finish' && !verified || mode === 'record' && outcome === 'PUBLISHED' && !remotePostId.trim()}>{label}</Button></div>
       </form>
     </ModalDialog>}
   </>;

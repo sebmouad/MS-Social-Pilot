@@ -11,7 +11,7 @@ import { Tabs } from '@/components/Tabs';
 import { Badge, DataTable, InlineEdit, ConfirmDialog, EmptyState, Select, Avatar, useToast } from '@/components';
 import { IconGripVertical, IconChecklist, IconLayoutKanban, IconList } from '@tabler/icons-react';
 import { RouteNotice } from '@/components/RouteNotice';
-import { TASK_STATUSES, TASK_STATUS_LABELS, TASK_TRANSITIONS, taskConfirmations, type TaskCommentView, type TaskLimits, type TaskPostChoice, type TaskStatus, type TaskSummary, type TaskView } from '@/modules/tasks/tasks';
+import { TASK_STATUSES, TASK_STATUS_LABELS, TASK_TRANSITIONS, taskConfirmations, type TaskChecklistItemView, type TaskCommentView, type TaskLimits, type TaskPostChoice, type TaskStatus, type TaskSummary, type TaskView } from '@/modules/tasks/tasks';
 import styles from './tasks.module.css';
 
 type Person = { id: string; name: string };
@@ -40,8 +40,11 @@ export function TaskBoard({ tasks, assignees, canCreate, limits, today, summary,
   const [checklist, setChecklist] = useState({ lines: '', assigneeId: '', startOn: '', gapDays: '1' });
 
   const [deletingComment, setDeletingComment] = useState<{ task: TaskView; comment: TaskCommentView } | null>(null);
+  const [deletingItem, setDeletingItem] = useState<{ task: TaskView; item: TaskChecklistItemView } | null>(null);
   const [comments, setComments] = useState<{ items: TaskCommentView[]; hasMore: boolean; canComment: boolean } | null>(null);
   const [commentDraft, setCommentDraft] = useState('');
+  const [items, setItems] = useState<{ list: TaskChecklistItemView[]; hasMore: boolean; canChange: boolean } | null>(null);
+  const [itemDraft, setItemDraft] = useState('');
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<{ error: boolean; text: string; key: number } | null>(null);
   const [formError, setFormError] = useState('');
@@ -116,12 +119,28 @@ export function TaskBoard({ tasks, assignees, canCreate, limits, today, summary,
       if (request !== detailRequest.current) return false;
       if (!response.ok || !body || !Array.isArray(body.comments)) { setFormError(message(body)); return false; }
       setComments(current => ({ items: offset && current ? [...current.items, ...body.comments] : body.comments, hasMore: Boolean(body.commentsHasMore), canComment: body.canComment === true }));
+      if (!offset && Array.isArray(body.checklist)) setItems({ list: body.checklist, hasMore: Boolean(body.checklistHasMore), canChange: body.canChangeChecklist === true });
       return true;
     } catch { if (request !== detailRequest.current) return false; setFormError(t("Comments could not be loaded. Close this window and try again.")); return false; }
   }
   function openDetail(task: TaskView) {
-    setComments(null); setCommentDraft(''); setFormError(''); setNotice(null); setMode({ kind: 'detail', task });
+    setComments(null); setCommentDraft(''); setItems(null); setItemDraft(''); setFormError(''); setNotice(null); setMode({ kind: 'detail', task });
     void loadComments(task, 0);
+  }
+  async function addItem(task: TaskView) {
+    if (!itemDraft.trim()) { setFormError(t("Enter a checklist item.")); return; }
+    if (itemDraft.trim().length > limits.checklistItemMaxCharacters) { setFormError(t("The checklist item is longer than {0} characters.", limits.checklistItemMaxCharacters)); return; }
+    setFormError('');
+    if (await send({ action: 'checklist.add', confirmation: taskConfirmations.checklistAdd(task.id), taskId: task.id, text: itemDraft.trim() })) { setItemDraft(''); await loadComments(task, 0); say(t("Checklist item added.")); router.refresh(); }
+  }
+  async function toggleItem(task: TaskView, item: TaskChecklistItemView) {
+    setFormError('');
+    if (await send({ action: 'checklist.set', confirmation: taskConfirmations.checklistSet(item.id), id: item.id, done: !item.done })) { await loadComments(task, 0); router.refresh(); }
+  }
+  async function removeItem(task: TaskView, item: TaskChecklistItemView) {
+    setFormError('');
+    if (await send({ action: 'checklist.delete', id: item.id, confirmation: taskConfirmations.checklistDelete(item.id) })) { await loadComments(task, 0); say(t("Checklist item deleted.")); router.refresh(); return null; }
+    return UNKNOWN;
   }
   async function addComment(task: TaskView) {
     if (!commentDraft.trim()) { setFormError(t("Enter a comment.")); return; }
@@ -145,6 +164,7 @@ export function TaskBoard({ tasks, assignees, canCreate, limits, today, summary,
   }} />;
   const assignee = (task: TaskView) => <span className={styles.assignee}><Avatar name={task.assignee?.name ?? t("Unassigned")} size="sm" decorative />{task.assignee?.name ?? t("Unassigned")}</span>;
   const postNote = (task: TaskView) => task.post ? <details className={styles.postPreview}><summary>{t("Linked post")}</summary><p>{task.post.preview || t("Untitled post")}</p><Badge>{t(task.post.status.replaceAll('_', ' '))}</Badge></details> : task.postHidden ? <span className={styles.meta}>{t("Linked post is not available to you.")}</span> : null;
+  const checklistNote = (task: TaskView) => task.checklist.total > 0 ? <span className={styles.meta}>{t("Checklist")}: {t("{0} of {1} done", task.checklist.done, task.checklist.total)}</span> : null;
   const rowActions = (task: TaskView) => <div className={styles.actions}>
     {task.canEdit && TASK_TRANSITIONS[task.status].map(status => <Button key={status} size="sm" disabled={busy} onClick={() => move(task, status)}>{verb(status)}</Button>)}
     <Button size="sm" variant="quiet" disabled={busy} onClick={() => openDetail(task)}>{t("Details")}{task.commentCount ? ` (${task.commentCount})` : ''}</Button>
@@ -162,6 +182,7 @@ export function TaskBoard({ tasks, assignees, canCreate, limits, today, summary,
       window.history.replaceState(window.history.state, '', url);
     }} />
     {deletingComment && <ConfirmDialog open title={t("Delete comment")} objectName={deletingComment.comment.body} consequence={t("This comment is permanently removed from the task.")} confirmLabel={t("Delete comment")} cancelLabel={t("Cancel")} failureLabel={UNKNOWN} onClose={() => setDeletingComment(null)} onConfirm={() => removeComment(deletingComment.task, deletingComment.comment)} />}
+    {deletingItem && <ConfirmDialog open title={t("Delete checklist item")} objectName={deletingItem.item.text} consequence={t("This item is permanently removed from the task.")} confirmLabel={t("Delete item")} cancelLabel={t("Cancel")} failureLabel={UNKNOWN} onClose={() => setDeletingItem(null)} onConfirm={() => removeItem(deletingItem.task, deletingItem.item)} />}
     {notice && <RouteNotice error={notice.error} focusKey={`task-notice-${notice.key}`}>{notice.text}</RouteNotice>}
     <div className={styles.toolbar}>
       <ul className={styles.summary} aria-label={t("Workspace task totals")}>
@@ -191,13 +212,13 @@ export function TaskBoard({ tasks, assignees, canCreate, limits, today, summary,
               dragged.current = task.id; event.dataTransfer.effectAllowed = 'move'; event.dataTransfer.setData('text/plain', task.id);
             }} onDragEnd={() => { dragged.current = null; setDropStatus(null); }}><IconGripVertical size={18} /></span>}
             {postNote(task)}
-            <div>{assignee(task)} {dueCell(task)}</div>
+            <div>{assignee(task)} {dueCell(task)} {checklistNote(task)}</div>
             {rowActions(task)}
           </li>)}</ul>}
         </section>;
       })}</div></>
       : <DataTable caption={t("Workspace tasks")} rows={tasks} rowKey={task => task.id} columns={[
-        { key: 'title', label: t("Task"), render: task => <><span className={styles.title}>{taskTitle(task)}</span>{postNote(task)}</> },
+        { key: 'title', label: t("Task"), render: task => <><span className={styles.title}>{taskTitle(task)}</span>{postNote(task)}{checklistNote(task)}</> },
         { key: 'status', label: t("Status"), render: task => <Badge tone={task.status === 'done' ? 'success' : task.status === 'doing' ? 'module' : 'neutral'}>{t(TASK_STATUS_LABELS[task.status])}</Badge> },
         { key: 'assignee', label: t("Assigned to"), render: assignee },
         { key: 'due', label: t("Due"), render: dueCell },
@@ -243,7 +264,7 @@ export function TaskBoard({ tasks, assignees, canCreate, limits, today, summary,
       </form>
     </Dialog>
 
-    {mode?.kind === 'delete' && <ConfirmDialog open title={t("Delete task")} objectName={mode.task.title} consequence={t("The task and its comments are permanently removed for everyone in this workspace.")} confirmLabel={t("Delete task")} cancelLabel={t("Cancel")} pendingLabel={t("Deleting...")} failureLabel={UNKNOWN} onClose={close} onConfirm={() => remove(mode.task)} />}
+    {mode?.kind === 'delete' && <ConfirmDialog open title={t("Delete task")} objectName={mode.task.title} consequence={t("The task, its comments and its checklist are permanently removed for everyone in this workspace.")} confirmLabel={t("Delete task")} cancelLabel={t("Cancel")} pendingLabel={t("Deleting...")} failureLabel={UNKNOWN} onClose={close} onConfirm={() => remove(mode.task)} />}
 
     <SidePanel closeLabel={t('Close')} open={mode?.kind === 'detail' && !deletingComment} title={mode?.kind === 'detail' ? mode.task.title : t("Task")} onClose={close}
       actions={<Button onClick={close} disabled={busy}>{t("Close")}</Button>}>
@@ -251,6 +272,16 @@ export function TaskBoard({ tasks, assignees, canCreate, limits, today, summary,
         {formError && <RouteNotice error focusKey={`task-detail-${formError}`}>{formError}</RouteNotice>}
         {mode.task.notes && <p className={styles.notes}>{mode.task.notes}</p>}
         {postNote(mode.task)}
+        <h3>{t("Checklist")}{items && items.list.length > 0 ? <span className={styles.meta}> · {t("{0} of {1} done", items.list.filter(item => item.done).length, items.list.length)}</span> : null}</h3>
+        {items === null ? (formError ? null : <p className={styles.help} role="status">{t("Loading checklist...")}</p>) : items.list.length === 0 ? <p className={styles.help}>{t("No checklist items yet.")}</p> : <ul className={styles.comments}>{items.list.map(item => <li key={item.id}>
+          <label><input type="checkbox" checked={item.done} disabled={busy || !item.canChange} onChange={() => toggleItem(mode.task, item)} aria-label={item.done ? t("Mark not done") : t("Mark done")} /><span>{item.text}</span></label>
+          {item.canChange && <div><Button size="sm" variant="quiet" disabled={busy} onClick={() => setDeletingItem({ task: mode.task, item })}>{t("Delete item")}</Button></div>}
+        </li>)}</ul>}
+        {items?.hasMore && <p className={styles.help}>{t("Only the first {0} checklist items are shown.", limits.checklistLimit)}</p>}
+        {items?.canChange && <>
+          <label>{t("Add a checklist item")}<input value={itemDraft} maxLength={limits.checklistItemMaxCharacters} placeholder={t("Type the item, then press Enter.")} onChange={event => setItemDraft(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); void addItem(mode.task); } }} /></label>
+          <div><Button variant="primary" disabled={busy || !itemDraft.trim()} onClick={() => addItem(mode.task)}>{busy ? t("Saving...") : t("Add a checklist item")}</Button></div>
+        </>}
         <h3>{t("Comments")}</h3>
         {comments === null ? (formError ? null : <p className={styles.help} role="status">{t("Loading comments...")}</p>) : comments.items.length === 0 ? <p className={styles.help}>{t("No comments yet.")}</p> : <ul className={styles.comments}>{comments.items.map(comment => <li key={comment.id}>
           <span className={styles.meta}>{comment.author?.name ?? t("Former member")} · {new Date(comment.createdAt).toLocaleString(locale)}</span>{comment.body}

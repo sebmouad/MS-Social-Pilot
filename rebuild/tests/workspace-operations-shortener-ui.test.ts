@@ -70,3 +70,24 @@ it('keeps the edit and shows the failure when a save is refused, and is read-onl
   expect(container.textContent).toContain(t.readOnly);
   expect(container.querySelector('button[type="submit"]')).toBeNull();
 });
+
+it.each(['en', 'fr'] as const)('shows the Tasks area card and saves it alone through the operations API (%s)', async locale => {
+  const t = sectionsCopy[locale];
+  const fetch = vi.fn().mockImplementation(async (_url: string, init: { body: string }) => Response.json({ ok: true, settings: JSON.parse(init.body).settings }));
+  vi.stubGlobal('fetch', fetch);
+  await render(locale);
+  const areas = card(t.areas.title);
+  expect(areas.textContent).toContain(t.areas.detail);
+  expect(saveButton(t.areas.title).disabled).toBe(true);
+  const toggle = areas.querySelector<HTMLButtonElement>('[role="switch"]')!;
+  expect(toggle.getAttribute('aria-checked')).toBe('false');
+  await act(async () => toggle.click());
+  expect(saveButton(t.links.title).disabled).toBe(true);
+  await act(async () => { saveButton(t.areas.title).click(); });
+  expect(fetch).toHaveBeenCalledOnce();
+  const [url, init] = fetch.mock.calls[0]!;
+  expect(url).toBe('/api/settings/workspace/operations');
+  const body = JSON.parse(init.body);
+  expect(body.confirmation).toBe(workspaceOperationsConfirmation('w1'));
+  expect(body.settings.tasksAreaEnabled).toBe(true);
+});

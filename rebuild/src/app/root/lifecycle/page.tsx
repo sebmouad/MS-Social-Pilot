@@ -1,7 +1,7 @@
 import { DataTable } from '@/components/DataTable';
 import { PageHeader } from '@/components/PageHeader';
 import { requireRootPage } from '@/server/config/access';
-import { RootFrame } from '@/server/root/RootFrame';
+import { RootFrame } from '@/modules/root/ui/RootFrame';
 import { loadRootLifecycle } from '@/modules/root/server/admin/lifecycle';
 import { DeleteUser, DeleteWorkspace, EnableUser, RestoreWorkspace } from './AccessControls';
 import { TransferOwnership } from './TransferOwnership';

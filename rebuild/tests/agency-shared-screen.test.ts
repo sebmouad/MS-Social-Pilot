@@ -8,25 +8,33 @@ import { createRoot } from 'react-dom/client';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { beforeEach, expect, it, vi } from 'vitest';
 import type { AgencyOverview } from '@/modules/agency/agency';
-const m = vi.hoisted(() => ({ overview: vi.fn(), language: 'en' }));
+const m = vi.hoisted(() => ({ overview: vi.fn(), scope: vi.fn(), language: 'en' }));
 vi.mock('@/server/config/store', () => ({ runtimeConfig: async (key: string) => key === 'agency.exportCopy' ? agencyExportCatalog : customerCopy }));
 vi.mock('next/headers', () => ({ headers: async () => new Headers({ 'accept-language': m.language }) }));
 vi.mock('@/server/context', () => ({ requireViewer: async () => ({ user: { id: 'person' } }) }));
 vi.mock('@/modules/agency/server/agency', () => ({ agencySearchLimit: async () => 40, agencyOverview: m.overview }));
+vi.mock('@/modules/shell/server/scope', () => ({ pageChannelScope: m.scope }));
 import AgencyScreen from '@/modules/agency/ui/AgencyScreen';
-const coverage = { channels: { covered: 1, of: 1 }, publishing: { covered: 1, of: 1 }, tasks: { covered: 0, of: 1 }, team: { covered: 1, of: 1 } };
+const coverage = { channels: { covered: 1, of: 1 }, publishing: { covered: 1, of: 1 }, inbox: { covered: 1, of: 1 }, tasks: { covered: 0, of: 1 }, team: { covered: 1, of: 1 } };
 const overview: AgencyOverview = {
   ok: true, windowDays: 14, limit: 50, truncated: false, filtered: false,
-  totals: { workspaces: 1, needingAttention: 1, channels: 3, disconnected: 1, scheduled: 4, failed: 2, openTasks: null, overdueTasks: null, coverage },
-  workspaces: [{ id: 'studio', name: 'Studio client', role: 'owner', state: 'available', needsAttention: true, metrics: { channels: 3, disconnected: 1, scheduled: 4, failed: 2, openTasks: null, overdueTasks: null, members: 2, clients: 1 } }],
+  totals: { workspaces: 1, needingAttention: 1, channels: 3, disconnected: 1, scheduled: 4, failed: 2, waitingConversations: 5, openTasks: null, overdueTasks: null, coverage },
+  workspaces: [{ id: 'studio', name: 'Studio client', role: 'owner', state: 'available', needsAttention: true, metrics: { channels: 3, disconnected: 1, scheduled: 4, failed: 2, waitingConversations: 5, openTasks: null, overdueTasks: null, members: 2, clients: 1 } }],
 };
 beforeEach(() => { vi.clearAllMocks(); m.language = 'en'; m.overview.mockResolvedValue(overview); });
 it('renders shared phone-card tables, module metrics, coverage disclosures and withheld-data explanations', async () => {
   const html = renderToStaticMarkup(await AgencyScreen({ searchParams: Promise.resolve({}) }));
   expect(html).toContain('ui-page-header__titleline'); expect(html).toContain('ui-table--stack'); expect(html).toContain('Studio client');
-  expect(html.match(/class="ui-metric"/g)).toHaveLength(6);
+  expect(html.match(/class="ui-metric"/g)).toHaveLength(7);
+  expect(html).toContain('Waiting conversations');
   expect(html).toContain('ui-infotip is-warning'); expect(html).toContain('Not shown for workspaces where you lack access');
   expect(html).not.toContain('Each point shows'); expect(html).toContain('Needs attention');
+});
+it('accepts the shared channel parameter and clarifies that it does not filter', async () => {
+  m.scope.mockResolvedValue({ ids: ['c1'], dropped: 0, source: 'url', channels: [] });
+  const html = renderToStaticMarkup(await AgencyScreen({ searchParams: Promise.resolve({ channel: 'c1' }) }));
+  expect(html).toContain('Agency compares every workspace you manage; the channel scope does not filter it.');
+  expect(m.overview).toHaveBeenCalled();
 });
 it('offers a workspace next action and icon when there are no administered workspaces', async () => {
   m.overview.mockResolvedValue({ ...overview, totals: { ...overview.totals, workspaces: 0 }, workspaces: [] });

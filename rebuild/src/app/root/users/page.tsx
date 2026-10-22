@@ -1,12 +1,12 @@
-import { RootEmptyState } from '@/server/root/RootEmptyState';
+import { RootEmptyState } from '@/modules/root/ui/RootEmptyState';
 import { DataTable } from '@/components/DataTable';
 import { PageHeader } from '@/components/PageHeader';
 import { StatusChip } from '@/components/StatusChip';
 import { OperationError } from '@/lib/operation-error';
 import { requireRootPage } from '@/server/config/access';
 import { runtimeConfig } from '@/server/config/store';
-import { RootFrame } from '@/server/root/RootFrame';
-import { RootUserFilters } from '@/server/root/RootUserFilters';
+import { RootFrame } from '@/modules/root/ui/RootFrame';
+import { RootUserFilters } from '@/modules/root/ui/RootUserFilters';
 import { loadRootUsers } from '@/server/root/users';
 import { RootUserControls } from './RootUserControls';
 import './root-users.css';
@@ -32,7 +32,7 @@ export default async function RootUsersPage({ searchParams }: { searchParams: Pr
   const filtered = Boolean(params.q || params.status && params.status !== 'all');
   return <RootFrame active="/root/users">
     <PageHeader module="root" title="Users" description={<>Manage installation account access and recovery. API keys do not grant Root access. Account changes are recorded in installation activity.</>} />
-    <RootUserFilters values={params} page={data} searchMaxCharacters={searchMaxCharacters} />
+    {await RootUserFilters({ values: params, page: data, searchMaxCharacters })}
     {data === null ? <section className="root-control__notice" role="alert">
       <h2>{invalid ? 'Check user filters' : 'User directory unavailable'}</h2>
       <p>{invalid ? 'A search, status or page value is invalid. Adjust the filters or reset the directory.' : 'The installation user directory could not be loaded. Try again, or check database availability.'}</p>

@@ -1,5 +1,5 @@
 import { ROOT_EVIDENCE_POLICY } from '@/lib/config/root-evidence-policy';
-import { readRootPlatformPublicationEvidence, loadRootEvidencePolicy, loadRootEvidenceCopy } from './platform-publication-evidence';
+import { readRootPlatformPublicationEvidence, loadRootEvidencePolicy, loadRootEvidenceCopy } from '@/server/root/platform-publication-evidence';
 import { requireRootPage } from '@/server/config/access';
 import { SidebarDock } from '@/components/SidebarDock';
 import { Button } from '@/components/Button';

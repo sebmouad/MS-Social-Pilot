@@ -8,8 +8,8 @@ vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: vi.fn() }), not
 vi.mock('@/server/config/store', () => ({ runtimeConfig: state.config }));
 vi.mock('@/server/config/access', () => ({ requireRootPage: async () => ({ id: 'root' }) }));
 vi.mock('@/modules/root/server/admin/errors', () => ({ listRootErrors: state.list, getRootError: state.detail }));
-vi.mock('@/server/root/RootFrame', () => ({ RootFrame: ({ children, controls }: { children: ReactNode; controls?: ReactNode }) => createElement('main', null, controls, children) }));
-vi.mock('@/server/root/RootFilters', () => ({
+vi.mock('@/modules/root/ui/RootFrame', () => ({ RootFrame: ({ children, controls }: { children: ReactNode; controls?: ReactNode }) => createElement('main', null, controls, children) }));
+vi.mock('@/modules/root/ui/RootFilters', () => ({
   RootFilters: ({ children }: { children: ReactNode }) => createElement('aside', null, children),
   RootFilterSelect: ({ options, name }: { options: { value: string; label: string }[]; name: string }) => createElement('select', { name }, options.map(item => createElement('option', { key: item.value, value: item.value }, item.label))),
 }));

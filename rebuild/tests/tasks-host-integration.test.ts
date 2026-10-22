@@ -117,7 +117,7 @@ describe('Tasks MCP host wiring', () => {
   it('keeps definitions, access map and write set consistent', () => {
     expect(tasksToolDefinitions.map(({ name }) => name).sort()).toEqual(Object.keys(TASKS_TOOL_ACCESS).sort());
     expect([...tasksTools].sort()).toEqual(Object.keys(TASKS_TOOL_ACCESS).sort());
-    expect([...tasksWriteTools].sort()).toEqual(['add_task_comment', 'create_task', 'create_task_checklist', 'delete_task', 'delete_task_comment', 'move_task', 'update_task']);
+    expect([...tasksWriteTools].sort()).toEqual(['add_task_checklist_item', 'add_task_comment', 'create_task', 'create_task_checklist', 'delete_task', 'delete_task_checklist_item', 'delete_task_comment', 'move_task', 'set_task_checklist_item', 'update_task']);
   });
 
   it('advertises read and write tools to a writer, only read tools to a viewer, and none to a client or disabled module', async () => {

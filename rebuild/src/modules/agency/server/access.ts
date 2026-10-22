@@ -12,10 +12,10 @@ export type Classified = AdministeredWorkspace & { state: AgencyWorkspaceState; 
 
 /** The feature whose permission and entitlement must hold, in that workspace, before a capability group is counted. */
 export const GROUP_FEATURES: Record<AgencyGroup, string> = {
-  channels: 'settings/connections', publishing: 'publishing/posts', tasks: 'tasks/board', team: 'settings/team',
+  channels: 'settings/connections', publishing: 'publishing/posts', inbox: 'inbox/conversations', tasks: 'tasks/board', team: 'settings/team',
 };
 /** Groups that read channel-linked data are withheld from a member whose channel scope is limited. */
-const CHANNEL_SCOPED: ReadonlySet<AgencyGroup> = new Set(['channels', 'publishing']);
+const CHANNEL_SCOPED: ReadonlySet<AgencyGroup> = new Set(['channels', 'publishing', 'inbox']);
 
 /** Escapes LIKE wildcards so user text is matched literally; pair with `ESCAPE '!'`. */
 export const likePattern = (text: string) => `%${text.replace(/[!%_]/g, match => `!${match}`)}%`;
@@ -90,7 +90,7 @@ async function suspendedStillEntitled(actor: AgencyActor, workspaceId: string, f
   return canUseModule(entitlements, AGENCY_MODULE_ID) && canUseFeature(entitlements, featureId);
 }
 
-const NONE: AgencyAccess = { channels: false, publishing: false, tasks: false, team: false };
+const NONE: AgencyAccess = { channels: false, publishing: false, inbox: false, tasks: false, team: false };
 
 /**
  * Rechecks, per workspace and at read time, the Agency module and feature entitlement (plan, Root switches,

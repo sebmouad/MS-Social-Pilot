@@ -3,7 +3,7 @@ import { ModuleGlyph } from '@/components/icons';
 import { PageHeader } from '@/components/PageHeader';
 import { ModuleHealth } from './ModuleHealth';
 import { requireRootPage } from '@/server/config/access';
-import { RootFrame } from '@/server/root/RootFrame';
+import { RootFrame } from '@/modules/root/ui/RootFrame';
 import { moduleManifests } from '@/modules';
 import { safeConfigShape } from '@/lib/config/registry';
 

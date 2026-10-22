@@ -213,6 +213,9 @@ live catalog inside the test or add a blanket exclusion to make it pass.
 | delete_task | tasks/board | write | POST /api/tasks | Shared customer operation; transport arguments may differ. |
 | add_task_comment | tasks/board | write | POST /api/tasks | Shared customer operation; transport arguments may differ. |
 | delete_task_comment | tasks/board | write | POST /api/tasks | Shared customer operation; transport arguments may differ. |
+| add_task_checklist_item | tasks/board | write | POST /api/tasks | Shared checklist operation; same confirmations and audit as UI. |
+| set_task_checklist_item | tasks/board | write | POST /api/tasks | Shared checklist operation; same confirmations and audit as UI. |
+| delete_task_checklist_item | tasks/board | write | POST /api/tasks | Shared checklist operation; same confirmations and audit as UI. |
 | list_share_links | settings/sharing | read | GET /api/sharing/links | Same authorized list service, including safe workspace logo and Root advisory-decision notification policy; no secret address is listed. |
 | list_shareable_channels | settings/sharing | read | GET /api/sharing/channels | Shared customer operation; transport arguments may differ. |
 | list_share_feedback | settings/sharing | read | GET /api/sharing/links/[id]/feedback | Shared customer operation; transport arguments may differ. |
