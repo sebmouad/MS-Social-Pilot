@@ -6,15 +6,16 @@
 # (/srv/ms-social-pilot, services social-pilot and social-pilot-worker) is not touched;
 # its service start times are compared before and after to prove it never restarted.
 #
-# Usage (from app/): bash rebuild/scripts/prod-stage-drill.sh
+# Usage (any directory in the checkout): bash rebuild/scripts/prod-stage-drill.sh
 set -euo pipefail
+cd "$(dirname "$0")/.."   # rebuild/
 HOST="${PROD_HOST:-$(grep -o 'root@[0-9.]*' docs/OPERATIONS.md | head -1)}"
 KEY="${PROD_KEY:-$HOME/.ssh/SebMouadSSH}"
 COMMIT="$(git rev-parse origin/main)"
 echo "Drill commit: $COMMIT"
 # Ship the exact commit as an archive (the server's release folder is not a git checkout).
 ssh -i "$KEY" "$HOST" 'rm -rf /srv/ms-social-pilot-rebuild-drill && mkdir -p /srv/ms-social-pilot-rebuild-drill'
-git archive --format=tar "$COMMIT" | ssh -i "$KEY" "$HOST" 'tar -x -C /srv/ms-social-pilot-rebuild-drill'
+git archive --format=tar --prefix=rebuild/ "$COMMIT:rebuild" | ssh -i "$KEY" "$HOST" 'tar -x -C /srv/ms-social-pilot-rebuild-drill'
 echo "Archive shipped."
 ssh -i "$KEY" "$HOST" "COMMIT=$COMMIT bash -s" <<'REMOTE'
 set -euo pipefail
@@ -33,7 +34,7 @@ DBURL="$(grep '^DATABASE_URL=' "$LEGACY_ENV" | cut -d= -f2- | sed 's#/social_pil
 chmod 600 "$D/rebuild/.env.drill"; chown socialpilot:socialpilot "$D/rebuild/.env.drill"
 grep -q 'social_pilot_rehearsal' "$D/rebuild/.env.drill" || { echo "Refusing: drill env does not point at the scratch DB"; exit 1; }
 echo "Installing and building (several minutes)…"
-sudo -u socialpilot bash -c "cd $D && npm ci --no-audit --no-fund >/tmp/drill-npm.log 2>&1 && cd rebuild && npx prisma generate >/dev/null && set -a && . ./.env.drill && set +a && npx next build >/tmp/drill-build.log 2>&1" \
+sudo -u socialpilot bash -c "cd $D/rebuild && npm ci --no-audit --no-fund >/tmp/drill-npm.log 2>&1 && npx prisma generate >/dev/null && set -a && . ./.env.drill && set +a && npx next build >/tmp/drill-build.log 2>&1" \
   && echo "Build: OK" || { echo "Build: FAILED"; tail -20 /tmp/drill-build.log /tmp/drill-npm.log; exit 1; }
 systemd-run --unit=social-pilot-rebuild-drill --uid=socialpilot --gid=socialpilot \
   --property=EnvironmentFile="$D/rebuild/.env.drill" --working-directory="$D/rebuild" \

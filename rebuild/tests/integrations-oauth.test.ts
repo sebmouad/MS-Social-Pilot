@@ -483,8 +483,8 @@ describe('source and migration properties', () => {
     expect(read('src/modules/integrations/oauth/ui/ConsentForm.tsx')).toContain("from '@/components/useConfirm'");
   });
   it('ships an additive migration that stores only hashes and cannot touch existing tables', () => {
-    const dir = readdirSync('../prisma/migrations').find(name => name.endsWith('_rebuild_oauth_connectors'))!;
-    const sql = read(`../prisma/migrations/${dir}/migration.sql`);
+    const dir = readdirSync('prisma/migrations').find(name => name.endsWith('_rebuild_oauth_connectors'))!;
+    const sql = read(`prisma/migrations/${dir}/migration.sql`);
     expect(sql.match(/CREATE TABLE /g)).toHaveLength(2);
     expect(sql).not.toMatch(/\b(ALTER TABLE|DROP|TRUNCATE|INSERT INTO|UPDATE "|DELETE FROM)/i);
     expect(sql).toContain('"codeHash" TEXT NOT NULL');

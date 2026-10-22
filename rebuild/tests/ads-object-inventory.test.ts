@@ -13,7 +13,7 @@ describe('neutral ad inventory', () => {
     expect(mergeAdObjectSummaries([summary!], [{ ...object, name: 'Winter audience' }], [{ id: 'account1', name: 'Studio', currency: 'EUR' }])).toEqual([{ ...summary, name: 'Winter audience' }]);
   });
   it('pins the additive inventory migration and account erasure relationship', () => {
-    const sql = readFileSync('../prisma/migrations/20261101120000_ads_object_inventory/migration.sql', 'utf8');
+    const sql = readFileSync('prisma/migrations/20261101120000_ads_object_inventory/migration.sql', 'utf8');
     expect(createHash('sha256').update(sql).digest('hex')).toBe('a6ea92c28d7697c4d229c6c90e068cc6da6b1d5575864b43e1d0976a31b50861');
     expect(sql).toContain('REFERENCES ad_accounts(id) ON DELETE CASCADE');
     expect(sql).not.toMatch(/DROP|ALTER|DELETE FROM|UPDATE/);

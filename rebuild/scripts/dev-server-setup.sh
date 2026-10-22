@@ -4,8 +4,9 @@
 # priority, and a systemd unit `msp-dev` running `next dev` on 127.0.0.1:${DEV_PORT}.
 # It shares the live database (pre-production), runs NO worker, and is resource-capped so
 # other sites on the host are unaffected. Start/stop it with dev-sync.sh or systemctl.
-# Usage (from app/): bash rebuild/scripts/dev-server-setup.sh
+# Usage (any directory in the checkout): bash rebuild/scripts/dev-server-setup.sh
 set -euo pipefail
+cd "$(dirname "$0")/.."   # rebuild/
 HOST="${PROD_HOST:-$(grep -o 'root@[0-9.]*' docs/OPERATIONS.md | head -1)}"
 KEY="${PROD_KEY:-$HOME/.ssh/SebMouadSSH}"
 DEV_PORT="${DEV_PORT:-3110}"
@@ -14,7 +15,7 @@ DEV_MEMORY_MAX="${DEV_MEMORY_MAX:-3G}"
 DEV_NICE="${DEV_NICE:-15}"
 COMMIT="$(git rev-parse origin/main)"
 ssh -i "$KEY" "$HOST" 'systemctl stop msp-dev 2>/dev/null || true; mkdir -p /srv/ms-social-pilot-rebuild-dev'
-git archive --format=tar "$COMMIT" | ssh -i "$KEY" "$HOST" 'tar -x -C /srv/ms-social-pilot-rebuild-dev'
+git archive --format=tar --prefix=rebuild/ "$COMMIT:rebuild" | ssh -i "$KEY" "$HOST" 'tar -x -C /srv/ms-social-pilot-rebuild-dev'
 ssh -i "$KEY" "$HOST" "DEV_PORT=$DEV_PORT DEV_CPU_QUOTA=$DEV_CPU_QUOTA DEV_MEMORY_MAX=$DEV_MEMORY_MAX DEV_NICE=$DEV_NICE bash -s" <<'REMOTE'
 set -euo pipefail
 D=/srv/ms-social-pilot-rebuild-dev
@@ -25,7 +26,7 @@ echo "PORT=$DEV_PORT" >> "$D/rebuild/.env.development.local"
 chmod 600 "$D/rebuild/.env.development.local"
 chown -R socialpilot:socialpilot "$D"
 echo "Installing dependencies at low priority…"
-sudo -u socialpilot bash -c "cd $D && nice -n 19 npm ci --no-audit --no-fund >/tmp/dev-npm.log 2>&1 && cd rebuild && nice -n 19 npm ci --no-audit --no-fund >>/tmp/dev-npm.log 2>&1 && nice -n 19 npx prisma generate >/dev/null" || { tail -20 /tmp/dev-npm.log; exit 1; }
+sudo -u socialpilot bash -c "cd $D/rebuild && nice -n 19 npm ci --no-audit --no-fund >/tmp/dev-npm.log 2>&1 && nice -n 19 npx prisma generate >/dev/null" || { tail -20 /tmp/dev-npm.log; exit 1; }
 cat > /etc/systemd/system/msp-dev.service <<UNIT
 [Unit]
 Description=MS Social Pilot rebuild DEV server (next dev, capped, no worker)

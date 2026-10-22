@@ -56,7 +56,7 @@ describe('neutral Inbox metadata', () => {
   });
 
   it('pins the additive migration checksum and preserves unknown metadata for existing rows', () => {
-    const migration = readFileSync(new URL('../../prisma/migrations/20261031170000_rebuild_inbox_metadata/migration.sql', import.meta.url), 'utf8');
+    const migration = readFileSync(new URL('../prisma/migrations/20261031170000_rebuild_inbox_metadata/migration.sql', import.meta.url), 'utf8');
     expect(createHash('sha256').update(migration).digest('hex')).toBe('0f64264b7fbdb9108ffd77fd4dff7b8a233d6c227ec6a57652b9f88c8f63f870');
     for (const table of ['conversations', 'conversation_messages', 'post_comments']) expect(migration).toContain(`ALTER TABLE ${table} ADD COLUMN "inboxMetadata" JSONB;`);
     expect(migration).not.toMatch(/DROP|DEFAULT|NOT NULL/);

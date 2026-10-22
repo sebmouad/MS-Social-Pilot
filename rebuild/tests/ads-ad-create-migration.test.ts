@@ -2,8 +2,8 @@ import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
-const migration = readFileSync('../prisma/migrations/20261031180000_rebuild_ads_ad_creation/migration.sql', 'utf8');
-const previous = readFileSync('../prisma/migrations/20261030110000_rebuild_ads_creative_creation/migration.sql', 'utf8');
+const migration = readFileSync('prisma/migrations/20261031180000_rebuild_ads_ad_creation/migration.sql', 'utf8');
+const previous = readFileSync('prisma/migrations/20261030110000_rebuild_ads_creative_creation/migration.sql', 'utf8');
 
 describe('additive ad.create journal migration', () => {
   it('pins the reviewed SQL checksum', () => {

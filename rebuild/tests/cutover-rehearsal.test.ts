@@ -9,8 +9,8 @@ const approvedMigrationSet = '20261015120000_mcp_api_keys,20261023100000_rebuild
 describe('cutover rehearsal safety gates', () => {
   it('pins report run migrations, refuses already migrated objects/history, and proves the purge gate', () => {
     const source = readFileSync(script, 'utf8');
-    const runs = readFileSync('../prisma/migrations/20261019010000_rebuild_report_runs/migration.sql', 'utf8');
-    const purgeGate = readFileSync('../prisma/migrations/20261019011000_rebuild_report_purge_gate/migration.sql', 'utf8');
+    const runs = readFileSync('prisma/migrations/20261019010000_rebuild_report_runs/migration.sql', 'utf8');
+    const purgeGate = readFileSync('prisma/migrations/20261019011000_rebuild_report_purge_gate/migration.sql', 'utf8');
     const hash = (text: string) => createHash('sha256').update(text).digest('hex');
     expect(hash(runs)).toBe('caa0c553569cf9f984e973ceb6e3ee858750209c6d2931e1316d3323b4357c4a');
     expect(hash(purgeGate)).toBe('122e813070361737ba1a89d775d2f92922dadd36423debb83411e0d5a4aa5d9e');
@@ -33,7 +33,7 @@ describe('cutover rehearsal safety gates', () => {
 
   it('pins sharing expiry and refuses a partially migrated baseline', () => {
     const source = readFileSync(script, 'utf8');
-    const migration = readFileSync('../prisma/migrations/20261018230000_rebuild_sharing_expiry/migration.sql', 'utf8');
+    const migration = readFileSync('prisma/migrations/20261018230000_rebuild_sharing_expiry/migration.sql', 'utf8');
     expect(createHash('sha256').update(migration).digest('hex')).toBe('28d4f9da65ed866f6139aa982d4756906cd329080dccf6cf2d87dee32e59d263');
     expect(source).toContain('verify_migration 20261018230000_rebuild_sharing_expiry 28d4f9da65ed866f6139aa982d4756906cd329080dccf6cf2d87dee32e59d263');
     expect(source).toContain("table_name = 'share_links' AND column_name = 'expiresAt'");
@@ -99,7 +99,7 @@ describe('cutover rehearsal safety gates', () => {
 
   it('pins the Ads ledger and refuses already applied baselines', () => {
     const source = readFileSync(script, 'utf8');
-    const migration = readFileSync('../prisma/migrations/20261018170000_rebuild_ads_operations/migration.sql', 'utf8');
+    const migration = readFileSync('prisma/migrations/20261018170000_rebuild_ads_operations/migration.sql', 'utf8');
     expect(createHash('sha256').update(migration).digest('hex')).toBe('61f575314590e45e8eafc7cb8088677fec2a78b39210b82187b6f2c05197d6d2');
     expect(source).toContain('verify_migration 20261018170000_rebuild_ads_operations 61f575314590e45e8eafc7cb8088677fec2a78b39210b82187b6f2c05197d6d2');
     expect(source).toContain("to_regclass('public.ads_management_operations')");
@@ -110,7 +110,7 @@ describe('cutover rehearsal safety gates', () => {
 
   it('pins creation operation kinds after the Ads ledger migration', () => {
     const source = readFileSync(script, 'utf8');
-    const migration = readFileSync('../prisma/migrations/20261018190000_rebuild_ads_creation/migration.sql', 'utf8');
+    const migration = readFileSync('prisma/migrations/20261018190000_rebuild_ads_creation/migration.sql', 'utf8');
     expect(createHash('sha256').update(migration).digest('hex')).toBe('749fc69e2937588b95e7b050ebb49525e30b2624915abd2bdc92de6e92a899d0');
     expect(source).toContain('verify_migration 20261018190000_rebuild_ads_creation 749fc69e2937588b95e7b050ebb49525e30b2624915abd2bdc92de6e92a899d0');
     expect(source.indexOf('migration_dir/20261018190000_rebuild_ads_creation/migration.sql')).toBeGreaterThan(source.indexOf('migration_dir/20261018170000_rebuild_ads_operations/migration.sql'));
@@ -120,8 +120,8 @@ describe('cutover rehearsal safety gates', () => {
 
   it('pins the purge gate and task comments, applies them in dependency order and refuses migrated baselines', () => {
     const source = readFileSync(script, 'utf8');
-    const purge = readFileSync('../prisma/migrations/20261018193000_rebuild_purge_write_gates/migration.sql', 'utf8');
-    const comments = readFileSync('../prisma/migrations/20261025100000_rebuild_task_comments/migration.sql', 'utf8');
+    const purge = readFileSync('prisma/migrations/20261018193000_rebuild_purge_write_gates/migration.sql', 'utf8');
+    const comments = readFileSync('prisma/migrations/20261025100000_rebuild_task_comments/migration.sql', 'utf8');
     const hash = (text: string) => createHash('sha256').update(text).digest('hex');
     expect(source).toContain(`verify_migration 20261018193000_rebuild_purge_write_gates ${hash(purge)}`);
     expect(source).toContain(`verify_migration 20261025100000_rebuild_task_comments ${hash(comments)}`);
@@ -143,7 +143,7 @@ describe('cutover rehearsal safety gates', () => {
 
   it('pins notifications and refuses an already migrated notification baseline', () => {
     const source = readFileSync(script, 'utf8');
-    const migration = readFileSync('../prisma/migrations/20261018150000_rebuild_notifications/migration.sql', 'utf8');
+    const migration = readFileSync('prisma/migrations/20261018150000_rebuild_notifications/migration.sql', 'utf8');
     expect(createHash('sha256').update(migration).digest('hex')).toBe('b60b92752dc3019e15156f1ecb4cb58d29b5de4a6676dd141ac13a955277b067');
     expect(source).toContain('verify_migration 20261018150000_rebuild_notifications b60b92752dc3019e15156f1ecb4cb58d29b5de4a6676dd141ac13a955277b067');
     expect(source).toContain("to_regclass('public.rebuild_notifications')");
@@ -152,14 +152,14 @@ describe('cutover rehearsal safety gates', () => {
 
   it('pins the reviewed migration files and applies them before mapped-schema checks', () => {
     const source = readFileSync(script, 'utf8');
-    const root = readFileSync('../prisma/migrations/20261015120000_mcp_api_keys/migration.sql', 'utf8');
-    const worker = readFileSync('../prisma/migrations/20261023100000_rebuild_worker_jobs/migration.sql', 'utf8');
-    const inbox = readFileSync('../prisma/migrations/20261016190000_rebuild_inbox_deletions/migration.sql', 'utf8');
-    const postDeletion = readFileSync('../prisma/migrations/20261016220000_rebuild_post_deletions/migration.sql', 'utf8');
-    const publicationAttempts = readFileSync('../prisma/migrations/20261017010000_rebuild_publication_attempts/migration.sql', 'utf8');
-    const mediaSteps = readFileSync('../prisma/migrations/20261017020000_rebuild_facebook_media_steps/migration.sql', 'utf8');
-    const mediaDeletions = readFileSync('../prisma/migrations/20261017030000_rebuild_facebook_media_deletions/migration.sql', 'utf8');
-    const resolutions = readFileSync('../prisma/migrations/20261017040000_rebuild_facebook_media_resolution/migration.sql', 'utf8');
+    const root = readFileSync('prisma/migrations/20261015120000_mcp_api_keys/migration.sql', 'utf8');
+    const worker = readFileSync('prisma/migrations/20261023100000_rebuild_worker_jobs/migration.sql', 'utf8');
+    const inbox = readFileSync('prisma/migrations/20261016190000_rebuild_inbox_deletions/migration.sql', 'utf8');
+    const postDeletion = readFileSync('prisma/migrations/20261016220000_rebuild_post_deletions/migration.sql', 'utf8');
+    const publicationAttempts = readFileSync('prisma/migrations/20261017010000_rebuild_publication_attempts/migration.sql', 'utf8');
+    const mediaSteps = readFileSync('prisma/migrations/20261017020000_rebuild_facebook_media_steps/migration.sql', 'utf8');
+    const mediaDeletions = readFileSync('prisma/migrations/20261017030000_rebuild_facebook_media_deletions/migration.sql', 'utf8');
+    const resolutions = readFileSync('prisma/migrations/20261017040000_rebuild_facebook_media_resolution/migration.sql', 'utf8');
     const hash = (text: string) => createHash('sha256').update(text).digest('hex');
 
     expect(source).toContain(hash(root));
@@ -206,7 +206,7 @@ describe('cutover rehearsal safety gates', () => {
 
   it('maps the content-free deletion journal and guards its SQL constraints', () => {
     const schema = readFileSync('prisma/schema.prisma', 'utf8');
-    const migration = readFileSync('../prisma/migrations/20261016190000_rebuild_inbox_deletions/migration.sql', 'utf8');
+    const migration = readFileSync('prisma/migrations/20261016190000_rebuild_inbox_deletions/migration.sql', 'utf8');
     const model = schema.split('model RebuildInboxDeletion {')[1]?.split('\n}')[0] ?? '';
 
     expect(model).toContain('workspace           Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)');
@@ -229,7 +229,7 @@ describe('cutover rehearsal safety gates', () => {
 
   it('pins the native Facebook journal as a raw module table with parent and purge guards', () => {
     const source = readFileSync(script, 'utf8');
-    const migration = readFileSync('../prisma/migrations/20261019030000_rebuild_facebook_native_journal/migration.sql', 'utf8');
+    const migration = readFileSync('prisma/migrations/20261019030000_rebuild_facebook_native_journal/migration.sql', 'utf8');
     const schema = readFileSync('prisma/schema.prisma', 'utf8');
     const hash = createHash('sha256').update(migration).digest('hex');
     const apply = (name: string) => source.indexOf(`migration_dir/${name}/migration.sql`);
@@ -261,7 +261,7 @@ describe('cutover rehearsal safety gates', () => {
 
   it('pins and rehearses the identity-bound native status proof ledger', () => {
     const source = readFileSync(script, 'utf8');
-    const migration = readFileSync('../prisma/migrations/20261019040000_rebuild_facebook_native_status_proofs/migration.sql', 'utf8');
+    const migration = readFileSync('prisma/migrations/20261019040000_rebuild_facebook_native_status_proofs/migration.sql', 'utf8');
     const schema = readFileSync('prisma/schema.prisma', 'utf8');
     const hash = createHash('sha256').update(migration).digest('hex');
     const apply = (name: string) => source.indexOf(`migration_dir/${name}/migration.sql`);
@@ -286,7 +286,7 @@ describe('cutover rehearsal safety gates', () => {
 
   it('pins and rehearses template and version first-comment delay constraints', () => {
     const source = readFileSync(script, 'utf8');
-    const migration = readFileSync('../prisma/migrations/20261019060000_rebuild_template_comment_delay/migration.sql', 'utf8');
+    const migration = readFileSync('prisma/migrations/20261019060000_rebuild_template_comment_delay/migration.sql', 'utf8');
     const hash = createHash('sha256').update(migration).digest('hex');
     const apply = source.indexOf('migration_dir/20261019060000_rebuild_template_comment_delay/migration.sql');
 
@@ -311,7 +311,7 @@ describe('cutover rehearsal safety gates', () => {
 
   it('pins the WordPress recipe source and plan ledger migration', () => {
     const source = readFileSync(script, 'utf8');
-    const migration = readFileSync('../prisma/migrations/20261031140000_rebuild_wordpress_sources/migration.sql', 'utf8');
+    const migration = readFileSync('prisma/migrations/20261031140000_rebuild_wordpress_sources/migration.sql', 'utf8');
     const hash = createHash('sha256').update(migration).digest('hex');
 
     expect(hash).toBe('cce64edcfbcf19553f7eafe661f86fb067d8d0152e08712d05dc1745121c4642');

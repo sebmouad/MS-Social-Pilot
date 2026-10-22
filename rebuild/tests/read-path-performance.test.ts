@@ -31,7 +31,7 @@ describe('Posts list query budget', () => {
 
 describe('additive read-path indexes', () => {
   it('pins the SQL checksum and covers the list ordering and analytics date-range prefixes', () => {
-    const sql = readFileSync('../prisma/migrations/20261031160000_rebuild_read_path_indexes/migration.sql', 'utf8');
+    const sql = readFileSync('prisma/migrations/20261031160000_rebuild_read_path_indexes/migration.sql', 'utf8');
     expect(createHash('sha256').update(sql).digest('hex')).toBe('afada5e8886f5b725e5ba1907315048ccb11b6d9c300939d649220c9b9638762');
     const statements = sql.replace(/--[^\n]*/g, '').split(';').map(value => value.trim()).filter(Boolean);
     expect(statements).toHaveLength(4);

@@ -231,10 +231,10 @@ first account registered becomes root and finishes setup in the app.
 | Services | `social-pilot` (web, `node scripts/start.mjs`) and `social-pilot-worker` (`node --import tsx scripts/worker.ts`), both `User=socialpilot`, hardened, memory and CPU capped |
 | Neighbours | Three WordPress sites on the same server (listed in `scripts/deploy/deploy.sh`) must stay up |
 | Backups | `/usr/local/sbin/ms-social-pilot-backup` → `/var/backups/ms-social-pilot` (database dump, media, env), 04:15 daily, 14 days; every deploy runs it first |
-| Off-site backups | `scripts/server/offsite-backup.sh`, `restore-test.sh`, `install-offsite.sh` (age-encrypted, rclone); results in Root › Backups; not installed yet |
+| Off-site backups | `rebuild/scripts/server/offsite-backup.sh`, `restore-test.sh`, `install-offsite.sh` (age-encrypted, rclone); results in Root › Backups; not installed yet |
 | Health | `/api/health` → `{"status":"ok","worker":{"status":"ok",…}}` |
 | Logs | `journalctl -u social-pilot -n 100`, `journalctl -u social-pilot-worker -n 100` |
-| Firewall | Ports 80/443 accept Cloudflare ranges only (`/etc/nftables.conf`); applied once by `scripts/server/hardening-20261009.sh` (record only, do not re-run) |
+| Firewall | Ports 80/443 accept Cloudflare ranges only (`/etc/nftables.conf`); applied once by `rebuild/scripts/server/hardening-20261009.sh` (record only, do not re-run) |
 
 The production `.env` is never edited, printed or copied without the owner's
 OK, and production database contents are never read. Logs, service status and
@@ -280,10 +280,10 @@ runuser -u postgres -- pg_restore --clean -d social_pilot <dump>
 ## Migrations
 
 ```bash
-npx prisma migrate diff --from-migrations prisma/migrations \
-  --to-schema-datamodel prisma/schema.prisma \
+npx prisma migrate diff --from-migrations rebuild/prisma/migrations \
+  --to-schema-datamodel rebuild/prisma/legacy-schema.prisma \
   --shadow-database-url postgresql://postgres:postgres@127.0.0.1:55432/sp_shadow \
-  --script > prisma/migrations/<YYYYMMDDHHMMSS>_<name>/migration.sql
+  --script > rebuild/prisma/migrations/<YYYYMMDDHHMMSS>_<name>/migration.sql
 npx prisma generate
 ```
 

@@ -25,6 +25,7 @@
     "screenshots": "playwright test screenshots.spec.ts --project=chromium"
   },
   "prisma": {
+    "schema": "rebuild/prisma/legacy-schema.prisma",
     "seed": "node --env-file-if-exists=.env --import tsx prisma/seed.ts"
   },
   "dependencies": {

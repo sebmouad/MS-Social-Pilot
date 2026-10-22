@@ -9,7 +9,7 @@ import { tasksToolDefinitions, tasksTools, tasksWriteTools } from '../src/module
 
 const root = join(__dirname, '..');
 const read = (path: string) => readFileSync(join(root, path), 'utf8');
-const migrations = join(root, '..', 'prisma', 'migrations');
+const migrations = join(root, 'prisma', 'migrations');
 const MIGRATION = '20261025100000_rebuild_task_comments';
 
 describe('Tasks manifest', () => {
@@ -37,7 +37,7 @@ describe('Tasks manifest', () => {
   it('keeps the database comment ceiling equal to the largest configurable comment length', () => {
     const comment = TASKS_CONFIG.find(item => item.key === 'tasks.commentMaxCharacters')!;
     expect(comment.schema.safeParse(20000).success).toBe(true); expect(comment.schema.safeParse(20001).success).toBe(false);
-    expect(read(`../prisma/migrations/${MIGRATION}/migration.sql`)).toContain('char_length("body") <= 20000');
+    expect(read(`prisma/migrations/${MIGRATION}/migration.sql`)).toContain('char_length("body") <= 20000');
   });
 });
 
@@ -79,7 +79,7 @@ describe('Tasks contracts', () => {
 });
 
 describe('Tasks comments migration', () => {
-  const sql = read(`../prisma/migrations/${MIGRATION}/migration.sql`);
+  const sql = read(`prisma/migrations/${MIGRATION}/migration.sql`);
   it('sorts after every other migration and has a unique timestamp', () => {
     const names = readdirSync(migrations).filter(name => /^\d{14}_/.test(name));
     expect(names).toContain(MIGRATION);

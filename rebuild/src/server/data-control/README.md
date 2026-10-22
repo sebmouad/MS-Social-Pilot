@@ -1,7 +1,7 @@
 # Data-control ownership audit (2026-10-21)
 
 Binding target: `rebuild/docs/ARCHITECTURE_CONTRACT.md`. This audit covers every
-CREATE TABLE in `prisma/migrations/20261020*` and later, including future-dated
+CREATE TABLE in `rebuild/prisma/migrations/20261020*` and later, including future-dated
 migration names already in source. No migration was applied by this lane.
 
 | Table | Export/erasure ownership |

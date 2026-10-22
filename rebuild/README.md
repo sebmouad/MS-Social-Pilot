@@ -9,12 +9,14 @@ This is a new Next.js application with a new route map, shell, design system, an
 ## Local checks
 
 ```sh
-npm install
+npm ci                       # self-contained: no root install is needed
 npx prisma generate --schema prisma/schema.prisma
 npm run typecheck
 npm test
 DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:55432/social_pilot_test npm run build
 ```
+
+Database migrations live in `prisma/migrations/` and the full database model in `prisma/legacy-schema.prisma` (both under `rebuild/`); host and deploy details are in [docs/OPERATIONS.md](docs/OPERATIONS.md).
 
 Use a dedicated local database populated with realistic synthetic example data for interactive testing. Follow [PREVIEW.md](docs/PREVIEW.md) for schema preparation, guarded fixture seeding and sign-in setup. Production-shaped migration rehearsals remain separate. The Prisma schema maps selected existing tables; the rebuild already writes sessions, draft posts, selections, and Root settings. Never run `db push` or migrations from `rebuild` against the existing database without a reviewed migration and backup.
 

@@ -6,7 +6,7 @@ import {
 } from '../scripts/legacy-data-manifest';
 import { evaluate, printSql, type TableReport } from '../scripts/legacy-data-audit';
 
-const schema = readFileSync(path.resolve(process.cwd(), '../prisma/schema.prisma'), 'utf8');
+const schema = readFileSync(path.resolve(process.cwd(), 'prisma/legacy-schema.prisma'), 'utf8');
 const parsed = [...schema.matchAll(/^model (\w+) \{([\s\S]*?)^\}/gm)].map(m => ({
   model: m[1],
   table: /@@map\("(\w+)"\)/.exec(m[2])?.[1] ?? m[1],

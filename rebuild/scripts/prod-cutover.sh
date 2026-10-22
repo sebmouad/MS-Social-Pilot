@@ -3,15 +3,18 @@
 # 1 fresh backup  2 stop legacy worker  3 migrate live DB (rehearsed order)  4 build rebuild,
 # stop legacy web, start rebuild web+worker on 3100  5 health checks.
 # Any failure after step 1 -> stop rebuild, restore DB from the fresh backup, restart legacy.
-# Usage (from app/): bash rebuild/scripts/prod-cutover.sh
+# Usage (any directory in the checkout): bash rebuild/scripts/prod-cutover.sh
+# Ships only rebuild/ (the legacy root app is no longer part of the release archive; the cutover
+# already ran, so this is kept as the historical procedure).
 set -euo pipefail
+cd "$(dirname "$0")/.."   # rebuild/
 HOST="${PROD_HOST:-$(grep -o 'root@[0-9.]*' docs/OPERATIONS.md | head -1)}"
 KEY="${PROD_KEY:-$HOME/.ssh/SebMouadSSH}"
 COMMIT="$(git rev-parse origin/main)"
 echo "Cutover commit: $COMMIT"
 
 ORDER_FILE="$(mktemp)"; APPROVED="$(mktemp)"; ALL="$(mktemp)"
-grep -o 'migration_dir/[0-9a-z_]*/migration.sql' rebuild/scripts/cutover-rehearsal.sh | sed 's#migration_dir/##;s#/migration.sql##' > "$APPROVED"
+grep -o 'migration_dir/[0-9a-z_]*/migration.sql' scripts/cutover-rehearsal.sh | sed 's#migration_dir/##;s#/migration.sql##' > "$APPROVED"
 ls prisma/migrations | grep -E '^[0-9]{14}_' | sort > "$ALL"
 { grep -vxF -f "$APPROVED" "$ALL" | grep -v '_rebuild_' || true; cat "$APPROVED"; grep -vxF -f "$APPROVED" "$ALL" | grep '_rebuild_' || true; } > "$ORDER_FILE"
 
@@ -19,7 +22,7 @@ ls prisma/migrations | grep -E '^[0-9]{14}_' | sort > "$ALL"
 tar -C prisma/migrations -cf - $(cat "$ORDER_FILE") | ssh -i "$KEY" "$HOST" 'rm -rf /var/tmp/cutover-migrations && mkdir -m 755 /var/tmp/cutover-migrations && tar -x -C /var/tmp/cutover-migrations'
 scp -q -i "$KEY" "$ORDER_FILE" "$HOST:/var/tmp/cutover-migrations/ORDER"
 ssh -i "$KEY" "$HOST" 'rm -rf /srv/ms-social-pilot-rebuild.new && mkdir -p /srv/ms-social-pilot-rebuild.new'
-git archive --format=tar "$COMMIT" | ssh -i "$KEY" "$HOST" 'tar -x -C /srv/ms-social-pilot-rebuild.new'
+git archive --format=tar --prefix=rebuild/ "$COMMIT:rebuild" | ssh -i "$KEY" "$HOST" 'tar -x -C /srv/ms-social-pilot-rebuild.new'
 echo "Shipped migrations and release."
 
 ssh -i "$KEY" "$HOST" "COMMIT=$COMMIT bash -s" <<'REMOTE'
@@ -55,7 +58,7 @@ step "2. Build the rebuild before touching live services"
 DBURL="$(grep '^DATABASE_URL=' "$LEGACY_ENV" | cut -d= -f2-)"
 { grep -E '^(ENCRYPTION_KEY|SESSION_SECRET)=' "$LEGACY_ENV"; echo "DATABASE_URL=$DBURL"; echo "NODE_ENV=production"; echo "PORT=3100"; } > "$NEW/rebuild/.env.production.local"
 chmod 600 "$NEW/rebuild/.env.production.local"; chown -R socialpilot:socialpilot "$NEW"
-sudo -u socialpilot bash -c "cd $NEW && npm ci --no-audit --no-fund >/tmp/cutover-npm.log 2>&1 && cd rebuild && npx prisma generate >/dev/null && npx next build >/tmp/cutover-build.log 2>&1" \
+sudo -u socialpilot bash -c "cd $NEW/rebuild && npm ci --no-audit --no-fund >/tmp/cutover-npm.log 2>&1 && npx prisma generate >/dev/null && npx next build >/tmp/cutover-build.log 2>&1" \
   || { echo "Build failed; nothing changed"; tail -n 20 /tmp/cutover-build.log; exit 1; }
 echo "Build: OK"
 

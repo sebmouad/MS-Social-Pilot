@@ -194,7 +194,7 @@ describe('hand-off of automatically scheduled posts to the platform', () => {
 });
 
 describe('migration', () => {
-  const file = '../prisma/migrations/20261031100000_rebuild_destination_schedule_mode/migration.sql';
+  const file = 'prisma/migrations/20261031100000_rebuild_destination_schedule_mode/migration.sql';
   it('adds one nullable, constrained column and is pinned in the cutover rehearsal', () => {
     const sql = readFileSync(file, 'utf8');
     const script = readFileSync('scripts/cutover-rehearsal.sh', 'utf8');

@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 const schema = readFileSync('prisma/schema.prisma', 'utf8');
-const migration = readFileSync('../prisma/migrations/20261017010000_rebuild_publication_attempts/migration.sql', 'utf8');
+const migration = readFileSync('prisma/migrations/20261017010000_rebuild_publication_attempts/migration.sql', 'utf8');
 const rehearsal = readFileSync('scripts/cutover-rehearsal.sh', 'utf8');
 const model = schema.split('model PublicationAttempt {')[1]?.split('\n}')[0] ?? '';
 

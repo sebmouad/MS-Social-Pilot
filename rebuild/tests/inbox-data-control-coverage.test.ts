@@ -20,7 +20,7 @@ describe('inbox export and erasure coverage', () => {
     expect(order.indexOf('moderation_actions')).toBeLessThan(order.indexOf('moderation_rules'));
   });
   it('keeps every workspace-owned inbox table behind a cascading workspace foreign key', () => {
-    const schema = readFileSync(join(__dirname, '../../prisma/schema.prisma'), 'utf8');
+    const schema = readFileSync(join(__dirname, '../prisma/legacy-schema.prisma'), 'utf8');
     for (const model of ['ModerationRule', 'ModerationAction', 'InboxNote', 'SavedReply']) {
       const block = schema.match(new RegExp(`model ${model} \\{[\\s\\S]*?\\n\\}`))?.[0] ?? '';
       expect(block, model).toMatch(/workspaceId\s+String/);

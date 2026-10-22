@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
-const migration = readFileSync('../prisma/migrations/20261017020000_rebuild_facebook_media_steps/migration.sql', 'utf8');
+const migration = readFileSync('prisma/migrations/20261017020000_rebuild_facebook_media_steps/migration.sql', 'utf8');
 
 describe('Facebook media step journal migration', () => {
   it('adds a single workspace-owned, content-free journal table', () => {

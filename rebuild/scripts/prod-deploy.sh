@@ -7,8 +7,11 @@
 # Incremental: a persistent build folder keeps node_modules and .next/cache, so npm ci runs
 # only when package-lock.json changes; the build runs at low priority under a CPU cap so
 # other sites on the host stay responsive.
-# Usage (from app/): bash rebuild/scripts/prod-deploy.sh
+# Self-contained: only rebuild/ is shipped (git archive of the rebuild/ tree), installed, built and
+# migrated; the migration set comes from rebuild/prisma/migrations. No root package is used.
+# Usage (any directory in the checkout): bash rebuild/scripts/prod-deploy.sh
 set -euo pipefail
+cd "$(dirname "$0")/.."   # rebuild/
 BUILD_CPU_QUOTA="${BUILD_CPU_QUOTA:-300%}"   # at most 3 of the host's cores
 BUILD_NICE="${BUILD_NICE:-10}"
 HOST="${PROD_HOST:-$(grep -o 'root@[0-9.]*' docs/OPERATIONS.md | head -1)}"
@@ -16,13 +19,13 @@ KEY="${PROD_KEY:-$HOME/.ssh/SebMouadSSH}"
 COMMIT="$(git rev-parse origin/main)"
 echo "Release commit: $COMMIT"
 ORDER_FILE="$(mktemp)"; APPROVED="$(mktemp)"; ALL="$(mktemp)"
-grep -o 'migration_dir/[0-9a-z_]*/migration.sql' rebuild/scripts/cutover-rehearsal.sh | sed 's#migration_dir/##;s#/migration.sql##' > "$APPROVED"
+grep -o 'migration_dir/[0-9a-z_]*/migration.sql' scripts/cutover-rehearsal.sh | sed 's#migration_dir/##;s#/migration.sql##' > "$APPROVED"
 ls prisma/migrations | grep -E '^[0-9]{14}_' | sort > "$ALL"
 { grep -vxF -f "$APPROVED" "$ALL" | grep -v '_rebuild_' || true; cat "$APPROVED"; grep -vxF -f "$APPROVED" "$ALL" | grep '_rebuild_' || true; } > "$ORDER_FILE"
 COPYFILE_DISABLE=1 tar --no-xattrs -C prisma/migrations -cf - $(cat "$ORDER_FILE") 2>/dev/null | ssh -i "$KEY" "$HOST" 'rm -rf /var/tmp/deploy-migrations && mkdir -m 755 /var/tmp/deploy-migrations && tar -x -C /var/tmp/deploy-migrations 2>/dev/null'
 scp -q -i "$KEY" "$ORDER_FILE" "$HOST:/var/tmp/deploy-migrations/ORDER"
 ssh -i "$KEY" "$HOST" 'rm -rf /var/tmp/deploy-src && mkdir -p /var/tmp/deploy-src'
-git archive --format=tar "$COMMIT" | ssh -i "$KEY" "$HOST" 'tar -x -C /var/tmp/deploy-src'
+git archive --format=tar --prefix=rebuild/ "$COMMIT:rebuild" | ssh -i "$KEY" "$HOST" 'tar -x -C /var/tmp/deploy-src'
 
 ssh -i "$KEY" "$HOST" "COMMIT=$COMMIT BUILD_CPU_QUOTA=$BUILD_CPU_QUOTA BUILD_NICE=$BUILD_NICE bash -s" <<'REMOTE'
 set -uo pipefail
@@ -33,17 +36,19 @@ T=$(date +%Y%m%d-%H%M%S); B=/var/backups/socialpilot-deploy-$T; mkdir -m 700 -p 
 sudo -u postgres pg_dump -Fc social_pilot > "$B/social_pilot.dump" && chmod 600 "$B/social_pilot.dump" || { echo "Backup failed; nothing changed"; exit 1; }
 echo "Backup: $B"
 BUILD=/srv/ms-social-pilot-rebuild-build; mkdir -p "$BUILD"
-# Mirror the release source into the persistent build folder, keeping dependencies and caches.
-rsync -a --delete --exclude node_modules --exclude 'rebuild/node_modules' --exclude 'rebuild/.next' --exclude 'rebuild/generated' /var/tmp/deploy-src/ "$BUILD/"
+# Mirror the release source (rebuild/ only) into the persistent build folder, keeping dependencies and caches.
+# A root node_modules left by pre-self-contained releases is no longer needed; drop it once.
+rm -rf "$BUILD/node_modules"
+rsync -a --delete --exclude 'rebuild/node_modules' --exclude 'rebuild/.next' --exclude 'rebuild/generated' --exclude 'rebuild/.lock-sum' /var/tmp/deploy-src/ "$BUILD/"
 cp "$ENVF" "$BUILD/rebuild/.env.production.local"; chmod 600 "$BUILD/rebuild/.env.production.local"
 chown -R socialpilot:socialpilot "$BUILD"
-LOCK_SUM="$(cat "$BUILD/package-lock.json" "$BUILD/rebuild/package-lock.json" 2>/dev/null | sha256sum | cut -d' ' -f1)"
-INSTALL=1; [ -d "$BUILD/node_modules" ] && [ -d "$BUILD/rebuild/node_modules" ] && [ "$(cat "$BUILD/.lock-sum" 2>/dev/null)" = "$LOCK_SUM" ] && INSTALL=0
+LOCK_SUM="$(cat "$BUILD/rebuild/package-lock.json" 2>/dev/null | sha256sum | cut -d' ' -f1)"
+INSTALL=1; [ -d "$BUILD/rebuild/node_modules" ] && [ "$(cat "$BUILD/rebuild/.lock-sum" 2>/dev/null)" = "$LOCK_SUM" ] && INSTALL=0
 start=$(date +%s)
 systemd-run --quiet --wait --collect --uid=socialpilot --gid=socialpilot -p CPUQuota="$BUILD_CPU_QUOTA" -p Nice="$BUILD_NICE" -p IOSchedulingClass=idle --working-directory="$BUILD" \
-  /bin/bash -c "set -e; if [ $INSTALL = 1 ]; then npm ci --no-audit --no-fund >/tmp/deploy-npm.log 2>&1; (cd rebuild && npm ci --no-audit --no-fund >>/tmp/deploy-npm.log 2>&1); fi; cd rebuild; npx prisma generate >/dev/null; npx next build >/tmp/deploy-build.log 2>&1" \
+  /bin/bash -c "set -e; cd rebuild; if [ $INSTALL = 1 ]; then npm ci --no-audit --no-fund >/tmp/deploy-npm.log 2>&1; fi; npx prisma generate >/dev/null; npm run build >/tmp/deploy-build.log 2>&1" \
   || { echo "Build failed; nothing changed"; tail -n 25 /tmp/deploy-build.log; exit 1; }
-echo "$LOCK_SUM" > "$BUILD/.lock-sum"
+echo "$LOCK_SUM" > "$BUILD/rebuild/.lock-sum"
 echo "Build: OK in $(( $(date +%s) - start ))s (dependencies $( [ $INSTALL = 1 ] && echo reinstalled || echo reused ))"
 rm -rf "$NEW"; cp -a "$BUILD" "$NEW"
 DONE="$(sudo -u postgres psql -d social_pilot -Atc "select migration_name from _prisma_migrations where finished_at is not null and rolled_back_at is null")"

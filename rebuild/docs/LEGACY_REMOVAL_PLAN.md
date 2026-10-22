@@ -18,6 +18,25 @@ and the retained release at `/srv/ms-social-pilot`. No host state, installed
 guard, deployed SHA, migration receipt or backup was inspected by this lane.
 The repository still contains dependencies that prevent wholesale root removal.
 
+**Phase 3 progress (2026-10-22, self-contained lane; source only, nothing run
+against a host):** `prisma/schema.prisma` moved to `rebuild/prisma/legacy-schema.prisma`
+and `prisma/migrations/` to `rebuild/prisma/migrations/` (folders and SQL bytes
+unchanged, so checksums are identical). `rebuild/package.json` and its lockfile now
+carry every dependency the rebuild imports (vitest, jsdom, tsx, sharp, nodemailer,
+SimpleWebAuthn, Playwright); `npm test` uses the local vitest and the worker reads
+`rebuild/.env`. Host/bootstrap facts moved to [OPERATIONS.md](OPERATIONS.md) and all
+`prod-*`/`dev-*` scripts read it from there and operate from `rebuild/`.
+`scripts/server/*` and `scripts/deploy/rebuild-*.sh` moved under `rebuild/scripts/`.
+`prod-deploy.sh` now ships `git archive` of `rebuild/` only, installs and builds
+only in `rebuild/`, and still takes a backup, migrates, swaps and health-checks.
+The root `package.json` points Prisma at the moved legacy schema so the legacy tree
+still builds until its removal batch. Remaining for phase 3: rebuild equivalents of
+`scripts/admin/{set-root,reset-two-step}.ts` and `scripts/dev/test-db.sh`; a clean-checkout
+`npm ci && npm run build` proof (the lockfile was merged from the root lock without
+registry access; run `npm install --package-lock-only` once online to prune unused
+entries); root `.claude/skills/db-migration` and the legacy `scripts/deploy/*` that
+still cite old paths.
+
 ## Removal gates and sequence
 
 Use these phase numbers in the inventory. “Safe” below always means safe **after

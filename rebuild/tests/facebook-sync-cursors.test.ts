@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 const name = '20261031120000_rebuild_facebook_sync_cursors';
-const migration = readFileSync(`../prisma/migrations/${name}/migration.sql`, 'utf8');
+const migration = readFileSync(`prisma/migrations/${name}/migration.sql`, 'utf8');
 describe('Facebook cursor persistence boundary', () => {
  it('pins the migration and refuses an already migrated scratch dump', () => {
   const script = readFileSync('scripts/cutover-rehearsal.sh', 'utf8');

@@ -600,8 +600,8 @@ HTTP/database readiness of these two artifacts against that backup; media byte
 recovery, authenticated workflows, provider writes, worker/queue ownership,
 proxy switching and actual rollback execution remain separate release evidence.
 
-Static checks (from `rebuild/`; the owned test lives in the repository-root
-`tests/` directory):
+Static checks (from `rebuild/`; the rebuild's `tests/operator-health-probes.test.ts`
+asserts the same script contracts; the repository-root test named below is legacy):
 
 ```sh
 npx vitest run --root .. --cache=false tests/rollback-drill-script.test.ts

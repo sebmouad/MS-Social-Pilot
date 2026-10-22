@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
-# Post-cutover recovery smoke test; run from app/. Never swaps releases or starts workers.
+# Post-cutover recovery smoke test; run from anywhere in the checkout. Never swaps releases or starts workers.
 # Safety targets are deliberately fixed bootstrap values, not application/Root policy.
 # Usage: bash rebuild/scripts/prod-rollback-drill.sh
 set -euo pipefail
+cd "$(dirname "$0")/.."   # rebuild/
 HOST="${PROD_HOST:-$(grep -o 'root@[0-9.]*' docs/OPERATIONS.md | head -1)}"
 KEY="${PROD_KEY:-$HOME/.ssh/SebMouadSSH}"
 [ -n "$HOST" ] || { echo 'ROLLBACK DRILL FAIL: no production host' >&2; exit 1; }

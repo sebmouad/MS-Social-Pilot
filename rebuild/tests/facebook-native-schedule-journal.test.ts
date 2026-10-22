@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
 import { createFacebookNativeScheduleStore } from '../src/platforms/facebook/formats/schedule-journal';
 
-const migration = readFileSync('../prisma/migrations/20261030140000_rebuild_facebook_native_schedule_changes/migration.sql', 'utf8');
+const migration = readFileSync('prisma/migrations/20261030140000_rebuild_facebook_native_schedule_changes/migration.sql', 'utf8');
 const limits = async () => ({ timeout: 1000, maxWait: 1000 });
 const scope = { workspaceId: 'ws', publishOperationId: 'pub' };
 const video = (operationId: string, over = {}) => ({ operationId, format: 'video' as const, state: 'started' as const, knownIds: ['VID'], targetId: 'page', ...over });

@@ -112,7 +112,7 @@ describe('notification engine persistence and access', () => {
     await expect(enqueueNotification(tx, noteEvent)).resolves.toMatchObject({ inserted: false });
     const insert = state.executions.find(item => item.sql.includes('INSERT INTO rebuild_notifications'))!;
     expect(insert.sql).toContain('ON CONFLICT');
-    await expect((await import('node:fs/promises')).readFile(new URL('../../prisma/migrations/20261018150000_rebuild_notifications/migration.sql', import.meta.url), 'utf8')).resolves.toContain('rebuild_notifications_event_recipient_uq');
+    await expect((await import('node:fs/promises')).readFile(new URL('../prisma/migrations/20261018150000_rebuild_notifications/migration.sql', import.meta.url), 'utf8')).resolves.toContain('rebuild_notifications_event_recipient_uq');
   });
 
   it('does not enqueue when whole-post visibility or the note workspace binding fails', async () => {

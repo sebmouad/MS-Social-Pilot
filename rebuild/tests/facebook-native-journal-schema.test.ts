@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
-const migration = readFileSync('../prisma/migrations/20261019030000_rebuild_facebook_native_journal/migration.sql', 'utf8');
+const migration = readFileSync('prisma/migrations/20261019030000_rebuild_facebook_native_journal/migration.sql', 'utf8');
 
 describe('Facebook native journal migration', () => {
   it('adds a bounded child journal under the neutral publication claim', () => {

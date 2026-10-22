@@ -29,7 +29,7 @@ Every page sets its title with `screenMetadata` (checked by `tests/metadata.test
 
 ## Data model
 
-`prisma/schema.prisma` holds about 90 models; migrations in `prisma/migrations`
+`rebuild/prisma/legacy-schema.prisma` holds about 90 models; migrations in `rebuild/prisma/migrations`
 are additive so the previous release runs on the new schema. Main groups:
 
 - **Identity and tenancy**: `User` (with `isInstanceOwner` for root), `Session`,

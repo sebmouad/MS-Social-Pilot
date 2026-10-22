@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
-const migrationPath = '../prisma/migrations/20261019050000_rebuild_publication_submissions/migration.sql';
+const migrationPath = 'prisma/migrations/20261019050000_rebuild_publication_submissions/migration.sql';
 const migration = readFileSync(migrationPath, 'utf8');
 const rehearsal = readFileSync('scripts/cutover-rehearsal.sh', 'utf8');
 

@@ -4,15 +4,16 @@
 # and /var/tmp, which are removed at the end. The live app, its services and its database
 # are not modified or restarted. Customer data never leaves the server.
 #
-# Usage (from app/): bash rebuild/scripts/prod-rehearsal.sh
+# Usage (any directory in the checkout): bash rebuild/scripts/prod-rehearsal.sh
 set -euo pipefail
+cd "$(dirname "$0")/.."   # rebuild/
 HOST="${PROD_HOST:-$(grep -o 'root@[0-9.]*' docs/OPERATIONS.md | head -1)}"
 KEY="${PROD_KEY:-$HOME/.ssh/SebMouadSSH}"
 ORDER_FILE="$(mktemp)"
 # Every migration in the repo, in name order. The server skips those already recorded in
 # _prisma_migrations, so production's missing legacy migrations are applied first, in order.
 APPROVED="$(mktemp)"
-grep -o 'migration_dir/[0-9a-z_]*/migration.sql' rebuild/scripts/cutover-rehearsal.sh \
+grep -o 'migration_dir/[0-9a-z_]*/migration.sql' scripts/cutover-rehearsal.sh \
   | sed 's#migration_dir/##;s#/migration.sql##' > "$APPROVED"
 ALL="$(mktemp)"; ls prisma/migrations | grep -E '^[0-9]{14}_' | sort > "$ALL"
 # Dependency-correct order: legacy migrations first (name order), then the reviewed rebuild

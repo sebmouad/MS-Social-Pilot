@@ -3,9 +3,10 @@
 # (30 minutes, single use) for the given account through the same email_tokens path as
 # /password-recovery, audited in root_activities. The link is printed only to the
 # operator's terminal; do not paste it anywhere else.
-# Usage (from app/): bash rebuild/scripts/prod-owner-reset-link.sh you@example.com
+# Usage (any directory in the checkout): bash rebuild/scripts/prod-owner-reset-link.sh you@example.com
 set -euo pipefail
 EMAIL="${1:?usage: prod-owner-reset-link.sh <account email>}"
+cd "$(dirname "$0")/.."   # rebuild/
 HOST="${PROD_HOST:-$(grep -o 'root@[0-9.]*' docs/OPERATIONS.md | head -1)}"
 KEY="${PROD_KEY:-$HOME/.ssh/SebMouadSSH}"
 ssh -i "$KEY" "$HOST" "RESET_EMAIL='$EMAIL' bash -s" <<'REMOTE'

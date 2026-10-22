@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 const schema = readFileSync('prisma/schema.prisma', 'utf8');
-const migration = readFileSync('../prisma/migrations/20261016220000_rebuild_post_deletions/migration.sql', 'utf8');
+const migration = readFileSync('prisma/migrations/20261016220000_rebuild_post_deletions/migration.sql', 'utf8');
 const rehearsal = readFileSync('scripts/cutover-rehearsal.sh', 'utf8');
 const model = schema.split('model RebuildPostDeletion {')[1]?.split('\n}')[0] ?? '';
 const tableDefinition = migration.slice(migration.indexOf('CREATE TABLE'), migration.indexOf('\n);') + 3);

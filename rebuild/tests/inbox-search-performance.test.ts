@@ -74,7 +74,7 @@ describe('Inbox search query budget', () => {
 
 describe('optional trigram migration', () => {
   it('pins the reviewed SQL and skips acceleration only for expected extension installation failures', () => {
-    const sql = readFileSync('../prisma/migrations/20261031170000_rebuild_search_trigrams/migration.sql', 'utf8');
+    const sql = readFileSync('prisma/migrations/20261031170000_rebuild_search_trigrams/migration.sql', 'utf8');
     expect(createHash('sha256').update(sql).digest('hex')).toBe('2a5c27ac493fedbed7174ebb1c2bab19d0f33f220a341cb23b271f42e5cf572e');
     expect(sql).toContain('CREATE EXTENSION IF NOT EXISTS pg_trgm');
     expect(sql).toContain('WHEN insufficient_privilege OR undefined_file OR feature_not_supported THEN');

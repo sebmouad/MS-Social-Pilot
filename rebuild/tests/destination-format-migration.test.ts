@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 const rehearsal = readFileSync('scripts/cutover-rehearsal.sh', 'utf8');
-const migration = readFileSync('../prisma/migrations/20261019020000_rebuild_destination_formats/migration.sql', 'utf8');
+const migration = readFileSync('prisma/migrations/20261019020000_rebuild_destination_formats/migration.sql', 'utf8');
 const hash = createHash('sha256').update(migration).digest('hex');
 
 describe('destination format migration rehearsal guards', () => {
@@ -31,8 +31,8 @@ describe('destination format migration rehearsal guards', () => {
   });
 
   it('keeps deploy and rebuild rollback blocked until the migration and host procedure are reviewed', () => {
-    const deploy = readFileSync('../scripts/deploy/rebuild-deploy.sh', 'utf8');
-    const rollback = readFileSync('../scripts/deploy/rebuild-rollback.sh', 'utf8');
+    const deploy = readFileSync('scripts/deploy/rebuild-deploy.sh', 'utf8');
+    const rollback = readFileSync('scripts/deploy/rebuild-rollback.sh', 'utf8');
     expect(deploy).toContain('REBUILD_CUTOVER_BLOCKED');
     expect(deploy).toContain('approved migration plan compatible with legacy rollback');
     expect(rollback).toContain('REBUILD_ROLLBACK_BLOCKED');

@@ -3,8 +3,9 @@
 # so new tables/functions were owned by postgres and the app role got "permission denied"
 # (e.g. workspace_data_purges), breaking sign-in. Transfers every postgres-owned object in
 # schema public to the app role (owner of the existing legacy tables), then restarts the rebuild.
-# Usage (from app/): bash rebuild/scripts/prod-fix-ownership.sh
+# Usage (any directory in the checkout): bash rebuild/scripts/prod-fix-ownership.sh
 set -euo pipefail
+cd "$(dirname "$0")/.."   # rebuild/
 HOST="${PROD_HOST:-$(grep -o 'root@[0-9.]*' docs/OPERATIONS.md | head -1)}"
 KEY="${PROD_KEY:-$HOME/.ssh/SebMouadSSH}"
 ssh -i "$KEY" "$HOST" 'bash -s' <<'REMOTE'

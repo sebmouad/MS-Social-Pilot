@@ -129,7 +129,7 @@ Load the one that matches before starting.
 | `run-tests` | Before and after every change |
 | `deploy-production` | Shipping or rolling back |
 | `live-facebook-test` | Checking on real Facebook with the test Page (owner's OK) |
-| `db-migration` | Changing `prisma/schema.prisma` |
+| `db-migration` | Changing `rebuild/prisma/legacy-schema.prisma` |
 | `add-network-connector` | Adding a network |
 | `meta-api-integration`, `debug-access-token`, `api-health`, `webhook-setup`, `debug-webhooks`, `search-meta-docs` | Graph API work |
 | `app-review-prep`, `app-health-check`, `compliance-check` | Meta App Review, app settings, policy |

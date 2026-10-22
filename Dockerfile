@@ -15,6 +15,8 @@ RUN apt-get update \
 FROM base AS deps
 COPY package.json package-lock.json ./
 COPY prisma ./prisma
+# The schema and migrations moved under rebuild/prisma (package.json "prisma.schema").
+COPY rebuild/prisma ./rebuild/prisma
 # Dev dependencies stay: the runtime needs two of them — the `prisma` CLI for
 # `migrate deploy` on boot and `tsx` to run the worker — and pruning around
 # them saves little next to what those two weigh.
@@ -48,6 +50,7 @@ COPY --from=build /app/public ./public
 COPY --from=build /app/node_modules/.prisma ./node_modules/.prisma
 COPY package.json next.config.mjs ./
 COPY prisma ./prisma
+COPY rebuild/prisma ./rebuild/prisma
 COPY scripts ./scripts
 COPY src ./src
 COPY messages ./messages

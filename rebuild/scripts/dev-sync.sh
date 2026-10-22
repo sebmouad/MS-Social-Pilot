@@ -4,8 +4,9 @@
 # rebuild/ source edits to the server every second; next dev hot-reloads them.
 # Ctrl+C stops syncing, closes the tunnel and stops the dev server (frees its resources).
 # Requires Root app.developmentOrigins to contain http://localhost:${DEV_PORT}.
-# Usage (from app/): bash rebuild/scripts/dev-sync.sh
+# Usage (any directory in the checkout): bash rebuild/scripts/dev-sync.sh
 set -euo pipefail
+cd "$(dirname "$0")/.."   # rebuild/
 HOST="${PROD_HOST:-$(grep -o 'root@[0-9.]*' docs/OPERATIONS.md | head -1)}"
 KEY="${PROD_KEY:-$HOME/.ssh/SebMouadSSH}"
 DEV_PORT="${DEV_PORT:-3110}"
@@ -29,6 +30,6 @@ while true; do
   rsync -az --delete -e "${SSH[*]}" \
     --exclude node_modules --exclude .next --exclude generated --exclude '.env*' \
     --exclude test-results --exclude '*.log' \
-    rebuild/ "$HOST:$REMOTE_DIR" 2>/dev/null || true
+    ./ "$HOST:$REMOTE_DIR" 2>/dev/null || true
   sleep "$SYNC_SECONDS"
 done

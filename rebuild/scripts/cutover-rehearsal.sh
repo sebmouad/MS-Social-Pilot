@@ -15,7 +15,7 @@ approved_migrations='20261015120000_mcp_api_keys,20261023100000_rebuild_worker_j
 [ "$CUTOVER_APPROVED_MIGRATION_SET" = "$approved_migrations" ] || fail "migration set must exactly match the reviewed staging allowlist"
 [ -f "$CUTOVER_STAGING_DUMP" ] || fail "staging dump does not exist"
 
-ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"   # rebuild/ (migrations and schema live here)
 migration_dir="$ROOT/prisma/migrations"
 verify_migration() {
   local name="$1" expected="$2" path="$migration_dir/$1/migration.sql" actual
