@@ -1,4 +1,4 @@
-# Session handover (2026-10-22)
+# Session handover (2026-10-22, after design v2 B9)
 
 Everything needed to continue is in Git. Start a new session in a fresh clone of
 `sebmouad/MS-Social-Pilot` and read, in order: `AGENTS.md`, `CLAUDE.md`,
@@ -9,21 +9,47 @@ Everything needed to continue is in Git. Start a new session in a fresh clone of
 
 | Area | State |
 | --- | --- |
-| Repository | Only `rebuild/` plus agent files. Legacy app deleted (`07c2394f`). Migrations squashed into `20261103000000_baseline`. |
-| Production | https://social.newsgeet.com runs `bf84cb8f` (health 200, web+worker active). Deploy: `bash rebuild/scripts/prod-deploy.sh` (host from `rebuild/docs/OPERATIONS.md`, key `~/.ssh/SebMouadSSH`). |
+| Repository | Only `rebuild/` plus agent files. `main` is `2fde8abd` (design v2 B9), pushed and verified on `origin/main`. Working tree clean. |
+| Production | https://social.newsgeet.com still runs `bf84cb8f` (B9 **not** deployed — deploy blocked, see below). When unblocked, deploy with `bash rebuild/scripts/prod-deploy.sh` (host from `rebuild/docs/OPERATIONS.md`, key `~/.ssh/SebMouadSSH`). |
 | Server | Legacy units, `/srv/ms-social-pilot{,.prev}`, legacy deploy guard and 5 unmapped tables removed after backup `/var/backups/legacy-cleanup-20261022110559` (also `/var/backups/legacy-removal-202610221216`, verified restore). Media root `/var/lib/ms-social-pilot/media`. |
 | Legacy parity | Sweep `LEGACY_SWEEP_2026-10-21.md`: 0 missing. Dropped by owner: Facebook Groups, old API tokens, Facebook colored text backgrounds. Nine non-Facebook connectors installed, off by default, no live-provider evidence. |
-| Design v2 | B1–B8 merged and deployed. **Next: B9 verification** (see `design-v2/08-BUILD_PLAN.md`): remove `SidebarDock`/Page tools adapter, update `scripts/verify-*` selectors for new Composer/Inbox/Settings/Root, real browser checks (themes, phone/desktop, keyboard, FR). |
-| Tests | 11,688 pass; typecheck and `next build` pass. Full suite: `npx vitest run --exclude "**/facebook-diagnostic-transport.test.ts" --testTimeout 30000` from `rebuild/`. |
+| Design v2 | B1–B9 merged. B9 (`2fde8abd`): SidebarDock/ModeToggle/Page-tools adapter deleted, 8 `scripts/verify-*` selectors rewritten, data-deletion sentences in Root `public.content` (EN/FR), atomic Root token refresh, Inbox reply-box saved-replies menu + bulk Assign (UI/REST/MCP, confirmation, audit). Schema **136**. |
+| Tests | Typecheck 0 errors; full suite 724 files / 11,726 tests pass, 5 fail (known sandbox-only `facebook-native-http` loopback `listen EPERM ::1`; rerun where sockets are permitted); `npx next build` passes. Full suite: `npx vitest run --exclude "**/facebook-diagnostic-transport.test.ts" --testTimeout 30000` from `rebuild/`. |
+
+## Deploy blocked (exact reason)
+
+`bash rebuild/scripts/prod-deploy.sh` was **not** run to completion. In this
+session the sandbox blocks it twice over, proven by independent probes:
+
+- `ssh` cannot start: even `ssh -G` (no network) fails with `No user exists
+  for uid 501` (exit 255); the sandbox hides user-name resolution, which
+  OpenSSH requires.
+- Raw TCP to `213.246.45.75:22` fails with `EPERM`.
+
+`require_escalated` is unavailable because approval prompts are disabled
+(`--approval-mode never`). Nothing on the server was touched: no backup, no
+build, no migration, no swap. To ship B9, run this from a normal terminal
+(not this sandboxed session), after `git pull`:
+
+```sh
+bash rebuild/scripts/prod-deploy.sh
+```
+
+Then verify the B9 screens live in the owner's Chrome with real data, and
+update the Production row above with the new SHA.
 
 ## Known open items
 
-- B9 verification batch (above); no real-browser evidence for the v2 screens yet.
-- Root manual token refresh should update destination token + expiry atomically (lane 46 note). Mastodon supports one Root-configured server.
-- Inbox: no saved-replies menu inside the reply box, no bulk Assign, phone bottom-sheet not built.
-- Data-deletion page copy is a code constant, not Root-managed (violates no-hardcoded rule).
-- Owner action: repoint Meta dashboard deauthorize/data-deletion URLs to `/api/platforms/facebook/deauthorize` and `/data-deletion`.
-- Live-provider, MCP-client and release gates in `ARCHITECTURE_CONTRACT.md` §10 remain open.
+- B9 follow-ups: full v2 browser matrix on the rewritten selectors; assign
+  dialog + saved-replies menu at desktop/phone widths in EN/FR with
+  keyboard; live-provider token renewal run; `DESIGN.md` Layout section
+  still describes the pre-v2 two-sidebar shell.
+- Saved `home.shellCopy` catalogs carrying `pageTools` keys read as the
+  shipped default until re-saved in Root (strict-schema read + default).
+- Owner action: repoint Meta dashboard deauthorize/data-deletion URLs to
+  `/api/platforms/facebook/deauthorize` and `/data-deletion`.
+- Live-provider, MCP-client and release gates in
+  `ARCHITECTURE_CONTRACT.md` §10 remain open.
 
 ## Working method (owner rules)
 
