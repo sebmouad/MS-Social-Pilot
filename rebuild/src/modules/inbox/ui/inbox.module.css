@@ -27,7 +27,9 @@
 
 .split { display: grid; grid-template-columns: minmax(280px, 380px) minmax(0, 1fr); align-items: stretch; gap: 16px; min-width: 0; height: max(480px, calc(100dvh - var(--inbox-top-offset, 220px))); }
 .listPane, .threadPane { min-width: 0; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface); }
-.listPane { display: grid; grid-template-rows: auto minmax(0, 1fr); align-content: stretch; min-height: 0; overflow: hidden; }
+.listPane { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+.listPane > .list { flex: 1 1 auto; min-height: 0; }
+.listPane > .bulk, .listPane > .listHead { flex: 0 0 auto; }
 .listHead { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; padding: 14px 16px; border-bottom: 1px solid var(--line); }
 .listHead h2 { margin: 0; font-size: 15px; }
 .listHead span { color: var(--ink-soft); font-size: 12px; }

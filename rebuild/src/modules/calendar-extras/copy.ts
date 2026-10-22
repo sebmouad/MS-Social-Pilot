@@ -47,7 +47,7 @@ export const copy = {
   updated: 'Dernière utilisation', never: 'Pas encore', holidays: 'Jours fériés', searches: 'Recherches récentes', source: 'Données enregistrées', unknown: 'Indisponible',
   keywords: 'Mots-clés des sujets (séparés par des virgules)', keywordsHint: 'Une liste vide affiche tous les sujets enregistrés. Ces mots-clés sont partagés dans votre espace.',
   showAll: 'Afficher tous les sujets', fresh: 'Récupéré le', country: 'Pays', trendEmpty: 'Aucun sujet récent enregistré pour cette audience.',
-  noCoverage: 'Aucune couverture des jours fériés enregistrée pour', seasonNotice: 'La programmation saisonnière automatique n’est pas encore disponible. Vous pouvez enregistrer les saisons pour préparer votre calendrier ; les publications déjà programmées restent inchangées.',
+  noCoverage: 'Aucune couverture des jours fériés enregistrée pour', seasonNotice: 'La programmation saisonnière automatique n’est pas encore disponible. Vous pouvez enregistrer les saisons pour préparer votre calendrier ; les publications déjà programmées restent inchangées.',
   notesCaption: 'Notes datées de ce graphique', global: 'Tout l’espace', feedInvalid: 'Cet abonnement au calendrier est indisponible.',
  }
 };

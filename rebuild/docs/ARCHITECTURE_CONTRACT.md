@@ -85,6 +85,8 @@ Adding a provider requires a tested module and a shipped application release. Ro
 
 Use route families `/publishing/*`, `/inbox/*`, `/analytics/*`, `/ads/*`, `/settings/*`, `/root/*` as needed, with no `/app` prefix. Canonical routes are declared consistently by manifests. No old-URL compatibility requirement.
 
+User decision, 2026-10-21 (design v2 decision record, [design-v2/README.md](design-v2/README.md)): **route families become `/content/*`, `/create`, `/insights/*` beside `/inbox/*`, `/settings/*`, `/root/*`; old `/publishing/*`, `/analytics/*`, `/ads/*` redirect with 308.** Reason: customer navigation is by area (Home, Content, Inbox, Insights), not by module. Modules, services and authorization are unchanged. Routes move batch by batch (B2 to B5); until a batch lands its old routes stay canonical.
+
 Thin UI/API/MCP entry points call shared application services. Services own tenant checks, state transitions, persistence, auditing, and module dispatch. Do not fork the business rules across interfaces.
 
 ## 5. Customer resource and data control
@@ -102,6 +104,8 @@ Thin UI/API/MCP entry points call shared application services. Services own tena
 Use one new branded design system with selectable themes across all routes, including Root. [../DESIGN.md](../DESIGN.md) owns visual decisions; [../UX-CONTRACT.md](../UX-CONTRACT.md) owns observable behavior.
 
 Navigation, filters, channel/ad-account pickers and route controls belong in the sidebar system, with accessible responsive equivalents. Avoid duplicate settings navigation, duplicate permissions pages, and wrapping pill controls. Use shared buttons, forms, tables, dialogs, feedback and selection patterns.
+
+User decision, 2026-10-21 (design v2 decision record): **one collapsible sidebar holds the areas and the channel list that scopes every page; each page has one Filter button in its header; Clean is the default theme for new users.** This replaces the sentence above that places filters in the sidebar system and the two-sidebar layout. Reason: the owner asked for a simpler, more efficient interface. Number caveats sit behind ⓘ. The shell changes in batch B1; accessible responsive equivalents remain required.
 
 Customer screens expose only usable/entitled features. Provider credentials, app review/setup status, module enablement instructions and technical errors belong to Root/operator surfaces. Customer errors explain a useful recovery action without leaking internals.
 

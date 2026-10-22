@@ -52,7 +52,8 @@ describe('inbox message history scrolling', () => {
   it('bounds the desktop layout so the list and the history scroll inside their panes', () => {
     const css = readFileSync('src/modules/inbox/ui/inbox.module.css', 'utf8');
     expect(css).toMatch(/\.split \{[^}]*height: max\(480px, calc\(100dvh - var\(--inbox-top-offset, 220px\)\)\)/);
-    expect(css).toMatch(/\.listPane \{[^}]*grid-template-rows: auto minmax\(0, 1fr\)/);
+    expect(css).toMatch(/\.listPane \{[^}]*(grid-template-rows: auto minmax\(0, 1fr\)|flex-direction: column)/);
+    expect(css).toMatch(/\.listPane > \.list \{[^}]*min-height: 0/);
     expect(css).toMatch(/\.threadPane \{[^}]*flex-direction: column[^}]*overflow: hidden/);
     expect(css).toMatch(/\.threadScroll \{[^}]*overflow-y: auto/);
     expect(css).toMatch(/@media \(max-width: 900px\)[\s\S]*\.split \{ height: auto; \}/);

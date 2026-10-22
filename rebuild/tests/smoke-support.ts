@@ -114,6 +114,8 @@ class StubPrismaClient {
 vi.mock('../generated/client', async (importOriginal) => ({ ...(await importOriginal<Record<string, unknown>>()), PrismaClient: StubPrismaClient }));
 
 vi.mock('server-only', () => ({}));
+// next/font is a build-time transform; outside Next it is not callable.
+vi.mock('next/font/google', () => ({ Inter: () => ({ variable: '--font-inter', className: 'inter' }) }));
 
 vi.mock('next/headers', () => {
   const cookieJar = () => ({

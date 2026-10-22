@@ -14,7 +14,7 @@ import { ROOT_CONFIG_COPY } from '@/lib/config/root-config-copy';
 import { moduleManifests } from '@/modules';
 import { z } from 'zod';
 import { entry, optionList, options } from '@/lib/config/entry';
-import { MODES, THEMES } from '@/lib/themes';
+import { DEFAULT_THEME, MODES, THEMES } from '@/lib/themes';
 import { WORKSPACE_JOB_ACCESS_DEFAULTS, WORKSPACE_JOB_OWNER_POLICY_SCHEMA, WORKSPACE_JOB_OWNER_LIMIT_SCHEMA } from '@/server/jobs/access-policy';
 import { MAIL_CONFIG } from '@/server/mail/config';
 import { ROOT_LEGACY_CONFIG } from '@/server/root/legacy/config';
@@ -143,6 +143,6 @@ export const SHARED_CONFIG = [
   entry({ key: 'mcp.requestsPerMinute', group: 'MCP', label: 'MCP requests per minute', kind: 'number', description: 'Per-user request budget for MCP operations.', defaultValue: 60, schema: z.number().int().min(1).max(100000), consumption: 'active' }),
   entry({ key: 'mcp.maxResultItems', group: 'MCP', label: 'Maximum MCP result items', kind: 'number', description: 'Maximum rows returned by a single MCP list operation.', defaultValue: 100, schema: z.number().int().min(1).max(1000), consumption: 'active' }),
   entry({ key: 'theme.defaultMode', group: 'Theme defaults', label: 'Default light or dark mode', kind: 'select', description: 'Mode used when a visitor has not chosen one. Match device follows the system light/dark preference.', defaultValue: 'system', schema: optionList(MODES.map((mode) => mode.id)), consumption: 'active', options: options(MODES) }),
-  entry({ key: 'theme.default', group: 'Theme defaults', label: 'Default workspace theme', kind: 'select', description: 'Theme used when a visitor has no saved theme preference.', defaultValue: THEMES[0].id, schema: optionList(THEMES.map((theme) => theme.id)), consumption: 'active', options: options(THEMES) }),
+  entry({ key: 'theme.default', group: 'Theme defaults', label: 'Default workspace theme', kind: 'select', description: 'Theme used when a visitor has no saved theme preference.', defaultValue: DEFAULT_THEME, schema: optionList(THEMES.map((theme) => theme.id)), consumption: 'active', options: options(THEMES) }),
   entry({ key: 'operations.supportEmail', group: 'Operations', label: 'Support email', kind: 'text', description: 'Contact address shown to operators.', defaultValue: '', schema: z.union([z.literal(''), z.string().email()]), consumption: 'planned' }),
 ] as const;

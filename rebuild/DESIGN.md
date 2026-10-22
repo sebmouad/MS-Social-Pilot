@@ -234,3 +234,15 @@ Vivid/Meta blue/Warm/Clean in light/dark; older Grove/Coast/Clay/Nightfall brows
 results retain only their original dated scope. Verify current language, keyboard,
 failure recovery, desktop/phone and theme states with synthetic local data;
 production planning/provider results cannot substitute for that UI evidence.
+
+## Design v2 decisions (batch B0, 2026-10-21)
+
+Source: [docs/design-v2/README.md](docs/design-v2/README.md) decision record (owner-approved), with tokens in [docs/design-v2/02-FOUNDATIONS.md](docs/design-v2/02-FOUNDATIONS.md). Where these lines conflict with older text above, these win.
+
+- **Default theme is Clean** for new users (decision 2026-10-21, "Default theme for new users is Clean (Root `theme.default`); Vivid, Meta blue and Warm stay selectable"). Existing users keep their saved theme. Supersedes the Vivid default.
+- **One collapsible sidebar with areas and a channel list; tabs inside areas; a Filter button in the page header** (decision 2026-10-21). Supersedes the "two left sidebars" rule and filters in the sidebar. The shell changes in B1; until then the current shell remains.
+- **Areas Home · Content · Inbox · Insights** (FR Accueil · Contenu · Messages · Statistiques); Tasks and Agency only when used. Area colours are `--area-*` tokens, pairwise distinct per palette and mode.
+- **Content is Table plus side preview**; Feed and Cards are removed (decision 2026-10-21). Supersedes "Table as the default, with Feed and Cards available".
+- **Number caveats live behind ⓘ**, partial results show ⚠ (decision 2026-10-21).
+- **Tokens (B0):** Inter loaded with `next/font` (`--font-inter`); nine type sizes `--text-2xs…--text-metric`; five radii; `--shadow-card/pop/sheet`; `--ease-fast/ease/ease-sheet`; control heights 32/40/44; `--on-mod`; `--success`/`--success-soft` for positive states (`--ui-good*` remain as deprecated aliases); fields and controls draw their border with `--control-border`; every chart slot is at least 3:1 on the surface; focus is a 2 px `--focus` outline with 2 px offset everywhere.
+- The "round 4" override layer is deleted; its values are folded into the base declarations. The card, page-header and chrome descriptions in "Design pass 2026-10-21" above describe those folded values.

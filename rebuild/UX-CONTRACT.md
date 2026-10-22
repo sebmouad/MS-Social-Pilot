@@ -578,3 +578,14 @@ Vivid/Meta blue/Warm/Clean in light/dark; older Grove/Coast/Clay/Nightfall brows
 results retain only their original dated scope. Verify current language, keyboard,
 failure recovery, desktop/phone and theme states with synthetic local data;
 production planning/provider results cannot substitute for that UI evidence.
+
+## Design v2 decisions (batch B0, 2026-10-21)
+
+Source: [docs/design-v2/README.md](docs/design-v2/README.md) decision record (owner-approved). Behaviour changes ship batch by batch (B1 to B9); a row above stays current until its batch lands.
+
+- Clean is the default theme for new users; saved choices are kept.
+- Navigation target: one sidebar with areas Home · Content · Inbox · Insights and a channel list that scopes every page; a Filter button per page (B1). Supersedes filters in the contextual sidebar.
+- Content target: Table with side preview; Feed and Cards views removed, old `view=feed|cards` values open the table with a one-time notice (B3). Supersedes "Feed and Cards, alongside default Table".
+- Number caveats sit behind ⓘ; partial results show ⚠ (B5).
+- Phone first-class flows: Inbox replies, Create, post status, Insights numbers.
+- Form fields and controls use `--control-border` (3:1); focus is a 2 px outline on every control.

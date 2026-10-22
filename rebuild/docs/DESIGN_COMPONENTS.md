@@ -92,3 +92,7 @@ At 480px and below each row becomes a labeled card (`td[data-label]`), so no sid
 ## Known gaps
 
 No browser/visual run was done for round 2; verify light/dark in all four themes at 1440px and 390px before release. Popups (`Select`, `Menu`) are positioned below the trigger and do not flip near the viewport bottom. Phone card layout drops header sort controls. Existing screens still use native selects and local table markup until their owners opt in.
+
+## Tokens after B0 (design v2)
+
+Components read shared tokens only: text `--text-2xs…--text-metric` (nine sizes), radius `--radius-xs/sm/md/lg/full`, elevation `--shadow-card/pop/sheet`, motion `--ease-fast/ease/ease-sheet`, heights `--control-h-sm/h/h-touch`, `--row-h`, `--row-h-compact`, colour `--on-mod`, `--success(-soft)`, `--area-*`. Legacy `--control-height*`, `--text-base`, `--card-lift*` and `--ui-good*` remain as aliases until their consumers migrate. Contract: [design-v2/02-FOUNDATIONS.md](design-v2/02-FOUNDATIONS.md), [design-v2/03-COMPONENTS.md](design-v2/03-COMPONENTS.md). Guarded by `tests/design-tokens-v2.test.ts`.

@@ -14,6 +14,7 @@ import { PUBLISHING_MODULE_CONFIG } from './publishing/config';
 import { SETTINGS_MODULE_CONFIG } from './settings/config';
 import { SHARING_CONFIG } from './sharing/config';
 import { TASKS_CONFIG } from './tasks/config';
+import { CALENDAR_EXTRAS_CONFIG } from './calendar-extras/config';
 
 /**
  * Root settings of every installed product module, in installation order. A module adds or
@@ -21,6 +22,7 @@ import { TASKS_CONFIG } from './tasks/config';
  */
 export const INSTALLED_MODULE_CONFIG = [
   ...HOME_CONFIG,
+  ...CALENDAR_EXTRAS_CONFIG,
   ...ADS_MODULE_CONFIG,
   ...ANALYTICS_MODULE_CONFIG,
   ...SETTINGS_MODULE_CONFIG,

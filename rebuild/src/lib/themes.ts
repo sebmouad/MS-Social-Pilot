@@ -9,6 +9,8 @@ export const THEMES = [
   { id: 'clean', name: 'Clean', description: 'Near-white and crisp gray; color only in icons and charts.', swatches: ['#ffffff', '#111318', '#2563eb', '#16a34a'] },
 ] as const;
 export type ThemeId = typeof THEMES[number]['id'];
+/** Theme for visitors with no saved choice (owner decision 2026-10-21: Clean). Root `theme.default` may override it. */
+export const DEFAULT_THEME: ThemeId = 'clean';
 export const MODES = [
   { id: 'light', name: 'Light' },
   { id: 'dark', name: 'Dark' },

@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useCallback, useContext, useMemo, useRef, useState, type ReactNode } from 'react';
-import { THEMES, isModeId, isThemeId, type ModeId, type ThemeId } from '@/lib/themes';
+import { DEFAULT_THEME, THEMES, isModeId, isThemeId, type ModeId, type ThemeId } from '@/lib/themes';
 import { appearanceCopy, type AppearanceCopy } from '@/modules/settings/ui/appearance/copy';
 export { MODE_COOKIE, MODES, THEME_COOKIE, THEMES, type ModeId, type ThemeId } from '@/lib/themes';
 
@@ -17,7 +17,7 @@ type ThemeState = Appearance & {
 const ThemeContext = createContext<ThemeState | null>(null);
 
 export function ThemeProvider({ initialTheme, initialMode, copy = appearanceCopy.en, children }: { initialTheme: string; initialMode?: string; copy?: AppearanceCopy; children: ReactNode }) {
-  const [theme, setCurrentTheme] = useState<ThemeId>(isThemeId(initialTheme) ? initialTheme : THEMES[0].id);
+  const [theme, setCurrentTheme] = useState<ThemeId>(isThemeId(initialTheme) ? initialTheme : DEFAULT_THEME);
   const [mode, setCurrentMode] = useState<ModeId>(isModeId(initialMode) ? initialMode : 'system');
   const saved = useRef<Appearance>({ theme, mode });
   const inFlight = useRef(false);

@@ -32,7 +32,7 @@ describe('shared component color pairs', () => {
     it(`${theme.name} ${mode}: text on component surfaces meets WCAG AA`, () => {
       const t = resolver(theme.id, mode);
       const pairs: Array<[string, string]> = [
-        ['ui-good', 'ui-good-soft'], ['ui-good', 'surface'], ['ui-good', 'surface-muted'],
+        ['success', 'success-soft'], ['success', 'surface'], ['success', 'surface-muted'],
         ['ink', 'accent-soft'], ['ink', 'surface-hover'], ['ink', 'surface-muted'], ['ink-soft', 'surface-hover'],
         ['accent', 'surface-hover'], ['danger', 'surface-muted'], ['on-danger', 'danger'],
       ];

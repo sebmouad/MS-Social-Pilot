@@ -41,10 +41,10 @@ describe('shared responsive CSS (phone 390px, tablet 768px)', () => {
     expect(phone).toContain('.ui-button');
     expect(phone).toContain('.ui-icon-button');
     expect(phone).toContain('min-height: var(--control-height-touch)');
-    expect(tokens).toContain('--control-height-touch: 44px');
+    expect(tokens).toContain('--control-h-touch: 44px');
   });
   it('uses 16px form text on phones to avoid iOS zoom', () => {
-    expect(media(responsive, '(max-width: 760px)')).toMatch(/\.ui-input[^}]*font-size: 16px/);
+    expect(media(responsive, '(max-width: 760px)')).toMatch(/\.ui-input[^}]*font-size: var\(--text-lg\)/);
   });
   it('keeps toasts above the bottom navigation and inside the safe area', () => {
     expect(components).toContain('bottom: calc(76px + env(safe-area-inset-bottom))');
