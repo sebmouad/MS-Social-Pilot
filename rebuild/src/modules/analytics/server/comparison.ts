@@ -137,6 +137,7 @@ function comparison(current: ComparisonInput, previous: ComparisonInput): Compar
     return { previous: previousValue, delta: null, percent: null, status: 'coverage_changed' };
   }
   if (current.available === 0 || current.coverage !== current.available || current.kind !== previous.kind || current.aggregationLabel !== previous.aggregationLabel ||
+      current.audienceGrowth?.kind !== previous.audienceGrowth?.kind || current.audienceGrowth?.direction !== previous.audienceGrowth?.direction ||
       !['stock', 'flow', 'ratio'].includes(current.kind) || current.total === null || previousValue === null ||
       current.displayTotal !== undefined || previous.displayTotal !== undefined || !Number.isFinite(current.total) || !Number.isFinite(previousValue)) {
     return { previous: previousValue, delta: null, percent: null, status: 'not_comparable' };

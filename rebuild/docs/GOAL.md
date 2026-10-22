@@ -31,3 +31,7 @@ Continue from [DELIVERY_PLAN.md](DELIVERY_PLAN.md) and
 [AGENT_HANDOFF.md](AGENT_HANDOFF.md). Retain the full
 [legacy inventory](LEGACY_CAPABILITY_PARITY.md) and release/recovery gates.
 This docs worker runs local checks only; no servers, deploy, push or production.
+
+## Legacy shell lane q-35 — 2026-10-22
+
+Source update: installable app shell (dynamic public branding/manifest, offline-only service worker, icons and bilingual Appearance controls), global cross-site mutation middleware and neutral likes-versus-followers growth identity are implemented in the working tree. See [PLATFORM_SHELL_Q35.md](PLATFORM_SHELL_Q35.md) for exact evidence and remaining checks. New Root key: `settings.webApp`; integrator must bump CONFIG_SCHEMA_VERSION (unchanged here). Existing `meta.metricLabels` and `analytics.overviewCopy` gain copy entries with saved-catalog compatibility. No new database table, migration, background job or provider write. Browser service workers are local browser infrastructure; existing audience synchronization stays under shared worker leases/run history. No server, deploy, commit, push or production action was authorized in this lane. These source changes do not close real browser/provider/release gates or unrelated historical gaps. Facebook Groups are dropped by owner decision 2026-10-22; historical missing-feature statements above do not authorize Groups work.

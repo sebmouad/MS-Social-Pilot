@@ -1,3 +1,4 @@
+import { WEB_APP_MCP } from './web-app/mcp';
 import { changeConnectionSelections } from './server/connection-selection';
 import { exportWorkspaceArchive } from '@/server/data-control/archive';
 import { ACCOUNT_MCP } from './account-mcp';
@@ -26,6 +27,7 @@ import { connectionDirectoryFeatures, connectionDirectoryToolDefinitions, connec
 /** MCP tool groups this module installs. The host merges installed groups; edit only here. */
 export const SETTINGS_MCP: readonly McpToolGroup[] = [
   SESSION_PARITY_MCP,
+  WEB_APP_MCP,
   CONNECTION_START_MCP,
   AGENCY_SESSION_MCP,
   ACCOUNT_MCP,

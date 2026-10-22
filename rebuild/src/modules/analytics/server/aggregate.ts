@@ -5,6 +5,7 @@ import { aggregateValues, type AnalyticsAudienceEntry, type AnalyticsKind, type 
 export type MetricView = {
   key: string;
   label: string;
+  audienceGrowth?: AnalyticsMetricInput['audienceGrowth'];
   sourceLabel: string;
   resourceKind: 'channel' | 'ad-account';
   aggregationLabel: string;
@@ -73,6 +74,7 @@ function metricView(input: AnalyticsMetricInput, copy: WorkspaceCopy, locale: 'e
   return {
     key: input.key,
     label: input.label,
+    ...(input.audienceGrowth ? { audienceGrowth: { ...input.audienceGrowth } } : {}),
     sourceLabel: input.sourceLabel,
     resourceKind: input.resourceKind ?? 'channel',
     aggregationLabel: input.aggregationLabel ?? (input.kind === 'breakdown' ? t("Latest category values")

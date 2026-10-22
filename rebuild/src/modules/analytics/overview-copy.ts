@@ -2,6 +2,8 @@ import { z } from 'zod';
 import { copySchema } from '@/lib/config/copy-schema';
 
 const en = {
+  "About audience growth": "About audience growth",
+  "Likes and followers are different measures. Growth is shown separately for each.": "Likes and followers are different measures. Growth is shown separately for each.",
   "No match": "No match",
   "Report filters": "Report filters",
   "Stored calendar dates (UTC)": "Stored calendar dates (UTC)",
@@ -118,6 +120,8 @@ const en = {
   "Relative engagement by weekday and hour ({zone}), from {posts} measured posts. Each channel is compared with its own typical post.": "Relative engagement by weekday and hour ({zone}), from {posts} measured posts. Each channel is compared with its own typical post."
 };
 const fr: typeof en = {
+  "About audience growth": "À propos de l’évolution de l’audience",
+  "Likes and followers are different measures. Growth is shown separately for each.": "Les mentions J’aime et les abonnés sont des mesures différentes. Leur évolution est présentée séparément.",
   "No match": "Aucun résultat",
   "Report filters": "Filtres du rapport",
   "Stored calendar dates (UTC)": "Dates enregistrées (UTC)",
@@ -243,7 +247,10 @@ export function overviewText(copy: OverviewCopy) {
 export const overviewCopyCatalogDefaults = Object.fromEntries(Object.keys(en).map(key => [key, { en: en[key as keyof typeof en], fr: fr[key as keyof typeof en] }])) as { [K in keyof typeof en]: { en: string; fr: string } };
 const text = z.string().min(1).max(4000).refine(value => value.trim().length > 0);
 const pair = z.object({ en: text, fr: text }).strict();
-export const overviewCopySchema = z.object(Object.fromEntries(Object.keys(en).map(key => [key, pair])) as unknown as { [K in keyof typeof en]: typeof pair }).strict();
+export const overviewCopySchema = z.object(Object.fromEntries(Object.keys(en).map(key => [key,
+  key === 'About audience growth' || key === 'Likes and followers are different measures. Growth is shown separately for each.'
+    ? pair.default(overviewCopyCatalogDefaults[key]) : pair,
+])) as unknown as { [K in keyof typeof en]: typeof pair }).strict();
 export function overviewLocaleCopy(catalog: typeof overviewCopyCatalogDefaults, locale: 'en' | 'fr'): typeof en {
   return Object.fromEntries(Object.entries(catalog).map(([key, value]) => [key, value[locale]])) as typeof en;
 }

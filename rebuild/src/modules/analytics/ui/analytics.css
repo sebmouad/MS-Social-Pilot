@@ -38,6 +38,8 @@
 .analytics-metric__heading h3 { margin: 0; font-size: 16px; overflow-wrap: anywhere; }
 .analytics-metric__heading p { margin: 6px 0 0; color: var(--ink-soft); font-size: 13px; }
 .analytics-aggregation-note { max-width: 72ch; color: var(--ink-soft); font-size: 13px; line-height: 1.45; }
+.analytics-aggregation-note > summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; gap: var(--space-2); color: var(--ink); }
+.analytics-aggregation-note > summary:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .analytics-metric__heading > strong { color: var(--ink); font-size: 20px; font-variant-numeric: tabular-nums; text-align: right; overflow-wrap: anywhere; }
 .analytics-metric__comparison { margin: 14px 0 0; color: var(--ink-soft); font-size: 13px; line-height: 1.5; }
 .analytics-series-preview { margin-top: 14px; }

@@ -485,3 +485,9 @@ Fresh local checks: TypeScript zero errors; parity guard 22/22 and config valida
 Root config search test times out (also reproduced in the focused rerun). See the
 appended release-gate entry for exact commands. Full suite is not green. Git
 metadata is outside writable roots, so no commit; no push is authorized here.
+
+## Legacy shell lane q-35 — 2026-10-22
+
+Source update: installable app shell (dynamic public branding/manifest, offline-only service worker, icons and bilingual Appearance controls), global cross-site mutation middleware and neutral likes-versus-followers growth identity are implemented in the working tree. See [PLATFORM_SHELL_Q35.md](PLATFORM_SHELL_Q35.md) for exact evidence and remaining checks. New Root key: `settings.webApp`; integrator must bump CONFIG_SCHEMA_VERSION (unchanged here). Existing `meta.metricLabels` and `analytics.overviewCopy` gain copy entries with saved-catalog compatibility. No new database table, migration, background job or provider write. Browser service workers are local browser infrastructure; existing audience synchronization stays under shared worker leases/run history. No server, deploy, commit, push or production action was authorized in this lane. These source changes do not close real browser/provider/release gates or unrelated historical gaps. Facebook Groups are dropped by owner decision 2026-10-22; historical missing-feature statements above do not authorize Groups work.
+
+Q-35 final verification: rebuild TypeScript zero errors; PWA/parity/config 67/67 and cross-site/audience/REST-MCP/UX 242/242 pass. Required full suite: 660 passed files, 1 failed, 49 skipped (10,288 passed tests, 5 failed, 2,191 skipped); all failures are unchanged facebook-native-http loopback `listen EPERM ::1`. Build blocked by Google Fonts DNS. New checks are green, but full-suite/build/browser release gates remain open. Changes left uncommitted.

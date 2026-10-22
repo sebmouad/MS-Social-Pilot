@@ -163,6 +163,22 @@ describe('v1 through the actual MCP host', () => {
     expect(await response.json()).toMatchObject({ metrics: [{ previousPoints: [{ date: '2026-10-19', value: 2 }], comparison: { previous: 2 } }] });
     expect(snapshotRead).toHaveBeenCalledWith(state.key, {}, { allowedChannelIds: ['channel-a'] });
   });
+  it('preserves normalized audience growth identity through REST and MCP metric details', async () => {
+    state.key = viewer({}, { 'analytics/overview': { read: true, write: true } }, { all: false, ids: ['channel-a'] });
+    const audienceGrowth = { kind: 'likes', direction: 'lost' };
+    snapshotRead.mockResolvedValue({
+      period: { range: {}, start: '2026-10-20', end: '2026-10-20' },
+      allMetrics: [{ key: 'growth-series', label: 'Lost likes', audienceGrowth, points: [{ date: '2026-10-20', value: 3 }], rows: [] }],
+      comparisons: {}, previousPoints: {},
+    });
+    const input = { metricKey: 'growth-series', kind: 'points', targetIds: ['channel-a'] };
+    const response = await analyticsRoute.GET(keyed(`/api/v1/analytics/get_analytics_metric_details?input=${encodeURIComponent(JSON.stringify(input))}`), { params: Promise.resolve({ operation: 'get_analytics_metric_details' }) });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ metric: { audienceGrowth } });
+    const result = await dispatch(state.key, { jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'get_analytics_metric_details', arguments: input } });
+    expect(await result.json()).toMatchObject({ result: { structuredContent: { metric: { audienceGrowth } } } });
+    expect(snapshotRead).toHaveBeenCalledWith(state.key, { filter: '1', channel: ['channel-a'], metric: 'growth-series' }, { allowedChannelIds: ['channel-a'] });
+  });
   it('does not let an Ads creation omit its confirmation', async () => {
     state.key = viewer({}, { 'ads/campaigns': { read: true, write: true } });
     const response = await adsRoute.POST(keyed('/api/v1/ads/create_ad_campaign', 'POST', { adAccountId: 'account-a', name: 'Example', objective: 'traffic' }), { params: Promise.resolve({ operation: 'create_ad_campaign' }) });

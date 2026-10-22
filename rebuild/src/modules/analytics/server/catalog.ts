@@ -7,6 +7,12 @@ export type AnalyticsAdAccount = { id: string; name: string; currency: string | 
 export type AnalyticsObservation = { date: Date; channelId: string; channelLabel: string; value: number };
 export type AnalyticsMetricRow = { label: string; value: number; asOf: Date | null };
 
+/** Provider-normalized growth identity. A missing identity is unknown, never inferred from a label. */
+export type AnalyticsAudienceGrowthIdentity = {
+  kind: 'likes' | 'followers';
+  direction: 'gained' | 'lost';
+};
+
 /** One stored category snapshot; never summed across dates or resources. */
 export type AnalyticsBreakdownSnapshot = {
   resourceId: string; resourceLabel: string; asOf: Date; fetchedAt: Date;
@@ -17,6 +23,7 @@ export type AnalyticsBreakdownSnapshot = {
 export type AnalyticsMetricInput = {
   key: string;
   label: string;
+  audienceGrowth?: AnalyticsAudienceGrowthIdentity;
   /** Human-readable provenance shown to customers, such as "Community" or "Advertising". */
   sourceLabel: string;
   /** Cross-platform resource domain, independent of translated provenance labels. */

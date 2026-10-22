@@ -47,8 +47,8 @@ a manifest, saved setting or unit test is not complete workflow proof. See
 | P1 | Legacy REST `api_tokens` | Missing by design: replaced by MCP keys, person keys and `/api/v1`; existing tokens are not migrated. | Owner decision on migration or retirement. |
 | P1 | Root changelog, client invitations, alert test and Meta usage (`graph_usage`) | Missing at 25c3ea53. | Root service, UI, REST and MCP. |
 | P1 | Global command palette | Missing at 25c3ea53. | Shared shell component, keyboard and FR checks. |
-| P2 | Installable web app (manifest, service worker, offline page, icons) | Missing at 25c3ea53; no `rebuild/public`. | Manifest and icons in the rebuild, cache policy, browser check. |
-| P1 | Central cross-site write refusal (`Sec-Fetch-Site`) | Partial: module HTTP helpers check same-origin; no shared middleware; sign-out Origin waiver open. | One shared guard, tests per route family. |
+| P2 | Installable web app (manifest, service worker, offline page, icons) | Implemented at source in q-35: owned dynamic manifest/worker/offline/PNG routes, Root branding, Settings preparation UI and shared confirmed/audited REST/MCP service. Unit/generated-worker/DOM evidence; real install/offline browser verification remains open. | Manifest and icons in the rebuild, cache policy, browser check. |
+| P1 | Central cross-site write refusal (`Sec-Fetch-Site`) | Implemented at source in q-35: shared middleware guards every mutating path and server action with Root origins. 41 origin/cookie/Fetch-Metadata tests. Route-unit smoke bypasses middleware; live HTTP/browser verification remains open. | One shared guard, tests per route family. |
 
 ## Evidence and next checks
 

@@ -4,6 +4,7 @@ import { analyticsLanguage } from '@/modules/analytics/server/error-copy';
 import { runtimeConfigBatch } from '@/server/config/store';
 import { FACEBOOK_METRIC_LABEL_DEFAULTS, FACEBOOK_PAGE_ANALYTICS_COPY_DEFAULTS } from './config';
 import { facebookInsightCategories } from './data-normalization';
+import { facebookAudienceGrowthIdentity } from './audience-growth';
 import { prisma } from '@/server/data';
 import { Prisma } from '../../../generated/client';
 import { readFacebookPostPerformance } from './post-performance';
@@ -149,7 +150,10 @@ function pageInputs(rows: PageRow[], selected: FacebookTarget[], audienceRows: P
   const newest = new Map<string, PageRow>();
   for (const row of audienceRows) { if (audienceAsOf && row.endTime > audienceAsOf) continue; const old = newest.get(row.target.id); if (!old || row.endTime > old.endTime || (row.endTime.getTime() === old.endTime.getTime() && row.metric === 'page_follows' && old.metric !== 'page_follows') || (row.endTime.getTime() === old.endTime.getTime() && row.metric === old.metric && row.fetchedAt > old.fetchedAt)) newest.set(row.target.id, row); }
   const audience = [...newest.values()].flatMap(row => row.numeric === null ? [] : [{ id: row.target.id, name: row.target.name, metric: row.metric, metricLabel: label(row.metric), sourceLabel: copy.source, value: row.numeric, asOf: row.endTime, fetchedAt: row.fetchedAt }]);
-  return { metrics, audience };
+  return { metrics: metrics.map(metric => {
+    const audienceGrowth = facebookAudienceGrowthIdentity(metric.key.split('::')[0]!);
+    return audienceGrowth && metric.kind !== 'breakdown' ? { ...metric, audienceGrowth } : metric;
+  }), audience };
 }
 
 type PostRow = { createdTime: Date; insights: unknown; insightsSyncedAt: Date | null; target: { id: string; name: string } };

@@ -15,7 +15,7 @@ const routeOf = (file: string) => file.replace('../src/app', '').replace(/\/rout
 const paramsFor = (route: string) => Object.fromEntries([...route.matchAll(/\[(\.\.\.)?\[?(\w+)\]?\]/g)].map(match => [match[2], match[1] ? [] : 'smoke-id']));
 
 /** Routes that authenticate with something other than the workspace session cookie. */
-const NO_SESSION = /^\/(\.well-known|api\/(auth|oauth|v1|mcp|health|platforms|sharing\/public|connections\/\[platform\]\/callback)|api\/calendar-feed\/|bio|s\/|share)/;
+const NO_SESSION = /^\/(manifest\.webmanifest$|sw\.js$|offline$|app-icon\/|\.well-known|api\/(auth|oauth|v1|mcp|health|platforms|sharing\/public|connections\/\[platform\]\/callback)|api\/calendar-feed\/|bio|s\/|share)/;
 /** Bearer-token surfaces: anonymous callers must get 401, not a session redirect. */
 const BEARER = /^\/api\/(v1|mcp)/;
 /** Writes that are cross-origin by protocol (OAuth token exchange, dynamic registration, public decisions). */

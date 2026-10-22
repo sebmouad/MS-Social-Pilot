@@ -1,3 +1,5 @@
+import { readWebApp } from '@/modules/settings/web-app/service';
+import { InstallControl } from '@/modules/settings/web-app/InstallControl';
 import { configValueOrDefault } from '@/server/config/config-or-default';
 import type { Metadata } from 'next';
 import { PageFrame } from '@/server/PageFrame';
@@ -18,10 +20,12 @@ export default async function AppearancePage() {
   const locale = await settingsLocale();
   const t = (await configValueOrDefault('settings.appearanceCopy'))[locale] as AppearanceCopy;
   const appearance = await appearanceSession(await accountSessionActor(viewer.user.id, viewer.workspaceId));
+  const webApp = await readWebApp(await accountSessionActor(viewer.user.id, viewer.workspaceId));
   return <PageFrame module="settings" scopedAccess><SettingsPage active="settings/appearance" title={t.title} description={t.description} locale={locale}>
     <SettingsPanel title={t.panel} detail={t.panelDetail}>
       <AppearancePicker initialTheme={appearance.theme} initialMode={appearance.mode} copy={t} canWrite={canAccessFeature(viewer.permissions, 'settings/appearance', 'write')} />
     </SettingsPanel>
+    {webApp.enabled ? <SettingsPanel title={webApp.copy[locale].title}><InstallControl requestTimeoutMs={webApp.requestTimeoutMs} copy={webApp.copy[locale]} canWrite={canAccessFeature(viewer.permissions, 'settings/appearance', 'write')} /></SettingsPanel> : null}
     <p className={settingsStyles['settings-note']}>{t.note}</p>
   </SettingsPage></PageFrame>;
 }

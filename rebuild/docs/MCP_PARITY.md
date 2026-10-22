@@ -458,6 +458,8 @@ live catalog inside the test or add a blanket exclusion to make it pass.
 | get_calendar_trends_options | publishing/calendar | read | GET /api/calendar/trends | calendarOptions('trends'): audience-country channels and copy. |
 | list_calendar_trends | publishing/calendar | read | GET /api/calendar/trends | readTrends over stored holidays and recent searches with per-country coverage and freshness; refreshed by the `calendarHolidays` and `calendarTrends` worker jobs. |
 | change_calendar_trends | publishing/calendar | write | POST /api/calendar/trends | changeCalendarEntry('trends'): workspace trend keywords only; exact `UPDATE CALENDAR TRENDS` confirmation and audit. |
+| get_web_app | settings/appearance | read | GET /api/settings/web-app | Shared session-authorized public branding and installation policy. |
+| prepare_web_app_installation | settings/appearance | write | POST /api/settings/web-app | Shared exact-confirmed account audit; browser installation ceremony remains interactive and is never claimed by MCP. |
 <!-- parity-tools:end -->
 
 The next table records additional REST entry points for the same named tools.
@@ -742,3 +744,9 @@ guard (22), and Settings copy parity (48). These are synthetic DOM/mocked checks
 no browser, live MCP, PostgreSQL, provider or production check was performed.
 Complete portability, supplementary purge migration rehearsal and concurrency
 proof remain open. No server, deployment or push was run in this lane.
+
+## Legacy shell lane q-35 — 2026-10-22
+
+`get_web_app` and `prepare_web_app_installation` use the same Settings account service as Appearance UI and GET/POST `/api/settings/web-app`. Preparation requires exact `PREPARE WEB APP INSTALLATION` and an account audit. Session-only access preserves tenant/permission checks. A preparation receipt explicitly says `installed: false`; browser installation itself is a device-local interactive ceremony, not a remotely executable MCP action. Manifest, worker, offline document and icon routes expose public branding only.
+
+Existing Analytics snapshot and metric-detail UI/REST/MCP operations now retain provider-normalized `audienceGrowth: { kind, direction }`. Likes/followers and gained/lost identities are kept separate; incompatible identities refuse comparison. Existing snapshot service owns authorization; this stored-read normalization adds no write or job. Evidence: `analytics-audience-growth.test.ts`, the REST/MCP detail case in `integrations-v1-analytics-ads.test.ts`. The shared cross-site middleware adds transport security to all mutation routes without a new product action or tool.

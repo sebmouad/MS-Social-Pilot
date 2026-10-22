@@ -3,7 +3,7 @@ import { MetricCard, type MetricDelta } from '@/components/MetricCard';
 import { TimeSeriesChart, DonutChart, BarChart } from '@/components/charts';
 import { NotesTimeSeriesChart } from '@/modules/calendar-extras/ui/NotesTimeSeriesChart';
 import type { ChartAnnotations } from '@/modules/calendar-extras/server/chart-notes';
-import { IconChartLine } from '@tabler/icons-react';
+import { IconChartLine, IconInfoCircle } from '@tabler/icons-react';
 import { previousSeries, type DatedValues } from './series';
 import type { MetricView } from '@/modules/analytics/server/aggregate';
 import type { AnalyticsComparisonValue } from '@/modules/analytics/server/types';
@@ -77,6 +77,7 @@ export default function AnalyticsMetric({ metric, comparison, chartPoints, previ
     <div className="analytics-metric__heading"><div>
       <p>{t("{source} · {covered} of {available} {resources} covered", { source: metric.sourceLabel, covered: metric.coverage, available: metric.available, resources: detailLabel })}</p>
       <p>{metric.aggregationLabel}</p>
+      {metric.audienceGrowth && <details className="analytics-aggregation-note"><summary><IconInfoCircle size={16} aria-hidden="true" /> {t("About audience growth")}</summary><p>{t("Likes and followers are different measures. Growth is shown separately for each.")}</p></details>}
       {metric.aggregationNote && <p className="analytics-aggregation-note">{metric.aggregationNote}</p>}
       {metric.latestAt && <p>{t("Latest data {date}", { date: new Intl.DateTimeFormat(locale, { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' }).format(metric.latestAt) })}</p>}
       {metric.updatedAt && <p>{t("Last synced {date}", { date: new Intl.DateTimeFormat(locale, { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' }).format(metric.updatedAt) })}</p>}
