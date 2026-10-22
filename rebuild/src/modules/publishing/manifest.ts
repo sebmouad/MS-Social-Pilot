@@ -49,8 +49,8 @@ export const publishingManifest = {
     ...MEDIA_PAGES,
     // Feeds is its own Content-area tab (2026-10-22 UX organization); the rest are tabs inside Library, not tabs of the Content area.
     ...FEEDS_PAGES,
-    { id: 'publishing/collaboration', title: 'Fields', href: '/content/library/fields', navigation: false, description: 'Label posts, manage custom fields and collaborate with your team.' },
-    { id: 'publishing/labels', title: 'Labels', href: '/content/library/labels', navigation: false, description: 'Organize workspace content with shared labels.' },
-    { id: 'publishing/templates', title: 'Templates', href: '/content/library/templates', navigation: false, description: 'Create and reuse workspace post templates.' },
+    { id: 'publishing/collaboration', title: 'Fields', href: '/content/library/fields', navigation: false, palette: true, description: 'Label posts, manage custom fields and collaborate with your team.' },
+    { id: 'publishing/labels', title: 'Labels', href: '/content/library/labels', navigation: false, palette: true, description: 'Organize workspace content with shared labels.' },
+    { id: 'publishing/templates', title: 'Templates', href: '/content/library/templates', navigation: false, palette: true, description: 'Create and reuse workspace post templates.' },
   ],
 } as const satisfies ModuleManifest;

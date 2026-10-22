@@ -70,11 +70,20 @@ describe('platform-neutral Inbox resolve workflow', () => {
     expect(kind === 'message' ? where.targetId : where.postTarget.targetId).toEqual({ in: [targetId] });
     expect(update.mock.calls[0][0].data.resolvedAt).toBeInstanceOf(Date);
     expect(update.mock.calls[1][0].data.resolvedAt).toBeNull();
-    expect(mocks.audit).toHaveBeenCalledTimes(2);
+    // Each decision lands in Root operations and in workspace history (Settings › History).
+    expect(mocks.audit).toHaveBeenCalledTimes(4);
     expect(mocks.audit.mock.calls[0][4]).toContain('"workspaceId":"workspace"');
     expect(mocks.audit.mock.calls[0][4]).toContain('"targetId":"channel"');
-    expect(mocks.audit.mock.calls[0][3]).toBe(`inbox.${kind === 'message' ? 'conversation' : 'comment'}_resolved`);
-    expect(mocks.audit.mock.calls[1][3]).toBe(`inbox.${kind === 'message' ? 'conversation' : 'comment'}_reopened`);
+    const resolvedAction = `inbox.${kind === 'message' ? 'conversation' : 'comment'}_resolved`;
+    const reopenedAction = `inbox.${kind === 'message' ? 'conversation' : 'comment'}_reopened`;
+    expect(mocks.audit.mock.calls[0][0].join('')).toContain('INSERT INTO root_activities');
+    expect(mocks.audit.mock.calls[0][3]).toBe(resolvedAction);
+    expect(mocks.audit.mock.calls[1][0].join('')).toContain('INSERT INTO activity_logs');
+    expect(mocks.audit.mock.calls[1][4]).toBe(resolvedAction);
+    expect(mocks.audit.mock.calls[1][5]).toContain('"targetId":"channel"');
+    expect(mocks.audit.mock.calls[1][5]).not.toContain('workspaceId');
+    expect(mocks.audit.mock.calls[2][3]).toBe(reopenedAction);
+    expect(mocks.audit.mock.calls[3][4]).toBe(reopenedAction);
   });
 
   it.each(['disabled_account', 'membership', 'feature', 'read_only', 'unassigned'])(

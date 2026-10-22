@@ -48,3 +48,14 @@
 .thumb { width: 3.5rem; height: 3.5rem; object-fit: cover; border-radius: var(--radius-sm); background: var(--surface-muted); }
 .holders { margin: .3rem 0 0; padding-left: 1.1rem; font-size: .75rem; color: var(--ink-soft); }
 .inline { display: flex; align-items: center; gap: .5rem; font-size: .85rem; }
+/* Detail sheet: full preview, facts and the posts that use the asset. */
+.detail { display: grid; gap: var(--space-4); min-width: 0; }
+.detailPreview { display: grid; place-items: center; min-height: 12rem; overflow: hidden; border-radius: var(--radius-lg); background: var(--surface-muted); }
+.detailImage { display: block; width: 100%; height: auto; max-height: 22rem; object-fit: contain; }
+.facts { display: grid; gap: var(--space-2); margin: 0; }
+.facts > div { display: grid; grid-template-columns: minmax(6rem, 9rem) 1fr; gap: var(--space-3); }
+.facts dt { color: var(--ink-soft); font-size: var(--text-sm); font-weight: 650; }
+.facts dd { margin: 0; overflow-wrap: anywhere; }
+.detail h3 { margin: 0 0 var(--space-2); font-size: var(--text-md); }
+.detailHolders { display: grid; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
+.detailHolders a { color: var(--accent); font-weight: 650; overflow-wrap: anywhere; }

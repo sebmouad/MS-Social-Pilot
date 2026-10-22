@@ -68,6 +68,24 @@ describe('full-screen post composer', () => {
     expect(container.querySelector<HTMLTextAreaElement>('#composer-first-comment')?.value).toBe('Follow up');
   });
 
+  it('offers workspace labels in More options and submits the chosen one', async () => {
+    await act(async () => root.render(createElement(PostComposer, { targets, labels: [{ id: 'label-a', name: 'Promo' }, { id: 'label-b', name: 'News' }], imageRules: rules, maxFirstCommentDelayMinutes: 10080, schedule, authorName: 'Your team', createdAt: new Date('2026-10-16T10:00:00.000Z'), createdAtDisplay: 'Oct 16, 2026, 10:00 AM' })));
+    const select = container.querySelector<HTMLSelectElement>('select#composer-label')!;
+    expect(select.labels?.[0]?.querySelector('span')?.textContent).toBe('Label');
+    expect(Array.from(select.options).map(option => option.textContent)).toEqual(['No label', 'Promo', 'News']);
+    const setter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value')!.set!;
+    await act(async () => { setter.call(select, 'label-b'); select.dispatchEvent(new Event('change', { bubbles: true })); });
+    expect(container.querySelector<HTMLInputElement>('input[name="labelId"]')?.value).toBe('label-b');
+  });
+
+  it('keeps a template label only when the workspace still has it', async () => {
+    await act(async () => root.render(createElement(PostComposer, { targets, labels: [{ id: 'label-a', name: 'Promo' }], templates: [{ id: 'template-a', name: 'Welcome', category: '', body: 'Hello', hashtags: '', firstComment: '', firstCommentDelayMinutes: 0, labelId: 'label-gone' }], imageRules: rules, maxFirstCommentDelayMinutes: 10080, schedule, authorName: 'Your team', createdAt: new Date('2026-10-16T10:00:00.000Z'), createdAtDisplay: 'Oct 16, 2026, 10:00 AM' })));
+    await act(async () => byText('Templates').click());
+    await act(async () => byText('Use template').click());
+    expect(container.querySelector<HTMLSelectElement>('select#composer-label')?.value).toBe('');
+    expect(container.querySelector<HTMLInputElement>('input[name="labelId"]')?.value).toBe('');
+  });
+
   it('navigates only after confirmed save and prevents another submission while opening Posts', async () => {
     mocks.action.mockResolvedValueOnce({ status: 'success', destination: '/content?notice=created', values: {} });
     await render();

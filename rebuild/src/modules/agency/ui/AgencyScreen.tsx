@@ -70,26 +70,26 @@ export default async function AgencyPage({ searchParams }: { searchParams: Promi
   const filters = { q: String(params.q ?? ''), sort: String(params.sort ?? 'attention'), order: String(params.order ?? 'desc'), attention: params.attention === 'true' };
   // Agency spans every administered workspace, so the channel scope cannot filter it. The parameter is accepted
   // (validated centrally like every page) and clarified with a notice, never silently ignored.
-  const scope = typeof params.channel === 'string' && params.channel ? await pageChannelScope(viewer, params).catch(() => null) : null;
+  const channelScope = typeof params.channel === 'string' && params.channel ? await pageChannelScope(viewer, params).catch(() => null) : null;
   try {
     const searchLimit = await agencySearchLimit();
     const result = await agencyOverview({ userId: viewer.user.id }, { ...(filters.q ? { q: filters.q } : {}), sort: filters.sort, order: filters.order, attentionOnly: filters.attention });
     const exportQuery = new URLSearchParams({ q: filters.q, sort: filters.sort, order: filters.order, attention: String(filters.attention) }).toString();
     const totals = result.totals;
-    const scope = result.filtered ? t('{0} matching workspaces', totals.workspaces) : t("your workspaces");
+    const scopeLabel = result.filtered ? t('{0} matching workspaces', totals.workspaces) : t("your workspaces");
     const count = (value: number | null) => value === null ? '–' : value;
     return <AgencyShell>
       <AgencyHeading locale={locale} copy={copy} description={t("Compare the workspaces you own or administer. Failed posts cover the last {0} days.", result.windowDays)}
         filters={<AgencyFilters key={JSON.stringify(filters)} locale={locale} copy={copy} values={filters} searchLimit={searchLimit} />}
         actions={<AgencyExport key={`${locale}:${exportQuery}`} query={exportQuery} locale={locale} catalog={exportCopy} />} />
       <WorkspaceQuickSwitch locale={locale} copy={copy} workspaces={result.workspaces.filter(item => item.state === 'available' && item.metrics).map(({ id, name }) => ({ id, name }))} />
-      {scope && <RouteNotice focusKey="agency-scope-notice">{t("Agency compares every workspace you manage; the channel scope does not filter it.")}</RouteNotice>}
+      {channelScope && <RouteNotice focusKey="agency-scope-notice">{t("Agency compares every workspace you manage; the channel scope does not filter it.")}</RouteNotice>}
       {result.truncated && <RouteNotice focusKey="agency-truncated">
         {(result.filtered ? t("More than {0} workspaces match this search; only the first {1} by name are shown. Search for more of the name to narrow them.", result.limit, result.limit)
           : t("You manage more than {0} workspaces; only the first {1} by name are shown. Search by name to find another workspace.", result.limit, result.limit))
           + (filters.attention ? t(" The needs-attention filter only looked at those {0}.", result.limit) : '')}
       </RouteNotice>}
-      {totals.workspaces > 0 && <div className={styles.metrics} aria-label={t("Across {0}", scope)}>
+      {totals.workspaces > 0 && <div className={styles.metrics} aria-label={t("Across {0}", scopeLabel)}>
         <MetricCard module="agency" icon={<IconBuildingCommunity size={20} />} label={result.filtered ? t("Matching workspaces") : t("Workspaces")} value={totals.workspaces} />
         <MetricCard module="agency" icon={<IconAlertTriangle size={20} />} label={t("Need attention")} value={totals.needingAttention} />
         <MetricCard module="agency" icon={<IconPlugConnected size={20} />} label={t("Channels that cannot publish")} value={count(totals.disconnected)} unavailable={totals.disconnected === null ? t(WITHHELD) : undefined} info={<InfoTip name={t("Channels that cannot publish")} warning={totals.coverage.channels.covered < totals.coverage.channels.of}><p>{totals.channels !== null && t("of {0}", totals.channels)}<Coverage locale={locale} copy={copy} totals={totals} group="channels" /></p></InfoTip>} />

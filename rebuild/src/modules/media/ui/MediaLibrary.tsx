@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/Button';
 import { Dialog } from '@/components/Dialog';
 import { RouteNotice } from '@/components/RouteNotice';
+import { SidePanel } from '@/components/SidePanel';
 import { mediaText, type MediaCopyCatalog, type MediaCopyKey, type MediaLocale } from '../copy';
 import styles from './media.module.css';
 import { renameMediaAction } from './rename-action';
@@ -27,6 +28,7 @@ export function MediaLibrary({ items, usage, page, hasMore, filters, canWrite, w
   useEffect(() => setAssets(items), [items]);
   const [importing, setImporting] = useState(false);
   const [url, setUrl] = useState(''); const [name, setName] = useState('');
+  const [detailId, setDetailId] = useState<string | null>(null);
   const [renaming, setRenaming] = useState<Asset | null>(null);
   const [renameName, setRenameName] = useState('');
   const [removing, setRemoving] = useState<Asset | null>(null);
@@ -43,6 +45,8 @@ export function MediaLibrary({ items, usage, page, hasMore, filters, canWrite, w
   const query = (p: number) => { const s = new URLSearchParams(); if (filters.kind) s.set('kind', filters.kind); if (filters.usage) s.set('usage', filters.usage); if (filters.q) s.set('q', filters.q); s.set('page', String(p)); return `${PATH}?${s}`; };
   const filtered = Boolean(filters.q || filters.kind || filters.usage);
   const usedLabel = (count: number) => count === 1 ? t('usedByOne') : t('usedBy', { count });
+  // The open sheet follows the live list, so a rename inside it updates the title without closing.
+  const detail = detailId ? assets.find(a => a.id === detailId) ?? null : null;
 
   async function run(task: () => Promise<void>, unknown: string) {
     if (inFlight.current) return;
@@ -69,6 +73,7 @@ export function MediaLibrary({ items, usage, page, hasMore, filters, canWrite, w
     const body = await response.json().catch(() => null);
     if (!response.ok || !body || body.deleted !== true || body.id !== asset.id) throw new Error(errorText(body));
     setAssets(cur => cur.filter(a => a.id !== asset.id)); setRemoving(null);
+    if (asset.id === detailId) setDetailId(null);
     say(body.fileRemoved === 'unconfirmed' ? t('deletedFileUnconfirmed') : t('deleted'), body.fileRemoved === 'unconfirmed');
     router.refresh();
   }, t('deleteUnknown'));
@@ -107,11 +112,36 @@ export function MediaLibrary({ items, usage, page, hasMore, filters, canWrite, w
           <span className={styles.meta}>{a.mimeType} · {size(a.size)} · {t('added', { date: day(a.createdAt) })}</span>
           {a.holders && a.holders.length > 0 && <ul className={styles.holders}>{a.holders.map(h => <li key={h.postId}>{h.excerpt || t('untitled')} ({h.status.replace(/_/g, ' ')})</li>)}</ul>}
         </div>
-        {canWrite && workspaceWide && <div className={styles.tileActions}><Button size="sm" disabled={busy} onClick={() => { setNotice(null); setConfirmation(''); setRenameName(a.name); setRenaming(a); }}>{t('rename')}</Button><Button size="sm" variant="danger" disabled={busy} aria-label={`${t('delete')} ${a.name}`} onClick={() => { setNotice(null); setConfirmation(''); setForce(false); setRemoving(a); }}>{t('delete')}</Button></div>}
+        <div className={styles.tileActions}>
+          <Button size="sm" variant="secondary" onClick={() => setDetailId(a.id)}>{t('details')}</Button>
+          {canWrite && workspaceWide && <><Button size="sm" disabled={busy} onClick={() => { setNotice(null); setConfirmation(''); setRenameName(a.name); setRenaming(a); }}>{t('rename')}</Button><Button size="sm" variant="danger" disabled={busy} aria-label={`${t('delete')} ${a.name}`} onClick={() => { setNotice(null); setConfirmation(''); setForce(false); setRemoving(a); }}>{t('delete')}</Button></>}
+        </div>
       </li>)}
     </ul> : <p className={styles.empty}>{filtered ? t('noMatch') : t('empty')}</p>}
     <nav className={styles.pagination} aria-label={t('pages')}>{page > 1 && <a href={query(page - 1)}>{t('previous')}</a>}<span>{t('page', { page })}</span>{hasMore && <a href={query(page + 1)}>{t('next')}</a>}</nav>
     {canWrite && !workspaceWide && <p className={styles.help}>{t('deleteNeedsAll')}</p>}
+
+    {detail ? <SidePanel open title={detail.name} closeLabel={t('close')} onClose={() => setDetailId(null)}
+      actions={canWrite && workspaceWide ? <><Button size="sm" disabled={busy} onClick={() => { setNotice(null); setConfirmation(''); setRenameName(detail.name); setRenaming(detail); }}>{t('rename')}</Button><Button size="sm" variant="danger" disabled={busy} onClick={() => { setNotice(null); setConfirmation(''); setForce(false); setRemoving(detail); }}>{t('delete')}</Button></> : undefined}>
+      <div className={styles.detail}>
+        <div className={styles.detailPreview}>{detail.kind === 'image' && detail.source === 'stored-image' ? <img className={styles.detailImage} src={`/api/media/${encodeURIComponent(detail.id)}`} alt="" /> : <span className={styles.tileKind}>{detail.kind === 'video' ? t('video') : t('image')}</span>}</div>
+        <dl className={styles.facts}>
+          <div><dt>{t('type')}</dt><dd>{detail.kind === 'video' ? t('video') : t('image')}</dd></div>
+          <div><dt>{t('colFile')}</dt><dd>{detail.mimeType} · {size(detail.size)}</dd></div>
+          {detail.width !== null && detail.height !== null ? <div><dt>{t('dimensionsLabel')}</dt><dd>{t('dimensions', { width: detail.width, height: detail.height })}</dd></div> : null}
+          <div><dt>{t('use')}</dt><dd>{detail.inUse ? usedLabel(detail.holderCount) : t('unused')}</dd></div>
+          <div><dt>{t('addedLabel')}</dt><dd>{t('added', { date: day(detail.createdAt) })}</dd></div>
+        </dl>
+        {detail.inUse && detail.holders && detail.holders.length > 0 ? <section aria-label={t('usedIn')}>
+          <h3>{t('usedIn')}</h3>
+          <ul className={styles.detailHolders}>{detail.holders.map(h => <li key={h.postId}>
+            <a href={`/content/post/${encodeURIComponent(h.postId)}`} title={t('openPost')}>{h.excerpt || t('untitled')}</a>
+            <span className={styles.meta}>{h.status.replace(/_/g, ' ')}</span>
+          </li>)}</ul>
+          {detail.holderCount > detail.holders.length ? <p className={styles.help}>{t('holdersPartial', { shown: detail.holders.length, count: detail.holderCount })}</p> : null}
+        </section> : null}
+      </div>
+    </SidePanel> : null}
 
     <Dialog open={Boolean(renaming)} title={t('renameTitle')} onClose={() => !busy && setRenaming(null)} busy={busy}
       actions={<><Button data-dialog-cancel disabled={busy} onClick={() => setRenaming(null)}>{t('cancel')}</Button><Button variant="primary" disabled={busy || !renameName.trim() || confirmation !== `RENAME MEDIA ${renaming?.id}`} onClick={() => void performRename()}>{t('rename')}</Button></>}>

@@ -129,7 +129,7 @@ function selectedMediaIssue(targets: TargetChoice[], formats: Record<string, str
   return localUploadIssue(targets, items, ui);
 }
 
-function PostComposerContent({ copyCatalog = composerCatalogDefaults, profiles, targets, templates = [], imageRules, schedule, authorName, createdAt, createdAtDisplay, maxFirstCommentDelayMinutes, spacingGapMinutes = 0, aiStatus, aiLocale = 'en', queueAvailable = false, remoteScheduling, autosaveSeconds = 0, initialTargetIds = [], closeHref = '/content' }: { initialTargetIds?: string[]; closeHref?: string; copyCatalog?: ComposerCatalog; autosaveSeconds?: number; remoteScheduling?: { offered: boolean; defaultMode: 'application' | 'remote' }; profiles?: ProfileDirectory; queueAvailable?: boolean; aiStatus?: AiStatus; aiLocale?: 'en' | 'fr'; targets: TargetChoice[]; templates?: ComposerTemplate[]; imageRules: ImageRules; schedule: Schedule; authorName: string; createdAt: Date; createdAtDisplay: string; maxFirstCommentDelayMinutes: number; spacingGapMinutes?: number }) {
+function PostComposerContent({ copyCatalog = composerCatalogDefaults, profiles, targets, templates = [], labels = [], imageRules, schedule, authorName, createdAt, createdAtDisplay, maxFirstCommentDelayMinutes, spacingGapMinutes = 0, aiStatus, aiLocale = 'en', queueAvailable = false, remoteScheduling, autosaveSeconds = 0, initialTargetIds = [], closeHref = '/content' }: { initialTargetIds?: string[]; closeHref?: string; copyCatalog?: ComposerCatalog; autosaveSeconds?: number; remoteScheduling?: { offered: boolean; defaultMode: 'application' | 'remote' }; profiles?: ProfileDirectory; queueAvailable?: boolean; aiStatus?: AiStatus; aiLocale?: 'en' | 'fr'; targets: TargetChoice[]; templates?: ComposerTemplate[]; labels?: Array<{ id: string; name: string }>; imageRules: ImageRules; schedule: Schedule; authorName: string; createdAt: Date; createdAtDisplay: string; maxFirstCommentDelayMinutes: number; spacingGapMinutes?: number }) {
   const router = useRouter();
   const navigated = useRef<ComposerActionState | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
@@ -141,7 +141,10 @@ function PostComposerContent({ copyCatalog = composerCatalogDefaults, profiles, 
   const [firstComment, setFirstComment] = useState(initial.firstComment ?? '');
   const [firstCommentDelayMinutes, setFirstCommentDelayMinutes] = useState(initial.firstCommentDelayMinutes ?? '0');
   const [firstCommentDelayError, setFirstCommentDelayError] = useState('');
-  const [labelId, setLabelId] = useState(initial.labelId ?? '');
+  // Only a label the server listed can be attached; anything else (a label deleted after a template was saved)
+  // would be rejected at save time, so it is dropped here instead of submitted blindly.
+  const knownLabel = (id: string | null | undefined) => id && labels.some(label => label.id === id) ? id : '';
+  const [labelId, setLabelId] = useState(knownLabel(initial.labelId));
   const [link, setLink] = useState(initial.link ?? '');
   const [selectedTargets, setSelectedTargets] = useState<string[]>(initial.targetIds ?? initialTargetIds);
   const [formatChoices, setFormatChoices] = useState<Record<string, string>>(() => parseFormats(initial.destinationFormatsJson));
@@ -240,7 +243,7 @@ function PostComposerContent({ copyCatalog = composerCatalogDefaults, profiles, 
     setMessage(text);
     setFirstComment(template.firstComment);
     setFirstCommentDelayMinutes(String(template.firstCommentDelayMinutes));
-    setLabelId(template.labelId ?? '');
+    setLabelId(knownLabel(template.labelId));
     setTemplateToApply(null);
   }
 
@@ -514,6 +517,13 @@ function PostComposerContent({ copyCatalog = composerCatalogDefaults, profiles, 
       <details className={styles.advanced}>
         <summary><IconChevronDown size={16} aria-hidden="true" />{cc.createAdvanced}</summary>
         <div className={styles.advancedBody}>
+        {labels.length > 0 && <fieldset className={styles.group} disabled={busy}>
+          <label className={styles.linkField} htmlFor="composer-label"><span>{cc.createAdvancedLabel}</span>
+            <select id="composer-label" value={labelId} disabled={saved} onChange={event => setLabelId(event.currentTarget.value)}>
+              <option value="">{cc.createAdvancedNoLabel}</option>
+              {labels.map(label => <option key={label.id} value={label.id}>{label.name}</option>)}
+            </select></label>
+        </fieldset>}
         {selected.some(target => target.publishingFormats?.length) && <fieldset className={styles.group} disabled={busy}>
           <legend>{cc.createAdvancedFormats}</legend>
           <DestinationFormats copyCatalog={copyCatalog} locale={aiLocale} targets={targets} selectedIds={selected.map(target => target.id)} values={formatChoices} formId={FORM_ID} disabled={busy} onChange={(id, value) => setFormatChoices(current => ({ ...current, [id]: value }))} />

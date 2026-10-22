@@ -59,6 +59,9 @@ describe('Root setting declarations', () => {
   });
   it('labels known actions in both languages and makes words from unknown codes', () => {
     expect(actionLabel('tasks.created', 'fr', HISTORY_ACTION_LABELS)).toBe('A créé une tâche');
+    expect(actionLabel('inbox.conversation_resolved', 'en', HISTORY_ACTION_LABELS)).toBe('Resolved a conversation');
+    expect(actionLabel('inbox.comment_reopened', 'fr', HISTORY_ACTION_LABELS)).toBe('A rouvert un commentaire');
+    expect(actionLabel('inbox.review_resolved', 'fr', HISTORY_ACTION_LABELS)).toBe('A résolu un avis');
     expect(actionLabel('media.upload_failed', 'en', {})).toBe('Media: upload failed');
     expect(humanizeAction('ping')).toBe('Ping');
   });

@@ -981,3 +981,8 @@ Evidence: `npm run typecheck` 0 errors; touched suites pass (content-v2,
 content-v2-server, calendar-board-ui, publishing-customer-copy,
 publishing-read-service) plus config-validation. No browser, provider or
 production verification in this batch.
+
+## Excellence pass: six remaining modules — 2026-10-22 (source/unit only, uncommitted)
+
+Inbox, Publishing depth, Home, Tasks, Agency, Settings. Agency scope-notice shadowing fixed; palette reaches seven more tab-hidden sub-pages; Library Media detail sheet; Create label selector in More options; resolve/reopen writes workspace history. Home/Tasks/Agency-metrics/Settings-connections verified without changes; per-channel text, Posts date/label filters, create-time custom fields, feature-less tab routes in the palette, and reply/hide/delete history stay open (need new/extended services). `CONFIG_SCHEMA_VERSION` stays **137** (no registry entries added; config-validation passes).
+Evidence: `npm run typecheck` 0 errors; touched suites pass (agency-shared-screen, command-palette, command-palette-ui, media-round11-ui, media-library-module, media-route-auth, ui-copy-coverage, regression-round9-ui, config-validation, module-manifests, parity-guard, post-composer-ui, post-composer-page, post-composer-action, publishing-composer-catalog, publishing-ui-round2, content-v2, content-v2-server, inbox-workflow, inbox-workflow.integration (skipped without preview DB), inbox-round3, inbox-bulk-assign-mcp, inbox-actions-route, inbox-route-auth, inbox-reviews, inbox-reviews-read, inbox-key-scope80, history-service, history-routes, agency-service, agency-route, agency-ui, shell-v2, mcp-security, tasks-agency-copy, public-site). No full suite, browser, provider or production verification in this batch.

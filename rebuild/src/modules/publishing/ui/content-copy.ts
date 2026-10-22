@@ -46,6 +46,8 @@ export const contentCopyDefaults = {
   createFirstCommentHide: m('Remove the first comment', 'Retirer le premier commentaire'),
   createAdvanced: m('More options', 'Plus d’options'),
   createAdvancedFormats: m('Format for each channel', 'Format pour chaque canal'),
+  createAdvancedLabel: m('Label', 'Étiquette'),
+  createAdvancedNoLabel: m('No label', 'Aucune étiquette'),
   createTemplates: m('Templates', 'Modèles'),
   // ---- Create: action bar ----
   createStatusNeedContent: m('Add text, media or a link to continue', 'Ajoutez du texte, un média ou un lien pour continuer'),

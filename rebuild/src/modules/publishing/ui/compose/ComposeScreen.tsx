@@ -11,6 +11,7 @@ import { runtimeConfig } from '@/server/config/store';
 import { canAccessFeature } from '@/server/permissions';
 import { canUseFeature } from '@/server/entitlements';
 import { readTemplatePage } from '@/modules/publishing/server/templates';
+import { readLabelPage } from '@/modules/publishing/server/labels';
 import { publishingDestinationChoices } from '@/modules/publishing/server/destinations';
 import { pageChannelScope } from '@/modules/shell/server/scope';
 import { isDateKey } from '@/lib/calendar-dates';
@@ -41,6 +42,17 @@ async function ComposePageContent({ searchParams }: { searchParams: Promise<Para
   const queueAvailable = canCreate && canUseFeature(viewer.entitlements, 'publishing/queue') && canAccessFeature(viewer.permissions, 'publishing/queue', 'write');
   const canUseTemplates = canUseFeature(viewer.entitlements, 'publishing/templates') && canAccessFeature(viewer.permissions, 'publishing/templates', 'read');
   const templates = canUseTemplates ? await readTemplatePage({ userId: viewer.user.id, workspaceId: viewer.workspaceId }, {}).then(result => result.templates.map(({ id, name, category, body, hashtags, firstComment, firstCommentDelayMinutes, labelId }) => ({ id, name, category, body, hashtags, firstComment, firstCommentDelayMinutes, labelId }))) : [];
+  // Label choices for More options; unavailable labels hide the selector rather than blocking composition.
+  const canUseLabels = canUseFeature(viewer.entitlements, 'publishing/labels') && canAccessFeature(viewer.permissions, 'publishing/labels', 'read');
+  const labels = canUseLabels ? await (async () => {
+    const all: Array<{ id: string; name: string }> = [];
+    for (let page = 1; page <= 100; page++) {
+      const result = await readLabelPage({ userId: viewer.user.id, workspaceId: viewer.workspaceId }, { page });
+      all.push(...result.labels.map(({ id, name }) => ({ id, name })));
+      if (!result.hasMore) break;
+    }
+    return all;
+  })().catch(() => []) : [];
   // Advisory only: an unavailable setting hides the warning rather than blocking composition.
   const spacingGapMinutes = canCreate ? await loadWorkspaceOperations(viewer.workspaceId).then(value => value.spamGapMinutes, () => 0) : 0;
   // Suggestion-only writing help; the status is empty (and the control hidden) when unavailable.
@@ -63,7 +75,7 @@ async function ComposePageContent({ searchParams }: { searchParams: Promise<Para
   const authorFallback = copyCatalog.authorFallback[locale];
   return <ContentProvider copy={content} policy={policy} locale={locale}>
     {canCreate
-      ? <PostComposer copyCatalog={copyCatalog} autosaveSeconds={Number(autosaveSeconds)} remoteScheduling={remoteScheduling} profiles={profiles ?? undefined} queueAvailable={queueAvailable} aiStatus={aiAssist} aiLocale={locale} targets={choices} initialTargetIds={initialTargetIds} templates={templates} maxFirstCommentDelayMinutes={Number(maxFirstCommentDelayMinutes)} spacingGapMinutes={spacingGapMinutes} imageRules={{ allowedMimeTypes: allowedMimeTypes as string[], maxUploadBytes: Number(maxUploadBytes), maxAltCharacters: Number(maxAltCharacters), maxMessageCharacters: Number(maxMessageCharacters), maxMedia: Number(maxMedia) }} schedule={schedule} authorName={viewer.user.name || authorFallback} createdAt={createdAt} createdAtDisplay={formatPostPreviewTime(createdAt, schedule.timeZone)} />
+      ? <PostComposer copyCatalog={copyCatalog} autosaveSeconds={Number(autosaveSeconds)} remoteScheduling={remoteScheduling} profiles={profiles ?? undefined} queueAvailable={queueAvailable} aiStatus={aiAssist} aiLocale={locale} targets={choices} initialTargetIds={initialTargetIds} templates={templates} labels={labels} maxFirstCommentDelayMinutes={Number(maxFirstCommentDelayMinutes)} spacingGapMinutes={spacingGapMinutes} imageRules={{ allowedMimeTypes: allowedMimeTypes as string[], maxUploadBytes: Number(maxUploadBytes), maxAltCharacters: Number(maxAltCharacters), maxMessageCharacters: Number(maxMessageCharacters), maxMedia: Number(maxMedia) }} schedule={schedule} authorName={viewer.user.name || authorFallback} createdAt={createdAt} createdAtDisplay={formatPostPreviewTime(createdAt, schedule.timeZone)} />
       : <section><p>{copyCatalog.noPermission[locale]}</p><a href="/content">{content.postDetailBack}</a></section>}
   </ContentProvider>;
 }

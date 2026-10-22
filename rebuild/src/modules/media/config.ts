@@ -1,6 +1,5 @@
 import { z } from 'zod';
 import { entry, cron } from '@/lib/config/entry';
-import { copySchema } from '@/lib/config/copy-schema';
 import { mediaCopy } from './copy';
 import { mediaMessages, mediaMessagesSchema } from './messages';
 
@@ -23,6 +22,14 @@ export const MEDIA_BOUNDS = {
 export const VIDEO_MIME_CHOICES = ['video/mp4', 'video/quicktime', 'video/webm'] as const;
 const int = (range: { min: number; max: number }) => z.number().int().min(range.min).max(range.max);
 const G = 'Media library';
+
+/** Detail-sheet keys added after the catalog shipped fill from the shipped default, so saved Root customizations keep validating. */
+const NEW_MEDIA_COPY_KEYS = new Set(['details', 'close', 'dimensionsLabel', 'dimensions', 'addedLabel', 'usedIn', 'openPost', 'holdersPartial']);
+type MediaCopyKeyOf = keyof typeof mediaCopy.en;
+const mediaCopyShape = (locale: 'en' | 'fr') => z.object(Object.fromEntries(Object.keys(mediaCopy.en).map(key => [key, NEW_MEDIA_COPY_KEYS.has(key)
+  ? z.string().trim().min(1).max(4000).default(mediaCopy[locale][key as MediaCopyKeyOf])
+  : z.string().trim().min(1).max(4000)])) as unknown as { [K in MediaCopyKeyOf]: z.ZodType<string> }).strict();
+export const mediaCopySchema = z.object({ en: mediaCopyShape('en'), fr: mediaCopyShape('fr') }).strict();
 
 export const webpImportPolicySchema = z.object({
   enabled: z.boolean(), maxPixels: z.number().int().min(1).max(100000000),
@@ -57,6 +64,6 @@ export const MEDIA_CONFIG = [
   entry({ key: 'media.searchMaxCharacters', group: G, label: 'Library search limit', kind: 'number', description: 'Maximum characters in a library search.', defaultValue: MEDIA_DEFAULTS.maxSearchCharacters, schema: int(MEDIA_BOUNDS.maxSearchCharacters), consumption: 'active' }),
   entry({ key: 'media.transactionTimeoutMs', group: G, label: 'Library transaction timeout (ms)', kind: 'number', description: 'Maximum duration of one library write.', defaultValue: MEDIA_DEFAULTS.transactionTimeoutMs, schema: int(MEDIA_BOUNDS.transactionTimeoutMs), consumption: 'active' }),
   entry({ key: 'media.transactionMaxWaitMs', group: G, label: 'Library transaction wait (ms)', kind: 'number', description: 'Maximum wait for a library write slot.', defaultValue: MEDIA_DEFAULTS.transactionMaxWaitMs, schema: int(MEDIA_BOUNDS.transactionMaxWaitMs), consumption: 'active' }),
-  entry({ key: 'media.copy', group: G, label: 'Media library copy', kind: 'json', description: 'English and French media library labels, confirmations and feedback.', defaultValue: mediaCopy, schema: z.object({ en: copySchema(mediaCopy.en), fr: copySchema(mediaCopy.fr) }).strict(), consumption: 'active' }),
+  entry({ key: 'media.copy', group: G, label: 'Media library copy', kind: 'json', description: 'English and French media library labels, confirmations and feedback.', defaultValue: mediaCopy, schema: mediaCopySchema, consumption: 'active' }),
   entry({ key: 'media.messages', group: G, label: 'Media library failure messages', kind: 'json', description: 'English and French text of the media library\'s failure replies in the app, REST API and MCP. The request\'s language picks the version; without one, English is used.', defaultValue: mediaMessages, schema: mediaMessagesSchema, consumption: 'active' }),
 ] as const;

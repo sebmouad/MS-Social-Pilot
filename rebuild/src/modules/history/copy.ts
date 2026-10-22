@@ -122,6 +122,12 @@ export const HISTORY_ACTION_LABELS = {
   'inbox.moderation_rule_updated': { en: 'Changed a moderation rule', fr: 'A modifié une règle de modération' },
   'inbox.moderation_rule_deleted': { en: 'Deleted a moderation rule', fr: 'A supprimé une règle de modération' },
   'inbox.moderation_action_undone': { en: 'Undid a moderation action', fr: 'A annulé une action de modération' },
+  'inbox.conversation_resolved': { en: 'Resolved a conversation', fr: 'A résolu une conversation' },
+  'inbox.conversation_reopened': { en: 'Reopened a conversation', fr: 'A rouvert une conversation' },
+  'inbox.comment_resolved': { en: 'Resolved a comment', fr: 'A résolu un commentaire' },
+  'inbox.comment_reopened': { en: 'Reopened a comment', fr: 'A rouvert un commentaire' },
+  'inbox.review_resolved': { en: 'Resolved a review', fr: 'A résolu un avis' },
+  'inbox.review_reopened': { en: 'Reopened a review', fr: 'A rouvert un avis' },
 } as const;
 export const historyActionLabelsSchema = z.record(z.string().min(1).max(120), z.object({ en: text, fr: text }).strict());
 export type ActionLabels = Record<string, { en: string; fr: string }>;

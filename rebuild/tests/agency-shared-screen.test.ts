@@ -29,6 +29,7 @@ it('renders shared phone-card tables, module metrics, coverage disclosures and w
   expect(html).toContain('Waiting conversations');
   expect(html).toContain('ui-infotip is-warning'); expect(html).toContain('Not shown for workspaces where you lack access');
   expect(html).not.toContain('Each point shows'); expect(html).toContain('Needs attention');
+  expect(html).not.toContain('the channel scope does not filter it');
 });
 it('accepts the shared channel parameter and clarifies that it does not filter', async () => {
   m.scope.mockResolvedValue({ ids: ['c1'], dropped: 0, source: 'url', channels: [] });

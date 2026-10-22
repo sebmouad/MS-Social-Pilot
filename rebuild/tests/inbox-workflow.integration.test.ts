@@ -123,6 +123,8 @@ describe.skipIf(!databaseUrl)('Inbox workflow atomicity against PostgreSQL', () 
         expect((await outer.conversation.findUniqueOrThrow({ where: { id: conversationId } })).resolvedAt).toBeNull();
         let auditRows = await outer.$queryRaw<Array<{ count: bigint }>>`SELECT COUNT(*) AS count FROM root_activities WHERE "actorId" = ${userId} AND detail->>'workspaceId' = ${workspaceId}`;
         expect(Number(auditRows[0]?.count)).toBe(0);
+        const rolledBackHistory = await outer.$queryRaw<Array<{ count: bigint }>>`SELECT COUNT(*) AS count FROM activity_logs WHERE "workspaceId" = ${workspaceId} AND "actorId" = ${userId}`;
+        expect(Number(rolledBackHistory[0]?.count)).toBe(0);
 
         await expect(setInboxResolved(actor, { kind: 'message', id: conversationId, resolved: true })).resolves.toMatchObject({ ok: true, kind: 'message', id: conversationId, resolved: true });
         expect((await outer.conversation.findUniqueOrThrow({ where: { id: conversationId } })).resolvedAt).toBeInstanceOf(Date);
@@ -151,6 +153,11 @@ describe.skipIf(!databaseUrl)('Inbox workflow atomicity against PostgreSQL', () 
           'inbox.comment_reopened', 'inbox.comment_resolved', 'inbox.conversation_reopened', 'inbox.conversation_resolved',
         ]);
         expect(actions.every(row => row.targetId === targetIds.primary)).toBe(true);
+        const history = await outer.$queryRaw<Array<{ action: string; targetId: string }>>`SELECT action, detail->>'targetId' AS "targetId" FROM activity_logs WHERE "workspaceId" = ${workspaceId} AND "actorId" = ${userId} ORDER BY action`;
+        expect(history.map(row => row.action)).toEqual([
+          'inbox.comment_reopened', 'inbox.comment_resolved', 'inbox.conversation_reopened', 'inbox.conversation_resolved',
+        ]);
+        expect(history.every(row => row.targetId === targetIds.primary)).toBe(true);
         throw rollback;
       }, { timeout: 60000 });
     } catch (error) {

@@ -43,3 +43,26 @@ it('submits a named WebP through REST and announces conversion only on a confirm
   expect(JSON.parse(String(vi.mocked(fetch).mock.calls[0]![1]!.body))).toEqual({ url, name: 'Spring.webp', confirmation: `IMPORT MEDIA ${url}` });
   expect(container.textContent).toContain('The WebP image was saved as PNG.'); expect(state.refresh).toHaveBeenCalledOnce();
 });
+it('opens a detail sheet with facts, post links and honest holder counts', async () => {
+  const used: Asset = { ...asset, width: 800, height: 600, inUse: true, holderCount: 3, holders: [{ postId: 'p1', status: 'published', scheduledAt: null, excerpt: 'Hello world' }] };
+  await act(async () => root.render(createElement(MediaLibrary, { ...props, items: [used] })));
+  expect(container.querySelector('.ui-side-panel')).toBeNull();
+  await act(async () => button('Details').click());
+  const panel = container.querySelector('.ui-side-panel')!;
+  expect(panel.querySelector('h2')?.textContent).toBe('Spring.jpg');
+  expect(panel.textContent).toContain('800 × 600 pixels');
+  expect(panel.textContent).toContain('Used in 3 posts');
+  const link = panel.querySelector('a[href="/content/post/p1"]')!;
+  expect(link.textContent).toContain('Hello world'); expect(link.getAttribute('title')).toBe('Open post');
+  expect(panel.textContent).toContain('Showing 1 of 3 posts');
+  await act(async () => panel.querySelector<HTMLButtonElement>('button[aria-label="Close details"]')!.click());
+  expect(container.querySelector('.ui-side-panel')).toBeNull();
+});
+it('shows French detail labels and an unused state', async () => {
+  await act(async () => root.render(createElement(MediaLibrary, { ...props, locale: 'fr' })));
+  await act(async () => button('Détails').click());
+  const panel = container.querySelector('.ui-side-panel')!;
+  expect(panel.textContent).toContain('Inutilisé');
+  expect(panel.querySelector('button[aria-label="Fermer le détail"]')).not.toBeNull();
+  expect(panel.querySelector('a[href^="/content/post/"]')).toBeNull();
+});

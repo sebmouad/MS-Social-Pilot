@@ -67,6 +67,20 @@ describe('command palette commands', () => {
     ]));
   });
 
+  it('reaches the Library and Settings sub-pages hidden from tabs', async () => {
+    mocks.config.mockResolvedValue(100);
+    const { items } = await listNavigationCommands(actor);
+    expect(items).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: 'publishing/collaboration', href: '/content/library/fields' }),
+      expect.objectContaining({ id: 'publishing/labels', href: '/content/library/labels' }),
+      expect.objectContaining({ id: 'publishing/templates', href: '/content/library/templates' }),
+      expect.objectContaining({ id: 'settings/bio', href: '/settings/sharing/bio' }),
+      expect.objectContaining({ id: 'settings/notifications', href: '/settings/account/notifications' }),
+      expect.objectContaining({ id: 'settings/appearance', href: '/settings/account/appearance' }),
+      expect.objectContaining({ id: 'settings/webhooks', href: '/settings/integrations/webhooks' }),
+    ]));
+  });
+
   it('leaves out modules and features the member cannot use', async () => {
     deniedModules.add('ads');
     deniedFeatures.add('settings/data');

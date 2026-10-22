@@ -50,6 +50,7 @@ export async function setInboxWorkflowResolved(actor: InboxReadActor, input: unk
         if (!rows[0]) throw new OperationError('not_found', await inboxServiceText('service6'));
         const reviewDetail = JSON.stringify({ workspaceId: actor.workspaceId, targetId: rows[0].targetId, itemId: value.id, kind: value.kind });
         await tx.$executeRaw`INSERT INTO root_activities (id, "actorId", action, detail, "createdAt") VALUES (${randomUUID()}, ${actor.userId}, ${`inbox.review_${value.resolved ? 'resolved' : 'reopened'}`}, ${reviewDetail}::jsonb, NOW())`;
+        await tx.$executeRaw`INSERT INTO activity_logs (id, "workspaceId", "actorId", action, detail, "createdAt") VALUES (${randomUUID()}, ${actor.workspaceId}, ${actor.userId}, ${`inbox.review_${value.resolved ? 'resolved' : 'reopened'}`}, ${JSON.stringify({ targetId: rows[0].targetId, itemId: value.id, kind: value.kind })}::jsonb, NOW())`;
         return { ok: true, kind: value.kind, id: value.id, resolved: value.resolved };
       }
       const scope = value.kind === 'message'
@@ -66,6 +67,8 @@ export async function setInboxWorkflowResolved(actor: InboxReadActor, input: unk
       const action = `inbox.${value.kind === 'message' ? 'conversation' : 'comment'}_${value.resolved ? 'resolved' : 'reopened'}`;
       const detail = JSON.stringify({ workspaceId: actor.workspaceId, targetId: item.targetId, itemId: value.id, kind: value.kind });
       await tx.$executeRaw`INSERT INTO root_activities (id, "actorId", action, detail, "createdAt") VALUES (${randomUUID()}, ${actor.userId}, ${action}, ${detail}::jsonb, NOW())`;
+      // The same decision is workspace history (Settings › History), alongside assignment and moderation actions.
+      await tx.$executeRaw`INSERT INTO activity_logs (id, "workspaceId", "actorId", action, detail, "createdAt") VALUES (${randomUUID()}, ${actor.workspaceId}, ${actor.userId}, ${action}, ${JSON.stringify({ targetId: item.targetId, itemId: value.id, kind: value.kind })}::jsonb, NOW())`;
       return { ok: true, kind: value.kind, id: value.id, resolved: value.resolved };
     }, { timeout, maxWait });
   });

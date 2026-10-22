@@ -722,3 +722,13 @@ where the numbers appear. The command palette reaches every Insights
 page including the Goals, Pins and Chart-notes sub-pages that tabs
 hide. Touch targets on Insights-local controls (filter chips, chart
 metric tabs, compare kind switch) reach 40px on coarse pointers.
+
+## Excellence pass: Inbox, Publishing depth, Home, Tasks, Agency, Settings — 2026-10-22
+
+Source/unit evidence only; no browser, provider or production run in this batch.
+
+- Library Media tiles open a detail sheet (a `SidePanel`, a full page on phones) with the large preview, type, file, dimensions when known, usage and the posts that use the asset, each linking to its post page; a capped holder list says how many are shown. Rename and Delete keep their exact confirmations inside the sheet. Deleting the open asset closes the sheet.
+- Create's More options offers the workspace labels (the complete list from the same read service as Library › Labels); the chosen label is submitted with the draft. A template label the workspace no longer has is dropped instead of submitted, because the save service would reject it.
+- Resolving or reopening a conversation, comment or review writes workspace history (Settings › History) in the same transaction as the state change, alongside assignment, note and moderation actions; single and bulk paths share it. Replies stay visible in the thread itself; reply/hide/delete provider outcomes are not history rows.
+- The command palette reaches the Library sub-pages (Fields, Labels, Templates) and the Settings sub-pages (Link in bio, Notifications, Appearance, Webhooks) that tabs hide. Tab routes without their own feature id (Inbox Rules, API keys, Security, channel groups) stay reachable through their section tabs.
+- Agency shows the "the channel scope does not filter it" notice only when a channel parameter is present; without one the page shows no scope notice.
