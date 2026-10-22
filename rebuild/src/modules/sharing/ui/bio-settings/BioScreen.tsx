@@ -20,7 +20,7 @@ export default async function BioSettingsPage() {
   const [bio, limits] = await Promise.all([readBioPage(actor).catch(() => null), sharingLimits().catch(() => null)]);
   const copy = await loadOwnerCopy(await settingsLocale());
   const t = ownerText(copy);
-  return <PageFrame module="settings"><SettingsPage active={BIO_FEATURE_ID as FeatureId} title={t('Bio page')} description={t('One public page with your links for {0}. Clicks are counted without storing visitor details.', viewer.membership.workspace.name)}>
+  return <PageFrame module="settings"><SettingsPage active={BIO_FEATURE_ID as FeatureId} tab="sharingBio" locale={await settingsLocale()} title={t('Bio page')} description={t('One public page with your links for {0}. Clicks are counted without storing visitor details.', viewer.membership.workspace.name)}>
     <SettingsPanel title={t('Public page')} detail={t('Visitors need no account. Only the address, title, picture and link labels are shown; link addresses open through a counted redirect.')}>
       {bio && limits
         ? <BioManager initial={JSON.parse(JSON.stringify(bio))} limits={{ titleMax: limits.bio_titleMaxCharacters!, descriptionMax: limits.bio_descriptionMaxCharacters!, labelMax: limits.bio_linkLabelMaxCharacters!, urlMax: limits.bio_urlMaxCharacters! }} copy={copy} />

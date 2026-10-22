@@ -91,7 +91,7 @@ it('refreshes active sessions after enabling a verification method', async () =>
     if (String(url).endsWith('/enable') && init?.method === 'POST') { enabled = true; return response({ ok: true, recoveryCodes: ['private-recovery'] }); }
     return response({ passkeys: [], required: false, twoStepEnabled: enabled });
   });
-  await render(createElement(AccountSettings, { canWrite: true, nameMaxLength: 100, confirmationCopy: accountConfirmationCopy.en, initialName: 'Synthetic owner', email: 'owner@example.test', passwordPolicy: { minLength: 12, maxBytes: 800 } }));
+  await render(createElement(AccountSettings, { part: 'security', canWrite: true, nameMaxLength: 100, confirmationCopy: accountConfirmationCopy.en, initialName: 'Synthetic owner', email: 'owner@example.test', passwordPolicy: { minLength: 12, maxBytes: 800 } }));
   expect(container.textContent).toContain('Signed-in session');
   const section = [...container.querySelectorAll('section')].find(item => item.textContent?.includes('Sign-in security'))!;
   await input(section.querySelector<HTMLInputElement>('input[type=password]')!, 'private-password'); await click(section.querySelector('[role=switch]')!); await click(button('Set up authenticator', container.querySelector('dialog')!));

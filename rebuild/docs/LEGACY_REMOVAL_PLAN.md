@@ -311,3 +311,7 @@ Outside this owned file, integration owners need to:
 - Only the release owner can record the future host inspection, approved
   retirement window, exact recovery artifacts and eventual removal receipts.
   This worker has not performed them and leaves this file for integration.
+
+## Legacy server removal executed (2026-10-22)
+
+`scripts/server-legacy-cleanup.sh` ran once on production and was then deleted from the repository; references to it above are historical. Result: fresh backup `/var/backups/legacy-cleanup-20261022110559`, five unmapped tables dropped (workspace_exports had 1 row; others empty), legacy units, `/srv/ms-social-pilot{,.prev}` and `/usr/local/sbin/socialpilot-deploy` removed; rebuild units stayed active. Production then deployed `b9001ddf` with the baseline marked applied. `20261022200000_root_admin_settings` was never applied in production before the squash; production had no `root.legacy.*` keys, so no data changed.

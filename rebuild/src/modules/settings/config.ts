@@ -12,10 +12,12 @@ import { REGISTRATION_CONFIG } from './registration-config';
 import { NOTIFICATIONS_CONFIG } from './notifications/config';
 import { entry, cron } from '@/lib/config/entry';
 import { appearanceCopy, appearanceCopySchema } from './ui/appearance/copy';
+import { sectionsCopy, sectionsCopySchema } from './ui/sections-copy';
 import { RETENTION_COPY, retentionCopySchema } from './retention-copy';
 
 export const SETTINGS_CONFIG = [
   entry({ key: 'settings.uiCopy', group: 'Settings · Copy', label: 'Settings screen copy', kind: 'json', description: 'English and French customer copy for Settings screens, forms, tables and security controls.', defaultValue: settingsUiCopy, schema: settingsUiCopySchema, consumption: 'active' }),
+  entry({ key: 'settings.sectionsCopy', group: 'Settings · Copy', label: 'Settings sections copy', kind: 'json', description: 'English and French labels for Settings section tabs, Workspace cards and Channels cards.', defaultValue: sectionsCopy, schema: sectionsCopySchema, consumption: 'active' }),
   entry({ key: 'settings.accountPasskeyLimit', group: 'Settings · Account', label: 'Passkey list limit', kind: 'number', description: 'Refuse oversized passkey lists rather than silently omitting credentials.', defaultValue: 100, schema: z.number().int().min(1).max(10000), consumption: 'active' }),
   entry({ key: 'settings.accountAuthenticatorIssuer', group: 'Settings · Account', label: 'Authenticator issuer', kind: 'text', description: 'Account label shown in authenticator apps.', defaultValue: 'MS Social Pilot', schema: z.string().trim().min(1).max(100), consumption: 'active' }),
   entry({ key: 'settings.appearanceCookieMaxAgeSeconds', group: 'Settings · Appearance', label: 'Appearance cookie lifetime (seconds)', kind: 'number', description: 'Lifetime of theme and display-mode cookies saved by Settings REST and session MCP.', defaultValue: 31536000, schema: z.number().int().min(1).max(315360000), consumption: 'active' }),

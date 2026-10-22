@@ -120,7 +120,6 @@ const LITERAL_ALLOWLIST: Array<{ file: RegExp; text: string; reason: string }> =
   { file: /feeds\/ui\/FeedManager\.tsx$/, text: 'https://example.com/feed', reason: 'Input-format example for a URL field (the reserved example.com domain); not translatable copy.' },
   { file: /feeds\/ui\/RecipeSource\.tsx$/, text: 'https://', reason: 'URL scheme prefix used as an input-format hint; not translatable copy.' },
   { file: /media\/ui\/MediaLibrary\.tsx$/, text: 'https://example.com/photo.jpg', reason: 'Input-format example for an image URL field (the reserved example.com domain); not translatable copy.' },
-  { file: /settings\/ui\/workspace\/policy-form\.tsx$/, text: 'America/New_York', reason: 'IANA time-zone identifier example; the identifier syntax is not localized.' },
   { file: /sharing\/ui\/bio-settings\/BioManager\.tsx$/, text: '/bio/', reason: 'Public URL path prefix shown in front of the editable address; a route, not translatable copy.' },
   { file: /publishing\/ui\/posts\/PostActions\.tsx$/, text: 'message,firstComment,channels', reason: 'CSV column names are the import file contract, not display text; shown in a code element.' },
   { file: /publishing\/ui\/posts\/PostActions\.tsx$/, text: 'firstCommentDelayMinutes', reason: 'Optional CSV column name from the import file contract; shown in a code element.' },

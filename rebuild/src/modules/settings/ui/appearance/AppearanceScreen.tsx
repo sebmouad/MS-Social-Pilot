@@ -21,7 +21,7 @@ export default async function AppearancePage() {
   const t = (await configValueOrDefault('settings.appearanceCopy'))[locale] as AppearanceCopy;
   const appearance = await appearanceSession(await accountSessionActor(viewer.user.id, viewer.workspaceId));
   const webApp = await readWebApp(await accountSessionActor(viewer.user.id, viewer.workspaceId));
-  return <PageFrame module="settings" scopedAccess><SettingsPage active="settings/appearance" title={t.title} description={t.description} locale={locale}>
+  return <PageFrame module="settings" scopedAccess><SettingsPage tab="accountAppearance" active="settings/appearance" title={t.title} description={t.description} locale={locale}>
     <SettingsPanel title={t.panel} detail={t.panelDetail}>
       <AppearancePicker initialTheme={appearance.theme} initialMode={appearance.mode} copy={t} canWrite={canAccessFeature(viewer.permissions, 'settings/appearance', 'write')} />
     </SettingsPanel>

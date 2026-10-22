@@ -9,7 +9,7 @@ const source = { workspace: { id: 'w', disabledModules: [] as string[] }, member
 describe('Client sharing and bio host boundaries', () => {
   it('exposes separate pages and Root ownership', () => {
     expect(settingsManifest.pages.find(p => p.id === 'settings/sharing')?.href).toBe('/settings/sharing');
-    expect(settingsManifest.pages.find(p => p.id === 'settings/bio')?.href).toBe('/settings/bio');
+    expect(settingsManifest.pages.find(p => p.id === 'settings/bio')?.href).toBe('/settings/sharing/bio');
     for (const key of ['sharing.defaultExpiryDays','sharing.maxTargetsPerLink','sharing.presentationPolicy','bio.maxLinks']) expect(safeConfigShape().find(s => s.key === key)).toMatchObject({ owner: { kind: 'product', id: 'settings' }, consumption: 'active' });
   });
   it('requires manager authority for both features', () => {

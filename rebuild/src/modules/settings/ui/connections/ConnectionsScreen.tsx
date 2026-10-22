@@ -1,4 +1,4 @@
-import { readSettingsUiCopy } from '@/modules/settings/ui/copy-server';
+import { readSectionsCopy, readSettingsUiCopy } from '@/modules/settings/ui/copy-server';
 
 import { entitledPlatformIds } from '@/server/entitlements';
 import type { Metadata } from 'next';
@@ -11,24 +11,24 @@ import { fill } from '@/modules/settings/ui/shell-copy';
 import { ConnectionManager } from './manager';
 import { connectablePlatforms, platformConnectsWithCredentials, platformGrantHealth } from '@/server/platforms/registry';
 import { summarizeConnectionHealth, connectionHealthText, type ConnectionHealthCopyKey } from '@/lib/connection-health';
-import { ConnectionRowMenu } from './row-menu';
+import { ChannelCardActions } from './row-menu';
 import { Avatar, DataTable, EmptyState } from '@/components';
 import { GrantChips } from './GrantChips';
-import tableStyles from './connections.module.css';
-import { IconPlugConnected, IconVersions } from '@tabler/icons-react';
+import cardStyles from './connections.module.css';
+import { IconPlugConnected } from '@tabler/icons-react';
 import { platformModule } from '@/platforms';
 import { connectionState } from '@/lib/connection-status';
 import { runtimeConfig } from '@/server/config/store';
 
-
-export const metadata: Metadata = { title: 'Connections' };
+export const metadata: Metadata = { title: 'Channels' };
 
 const providerName = (provider: string) => platformModule(provider)?.name ?? provider.replace(/[_-]/g, ' ').replace(/\b\w/g, letter => letter.toUpperCase());
 
 export default async function ConnectionsPage({ searchParams }: { searchParams: Promise<{ notice?: string; select?: string; source?: string; action?: string }> }) {
   const [viewer, params, locale] = await Promise.all([requireViewer({ feature: 'settings/connections' }), searchParams, settingsLocale()]);
-  const uiCopy = await readSettingsUiCopy();
+  const [uiCopy, sections] = await Promise.all([readSettingsUiCopy(), readSectionsCopy(locale)]);
   const t = uiCopy.connections[locale];
+  const c = sections.channels;
   const allowedProviders = entitledPlatformIds(viewer.entitlements);
   const [accounts, adAccounts, platforms, statusLabels] = await Promise.all([listConnections(viewer.workspaceId, allowedProviders), getAdAccounts(viewer.workspaceId, allowedProviders), connectablePlatforms(allowedProviders), runtimeConfig('connections.statusLabels')]);
   const connectable = platforms.map(({ id, name, mark }) => ({ id, name, mark, credentials: platformConnectsWithCredentials(id) }));
@@ -41,12 +41,10 @@ export default async function ConnectionsPage({ searchParams }: { searchParams: 
   const now = new Date();
   const healthById = new Map(await Promise.all(accounts.map(async account => [account.id, summarizeConnectionHealth(account, await platformGrantHealth(account.provider, { scopes: account.scopes, hasAdAccounts: account.adAccounts.length > 0, locale }), now)] as const)));
   const text = (key: ConnectionHealthCopyKey, values?: Record<string, string>) => connectionHealthText(locale, key, values);
-  const dateFormat = new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' });
   const dayFormat = new Intl.DateTimeFormat(locale, { dateStyle: 'medium' });
   const notice = (key: string, tone: 'status' | 'alert', message: string) => params.notice === key && <p className={styles['settings-note']} role={tone}>{message}</p>;
 
-  return <PageFrame module="settings"><SettingsPage copy={uiCopy} active="settings/connections" title={t.title} description={t.description} locale={locale}>
-    <a className={tableStyles.profilesLink} href="/settings/profiles"><IconVersions size={16} stroke={1.9} aria-hidden="true" />{uiCopy.profiles[locale].title}</a>
+  return <PageFrame module="settings"><SettingsPage copy={uiCopy} tab="channelsAccounts" active="settings/connections" title={t.title} description={t.description} locale={locale}>
     <ConnectionManager locale={locale} statusLabels={statusLabels} sources={accounts.map(account => ({ ...account, platformName: providerName(account.provider) }))} canManage={canManage} platforms={connectable} initiallyOpen={params.select === '1'} initialSourceId={params.source} initialAction={params.action === 'disconnect' ? 'disconnect' : params.action === 'manage' ? 'manage' : undefined} />
     {notice('connected_partial', 'status', t.connectedPartial)}
     {notice('connected', 'status', t.connected)}
@@ -58,31 +56,40 @@ export default async function ConnectionsPage({ searchParams }: { searchParams: 
     {!accounts.length && !adRows.length ? <SettingsPanel title={t.noneTitle} detail={t.noneDetail}>
       <EmptyState title={t.noneTitle} icon={<IconPlugConnected />} action={connectable.length && canManage ? <a href="#connection-actions">{t.manageSelections}</a> : <a href="/settings/account">{t.account}</a>}>{canManage && connectable.length ? t.noneConnect : t.noneAvailable}</EmptyState>
     </SettingsPanel> : <>
-    <SettingsPanel title={t.socialPanel} detail={accounts.length === 1 ? t.socialDetailOne : fill(t.socialDetailMany, { count: accounts.length })}>
-      {[...new Set(accounts.map(account => account.provider))].map(provider => <section key={provider} aria-label={providerName(provider)}>
-        <h3>{providerName(provider)}</h3>
-        <DataTable caption={`${t.socialPanel} · ${providerName(provider)}`} rows={accounts.filter(account => account.provider === provider)} rowKey={account => account.id} emptyMessage={t.noSocial} columns={[
-          { key: 'account', label: t.account, render: account => <div className={tableStyles.account}><Avatar name={account.name} size="md" decorative /><div className={tableStyles.accountText}><strong>{account.name}</strong><span className={tableStyles.accountMeta}>{fill(t.added, { date: dayFormat.format(account.createdAt) })}</span></div></div> },
-          { key: 'channels', label: t.channels, render: account => account.targets.length ? <><span>{fill(t.selectedOf, { enabled: account.targets.filter(target => target.enabled).length, total: account.targets.length })}</span><div className={styles['settings-inline-list']}>{account.targets.map(target => <div key={target.id} className={styles['settings-chip']} data-disabled={!target.enabled}>{target.name || target.type}{!target.enabled && t.notSelectedSuffix}</div>)}</div></> : t.noChannels },
-          { key: 'status', label: t.status, render: account => { const health = healthById.get(account.id)!; return <><Status tone={health.token === 'valid' ? 'good' : 'warning'}>{text(`token.${health.token}`)}</Status><span className={styles['settings-table__secondary']}>{account.tokenExpiresAt ? text('token.expiresOn', { date: dateFormat.format(account.tokenExpiresAt) }) : text('token.noExpiry')}</span>
-            <GrantChips grants={health.grants} locale={locale} label={text('permissions')} />
-            {health.missing.length > 0 && <span className={styles['settings-table__secondary']}>{text('missingSummary', { labels: health.missing.map(group => group.label).join(', ') })}</span>}
-            {health.grants.length > 0 && health.grants.every(group => group.state === 'unknown') && <span className={styles['settings-table__secondary']}>{text('unknownSummary')}</span>}</>; } },
-          ...(canManage ? [{ key: 'actions', label: t.actions, render: (account: (typeof accounts)[number]) => <ConnectionRowMenu id={account.id} name={account.name} platformId={account.provider} manageLabel={t.manageSelection} disconnectLabel={t.disconnect} actionsLabel={t.actions} reconnectLabel={text('reconnect')} busyLabel={text('reconnecting')} failedLabel={text('reconnectFailed')} /> }] : []),
-        ]} />
-      </section>)}
-      {!canManage && <p className={styles['settings-note']}>{t.managersOnly}</p>}
-    </SettingsPanel>
-    <SettingsPanel title={t.adPanel} detail={adRows.length === 1 ? t.adDetailOne : fill(t.adDetailMany, { count: adRows.length })}>
-      <DataTable caption={t.adPanel} rows={adRows} rowKey={ad => ad.id} emptyMessage={t.noAds} emptyIcon={<IconPlugConnected />} columns={[
+    <div className={cardStyles.cards} role="list" aria-label={t.socialPanel}>
+      {accounts.map(account => {
+        const health = healthById.get(account.id)!;
+        const state = connectionState(account, now);
+        const enabled = account.targets.filter(target => target.enabled).length;
+        return <article key={account.id} className={cardStyles.card} role="listitem" aria-label={account.name}>
+          <div className={cardStyles.cardHead}>
+            <div className={cardStyles.cardTitle}>
+              <Avatar name={account.name} size="md" decorative />
+              <div><h3>{account.name}</h3><p>{providerName(account.provider)} · {fill(t.added, { date: dayFormat.format(account.createdAt) })}</p></div>
+            </div>
+            <Status tone={state === 'connected' ? 'good' : 'warning'}>{statusLabels[state]}</Status>
+          </div>
+          <div className={cardStyles.cardMeta}>
+            <span>{account.targets.length ? fill(c.inUse, { enabled, total: account.targets.length }) : t.noChannels}</span>
+            {account.tokenExpiresAt && state === 'connected' ? <span>{text('token.expiresOn', { date: dayFormat.format(account.tokenExpiresAt) })}</span> : null}
+          </div>
+          {health.missing.length > 0 && <p className={cardStyles.cardMissing}>{fill(c.permissionsMissing, { labels: health.missing.map(group => group.label).join(', ') })}</p>}
+          {health.grants.length > 0 ? <GrantChips grants={health.grants} locale={locale} label={c.permissions} /> : null}
+          {canManage && <ChannelCardActions id={account.id} name={account.name} platformId={account.provider} needsReconnect={state !== 'connected' || health.missing.length > 0} manageLabel={c.manage} disconnectLabel={c.disconnect} actionsLabel={c.more} reconnectLabel={c.reconnect} busyLabel={text('reconnecting')} failedLabel={text('reconnectFailed')} />}
+        </article>;
+      })}
+    </div>
+    {!canManage && <p className={styles['settings-note']}>{t.managersOnly}</p>}
+    <SettingsPanel title={c.adTitle} detail={c.adDetail}>
+      <DataTable caption={c.adTitle} rows={adRows} rowKey={ad => ad.id} emptyMessage={t.noAds} emptyIcon={<IconPlugConnected />} columns={[
         { key: 'account', label: t.adAccount, render: ad => <><strong>{ad.name}</strong><span className={styles['settings-table__secondary']}>{ad.provider ? providerName(ad.provider) : t.platformMissing}</span></> },
-        { key: 'profile', label: t.linkedProfile, render: ad => ad.owner ?? t.noLinkedProfile },
-        { key: 'id', label: t.accountId, render: ad => ad.actId },
-        { key: 'status', label: t.status, render: ad => <Status tone={ad.enabled && ad.state === 'connected' ? 'good' : 'warning'}>{!ad.enabled ? t.notSelected : ad.state && ad.state !== 'connected' ? statusLabels[ad.state] : t.selected}</Status> },
-        ...(canManage ? [{ key: 'actions', label: t.actions, render: (ad: (typeof adRows)[number]) => ad.socialAccountId && socialById.has(ad.socialAccountId) ? <a href={`/settings/connections?source=${encodeURIComponent(ad.socialAccountId)}&action=manage`}>{t.manageSelection}</a> : t.reconnectFirst }] : []),
+        { key: 'profile', label: c.adLinked, render: ad => ad.owner ?? t.noLinkedProfile },
+        { key: 'status', label: t.status, render: ad => <Status tone={ad.enabled && ad.state === 'connected' ? 'good' : 'warning'}>{!ad.enabled ? c.inUseOff : ad.state && ad.state !== 'connected' ? statusLabels[ad.state] : c.inUseOn}</Status> },
+        ...(canManage ? [{ key: 'actions', label: t.actions, render: (ad: (typeof adRows)[number]) => ad.socialAccountId && socialById.has(ad.socialAccountId) ? <a href={`/settings/channels?source=${encodeURIComponent(ad.socialAccountId)}&action=manage`}>{c.adManage}</a> : t.reconnectFirst }] : []),
       ]} />
     </SettingsPanel>
     </>}
+    <SettingsPanel title={c.groupsTitle} detail={c.groupsDetail}><a href="/settings/channels/groups">{c.groupsOpen}</a></SettingsPanel>
     <p className={styles['settings-note']}>{t.footnote}</p>
   </SettingsPage></PageFrame>;
 }

@@ -12,7 +12,7 @@ import { fill } from './copy';
 
 type Session = { id: string; expiresAt: string; current: boolean };
 
-export function AccountManager({ initialName, email, passwordPolicy, canWrite, nameMaxLength, confirmationCopy, sessionRevision = 0, locale = 'en' }: { sessionRevision?: number; canWrite: boolean; nameMaxLength: number; confirmationCopy: AccountConfirmationCopy; initialName: string; email: string; passwordPolicy: { minLength: number; maxBytes: number }; locale?: 'en' | 'fr' }) {
+export function AccountManager({ initialName, email, passwordPolicy, canWrite, nameMaxLength, confirmationCopy, sessionRevision = 0, locale = 'en', part = 'profile' }: { part?: 'profile' | 'security'; sessionRevision?: number; canWrite: boolean; nameMaxLength: number; confirmationCopy: AccountConfirmationCopy; initialName: string; email: string; passwordPolicy: { minLength: number; maxBytes: number }; locale?: 'en' | 'fr' }) {
   const toast = useToast();
   const t = useSettingsCopy('account', locale);
   const [confirm, confirmationDialog] = useConfirm(confirmationCopy);
@@ -28,6 +28,7 @@ export function AccountManager({ initialName, email, passwordPolicy, canWrite, n
   const passwordValidation = useFormValidation();
 
   useEffect(() => {
+    if (part !== 'security') return;
     let active = true;
     fetch('/api/settings/account/sessions', { cache: 'no-store' }).then(async response => {
       const result = await response.json();
@@ -35,7 +36,7 @@ export function AccountManager({ initialName, email, passwordPolicy, canWrite, n
       if (active) { setSessions(result.sessions); setNextOffset(result.nextOffset ?? null); }
     }).catch(() => { if (active) setNotice(t.sessionsFailed); });
     return () => { active = false; };
-  }, [t, sessionRevision]);
+  }, [t, sessionRevision, part]);
 
   async function moreSessions() {
     if (busy || nextOffset === null) return;
@@ -90,28 +91,28 @@ export function AccountManager({ initialName, email, passwordPolicy, canWrite, n
   }
 
   return <>{confirmationDialog}
-    {pendingSession && <ConfirmDialog open title={t.signOut} objectName={`${t.otherSession} · ${pendingSession}`} consequence={confirmationCopy.session} confirmLabel={t.signOut} cancelLabel={confirmationCopy.cancel} failureLabel={t.revokeFailed} onClose={() => setPendingSession(null)} onConfirm={async () => (await revokeSession(pendingSession)) ?? null} />}
-    <section className={styles['settings-panel']}><div className={styles['settings-panel__heading']}><div><h2>{t.profile}</h2><p>{t.profileDetail}</p></div></div>
+    {pendingSession && <ConfirmDialog open title={t.signOut} objectName={t.otherSession} consequence={confirmationCopy.session} confirmLabel={t.signOut} cancelLabel={confirmationCopy.cancel} failureLabel={t.revokeFailed} onClose={() => setPendingSession(null)} onConfirm={async () => (await revokeSession(pendingSession)) ?? null} />}
+    {part === 'profile' && <section className={styles['settings-panel']}><div className={styles['settings-panel__heading']}><div><h2>{t.profile}</h2><p>{t.profileDetail}</p></div></div>
       <form method="post" noValidate className={styles['mcp-key-form']} onSubmit={saveName}>
         <div className={styles['mcp-key-fields']}><label>{t.name}<input name="name" required maxLength={nameMaxLength} value={name} onChange={event => { setName(event.currentTarget.value); nameValidation.clear('name'); }} disabled={busy || !canWrite} {...nameValidation.fieldProps('name')} /><FieldError {...nameValidation.errorProps('name')} /></label><label>{t.email}<input name="email" value={email} readOnly aria-describedby="account-email-note" /></label></div>
         <p id="account-email-note" className={styles['settings-note']}>{t.emailNote}</p>
         <button type="submit" disabled={!canWrite || busy || name.trim() === initialName}>{t.saveProfile}</button>
       </form>
-    </section>
-    {canWrite && <section className={styles['settings-panel']}><div className={styles['settings-panel__heading']}><div><h2>{t.password}</h2><p>{t.passwordDetail}</p></div></div>
+    </section>}
+    {part === 'security' && canWrite && <section className={styles['settings-panel']}><div className={styles['settings-panel__heading']}><div><h2>{t.password}</h2><p>{t.passwordDetail}</p></div></div>
       <form method="post" noValidate className={styles['mcp-key-form']} onSubmit={changePassword}><div className={styles['mcp-key-fields']}>
         <label>{t.currentPassword}<input name="currentPassword" type="password" autoComplete="current-password" required value={currentPassword} onChange={event => { setCurrentPassword(event.currentTarget.value); passwordValidation.clear('currentPassword'); }} disabled={busy} {...passwordValidation.fieldProps('currentPassword')} /><FieldError {...passwordValidation.errorProps('currentPassword')} /></label>
         <label>{t.newPassword}<input name="newPassword" type="password" autoComplete="new-password" minLength={passwordPolicy.minLength} maxLength={passwordPolicy.maxBytes} required value={newPassword} onChange={event => { setNewPassword(event.currentTarget.value); passwordValidation.clear('newPassword'); }} disabled={busy} {...passwordValidation.fieldProps('newPassword')} /><FieldError {...passwordValidation.errorProps('newPassword')} /></label>
       </div><p className={styles['settings-note']}>{fill(t.passwordRule, { min: passwordPolicy.minLength, max: passwordPolicy.maxBytes })}</p><button type="submit" disabled={busy}>{t.changePassword}</button></form>
     </section>}
-    <section className={styles['settings-panel']}><div className={styles['settings-panel__heading']}><div><h2>{t.sessions}</h2><p>{t.sessionsDetail}</p></div></div>
+    {part === 'security' && <section className={styles['settings-panel']}><div className={styles['settings-panel__heading']}><div><h2>{t.sessions}</h2><p>{t.sessionsDetail}</p></div></div>
       <DataTable caption={t.sessions} rows={sessions} rowKey={session => session.id} emptyMessage={t.noSessions} emptyIcon={<IconDevices />} columns={[
         { key: 'session', label: t.session, render: session => <Badge tone={session.current ? 'module' : 'neutral'}>{session.current ? t.currentSession : t.otherSession}</Badge> },
         { key: 'expires', label: t.expires, render: session => new Date(session.expiresAt).toLocaleString(locale) },
         { key: 'actions', label: t.signOut, render: session => canWrite && !session.current && <button type="button" className="ui-button ui-button--quiet" disabled={busy} onClick={() => setPendingSession(session.id)}>{t.signOut}</button> },
       ]} />
-    </section>
-    {nextOffset !== null && <button type="button" disabled={busy} onClick={() => void moreSessions()}>{confirmationCopy.more}</button>}
+    </section>}
+    {part === 'security' && nextOffset !== null && <button type="button" disabled={busy} onClick={() => void moreSessions()}>{confirmationCopy.more}</button>}
     {notice && <p role="status" className={styles['settings-note']}>{notice}</p>}
   </>;
 }

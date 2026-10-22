@@ -91,7 +91,7 @@ describe('browser matrix report', () => {
   });
   it('records dynamic exclusions and discovers current static pages', () => {
     const inventory = discoverRoutes(fileURLToPath(new URL('../src/app', import.meta.url)));
-    for (const route of ['/home', '/create', '/content/calendar', '/content/library/templates', '/inbox/rules', '/insights/reports', '/insights/ads/campaigns', '/settings/appearance', '/tasks', '/agency/clients']) expect(inventory.routes).toContain(route);
+    for (const route of ['/home', '/create', '/content/calendar', '/content/library/templates', '/inbox/rules', '/insights/reports', '/insights/ads/campaigns', '/settings/account/appearance', '/tasks', '/agency/clients']) expect(inventory.routes).toContain(route);
     expect(inventory.excludedDynamicRoutes).toContain('/content/post/[postId]');
     expect(inventory.routes.some(route => route.startsWith('/root') || route.includes('['))).toBe(false);
     expect(customerRoute('/settings-evil')).toBe(false);

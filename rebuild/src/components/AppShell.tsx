@@ -255,7 +255,7 @@ export function AppShell({ children, activeModule, enabledModules, enabledFeatur
   const sidebarScope = showScope && <section className="shell-channels" aria-label={copy.channels}>
     <h2 className="shell-section-label">{copy.channels}</h2>
     <ChannelScopeList channels={channels as ScopeChannel[]} selectedIds={scope} onSelect={onSelectChannel} onReset={() => applyScope([])} collapsedCount={policy.channelsCollapsedCount} searchThreshold={policy.channelSearchThreshold}
-      manageHref={enabledFeatures.includes("settings/connections") ? "/settings/connections" : undefined} compact={rail} busy={navigating} />
+      manageHref={enabledFeatures.includes("settings/connections") ? "/settings/channels" : undefined} compact={rail} busy={navigating} />
   </section>;
 
   return <ShellCopyProvider copy={copy}><SidebarDockContext.Provider value={toolsHost}><ToastProvider>
@@ -312,14 +312,22 @@ export function AppShell({ children, activeModule, enabledModules, enabledFeatur
           </div>
         </header>
         <main id="main-content" className="shell-content" tabIndex={-1}>
-          {tabs.length > 1 && <LinkTabs items={tabs} activeId={activeTabId} label={fill(copy.areaTabsLabel, { area: activeArea ? copy.areas[activeArea] : "" })} maxVisible={policy.maxVisibleTabs} moreLabel={copy.moreTabs} className="shell-tabs"/>}
+          {tabs.length > 1 && activeArea !== "settings" && <LinkTabs items={tabs} activeId={activeTabId} label={fill(copy.areaTabsLabel, { area: activeArea ? copy.areas[activeArea] : "" })} maxVisible={policy.maxVisibleTabs} moreLabel={copy.moreTabs} className="shell-tabs"/>}
           {!installationMode && dropped > 0 && <p className="shell-notice" role="status">{dropped === 1 ? copy.scopeDroppedOne : fill(copy.scopeDroppedMany, { count: dropped })}</p>}
-          {children}
+          {activeArea === "settings" && !installationMode && tabs.length > 1
+            ? <div className="shell-settings">
+              {/* Settings sections are an in-content list (left on desktop, a scrolling strip on phones), not area tabs. */}
+              <nav className="shell-settings__list" aria-label={fill(copy.areaTabsLabel, { area: copy.areas.settings })}>
+                <ul>{tabs.map(tab => <li key={tab.id}><a href={tab.href} aria-current={tab.id === activeTabId ? "page" : undefined}>{tab.label}</a></li>)}</ul>
+              </nav>
+              <div className="shell-settings__body">{children}</div>
+            </div>
+            : children}
         </main>
       </div>
       {bottomItems.length > 0 && <BottomBar label={copy.bottomBar} items={bottomItems} create={primaryAction ? { href: primaryAction.href, label: copy.createPost } : undefined}/>}
       {scopeOpen && showScope && <Drawer open title={copy.scopeSheetTitle} variant="sheet" closeLabel={copy.close} onClose={() => setScopeOpen(false)}>
-        <ChannelScopeList channels={channels as ScopeChannel[]} selectedIds={scope} onSelect={onSelectChannel} onReset={() => applyScope([])} collapsedCount={policy.channelsCollapsedCount} searchThreshold={policy.channelSearchThreshold} manageHref={enabledFeatures.includes("settings/connections") ? "/settings/connections" : undefined} busy={navigating}/>
+        <ChannelScopeList channels={channels as ScopeChannel[]} selectedIds={scope} onSelect={onSelectChannel} onReset={() => applyScope([])} collapsedCount={policy.channelsCollapsedCount} searchThreshold={policy.channelSearchThreshold} manageHref={enabledFeatures.includes("settings/connections") ? "/settings/channels" : undefined} busy={navigating}/>
       </Drawer>}
       <dialog ref={toolsRef} className="ui-drawer ui-drawer--end ui-drawer--sheet shell-tools" aria-labelledby={toolsTitleId}
         onCancel={event => { event.preventDefault(); closeTools(); }}

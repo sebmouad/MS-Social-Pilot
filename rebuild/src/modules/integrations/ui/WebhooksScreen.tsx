@@ -5,7 +5,7 @@ import { PageHeader } from '@/components/PageHeader';
 import { headers } from 'next/headers';
 import { PageFrame } from '@/server/PageFrame';
 import { requireViewer } from '@/server/context';
-import { SettingsPanel, styles } from '@/modules/settings/ui/_components';
+import { SectionTabs, SettingsPanel, styles } from '@/modules/settings/ui/_components';
 import { EMITTED_EVENTS } from '../contracts';
 import { WEBHOOKS_FEATURE_ID } from '../manifest';
 import { integrationsLocale, type IntegrationsCopyKey } from '../copy';
@@ -20,9 +20,10 @@ export default async function WebhooksScreen() {
   const copy = catalog[locale];
   const t = (key: IntegrationsCopyKey, vars?: Record<string, string | number>) => Object.entries(vars ?? {}).reduce((value: string, [name, item]) => value.split(`{${name}}`).join(String(item)), copy[key]);
   const viewer = await requireViewer({ feature: WEBHOOKS_FEATURE_ID, channelScoped: true });
+  const tabs = <SectionTabs tab="integrationsWebhooks" locale={locale} title={t('title')} />;
   const frame = (body: React.ReactNode) => <PageFrame module="settings">
     <div className={styles['settings-page']}>
-      <PageHeader module="settings" title={t('title')} description={t('description', { workspace: viewer.membership.workspace.name })} />
+      <PageHeader module="settings" title={t('title')} description={t('description', { workspace: viewer.membership.workspace.name })} tabs={tabs} />
       {body}
     </div>
   </PageFrame>;

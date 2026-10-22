@@ -21,7 +21,7 @@ describe('module declarations', () => {
   });
   it('declares one Settings page and one worker job whose schedule key exists', () => {
     expect(INTEGRATIONS_PAGES.map(page => page.id)).toEqual(['settings/webhooks']);
-    expect(PAGES.some(page => page.id === 'settings/webhooks' && page.href === '/settings/webhooks')).toBe(true);
+    expect(PAGES.some(page => page.id === 'settings/webhooks' && page.href === '/settings/integrations/webhooks')).toBe(true);
     expect(settingsManifest.jobs.map(job => job.name)).toContain('webhooks');
     for (const job of INTEGRATIONS_JOBS) expect(CONFIG_BY_KEY.has(job.configKey as never)).toBe(true);
   });

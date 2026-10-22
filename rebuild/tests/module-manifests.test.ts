@@ -66,7 +66,7 @@ describe('customer module manifests', () => {
     expect(settings.jobs).toContainEqual({ name: 'notifications', label: 'Notification delivery', configKey: 'notifications.deliverySchedule' });
     expect(settings.rootSettingsPrefixes).toContain('notifications.');
     expect(configurationOwner('notifications.deliverySchedule')).toEqual({ kind: 'product', id: 'settings' });
-    expect(PAGES.find(page => page.id === 'settings/notifications')).toMatchObject({ href: '/settings/notifications', title: 'Notifications', module: 'settings' });
+    expect(PAGES.find(page => page.id === 'settings/notifications')).toMatchObject({ href: '/settings/account/notifications', title: 'Notifications', module: 'settings' });
     expect(PAGES.filter(page => page.id === 'settings/account')).toHaveLength(1);
     expect(CONFIG_BY_KEY.get('notifications.deliverySchedule')?.schema.safeParse('*/2 * * * *').success).toBe(true);
     expect(CONFIG_BY_KEY.get('jobs.order')?.defaultValue).toContain('notifications');

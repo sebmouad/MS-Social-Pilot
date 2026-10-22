@@ -27,7 +27,7 @@ export default async function SharingPage() {
   const ready = links && channels && limits && auth;
   const copy = await loadOwnerCopy(await settingsLocale());
   const t = ownerText(copy);
-  return <PageFrame module="settings"><SettingsPage active={SHARING_FEATURE_ID as FeatureId} title={t('Client sharing')} description={t('Give clients limited access to {0} without an account.', viewer.membership.workspace.name)}>
+  return <PageFrame module="settings"><SettingsPage active={SHARING_FEATURE_ID as FeatureId} tab="sharingLinks" locale={await settingsLocale()} title={t('Client sharing')} description={t('Give clients limited access to {0} without an account.', viewer.membership.workspace.name)}>
     <SettingsPanel title={t('Share links')} detail={t('Review, calendar and portal links open without signing in, show only the channels you choose, and expire.')}>
       {ready
         ? <LinksManager initial={JSON.parse(JSON.stringify(links))} channels={channels} canApprove={auth.canApprove} limits={{ titleMax: limits.titleMaxCharacters!, descriptionMax: limits.descriptionMaxCharacters!, defaultExpiryDays: limits.defaultExpiryDays!, maxExpiryDays: limits.maxExpiryDays!, maxDaysBack: limits.maxDaysBack!, maxDaysAhead: limits.maxDaysAhead!, maxTargets: limits.maxTargetsPerLink!, publishAnywayMax: limits.publishAnywayMaxHours! }} copy={copy} />

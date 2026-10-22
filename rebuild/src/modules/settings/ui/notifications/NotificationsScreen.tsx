@@ -28,7 +28,7 @@ export default async function NotificationsPage() {
   const chatCopy = canManageChat ? await chatCopyCatalog().then(copy => copy[locale]).catch(() => null) : null;
 
   return <PageFrame module="settings" scopedAccess>
-    <SettingsPage copy={uiCopy} active="settings/notifications" title={t.title} locale={locale} description={fill(t.description, { workspace: viewer.membership.workspace.name })}>
+    <SettingsPage copy={uiCopy} tab="accountNotifications" active="settings/notifications" title={t.title} locale={locale} description={fill(t.description, { workspace: viewer.membership.workspace.name })}>
       <SettingsPanel title={t.panel} detail={t.panelDetail}>
         <NotificationCenter initialPreferences={preferences} initialPage={notifications} locale={locale} />
       </SettingsPanel>

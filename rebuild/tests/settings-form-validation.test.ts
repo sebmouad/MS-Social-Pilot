@@ -65,9 +65,9 @@ describe('settings form validation', () => {
   });
 
   it('shows and focuses the missing current password before changing credentials', async () => {
-    await render(createElement(AccountManager, { canWrite: true, nameMaxLength: 100, confirmationCopy: accountConfirmationCopy.en, initialName: 'Samira', email: 'samira@example.test', passwordPolicy: { minLength: 12, maxBytes: 800 } }));
-    const form = container.querySelectorAll('form')[1]!;
-    const password = form.querySelector<HTMLInputElement>('[name="currentPassword"]')!;
+    await render(createElement(AccountManager, { part: 'security', canWrite: true, nameMaxLength: 100, confirmationCopy: accountConfirmationCopy.en, initialName: 'Samira', email: 'samira@example.test', passwordPolicy: { minLength: 12, maxBytes: 800 } }));
+    const form = container.querySelectorAll('form')[0]!;
+    const password =form.querySelector<HTMLInputElement>('[name="currentPassword"]')!;
     vi.mocked(fetch).mockClear();
     await submit(form);
     expect(password.getAttribute('aria-invalid')).toBe('true');
@@ -77,9 +77,9 @@ describe('settings form validation', () => {
   });
 
   it('checks the password byte limit in UTF-8 before sending credentials', async () => {
-    await render(createElement(AccountManager, { canWrite: true, nameMaxLength: 100, confirmationCopy: accountConfirmationCopy.en, initialName: 'Samira', email: 'samira@example.test', passwordPolicy: { minLength: 2, maxBytes: 4 } }));
-    const form = container.querySelectorAll('form')[1]!;
-    const current = form.querySelector<HTMLInputElement>('[name="currentPassword"]')!;
+    await render(createElement(AccountManager, { part: 'security', canWrite: true, nameMaxLength: 100, confirmationCopy: accountConfirmationCopy.en, initialName: 'Samira', email: 'samira@example.test', passwordPolicy: { minLength: 2, maxBytes: 4 } }));
+    const form = container.querySelectorAll('form')[0]!;
+    const current =form.querySelector<HTMLInputElement>('[name="currentPassword"]')!;
     const next = form.querySelector<HTMLInputElement>('[name="newPassword"]')!;
     const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!;
     await act(async () => {

@@ -17,8 +17,7 @@ export default async function ProfilesScreen() {
   const confirmationCopy = (await configOrDefault('settings.channelProfilesConfirmationCopy', profileConfirmationCopySchema))[locale];
   let directory = null;
   try { directory = await readChannelProfiles({ userId: viewer.user.id, workspaceId: viewer.workspaceId }); } catch {}
-  return <PageFrame module="settings"><SettingsPage copy={uiCopy} active="settings/connections" title={copy.title} description={copy.description} locale={locale}>
-    <a href="/settings/connections">{copy.back}</a>
+  return <PageFrame module="settings"><SettingsPage copy={uiCopy} tab="channelsGroups" active="settings/connections" title={copy.title} description={copy.description} locale={locale}>
     <SettingsPanel title={copy.groups}>{directory ? <ProfilesManager confirmationCopy={confirmationCopy} initial={directory} locale={locale} canManage={['owner', 'admin'].includes(viewer.membership.role)} /> : <p role="alert">{copy.unavailable}</p>}</SettingsPanel>
   </SettingsPage></PageFrame>;
 }

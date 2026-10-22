@@ -6,7 +6,7 @@
 export const WEBHOOKS_FEATURE_ID = 'settings/webhooks' as const;
 
 export const INTEGRATIONS_PAGES = [
-  { id: WEBHOOKS_FEATURE_ID, title: 'Webhooks', href: '/settings/webhooks', description: 'Send signed events to Zapier, Make or your own server.' },
+  { id: WEBHOOKS_FEATURE_ID, title: 'Webhooks', href: '/settings/integrations/webhooks', description: 'Send signed events to Zapier, Make or your own server.', navigation: false },
 ] as const;
 
 export const INTEGRATIONS_JOBS = [

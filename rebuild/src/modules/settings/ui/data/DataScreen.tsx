@@ -7,6 +7,8 @@ import { settingsLocale } from '@/modules/settings/ui/locale';
 import { fill } from '@/modules/settings/ui/shell-copy';
 import { configValueOrDefault } from '@/server/config/config-or-default';
 import { RETENTION_COPY, retentionCopySchema } from '@/modules/settings/retention-copy';
+import { runtimeConfig } from '@/server/config/store';
+import { AccountExport } from '@/modules/settings/ui/account/export';
 import { DataControls } from './controls';
 import { WorkspaceExports } from './exports';
 import { RetentionPanel } from './retention';
@@ -28,6 +30,7 @@ export default async function DataSettingsPage() {
       <p className={styles['settings-note']}>{t.exportNote}</p>
       {manager ? <WorkspaceExports key={viewer.workspaceId} workspaceId={viewer.workspaceId} workspaceName={viewer.membership.workspace.name} locale={locale} /> : <p className={styles['settings-note']}>{t.managersOnly}</p>}
     </SettingsPanel>
+    <AccountExport locale={locale} maxBytes={await runtimeConfig('data.maxArchiveBytes')} />
     <SettingsPanel title={retentionCopy.title} detail={retentionCopy.intro}>
       {manager ? <RetentionPanel copy={retentionCopy} locale={locale} /> : <p className={styles['settings-note']}>{retentionCopy.forbidden}</p>}
     </SettingsPanel>

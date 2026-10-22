@@ -28,3 +28,18 @@
 .grantChip[data-state="unknown"] .grantMark { color: var(--ink-faint); }
 
 @media (max-width: 620px) { .grantGroups { padding: 8px 10px; } }
+
+/* Channels (design v2 S13): one card per connected account. */
+.cards { display: grid; gap: 14px; max-width: var(--form-max, 720px); min-width: 0; }
+.card { display: grid; gap: 14px; min-width: 0; padding: 18px 20px; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface); box-shadow: var(--shadow-panel); }
+.cardHead { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px 16px; flex-wrap: wrap; }
+.cardTitle { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.cardTitle h3 { margin: 0; font-size: 15px; overflow-wrap: anywhere; }
+.cardTitle p { margin: 2px 0 0; color: var(--ink-soft); font-size: 12px; }
+.cardActions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.cardMeta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; color: var(--ink-soft); font-size: 13px; }
+.cardMissing { margin: 0; color: var(--danger); font-size: 13px; }
+.sectionHead { margin: 8px 0 0; font-size: 15px; }
+.sectionHead + p { margin: 2px 0 0; color: var(--ink-soft); font-size: 13px; }
+.groupsLink { max-width: var(--form-max, 720px); }
+@media (max-width: 620px) { .card { padding: 16px; } }
