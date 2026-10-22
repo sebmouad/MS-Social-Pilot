@@ -29,7 +29,7 @@ ls prisma/migrations | grep -E '^[0-9]{14}_' | sort > "$ALL"
 COPYFILE_DISABLE=1 tar --no-xattrs -C prisma/migrations -cf - $(cat "$ORDER_FILE") 2>/dev/null | ssh -i "$KEY" "$HOST" 'rm -rf /var/tmp/deploy-migrations && mkdir -m 755 /var/tmp/deploy-migrations && tar -x -C /var/tmp/deploy-migrations 2>/dev/null'
 scp -q -i "$KEY" "$ORDER_FILE" "$HOST:/var/tmp/deploy-migrations/ORDER"
 ssh -i "$KEY" "$HOST" 'rm -rf /var/tmp/deploy-src && mkdir -p /var/tmp/deploy-src'
-git archive --format=tar --prefix=rebuild/ "$COMMIT:rebuild" | ssh -i "$KEY" "$HOST" 'tar -x -C /var/tmp/deploy-src'
+git -C "$(git rev-parse --show-toplevel)" archive --format=tar --prefix=rebuild/ "$COMMIT:rebuild" | ssh -i "$KEY" "$HOST" 'tar -x -C /var/tmp/deploy-src'
 
 ssh -i "$KEY" "$HOST" "COMMIT=$COMMIT BUILD_CPU_QUOTA=$BUILD_CPU_QUOTA BUILD_NICE=$BUILD_NICE bash -s" <<'REMOTE'
 set -uo pipefail

@@ -15,7 +15,7 @@ DEV_MEMORY_MAX="${DEV_MEMORY_MAX:-3G}"
 DEV_NICE="${DEV_NICE:-15}"
 COMMIT="$(git rev-parse origin/main)"
 ssh -i "$KEY" "$HOST" 'systemctl stop msp-dev 2>/dev/null || true; mkdir -p /srv/ms-social-pilot-rebuild-dev'
-git archive --format=tar --prefix=rebuild/ "$COMMIT:rebuild" | ssh -i "$KEY" "$HOST" 'tar -x -C /srv/ms-social-pilot-rebuild-dev'
+git -C "$(git rev-parse --show-toplevel)" archive --format=tar --prefix=rebuild/ "$COMMIT:rebuild" | ssh -i "$KEY" "$HOST" 'tar -x -C /srv/ms-social-pilot-rebuild-dev'
 ssh -i "$KEY" "$HOST" "DEV_PORT=$DEV_PORT DEV_CPU_QUOTA=$DEV_CPU_QUOTA DEV_MEMORY_MAX=$DEV_MEMORY_MAX DEV_NICE=$DEV_NICE bash -s" <<'REMOTE'
 set -euo pipefail
 D=/srv/ms-social-pilot-rebuild-dev

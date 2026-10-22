@@ -15,7 +15,7 @@ COMMIT="$(git rev-parse origin/main)"
 echo "Drill commit: $COMMIT"
 # Ship the exact commit as an archive (the server's release folder is not a git checkout).
 ssh -i "$KEY" "$HOST" 'rm -rf /srv/ms-social-pilot-rebuild-drill && mkdir -p /srv/ms-social-pilot-rebuild-drill'
-git archive --format=tar --prefix=rebuild/ "$COMMIT:rebuild" | ssh -i "$KEY" "$HOST" 'tar -x -C /srv/ms-social-pilot-rebuild-drill'
+git -C "$(git rev-parse --show-toplevel)" archive --format=tar --prefix=rebuild/ "$COMMIT:rebuild" | ssh -i "$KEY" "$HOST" 'tar -x -C /srv/ms-social-pilot-rebuild-drill'
 echo "Archive shipped."
 ssh -i "$KEY" "$HOST" "COMMIT=$COMMIT bash -s" <<'REMOTE'
 set -euo pipefail
