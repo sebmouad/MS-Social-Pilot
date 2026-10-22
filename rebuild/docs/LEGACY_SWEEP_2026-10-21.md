@@ -5,6 +5,64 @@ Lane: exhaustive legacy sweep (report only; no source changed). Compared against
 
 Inventory sizes: 95 legacy pages, 191 legacy `route.ts`, ~150 `src/lib` files, 94 Prisma models (+`RebuildReportRun`), 101 Root settings keys, 8 env vars in `.env.example`.
 
+## 0. Reconciliation at HEAD `25c3ea53` (2026-10-22)
+
+Lane: legacy sweep reconcile (docs only). Evidence kind: **static source search (grep/ls/git log) of the checked-in tree at `25c3ea53`; no test, browser, PostgreSQL, provider or production run.** Sections 1 to 8 below keep their original wording and dated `8d9ccbe7` status; this section supersedes any row it names. Where a row says "installed" or "done at source", the proof level is the one in LEGACY_CAPABILITY_PARITY.md (mocked/unit only).
+
+### 0.1 Rows closed or changed since `8d9ccbe7`
+
+| Row | Was | Now | Evidence |
+| --- | --- | --- | --- |
+| Gap 1: Meta deauthorize + data-deletion callbacks | missing | **done at source.** Owner must repoint the Meta dashboard URLs to `/api/platforms/facebook/deauthorize` and `/data-deletion` | `src/app/api/platforms/[platform]/{deauthorize,data-deletion}/route.ts`, `src/platforms/facebook/data-callbacks.ts`, `tests/facebook-data-callbacks.test.ts`; LEGACY_SWEEP_STATUS_Q13.md |
+| Page `data-deletion` | missing | **done at source** (public status page, EN/FR, local constant copy, not Root-managed) | `src/app/data-deletion/page.tsx` |
+| Gap 8 / Instagram (P0) | helpers only | **installed, disabled by default (`platforms.instagram.enabled` false)**: adapter, connection, inbox host, analytics host, analytics job, container journal/recovery, publishing (image/carousel/Reel), first comment. Not declared: media deletion, native scheduling, Stories, DMs, ads. Fixture/mocked evidence only; no live Graph run | `src/platforms/index.ts` (`PLATFORM_MODULES = [facebook, instagram]`), `src/platforms/instagram/{host,connection,publishing,inbox-host,analytics-host,jobs}.ts`, `src/server/platforms/index.ts:11`, tests `instagram-{host-connection,hosts,jobs,container-journal,container-recovery,customer-filters-ui,selection}.test.ts` |
+| Gap 7 / AI agents; page `settings/agents`; routes `api/ai-agents*`; `lib/ai-agents`; model `AiAgent` | missing | **partial.** Writing agents module: saved brief, metered post/reply suggestions, content-free history, UI `/agents`, REST `/api/agents`, MCP `list_writing_agents` + `writing_agents`. **No scheduled/automatic agent runs** (legacy `aiAgents` job) | `src/modules/agents/**`, `src/app/agents/page.tsx`, `src/app/api/agents/route.ts`, `docs/MCP_PARITY.md:155-156`, migration `20261101100000_rebuild_writing_agents`, tests `agents-*.test.ts` |
+| Posts CSV (sync only) | partial | **done at source** for background export: queued job, status, private download, expiry, retries, worker job `postExports`, MCP `posts_export_job`/`posts_export_status`. Sync `export_posts` remains. Migration `20261101100100_rebuild_post_exports` authored, application not observed | `src/modules/publishing/server/export/{jobs,http,config}.ts`, `src/app/api/publishing/posts/export/jobs/route.ts`, `docs/MCP_PARITY.md:157-158`, `tests/async-post-export.test.ts` |
+| AI monthly budget and prices (`ai.monthlyBudgetUsd`, `ai.priceOverrides`) | partial | done at source (already noted in section 6) | `src/modules/ai/server/usage.ts` |
+| Facebook Groups publishing/discovery | missing | **obsolete by owner decision 2026-10-22**: Meta removed the Groups API (2024-04-22); rows `features.groups` and Group publishing are not to be rebuilt | commit `8aefd7d8` |
+| Gap 3, 2 (rest), 4, 5, 6, 9, 10 | open | **still open** (re-verified below) | see 0.2 |
+
+### 0.2 Re-verified still missing or partial at `25c3ea53`
+
+| Row | Status | Evidence of absence / state |
+| --- | --- | --- |
+| `/api/health` and a readiness probe (gap 6) | missing | no `health` route under `src/app/api`; no match for `api/health` in `rebuild/src` |
+| `error_events` / `system_alerts` writers, `/api/errors` client reporter, `ErrorReporter`, alert test (gap 3) | missing | only `src/server/root/legacy/backups.ts` and `src/modules/root/server/errors.ts` reference the tables (readers) |
+| `/privacy-policy`, `/terms`, `/help`, `/pricing`, `/changelog`, `/status`, `operator.*`, `site.public` (gap 2 rest) | missing | `src/app` has only `data-deletion` among the legacy public pages |
+| Root changelog (`root/changelog`, `api/root/changelog*`, `ChangelogEntry`), Root client invitations, Root alerts test, `root/meta/usage` (`graph_usage`) | missing | `src/app/api/root` has no `changelog`, `client-invitations`, `alerts`; no table reference to `changelog_entries`, `client_invitations`, `graph_usage` |
+| Caption tests, chart notes, key dates, seasons, holidays, trends, ICS calendar feeds, chat channels (Slack/Telegram), spam check, engagement outlook, link preview, structured data, translated posts, AI image/video/voice, `api_tokens` | missing | no reference to `caption_tests`, `chart_notes`, `key_dates`, `seasonal_modes`, `public_holidays`, `calendar_feeds`, `chat_channels`, `ai_videos`, `api_tokens` in `rebuild/src` except the data-control README keep-list; no route for them in `src/app/api` |
+| Nine other network connectors | missing | `PLATFORM_MODULES` lists Facebook and Instagram only |
+| Host backup scripts, root `prisma/migrations`, `prod-deploy.sh` dependencies (gaps 4, 5) | open | `rebuild/scripts` has no `server/` directory; root `scripts/server/*` unchanged |
+| Legacy config import beyond Facebook/AI/auth/app URL (gap 9), OAuth client re-registration (gap 10) | open | `rebuild/scripts/import-legacy-config.ts` unchanged scope |
+
+### 0.3 Legacy capabilities not listed in sections 1 to 8 (added by this reconcile)
+
+Source: `src/lib/scheduler/jobs.ts`, `src/middleware.ts`, `src/components/*`, `src/lib/*`, `public/`, `src/app/manifest.ts`.
+
+| New row | Legacy source | Rebuild state | Status |
+| --- | --- | --- | --- |
+| Retention pruning job (`housekeeping`: activity, email, click, AI history, errors) | `scheduler/jobs.ts` `housekeeping`, `lib/housekeeping.ts`, `settings retention.*` | `retention.auditDays` and `retention.syncLogDays` are registered with `consumption: 'planned'` and nothing prunes | missing |
+| Share-link "publish anyway" auto-approval (`clientDeadlines` job, `approveUnanswered`, `publishAnywayHours`) | `lib/share-links.ts:102`, `scheduler/jobs.ts` | `CLIENT_SHARING.md` lists it as not carried; field "stays unused" | missing |
+| Scheduled AI agent runs (`aiAgents` job, `runDueAgents`) | `lib/ai-agents.ts` | writing agents are on demand only (`jobs: []` in `agents/manifest.ts`) | missing |
+| AI video polling (`aiVideos`), AI voice, AI image | `lib/ai-video.ts`, `ai-voice.ts`, `ai-image.ts`, `components/AiVideoPanel.tsx`, `AiVoicePanel.tsx` | none (already in section 3, repeated here for the job) | missing |
+| Caption-test evaluation job (`captionTests`) | `lib/caption-test.ts` | none | missing |
+| Holiday and trend refresh jobs (`holidays`, `trends`), `TrendKeywords` | `lib/holidays.ts`, `lib/trends.ts` | none | missing |
+| Alert evaluation job (`alerts`: publish failures, disk, uptime) and uptime days | `lib/system-alerts.ts`, `lib/uptime.ts` | no writer; Telegram/disk alerts absent (section 6) | missing |
+| Negative-comment spike watcher (`negativeComments`) | `lib/negative-comments.ts`, `negativeSpikeEmail` | `negativeSpike` notification event + sentiment input | done at source (`modules/inbox/server/notification-events.ts`, `settings/notifications/server.ts`) |
+| Inbox digest, queue-empty and token-expiry notifications | `email/notify.ts` | notification catalog, `connection-alerts.ts`, queue-empty in `settings/notifications/server.ts` | done at source (mail delivery unproven) |
+| Automatic best-time application (`bestTimes` job, `applyBestTimes`) | `lib/best-times.ts` | `publishing/server/best-time.ts` suggestions in the composer/queue; no automatic apply job found | partial |
+| Global command palette | `components/CommandPalette.tsx` | no match in `rebuild/src` | missing |
+| Installable web app: `manifest.ts`, `public/sw.js`, `offline.html`, icons, `ServiceWorker.tsx` | `src/app/manifest.ts`, `public/*` | no `rebuild/public`, no manifest or service worker in `rebuild/src` | missing |
+| Central cross-site write refusal (`Sec-Fetch-Site`) | `src/middleware.ts`, `lib/cross-site.ts` | no `src/middleware.ts`; module HTTP helpers carry same-origin checks (`modules/*/http.ts`, `server/root/legacy/http.ts`). Smoke waiver "sign-out Origin acceptance" is open | partial |
+| Module/feature path gating in middleware (`PATHNAME_HEADER`, `lib/product-catalog.ts`) | `middleware.ts`, `lib/modules.ts` | replaced by manifest, entitlement and permission feature switches (`server/permissions/index.ts`) | done (different mechanism) |
+| Likes versus followers identity for audience growth (`audienceGrowthIdentity`) | `lib/audience-growth-metrics.ts` | Facebook-owned metric labels and goals; audience trend identity is an open adapter gap (AGENT_HANDOFF numbers) | partial |
+| @mentions in internal notes | `lib/mentions.ts` | post notes carry mentions (`publishing/collaboration/server/notes.ts`); Inbox note mentions not verified | partial |
+| Host install and bootstrap: `scripts/install-debian.sh`, `setup.mjs`, `start.mjs`, `scripts/admin/set-root.ts`, `reset-two-step.ts` | root `scripts/` | rebuild has `prod-owner-reset-link.sh`, Root user reset-two-step API; no installer or set-root port (already in section 8 for `set-root`) | partial |
+| Short link path `/l/[slug]` | `src/app/l/[slug]` | `src/app/s/[slug]`; already in section 3 (printed links break) | done (path changed) |
+| Facebook `opengraph` link preview in composer | `lib/facebook/opengraph.ts`, `api/link-preview` | none | missing |
+
+Totals for this reconcile: 7 rows closed, advanced or retired at source (0.1), 19 rows in 0.3 (10 missing, 5 partial, 4 done; two of them, AI video/voice/image and `/l/` to `/s/`, repeat section 3 to record the job or path side). Rows whose live proof is unobserved stay unproven.
+
 ## 1. Headline gaps (action items)
 
 | # | Gap | Why it matters | Suggested owner |

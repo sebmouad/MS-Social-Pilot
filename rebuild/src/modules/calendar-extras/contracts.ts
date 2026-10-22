@@ -1,0 +1,16 @@
+import type { ScopedPermissions } from '@/server/permissions';
+export type Locale = 'en' | 'fr';
+export type Actor = { userId: string; workspaceId: string; locale?: Locale; allowedTargetIds?: readonly string[]; permissionCeiling?: ScopedPermissions; apiKeyId?: string };
+export const AREAS = ['dates', 'seasons', 'feeds', 'notes', 'trends'] as const;
+export type Area = typeof AREAS[number];
+export const FEATURES = { dates: 'publishing/calendar', seasons: 'publishing/calendar', feeds: 'publishing/calendar', notes: 'analytics/overview', trends: 'publishing/calendar' } as const;
+export const RULES = ['pause', 'shift', 'fewer', 'more'] as const;
+export type KeyDate = { id: string; date: string; title: string; yearly: boolean; targetIds: string[] };
+export type Season = { id: string; name: string; startsOn: string; endsOn: string; targetIds: string[]; rule: typeof RULES[number]; shiftMinutes: number; extraTimes: string[] };
+export type Note = { id: string; day: string; label: string; color: string; targetId: string | null };
+export type Feed = { id: string; name: string; pageIds: string[]; groupId: string | null; createdAt: Date; lastUsedAt: Date | null };
+export type Holiday = { country: string; date: string; name: string; localName: string };
+export type Trend = { id: string; country: string; title: string; traffic: string | null; newsTitle: string | null; newsUrl: string | null; fetchedAt: Date; startedAt: Date | null };
+export type Filters = { from: string; to: string; offset: number; targetId?: string; showAll?: boolean };
+export type Page<T> = { items: T[]; hasMore: boolean; offset: number; limit: number };
+export type Scope = readonly string[] | null;
