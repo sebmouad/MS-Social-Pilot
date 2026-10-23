@@ -1,9 +1,43 @@
 # Shared agent handoff
 
-Updated 2026-10-23 (UI waves 3-4 Engage + Measure/Grow polish; uncommitted working tree), schema **142**.
-Full goal remains active. No browser, provider, database or production call by
-this lane. Historical records below retain their dates; current source
-reconciliation wins.
+Updated 2026-10-23 (weakness-hunt batches 6-11 pushed to origin/main as
+`2f20e94d`; production still runs the earlier release until the next
+`prod-deploy.sh`), schema **142**. Full goal remains active. No browser,
+provider, database or production call by this lane. Historical records
+below retain their dates; current source reconciliation wins.
+
+## Weakness-hunt batches 6-11 — 2026-10-23 (pushed, sandbox lane)
+
+Six batches, each typechecked, unit-tested and pushed to `origin/main`
+(full suite green after batch 8: 779 files, 12296 tests, 0 failures).
+Deploy, browser matrix, screenshots and all live gates still need a
+`--yolo` relaunch (sandbox blocks SSH/Docker).
+
+- **Batch 6** (`5dd45cae`): approvals board draft/approved totals exact
+  over the full authorized scope (`readDraftApprovalSplit`; the
+  raw-SQL-only `approvalStatus` column forces a scope translation, same
+  rules as `publishingPostReadQuery`). Fail-soft to page-1 math.
+- **Batch 7** (`72730698`): analytics post explorer rows link to the
+  internal post page via one batched `post_targets` lookup
+  (`resolveInternalPostIds`); unmapped rows unchanged.
+- **Batch 8** (`1e46216e`): dry-run boundary audit found worker email
+  sends escaping `jobs.stagingDryRun`; now suppressed and audited as
+  `email_notification`, rows left pending. All other worker dispatch
+  paths verified guarded or local-only.
+- **Batch 9** (`061ba36b`): creatives browser shows fetched title/body
+  and gains a Copy ID row action (shared ads copy keys).
+- **Batch 10** (`707708ae`): inbox comment rows link the origin post
+  (`postId` added to the list read, no new query; sibling link outside
+  the thread anchor; row separator moved to the list item).
+- **Batch 11** (`2f20e94d`): the new post links match the unconditional
+  cross-link convention (thread head, tasks, media, approvals, calendar,
+  home); also fixes the progressive inbox rows never getting the link.
+- Hunted and verified healthy (no change): tasks, media, reports
+  manager/history, agency clients/invitations, settings connections,
+  studio agents, home dashboard, calendar, approvals cards, inbox
+  cursors/empty states/freshness, thread-head post link. Report-history
+  re-download deliberately not built (idempotent re-prepare replays
+  stored output; history rows are records).
 
 ## UI waves 3-4 — 2026-10-23 (source/unit only, uncommitted)
 
