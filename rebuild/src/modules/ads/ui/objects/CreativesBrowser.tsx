@@ -2,6 +2,8 @@
 import { useState } from 'react';
 import { Button } from '@/components/Button';
 import { DataTable } from '@/components/DataTable';
+import { useToast } from '@/components/Toast';
+import { IconCopy } from '@tabler/icons-react';
 import { useAdsMessage, useAdsText } from '@/modules/ads/ui/AdsCopyProvider';
 
 type Creative = { id: string; name: string | null; status: string | null; title: string | null; body: string | null; thumbnailUrl: string | null };
@@ -13,6 +15,7 @@ type Creative = { id: string; name: string | null; status: string | null; title:
 export function CreativesBrowser({ accounts }: { accounts: Array<{ id: string; name: string }> }) {
   const t = useAdsText();
   const localize = useAdsMessage();
+  const toast = useToast();
   const [accountId, setAccountId] = useState(accounts[0]?.id ?? '');
   const [items, setItems] = useState<Creative[] | null>(null);
   const [after, setAfter] = useState<string | null>(null);
@@ -33,6 +36,11 @@ export function CreativesBrowser({ accounts }: { accounts: Array<{ id: string; n
     finally { setBusy(false); }
   }
 
+  async function copyId(row: Creative) {
+    try { await navigator.clipboard.writeText(row.id); toast.notify({ title: t('text159'), tone: 'success' }); }
+    catch { toast.failed(t('text160'), () => void copyId(row), t('text161')); }
+  }
+
   return <div className="ads-creatives-browser">
     <p className="small-note">{t('manageCreativesReadOnly')}</p>
     <div className="ads-campaign-create__fields">
@@ -44,9 +52,14 @@ export function CreativesBrowser({ accounts }: { accounts: Array<{ id: string; n
     {busy && items === null ? <p role="status">{t('text093')}</p> : null}
     {error ? <p role="alert" className="ui-error">{localize(error)}</p> : null}
     {items !== null ? <>
-      <DataTable caption={t('manageCreativesList')} rows={items} rowKey={row => row.id} emptyMessage={t('manageCreativesEmpty')} columns={[
+      <DataTable caption={t('manageCreativesList')} rows={items} rowKey={row => row.id} emptyMessage={t('manageCreativesEmpty')}
+        rowActionsLabel={row => t('text163', { value0: row.name ?? row.id })}
+        rowActions={row => [{ key: 'copy', label: t('text164'), icon: <IconCopy size={16} />, onSelect: () => void copyId(row) }]}
+        columns={[
         { key: 'preview', label: t('manageCreativePreview'), render: row => row.thumbnailUrl ? <img src={row.thumbnailUrl} alt="" width={96} height={72} loading="lazy" /> : t('text094') },
-        { key: 'name', label: t('text066'), render: row => <><strong>{row.name || row.title || row.id}</strong><br /><span className="small-note">{row.id}</span></> },
+        { key: 'name', label: t('text066'), render: row => <><strong>{row.name || row.title || row.id}</strong><br /><span className="small-note">{row.id}</span>
+          {row.name && row.title && row.title !== row.name ? <><br /><span>{row.title}</span></> : null}
+          {row.body ? <><br /><span className="small-note">{row.body}</span></> : null}</> },
         { key: 'status', label: t('manageStatus'), render: row => row.status ?? t('text094') },
       ]} />
       {after ? <p><Button type="button" onClick={() => void load(after, true)} disabled={busy}>{t('text078')}</Button></p> : null}

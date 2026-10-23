@@ -96,6 +96,39 @@ describe('creatives browser', () => {
     expect(container.textContent).toContain('ACTIVE');
   });
 
+  it('shows the creative title and body instead of hiding fetched content', async () => {
+    fetchMock.mockImplementation(async () => response({ items: [
+      { id: 'cr1', name: 'Hero', status: 'ACTIVE', title: 'Hello', body: 'World', thumbnailUrl: null },
+      { id: 'cr2', name: null, status: null, title: 'Solo', body: null, thumbnailUrl: null },
+      { id: 'cr3', name: 'Same', status: null, title: 'Same', body: null, thumbnailUrl: null },
+    ], next: null }));
+    await render(createElement(CreativesBrowser, { accounts }));
+    await click('Load creatives');
+    expect(container.textContent).toContain('Hello');
+    expect(container.textContent).toContain('World');
+    expect(container.textContent?.match(/Solo/g)).toHaveLength(1);
+    expect(container.textContent?.match(/Same/g)).toHaveLength(1);
+  });
+
+  it('copies the creative id from the row menu', async () => {
+    const writeText = vi.fn(async () => {});
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
+    fetchMock.mockImplementation(async () => response({ items: [
+      { id: 'cr1', name: 'Hero', status: 'ACTIVE', title: null, body: null, thumbnailUrl: null },
+    ], next: null }));
+    await render(createElement(CreativesBrowser, { accounts }));
+    await click('Load creatives');
+    const trigger = container.querySelector('button[aria-label="Actions for Hero"]') as HTMLButtonElement;
+    expect(trigger).not.toBeNull();
+    await act(async () => trigger.click());
+    await settle();
+    const copy = [...container.querySelectorAll('[role="menuitem"]')].find(item => item.textContent?.includes('Copy ID')) as HTMLButtonElement;
+    expect(copy).not.toBeUndefined();
+    await act(async () => copy.click());
+    await settle();
+    expect(writeText).toHaveBeenCalledWith('cr1');
+  });
+
   it('reports load failures and empty accounts without losing the account choice', async () => {
     fetchMock.mockImplementation(async () => response({ error: 'Creatives are offline.' }, false));
     await render(createElement(CreativesBrowser, { accounts }));
