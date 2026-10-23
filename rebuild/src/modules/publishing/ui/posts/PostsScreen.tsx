@@ -12,6 +12,7 @@ import { IconPlus } from "@tabler/icons-react";
 import { redirect } from 'next/navigation';
 import { requireViewer } from "@/server/context";
 import { readPublishingPostPage, readPublishingStatusCounts } from "@/modules/publishing/server/read";
+import { loadPostReach } from "../../server/post-reach";
 import { publishingDestinationChoices } from '@/modules/publishing/server/destinations';
 import { formatDate } from "@/modules/publishing/ui/publishing-ui";
 import { EmptyPanel, type FilterChip } from "../kit/kit";
@@ -97,7 +98,8 @@ export default async function PostsPage({ searchParams }: { searchParams: Promis
   };
   const origins = await loadPostOrigins(viewer.workspaceId, listing.posts.map(post => post.id), locale);
   const originOptions = await originFilterOptions(viewer.workspaceId, locale).catch(() => []);
-  const rows: PostsTableRow[] = listing.posts.map(post => ({ ...post, origin: origins.get(post.id) ?? null, media: post.media as Array<{ kind: string; url: string; altText?: string }>, authorName: post.authorId === viewer.user.id ? viewer.user.name : copy.approvalsMember, ...authority(post), whenLabel: formatDate(post.scheduledAt ?? post.publishedAt, timeZone, true, locale, copy), firstCommentDueLabels: firstCommentDueLabels(post, timeZone) }));
+  const reach = await loadPostReach(viewer.workspaceId, listing.posts.map(post => post.id));
+  const rows: PostsTableRow[] = listing.posts.map(post => ({ ...post, origin: origins.get(post.id) ?? null, media: post.media as Array<{ kind: string; url: string; altText?: string }>, authorName: post.authorId === viewer.user.id ? viewer.user.name : copy.approvalsMember, ...authority(post), whenLabel: formatDate(post.scheduledAt ?? post.publishedAt, timeZone, true, locale, copy), firstCommentDueLabels: firstCommentDueLabels(post, timeZone), reach: reach.get(post.id) ?? { value: null, measured: 0 } }));
   const noticeText = notice ? postsNotice(notice, locale, noticeCatalog) ?? undefined : undefined;
   // Every address keeps the sidebar's channel parameter and the other filters; only the omitted one is dropped.
   const hrefWith = (page: number | null, omit?: 'status' | 'q' | 'origin') => {

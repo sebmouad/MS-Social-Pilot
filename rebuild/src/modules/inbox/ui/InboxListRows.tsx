@@ -47,11 +47,13 @@ export function inboxListRows(page: InboxListPage, abilities: Awaited<ReturnType
     const badge = channelBadgeInfo(item.target.provider);
     const selected = selectedThread === item.key;
     const selectable = selectables.get(item.key);
+    const body = item.preview.trim() ? (item.preview.length > previewMaxCharacters ? `${item.preview.slice(0, previewMaxCharacters)}…` : item.preview) : item.kind === 'comment' ? copy.commentNoText : item.kind === 'review' ? reviewLabel(locale, 'noText') : item.preview;
     const content = <li key={item.key} className={hasSelection ? r3.row : undefined}>{hasSelection ? <span className={r3.rowSelect}>{selectable ? <SelectBox item={selectable} label={extra.bulk.selectItem(item.author)} /> : null}</span> : null}<a className={styles.item} href={inboxHref({ ...baseLocation, ...(page.cursor ? { cursor: page.cursor } : {}), thread: item.key })} aria-current={selected ? 'true' : undefined} data-attention={item.needsReply || item.unread > 0 || undefined} data-group={item.kind} data-inbox-item>
       <PersonAvatar name={item.author} size={38} />
       <div className={styles.itemBody}>
       <div className={styles.itemTop}><span className={styles.author}>{item.unread > 0 || item.needsReply ? <span className={styles.unreadDot} role="img" aria-label={copy.unread} /> : null}{item.author}</span><time dateTime={item.time.toISOString()}>{formatInboxTime(item.time, timeZone, false, locale)}</time></div>
-      <p className={styles.preview}>{item.kind === 'review' && !item.preview ? reviewLabel(locale, 'noText') : item.preview.length > previewMaxCharacters ? `${item.preview.slice(0, previewMaxCharacters)}…` : item.preview}</p>
+      <p className={styles.preview}>{body}</p>
+      {item.kind === 'comment' && item.context ? <p className={styles.postContext}><strong>{copy.onYourPost}</strong>{item.context.length > 160 ? `${item.context.slice(0, 160)}…` : item.context}</p> : null}
       <div className={styles.itemMeta}>
         <ChannelBadge name={item.target.name} platformName={badge.platformName} mark={badge.mark} compact />
         <InboxTag icon={item.kind === 'message' ? 'message' : item.kind === 'review' ? 'review' : 'comment'} tone={inboxKindTone(item.kind)}>{item.kind === 'message' ? copy.message : item.kind === 'review' ? reviewLabel(locale, 'review') : copy.comment}</InboxTag>

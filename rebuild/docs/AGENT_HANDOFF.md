@@ -1526,3 +1526,20 @@ instagram-selection, instagram-source-binding, instagram-discovery,
 instagram-container-journal, instagram-customer-filters-ui,
 config-validation, publication-remote-projection). No full suite (not run per
 batch instructions), no browser, no provider, no production verification.
+
+## 2026-10-23 UX gaps batch 1 (uncommitted when written)
+Owner-reported weaknesses, verified in source: inbox comment rows never rendered
+the fetched origin-post text; posts list had no reach column; post rows opened
+the side panel instead of detail. Fixes: `InboxListRows.tsx` renders the origin
+excerpt (`On your post`, existing EN+FR key) and a `commentNoText` fallback for
+empty comments; new `publishing/server/post-reach.ts` sums stored per-post reach
+from `post_targets.insights` with the `external_posts` fallback (stored data
+only, fail-soft empty map); `PostsTable.tsx` gains an end-aligned Reach column
+(+ phone meta) and row click navigates to `/content/post/[id]` while the preview
+button keeps the side panel. Copy: `columnReach`/`reachUnavailable` EN+FR in
+publishing kit catalog. No registry/migration/route change; schema stays 142.
+
+Evidence: `npm run typecheck` 0 errors; new `content-ux-gaps-posts` (4) +
+`content-ux-gaps-inbox` (4) pass; neighbors `publishing-ui-round2`,
+`content-v2`, `content-catalog-merge`, `inbox-sync-freshness` pass (59 tests).
+No browser run (matrix needs a --yolo relaunch); deploy pending same.

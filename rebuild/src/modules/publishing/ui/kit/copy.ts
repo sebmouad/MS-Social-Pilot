@@ -280,6 +280,14 @@ export const publishingCopyDefaults = {
     "en": "Publish time",
     "fr": "Heure de publication"
   },
+  "columnReach": {
+    "en": "Reach",
+    "fr": "Portée"
+  },
+  "reachUnavailable": {
+    "en": "No reach data yet",
+    "fr": "Pas encore de données de portée"
+  },
   "selectPost.variant0": {
     "en": "Select post {v0}",
     "fr": "Sélectionner la publication {v0}"
@@ -747,6 +755,8 @@ export function resolvePublishingCopy(catalog: PublishingCopyCatalog) { return {
 "columnChannels": catalog["columnChannels"].en,
 "columnStatus": catalog["columnStatus"].en,
 "columnWhen": catalog["columnWhen"].en,
+"columnReach": catalog["columnReach"].en,
+"reachUnavailable": catalog["reachUnavailable"].en,
 "selectPost": (label: string) => fillCopy(catalog["selectPost.variant0"].en, {v0: (label)}),
 "selectAll": catalog["selectAll"].en,
 "actionsFor": (label: string) => fillCopy(catalog["actionsFor.variant0"].en, {v0: (label)}),
@@ -1000,6 +1010,8 @@ export function resolvePublishingCopy(catalog: PublishingCopyCatalog) { return {
 "columnChannels": catalog["columnChannels"].fr,
 "columnStatus": catalog["columnStatus"].fr,
 "columnWhen": catalog["columnWhen"].fr,
+"columnReach": catalog["columnReach"].fr,
+"reachUnavailable": catalog["reachUnavailable"].fr,
 "selectPost": (label: string) => fillCopy(catalog["selectPost.variant0"].fr, {v0: (label)}),
 "selectAll": catalog["selectAll"].fr,
 "actionsFor": (label: string) => fillCopy(catalog["actionsFor.variant0"].fr, {v0: (label)}),

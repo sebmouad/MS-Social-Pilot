@@ -14,7 +14,7 @@ import { fillContent } from '../content-copy';
 import { BulkPostActions } from './BulkPostActions';
 import { PostRowActions } from './PostActions';
 import type { PostOriginView } from '../origins/post-origin';
-import { ChannelsCell, PostCell, StatusCell, postThumbUrl } from './PostTableCells';
+import { ChannelsCell, PostCell, ReachCell, StatusCell, postThumbUrl } from './PostTableCells';
 import styles from './posts-table.module.css';
 
 type ManageProps = ComponentProps<typeof PostRowActions>;
@@ -29,12 +29,15 @@ export type PostsTableRow = Omit<ManageProps['post'], 'targets'> & {
   origin?: PostOriginView | null;
   /** Per-row authority decided by the server; the actions re-check on submit. */
   canEdit: boolean; canDuplicate: boolean;
+  /** Stored reach across published destinations; absent when nothing measured the post yet. */
+  reach?: { value: number | null; measured: number };
 };
 export type PostsTableManage = Pick<ManageProps, 'targets' | 'canPublish' | 'canOrganize' | 'canQueue' | 'imageRules' | 'timeZone' | 'undoSendSeconds'>;
 
 /**
- * Content › Posts (design v2 S2): the shared table with a side preview. Selecting a row opens the post beside the list
- * (`?post=<id>` keeps it shareable); the list stays usable. Phones get compact rows that open the post page.
+ * Content › Posts (design v2 S2): the shared table with a side preview. Activating a row opens the post detail page;
+ * the preview button opens the post beside the list (`?post=<id>` keeps it shareable); the list stays usable.
+ * Phones get compact rows that open the post page.
  */
 export function PostsTable({ rows, caption, locale = 'en', timeZone = 'UTC', selectable, canRetry, manage, empty, initialPostId }: { rows: PostsTableRow[]; caption: string; timeZone?: string; locale?: KitLocale; selectable: boolean; canRetry: boolean; manage: PostsTableManage | null; empty: ReactNode; initialPostId?: string }) {
   const copy = usePublishingCopy(locale);
@@ -57,6 +60,7 @@ export function PostsTable({ rows, caption, locale = 'en', timeZone = 'UTC', sel
     { key: 'post', label: copy.columnPost, render: row => <button type="button" className={styles.rowOpen} aria-haspopup="true" aria-expanded={openId === row.id} aria-label={fillContent(content.postsOpenRow, { text: label(row).slice(0, 80) })} onClick={event => { event.stopPropagation(); show(openId === row.id ? null : row.id); }}><PostCell post={row} locale={locale} /></button> },
     { key: 'channels', label: copy.columnChannels, render: row => <ChannelsCell post={row} locale={locale} /> },
     { key: 'status', label: copy.columnStatus, render: row => <StatusCell post={row} locale={locale} /> },
+    { key: 'reach', label: copy.columnReach, align: 'end', render: row => <ReachCell reach={row.reach} locale={locale} /> },
     { key: 'scheduled', label: copy.columnWhen, render: row => row.whenLabel },
   ];
   if (!rows.length) return <>{empty}</>;
@@ -66,7 +70,7 @@ export function PostsTable({ rows, caption, locale = 'en', timeZone = 'UTC', sel
       <div className={styles.listPane}>
         <div className={styles.desktopList}>
           <DataTable columns={columns} rows={rows} rowKey={row => row.id} caption={caption} stackOnPhone={false}
-            onRowClick={row => show(openId === row.id ? null : row.id)}
+            onRowClick={row => router.push(`/content/post/${encodeURIComponent(row.id)}`)}
             selection={selectable ? { selected, onChange: setSelected, rowLabel: row => copy.selectPost(label(row).slice(0, 60)), selectAllLabel: copy.selectAll } : undefined}
             rowActionsLabel={row => copy.actionsFor(label(row).slice(0, 60))}
             rowActions={row => [
@@ -81,7 +85,7 @@ export function PostsTable({ rows, caption, locale = 'en', timeZone = 'UTC', sel
             return <li key={row.id}><ListRow href={`/content/post/${encodeURIComponent(row.id)}`}
               leading={<MediaThumb url={postThumbUrl(row.media)} alt="" count={Array.isArray(row.media) ? row.media.length : 0} video={false} locale={locale} />}
               title={label(row)}
-              meta={<><AvatarStack channels={channels} max={3} locale={locale} /><StatusChip status={row.status} compact />{failed ? <AttentionHint locale={locale} /> : null}<span>{row.whenLabel}</span></>} /></li>;
+              meta={<><AvatarStack channels={channels} max={3} locale={locale} /><StatusChip status={row.status} compact />{failed ? <AttentionHint locale={locale} /> : null}{typeof row.reach?.value === 'number' ? <span>{copy.columnReach} {row.reach.value.toLocaleString(locale)}</span> : null}<span>{row.whenLabel}</span></>} /></li>;
           })}
         </ul>
       </div>

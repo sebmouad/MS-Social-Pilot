@@ -47,6 +47,13 @@ export function PostCell({ post, locale = 'en' }: { post: Row; locale?: KitLocal
   </div>;
 }
 
+/** Stored reach for one post row; an em dash when no destination has measured it yet. */
+export function ReachCell({ reach, locale = 'en' }: { reach?: { value: number | null; measured: number } | null; locale?: KitLocale }) {
+  const copy = usePublishingCopy(locale);
+  if (!reach || reach.value === null) return <span aria-label={copy.reachUnavailable}>—</span>;
+  return <span>{reach.value.toLocaleString(locale)}</span>;
+}
+
 export function ChannelsCell({ post, locale = 'en' }: { post: Row; locale?: KitLocale }) {
   const seen = new Map<string, { id: string; name: string; pictureUrl: string | null }>();
   for (const { target } of post.targets) if (!seen.has(target.id)) seen.set(target.id, target);
