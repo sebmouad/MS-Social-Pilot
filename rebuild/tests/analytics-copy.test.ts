@@ -2,7 +2,7 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 import { ANALYTICS_MODULE_CONFIG } from '@/modules/analytics/config';
-import { goalsCopyDefaults, reportCopyDefaults, downloadCopyDefaults, demographicsCopyDefaults, workspaceCopyDefaults, recordsCopyDefaults, errorCopyDefaults, workspaceCopySchema } from '@/modules/analytics/copy';
+import { goalsCopyDefaults, reportCopyDefaults, downloadCopyDefaults, demographicsCopyDefaults, workspaceCopyDefaults, recordsCopyDefaults, errorCopyDefaults, alertsCopyDefaults, workspaceCopySchema } from '@/modules/analytics/copy';
 import { uiCopy } from '@/modules/analytics/ui/reports/copy';
 import { goalsText } from '@/modules/analytics/goals/copy';
 import { ComparisonFilters } from '@/modules/analytics/ui/compare/ComparisonFilters';
@@ -13,7 +13,7 @@ vi.mock('next/headers', () => ({ headers: async () => new Headers({ 'accept-lang
 vi.mock('@/server/config/store', () => ({ runtimeConfig: read }));
 
 describe('Analytics Root customer catalogs', () => {
-  const catalogs = { reportsCopy: reportCopyDefaults, goalsCopy: goalsCopyDefaults, downloadCopy: downloadCopyDefaults, demographicsCopy: demographicsCopyDefaults, workspaceCopy: workspaceCopyDefaults, recordsCopy: recordsCopyDefaults, errorCopy: errorCopyDefaults };
+  const catalogs = { reportsCopy: reportCopyDefaults, goalsCopy: goalsCopyDefaults, downloadCopy: downloadCopyDefaults, demographicsCopy: demographicsCopyDefaults, workspaceCopy: workspaceCopyDefaults, recordsCopy: recordsCopyDefaults, errorCopy: errorCopyDefaults, alertsCopy: alertsCopyDefaults };
   it.each(Object.entries(catalogs))('declares a strict complete en/fr catalog for %s', (name, defaults) => {
     const entry = ANALYTICS_MODULE_CONFIG.find(entry => entry.key === `analytics.${name}`)!;
     expect(entry.kind).toBe('json'); expect(entry.consumption).toBe('active');
@@ -27,7 +27,7 @@ describe('Analytics Root customer catalogs', () => {
   it('reads the registered runtime catalogs for the request', async () => {
     read.mockImplementation(async (key: string) => ANALYTICS_MODULE_CONFIG.find(entry => entry.key === key)!.defaultValue);
     const { analyticsCopy } = await import('@/modules/analytics/server/copy');
-    expect(await analyticsCopy()).toEqual({ reports: reportCopyDefaults, goals: goalsCopyDefaults, downloads: downloadCopyDefaults, demographics: demographicsCopyDefaults, workspace: workspaceCopyDefaults, records: recordsCopyDefaults, errors: errorCopyDefaults });
+    expect(await analyticsCopy()).toEqual({ reports: reportCopyDefaults, goals: goalsCopyDefaults, downloads: downloadCopyDefaults, demographics: demographicsCopyDefaults, workspace: workspaceCopyDefaults, records: recordsCopyDefaults, errors: errorCopyDefaults, alerts: alertsCopyDefaults });
     expect(read.mock.calls.map(([key]) => key)).toEqual(Object.keys(catalogs).map(key => `analytics.${key}`));
   });
   it('uses Root edits in both languages and retains interpolation', () => {

@@ -25,7 +25,7 @@ export function NotificationCenter({ initialPreferences, initialPage, locale = i
   const retryFeedback = useRef<() => void>(() => {});
   const labels = useSettingsCopy('notificationLabels', locale);
   const t = useSettingsCopy('notifications', locale);
-  const eventName = (kind: NotificationRow['kind']) => kind === 'note_mention' ? t.eventMention : t.eventMix;
+  const eventName = (kind: NotificationRow['kind']) => kind === 'note_mention' || kind === 'inbox_note_mention' ? t.eventMention : kind === 'metric_alert' ? t.eventMetricAlert : kind === 'report_delivered' ? t.eventReport : kind === 'triage_assigned' ? t.eventTriage : t.eventMix;
   const emailOutcome = (state: NotificationRow['emailState']) => {
     switch (state) {
       case 'sent': return t.emailSent;

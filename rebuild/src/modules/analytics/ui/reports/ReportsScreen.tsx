@@ -11,6 +11,8 @@ import { canAccessFeature } from '@/server/permissions';
 import { listReportSchedules } from '@/modules/analytics/reports/server/schedules';
 import { listReportTemplates } from '@/modules/analytics/reports/server/templates';
 import { listReportRuns, reportFailureText } from '@/modules/analytics/reports/generation/runs';
+import { listMetricAlertFirings, listMetricAlertRules } from '@/modules/analytics/alerts/server/rules';
+import { AlertsManager } from '@/modules/analytics/ui/alerts/AlertsManager';
 import { reportCapabilities } from '@/modules/analytics/reports/generation/registry';
 import { reportLimits } from '@/modules/analytics/reports/server/limits';
 import { readAnalyticsSnapshot } from '@/modules/analytics/server/read';
@@ -41,6 +43,8 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
     policy: Awaited<ReturnType<typeof loadReportUiPolicy>>;
     limits: Awaited<ReturnType<typeof reportLimits>>;
     defaultPeriod: Awaited<ReturnType<typeof reportDefaultPeriod>> | null;
+    alerts: Awaited<ReturnType<typeof listMetricAlertRules>>;
+    firings: Awaited<ReturnType<typeof listMetricAlertFirings>>;
   };
   let failure = '';
   let data: Data | null = null;
@@ -55,15 +59,17 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
     const channelSnapshotPromise = canManage && (canSchedule || canGenerate)
       ? readAnalyticsSnapshot(actor, {}, { feature: 'analytics/reports' })
       : Promise.resolve(null);
-    const [templates, schedules, runs, policy, limits, defaultPeriod, templateOptions, channelSnapshot] = await Promise.all([
+    const [templates, schedules, runs, policy, limits, defaultPeriod, templateOptions, channelSnapshot, alerts, firings] = await Promise.all([
       listReportTemplates(actor, { page }), listReportSchedules(actor, { page }),
       canGenerate ? listReportRuns(actor, { page: runsPage }) : Promise.resolve({ ok: true as const, runs: [], page: runsPage, hasMore: false }),
       loadReportUiPolicy(actor), reportLimits(), canGenerate ? reportDefaultPeriod().catch(() => null) : Promise.resolve(null), reportTemplateOptions(actor),
       channelSnapshotPromise,
+      listMetricAlertRules(actor, { page }).catch(() => ({ ok: true as const, rules: [], page: 1, hasMore: false, canManage: false })),
+      listMetricAlertFirings(actor, { page: 1 }).catch(() => ({ ok: true as const, firings: [], page: 1, hasMore: false })),
     ]);
     // Channel choices are scoped to report access; no broader overview entitlement is required.
     const channels = channelSnapshot?.options.channels ?? [];
-    data = { templates, schedules, channels, templateOptions, runs, policy, limits, defaultPeriod };
+    data = { templates, schedules, channels, templateOptions, runs, policy, limits, defaultPeriod, alerts, firings };
   } catch (error) { failure = operationFailure(error, t("Reports could not be loaded. Please try again.")).error; }
 
   return <PageFrame module="analytics" scopedAccess><div className={styles.root}>
@@ -76,5 +82,8 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
       templates={data.templates.templates.map(t => ({ id: t.id, name: t.name, sections: t.sections, rangeKey: t.rangeKey, scheduleCount: t.scheduleCount }))}
       schedules={data.schedules.schedules.map(s => ({ id: s.id, channelId: s.channelId, channelName: s.channelName, templateId: s.templateId, templateName: s.templateName, frequency: s.frequency, recipientCount: s.recipientCount, recipients: s.recipients, nextRunAt: s.nextRunAt.toISOString(), nextRunLabel: formatInZone(s.nextRunAt.toISOString(), viewer.membership.workspace.timezone, locale, t('Time unavailable')), lastOutcome: s.lastOutcome }))}
       runs={data.runs.runs.map(r => ({ id: r.id, channelId: r.channelId, kind: r.kind, status: r.status, periodStart: r.periodStart, periodEnd: r.periodEnd, startedAt: r.startedAt.toISOString(), startedLabel: formatInZone(r.startedAt.toISOString(), viewer.membership.workspace.timezone, locale, t('Time unavailable')), rowCount: r.rowCount, truncated: r.truncated, note: reportFailureText(r.failureReason, copy.errors, locale), deliveries: r.deliveries.map(d => ({ mask: d.mask, status: d.status })) }))} />}
+    {data && <AlertsManager copy={copy.alerts} locale={locale} canManage={canManage} channels={data.channels}
+      rules={data.alerts.rules.map(r => ({ id: r.id, channelId: r.channelId, channelName: r.channelName, channelAvailable: r.channelAvailable, name: r.name, metric: r.metric, operator: r.operator, threshold: r.threshold, windowDays: r.windowDays, enabled: r.enabled, state: r.state, lastActual: r.lastActual, lastEvaluatedAt: r.lastEvaluatedAt?.toISOString() ?? null }))}
+      firings={data.firings.firings.map(f => ({ id: f.id, ruleName: f.ruleName, channelName: f.channelName, metric: f.metric, operator: f.operator, threshold: f.threshold, actual: f.actual, firedAt: f.firedAt.toISOString(), firedLabel: formatInZone(f.firedAt.toISOString(), viewer.membership.workspace.timezone, locale, t('Time unavailable')), resolvedAt: f.resolvedAt?.toISOString() ?? null }))} />}
   </div></PageFrame>;
 }

@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 export type NotificationActor = { userId: string; workspaceId: string };
-export const NOTIFICATION_EVENTS = ['note_mention', 'inbox_note_mention', 'mix_dry', 'publish_failure', 'connection_expired', 'token_expiring', 'approval_request', 'approval_decision', 'inbox_digest', 'queue_empty', 'draft_updated', 'moderation_alert', 'negative_spike'] as const;
+export const NOTIFICATION_EVENTS = ['note_mention', 'inbox_note_mention', 'mix_dry', 'publish_failure', 'connection_expired', 'token_expiring', 'approval_request', 'approval_decision', 'inbox_digest', 'queue_empty', 'draft_updated', 'moderation_alert', 'negative_spike', 'metric_alert', 'report_delivered', 'triage_assigned'] as const;
 export type NotificationEvent = (typeof NOTIFICATION_EVENTS)[number];
 export type NotificationMute = { targetId: string; event: 'queueEmpty' };
 
@@ -14,11 +14,14 @@ export const notificationPreferenceUpdateSchema = z.object({
   onNewInbox: z.boolean().optional(),
   onDraftUpdated: z.boolean().optional(),
   onModerationAlert: z.boolean().optional(),
+  onMetricAlert: z.boolean().optional(),
+  onReportDelivered: z.boolean().optional(),
+  onTriageAssigned: z.boolean().optional(),
   onNoteMention: z.boolean().optional(),
   onQueueEmpty: z.boolean().optional(),
   mutes: z.array(z.object({ targetId: identifier, event: z.literal('queueEmpty') }).strict()).max(5000).optional(),
   confirmation: z.string().max(500),
-}).strict().refine(value => (value.onNoteMention !== undefined || value.onQueueEmpty !== undefined || value.mutes !== undefined || value.onPublishFailure !== undefined || value.onTokenExpiry !== undefined || value.onApprovalRequest !== undefined || value.onApprovalDecision !== undefined || value.onNewInbox !== undefined || value.onDraftUpdated !== undefined || value.onModerationAlert !== undefined));
+}).strict().refine(value => (value.onNoteMention !== undefined || value.onQueueEmpty !== undefined || value.mutes !== undefined || value.onPublishFailure !== undefined || value.onTokenExpiry !== undefined || value.onApprovalRequest !== undefined || value.onApprovalDecision !== undefined || value.onNewInbox !== undefined || value.onDraftUpdated !== undefined || value.onModerationAlert !== undefined || value.onMetricAlert !== undefined || value.onReportDelivered !== undefined || value.onTriageAssigned !== undefined));
 export type NotificationPreferenceUpdate = z.infer<typeof notificationPreferenceUpdateSchema>;
 
 export const notificationPageSchema = z.object({ page: z.number().int().min(1).max(10000).optional(), unreadOnly: z.boolean().optional() }).strict();
@@ -34,7 +37,7 @@ export const notificationEnqueueSchema = z.object({
   if (value.kind === 'inbox_note_mention' && (!value.targetId || !value.noteId)) ctx.addIssue({ code: 'custom', message: 'An inbox note mention requires a channel and note.' });
   if (['publish_failure', 'approval_request', 'approval_decision', 'draft_updated'].includes(value.kind) && !value.postId) ctx.addIssue({ code: 'custom', message: 'This event requires a post.' });
   if (['connection_expired', 'token_expiring'].includes(value.kind) && !value.accountId) ctx.addIssue({ code: 'custom', message: 'This event requires a connection.' });
-  if (['inbox_digest', 'queue_empty', 'moderation_alert', 'negative_spike'].includes(value.kind) && !value.targetId) ctx.addIssue({ code: 'custom', message: 'This event requires a channel.' });
+  if (['inbox_digest', 'queue_empty', 'moderation_alert', 'negative_spike', 'metric_alert', 'report_delivered', 'triage_assigned'].includes(value.kind) && !value.targetId) ctx.addIssue({ code: 'custom', message: 'This event requires a channel.' });
   if (value.kind === 'mix_dry' && !value.targetId) ctx.addIssue({ code: 'custom', message: 'A dry content mix requires a selected target.' });
 });
 export type NotificationEnqueueInput = z.infer<typeof notificationEnqueueSchema>;
@@ -47,7 +50,7 @@ export const notificationConfirmation = {
 
 export type NotificationPreferenceView = {
   locale?: 'en' | 'fr';
-  preferences: { onNoteMention: boolean; onQueueEmpty: boolean; onPublishFailure?: boolean; onTokenExpiry?: boolean; onApprovalRequest?: boolean; onApprovalDecision?: boolean; onNewInbox?: boolean; onDraftUpdated?: boolean; onModerationAlert?: boolean };
+  preferences: { onNoteMention: boolean; onQueueEmpty: boolean; onPublishFailure?: boolean; onTokenExpiry?: boolean; onApprovalRequest?: boolean; onApprovalDecision?: boolean; onNewInbox?: boolean; onDraftUpdated?: boolean; onModerationAlert?: boolean; onMetricAlert?: boolean; onReportDelivered?: boolean; onTriageAssigned?: boolean };
   configured: boolean;
   mutes: NotificationMute[];
   channels: Array<{ id: string; name: string }>;

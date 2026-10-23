@@ -107,3 +107,11 @@
   .selectAll { min-height: 44px; }
 }
 @media (forced-colors: active) { .row:has(.selectBox:checked) { outline: 2px solid Highlight; outline-offset: -2px; } }
+
+/* Saved triage views beside the filter row. */
+.savedViews { display: grid; gap: 8px; min-width: 0; }
+.savedViews h2 { margin: 0; font-size: 13px; font-weight: 750; }
+.savedViews ul { display: flex; flex-wrap: wrap; gap: 6px 12px; margin: 0; padding: 0; list-style: none; }
+.savedViews li { display: inline-flex; align-items: center; gap: 8px; }
+.savedViews form { display: flex; flex-wrap: wrap; align-items: end; gap: 8px; }
+.savedViews input { min-height: 36px; }

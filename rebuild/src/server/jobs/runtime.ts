@@ -59,6 +59,11 @@ return {
       const result = await runScheduledReports(now);
       return Object.entries(result).map(([key, value]) => `${key}=${value}`).join(' ');
     }
+    if (job === 'analyticsAlerts') {
+      const { runMetricAlerts } = await import('@/modules/analytics/alerts/server/workflows');
+      const result = await runMetricAlerts(now);
+      return Object.entries(result).map(([key, value]) => `${key}=${value}`).join(' ');
+    }
     if (job === 'notifications') {
       const { deliverNotifications } = await import('@/modules/settings/notifications/delivery');
       const { scanConnectionAlerts } = await import('@/modules/settings/notifications/connection-alerts');

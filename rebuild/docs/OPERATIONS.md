@@ -141,6 +141,37 @@ defaults to `false`). Full audit and live checklist:
   app. Only public HTTPS media URLs publish; stored-library bytes are refused
   until the signed-URL pipeline exists.
 
+## Metric alert runbook (engagement batch, 2026-10-22)
+
+Module: `src/modules/analytics/alerts/` (rules + worker evaluation).
+Rules live in `metric_alert_rules`, firings in `metric_alert_firings`
+(one open firing per rule). Root bounds live in
+`analytics.alerts.policy` (rules per workspace, page sizes, rules
+evaluated per run, transaction bounds); the worker cadence is
+`analytics.alerts.schedule` (default every 10 minutes).
+
+- **Evaluation:** the `analyticsAlerts` job reads enabled rules from
+  active, non-purging workspaces and evaluates each in its own
+  transaction: plan/channel authority is rechecked, the stored actual
+  is read through the channel module's neutral measures (no provider
+  calls), and a firing opens (once, with one notification-center
+  entry) or resolves. Unknown measurements change nothing. The job
+  summary ends with
+  `examined=<n> fired=<n> resolved=<n> skipped=<n> failed=<n>`.
+- **Audit:** firings write `analytics.metric_alert_fired` and
+  resolutions `analytics.metric_alert_resolved` with `actorId` NULL
+  (worker rows). Rule changes are audited manager writes.
+- **Notifications:** firings emit `metric_alert` to eligible members;
+  email follows the personal `onMetricAlert` switch (default on).
+  Completed scheduled reports emit `report_delivered` (best effort;
+  the run receipt stands without it). New inbox assignments emit
+  `triage_assigned` to the new owner only.
+- **Incidents:** to stop checks for one rule, pause it (owners/admins/
+  editors; pausing resolves its open firing). There is no per-job kill
+  switch: stopping the whole worker cadence needs `jobs.enabled` off
+  (which stops every job). Never edit the alert tables by hand: rule
+  changes are audited service writes.
+
 ## Supervised autopilot runbook (idea batch 2, 2026-10-22)
 
 Module: `src/modules/studio/agents/` (policy surface + worker execution).

@@ -187,6 +187,10 @@ export const errorCopyDefaults = {
     "en": "This workspace has reached its report template limit. Delete one first.",
     "fr": "Cet espace a atteint sa limite de modèles. Supprimez-en un d’abord."
   },
+  "This workspace has reached its metric alert limit. Delete one first.": {
+    "en": "This workspace has reached its metric alert limit. Delete one first.",
+    "fr": "Cet espace a atteint sa limite d’alertes de mesure. Supprimez-en une d’abord."
+  },
   "A report template with this name already exists.": {
     "en": "A report template with this name already exists.",
     "fr": "Un modèle de rapport porte déjà ce nom."

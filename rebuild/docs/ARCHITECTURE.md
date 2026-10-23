@@ -1,9 +1,65 @@
 # MS Social Pilot architecture
 
-Updated 2026-10-22 (AI Studio module) against the local working tree, configuration schema **137**.
+Updated 2026-10-22 (engagement batch) against the local working tree, configuration schema **140**.
 [ARCHITECTURE_CONTRACT.md](ARCHITECTURE_CONTRACT.md) remains binding; §4 gained the owner-approved 2026-10-22 Ads-area decision.
 Current reconciliation below takes precedence over historical batch snapshots.
 Source, automated, browser, live-provider and production evidence remain distinct.
+
+## Engagement batch — 2026-10-22 (source only)
+
+Metric alert rules, inbox triage views, stored full-text search and
+engagement notifications. Typecheck 0 errors; new vitest suites pass
+(alerts, evaluation, migration, inbox views/search, notifications, UI)
+plus the touched guard/parity/config suites. No browser, provider,
+database or production run.
+
+- **Metric alerts (Analytics-owned):** rules on one channel's stored
+  metric (followers/views/engagements/posts over 7/30 trailing days,
+  above/below a threshold) in `metric_alert_rules`, firings in
+  `metric_alert_firings` (one open firing per rule). The new worker job
+  `analyticsAlerts` (`analytics.alerts.schedule`, default every 10 min)
+  evaluates enabled rules on stored data only, through the channel
+  module's neutral `goalMeasures` plus local published-post counts —
+  the same quantities Goals shows — with workspace/channel/plan
+  authority rechecked per rule. Unknown measurements change nothing.
+  UI/REST/MCP share `alerts/server/rules.ts` (Reports-page panel,
+  `/api/analytics/alerts`, `list_metric_alerts`/`manage_metric_alert`).
+  New Root keys `analytics.alerts.schedule`, `analytics.alerts.policy`,
+  `analytics.alertsCopy`; schema 139 → 140.
+- **Scheduled reports (pre-existing):** templates, schedules, worker
+  generation and email delivery already existed and are unchanged,
+  except a completed/partial scheduled run now also emits a
+  `report_delivered` notification-center entry (best effort; the run
+  receipt stands without it).
+- **Inbox triage:** bulk actions already existed (resolve/reopen/
+  assign/hide/delete through shared per-item services). New: personal
+  saved triage views over the existing read models, stored in the
+  shared `saved_views` table with screen `inbox` (type/status/hidden/
+  text/quick filters only; scope re-applies on open), with UI beside
+  the filter row, `/api/inbox/saved-views` and three MCP tools. New
+  assignments (single and bulk, same service) emit one
+  `triage_assigned` notification to the new owner; unassignment and
+  unchanged owners stay silent.
+- **Inbox search:** the list `q` filter (ILIKE) is unchanged. New
+  ranked full-text search (`searchInbox`, `GET /api/inbox/search`,
+  `search_inbox`) over stored conversation messages and top-level
+  comments within the workspace and channel scope, using the `simple`
+  text configuration with new GIN indexes; message hits open their
+  thread. No dedicated search-results UI: the list filter remains the
+  UI search.
+- **Notifications center (existing module extended):** new event kinds
+  `metric_alert`, `report_delivered`, `triage_assigned` with bilingual
+  event copy (saved catalogs without them keep validating via
+  per-entry defaults), per-recipient eligibility (report scope for the
+  first two, inbox scope for triage) and new email switches
+  (`onMetricAlert`, `onReportDelivered`, `onTriageAssigned`, default
+  on) with Root-editable labels and center toggles. Delivery reuses
+  the existing email pipeline unchanged.
+- **Migration** `20261103040000_engagement_alerts` is additive only
+  (2 tables + 3 columns + 2 FTS indexes + purge-gate triggers).
+  Saved `settings.uiCopy` catalogs predate the new preference/event
+  labels and fall back to shipped defaults until Root re-saves (the
+  designed `configOrDefault` behavior).
 
 ## Instagram live-ready lane — 2026-10-22 (source only)
 

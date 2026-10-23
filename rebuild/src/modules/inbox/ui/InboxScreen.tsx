@@ -25,6 +25,7 @@ import { NestedReply } from './NestedReply';
 import { InboxTag } from './InboxTags';
 import { InboxHeader } from './InboxChrome';
 import { InboxFilterRow } from './InboxFilterRow';
+import { InboxSavedViews } from './InboxSavedViews';
 import { ThreadDetailsLayout } from './ThreadDetailsLayout';
 import { InboxShortcuts } from './InboxShortcuts';
 import { ContactDetails } from './ContactDetails';
@@ -266,6 +267,7 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
   const filterRow = <div className={styles.filterTools}>
     <InboxFilterRow action={inboxHref()} filters={filters} scope={scope.param} locale={locale} thread={requestedThread} limit={listPage?.limit} maxLimit={listPage?.limits.listPageSize}
       searchMaxCharacters={listPage?.limits.searchMaxCharacters} resetHref={resetHref} disabledLimit={!listPage} quick={quickApplied} activeCount={chips.length} />
+    <InboxSavedViews locale={locale} currentQuery={new URLSearchParams(Object.entries(baseLocation).flatMap(([key, value]) => value === undefined ? [] : [[key, value]])).toString()} />
     <UrlFilterChips chips={chips} resetHref={resetHref} labels={{ active: copy.activeFilters, remove: copy.removeFilter, reset: copy.resetFilters }} />
   </div>;
 

@@ -771,3 +771,29 @@ Source/unit evidence only; no browser, provider or production run in this batch.
   picture) under the link field: cached previews render from the cache only, a
   missing preview says so while keeping the address publishable, and failures
   offer retry without losing composer input.
+
+## Engagement batch: metric alerts, triage views, engagement notifications — 2026-10-22
+
+Source/unit evidence only; no browser, provider or production run in this batch.
+
+- Metric alerts live on the Reports page below run history. Rules show
+  name, channel, condition (metric, at-or-above/below, threshold,
+  7/30-day window) and state (Firing, Within threshold, Not measured
+  yet, Paused); recent firings list separately with measured values.
+  Creating, editing, pausing and deleting use the shared dialog with
+  exact typed confirmations (`CREATE/UPDATE/DELETE METRIC ALERT …`);
+  deletion needs an acknowledgement and keeps past firings. A rule on
+  an unavailable channel stays visible and never fires.
+- Inbox triage views sit beside the filter row: the viewer's own named
+  filter sets (type, status, hidden, text, quick) with save/delete and
+  one-click open. Opening a view re-applies the sidebar channel scope;
+  the scope itself is never stored in a view. Deleting a view asks
+  first and never touches inbox content.
+- The notification center shows firing, scheduled-report and triage
+  alerts with their own family labels (EN/FR) and offers one email
+  switch per new event. A firing appears while the stored value
+  crosses the threshold and clears from the badge only by reading or
+  deleting the entry; resolving the firing does not remove the entry.
+- A new assignee gets one triage notification per assignment;
+  unassignment and unchanged owners stay silent. Bulk assignment
+  notifies per item through the same service.

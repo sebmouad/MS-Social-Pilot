@@ -14,6 +14,7 @@ import { analyticsPinToolDefinitions, executeAnalyticsPinTool } from './pins/mcp
 import { analyticsGoalToolDefinitions, executeAnalyticsGoalTool } from './goals/mcp';
 import { analyticsComparisonToolDefinitions, executeAnalyticsComparisonTool } from './comparison/mcp';
 import { analyticsExplorerToolDefinitions, executeAnalyticsExplorerTool } from './explorer-mcp';
+import { analyticsAlertToolDefinitions, executeAnalyticsAlertTool } from './alerts/mcp';
 
 async function readMcpAnalyticsSnapshot(viewer: McpViewer, args: Record<string, unknown>, metricKey?: string, feature?: 'analytics/overview' | 'analytics/reports') {
   const cap = viewer.maxResultItems ?? 100;
@@ -149,6 +150,18 @@ export const ANALYTICS_MCP: readonly McpToolGroup[] = [
       { uri: 'msp://analytics/explorer', name: "Analytics metric explorer", description: "Bounded stored metric catalog for authorized selected resources.", mimeType: 'application/json', feature: 'analytics/explorer', readTool: 'get_analytics_explorer' },
     ],
     execute: (viewer, _name, args, cap) => executeAnalyticsExplorerTool(analyticsActorFor(viewer, cap), args, { allowedChannelIds: pageIdsFor(viewer), feature: 'analytics/explorer' }, cap),
+  },
+  {
+    id: 'analytics-alerts',
+    tools: analyticsAlertToolDefinitions,
+    features: {
+      list_metric_alerts: 'analytics/reports',
+      manage_metric_alert: 'analytics/reports',
+    },
+    writeTools: ['manage_metric_alert'],
+    selfLockedWrites: ['manage_metric_alert'],
+    scope: { resourceTools: ['list_metric_alerts', 'manage_metric_alert'] },
+    execute: (viewer, name, args, cap) => executeAnalyticsAlertTool({ ...analyticsActorFor(viewer, cap), resourceRestricted: isResourceRestricted(viewer), ...(viewer.apiKeyId ? { apiKeyId: viewer.apiKeyId } : {}), ...(viewer.permissions ? { permissionCeiling: viewer.permissions } : {}) }, name, args),
   },
   {
     id: 'analytics-overview',

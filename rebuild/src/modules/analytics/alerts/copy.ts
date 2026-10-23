@@ -1,0 +1,60 @@
+/** Customer copy for metric alerts in both shipped languages. */
+export const alertsCopyDefaults = {
+  title: { en: 'Metric alerts', fr: 'Alertes de mesure' },
+  description: { en: 'Watched metrics email nothing by themselves: a firing appears here and in your notification center while the measured value crosses the threshold.', fr: 'Les mesures surveillées n’envoient rien par elles-mêmes : un déclenchement apparaît ici et dans votre centre de notifications tant que la valeur mesurée dépasse le seuil.' },
+  newRule: { en: 'New alert', fr: 'Nouvelle alerte' },
+  edit: { en: 'Edit', fr: 'Modifier' },
+  delete: { en: 'Delete', fr: 'Supprimer' },
+  rule: { en: 'Alert', fr: 'Alerte' },
+  channel: { en: 'Channel', fr: 'Canal' },
+  condition: { en: 'Condition', fr: 'Condition' },
+  state: { en: 'State', fr: 'État' },
+  firing: { en: 'Firing', fr: 'Déclenchée' },
+  ok: { en: 'Within threshold', fr: 'Dans le seuil' },
+  unknown: { en: 'Not measured yet', fr: 'Pas encore mesurée' },
+  enabled: { en: 'Enabled', fr: 'Activée' },
+  disabled: { en: 'Paused', fr: 'En pause' },
+  actual: { en: 'Measured', fr: 'Mesuré' },
+  evaluatedAt: { en: 'Last checked', fr: 'Dernière vérification' },
+  noRulesTitle: { en: 'No metric alerts', fr: 'Aucune alerte de mesure' },
+  noRulesBody: { en: 'Create an alert to watch a stored metric on a channel you manage.', fr: 'Créez une alerte pour surveiller une mesure enregistrée sur un canal que vous gérez.' },
+  noRulesReadOnly: { en: 'No metric alerts are set up for channels you can access.', fr: 'Aucune alerte de mesure n’est configurée pour les canaux auxquels vous avez accès.' },
+  name: { en: 'Alert name', fr: 'Nom de l’alerte' },
+  metric: { en: 'Metric', fr: 'Mesure' },
+  operator: { en: 'Fires when the value is', fr: 'Se déclenche quand la valeur est' },
+  above: { en: 'at or above', fr: 'égale ou supérieure à' },
+  below: { en: 'at or below', fr: 'égale ou inférieure à' },
+  threshold: { en: 'Threshold', fr: 'Seuil' },
+  window: { en: 'Measured over', fr: 'Mesuré sur' },
+  window7: { en: 'Last 7 days', fr: '7 derniers jours' },
+  window30: { en: 'Last 30 days', fr: '30 derniers jours' },
+  save: { en: 'Save alert', fr: 'Enregistrer l’alerte' },
+  saving: { en: 'Saving…', fr: 'Enregistrement…' },
+  saved: { en: 'Alert saved.', fr: 'Alerte enregistrée.' },
+  created: { en: 'Alert created.', fr: 'Alerte créée.' },
+  deleted: { en: 'Alert deleted.', fr: 'Alerte supprimée.' },
+  cancel: { en: 'Cancel', fr: 'Annuler' },
+  chooseChannel: { en: 'Choose a channel.', fr: 'Choisissez un canal.' },
+  enterName: { en: 'Enter an alert name.', fr: 'Saisissez un nom d’alerte.' },
+  enterThreshold: { en: 'Enter a threshold of 0 or more.', fr: 'Saisissez un seuil de 0 ou plus.' },
+  saveFailed: { en: 'The alert could not be saved. Refresh and check before trying again.', fr: 'Impossible d’enregistrer l’alerte. Actualisez et vérifiez avant de réessayer.' },
+  deleteTitle: { en: 'Delete this alert?', fr: 'Supprimer cette alerte ?' },
+  deleteDetail: { en: 'Future checks stop. Past firings remain in history.', fr: 'Les vérifications futures s’arrêtent. Les déclenchements passés restent dans l’historique.' },
+  deleteConfirm: { en: 'Delete alert', fr: 'Supprimer l’alerte' },
+  acknowledgeDelete: { en: 'I understand future checks will stop.', fr: 'Je comprends que les vérifications futures s’arrêteront.' },
+  firingsTitle: { en: 'Recent firings', fr: 'Déclenchements récents' },
+  firingsEmpty: { en: 'No firings in the recent history.', fr: 'Aucun déclenchement dans l’historique récent.' },
+  resolved: { en: 'Resolved', fr: 'Résolu' },
+  metricFollowers: { en: 'New followers', fr: 'Nouveaux abonnés' },
+  metricViews: { en: 'Views', fr: 'Vues' },
+  metricEngagements: { en: 'Engagement', fr: 'Engagement' },
+  metricPosts: { en: 'Posts published', fr: 'Publications' },
+} as const;
+
+export type AlertsLocale = 'en' | 'fr';
+export type AlertsCopyKey = keyof typeof alertsCopyDefaults;
+export type AlertsCopy = { [K in AlertsCopyKey]: string };
+export function alertsCopy(locale: string | null | undefined, catalog: Record<string, { en: string; fr: string }> = alertsCopyDefaults): AlertsCopy {
+  const language = locale?.toLowerCase().startsWith('fr') ? 'fr' : 'en';
+  return Object.fromEntries(Object.entries({ ...alertsCopyDefaults, ...catalog }).map(([key, value]) => [key, value[language] ?? value.en])) as AlertsCopy;
+}

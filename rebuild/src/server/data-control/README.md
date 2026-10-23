@@ -29,6 +29,8 @@ migration names already in source. No migration was applied by this lane.
 | `wordpress_recipe_plans` | Workspace FK: catalog export/counts/dependency-ordered erasure before sources/targets |
 | `ads_objects` | Explicit indirect export via workspace-owned ad accounts, with recursive credential redaction and row counts. Erased by its ad-account FK cascade. Real PostgreSQL cascade/export proof remains separate. |
 | `task_checklist_items` | Workspace FK: catalog export/counts/dependency-ordered erasure; composite task FK cascade on task/workspace deletion; author FK SET NULL on account deletion |
+| `metric_alert_rules` | Workspace FK: catalog export/counts/dependency-ordered erasure; channel FK cascade on channel deletion; author FK SET NULL on account deletion |
+| `metric_alert_firings` | Workspace FK: catalog export/counts/dependency-ordered erasure; rule FK cascade on rule deletion |
 
 Account appearance is not a new table: `users.theme` and the exact
 `app_settings` key `settings.appearance.user.<userId>.mode` belong to the account.

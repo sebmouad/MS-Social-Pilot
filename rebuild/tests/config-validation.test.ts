@@ -17,7 +17,7 @@ describe('configuration registry', () => {
     }
   });
   it('keeps operator alerts in the single Root monitoring system', () => {
-    expect(CONFIG_SCHEMA_VERSION).toBe(139);
+    expect(CONFIG_SCHEMA_VERSION).toBe(140);
     for (const key of ['notifications.systemAlertPolicy', 'notifications.systemAlertCopy', 'notifications.systemAlertTelegramToken']) {
       expect(CONFIG_BY_KEY.has(key)).toBe(false);
     }
@@ -62,7 +62,7 @@ describe('configuration registry', () => {
   });
 
   it('covers the operational configuration areas with explicit consumption status', () => {
-    expect(CONFIG_SCHEMA_VERSION).toBe(139);
+    expect(CONFIG_SCHEMA_VERSION).toBe(140);
     expect(safeConfigShape().find(setting => setting.key === 'settings.teamDefaultRole')).toMatchObject({ defaultValue: 'contributor', consumption: 'active', owner: { kind: 'product', id: 'settings' } });
     expect(safeConfigShape().find(setting => setting.key === 'settings.teamDefaultAllChannels')).toMatchObject({ defaultValue: false, consumption: 'active', owner: { kind: 'product', id: 'settings' } });
     expect(CONFIG_BY_KEY.get('settings.teamDefaultRole')!.schema.safeParse('owner').success).toBe(false);
@@ -282,6 +282,19 @@ describe('configuration registry', () => {
 
   it('omits configuration placeholders for uninstalled providers', () => {
     expect(CONFIG_BY_KEY.has('x.oauthScopes')).toBe(false);
+  });
+
+  it('registers the analytics metric-alert job, schedule, bounds and copy under the Analytics module', () => {
+    expect(CONFIG_SCHEMA_VERSION).toBe(140);
+    expect(CONFIG_BY_KEY.get('analytics.alerts.schedule')).toMatchObject({ kind: 'text', defaultValue: '*/10 * * * *', consumption: 'active' });
+    expect(CONFIG_BY_KEY.get('analytics.alerts.schedule')!.schema.safeParse('*/10 * * * *').success).toBe(true);
+    expect(CONFIG_BY_KEY.get('analytics.alerts.schedule')!.schema.safeParse('not a cron').success).toBe(false);
+    expect(CONFIG_BY_KEY.get('analytics.alerts.policy')).toMatchObject({ kind: 'json', consumption: 'active' });
+    expect(CONFIG_BY_KEY.get('analytics.alertsCopy')).toMatchObject({ kind: 'json', consumption: 'active' });
+    for (const key of ['analytics.alerts.schedule', 'analytics.alerts.policy', 'analytics.alertsCopy'] as const) {
+      expect(safeConfigShape().find(setting => setting.key === key)).toMatchObject({ consumption: 'active', owner: { kind: 'product', id: 'analytics' } });
+      expect(CONFIG_BY_KEY.get(key)!.schema.safeParse(CONFIG_BY_KEY.get(key)!.defaultValue).success).toBe(true);
+    }
   });
 
   it('audits changes with key, change type, and registry version only', () => {

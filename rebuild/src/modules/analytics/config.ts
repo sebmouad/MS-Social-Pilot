@@ -8,6 +8,7 @@ import { entry, cron } from '@/lib/config/entry';
 import { DEMOGRAPHICS_CONFIG } from './demographics/config';
 import { PINNED_METRIC_CONFIG } from './pins/config';
 import { COMPARISON_CONFIG } from './comparison/config';
+import { ALERTS_CONFIG } from './alerts/config';
 import { REPORT_WORKFLOW_CONFIG } from './reports/config';
 import { REPORT_UI_CONFIG, REPORT_HOST_CONFIG } from './report-ui-config';
 import { ANALYTICS_EXPLORER_CONFIG } from './explorer-config';
@@ -34,6 +35,7 @@ export const ANALYTICS_MODULE_CONFIG = [
   ...DEMOGRAPHICS_CONFIG,
   ...PINNED_METRIC_CONFIG,
   ...COMPARISON_CONFIG,
+  ...ALERTS_CONFIG,
   ...REPORT_WORKFLOW_CONFIG,
   ...REPORT_UI_CONFIG,
   ...REPORT_HOST_CONFIG,

@@ -5,11 +5,12 @@ import { workspaceCopyDefaults } from './workspace-copy';
 import { demographicsCopyDefaults } from './demographics/copy';
 import { z } from 'zod';
 import { reportCopyDefaults } from './ui/reports/copy';
+import { alertsCopyDefaults } from './alerts/copy';
 import { goalsCopyDefaults } from './goals/copy';
 import { downloadCopyDefaults } from './ui/reports/download-copy';
 
 /** Browser-safe catalogs; every customer entry has both supported languages. */
-export { reportCopyDefaults, goalsCopyDefaults, downloadCopyDefaults };
+export { reportCopyDefaults, goalsCopyDefaults, downloadCopyDefaults, alertsCopyDefaults };
 export function analyticsCopySchema<T extends Record<string, { en: string; fr: string }>>(defaults: T) {
   const bilingual = z.object({ en: z.string().trim().min(1).max(4000), fr: z.string().trim().min(1).max(4000) }).strict();
   return z.object(Object.fromEntries(Object.keys(defaults).map(key => [key, bilingual])) as { [K in keyof T]: typeof bilingual }).strict();
@@ -17,6 +18,7 @@ export function analyticsCopySchema<T extends Record<string, { en: string; fr: s
 export const reportCopySchema = analyticsCopySchema(reportCopyDefaults);
 export const goalsCopySchema = analyticsCopySchema(goalsCopyDefaults);
 export const downloadCopySchema = analyticsCopySchema(downloadCopyDefaults);
+export const alertsCopySchema = analyticsCopySchema(alertsCopyDefaults);
 
 export { demographicsCopyDefaults };
 export const demographicsCopySchema = analyticsCopySchema(demographicsCopyDefaults);

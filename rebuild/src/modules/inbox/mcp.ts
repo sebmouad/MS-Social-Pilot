@@ -3,10 +3,12 @@ import { moderateInboxComment, replyToInbox, setInboxResolved, syncInbox } from 
 import { auditedReceipt, inboxActor, pageIdsFor, requireConfirmation, requiredString, type McpToolGroup } from '@/server/mcp/kit';
 import { deleteInboxCommentDurably, finishInboxDeletion, getInboxDeletion } from './server/deletion';
 import { readInboxList, readInboxThread } from './server/read';
+import { searchInbox } from './server/search';
 import { readInboxContactDetails } from './server/details';
 import { bulkInboxAction } from './server/bulk';
 import { inboxProductivityToolDefinitions, executeInboxProductivityTool } from './productivity-mcp';
 import { inboxModerationToolDefinitions, executeInboxModerationTool } from './moderation-mcp';
+import { inboxSavedViewToolDefinitions, executeInboxSavedViewTool } from './saved-views-mcp';
 
 /** MCP tool groups this module installs. The host merges installed groups; edit only here. */
 export const INBOX_MCP: readonly McpToolGroup[] = [
@@ -24,6 +26,7 @@ export const INBOX_MCP: readonly McpToolGroup[] = [
     { name: 'get_inbox_contact_details', description: 'Read what is stored about the person behind one authorized Inbox item (message:<id>, comment:<id> or review:<id>): channel, first seen, messages written, related posts, workflow state and the sentiment trend of their classified comments. Reads stored data only; unclassified comments are unknown, not neutral.', inputSchema: { type: 'object', required: ['key'], properties: { key: { type: 'string' } }, additionalProperties: false } },
     { name: 'bulk_inbox_action', description: 'Resolve, reopen, assign, hide, show again or delete several Inbox items at once through the same per-item services as the single-item tools (hide, unhide and delete: comments only; assign: conversations and comments only, with assigneeId stating the member or null to unassign). Each item reports its own outcome; one failure never undoes another. Hide, unhide and delete contact the remote platform; deletion cannot be undone. The Root bulk limit applies. Confirmation must exactly match BULK <RESOLVE|REOPEN|HIDE|UNHIDE|DELETE> <number of distinct items> INBOX ITEMS, or BULK ASSIGN <number of distinct items> INBOX ITEMS TO <memberId|UNASSIGNED>.', inputSchema: { type: 'object', required: ['action', 'items', 'confirmation'], properties: { action: { type: 'string', enum: ['resolve', 'reopen', 'hide', 'unhide', 'delete', 'assign'] }, items: { type: 'array', minItems: 1, items: { type: 'object', required: ['kind', 'id'], properties: { kind: { type: 'string', enum: ['message', 'comment', 'review'] }, id: { type: 'string' } }, additionalProperties: false } }, assigneeId: { anyOf: [{ type: 'string' }, { type: 'null' }], description: 'Required for assign: the workspace member, or null to unassign. Forbidden for other actions.' }, confirmation: { type: 'string' } }, additionalProperties: false } },
     { name: 'moderate_inbox_comment', description: 'Hide or unhide a synced comment through its connected platform. This contacts the remote platform. Confirmation must exactly match HIDE COMMENT <id> or UNHIDE COMMENT <id>.', inputSchema: { type: 'object', required: ['id', 'hidden', 'confirmation'], properties: { id: { type: 'string' }, hidden: { type: 'boolean' }, confirmation: { type: 'string' } }, additionalProperties: false } },
+    { name: 'search_inbox', description: 'Ranked full-text search over stored Inbox messages and top-level comments within your channel scope. Message hits open their conversation thread; excerpts are stored text with match highlights. Reads stored data only; never contacts a platform.', inputSchema: { type: 'object', required: ['q'], properties: { q: { type: 'string', minLength: 1 }, channelId: { type: 'string' }, kind: { type: 'string', enum: ['all', 'message', 'comment'] }, limit: { type: 'integer', minimum: 1 } }, additionalProperties: false } },
     ],
     features: {
       list_inbox: 'inbox/conversations',
@@ -37,11 +40,12 @@ export const INBOX_MCP: readonly McpToolGroup[] = [
       moderate_inbox_comment: 'inbox/conversations',
       get_inbox_contact_details: 'inbox/conversations',
       bulk_inbox_action: 'inbox/conversations',
+      search_inbox: 'inbox/conversations',
     },
     writeTools: ['sync_inbox', 'reply_to_inbox', 'delete_inbox_comment', 'finish_inbox_deletion', 'set_inbox_resolved', 'moderate_inbox_comment', 'bulk_inbox_action'],
     // The bulk service takes the workspace operation lock per item, so the host must not wrap the whole request in one transaction.
     selfLockedWrites: ['delete_inbox_comment', 'finish_inbox_deletion', 'set_inbox_resolved', 'bulk_inbox_action'],
-    scope: { resourceTools: ['list_inbox', 'get_inbox_thread', 'get_inbox_contact_details', 'sync_inbox', 'reply_to_inbox', 'get_inbox_deletion', 'delete_inbox_comment', 'finish_inbox_deletion', 'set_inbox_resolved', 'moderate_inbox_comment', 'bulk_inbox_action'], resources: ['msp://inbox'] },
+    scope: { resourceTools: ['list_inbox', 'get_inbox_thread', 'get_inbox_contact_details', 'sync_inbox', 'reply_to_inbox', 'get_inbox_deletion', 'delete_inbox_comment', 'finish_inbox_deletion', 'set_inbox_resolved', 'moderate_inbox_comment', 'bulk_inbox_action', 'search_inbox'], resources: ['msp://inbox'] },
     resources: [
       { uri: 'msp://inbox', name: "Inbox", description: "Recent synced inbox activity.", mimeType: 'application/json', feature: 'inbox/conversations', readTool: 'list_inbox' },
     ],
@@ -53,6 +57,7 @@ export const INBOX_MCP: readonly McpToolGroup[] = [
       }
       case 'get_inbox_thread': return readInboxThread({ userId: viewer.userId, workspaceId: viewer.workspaceId }, args, { allowedChannelIds: pageIdsFor(viewer), maxItems: cap });
       case 'get_inbox_contact_details': return readInboxContactDetails({ userId: viewer.userId, workspaceId: viewer.workspaceId }, args, { allowedChannelIds: pageIdsFor(viewer) });
+      case 'search_inbox': return searchInbox({ userId: viewer.userId, workspaceId: viewer.workspaceId }, args, { allowedChannelIds: pageIdsFor(viewer), maxItems: cap });
       case 'bulk_inbox_action': {
         const result = await bulkInboxAction(inboxActor(viewer), args, { allowedChannelIds: pageIdsFor(viewer) });
         return auditedReceipt(viewer, name, { action: result.action, requested: result.requested, succeeded: result.succeeded, failed: result.failed, ...(result.action === 'assign' ? { assigneeId: typeof args.assigneeId === 'string' ? args.assigneeId : null } : {}) }, { ...result });
@@ -128,6 +133,18 @@ export const INBOX_MCP: readonly McpToolGroup[] = [
     selfLockedWrites: ['assign_inbox_item', 'add_inbox_private_note', 'delete_inbox_private_note', 'create_inbox_saved_reply', 'update_inbox_saved_reply', 'delete_inbox_saved_reply'],
     scope: { resourceTools: ['get_inbox_productivity', 'assign_inbox_item', 'add_inbox_private_note', 'delete_inbox_private_note'], workspaceTools: ['list_inbox_saved_replies', 'create_inbox_saved_reply', 'update_inbox_saved_reply', 'delete_inbox_saved_reply'] },
     execute: (viewer, name, args, cap) => executeInboxProductivityTool(inboxActor(viewer), name, args, cap),
+  },
+  {
+    id: 'inbox-saved-views',
+    tools: inboxSavedViewToolDefinitions,
+    features: {
+      list_inbox_saved_views: 'inbox/conversations',
+      create_inbox_saved_view: 'inbox/conversations',
+      delete_inbox_saved_view: 'inbox/conversations',
+    },
+    writeTools: ['create_inbox_saved_view', 'delete_inbox_saved_view'],
+    scope: { workspaceTools: ['list_inbox_saved_views', 'create_inbox_saved_view', 'delete_inbox_saved_view'] },
+    execute: (viewer, name, args) => executeInboxSavedViewTool(inboxActor(viewer), name, args),
   },
   {
     id: 'inbox-moderation',

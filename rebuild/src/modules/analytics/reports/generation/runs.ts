@@ -12,6 +12,7 @@ import { AnalyticsComparisonError, analyticsDateRange } from '../../server/compa
 import { audit, authorizeReport, bad, lockActor, missing, pageOf, requireWorkspaceWide, unavailable, usableChannelIds } from '../server/access';
 import { reportLimits, transact, type ReportLimits } from '../server/limits';
 import { cleanSections } from '../server/templates';
+import { emitWorkspaceAlert } from '@/modules/settings/notifications/producers';
 import { ClaimLost, clearExpiredOutputs, deriveStatus, fencedUpdate, finishRun, mask, newToken, reportFailureText, requestHash, runOutcome, safeReason, scheduleOutcome, type RunRef } from './run-store';
 import { mailReady, registeredReportPorts, runHistoryReady, reportCapabilities } from './registry';
 
@@ -167,6 +168,11 @@ export async function runDueReportSchedules(deps: DueRunDeps = {}): Promise<DueR
       const done = await finishRun(ref, patch, clock, limits.finishRetries, { audit: { actor: { userId: row.createdById, workspaceId: row.workspaceId }, action: 'analytics.report_run_finished', detail }, after: tx => scheduleOutcome(tx, row.id, row.workspaceId, clock(), status === 'completed' ? null : reason).then(() => undefined) });
       if (!done) summary.interrupted += 1;
       else if (status === 'completed') summary.completed += 1; else if (status === 'partial') summary.partial += 1; else if (status === 'skipped') summary.skipped += 1; else if (status === 'uncertain') summary.uncertain += 1; else summary.failed += 1;
+      // A delivered scheduled run also lands in the notification center. Best effort: the run outcome above is already recorded.
+      if (done && (status === 'completed' || status === 'partial')) {
+        try { await prisma.$transaction(tx => emitWorkspaceAlert(tx, { workspaceId: row.workspaceId, eventId: `report_${row.runId}`, kind: 'report_delivered', targetId: row.targetId }).then(() => undefined)); }
+        catch { /* the run receipt stands; the center entry is advisory */ }
+      }
     };
     try {
       const stop = await boundary(row, eligible);

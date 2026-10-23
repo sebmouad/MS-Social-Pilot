@@ -1,4 +1,5 @@
 import { configValueOrDefault } from '@/server/config/config-or-default';
+import { authorizeReport } from '@/modules/analytics/reports/server/access';
 import { authorizeInbox } from '@/modules/inbox/server/access';
 import { hasPlatformCapability } from '@/server/entitlements';
 import { ADDITIONAL_NOTIFICATION_PREFERENCES } from './catalog';
@@ -122,7 +123,7 @@ export async function readNotificationPreferences(actor: NotificationActor): Pro
   ]);
   const people = await protect(prisma.$queryRaw<Array<{ locale: string }>>`SELECT locale::text AS locale FROM users WHERE id = ${actor.userId} LIMIT 1`);
   const person = people[0];
-  const extra = await protect(prisma.$queryRaw<Array<Record<string, boolean>>>`SELECT "onPublishFailure", "onTokenExpiry", "onApprovalRequest", "onApprovalDecision", "onNewInbox", "onDraftUpdated", "onModerationAlert" FROM notification_settings WHERE "userId" = ${actor.userId} AND "workspaceId" = ${actor.workspaceId} LIMIT 1`);
+  const extra = await protect(prisma.$queryRaw<Array<Record<string, boolean>>>`SELECT "onPublishFailure", "onTokenExpiry", "onApprovalRequest", "onApprovalDecision", "onNewInbox", "onDraftUpdated", "onModerationAlert", "onMetricAlert", "onReportDelivered", "onTriageAssigned" FROM notification_settings WHERE "userId" = ${actor.userId} AND "workspaceId" = ${actor.workspaceId} LIMIT 1`);
   const extraPreferences = Object.fromEntries(ADDITIONAL_NOTIFICATION_PREFERENCES.map(key => [key, extra[0]?.[key] ?? (key !== 'onNewInbox')]));
   const targetIds = allowedChannels.map(channel => channel.id);
   const mutes = targetIds.length ? await protect(prisma.$queryRaw<NotificationMute[]>`SELECT m."targetId", 'queueEmpty'::text AS event FROM notification_mutes m JOIN targets t ON t.id = m."targetId" WHERE m."userId" = ${actor.userId} AND t."workspaceId" = ${actor.workspaceId} AND m.event = 'queueEmpty' AND m."targetId" = ANY(${targetIds}::text[]) ORDER BY m."targetId"`) : [];
@@ -144,7 +145,7 @@ export async function updateNotificationPreferences(actor: NotificationActor, in
     const n = await tx.$executeRaw`INSERT INTO notification_settings (id, "userId", "workspaceId", "onNoteMention", "onQueueEmpty") VALUES (${`ns_${randomUUID()}`}, ${actor.userId}, ${actor.workspaceId}, COALESCE(${value.onNoteMention ?? null}::boolean, ${limit.preferenceDefaults.onNoteMention}), COALESCE(${value.onQueueEmpty ?? null}::boolean, ${limit.preferenceDefaults.onQueueEmpty})) ON CONFLICT ("userId", "workspaceId") DO UPDATE SET "onNoteMention" = COALESCE(${value.onNoteMention ?? null}::boolean, notification_settings."onNoteMention"), "onQueueEmpty" = COALESCE(${value.onQueueEmpty ?? null}::boolean, notification_settings."onQueueEmpty")`;
     if (n !== 1) throw unavailable();
     // Fixed column names only; all values remain bound and caller/workspace scoped.
-    const additionalChanged = await tx.$executeRaw`UPDATE notification_settings SET "onPublishFailure" = COALESCE(${value.onPublishFailure ?? null}::boolean, "onPublishFailure"), "onTokenExpiry" = COALESCE(${value.onTokenExpiry ?? null}::boolean, "onTokenExpiry"), "onApprovalRequest" = COALESCE(${value.onApprovalRequest ?? null}::boolean, "onApprovalRequest"), "onApprovalDecision" = COALESCE(${value.onApprovalDecision ?? null}::boolean, "onApprovalDecision"), "onNewInbox" = COALESCE(${value.onNewInbox ?? null}::boolean, "onNewInbox"), "onDraftUpdated" = COALESCE(${value.onDraftUpdated ?? null}::boolean, "onDraftUpdated"), "onModerationAlert" = COALESCE(${value.onModerationAlert ?? null}::boolean, "onModerationAlert"), "inboxDigestAt" = CASE WHEN ${value.onNewInbox ?? null}::boolean IS NOT NULL AND ${value.onNewInbox ?? null}::boolean IS DISTINCT FROM "onNewInbox" THEN NULL ELSE "inboxDigestAt" END WHERE "userId" = ${actor.userId} AND "workspaceId" = ${actor.workspaceId}`;
+    const additionalChanged = await tx.$executeRaw`UPDATE notification_settings SET "onPublishFailure" = COALESCE(${value.onPublishFailure ?? null}::boolean, "onPublishFailure"), "onTokenExpiry" = COALESCE(${value.onTokenExpiry ?? null}::boolean, "onTokenExpiry"), "onApprovalRequest" = COALESCE(${value.onApprovalRequest ?? null}::boolean, "onApprovalRequest"), "onApprovalDecision" = COALESCE(${value.onApprovalDecision ?? null}::boolean, "onApprovalDecision"), "onNewInbox" = COALESCE(${value.onNewInbox ?? null}::boolean, "onNewInbox"), "onDraftUpdated" = COALESCE(${value.onDraftUpdated ?? null}::boolean, "onDraftUpdated"), "onModerationAlert" = COALESCE(${value.onModerationAlert ?? null}::boolean, "onModerationAlert"), "onMetricAlert" = COALESCE(${value.onMetricAlert ?? null}::boolean, "onMetricAlert"), "onReportDelivered" = COALESCE(${value.onReportDelivered ?? null}::boolean, "onReportDelivered"), "onTriageAssigned" = COALESCE(${value.onTriageAssigned ?? null}::boolean, "onTriageAssigned"), "inboxDigestAt" = CASE WHEN ${value.onNewInbox ?? null}::boolean IS NOT NULL AND ${value.onNewInbox ?? null}::boolean IS DISTINCT FROM "onNewInbox" THEN NULL ELSE "inboxDigestAt" END WHERE "userId" = ${actor.userId} AND "workspaceId" = ${actor.workspaceId}`;
     if (additionalChanged !== 1) throw unavailable();
 
     if (mutes) {
@@ -249,8 +250,15 @@ export async function notificationRecipientEligible(tx: Tx, input: NotificationE
     const accounts = await tx.$queryRaw<Array<{ provider: string }>>`SELECT provider FROM social_accounts WHERE id = ${value.accountId!} AND "workspaceId" = ${value.workspaceId}`;
     return accounts.length === 1 && hasPlatformCapability(authority.entitlements, accounts[0]!.provider);
   }
-  if (['inbox_digest', 'moderation_alert', 'negative_spike'].includes(value.kind)) {
+  if (['inbox_digest', 'moderation_alert', 'negative_spike', 'triage_assigned'].includes(value.kind)) {
     try { return (await authorizeInbox(recipient)).channelIds.includes(value.targetId!); }
+    catch (error) { if (error instanceof OperationError && ['unauthorized', 'forbidden', 'not_found'].includes(error.code)) return false; throw error; }
+  }
+  if (['metric_alert', 'report_delivered'].includes(value.kind)) {
+    try {
+      const report = await authorizeReport(recipient, 'read');
+      return report.scope === null || report.scope.includes(value.targetId!);
+    }
     catch (error) { if (error instanceof OperationError && ['unauthorized', 'forbidden', 'not_found'].includes(error.code)) return false; throw error; }
   }
   if (['publish_failure', 'approval_request', 'approval_decision', 'draft_updated', 'queue_empty'].includes(value.kind)) {
@@ -317,7 +325,7 @@ export async function recipientAllowsNotification(tx: Tx, input: Pick<Notificati
 export const notificationPreferenceDefaults = NOTIFICATIONS_DEFAULTS;
 
 export function notificationPreferenceKey(kind: import('./contracts').NotificationEvent): string {
-  return ({ note_mention: 'onNoteMention', inbox_note_mention: 'onNoteMention', mix_dry: 'onQueueEmpty', queue_empty: 'onQueueEmpty', publish_failure: 'onPublishFailure', connection_expired: 'onPublishFailure', token_expiring: 'onTokenExpiry', approval_request: 'onApprovalRequest', approval_decision: 'onApprovalDecision', draft_updated: 'onDraftUpdated', inbox_digest: 'onNewInbox', moderation_alert: 'onModerationAlert', negative_spike: 'onModerationAlert' })[kind];
+  return ({ note_mention: 'onNoteMention', inbox_note_mention: 'onNoteMention', mix_dry: 'onQueueEmpty', queue_empty: 'onQueueEmpty', publish_failure: 'onPublishFailure', connection_expired: 'onPublishFailure', token_expiring: 'onTokenExpiry', approval_request: 'onApprovalRequest', approval_decision: 'onApprovalDecision', draft_updated: 'onDraftUpdated', inbox_digest: 'onNewInbox', moderation_alert: 'onModerationAlert', negative_spike: 'onModerationAlert', metric_alert: 'onMetricAlert', report_delivered: 'onReportDelivered', triage_assigned: 'onTriageAssigned' })[kind];
 }
 export async function txLocale(tx: Tx, userId: string) {
   const rows = await tx.$queryRaw<Array<{ locale: string }>>`SELECT locale::text AS locale FROM users WHERE id = ${userId}`;

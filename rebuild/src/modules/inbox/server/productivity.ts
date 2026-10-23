@@ -137,6 +137,10 @@ export async function performInboxProductivityAction(actor: InboxReadActor, inpu
             : await tx.postComment.updateMany({ where: { id: value.id, parentRemoteId: null, postTarget: { targetId: current.targetId, target: { workspaceId: actor.workspaceId }, post: { workspaceId: actor.workspaceId } } }, data: { assigneeId: value.assigneeId } });
           if (!changed.count) throw new OperationError('not_found', await inboxServiceText('service7'));
           await audit(tx, actor, 'inbox.assignment_changed', { kind: value.kind, itemId: value.id, targetId: current.targetId, assigneeId: value.assigneeId });
+          // A new assignee gets one triage notification; unassignment and unchanged owners stay silent.
+          if (value.assigneeId && value.assigneeId !== current.assigneeId) {
+            await enqueueNotification(tx, { eventId: `triage_${value.kind}_${value.id}_${value.assigneeId}`, workspaceId: actor.workspaceId, userId: value.assigneeId, kind: 'triage_assigned', targetId: current.targetId });
+          }
           return { ok: true as const, action: value.action, kind: value.kind, id: value.id, assigneeId: value.assigneeId };
         }
         await lockActiveActor(tx, actor);

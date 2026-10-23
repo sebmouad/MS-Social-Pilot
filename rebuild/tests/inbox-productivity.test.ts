@@ -3,13 +3,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   prisma: { conversation: { findFirst: vi.fn(), updateMany: vi.fn() }, postComment: { findFirst: vi.fn(), updateMany: vi.fn() }, membership: { findUnique: vi.fn() }, $queryRaw: vi.fn(), $executeRaw: vi.fn(), $transaction: vi.fn() },
-  config: vi.fn(), authorize: vi.fn(), workspace: vi.fn(), lock: vi.fn(), deletions: vi.fn(),
+  config: vi.fn(), authorize: vi.fn(), workspace: vi.fn(), lock: vi.fn(), deletions: vi.fn(), notify: vi.fn(),
 }));
 vi.mock('../src/server/data', () => ({ prisma: mocks.prisma }));
 vi.mock('../src/server/config/store', () => ({ runtimeConfig: mocks.config }));
 vi.mock('../src/modules/inbox/server/access', () => ({ authorizeInbox: mocks.authorize }));
 vi.mock('../src/server/data-control/guard', () => ({ withWorkspaceOperation: mocks.workspace }));
 vi.mock('../src/modules/inbox/server/comment-guard', () => ({ lockInboxChannel: mocks.lock, assertInboxDeletionsSettled: mocks.deletions }));
+vi.mock('../src/modules/settings/notifications/server', () => ({ enqueueNotification: mocks.notify, loadNotificationPolicy: async () => ({ maxRecipientsPerEvent: 200 }) }));
 
 import { listSavedReplies, performInboxProductivityAction, readInboxProductivity } from '../src/modules/inbox/server/productivity';
 
@@ -45,6 +46,7 @@ beforeEach(() => {
     return [];
   });
   mocks.prisma.$executeRaw.mockResolvedValue(1);
+  mocks.notify.mockResolvedValue({ id: 'nt_a', inserted: true });
   mocks.workspace.mockImplementation(async (_workspace: string, operation: () => Promise<unknown>) => operation());
   mocks.prisma.$transaction.mockImplementation(async (operation: (tx: typeof mocks.prisma) => Promise<unknown>) => operation(mocks.prisma));
 });
@@ -136,6 +138,14 @@ describe('Inbox productivity service', () => {
     expect(mocks.prisma.postComment.updateMany.mock.calls[0]?.[0].where.postTarget).toMatchObject({ targetId: 'channel-a', target: { workspaceId: 'workspace-a' }, post: { workspaceId: 'workspace-a' } });
     expect(mocks.prisma.$queryRaw.mock.calls.filter(call => /FOR SHARE OF m, u/.test(sqlText(call[0])))).toHaveLength(1);
     expect(mocks.prisma.$executeRaw).toHaveBeenCalledOnce();
+  });
+
+  it('notifies a newly assigned triage owner once, and stays silent on unassignment', async () => {
+    await performInboxProductivityAction(actor, { action: 'assign', kind: 'comment', id: 'comment-a', assigneeId: 'assignee-a', confirmation: 'ASSIGN INBOX comment comment-a TO assignee-a' });
+    expect(mocks.notify).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ workspaceId: 'workspace-a', userId: 'assignee-a', kind: 'triage_assigned', targetId: 'channel-a' }));
+    mocks.notify.mockClear();
+    await performInboxProductivityAction(actor, { action: 'assign', kind: 'message', id: 'conversation-a', assigneeId: null, confirmation: 'ASSIGN INBOX message conversation-a TO UNASSIGNED' });
+    expect(mocks.notify).not.toHaveBeenCalled();
   });
 
   it('rechecks the active actor membership in the mutation transaction before assignment', async () => {

@@ -1,9 +1,63 @@
 # Shared agent handoff
 
-Updated 2026-10-22 (Meta Llama AI provider; uncommitted working tree), schema **139**.
+Updated 2026-10-22 (engagement batch; uncommitted working tree), schema **140**.
 Full goal remains active. No browser, provider, database or production call by
 this lane. Historical records below retain their dates; current source
 reconciliation wins.
+
+## Engagement batch — 2026-10-22 (source/unit only, uncommitted)
+
+Revalidated the brief against the tree first: scheduled reports and
+inbox bulk actions already existed end to end (worker job, mail
+delivery, run history, bulk UI/REST/MCP), so this batch adds the
+missing pieces only and wires the notifications between them.
+
+- **Metric alerts** (`src/modules/analytics/alerts/`, owned by
+  Analytics): rules + firings tables, CRUD service on `authorizeReport`
+  (managers write), worker evaluation on stored neutral measures, new
+  `analyticsAlerts` job, Reports-page panel, `GET/POST
+  /api/analytics/alerts`, `list_metric_alerts`/`manage_metric_alert`
+  MCP tools. New Root keys `analytics.alerts.schedule`,
+  `analytics.alerts.policy`, `analytics.alertsCopy`; schema 139 → 140
+  (registry + both `config-validation` pins + new key assertions).
+- **Inbox triage views** (`src/modules/inbox/saved-views*.ts`,
+  `server/saved-views.ts`, UI `InboxSavedViews`): personal views in
+  the shared `saved_views` table (screen `inbox`), filter-row UI,
+  `/api/inbox/saved-views` (+`[id]` DELETE), three MCP tools. No
+  migration (free-text screen column, workspace FK discovery covers
+  export/erasure).
+- **Inbox full-text search** (`server/search.ts`): ranked
+  `plainto_tsquery('simple')` over stored messages/top-level comments,
+  `GET /api/inbox/search`, `search_inbox` MCP tool, GIN indexes in the
+  batch migration. No new UI (the list `q` filter is unchanged).
+- **Notifications** (`src/modules/settings/notifications/`): new kinds
+  `metric_alert`, `report_delivered`, `triage_assigned` (contracts,
+  event copy with per-entry defaults so old saved catalogs validate,
+  eligibility, preference keys/columns/UI toggles, family labels).
+  Emitters: alert evaluation (in-tx), scheduled-report completion
+  (best effort, receipt stands), assignment change (in-tx, new owner
+  only; bulk shares the service). Delivery pipeline unchanged.
+- **Migration** `20261103040000_engagement_alerts` (additive; sorts
+  after `..._autopilot_variants_linkcache`): 2 tables, 3
+  `notification_settings` columns, 2 FTS indexes, purge triggers.
+- **Docs:** `ARCHITECTURE.md` status note, `OPERATIONS.md` alert
+  runbook, `MCP_PARITY.md` tool/alias/coverage rows, `UX-CONTRACT.md`
+  behavior rules, `data-control/README.md` table rows, this entry.
+  Saved `settings.uiCopy` catalogs fall back to shipped defaults
+  until Root re-saves (new label keys; designed behavior).
+- **Tests:** new `metric-alerts`, `metric-alerts-evaluate`,
+  `metric-alerts-ui`, `engagement-batch-migration`, `inbox-saved-views`,
+  `inbox-search`, `notifications-engagement(-ui)` suites; extended
+  `inbox-productivity` (notification mock + triage test) and
+  `analytics-copy` (alerts catalog). Existing suites updated only
+  where the feature required it (notification mock in the assign
+  path, alerts catalog in the copy inventory).
+
+Evidence: `npm run typecheck` 0 errors; new suites pass; 156-file
+targeted run (inbox/report/analytics/smoke/copy/config/notification)
+green; `parity-guard`, `module-manifests`, MCP scope/exec/security
+suites pass. No full suite, no browser, no provider, no production
+verification. No commit/push/deploy (not authorized this lane).
 
 ## Meta Llama AI text provider — 2026-10-22 (source/unit only, uncommitted)
 
