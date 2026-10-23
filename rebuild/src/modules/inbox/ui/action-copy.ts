@@ -8,7 +8,7 @@ type SyncCounts = { targets: number; conversations: number; messages: number; co
 /** Buttons, status lines and dialogs of the Inbox write controls (sync, resolve, hide, delete). */
 export const actionCopy = {
   en: {
-    syncNow: 'Sync now', syncing: 'Syncing…', lastSynced: 'Last synced', notSynced: 'Not synced yet', staleNote: 'May be out of date',
+    syncNow: 'Sync now', syncing: 'Syncing…', lastSynced: 'Last synced', notSynced: 'Not synced yet', staleNote: 'May be out of date', partialNote: 'Partial sync — items may be missing',
     synced: (c: SyncCounts) => `Checked ${plural(c.targets, 'channel')}: ${plural(c.conversations, 'conversation')} (${plural(c.messages, 'message')}) and ${plural(c.comments, 'comment')} up to date.${c.reviews === null ? '' : ` ${plural(c.reviews, 'review')} up to date.`}${c.failed ? ` ${plural(c.failed, 'channel')} could not be read. Reconnect it in Connections, then sync again.` : ''}`,
     uncertain: 'The outcome is unconfirmed. Check the current Inbox and platform state before repeating this action.',
     readOnly: 'You can read this conversation but not change it.',
@@ -29,7 +29,7 @@ export const actionCopy = {
     statusError: 'Could not check deletion status. Keep this dialog open and check again.',
   },
   fr: {
-    syncNow: 'Synchroniser', syncing: 'Synchronisation…', lastSynced: 'Dernière synchronisation', notSynced: 'Pas encore synchronisé', staleNote: 'Peut ne pas être à jour',
+    syncNow: 'Synchroniser', syncing: 'Synchronisation…', lastSynced: 'Dernière synchronisation', notSynced: 'Pas encore synchronisé', staleNote: 'Peut ne pas être à jour', partialNote: 'Synchronisation partielle — des éléments peuvent manquer',
     synced: (c: SyncCounts) => `${pluralFr(c.targets, 'canal', 'canaux')} vérifié${c.targets > 1 ? 's' : ''} : ${pluralFr(c.conversations, 'conversation')} (${pluralFr(c.messages, 'message')}) et ${pluralFr(c.comments, 'commentaire')} à jour.${c.reviews === null ? '' : ` ${pluralFr(c.reviews, 'avis', 'avis')} à jour.`}${c.failed ? ` ${pluralFr(c.failed, 'canal', 'canaux')} n’${c.failed > 1 ? 'ont' : 'a'} pas pu être lu${c.failed > 1 ? 's' : ''}. Reconnectez-${c.failed > 1 ? 'les' : 'le'} dans Connexions, puis synchronisez à nouveau.` : ''}`,
     uncertain: 'Le résultat n’est pas confirmé. Vérifiez l’état actuel de la boîte de réception et de la plateforme avant de répéter cette action.',
     readOnly: 'Vous pouvez lire cette conversation, mais pas la modifier.',

@@ -10,7 +10,7 @@ vi.mock('../src/components', async () => ({ ...await import('../src/components/B
 
 import { InboxSyncBar } from '../src/modules/inbox/ui/InboxActions';
 import { inboxCustomerCopy, resolveInboxCatalog } from '../src/modules/inbox/customer-copy';
-import { inboxSyncStale } from '../src/modules/inbox/server/freshness';
+import { inboxSyncStale, syncIncompleteFromAudit } from '../src/modules/inbox/server/freshness';
 
 let root: ReturnType<typeof createRoot>;
 let container: HTMLDivElement;
@@ -79,5 +79,37 @@ describe('inbox sync bar freshness states', () => {
     const overridden = resolveInboxCatalog('actionCopy', { ...inboxCustomerCopy, 'actionCopy.staleNote': { en: 'Custom stale', fr: 'Custom périmé' } });
     expect(overridden.en.staleNote).toBe('Custom stale');
     expect(overridden.fr.staleNote).toBe('Custom périmé');
+  });
+
+  it('warns when the stored sync hit provider bounds, in French too', async () => {
+    await render(createElement(InboxSyncBar, { lastSynced: '12:00', stale: false, incomplete: true }));
+    expect(container.textContent).toContain('Partial sync');
+    expect(container.querySelector('.ui-badge--warning')).not.toBeNull();
+    await render(createElement(InboxSyncBar, { lastSynced: '12:00', stale: false, incomplete: true, locale: 'fr' }));
+    expect(container.textContent).toContain('Synchronisation partielle');
+  });
+
+  it('shows no partial note for a complete stored sync', async () => {
+    await render(createElement(InboxSyncBar, { lastSynced: '12:00', stale: false }));
+    expect(container.textContent).not.toContain('Partial sync');
+  });
+
+  it('warns when a sync just completed with incomplete channels', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, status: 200, json: async () => ({ ok: true, conversationCount: 1, messageCount: 2, commentCount: 0, targetCount: 1, failedCount: 0, incompleteCount: 1, syncedAt: '2026-10-23T12:00:00.000Z', syncedLabel: 'just now' }) })));
+    await render(createElement(InboxSyncBar, { lastSynced: null, stale: false }));
+    await act(async () => { container.querySelector('button')!.click(); await Promise.resolve(); });
+    await act(async () => { await new Promise(resolve => setTimeout(resolve, 0)); });
+    expect(container.textContent).toContain('Partial sync');
+  });
+});
+
+describe('sync incomplete audit overlap', () => {
+  it('flags scoped channels in the latest incomplete list', () => {
+    expect(syncIncompleteFromAudit({ targetIds: ['a'], incompleteTargetIds: ['a', 'b'] }, ['a'])).toBe(true);
+    expect(syncIncompleteFromAudit({ targetIds: ['a'], incompleteTargetIds: ['b'] }, ['a'])).toBe(false);
+    expect(syncIncompleteFromAudit({ targetIds: ['a'], incompleteTargetIds: [] }, ['a'])).toBe(false);
+    expect(syncIncompleteFromAudit(null, ['a'])).toBe(false);
+    expect(syncIncompleteFromAudit({ targetIds: ['a'] }, ['a'])).toBe(false);
+    expect(syncIncompleteFromAudit({ targetIds: ['a'], incompleteTargetIds: 'a' }, ['a'])).toBe(false);
   });
 });

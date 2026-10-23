@@ -70,7 +70,7 @@ export async function syncInbox(actor: InboxActor, targetId?: string) {
   const eligibleProviders = new Set(eligibleTargets.map(target => target.socialAccount?.provider).filter((provider): provider is string => Boolean(provider)));
   const providers = (await inboxPlatformIds()).filter(provider => eligibleProviders.has(provider));
   if (!providers.length) throw new OperationError('unavailable', await inboxServiceText('service5'));
-  const totals = { targetCount: 0, failedCount: 0, conversationCount: 0, messageCount: 0, commentCount: 0, syncedAt: new Date().toISOString() } as { targetCount: number; failedCount: number; conversationCount: number; messageCount: number; commentCount: number; reviewCount?: number; syncedAt: string };
+  const totals = { targetCount: 0, failedCount: 0, incompleteCount: 0, conversationCount: 0, messageCount: 0, commentCount: 0, syncedAt: new Date().toISOString() } as { targetCount: number; failedCount: number; incompleteCount: number; conversationCount: number; messageCount: number; commentCount: number; reviewCount?: number; syncedAt: string };
   const errors: unknown[] = [];
   for (const provider of providers) {
     try {
@@ -78,7 +78,7 @@ export async function syncInbox(actor: InboxActor, targetId?: string) {
       const result = await providerHost.sync(actor);
       // Reviews are optional: a failure reading them must not undo the conversations and comments just synced.
       if (providerHost.reviews) totals.reviewCount = (totals.reviewCount ?? 0) + await providerHost.reviews.sync(actor).then(reviewed => reviewed.reviewCount, () => 0);
-      totals.targetCount += result.targetCount; totals.failedCount += result.failedCount;
+      totals.targetCount += result.targetCount; totals.failedCount += result.failedCount; totals.incompleteCount += result.incompleteCount ?? 0;
       totals.conversationCount += result.conversationCount; totals.messageCount += result.messageCount; totals.commentCount += result.commentCount;
       totals.syncedAt = result.syncedAt;
     } catch (error) { errors.push(error); }

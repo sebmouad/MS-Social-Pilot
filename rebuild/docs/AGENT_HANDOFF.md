@@ -1570,3 +1570,22 @@ link (new EN+FR key) beside the origin excerpt. No registry/migration change.
 Evidence: `npm run typecheck` 0 errors; extended `tasks76-ui` +1 and
 `inbox-round3-ui` +1, both suites fully green (46 pass, 1 skip). No browser
 run; deploy pending --yolo relaunch.
+
+## 2026-10-23 UX gaps batch 4
+Unclear-state hunt: a sync that hit paging bounds recorded `incompleteTargetIds`
+in the audit but the inbox still claimed "Synced X ago" with no warning.
+Fixes: `syncIncompleteFromAudit` (pure, tested) reads the latest overlapping
+`inbox.synced` audit; `InboxListPage.syncIncomplete` carries it; the sync bar
+shows a `partialNote` warning badge (new EN+FR key) for stored partial data and
+for a just-completed sync reporting `incompleteCount` (now accumulated in the
+multi-provider totals and declared optional on the host interface). Also
+documented the staging boundary in `staging.ts`: reads, enabling token
+refreshes and worker AI classification intentionally keep running under dry-run
+(they dispatch nothing outward); only the outward dispatches stay silent.
+Recon verdicts: lastSynced MAX/null semantics sound; Telegram publish + team
+chat already dry-run gated; Facebook inbox uses full rescan + incomplete
+tracking (no cursor) by design.
+
+Evidence: `npm run typecheck` 0 errors; extended `inbox-sync-freshness` (+4)
+and `inbox-round3-ui` green (45 pass). No browser run; deploy pending
+--yolo relaunch.

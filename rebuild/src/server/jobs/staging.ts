@@ -9,7 +9,11 @@ import { runtimeConfig } from '@/server/config/store';
  * team-chat notifications and outbound webhook deliveries) skip the dispatch
  * and audit what they would have sent instead. Local scheduling, drafts,
  * reads, reconciliation, queueing and every user-initiated action are
- * unaffected, so a rehearsal exercises the full local pipeline without
+ * unaffected. Token refreshes that enable those reads, and worker AI
+ * classification (for example comment sentiment), also keep running: they
+ * dispatch nothing outward and are what makes the rehearsal realistic. Only
+ * the outward dispatches above stay silent, so a rehearsal exercises the full
+ * local pipeline without
  * touching providers or external receivers. Staging is silent outbound:
  * no provider write, no chat message and no webhook POST leaves the worker.
  */

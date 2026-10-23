@@ -164,7 +164,7 @@ export interface ConnectionViewer {
 export interface PlatformInboxHost {
   replyPolicy(input: InboxReplyPolicyRequest): Promise<ReplyRule>;
   canManage(actor: InboxActor, targetId: string): Promise<boolean>;
-  sync(actor: InboxActor, targetId?: string): Promise<{ targetCount: number; failedCount: number; conversationCount: number; messageCount: number; commentCount: number; syncedAt: string }>;
+  sync(actor: InboxActor, targetId?: string): Promise<{ targetCount: number; failedCount: number; conversationCount: number; messageCount: number; commentCount: number; syncedAt: string; /** Channels whose discovery hit paging bounds; absent means the host does not report it. */ incompleteCount?: number }>;
   reply(actor: InboxActor, input: { kind: 'message' | 'comment'; id: string; text: string }): Promise<{ ok: boolean }>;
   moderate(actor: InboxActor, input: { id: string; hidden: boolean }): Promise<{ ok: boolean }>;
   prepareDeleteComment(actor: InboxActor, input: { targetId: string; remoteId: string }): Promise<(signal: AbortSignal) => Promise<void>>;

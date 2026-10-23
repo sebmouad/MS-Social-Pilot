@@ -4,3 +4,11 @@ export function inboxSyncStale(lastSynced: Date | null, staleAfterMinutes: numbe
   if (!lastSynced || !Number.isFinite(staleAfterMinutes) || staleAfterMinutes <= 0) return false;
   return now.getTime() - lastSynced.getTime() > staleAfterMinutes * 60_000;
 }
+
+/** Whether the latest overlapping sync audit reports bounds-hit channels inside the current scope. Malformed audits never claim partial data. */
+export function syncIncompleteFromAudit(detail: unknown, channelIds: readonly string[]): boolean {
+  if (!detail || typeof detail !== 'object' || !channelIds.length) return false;
+  const incomplete = (detail as { incompleteTargetIds?: unknown }).incompleteTargetIds;
+  if (!Array.isArray(incomplete)) return false;
+  return incomplete.some(id => typeof id === 'string' && channelIds.includes(id));
+}

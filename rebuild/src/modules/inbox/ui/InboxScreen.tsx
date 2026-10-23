@@ -276,7 +276,7 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
   return <InboxCopyProvider catalog={catalog}><PageFrame module="inbox" scopedAccess><div className={styles.page}>
     <InboxHeader title={copy.title} count={listPage && filters.state === 'open' ? listPage.total : undefined} info={<InfoTip name={copy.title}>{copy.description}</InfoTip>} tabs={tabs} filters={filterRow}
       actions={<>
-        {visibleChannels.length > 0 ? <InboxSyncBar targetId={syncTarget} lastSynced={lastSynced ? formatInboxTime(lastSynced, timeZone, true, locale) : null} stale={inboxSyncStale(lastSynced, staleAfterMinutes)} timeZone={timeZone} locale={locale} /> : null}
+        {visibleChannels.length > 0 ? <InboxSyncBar targetId={syncTarget} lastSynced={lastSynced ? formatInboxTime(lastSynced, timeZone, true, locale) : null} stale={inboxSyncStale(lastSynced, staleAfterMinutes)} incomplete={listPage?.syncIncomplete ?? false} timeZone={timeZone} locale={locale} /> : null}
         {visibleChannels.length > 0 ? <SavedRepliesManager locale={locale} canWrite={canWriteReplies} /> : null}
         <InboxShortcuts locale={locale} />
       </>} />

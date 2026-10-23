@@ -65,11 +65,12 @@ export function inboxFreshnessState({ lastSynced, stale = false, syncedNow = nul
   return stale ? 'stale' : 'fresh';
 }
 
-/** "Last synced" plus Sync now, reporting what the sync found. A stale stored read says so instead of looking current. */
-export function InboxSyncBar({ targetId, lastSynced, stale = false, disabled = false, locale = 'en' }: { targetId?: string; lastSynced: string | null; stale?: boolean; timeZone?: string; disabled?: boolean; locale?: InboxLocale }) {
+/** "Last synced" plus Sync now, reporting what the sync found. A stale or partial stored read says so instead of looking current. */
+export function InboxSyncBar({ targetId, lastSynced, stale = false, incomplete = false, disabled = false, locale = 'en' }: { targetId?: string; lastSynced: string | null; stale?: boolean; incomplete?: boolean; timeZone?: string; disabled?: boolean; locale?: InboxLocale }) {
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
   const [syncedNow, setSyncedNow] = useState<string | null>(null);
+  const [partialNow, setPartialNow] = useState(false);
   const router = useRouter();
   const copy = useInboxCatalog('actionCopy')[locale];
 
@@ -87,6 +88,9 @@ export function InboxSyncBar({ targetId, lastSynced, stale = false, disabled = f
     // Present only when the channel's module reads reviews.
     const reviewCount = outcome.body.reviewCount;
     const reviews = typeof reviewCount === 'number' && Number.isSafeInteger(reviewCount) && reviewCount >= 0 ? reviewCount : null;
+    // Optional so older providers keep validating; a bounds-hit sync still warns.
+    const incompleteCount = outcome.body.incompleteCount;
+    setPartialNow(typeof incompleteCount === 'number' && Number.isSafeInteger(incompleteCount) && incompleteCount > 0);
     setResult({ kind: failedCount ? 'error' : 'ok', text: copy.synced({ targets: Number(targetCount), conversations: Number(conversationCount), messages: Number(messageCount), comments: Number(commentCount), reviews, failed: failedCount }) });
     if (typeof outcome.body.syncedLabel === 'string') setSyncedNow(outcome.body.syncedLabel);
     router.refresh();
@@ -95,10 +99,12 @@ export function InboxSyncBar({ targetId, lastSynced, stale = false, disabled = f
   const shown = syncedNow ?? lastSynced;
   const freshness = inboxFreshnessState({ lastSynced, stale, syncedNow });
   const showStale = freshness === 'stale';
+  const showPartial = partialNow || (incomplete && !syncedNow);
   return <div className={styles.sync}>
     <Button variant="secondary" disabled={disabled || busy} aria-busy={busy} onClick={() => void sync()}>{busy ? copy.syncing : copy.syncNow}</Button>
     {showStale ? <Badge tone="warning">{copy.staleNote}</Badge> : null}
-    <InfoTip name={copy.lastSynced}>{shown ? <>{copy.lastSynced} <strong>{shown}</strong>{showStale ? <> · {copy.staleNote}</> : null}</> : copy.notSynced}</InfoTip>
+    {showPartial ? <Badge tone="warning">{copy.partialNote}</Badge> : null}
+    <InfoTip name={copy.lastSynced}>{shown ? <>{copy.lastSynced} <strong>{shown}</strong>{showStale ? <> · {copy.staleNote}</> : null}{showPartial ? <> · {copy.partialNote}</> : null}</> : copy.notSynced}</InfoTip>
     <div role="status" aria-live="polite" className="ui-visually-hidden">{result?.kind === 'ok' ? <span>{result.text}</span> : null}</div>
     {result?.kind === 'error' ? <p role="alert" className={styles.error}>{result.text}</p> : null}
   </div>;

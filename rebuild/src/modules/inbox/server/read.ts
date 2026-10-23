@@ -1,4 +1,5 @@
 import { readInboxMetadata } from './metadata';
+import { syncIncompleteFromAudit } from './freshness';
 import { inboxServiceText } from './service-copy';
 import { z } from 'zod';
 import { Prisma } from '../../../../generated/client';
@@ -82,7 +83,7 @@ export async function readInboxList(actor: InboxReadActor, input: unknown = {}, 
   const cursor = readInboxCursor(parsed.data.cursor, fingerprint, limits.cursorMaxCharacters, cursorError);
   const filters = { channelId: channelId ?? null, kind, state, hidden, q };
   const base = { ...(quick.length ? { quick } : {}), filters, channels: access.channels, timeZone: access.timeZone, limits, limit: take, cursor: parsed.data.cursor ?? null };
-  if (!channelIds.length) return { ...base, items: [], total: 0, totals: { message: 0, comment: 0, review: 0 }, unread: { message: 0, comment: 0, review: 0 }, olderCursor: null, newerCursor: null, lastSynced: null };
+  if (!channelIds.length) return { ...base, items: [], total: 0, totals: { message: 0, comment: 0, review: 0 }, unread: { message: 0, comment: 0, review: 0 }, olderCursor: null, newerCursor: null, lastSynced: null, syncIncomplete: false };
   const status = (alias: 'c' | 'pc' | 'r') => state === 'all' ? Prisma.empty : state === 'open' ? Prisma.sql`AND ${Prisma.raw(alias)}."resolvedAt" IS NULL` : Prisma.sql`AND ${Prisma.raw(alias)}."resolvedAt" IS NOT NULL`;
   const pattern = literalSearch(q);
   const narrow = (branch: QuickBranch) => quickConditions(quick, mentionPrefix, branch);
@@ -122,15 +123,16 @@ export async function readInboxList(actor: InboxReadActor, input: unknown = {}, 
     SELECT COALESCE(SUM(c."unreadCount"), 0) AS total FROM conversations c JOIN targets t ON t.id = c."targetId"
     WHERE t."workspaceId" = ${actor.workspaceId} AND t.id IN (${Prisma.join(channelIds)}) ${status('c')} ${narrow('message')} ${messageSearch}`)
     .then(rows => Number(rows[0]?.total ?? 0));
-  const [{ rows, total }, lastSynced, totals, unreadMessage] = await Promise.all([
+  const [{ rows, total }, lastSynced, totals, unreadMessage, syncIncomplete] = await Promise.all([
     activityPage,
     inboxLastSynced(actor.workspaceId, channelIds),
     kindTotals,
     unreadMessages,
+    inboxSyncIncomplete(actor.workspaceId, channelIds),
   ]);
   const { keys, ...cursors } = pageKeys(rows, take, cursor, fingerprint, limits.cursorMaxCharacters, cursorError);
   const items = await hydrateItems(actor.workspaceId, keys, channelIds);
-  return { ...base, ...cursors, items, total, totals, unread: { message: unreadMessage, comment: 0, review: 0 }, lastSynced };
+  return { ...base, ...cursors, items, total, totals, unread: { message: unreadMessage, comment: 0, review: 0 }, lastSynced, syncIncomplete };
 }
 
 type ReviewRow = { id: string; targetId: string; reviewerName: string | null; rating: number | null; recommendationType: string | null; reviewText: string | null; createdTime: Date; resolvedAt: Date | null };
@@ -264,6 +266,13 @@ export async function readInboxThread(actor: InboxReadActor, input: unknown, con
   const pageOrder = [...keys].reverse().flatMap(key => { const item = byId.get(key.id); return item ? [item] : []; });
   const chronological = comment ? nestReplies(pageOrder, comment, entry) : pageOrder.map(item => entry(item));
   return { thread: { kind, id, remoteId: conversation?.remoteId ?? comment?.remoteId, metadata: threadMetadata.get(id), rating: null, recommendation: null, target: { id: target.id, name: target.name, providerId: target.providerId, provider: target.socialAccount?.provider ?? null }, resolved: Boolean(conversation?.resolvedAt ?? comment?.resolvedAt), hidden: comment?.isHidden ?? false, postText: comment?.postTarget.post.message ?? null, postId: comment?.postTarget.post.id ?? null, entries: [...(comment ? [entry(comment)] : []), ...chronological], lastInbound }, history: { ...cursors, total: Number(counts[0]?.count ?? 0), shown: chronological.length, limit: take, cursor: encoded ?? null } };
+}
+
+/** Whether the latest sync audit overlapping the scope reports bounds-hit channels inside it. No audit, or none overlapping, means no partial claim. */
+export async function inboxSyncIncomplete(workspaceId: string, channelIds: string[]): Promise<boolean> {
+  if (!channelIds.length) return false;
+  const rows = await prisma.$queryRaw<Array<{ detail: unknown }>>`SELECT detail FROM root_activities WHERE action = 'inbox.synced' AND detail->>'workspaceId' = ${workspaceId} AND EXISTS (SELECT 1 FROM jsonb_array_elements_text(CASE WHEN jsonb_typeof(detail->'targetIds') = 'array' THEN detail->'targetIds' ELSE '[]'::jsonb END) AS channel(id) WHERE channel.id = ANY(${channelIds}::text[])) ORDER BY "createdAt" DESC LIMIT 1`;
+  return syncIncompleteFromAudit(rows[0]?.detail, channelIds);
 }
 
 /** Refresh timestamps only: replies and local workflow actions do not claim provider synchronization. */
