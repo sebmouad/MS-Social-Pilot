@@ -27,7 +27,7 @@ export async function inboxListAbilities(actor: InboxReadActor, page: InboxListP
 }
 
 /** Server-rendered row slots keep time, provider presentation and action grants on the server. */
-export function inboxListRows(page: InboxListPage, abilities: Awaited<ReturnType<typeof inboxListAbilities>>, baseLocation: InboxLocation, selectedThread: string | undefined, locale: InboxLocale, catalog: InboxCustomerCopy, previewMaxCharacters: number, canOpenPosts = false): InboxRow[] {
+export function inboxListRows(page: InboxListPage, abilities: Awaited<ReturnType<typeof inboxListAbilities>>, baseLocation: InboxLocation, selectedThread: string | undefined, locale: InboxLocale, catalog: InboxCustomerCopy, previewMaxCharacters: number): InboxRow[] {
   const copy = resolveInboxCatalog('inboxCopy', catalog)[locale];
   const extra = resolveInboxCatalog('round3Copy', catalog)[locale];
   const reviews = resolveInboxCatalog('reviewCopy', catalog);
@@ -65,7 +65,7 @@ export function inboxListRows(page: InboxListPage, abilities: Awaited<ReturnType
         {item.hidden ? <InboxTag icon="hidden">{copy.hidden}</InboxTag> : null}
       </div>
       </div>
-    </a>{item.kind === 'comment' && item.postId && canOpenPosts ? <a className={hasSelection ? `${styles.postOpen} ${r3.postOpen}` : styles.postOpen} href={`/content/post/${encodeURIComponent(item.postId)}`}>{copy.openPost}</a> : null}</li>;
+    </a>{item.kind === 'comment' && item.postId ? <a className={hasSelection ? `${styles.postOpen} ${r3.postOpen}` : styles.postOpen} href={`/content/post/${encodeURIComponent(item.postId)}`}>{copy.openPost}</a> : null}</li>;
 
     return { key: item.key, content, selectable: selectable ?? null };
   });
