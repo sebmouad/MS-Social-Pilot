@@ -188,7 +188,7 @@ export function CalendarBoard({ view, days, timeZone, nowIso, canCreate, filterQ
     {rangeIsEmpty && <p className={styles.empty}>{view === "month" ? copy.monthEmpty : copy.weekEmpty} {canCreate ? copy.pickDay : copy.plannedAppear}</p>}
 
     {previewPost?.preview && <Dialog open title={copy.previewTitle} description={copy.previewDescription} onClose={() => setPreviewPost(null)}
-      actions={<Button variant="secondary" onClick={() => setPreviewPost(null)}>{copy.close}</Button>}>
+      actions={<><a className="ui-button ui-button--secondary" href={`/content/post/${encodeURIComponent(previewPost.id)}`}>{copy.openDetails}</a><Button variant="secondary" onClick={() => setPreviewPost(null)}>{copy.close}</Button></>}>
       <PostPreview post={previewPost.preview} authorName={previewPost.authorName ?? copy.approvalsMember} timeZone={timeZone} />
     </Dialog>}
     <MoveDialog move={move} timeZone={timeZone} nowMs={nowMs} guardrails={guardrails} onChange={setMove} onConfirm={() => void confirmMove()} />

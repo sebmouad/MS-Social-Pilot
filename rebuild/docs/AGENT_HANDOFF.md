@@ -1589,3 +1589,14 @@ tracking (no cursor) by design.
 Evidence: `npm run typecheck` 0 errors; extended `inbox-sync-freshness` (+4)
 and `inbox-round3-ui` green (45 pass). No browser run; deploy pending
 --yolo relaunch.
+
+## 2026-10-23 UX gaps batch 5
+Calendar event preview dialog showed the full post with only a Close action and
+no path to the post. Fix: the dialog actions gain an "Open details" link
+(existing EN+FR `openDetails` key) to `/content/post/[id]`. Hunt notes: media
+library tiles already open a detail panel; home, studio agents, analytics
+cards, approvals cards and the posts search are already linked; compare rows
+and creative rows are honestly dead (aggregates/remote picker data).
+
+Evidence: `npm run typecheck` 0 errors; extended `calendar-wave2-ui` +1, suite
+green (6 pass). No browser run; deploy pending --yolo relaunch.

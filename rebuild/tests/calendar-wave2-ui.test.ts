@@ -113,3 +113,18 @@ describe('calendar wave 2: list, lanes and guardrails', () => {
     expect(dialog.textContent).toContain('cap reached (2/2)');
   });
 });
+
+describe('calendar event preview', () => {
+  it('links the preview dialog to the post detail page', async () => {
+    const preview = { id: 'p9', authorId: 'user-1', message: 'Preview post', firstComment: null, link: null, media: [], status: 'scheduled', scheduledAt: new Date('2026-10-15T10:00:00Z'), publishedAt: null, createdAt: new Date('2026-10-14T10:00:00Z'), targets: [] };
+    const previewDays: BoardDay[] = [{ ...days[0], posts: [{ ...post('p9', 'Preview post', [studio]), preview }] }];
+    await act(async () => root.render(createElement(ContentProvider, { copy: resolveContentCopy(contentCopyDefaults as never, 'en'), policy: contentPolicyDefaults, locale: 'en' },
+      createElement(PublishingCopyProvider, { catalog: publishingCopyDefaults, locale: 'en', children: createElement(CalendarBoard, {
+        view: 'month', days: previewDays, timeZone: 'UTC', nowIso: '2026-10-14T09:00:00.000Z', canCreate: true, filterQuery: '', defaultScheduleTime: '09:00', guardrails,
+      }) }))));
+    const view = container.querySelector('button[aria-label="View post: Preview post"]') as HTMLButtonElement | null;
+    expect(view).not.toBeNull();
+    await act(async () => { view!.click(); });
+    expect(container.querySelector('a[href="/content/post/p9"]')).not.toBeNull();
+  });
+});
