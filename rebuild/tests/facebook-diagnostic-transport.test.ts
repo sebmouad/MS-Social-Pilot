@@ -1,12 +1,17 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-vi.mock('../src/server/config/store', async () => {
-  const { CONFIG_BY_KEY } = await import('../src/lib/config/registry');
-  return { runtimeSecret: async (key: string) => key === 'meta.appSecret' ? 'synthetic-app-secret' : null, runtimeConfig: async (key: string) => CONFIG_BY_KEY.get(key)!.defaultValue };
-});
+const state = vi.hoisted(() => ({ values: new Map<string, unknown>() }));
+vi.mock('../src/server/config/store', () => ({
+  runtimeSecret: async (key: string) => key === 'meta.appSecret' ? 'synthetic-app-secret' : null,
+  runtimeConfig: async (key: string) => state.values.get(key),
+  runtimeConfigBatch: async (keys: readonly string[]) => Object.fromEntries(keys.map(key => [key, state.values.get(key)])),
+}));
 import { configuredFacebookEngine } from '../src/platforms/facebook/runtime';
-afterEach(() => vi.unstubAllGlobals());
+import { CONFIG_BY_KEY } from '../src/lib/config/registry';
+const setup = () => { for (const [key, entry] of CONFIG_BY_KEY) state.values.set(key, entry.defaultValue); };
+afterEach(() => { state.values.clear(); vi.unstubAllGlobals(); });
 describe('Facebook diagnostic request cancellation', () => {
   it('propagates suite cancellation alongside the adapter request timeout without following redirects', async () => {
+    setup();
     const controller = new AbortController();
     let requestSignal!: AbortSignal;
     let options: RequestInit | undefined;
