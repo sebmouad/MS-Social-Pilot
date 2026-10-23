@@ -5,7 +5,7 @@ import { validateFacebookConfig } from './config';
 import { PlatformApiError } from '../errors';
 import { facebookAppSecretProof, graphObjectUrl, isFacebookDefiniteRejection, isFacebookRetryable } from './protocol';
 import { FACEBOOK_RATINGS_FIELDS, mapFacebookReview, ratingsReadVersion } from './reviews';
-import type { RemoteRescheduleRequest, AdCampaignCreateRequest,AdMutationRequest, AdObjectReadRequest, AdObjectSnapshot, FirstCommentRequest, InboxReview, OAuthExchangeRequest, OAuthStartRequest, PlatformAdapter, PublishRequest, PublishResult, PublishingMediaSupport, RemoteStatus } from '../types';
+import type { RemoteRescheduleRequest, AdCampaignCreateRequest,AdMutationRequest, AdObjectReadRequest, AdObjectSnapshot, FirstCommentRequest, InboxReview, OAuthExchangeRequest, OAuthStartRequest, PlatformAdapter, PublishRequest, PublishResult, PublishingFormatPreview, PublishingMediaSupport, RemoteStatus } from '../types';
 import type { FacebookMediaJournal, FacebookMediaJournalFactory } from './media-journal-port';
 
 export type FacebookFetch = typeof fetch;
@@ -781,13 +781,13 @@ export function createFacebookAdapter(config: FacebookConfig, fetchImpl: Faceboo
     localImageUpload: { maxBytes: config.maxImageUploadBytes, mimeTypes: config.allowedImageMimeTypes },
     publishingMedia: FACEBOOK_PUBLISHING_MEDIA,
     defaultPublishingFormatId: FACEBOOK_FEED_FORMAT_ID,
-    publishingFormats: [{ id: FACEBOOK_FEED_FORMAT_ID, label: policy?.feedFormatLabel ?? FACEBOOK_FEED_FORMAT_LABEL, media: FACEBOOK_PUBLISHING_MEDIA, firstComment: true, remoteStatus: true, remoteDelete: true, scheduling: { application: true, ...(policy?.feedSchedule ? { native: true, nativeLeadSeconds: { min: policy.feedSchedule.minLeadSeconds, max: policy.feedSchedule.maxLeadSeconds } } : { native: false }) } },
+    publishingFormats: [{ id: FACEBOOK_FEED_FORMAT_ID, label: policy?.feedFormatLabel ?? FACEBOOK_FEED_FORMAT_LABEL, media: FACEBOOK_PUBLISHING_MEDIA, firstComment: true, remoteStatus: true, remoteDelete: true, preview: { textFoldChars: 480 } satisfies PublishingFormatPreview, scheduling: { application: true, ...(policy?.feedSchedule ? { native: true, nativeLeadSeconds: { min: policy.feedSchedule.minLeadSeconds, max: policy.feedSchedule.maxLeadSeconds } } : { native: false }) } },
       ...(native ? [
-        { id: 'video', label: native.videoLabel, media: FACEBOOK_NATIVE_VIDEO_MEDIA, firstComment: true, remoteStatus: true, remoteDelete: true, scheduling: { application: true, native: true } },
-        { id: 'reel', label: native.reelLabel, media: FACEBOOK_NATIVE_VIDEO_MEDIA, firstComment: true, remoteStatus: true, remoteDelete: true, scheduling: { application: true, native: false } },
+        { id: 'video', label: native.videoLabel, media: FACEBOOK_NATIVE_VIDEO_MEDIA, firstComment: true, remoteStatus: true, remoteDelete: true, preview: { textFoldChars: 480, mediaAspect: 'landscape' } satisfies PublishingFormatPreview, scheduling: { application: true, native: true } },
+        { id: 'reel', label: native.reelLabel, media: FACEBOOK_NATIVE_VIDEO_MEDIA, firstComment: true, remoteStatus: true, remoteDelete: true, preview: { textFoldChars: 480, mediaAspect: 'story' } satisfies PublishingFormatPreview, scheduling: { application: true, native: false } },
         // Stories expose no comment or delete operation here; status comes from the Page's Stories edge.
-        { id: 'story_photo', label: native.storyPhotoLabel, media: FACEBOOK_STORY_PHOTO_MEDIA, firstComment: false, remoteStatus: true, remoteDelete: false, scheduling: { application: true, native: false } },
-        { id: 'story_video', label: native.storyVideoLabel, media: FACEBOOK_STORY_VIDEO_MEDIA, firstComment: false, remoteStatus: true, remoteDelete: false, scheduling: { application: true, native: false } },
+        { id: 'story_photo', label: native.storyPhotoLabel, media: FACEBOOK_STORY_PHOTO_MEDIA, firstComment: false, remoteStatus: true, remoteDelete: false, preview: { mediaAspect: 'story', caption: false } satisfies PublishingFormatPreview, scheduling: { application: true, native: false } },
+        { id: 'story_video', label: native.storyVideoLabel, media: FACEBOOK_STORY_VIDEO_MEDIA, firstComment: false, remoteStatus: true, remoteDelete: false, preview: { mediaAspect: 'story', caption: false } satisfies PublishingFormatPreview, scheduling: { application: true, native: false } },
       ] : [])],
     capabilities: { connection: 'supported', discovery: 'supported', publishing: 'supported', remoteStatus: 'supported', remoteDelete: 'supported', inbox: 'supported', analytics: 'supported', ads: 'supported' },
     canUseCredential,

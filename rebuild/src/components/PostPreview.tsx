@@ -31,9 +31,28 @@ export type PostPreviewPost = {
   }>;
 };
 
+/**
+ * Per-channel rendering resolved by the caller from the destination module's safe format metadata
+ * (fold length, media shape, caption and first-comment support). Absent means the neutral preview.
+ * Copy comes from the caller's own catalog, resolved to the preview locale.
+ */
+export type PostPreviewRendering = {
+  textFoldChars?: number | null;
+  mediaAspect?: 'landscape' | 'square' | 'portrait' | 'story' | null;
+  /** False when the channel shows no body text at all. Defaults to true. */
+  caption?: boolean;
+  /** 'unsupported' explains a drafted first comment cannot go to this format. Defaults to 'supported'. */
+  firstComment?: 'supported' | 'unsupported';
+  /** Show the empty first-comment slot as a hint (composer only). */
+  emptyFirstCommentSlot?: boolean;
+  copy: { seeMore: string; seeLess: string; noCaption: string; noFirstComment: string; emptyComment: string };
+};
+
 type Props = {
   post: PostPreviewPost;
   authorName: string;
+  /** Channel picture for per-channel rendering; safe https URLs only, initials otherwise. */
+  authorAvatarUrl?: string | null;
   timeZone: string;
   variant?: 'feed' | 'card' | 'compact';
   actions?: ReactNode;
@@ -41,6 +60,8 @@ type Props = {
   locale?: KitLocale;
   /** Trusted composer-only media rendering (for example, temporary File previews). */
   mediaOverride?: ReactNode;
+  /** Per-channel rendering; absent keeps the neutral preview. */
+  rendering?: PostPreviewRendering;
 };
 
 type MediaItem = { kind: string; url: string; altText?: string };
@@ -83,7 +104,7 @@ export function formatPostPreviewTime(date: Date, timeZone: string) {
   return new Intl.DateTimeFormat('en-US', { timeZone, dateStyle: 'medium', timeStyle: 'short' }).format(date);
 }
 
-export function PostPreview({ post, authorName, timeZone, variant = 'feed', actions, mediaOverride, locale = 'en' }: Props) {
+export function PostPreview({ post, authorName, authorAvatarUrl, timeZone, variant = 'feed', actions, mediaOverride, locale = 'en', rendering }: Props) {
   const media = mediaItems(post.media).flatMap(item => {
     const url = mediaUrl(item);
     return url ? [{ ...item, url }] : [];
@@ -93,12 +114,19 @@ export function PostPreview({ post, authorName, timeZone, variant = 'feed', acti
   const commentLabels = firstCommentLabels(t);
   const timeLabel = post.publishedAt ? t.previewPublished : post.scheduledAt ? t.previewScheduled : t.previewCreated;
   const safeLink = webUrl(post.link);
+  const authorPicture = webUrl(authorAvatarUrl);
   // The header chip already says Failed; the notice is for a failed destination the post-level status does not show.
   const hasFailure = post.status !== 'failed' && post.targets.some(item => item.status === 'failed');
+  // Per-channel rendering: the channel folds long text, shapes media and may hide the caption or refuse a first comment.
+  const foldAt = rendering && rendering.caption !== false ? rendering.textFoldChars ?? null : null;
+  const folded = foldAt && post.message.length > foldAt ? { head: post.message.slice(0, foldAt), tail: post.message.slice(foldAt) } : null;
+  const showCaption = !rendering || rendering.caption !== false;
+  const commentUnsupported = rendering?.firstComment === 'unsupported' && Boolean(post.firstComment?.trim());
+  const commentEmptySlot = rendering?.emptyFirstCommentSlot === true && rendering?.firstComment !== 'unsupported' && !post.firstComment?.trim();
 
   return <article className={styles.preview} data-variant={variant} aria-label={fillCopy(t.previewBy, { name: authorName })}>
     <header className={styles.header}>
-      <span className={styles.authorAvatar} aria-hidden="true">{initials(authorName)}</span>
+      {authorPicture ? <img className={styles.channelAvatar} src={authorPicture} alt="" loading="lazy" /> : <span className={styles.authorAvatar} aria-hidden="true">{initials(authorName)}</span>}
       <div className={styles.headerText}>
         <strong>{authorName}</strong>
         <time dateTime={time.toISOString()}>{timeLabel} {post.displayTime ?? formatPostPreviewTime(time, timeZone)}</time>
@@ -126,9 +154,10 @@ export function PostPreview({ post, authorName, timeZone, variant = 'feed', acti
 
     {hasFailure ? <p className={styles.deliveryNotice} role="status">{t.previewDeliveryNotice}</p> : null}
 
-    {post.message.trim() ? <div className={styles.message}>{post.message}</div> : null}
+    {showCaption ? (post.message.trim() ? <div className={styles.message}>{folded ? <>{folded.head}… <details className={styles.fold}><summary><span className={styles.foldMore}>{rendering!.copy.seeMore}</span><span className={styles.foldLess}>{rendering!.copy.seeLess}</span></summary>{folded.tail}</details></> : post.message}</div> : null)
+      : post.message.trim() ? <p className={styles.renderNote} role="note">{rendering!.copy.noCaption}</p> : null}
 
-    {mediaOverride !== undefined ? mediaOverride : media.length ? <div className={styles.media}>
+    {mediaOverride !== undefined ? mediaOverride : media.length ? <div className={styles.media} data-aspect={rendering?.mediaAspect ?? undefined}>
       {media.map((item, index) => item.kind === 'image'
         ? <PostImage key={`${item.url}-${index}`} src={item.url} href={item.url} alt={item.altText?.trim() || t.previewImage} locale={locale} linkClassName={styles.imageLink} />
         : item.kind === 'video'
@@ -140,7 +169,9 @@ export function PostPreview({ post, authorName, timeZone, variant = 'feed', acti
     </div> : null}
 
     {safeLink ? <p className={styles.sharedLink}><a href={safeLink} target="_blank" rel="noopener noreferrer">{t.previewOpenLink}</a></p> : null}
-    {post.firstComment?.trim() ? <section className={styles.firstComment} aria-label={t.previewFirstComment}><strong>{t.previewFirstComment}</strong><p>{post.firstComment}</p></section> : null}
+    {commentUnsupported ? <p className={styles.renderNote} role="note">{rendering!.copy.noFirstComment}</p> : null}
+    {post.firstComment?.trim() ? <section className={styles.firstComment} aria-label={t.previewFirstComment}><strong>{t.previewFirstComment}</strong><p>{post.firstComment}</p></section>
+      : commentEmptySlot ? <p className={styles.emptyCommentSlot} aria-hidden="true">{rendering!.copy.emptyComment}</p> : null}
     {actions ? <div className={styles.actions}>{actions}</div> : null}
   </article>;
 }

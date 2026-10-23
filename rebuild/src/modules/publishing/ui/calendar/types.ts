@@ -25,6 +25,14 @@ export type BoardPost = {
   movable: boolean;
 };
 
+/** Advisory autopilot guardrails for conflict warnings: quiet window, daily cap and scheduled sends per day. */
+export type CalendarGuardrails = {
+  quietStartHour: number;
+  quietEndHour: number;
+  maxSendsPerDay: number;
+  sendsByDay: Record<string, number>;
+};
+
 export type BoardDay = {
   key: string;
   /** Short heading such as "Tue 20". */

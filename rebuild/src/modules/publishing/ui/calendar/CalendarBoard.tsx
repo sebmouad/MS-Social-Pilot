@@ -15,8 +15,11 @@ import { useContent } from "../ContentProvider";
 import { postGroup } from "@/lib/post-groups";
 import { instantToWall, wallTimeToInstant } from "@/lib/calendar-dates";
 import { moveCandidates } from "@/lib/reschedule";
+import { isAutopilotQuietHourOfDay } from "@/modules/studio/agents/quiet-hours";
 import { reschedulePostAction } from "./actions";
-import type { BoardDay, BoardPost } from "./types";
+import type { BoardDay, BoardPost, CalendarGuardrails } from "./types";
+import { fillContent } from "../content-copy";
+import { IconAlertTriangle } from "@tabler/icons-react";
 import styles from "./calendar.module.css";
 
 type Move = { post: BoardPost; step: "choose" | "confirm"; date: string; time: string; busy: boolean; error: string };
@@ -25,7 +28,7 @@ type Notice = { kind: "ok" | "error"; text: string } | null;
 const hourLabel = (hour: number, locale: string = "en-US") => new Intl.DateTimeFormat(locale, { hour: "numeric", timeZone: "UTC" }).format(new Date(Date.UTC(2000, 0, 1, hour)));
 const pad = (n: number) => String(n).padStart(2, "0");
 
-export function CalendarBoard({ view, days, timeZone, nowIso, canCreate, filterQuery, defaultScheduleTime }: { view: "month" | "week"; days: BoardDay[]; timeZone: string; nowIso: string; canCreate: boolean; filterQuery: string; defaultScheduleTime: string }) {
+export function CalendarBoard({ view, days, timeZone, nowIso, canCreate, filterQuery, defaultScheduleTime, guardrails }: { view: "month" | "week" | "list"; days: BoardDay[]; timeZone: string; nowIso: string; canCreate: boolean; filterQuery: string; defaultScheduleTime: string; guardrails?: CalendarGuardrails }) {
   const copy = usePublishingCopy();
   const locale = usePublishingLocale();
   const { copy: content, policy } = useContent();
@@ -35,7 +38,10 @@ export function CalendarBoard({ view, days, timeZone, nowIso, canCreate, filterQ
   const [previewPost, setPreviewPost] = useState<BoardPost | null>(null);
   const [notice, setNotice] = useState<Notice>(null);
   const [over, setOver] = useState<string | null>(null);
+  const [weekLayout, setWeekLayout] = useState<"timeline" | "lanes">("timeline");
   const dragged = useRef<BoardPost | null>(null);
+  const quietHour = (hour: number) => guardrails ? isAutopilotQuietHourOfDay(guardrails, hour) : false;
+  const showQuiet = Boolean(guardrails && guardrails.quietStartHour !== guardrails.quietEndHour);
 
   const timeOf = (post: BoardPost) => post.clockLabel ?? new Intl.DateTimeFormat(locale === "fr" ? "fr-FR" : "en-US", { timeZone, hour: "numeric", minute: "2-digit" }).format(new Date(post.whenIso));
   const startMove = (post: BoardPost) => { const wall = post.wallTime ?? instantToWall(new Date(post.whenIso), timeZone); setNotice(null); setMove({ post, step: "choose", date: wall.date, time: wall.time, busy: false, error: "" }); };
@@ -76,6 +82,15 @@ export function CalendarBoard({ view, days, timeZone, nowIso, canCreate, filterQ
   const postHours = days.flatMap(day => day.posts.map(post => Number((post.wallTime ?? instantToWall(new Date(post.whenIso), timeZone)).time.slice(0, 2))));
   const firstHour = Math.min(6, ...postHours);
   const hours = Array.from({ length: 24 - firstHour }, (_, index) => firstHour + index);
+  // Swimlanes: one row per profile posting this week; a post to several profiles appears in each lane.
+  const laneIndex = new Map<string, { id: string; name: string; color?: string }>();
+  for (const day of days) for (const post of day.posts) {
+    if (!post.channels.length) laneIndex.set("", { id: "", name: content.calendarNoChannel });
+    for (const channel of post.channels) if (!laneIndex.has(channel.id)) laneIndex.set(channel.id, { id: channel.id, name: channel.name, color: channel.mark.color });
+  }
+  const lanes = [...laneIndex.values()].sort((a, b) => (a.id === "" ? 1 : b.id === "" ? -1 : a.name.localeCompare(b.name)));
+  const lanePosts = (laneId: string, day: BoardDay) => day.posts.filter(post => laneId === "" ? post.channels.length === 0 : post.channels.some(channel => channel.id === laneId));
+  const laneCount = (laneId: string) => days.reduce((total, day) => total + lanePosts(laneId, day).length, 0);
 
   async function confirmMove() {
     if (!move) return;
@@ -96,6 +111,7 @@ export function CalendarBoard({ view, days, timeZone, nowIso, canCreate, filterQ
     <p className={styles.legend} aria-label={copy.calendarLegend}>
       <span className={styles.legendItem} data-group="planned"><strong>{copy.groupPlanned}</strong> · {copy.groupPlannedHint}</span>
       <span className={styles.legendItem} data-group="outcome"><strong>{copy.groupOutcome}</strong> · {copy.groupOutcomeHint}</span>
+      {showQuiet && <span className={styles.legendQuiet}>{content.calendarQuietLegend}</span>}
     </p>
 
     {view === "month" ? <div className={styles.monthWrap}>
@@ -111,7 +127,35 @@ export function CalendarBoard({ view, days, timeZone, nowIso, canCreate, filterQ
           {canCreate && !day.isPast && <a className={styles.add} href={newPostHref(day.key, defaultScheduleTime)}>{copy.addPost}<span className="ui-visually-hidden">{copy.onDay}{day.longLabel}</span></a>}
         </li>;
       })}</ol>
-    </div> : <div className={styles.weekWrap}><div className={styles.week} style={{ gridTemplateColumns: "52px repeat(7, minmax(0, 1fr))" }}>
+    </div> : view === "list" ? <div className={styles.listWrap}>
+      {days.map(day => {
+        const dropKey = `l:${day.key}`;
+        return <section key={day.key} className={styles.listDay} aria-labelledby={`list-${day.key}`} data-today={day.isToday || undefined} data-past={day.isPast || undefined} data-over={over === dropKey || undefined} {...dropProps(dropKey, day.key, undefined, day.isPast)}>
+          <div className={styles.listDayHead}><h3 id={`list-${day.key}`}><time dateTime={day.key}>{day.longLabel}</time>{day.isToday && <span className={styles.todayTag}>{copy.today}</span>}</h3>{canCreate && !day.isPast && <a className={styles.agendaAdd} href={newPostHref(day.key, defaultScheduleTime)}>{copy.addPost}<span className="ui-visually-hidden">{copy.onDay}{day.longLabel}</span></a>}</div>
+          {milestoneList(day)}
+          {day.posts.length ? <ol className={styles.listPosts}>{day.posts.map(post => <li key={post.id}>{postCard(post)}</li>)}</ol> : <p className={styles.muted}>{copy.nothingPlanned}</p>}
+          {canCreate && !day.isPast && day.freeSlots?.map(time => freePill(day, time))}
+        </section>;
+      })}
+    </div> : <>
+      <div className={styles.layoutSwitch} role="group" aria-label={content.calendarLanesLabel}>
+        <button type="button" aria-pressed={weekLayout === "timeline"} onClick={() => setWeekLayout("timeline")}>{content.calendarWeekTimeline}</button>
+        <button type="button" aria-pressed={weekLayout === "lanes"} onClick={() => setWeekLayout("lanes")}>{content.calendarWeekLanes}</button>
+      </div>
+      {weekLayout === "lanes" ? <div className={styles.lanesWrap}><div className={styles.lanes} style={{ gridTemplateColumns: `200px repeat(${days.length}, minmax(160px, 1fr))` }}>
+        <span className={styles.laneCorner} aria-hidden="true" />
+        {days.map(day => <div key={day.key} className={styles.laneDayHead} data-today={day.isToday || undefined}><time dateTime={day.key} aria-label={day.longLabel + (day.isToday ? copy.todaySuffix : "")}>{day.label}</time>{day.isToday && <span className={styles.todayTag}>{copy.today}</span>}</div>)}
+        {lanes.map(lane => [
+          <div key={lane.id} className={styles.laneHead}><span className={styles.laneDot} style={lane.color ? { background: lane.color } : undefined} aria-hidden="true" /><span className={styles.laneName}>{lane.name}</span><span className={styles.muted}>{fillContent(content.calendarLanePosts, { count: laneCount(lane.id) })}</span></div>,
+          ...days.map(day => {
+            const dropKey = `n:${lane.id || "none"}:${day.key}`;
+            return <div key={dropKey} role="group" aria-label={`${lane.name}, ${day.longLabel}`} className={styles.laneCell} data-today={day.isToday || undefined} data-past={day.isPast || undefined} data-over={over === dropKey || undefined} {...dropProps(dropKey, day.key, undefined, day.isPast)}>
+              {lanePosts(lane.id, day).map(postCard)}
+              {canCreate && !day.isPast && <a className={styles.slotAdd} href={newPostHref(day.key, defaultScheduleTime)} aria-label={fillCopy(copy.newPostLabel, {day:`${lane.name}, ${day.longLabel}`,time:defaultScheduleTime})}><span aria-hidden="true">+</span></a>}
+            </div>;
+          }),
+        ])}
+      </div></div> : <div className={styles.weekWrap}><div className={styles.week} style={{ gridTemplateColumns: "52px repeat(7, minmax(0, 1fr))" }}>
       <span className={styles.corner} aria-hidden="true" />
       {days.map(day => <div key={day.key} className={styles.weekHead} data-today={day.isToday || undefined}><time dateTime={day.key} aria-label={day.longLabel + (day.isToday ? copy.todaySuffix : "")}>{day.label}</time>{day.isToday && <span className={styles.todayTag}>{copy.today}</span>}{milestoneList(day)}</div>)}
       {hours.map(hour => [
@@ -122,7 +166,7 @@ export function CalendarBoard({ view, days, timeZone, nowIso, canCreate, filterQ
           const slotInstant = wallTimeToInstant(day.key, time, timeZone);
           const slotEnded = day.slotEndedByHour?.[time] ?? (slotInstant.ok ? slotInstant.instant.getTime() + 3600_000 <= nowMs : day.isPast);
           const dropKey = `s:${day.key}:${hour}`;
-          return <div key={dropKey} role="group" aria-label={`${day.longLabel}, ${hourLabel(hour, locale)}`} className={styles.slot} data-past={slotEnded || undefined} data-over={over === dropKey || undefined} {...dropProps(dropKey, day.key, time, day.isPast || slotEnded)}>
+          return <div key={dropKey} role="group" aria-label={`${day.longLabel}, ${hourLabel(hour, locale)}`} className={styles.slot} data-past={slotEnded || undefined} data-quiet={(showQuiet && quietHour(hour) && !slotEnded) || undefined} data-over={over === dropKey || undefined} {...dropProps(dropKey, day.key, time, day.isPast || slotEnded)}>
             {slotPosts.map(postCard)}
             {canCreate && !slotEnded && day.freeSlots?.filter(free => Number(free.slice(0, 2)) === hour).map(free => freePill(day, free))}
             {canCreate && !slotEnded && <a className={styles.slotAdd} href={newPostHref(day.key, time)} aria-label={fillCopy(copy.newPostLabel, {day:day.longLabel,time:hourLabel(hour, locale)})}><span aria-hidden="true">+</span></a>}
@@ -130,29 +174,31 @@ export function CalendarBoard({ view, days, timeZone, nowIso, canCreate, filterQ
         }),
       ])}
     </div></div>}
+    </>}
 
-    <section className={styles.agenda} aria-label={copy.agenda}>
+    {view !== "list" && <section className={styles.agenda} aria-label={copy.agenda}>
       {days.filter(day => view === "week" || day.posts.length > 0 || day.milestones?.length).map(day => <div className={styles.agendaDay} key={day.key}>
         <div className={styles.agendaHead}><h3><time dateTime={day.key}>{day.longLabel}</time>{day.isToday && <span className={styles.todayTag}>{copy.today}</span>}</h3>{canCreate && !day.isPast && <a className={styles.agendaAdd} href={newPostHref(day.key, defaultScheduleTime)}>{copy.addPost}<span className="ui-visually-hidden">{copy.onDay}{day.longLabel}</span></a>}</div>
         {milestoneList(day)}
         {day.posts.length ? <div className={styles.agendaPosts}>{day.posts.map(postCard)}</div> : <p className={styles.muted}>{copy.nothingPlanned}</p>}
       </div>)}
       {rangeIsEmpty && view === "month" && <p className={styles.muted}>{copy.monthEmpty}</p>}
-    </section>
+    </section>}
 
-    {rangeIsEmpty && <p className={styles.empty}>{view === "week" ? copy.weekEmpty : copy.monthEmpty} {canCreate ? copy.pickDay : copy.plannedAppear}</p>}
+    {rangeIsEmpty && <p className={styles.empty}>{view === "month" ? copy.monthEmpty : copy.weekEmpty} {canCreate ? copy.pickDay : copy.plannedAppear}</p>}
 
     {previewPost?.preview && <Dialog open title={copy.previewTitle} description={copy.previewDescription} onClose={() => setPreviewPost(null)}
       actions={<Button variant="secondary" onClick={() => setPreviewPost(null)}>{copy.close}</Button>}>
       <PostPreview post={previewPost.preview} authorName={previewPost.authorName ?? copy.approvalsMember} timeZone={timeZone} />
     </Dialog>}
-    <MoveDialog move={move} timeZone={timeZone} nowMs={nowMs} onChange={setMove} onConfirm={() => void confirmMove()} />
+    <MoveDialog move={move} timeZone={timeZone} nowMs={nowMs} guardrails={guardrails} onChange={setMove} onConfirm={() => void confirmMove()} />
   </div>;
 }
 
-function MoveDialog({ move, timeZone, nowMs, onChange, onConfirm }: { move: Move | null; timeZone: string; nowMs: number; onChange: (next: Move | null) => void; onConfirm: () => void }) {
+function MoveDialog({ move, timeZone, nowMs, guardrails, onChange, onConfirm }: { move: Move | null; timeZone: string; nowMs: number; guardrails?: CalendarGuardrails; onChange: (next: Move | null) => void; onConfirm: () => void }) {
   const copy = usePublishingCopy();
   const locale = usePublishingLocale();
+  const { copy: content } = useContent();
   const validation = useFormValidation();
   if (!move) return null;
   const close = () => { if (!move.busy) onChange(null); };
@@ -161,6 +207,15 @@ function MoveDialog({ move, timeZone, nowMs, onChange, onConfirm }: { move: Move
   const current = fillCopy(copy.atTime, {date:currentWall.date,time:currentWall.time});
   const problem = !validShape ? copy.chooseDateTime : move.date === currentWall.date && move.time === currentWall.time ? copy.alreadyScheduled : "";
   const preview = validShape ? fillCopy(copy.atTime, {date:move.date,time:move.time}) : null;
+  // Advisory conflicts only: a slot in the autopilot quiet window or on a day that already reached
+  // the automatic-send cap warns but never blocks — the server stays the authority, and scheduled
+  // posts go out either way. The moved post itself does not count twice on its own day.
+  const targetHour = validShape ? Number(move.time.slice(0, 2)) : -1;
+  const quiet = validShape && guardrails && guardrails.quietStartHour !== guardrails.quietEndHour ? isAutopilotQuietHourOfDay(guardrails, targetHour) : false;
+  const staysOnDay = (move.post.status === "scheduled" || move.post.status === "publishing") && move.date === currentWall.date ? 1 : 0;
+  const daySends = Math.max(0, (guardrails?.sendsByDay[move.date] ?? 0) - staysOnDay);
+  const capped = validShape && guardrails ? daySends >= guardrails.maxSendsPerDay : false;
+  const hourLabelOf = (hour: number) => `${String(hour).padStart(2, "0")}:00`;
 
   if (move.step === "choose") {
     const options = move.post.moveOptions ?? moveCandidates(move.post.whenIso, timeZone, nowMs, { ...synchronousPolicy("shared.reschedulePolicy"), locale: locale === "fr" ? "fr-FR" : "en-US" });
@@ -186,6 +241,8 @@ function MoveDialog({ move, timeZone, nowMs, onChange, onConfirm }: { move: Move
     <p className={styles.dialogPost}>{move.post.text.slice(0, 160) || copy.calendarNoText}</p>
     <dl className={styles.times}><div><dt>{copy.now}</dt><dd>{current}</dd></div><div><dt>{copy.newTime}</dt><dd>{preview ?? copy.invalidTime}</dd></div></dl>
     <p className={styles.muted}>{fillCopy(copy.timesIn, {zone:timeZone.replaceAll("_", " ")})}</p>
+    {quiet && guardrails && <p className={styles.dialogWarning} role="status"><IconAlertTriangle size={15} aria-hidden="true" /><span>{fillContent(content.calendarQuietHours, { start: hourLabelOf(guardrails.quietStartHour), end: hourLabelOf(guardrails.quietEndHour) })}</span></p>}
+    {capped && guardrails && <p className={styles.dialogWarning} role="status"><IconAlertTriangle size={15} aria-hidden="true" /><span>{fillContent(content.calendarCapReached, { count: daySends, cap: guardrails.maxSendsPerDay })}</span></p>}
     {(problem || move.error) && <p className={styles.dialogError} role="alert">{move.error || problem}</p>}
   </Dialog>;
 }

@@ -16,8 +16,8 @@ import styles from './calendar.module.css';
 export function CalendarToolbar({ navigation, rangeLabel, view, viewHrefs, statuses, origins, chips, resetHref, counts }: {
   navigation: { previous: string; today: string; next: string; unit: 'week' | 'month' };
   rangeLabel: string;
-  view: 'month' | 'week';
-  viewHrefs: { month: string; week: string };
+  view: 'month' | 'week' | 'list';
+  viewHrefs: { month: string; week: string; list: string };
   statuses: Array<{ value: string; label: string }>;
   origins: Array<{ kind: string; label: string }>;
   chips: UrlFilterChip[];
@@ -50,6 +50,7 @@ export function CalendarToolbar({ navigation, rangeLabel, view, viewHrefs, statu
       <div className={styles.viewSwitch} role="group" aria-label={copy.view}>
         <a href={viewHrefs.month} aria-current={view === 'month' ? 'true' : undefined}>{copy.month}</a>
         <a href={viewHrefs.week} aria-current={view === 'week' ? 'true' : undefined}>{copy.week}</a>
+        <a href={viewHrefs.list} aria-current={view === 'list' ? 'true' : undefined}>{content.calendarViewList}</a>
       </div>
       <FilterButton activeCount={chips.length} onClear={() => router.push(resetHref)}>
         <div className={styles.filterBody}>

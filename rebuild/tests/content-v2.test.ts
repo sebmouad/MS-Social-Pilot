@@ -75,7 +75,7 @@ describe('free queue slots on the calendar', () => {
 describe('calendar toolbar', () => {
   const props = {
     navigation: { previous: '/content/calendar?view=week&date=2026-10-08&status=published', today: '/content/calendar?view=week&date=2026-10-14&status=published', next: '/content/calendar?view=week&date=2026-10-22&status=published', unit: 'week' as const },
-    rangeLabel: 'Oct 12 – 18, 2026', view: 'week' as const, viewHrefs: { month: '/content/calendar?view=month', week: '/content/calendar?view=week' },
+    rangeLabel: 'Oct 12 – 18, 2026', view: 'week' as const, viewHrefs: { month: '/content/calendar?view=month', week: '/content/calendar?view=week', list: '/content/calendar?view=list' },
     statuses: [{ value: 'failed', label: 'Failed' }], origins: [], chips: [], resetHref: '/content/calendar?view=week',
   };
   it('keeps navigation, the range, the view switch and one Filter button in the page', async () => {
@@ -222,7 +222,7 @@ describe('planned vs outcome status filters', () => {
   it('groups the Calendar statuses the same way and names the groups in French', async () => {
     const props = {
       navigation: { previous: '/p', today: '/t', next: '/n', unit: 'month' as const }, rangeLabel: 'October 2026', view: 'month' as const,
-      viewHrefs: { month: '/m', week: '/w' }, statuses: all, origins: [], chips: [], resetHref: '/content/calendar',
+      viewHrefs: { month: '/m', week: '/w', list: '/l' }, statuses: all, origins: [], chips: [], resetHref: '/content/calendar',
     };
     nav.path = '/content/calendar';
     await act(async () => root.render(withContent(createElement(CalendarToolbar, props), 'fr')));
@@ -237,7 +237,7 @@ describe('planned vs outcome status filters', () => {
 describe('planned vs published counts', () => {
   const toolbar = (counts?: { planned: number; published: number }) => ({
     navigation: { previous: '/p', today: '/t', next: '/n', unit: 'month' as const }, rangeLabel: 'October 2026', view: 'month' as const,
-    viewHrefs: { month: '/m', week: '/w' }, statuses: [{ value: 'failed', label: 'Failed' }], origins: [], chips: [], resetHref: '/content/calendar',
+    viewHrefs: { month: '/m', week: '/w', list: '/l' }, statuses: [{ value: 'failed', label: 'Failed' }], origins: [], chips: [], resetHref: '/content/calendar',
     ...(counts ? { counts } : {}),
   });
   it('says "X planned · Y published" on the calendar toolbar, never a bare total', async () => {

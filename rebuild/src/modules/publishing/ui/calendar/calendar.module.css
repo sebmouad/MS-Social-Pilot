@@ -127,3 +127,44 @@
 @media (forced-colors: active) { .post, .day, .slot { border-color: CanvasText; } }
 .milestones { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; }
 .milestones li { overflow: hidden; padding: 1px 6px; border-left: 3px solid var(--mod, var(--accent)); border-radius: 4px; background: var(--mod-soft, var(--accent-soft)); color: var(--ink); font-size: 11px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+/* UI wave 2: week layout switch, per-profile swimlanes, week list, quiet hours, move warnings. Tokens only. */
+.layoutSwitch { display: inline-flex; gap: 2px; justify-self: start; padding: 3px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface-muted); }
+.layoutSwitch button { min-height: 30px; padding: 0 12px; border: 0; border-radius: 6px; background: transparent; color: var(--ink-soft); font: inherit; font-size: var(--text-md); font-weight: 650; cursor: pointer; }
+.layoutSwitch button[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 0 0 1px var(--line-strong); }
+.layoutSwitch button:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+.lanesWrap { min-width: 0; overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface); }
+.lanes { display: grid; min-width: min(100%, 1060px); }
+.laneCorner { position: sticky; top: 0; left: 0; z-index: 2; background: var(--surface-raised); border-bottom: 1px solid var(--line); }
+.laneDayHead { position: sticky; top: 0; z-index: 1; display: flex; align-items: center; gap: 6px; padding: 10px 8px; border-bottom: 1px solid var(--line); border-left: 1px solid var(--line-subtle); background: var(--surface-raised); font-size: 12px; font-weight: 700; }
+.laneDayHead[data-today] { background: color-mix(in srgb, var(--mod, var(--accent)) 6%, var(--surface)); box-shadow: inset 0 3px 0 var(--mod, var(--accent)); }
+.laneHead { position: sticky; left: 0; z-index: 1; display: flex; align-items: center; gap: 8px; min-width: 0; padding: 10px 12px; border-top: 1px solid var(--line-subtle); background: var(--surface); }
+.laneDot { flex: 0 0 auto; width: 10px; height: 10px; border-radius: 50%; background: var(--line-strong); }
+.laneName { min-width: 0; overflow: hidden; color: var(--ink); font-size: 12.5px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+.laneHead .muted { margin-inline-start: auto; white-space: nowrap; }
+.laneCell { position: relative; display: flex; flex-direction: column; gap: 4px; min-width: 0; min-height: 76px; padding: 6px; border-top: 1px solid var(--line-subtle); border-left: 1px solid var(--line-subtle); }
+.laneCell[data-past] { background: var(--surface-raised); }
+.laneCell[data-today] { background: color-mix(in srgb, var(--mod, var(--accent)) 5%, var(--surface)); }
+.laneCell[data-over] { background: var(--accent-soft); outline: 2px dashed var(--accent); outline-offset: -2px; }
+.laneCell > .post { position: relative; z-index: 1; }
+.laneCell .slotAdd { position: absolute; inset: 0; display: grid; place-items: center; color: transparent; font-size: 16px; font-weight: 700; }
+.laneCell .slotAdd:hover, .laneCell .slotAdd:focus-visible { color: var(--accent); background: var(--accent-soft); }
+.listWrap { display: grid; gap: 12px; min-width: 0; }
+.listDay { display: grid; gap: 8px; min-width: 0; padding: 14px 16px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface); }
+.listDay[data-today] { border-color: var(--mod, var(--accent)); box-shadow: inset 3px 0 0 var(--mod, var(--accent)); }
+.listDay[data-past] { background: var(--surface-raised); }
+.listDay[data-over] { background: var(--accent-soft); outline: 2px dashed var(--accent); outline-offset: -2px; }
+.listDayHead { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.listDayHead h3 { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 14px; }
+.listPosts { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.listPosts .post, .listDay .freeSlot { font-size: 13px; }
+.listDay .freeSlot { justify-self: start; }
+.slot[data-quiet] { background: repeating-linear-gradient(45deg, transparent 0 7px, color-mix(in srgb, var(--ink) 5%, transparent) 7px 14px); /* taste-skill-ignore: quiet-hour hatch, the prescribed calendar booking mark, not a fill */ }
+.legendQuiet { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px 3px 4px; border-radius: 999px; background: var(--surface); }
+.legendQuiet::before { content: ""; width: 22px; height: 14px; border-radius: 4px; background: repeating-linear-gradient(45deg, transparent 0 4px, color-mix(in srgb, var(--ink) 12%, transparent) 4px 8px); border: 1px solid var(--line-strong); /* taste-skill-ignore: legend swatch of the quiet-hour hatch */ }
+.dialogWarning { display: flex; align-items: flex-start; gap: 8px; margin: 10px 0 0; padding: 10px 12px; border-radius: var(--radius-sm); background: var(--warning-soft); color: var(--warning); font-size: 13px; line-height: 1.45; }
+.dialogWarning svg { flex: 0 0 auto; margin-top: 2px; }
+@media (max-width: 720px) {
+  .listDay { padding: 12px; }
+  .laneHead { padding: 8px; }
+}
+@media (forced-colors: active) { .laneCell, .listDay { border-color: CanvasText; } }

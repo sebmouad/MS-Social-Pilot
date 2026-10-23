@@ -19,7 +19,7 @@ function Decide({ decision, variant, children }: { decision: 'approve' | 'reject
   return <Button type="submit" name="decision" value={decision} variant={variant} busy={pending} disabled={pending}>{children}</Button>;
 }
 
-function ReviewCard({ row, locale, timeZone, canReview, reviewAction }: { row: ApprovalRow; locale: KitLocale; timeZone: string; canReview: boolean; reviewAction: (data: FormData) => void | Promise<void> }) {
+export function ReviewCard({ row, locale, timeZone, canReview, reviewAction }: { row: ApprovalRow; locale: KitLocale; timeZone: string; canReview: boolean; reviewAction: (data: FormData) => void | Promise<void> }) {
   const copy = usePublishingCopy(locale);
   const { copy: content } = useContent();
   const [asking, setAsking] = useState(false);

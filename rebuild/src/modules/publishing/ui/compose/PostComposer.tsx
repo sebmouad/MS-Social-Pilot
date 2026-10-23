@@ -12,11 +12,11 @@ import { ActionBar, Button, Field, InfoTip, Popover, RadioCards, Select, SplitBu
 import { Dialog } from '@/components/Dialog';
 import { Avatar } from '@/modules/publishing/ui/kit/kit';
 import { catalogGroup, composerCatalogDefaults, composerText, fillComposerCopy, type ComposerCatalog } from '../../composer-catalog';
-import { PostPreview } from '@/components/PostPreview';
 import { useContent } from '../ContentProvider';
+import { ChannelPreviewTabs } from './ChannelPreviewTabs';
 import { fillContent } from '../content-copy';
 import { LibraryPicker } from './LibraryPicker';
-import { AuthoringMediaPreview, PostAttachments, usePostAttachments, type PostMediaItem } from '@/modules/publishing/components/PostAttachments';
+import { PostAttachments, usePostAttachments, type PostMediaItem } from '@/modules/publishing/components/PostAttachments';
 import { publishingMediaIssue, publishingMediaFormatter, type PublishingMediaIssueFormatter } from '@/modules/publishing/media-support';
 import { DestinationFormats, effectiveDestinationFormat } from '@/modules/publishing/components/DestinationFormats';
 import type { PublishingFormatDescriptor, PublishingMediaSupport } from '@/platforms/types';
@@ -403,8 +403,9 @@ function PostComposerContent({ copyCatalog = composerCatalogDefaults, profiles, 
   const hasContent = Boolean(message.trim() || link.trim() || attachments.items.length);
   const queueReady = Boolean(queuePreview && typeof queuePreview === 'object' && queuePreview.status === 'ready' && previewSelection === selectedKey);
   const dateLabel = (date: string, time: string) => new Intl.DateTimeFormat(aiLocale, { timeZone: 'UTC', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(new Date(`${date}T${time}:00Z`));
-  const previewTargets = previewChannelId && selected.some(target => target.id === previewChannelId) ? previewPost.targets.filter(row => row.target.id === previewChannelId) : previewPost.targets;
   const toggleTarget = (id: string) => setSelectedTargets(current => current.includes(id) ? current.filter(item => item !== id) : [...current, id]);
+  // A deselected channel cannot stay the preview tab.
+  useEffect(() => { if (previewChannelId && !selectedTargets.includes(previewChannelId)) setPreviewChannelId(''); }, [previewChannelId, selectedTargets]);
 
   /** Pick the intent, then submit through the form so validation, uploads and the server action are the same for every button. */
   function submitWith(next: 'draft' | 'schedule' | 'queue', when?: { date: string; time: string }, now = false) {
@@ -570,11 +571,7 @@ function PostComposerContent({ copyCatalog = composerCatalogDefaults, profiles, 
 
     <aside className={styles.preview} aria-labelledby={`${titleId}-preview`}>
       <div className={styles.sectionHead}><h2 id={`${titleId}-preview`}>{cc.createPreviewTitle}</h2><InfoTip name={cc.createPreviewTitle}>{cc.createPreviewInfo}</InfoTip><span className={styles.sectionMeta}>{saved ? ui.savedPreview : ui.unsavedPreview}</span></div>
-      {selected.length > 1 && <div className={styles.previewChannels} role="group" aria-label={cc.createPreviewTitle}>
-        <button type="button" aria-pressed={!previewChannelId} onClick={() => setPreviewChannelId('')}>{cc.createChannels}</button>
-        {selected.map(target => <button key={target.id} type="button" aria-pressed={previewChannelId === target.id} aria-label={fillContent(cc.createPreviewChannel, { name: channelName(target) })} title={channelName(target)} onClick={() => setPreviewChannelId(target.id)}><Avatar name={channelName(target)} src={target.pictureUrl} size={22} /></button>)}
-      </div>}
-      <PostPreview post={{ ...previewPost, targets: previewTargets }} authorName={authorName || ui.yourTeam} timeZone={schedule.timeZone} variant="card" mediaOverride={<AuthoringMediaPreview controller={attachments} />} />
+      <ChannelPreviewTabs channels={selected.map(target => ({ ...target, displayName: channelName(target) }))} formats={formatChoices} previewPost={previewPost} attachments={attachments} timeZone={schedule.timeZone} locale={aiLocale} authorFallback={authorName || ui.yourTeam} value={previewChannelId || 'all'} onChange={id => setPreviewChannelId(id === 'all' ? '' : id)} />
       {mode === 'schedule' && hasTime && <p className={styles.timeNote}><IconCalendarEvent size={15} aria-hidden="true" />{fillComposerCopy(ui.schedulePreview, { date: scheduleDate, time: scheduleTime, zone: schedule.timeZone.replaceAll('_', ' ') })}</p>}
       {mode === 'queue' && queueReady && typeof queuePreview === 'object' && queuePreview?.status === 'ready' && <p className={styles.timeNote}><IconCalendarEvent size={15} aria-hidden="true" />{fill(copy.next, { time: queuePreview.scheduledLabel })} <small>{copy.estimate}</small></p>}
     </aside>

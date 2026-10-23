@@ -27,6 +27,16 @@
 .previewList li { display: grid; gap: 5px; overflow: hidden; padding: 8px; border: 1px solid var(--line); border-radius: var(--radius-sm); color: var(--ink-soft); background: var(--surface); font-size: 11px; }
 .previewList img, .previewList video { display: block; width: 100%; max-height: 220px; aspect-ratio: 4 / 3; object-fit: contain; background: var(--surface-raised); }
 .previewList small { overflow-wrap: anywhere; color: var(--ink-soft); }
+/* Channel layout (UI wave 2): the same items as tiles in the destination's shape. Tokens only. */
+.channelTiles { display: grid; gap: 10px; min-width: 0; }
+.channelTile { overflow: hidden; border-radius: var(--radius-sm); background: var(--surface-raised); }
+.channelTiles:not([data-aspect]) .channelTile img, .channelTiles:not([data-aspect]) .channelTile video { display: block; width: 100%; max-height: 420px; object-fit: contain; }
+.channelTiles[data-aspect] .channelTile img, .channelTiles[data-aspect] .channelTile video { display: block; width: 100%; height: 100%; object-fit: cover; }
+.channelTiles[data-aspect="landscape"] .channelTile { aspect-ratio: 16 / 9; }
+.channelTiles[data-aspect="square"] .channelTile { aspect-ratio: 1 / 1; }
+.channelTiles[data-aspect="portrait"] .channelTile { aspect-ratio: 4 / 5; }
+.channelTiles[data-aspect="story"] { justify-items: center; }
+.channelTiles[data-aspect="story"] .channelTile { width: min(100%, 300px); aspect-ratio: 9 / 16; max-height: 480px; }
 @media (max-width: 540px) {
   .attachments { padding: 11px; }
   .addControls { display: grid; grid-template-columns: 1fr; }

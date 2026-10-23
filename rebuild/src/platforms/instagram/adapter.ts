@@ -24,7 +24,9 @@ export function createInstagramAdapter(input: InstagramPolicy, options: { fetch?
       maxVideos: id === 'image' ? 0 : id === 'video' || id === 'reel' || id === 'story' ? 1 : policy.carouselMax,
       mixedKinds: id === 'carousel' },
       // Stories carry no caption or public comments; their media_publish receipt is the delivery proof.
-      firstComment: id !== 'story', remoteStatus: id !== 'story', remoteDelete: false, scheduling: { application: true, native: false } })),
+      firstComment: id !== 'story', remoteStatus: id !== 'story', remoteDelete: false,
+      preview: id === 'story' ? { mediaAspect: 'story', caption: false } : id === 'reel' ? { textFoldChars: 125, mediaAspect: 'story' } : { textFoldChars: 125 },
+      scheduling: { application: true, native: false } })),
     supportsTargetKind: kind => kind === 'professional' || kind === 'instagram',
     canUseCredential: (credential, capability) => capability === 'remoteDelete' || policy.appSecretProofEnabled && !options.appSecret ? false : hasScopes(credential, capability === 'publishing' ? policy.publishScopes : capability === 'firstComment' ? policy.commentScopes : policy.readScopes),
     classifyPublishingFailure: error => error instanceof InstagramError ? error.outcome : 'uncertain',

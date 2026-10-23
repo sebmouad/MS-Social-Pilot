@@ -34,6 +34,24 @@
 .firstComment strong { color: var(--ink-soft); font-size: 12px; }
 .firstComment p { margin: 5px 0 0; color: var(--ink); font-size: 12px; line-height: 1.5; white-space: pre-wrap; }
 .actions { padding-top: 12px; border-top: 1px solid var(--line-subtle); }
+/* Per-channel rendering (UI wave 2): folded text, shaped media, honest format notes. Tokens only. */
+.fold { display: inline; }
+.fold > summary { display: inline; cursor: pointer; color: var(--accent); font-weight: 650; list-style: none; }
+.fold > summary::-webkit-details-marker { display: none; }
+.fold > summary:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: var(--radius-xs); }
+.fold .foldLess { display: none; }
+.fold[open] .foldMore { display: none; }
+.fold[open] .foldLess { display: inline; }
+.renderNote { margin: 0; padding: 8px 12px; border-radius: var(--radius-sm); background: var(--surface-raised); color: var(--ink-soft); font-size: 12px; line-height: 1.5; }
+.emptyCommentSlot { margin: 0; padding: 12px 14px; border: 1px dashed var(--line-strong); border-radius: 0 var(--radius-sm) var(--radius-sm) 0; color: var(--ink-faint); font-size: 12px; }
+.media[data-aspect] .imageLink, .media[data-aspect] .imageLink img, .media[data-aspect] .video { max-height: none; }
+.media[data-aspect="landscape"] .imageLink, .media[data-aspect="landscape"] .imageLink img, .media[data-aspect="landscape"] .video { aspect-ratio: 16 / 9; }
+.media[data-aspect="square"] .imageLink, .media[data-aspect="square"] .imageLink img, .media[data-aspect="square"] .video { aspect-ratio: 1 / 1; }
+.media[data-aspect="portrait"] .imageLink, .media[data-aspect="portrait"] .imageLink img, .media[data-aspect="portrait"] .video { aspect-ratio: 4 / 5; }
+.media[data-aspect="story"] .imageLink, .media[data-aspect="story"] .imageLink img, .media[data-aspect="story"] .video { aspect-ratio: 9 / 16; }
+.media[data-aspect] .imageLink img { object-fit: cover; }
+.media[data-aspect="story"] { justify-items: center; }
+.media[data-aspect="story"] .imageLink, .media[data-aspect="story"] .video { width: min(100%, 300px); max-height: 480px; }
 .feedList, .cardsGrid { display: grid; margin: 0; padding: 0; list-style: none; }
 .feedList { gap: 18px; max-width: 720px; margin: 0 auto; }
 .cardsGrid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr)); align-items: stretch; gap: 16px; }

@@ -1,9 +1,32 @@
 # MS Social Pilot architecture
 
-Updated 2026-10-23 (UI wave 1 visible-first shell) against the local working tree, configuration schema **142**.
+Updated 2026-10-23 (UI wave 2 composer + planning) against the local working tree, configuration schema **142**.
 [ARCHITECTURE_CONTRACT.md](ARCHITECTURE_CONTRACT.md) remains binding; §4 gained the owner-approved 2026-10-22 Ads-area decision.
 Current reconciliation below takes precedence over historical batch snapshots.
 Source, automated, browser, live-provider and production evidence remain distinct.
+
+## UI wave 2 — 2026-10-23 (source/unit only)
+
+Visible-first composer + planning on the wave-1 style (reused, not redealt):
+per-channel composer tabs rendering each destination module's safe format
+metadata (text fold, media shape, caption and first-comment support) through
+the extended shared `PostPreview`; calendar week list view, per-profile
+swimlanes and autopilot quiet-hour/cap conflict warnings (advisory, server
+stays authoritative); four-stage approval pipeline with per-card
+team-comments threads. Ownership kept: Publishing owns the screens and the
+`publishing.contentCopy`/`contentPolicy` additions (30 messages +
+`pipelinePerStage`, per-key read-path merge so saved catalogs survive them),
+Studio owns the quiet-hour helper and policy read, Facebook/Instagram own
+their preview values (YouTube/TikTok stay neutral), shared UI branches on no
+provider. No route, manifest, feature-id, registry-key or migration change;
+schema stays 142.
+
+Typecheck 0 errors; 6 new suites (24 tests) plus 23 neighbor files (282)
+and a 118-file area sweep (1155) pass; `lint.mjs --app` 0 FAIL on all 18
+touched sources. No browser, provider, database or production run:
+screenshots and `inspect.mjs` blocked (Docker blocked, no local Postgres,
+no Playwright browsers, no `DATABASE_URL`); BEFORE state is source at
+`4742eaff`. No commit/push/deploy (not authorized this lane).
 
 ## UI wave 1 — 2026-10-23 (source/unit only)
 

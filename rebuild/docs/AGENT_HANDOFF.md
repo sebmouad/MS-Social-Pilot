@@ -1,9 +1,49 @@
 # Shared agent handoff
 
-Updated 2026-10-23 (UI wave 1 visible-first shell; uncommitted working tree), schema **142**.
+Updated 2026-10-23 (UI wave 2 composer + planning; uncommitted working tree), schema **142**.
 Full goal remains active. No browser, provider, database or production call by
 this lane. Historical records below retain their dates; current source
 reconciliation wins.
+
+## UI wave 2 — 2026-10-23 (source/unit only, uncommitted)
+
+All work is in the working tree, no commit/push/deploy. `npm run typecheck`
+0 errors; 6 new suites (24 tests) pass plus 23 neighbor files (282) and a
+118-file area sweep (1155); `lint.mjs --app` 0 FAIL on all 18 touched
+sources (quiet-hour hatch carries `taste-skill-ignore` as functional
+calendar marks; clock padding and pre-existing shadows defended).
+
+- **Composer tabs** (`compose/ChannelPreviewTabs.tsx`, `PostComposer.tsx`,
+  `PostPreview.tsx` + CSS, `PostAttachments.tsx` tile layout): All channels
+  + one shared-`Tabs` tab per destination, rendering the module's safe
+  format metadata (fold, shape, caption, first-comment slot) with an
+  "approximate" line; deselecting returns to All. New neutral descriptor
+  `preview` hints (`platforms/types.ts`, validated in
+  `publishing/formats.ts`); Facebook (480-char feed fold, story shapes)
+  and Instagram (125-char fold, story/reel shapes) declare values,
+  YouTube/TikTok stay neutral.
+- **Calendar** (`CalendarScreen/Toolbar/Board.tsx` + CSS, `types.ts`,
+  `studio/agents/quiet-hours.ts`): additive `view=list` week list; week
+  Timeline | By channel swimlanes (sticky lane column, multi-channel posts
+  in each lane); quiet-hour hatch + legend and Move-dialog quiet/cap
+  warnings from the resolved autopilot policy (advisory only, failed
+  lookup hides warnings). `evaluateAutoSchedule` reuses the extracted
+  pure helper; no behavior change.
+- **Approvals pipeline** (`ApprovalsScreen.tsx` rewritten,
+  `ApprovalPipeline.tsx`, `PostPanel.tsx` `PostNotesThread` export,
+  `lifecycle.ts` `readPostApprovalStates`): Draft · In review · Approved
+  · Scheduled board over the same authorized reads, per-stage cap from
+  new `pipelinePerStage` policy (6), shared submit/review actions,
+  per-card comments threads. `page` no longer paginates (accepted,
+  ignored); header count stays the review total.
+- **Copy (EN+FR, owning catalogs):** 30 messages in
+  `publishing.contentCopy` + `pipelinePerStage` in `publishing.contentPolicy`;
+  new per-key read-path merge keeps saved operator edits across additions
+  (Root saves stay strict). No registry key, no migration, schema stays 142.
+- **Unresolved / next:** BEFORE/AFTER screenshots and `inspect.mjs`
+  blocked (Docker blocked, no local Postgres, no Playwright browsers, no
+  `DATABASE_URL`; BEFORE is source at `4742eaff`). Next: browser matrix
+  at 1440/768/390 light+dark, keyboard walkthrough, tabular-figure check.
 
 ## UI wave 1 — 2026-10-23 (source/unit only, uncommitted)
 

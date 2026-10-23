@@ -29,7 +29,8 @@ import { loadBoardMilestones } from "@/modules/calendar-extras/server/board";
 import { CalendarBoard } from "./CalendarBoard";
 import { loadPostOrigins, parseOriginFilter } from "../origins/load";
 import { runtimeConfig } from '@/server/config/store';
-import type { BoardDay, BoardPost } from "./types";
+import type { BoardDay, BoardPost, CalendarGuardrails } from "./types";
+import { getAutopilotPolicy } from "@/modules/studio/agents/server/autopilot";
 import styles from "./calendar.module.css";
 import { postContentSummary } from '@/modules/publishing/content-summary';
 import { isWaitingToReschedule } from '../../schedule-state';
@@ -55,7 +56,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
   const params = await searchParams;
   const now = new Date();
   const today = workspaceDateKey(now, timeZone);
-  const view = params.view === "week" ? "week" : "month";
+  const view = params.view === "week" ? "week" : params.view === "list" ? "list" : "month";
   const month = params.month && /^[1-9]\d{3}-(0[1-9]|1[0-2])$/.test(params.month) ? params.month : undefined;
   const anchor = isDateKey(params.date) ? params.date : month ? (month === today.slice(0, 7) ? today : `${month}-01`) : today;
 
@@ -72,8 +73,9 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
   const firstOfMonth = `${selected.key}-01`;
   const daysInMonth = new Date(Date.UTC(selected.year, selected.month, 0)).getUTCDate();
   const weekStartsOn = await loadWorkspaceOperations(viewer.workspaceId).then(value => value.weekStartsOn, () => 0);
-  const gridStart = view === "week" ? weekStartKey(anchor, weekStartsOn) : weekStartKey(firstOfMonth, weekStartsOn);
-  const count = view === "week" ? 7 : Math.ceil((weekOffsetOfKey(firstOfMonth, weekStartsOn) + daysInMonth) / 7) * 7;
+  const weekLike = view === "week" || view === "list";
+  const gridStart = weekLike ? weekStartKey(anchor, weekStartsOn) : weekStartKey(firstOfMonth, weekStartsOn);
+  const count = weekLike ? 7 : Math.ceil((weekOffsetOfKey(firstOfMonth, weekStartsOn) + daysInMonth) / 7) * 7;
   const keys = Array.from({ length: count }, (_, index) => addDaysToKey(gridStart, index));
 
   const from = new Date(utcNoon(keys[0]!).getTime() - 2 * DAY);
@@ -145,22 +147,34 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
     ...(status ? [{ key: "status", label: copy.status, value: statusLabel(status), removeHref: without("status") }] : []),
     ...(originKind ? [{ key: "origin", label: originCopy[locale].createdBy, value: originOptions.find(option => option.kind === originKind)?.label ?? originKind, removeHref: without("origin") }] : []),
   ];
-  const previous = view === "week" ? addDaysToKey(gridStart, -7) : `${adjacentCalendarMonth(selected.year, selected.month, -1)}-01`;
-  const next = view === "week" ? addDaysToKey(gridStart, 7) : `${adjacentCalendarMonth(selected.year, selected.month, 1)}-01`;
+  const previous = weekLike ? addDaysToKey(gridStart, -7) : `${adjacentCalendarMonth(selected.year, selected.month, -1)}-01`;
+  const next = weekLike ? addDaysToKey(gridStart, 7) : `${adjacentCalendarMonth(selected.year, selected.month, 1)}-01`;
   const rangeLabel = view === "month" ? formatUtc(firstOfMonth, { month: "long", year: "numeric" }) : (() => {
     const last = keys[6]!;
     const sameMonth = gridStart.slice(0, 7) === last.slice(0, 7);
     return sameMonth ? `${formatUtc(gridStart, { month: "short", day: "numeric" })} – ${Number(last.slice(8))}, ${last.slice(0, 4)}` : `${formatUtc(gridStart, { month: "short", day: "numeric" })} – ${formatUtc(last, { month: "short", day: "numeric", year: "numeric" })}`;
   })();
-  const unit = view === "week" ? "week" : "month";
+  const unit = weekLike ? "week" : "month";
+  // Advisory guardrails only: the resolved autopilot quiet window and daily cap plus the scheduled
+  // posts already on each visible day. A lookup failure hides the warnings rather than the calendar.
+  let guardrails: CalendarGuardrails | undefined;
+  try {
+    const policy = await getAutopilotPolicy(viewer.workspaceId);
+    const sendsByDay: Record<string, number> = {};
+    for (const [key, dayPosts] of byDay) {
+      const sends = dayPosts.filter(post => post.status === "scheduled" || post.status === "publishing").length;
+      if (sends) sendsByDay[key] = sends;
+    }
+    guardrails = { quietStartHour: policy.quietStartHour, quietEndHour: policy.quietEndHour, maxSendsPerDay: policy.maxSendsPerDay, sendsByDay };
+  } catch { guardrails = undefined; }
 
   return <ContentProvider {...content}><PublishingCopyProvider catalog={catalog} locale={locale}>
     <PageHeader module="publishing" title={copy.calendarTitle} info={<InfoTip name={copy.calendarTitle}>{content.copy.calendarInfo}</InfoTip>}
       actions={<><CalendarMore links={extraCalendars} />{canCreate ? <a className="ui-button ui-button--primary" href="/create">{copy.newPost}</a> : undefined}</>} />
     {channelUnavailable ? <p role="status">{copy.unavailableChannel}</p> : null}
     <CalendarToolbar navigation={{ previous: href(view, previous), today: href(view, today), next: href(view, next), unit }} rangeLabel={rangeLabel} view={view} counts={{ planned: posts.filter(post => postGroup(post.status) === 'planned').length, published: posts.filter(post => post.status === 'published').length }}
-      viewHrefs={{ month: href("month", anchor), week: href("week", anchor) }} statuses={STATUSES.map(value => ({ value, label: value === "pending_approval" || value === "partially_failed" ? copy[`calendarStatus_${value}`] : copy[`status_${value}`] }))}
+      viewHrefs={{ month: href("month", anchor), week: href("week", anchor), list: href("list", anchor) }} statuses={STATUSES.map(value => ({ value, label: value === "pending_approval" || value === "partially_failed" ? copy[`calendarStatus_${value}`] : copy[`status_${value}`] }))}
       origins={originOptions} chips={chips} resetHref={`/content/calendar?view=${view}&date=${anchor}${params.channel ? `&channel=${encodeURIComponent(params.channel)}` : ""}`} />
-    <CalendarBoard view={view} days={days} timeZone={timeZone} nowIso={now.toISOString()} canCreate={canCreate} filterQuery={filterQuery} defaultScheduleTime={defaultScheduleTime} />
+    <CalendarBoard view={view} days={days} timeZone={timeZone} nowIso={now.toISOString()} canCreate={canCreate} filterQuery={filterQuery} defaultScheduleTime={defaultScheduleTime} guardrails={guardrails} />
   </PublishingCopyProvider></ContentProvider>;
 }

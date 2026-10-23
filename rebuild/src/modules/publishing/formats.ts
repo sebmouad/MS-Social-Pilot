@@ -26,10 +26,32 @@ function validDescriptor(value: unknown): value is PublishingFormatDescriptor {
       !item.scheduling || typeof item.scheduling !== 'object' || Array.isArray(item.scheduling)) return false;
   const scheduling = item.scheduling as Record<string, unknown>;
   if (typeof scheduling.application !== 'boolean' || typeof scheduling.native !== 'boolean') return false;
-  if (scheduling.nativeLeadSeconds === undefined) return true;
-  const lead = scheduling.nativeLeadSeconds as Record<string, unknown> | null;
-  return Boolean(lead) && typeof lead === 'object' && Number.isSafeInteger(lead!.min) && Number.isSafeInteger(lead!.max) &&
-    Number(lead!.min) >= 0 && Number(lead!.max) > Number(lead!.min);
+  const lead = scheduling.nativeLeadSeconds as Record<string, unknown> | null | undefined;
+  if (lead !== undefined && !(lead && typeof lead === 'object' && Number.isSafeInteger(lead.min) && Number.isSafeInteger(lead.max) &&
+    Number(lead.min) >= 0 && Number(lead.max) > Number(lead.min))) return false;
+  return validPreview(item.preview);
+}
+
+/** Preview hints are display-only: malformed hints fail the descriptor so nothing half-declared renders. */
+function validPreview(value: unknown): boolean {
+  if (value === undefined || value === null) return true;
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const item = value as Record<string, unknown>;
+  if (item.textFoldChars !== undefined && item.textFoldChars !== null &&
+    (!Number.isSafeInteger(item.textFoldChars) || Number(item.textFoldChars) < 20)) return false;
+  if (item.mediaAspect !== undefined && item.mediaAspect !== null &&
+    !['landscape', 'square', 'portrait', 'story'].includes(item.mediaAspect as string)) return false;
+  return item.caption === undefined || typeof item.caption === 'boolean';
+}
+
+function cleanPreview(value: PublishingFormatDescriptor['preview']): PublishingFormatDescriptor['preview'] {
+  if (!value) return undefined;
+  const out: NonNullable<PublishingFormatDescriptor['preview']> = {
+    ...(value.textFoldChars ? { textFoldChars: value.textFoldChars } : {}),
+    ...(value.mediaAspect ? { mediaAspect: value.mediaAspect } : {}),
+    ...(value.caption === false ? { caption: false as const } : {}),
+  };
+  return Object.keys(out).length ? out : undefined;
 }
 
 /** Validate module metadata once at the host boundary; malformed declarations fail closed. */
@@ -37,7 +59,7 @@ export function validatePublishingFormatDescriptors(value: unknown): PublishingF
   if (!Array.isArray(value) || value.some(item => !validDescriptor(item))) throw invalidMetadata();
   const descriptors = value as PublishingFormatDescriptor[];
   if (new Set(descriptors.map(item => item.id)).size !== descriptors.length) throw invalidMetadata();
-  return descriptors.map(item => ({ id: item.id, label: item.label, firstComment: item.firstComment, remoteStatus: item.remoteStatus, remoteDelete: item.remoteDelete, media: { kinds: [...item.media.kinds], maxImages: item.media.maxImages, maxVideos: item.media.maxVideos, mixedKinds: item.media.mixedKinds, linkWithMedia: item.media.linkWithMedia, imageAltText: item.media.imageAltText }, scheduling: { application: item.scheduling.application, native: item.scheduling.native, ...(item.scheduling.nativeLeadSeconds ? { nativeLeadSeconds: { min: item.scheduling.nativeLeadSeconds.min, max: item.scheduling.nativeLeadSeconds.max } } : {}) } }));
+  return descriptors.map(item => ({ id: item.id, label: item.label, firstComment: item.firstComment, remoteStatus: item.remoteStatus, remoteDelete: item.remoteDelete, media: { kinds: [...item.media.kinds], maxImages: item.media.maxImages, maxVideos: item.media.maxVideos, mixedKinds: item.media.mixedKinds, linkWithMedia: item.media.linkWithMedia, imageAltText: item.media.imageAltText }, scheduling: { application: item.scheduling.application, native: item.scheduling.native, ...(item.scheduling.nativeLeadSeconds ? { nativeLeadSeconds: { min: item.scheduling.nativeLeadSeconds.min, max: item.scheduling.nativeLeadSeconds.max } } : {}) }, ...(cleanPreview(item.preview) ? { preview: cleanPreview(item.preview) } : {}) }));
 }
 
 /** Return validated authoring choices. Missing declarations mean no format choices are available. */

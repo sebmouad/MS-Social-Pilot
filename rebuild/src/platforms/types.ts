@@ -66,6 +66,19 @@ export interface PublishingMediaSupport {
   imageAltText: boolean;
 }
 
+/**
+ * Optional display hints for per-channel previews. Values are the owning module's approximation of how the
+ * channel renders a post; shared UI renders neutrally when a hint is absent. Never a delivery rule.
+ */
+export interface PublishingFormatPreview {
+  /** Body-text characters shown before the channel folds the rest behind "See more". Absent means full text. */
+  textFoldChars?: number | null;
+  /** Preferred media tile shape. Absent means the media's natural shape. */
+  mediaAspect?: 'landscape' | 'square' | 'portrait' | 'story' | null;
+  /** False when the channel shows no body text at all (stories). Defaults to true. */
+  caption?: boolean;
+}
+
 /** Customer-safe, provider-declared formats. Identifiers are opaque to product logic. */
 export interface PublishingFormatDescriptor {
   id: string;
@@ -79,6 +92,8 @@ export interface PublishingFormatDescriptor {
    * (min/max seconds from now); a format without them is not offered the provider-held choice by shared authoring.
    */
   scheduling: { application: boolean; native: boolean; nativeLeadSeconds?: { min: number; max: number } };
+  /** Optional per-channel preview hints; absent means the shared neutral preview. */
+  preview?: PublishingFormatPreview | null;
 }
 
 export interface DiscoveryRequest { credential: PlatformCredential }

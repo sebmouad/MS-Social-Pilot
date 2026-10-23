@@ -62,11 +62,11 @@
 /* Preview pane. */
 .preview { position: sticky; top: 0; align-self: start; display: grid; gap: var(--space-3); min-width: 0; max-height: 100%; overflow: auto; padding: var(--space-4); border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface-muted); }
 .preview article { max-width: none; }
-.previewChannels { display: flex; flex-wrap: wrap; gap: 6px; }
-.previewChannels button { display: inline-flex; align-items: center; justify-content: center; min-width: 36px; min-height: 36px; padding: 0 8px; border: 1px solid var(--line-strong); border-radius: var(--radius-full); background: var(--surface); color: var(--ink); font: inherit; font-size: var(--text-sm); font-weight: 600; cursor: pointer; }
-.previewChannels button[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); }
-.previewChannels button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .timeNote { display: flex; align-items: center; gap: 6px; margin: 0; padding: 8px 12px; border-radius: var(--radius-sm); background: var(--accent-soft); color: var(--accent-hover); font-size: var(--text-sm); font-weight: 600; }
+/* Channel preview tabs (UI wave 2): the shared underline tabs, one panel at a time. */
+.previewNote { margin: 0 0 var(--space-3); color: var(--ink-soft); font-size: var(--text-sm); line-height: 1.5; }
+.preview :global(.composer-channel-tabs) { display: grid; gap: var(--space-3); }
+.preview :global(.composer-channel-tabs .ui-tabs__panel) { padding: 0; border: 0; background: transparent; }
 
 /* Status text inside the action bar. */
 .alert, .ok { display: flex; align-items: flex-start; gap: 8px; margin: 0; padding: 6px 10px; border-radius: var(--radius-sm); font-size: var(--text-sm); line-height: 1.45; }

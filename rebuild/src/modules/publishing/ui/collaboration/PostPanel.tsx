@@ -80,7 +80,12 @@ function FieldsSection({ postId, canWrite, fields, valueMax }: { postId: string;
   </section>;
 }
 
-function NotesSection({ postId, canWrite, notes: initial, mentionable, noteMax, viewerId, canModerate, canAdd = true, timeZone }: { postId: string; canWrite: boolean; notes: Note[]; mentionable: Array<{ id: string; name: string }>; noteMax: number; viewerId: string; canModerate: boolean; canAdd?: boolean; timeZone: string }) {
+/** The team-notes thread on its own, for surfaces that attach comments to a post card (the approval pipeline). */
+export function PostNotesThread(props: { postId: string; canWrite: boolean; notes: Note[]; mentionable: Array<{ id: string; name: string }>; noteMax: number; viewerId: string; canModerate: boolean; canAdd?: boolean; timeZone: string; idPrefix?: string }) {
+  return <NotesSection {...props} />;
+}
+
+function NotesSection({ postId, canWrite, notes: initial, mentionable, noteMax, viewerId, canModerate, canAdd = true, timeZone, idPrefix = 'notes' }: { postId: string; canWrite: boolean; notes: Note[]; mentionable: Array<{ id: string; name: string }>; noteMax: number; viewerId: string; canModerate: boolean; canAdd?: boolean; timeZone: string; idPrefix?: string }) {
   const c = useCollaborationCopy();
   const [notes, setNotes] = useState(initial);
   const [body, setBody] = useState('');
@@ -111,7 +116,7 @@ function NotesSection({ postId, canWrite, notes: initial, mentionable, noteMax, 
     });
     if (ok) setRemoving(null);
   }
-  return <section className={styles.section} aria-labelledby="notes-title"><h2 id="notes-title">{c.team_notes}</h2>
+  return <section className={styles.section} aria-labelledby={`${idPrefix}-title`}><h2 id={`${idPrefix}-title`}>{c.team_notes}</h2>
     <p className={styles.help}>{c.notes_are_for_your_team_only_and_are_never_published}</p>
     {action.banner}
     {canWrite && canAdd && <form noValidate className={styles.form} onSubmit={event => void add(event)}>

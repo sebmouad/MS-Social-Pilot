@@ -4,6 +4,7 @@ import { prisma } from '@/server/data';
 import { runtimeConfig } from '@/server/config/store';
 import { OperationError, type OperationErrorCode } from '@/lib/operation-error';
 import { instantToWall, wallTimeToInstant } from '@/lib/calendar-dates';
+import { isAutopilotQuietHour } from '../quiet-hours';
 import { authorizeAi, type AiActor } from '@/modules/studio/server/access';
 import { autopilotPolicySchema, autopilotTierSchema, type AutopilotTier } from '../../config';
 import { agentCopy } from './copy';
@@ -91,10 +92,7 @@ export function evaluateAutoSchedule(input: {
   if (policy.draftsOnlyTargetIds.includes(input.targetId)) return { ok: false, reason: 'drafts_only' };
   if (input.targetCreatedAt && input.policy.newTargetGraceDays > 0 && input.now.getTime() - input.targetCreatedAt.getTime() < policy.newTargetGraceDays * 86_400_000) return { ok: false, reason: 'new_destination' };
   if (!input.targetEverPublished) return { ok: false, reason: 'uncertain_destination' };
-  const hour = Number(instantToWall(input.now, input.timeZone).time.slice(0, 2));
-  const { quietStartHour: start, quietEndHour: end } = policy;
-  const quiet = start === end ? false : start < end ? hour >= start && hour < end : hour >= start || hour < end;
-  if (quiet) return { ok: false, reason: 'quiet_hours' };
+  if (isAutopilotQuietHour(policy, input.timeZone, input.now)) return { ok: false, reason: 'quiet_hours' };
   if (input.sendsToday >= policy.maxSendsPerDay) return { ok: false, reason: 'daily_cap' };
   return { ok: true };
 }

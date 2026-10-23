@@ -192,6 +192,22 @@ function canManage(role: string, authorId: string, userId: string) {
   return MANAGERS.has(role) || authorId === userId;
 }
 
+export type PostApprovalState = { status: string; reviewNote: string | null; reviewedAt: Date | null; reviewedByName: string | null };
+
+/**
+ * Approval workflow state for the given workspace posts. The approval columns live outside the Prisma
+ * Post model, so this reads them with the same raw SQL the review writes use. Posts without a row
+ * are absent from the map; callers treat them as never submitted.
+ */
+export async function readPostApprovalStates(workspaceId: string, postIds: readonly string[]): Promise<Map<string, PostApprovalState>> {
+  if (!postIds.length) return new Map();
+  const rows = await prisma.$queryRaw<Array<{ id: string; approvalStatus: string; reviewNote: string | null; reviewedAt: Date | null; reviewedByName: string | null }>>`
+    SELECT p.id, p."approvalStatus"::text AS "approvalStatus", p."reviewNote", p."reviewedAt", u.name AS "reviewedByName"
+    FROM posts p LEFT JOIN users u ON u.id = p."reviewedById"
+    WHERE p."workspaceId" = ${workspaceId} AND p.id = ANY(${[...postIds]}::text[])`;
+  return new Map(rows.map(row => [row.id, { status: row.approvalStatus, reviewNote: row.reviewNote, reviewedAt: row.reviewedAt, reviewedByName: row.reviewedByName }]));
+}
+
 /** Submit an authored draft for review. */
 export async function submitPostForApproval(actor: PublishingActor, postId: string) {
   const errorText = await loadPublishingErrorText();

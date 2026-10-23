@@ -453,7 +453,7 @@ function MediaLinkDetector({ item, controller, disabled, committed }: { item: Po
   </div>;
 }
 
-export function AuthoringMediaPreview({ controller }: { controller: PostAttachmentsController }) {
+export function AuthoringMediaPreview({ controller, layout, aspect }: { controller: PostAttachmentsController; layout?: 'list' | 'tiles'; aspect?: 'landscape' | 'square' | 'portrait' | 'story' | null }) {
   const c = useAttachmentCopy();
   const [objectUrls, setObjectUrls] = useState<Record<string, string>>({});
   useEffect(() => {
@@ -462,11 +462,24 @@ export function AuthoringMediaPreview({ controller }: { controller: PostAttachme
     return () => Object.values(urls).forEach(url => URL.revokeObjectURL(url));
   }, [controller.items]);
   if (!controller.items.length) return null;
+  const sources = controller.items.map(item => {
+    const localId = item.url.startsWith('media:') ? item.url.slice('media:'.length) : '';
+    const signedPreview = item.previewUrl?.startsWith('/api/media/') ? item.previewUrl : undefined;
+    return item.file ? objectUrls[item.clientId] : localId ? (signedPreview ?? (MEDIA_ID.test(localId) ? `/api/media/${encodeURIComponent(localId)}` : '')) : safeRemoteUrl(item.url) ? item.url : '';
+  });
+  // Channel layout: the same items as tiles in the channel's shape, without the authoring numbers.
+  if (layout === 'tiles') return <div className={styles.channelTiles} data-aspect={aspect ?? undefined} role="group" aria-label={c.preview}>
+    {controller.items.map((item, index) => {
+      const src = sources[index];
+      return <div key={item.clientId} className={styles.channelTile}>
+        {item.kind === 'image' && src ? <img src={src} alt={item.altText?.trim() || c.selectedImage} /> : null}
+        {item.kind === 'video' && src ? <video controls preload="metadata" src={src} aria-label={fillComposerCopy(c.videoLabel, { n: index + 1 })} /> : null}
+      </div>;
+    })}
+  </div>;
   return <ol className={styles.previewList} aria-label={c.preview}>
     {controller.items.map((item, index) => {
-      const localId = item.url.startsWith('media:') ? item.url.slice('media:'.length) : '';
-      const signedPreview = item.previewUrl?.startsWith('/api/media/') ? item.previewUrl : undefined;
-      const src = item.file ? objectUrls[item.clientId] : localId ? (signedPreview ?? (MEDIA_ID.test(localId) ? `/api/media/${encodeURIComponent(localId)}` : '')) : safeRemoteUrl(item.url) ? item.url : '';
+      const src = sources[index];
       return <li key={item.clientId}>
         <span>{index + 1}. {item.kind === 'image' ? c.image : c.video}</span>
         {item.kind === 'image' && src ? <img src={src} alt={item.altText?.trim() || c.selectedImage} /> : null}

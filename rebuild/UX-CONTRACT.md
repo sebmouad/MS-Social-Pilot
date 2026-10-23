@@ -900,3 +900,46 @@ navigation only (`src/lib/hubs.ts`).
   rail shrinks hub badges to a dot with the count kept in the accessible
   name. All touched surfaces are token-driven in light and dark across the
   four themes.
+
+## UI wave 2 behaviors — 2026-10-23 (composer tabs, calendar, pipeline)
+
+Source/unit evidence only; no browser, provider or production run in this batch.
+Routes, manifests and feature ids are unchanged; old calendar `view=month|week`
+and approvals links keep loading (`view=list` is additive; the approvals `page`
+parameter no longer paginates but is still accepted).
+
+- The Create preview is All channels plus one tab per selected destination
+  (shared underline tabs with arrow-key movement). A channel tab shows that
+  channel's name, avatar, chosen format label and an "approximate" line, then
+  the destination module's safe rendering: body text folded at the
+  module-declared length behind an expandable See more, media tiles in the
+  declared shape, no caption line for story formats, and the first-comment
+  slot (the drafted comment, an empty-slot hint, or an honest note when the
+  format cannot carry one). Destinations without declared metadata render the
+  neutral preview with a one-line note. Deselecting a channel returns the
+  preview to All channels.
+- The calendar keeps Month and Week and gains List (the week's days with
+  their posts in time order, milestones, free-slot pills and working drop
+  targets). The week view keeps its timeline and gains a Timeline | By
+  channel switch: lanes are one sticky row per profile posting that week
+  (alphabetical, multi-channel posts in each lane, a No-channel lane only
+  when needed), each cell a drop target that keeps the post's time.
+  Autopilot quiet hours shade timeline slots with a diagonal hatch and a
+  legend entry; the Move dialog warns (never blocks) when the target slot
+  falls in quiet hours or the target day already reached the automatic-send
+  cap, excluding the moved post itself from its own day's count. A failed
+  guardrail lookup hides the warnings, never the calendar.
+- `/content/approvals` is a Draft · In review · Approved · Scheduled board
+  over the same authorized reads (approved = draft status + approved
+  workflow state), capped per stage by the `pipelinePerStage` content
+  policy (6) with scoped totals and View-all-in-Posts links that keep
+  the channel scope (review/scheduled exact; the draft/approved split is
+  exact when drafts fit the loaded page, larger backlogs continue in
+  Posts). The header count stays the posts waiting for review.
+  Review cards keep their approve/request-changes flow and keyboard
+  shortcuts; drafts offer the shared submit action where the viewer may
+  manage them (same service, same redirect); every card attaches its
+  team-comments thread with add/delete and an honest unavailable state.
+  Saved `publishing.contentCopy`/`publishing.contentPolicy` catalogs merge
+  over shipped entries per key on the read path, so operator edits survive
+  the new messages; Root saves stay strict.
