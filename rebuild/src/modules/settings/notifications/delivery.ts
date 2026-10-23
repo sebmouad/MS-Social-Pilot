@@ -3,6 +3,7 @@ import type { Prisma } from '../../../../generated/client';
 import { OperationError } from '@/lib/operation-error';
 import { prisma } from '@/server/data';
 import { runtimeConfig } from '@/server/config/store';
+import { isStagingDryRun, suppressStagingBatch } from '@/server/jobs/staging';
 import { withWorkspaceOperation } from '@/server/data-control/guard';
 import { publicMailOrigin, sendTransactionalMail } from '@/server/mail';
 import { PAGES } from '@/lib/product';
@@ -171,6 +172,13 @@ export async function deliverNotifications(now: Date = new Date(), workspaceId?:
   stats.uncertain += await uncertainExpired(now, workspaceId);
   const workspace = workspaceId ?? null;
   const ids = await prisma.$queryRaw<Array<{ id: string; workspaceId: string }>>`SELECT n.id, n."workspaceId" FROM rebuild_notifications n JOIN workspaces w ON w.id = n."workspaceId" WHERE n."emailState" = 'pending' AND n."nextAt" <= ${now} AND w."suspendedAt" IS NULL AND (${workspace}::text IS NULL OR n."workspaceId" = ${workspace}) ORDER BY n."nextAt", n."createdAt", n.id LIMIT ${policy.deliveryBatchSize}`;
+  // Dry-run rehearsals stay silent outbound: audit the batch and leave the rows pending for the next live pass.
+  if (ids.length && await isStagingDryRun()) {
+    await suppressStagingBatch('notifications', 'email_notification', ids);
+    stats.examined += ids.length;
+    stats.skipped += ids.length;
+    return stats;
+  }
   for (const item of ids) {
     stats.examined += 1;
     let claimed: Claim | null = null;

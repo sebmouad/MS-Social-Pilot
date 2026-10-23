@@ -146,9 +146,10 @@ fan-out added on page load, no migration, no registry key change.
   totals always detailed). Insufficient data stays disclosed, never
   hidden as zero or partial totals.
 - Staging dry-run outbound boundary: `jobs.stagingDryRun` now also
-  gates worker team-chat notifications (`notifications`) and outbound
-  webhook deliveries (`webhooks`), auditing each suppressed batch as
-  `worker.staging_dry_run` (`chat_notification`,
+  gates worker team-chat notifications (`notifications`), worker email
+  notifications (`notifications`) and outbound webhook deliveries
+  (`webhooks`), auditing each suppressed batch as
+  `worker.staging_dry_run` (`chat_notification`, `email_notification`,
   `outbound_webhook`). Queueing, purging, local scheduling, reads and
   user-initiated chat tests and webhook test/redeliver are unaffected.
   Staging is silent outbound. Contract: [OPERATIONS.md](OPERATIONS.md)
