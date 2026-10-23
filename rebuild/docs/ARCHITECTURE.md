@@ -1,9 +1,45 @@
 # MS Social Pilot architecture
 
-Updated 2026-10-23 (platform/moat batch) against the local working tree, configuration schema **141**.
+Updated 2026-10-23 (correctness sweep) against the local working tree, configuration schema **141**.
 [ARCHITECTURE_CONTRACT.md](ARCHITECTURE_CONTRACT.md) remains binding; §4 gained the owner-approved 2026-10-22 Ads-area decision.
 Current reconciliation below takes precedence over historical batch snapshots.
 Source, automated, browser, live-provider and production evidence remain distinct.
+
+## Correctness sweep — 2026-10-23 (source only)
+
+Three additive fixes; no route, tool or behavior removal, no provider
+fan-out added on page load, no migration, no registry key change.
+
+- Sentiment provider honesty (Studio-owned): `sentimentSettings` gates
+  on the configured `ai.provider` secret
+  (`aiProviderSecretKey`) instead of always `ai.apiKey`, and
+  provenance records `s.provider` instead of hardcoded `anthropic`.
+  `Settings` gains the additive `provider` field; sibling assist,
+  recap and alt-text behavior is unchanged for every provider.
+- Instagram rollups (Instagram-owned mapper, Analytics-owned tables
+  and worker): new `src/platforms/instagram/rollups.ts`
+  (`computeInstagramDailyRollups`, day-series flows sum, reach and
+  unversioned rows keep the latest as stocks, non-numerics skipped;
+  `hasUnrolledInstagramDayBreakdowns` forces detailed reads on any
+  non-numeric day row) wired into `instagramHost.analytics.rollups`,
+  with read preference in `instagramAnalyticsHost.load` (daily past
+  days, weekly long ranges with the new EN/FR
+  `instagram.policy` copy `rollupWeeksNote`, current day and range
+  totals always detailed). Insufficient data stays disclosed, never
+  hidden as zero or partial totals.
+- Staging dry-run outbound boundary: `jobs.stagingDryRun` now also
+  gates worker team-chat notifications (`notifications`) and outbound
+  webhook deliveries (`webhooks`), auditing each suppressed batch as
+  `worker.staging_dry_run` (`chat_notification`,
+  `outbound_webhook`). Queueing, purging, local scheduling, reads and
+  user-initiated chat tests and webhook test/redeliver are unaffected.
+  Staging is silent outbound. Contract: [OPERATIONS.md](OPERATIONS.md)
+  staging dry-run section.
+
+Typecheck 0 errors; new suites `ai-sentiment-provider` (9),
+`instagram-rollups` (5), `staging-dry-run-outbound` (3) pass, plus
+the touched sentiment/rollup/staging/chat/integrations/config suites.
+No browser, provider, database or production run.
 
 ## Platform/moat batch — 2026-10-23 (source only)
 

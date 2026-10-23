@@ -7,7 +7,7 @@ import { assertWorkspaceJobAccess } from '@/server/jobs/access';
 import { lockInboxChannel } from '@/modules/inbox/server/comment-guard';
 import { inboxTargetWhere } from '@/modules/inbox/server/providers';
 import { AI_CONFIG } from '../config';
-import { complete, settings, type AiDeps } from './ai';
+import { aiProviderSecretKey, complete, settings, type AiDeps } from './ai';
 import { recordUsage } from './usage';
 
 export const SENTIMENT_VERSION = 'comment-sentiment-v1';
@@ -18,8 +18,12 @@ export function parseSentiment(raw: string): 'negative' | 'neutral' | 'positive'
 }
 
 async function sentimentSettings(deps: AiDeps) {
-  try { return await runtimeSecret('ai.apiKey') ? await settings(deps) : null; }
-  catch { return null; }
+  try {
+    const configured = await runtimeConfigBatch(['ai.provider']);
+    const secretKey = aiProviderSecretKey(configured['ai.provider']);
+    if (!secretKey) return null;
+    return await runtimeSecret(secretKey) ? await settings(deps) : null;
+  } catch { return null; }
 }
 export async function sentimentAvailable(deps: AiDeps = {}) { return Boolean(await sentimentSettings(deps)); }
 
@@ -84,7 +88,7 @@ export async function classifyCommentSentiment(now = new Date(), deps: AiDeps = 
         await recordUsage(s.metering, { workspaceId: item.workspaceId }, 'sentiment', claim.message.length, raw.length, new Date());
         const sentiment = parseSentiment(raw);
         if (!sentiment || !await authorize()) return;
-        const provenance = JSON.stringify({ provider: 'anthropic', model: s.model, version: SENTIMENT_VERSION, classifiedAt: now.toISOString(), inputHash: createHash('sha256').update(claim.message).digest('hex') });
+        const provenance = JSON.stringify({ provider: s.provider, model: s.model, version: SENTIMENT_VERSION, classifiedAt: now.toISOString(), inputHash: createHash('sha256').update(claim.message).digest('hex') });
         const changed = await tx.$executeRaw`UPDATE post_comments c SET sentiment = ${sentiment}, "sentimentProvenance" = ${provenance}::jsonb
           FROM post_targets pt, posts p WHERE c.id = ${item.id} AND c.message = ${claim.message} AND c."sentimentProvenance" IS NULL
             AND c."sentimentAttemptedAt" = ${now} AND pt.id = c."postTargetId" AND pt."targetId" = ${item.targetId}

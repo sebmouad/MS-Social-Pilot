@@ -1,9 +1,48 @@
 # Shared agent handoff
 
-Updated 2026-10-23 (platform/moat batch; uncommitted working tree), schema **141**.
+Updated 2026-10-23 (correctness sweep; uncommitted working tree), schema **141**.
 Full goal remains active. No browser, provider, database or production call by
 this lane. Historical records below retain their dates; current source
 reconciliation wins.
+
+## Correctness sweep — 2026-10-23 (source/unit only, uncommitted)
+
+Three additive fixes, all in the working tree, no commit/push/deploy.
+`npm run typecheck` 0 errors; new suites `ai-sentiment-provider` (9),
+`instagram-rollups` (5), `staging-dry-run-outbound` (3) pass, plus
+`ai-sentiment` (10), `analytics-rollups` (12), `staging-dry-run` (7),
+`chat-channels-delivery` (11), `integrations-services` (48),
+`integrations-events` (13) and `config-validation` (12).
+
+- **Sentiment provider honesty** (`studio/server/ai.ts`,
+  `studio/server/sentiment.ts`): `aiProviderSecretKey` helper +
+  additive `Settings.provider`; sentiment gates on the configured
+  provider secret and records it in provenance. Sibling assist/recap/
+  alt-text unchanged. Existing `ai-sentiment` still passes (default
+  anthropic); new `ai-sentiment-provider` covers all four providers,
+  cross-provider key isolation and unknown ids.
+- **Instagram rollups** (`platforms/instagram/rollups.ts` new,
+  `analytics-host.ts`, `host.ts`, `config.ts` copy): day-series
+  mapper mirroring Facebook (flows sum, reach/unversioned latest,
+  non-numerics skipped; breakdown guard forces detailed reads),
+  wired to the shared worker with daily/weekly read preference and
+  EN/FR `rollupWeeksNote`. Range totals, audience and media stay
+  detailed. No migration, no registry key, schema stays 141.
+- **Staging outbound boundary** (`server/jobs/staging.ts`,
+  `chat-channels/server/delivery.ts`,
+  `integrations/server/webhooks.ts`, `shared-config.ts` description):
+  `jobs.stagingDryRun` now also suppresses worker chat notifications
+  and outbound webhook sends, auditing `chat_notification` and
+  `outbound_webhook` batches. Queueing, purging, local work and
+  user-initiated tests/redelivers unaffected. Docs: `OPERATIONS.md`
+  boundary, `ANALYTICS_ROLLUPS.md` Instagram wording,
+  `ARCHITECTURE.md` status, this entry. Existing
+  `chat-channels-delivery` mock updated for the workspaceId select
+  (feature-required).
+- **Unresolved / next:** live sentiment run per provider; Instagram
+  rollup production timing + a database rehearsal of the read
+  preference; staging dry-run rehearsal covering notifications and
+  webhooks jobs.
 
 ## Platform/moat batch — 2026-10-23 (source/unit only, uncommitted)
 

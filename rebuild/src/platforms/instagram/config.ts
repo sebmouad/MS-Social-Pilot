@@ -32,6 +32,7 @@ const copy = {
   processing: { en: 'Instagram could not prepare this media. Check the file before trying again.', fr: 'Instagram n’a pas pu préparer ce média. Vérifiez le fichier avant de réessayer.' },
   source: { en: 'Instagram performance', fr: 'Performances Instagram' },
   overlap: { en: 'Reach and lifetime snapshots are not additive. People may overlap across accounts.', fr: 'La portée et les instantanés cumulés ne s’additionnent pas. Les personnes peuvent figurer dans plusieurs comptes.' },
+  rollupWeeksNote: { en: 'Long ranges show weekly points from precomputed rollups; partial weeks at the edges keep daily points.', fr: 'Les longues périodes affichent des points hebdomadaires issus des cumuls précalculés ; les semaines partielles aux extrémités gardent des points quotidiens.' },
   image: { en: 'Photo', fr: 'Photo' }, video: { en: 'Video', fr: 'Vidéo' },
   carousel: { en: 'Carousel', fr: 'Carrousel' }, reel: { en: 'Reel', fr: 'Reel' },
   story: { en: 'Story', fr: 'Story' },

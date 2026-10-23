@@ -7,6 +7,7 @@ import { DELIVERY_QUERY_SCHEMA, ID_CONFIRM_SCHEMA, WEBHOOK_CREATE_SCHEMA, WEBHOO
 import { audit, authorize, exact, notFound, pageOffset, parse, protect, requireEnabled, runtime, transact, type Tx } from './core';
 import { emitRecentEvents } from './events';
 import { checkReceiver, defaultWebhookDeps, sendSigned, type WebhookDeps } from './webhook-transport';
+import { isStagingDryRun, suppressStagingBatch } from '@/server/jobs/staging';
 
 export { emitWebhook, emitRecentPostEvents, emitRecentEvents } from './events';
 const within = (condition: boolean) => { if (!condition) throw new OperationError('invalid_request', 'One or more fields exceed the current integrations limits.'); };
@@ -201,6 +202,14 @@ export async function deliverDueWebhooks(deps: WebhookDeps = defaultWebhookDeps(
   if (!rt.enabled.webhooks) return zero;
   await disableEndedKeyWebhooks();
   const scanned = await emitRecentEvents(now);
+  if (await isStagingDryRun()) {
+    const due = await prisma.$queryRaw<Array<{ id: string; workspaceId: string }>>`SELECT d2.id, d2."workspaceId" FROM webhook_deliveries d2 JOIN webhook_endpoints e ON e.id = d2."endpointId" JOIN workspaces w ON w.id = d2."workspaceId"
+      WHERE d2.status = 'pending' AND d2."nextAttemptAt" <= ${now} AND e.enabled AND w."suspendedAt" IS NULL ORDER BY d2."nextAttemptAt" ASC LIMIT ${rt.limits.webhookBatchSize}`;
+    if (due.length) await suppressStagingBatch('webhooks', 'outbound_webhook', due.map(row => ({ workspaceId: row.workspaceId, id: row.id })));
+    const cutoff = new Date(now.getTime() - rt.limits.webhookRetentionDays * 86_400_000);
+    const purged = Number(await prisma.$executeRaw`DELETE FROM webhook_deliveries WHERE id IN (SELECT id FROM webhook_deliveries WHERE status <> 'pending' AND "createdAt" < ${cutoff} ORDER BY "createdAt" ASC LIMIT ${rt.limits.webhookPurgeBatchSize})`);
+    return { ...zero, events: scanned.queued, purged };
+  }
   const lease = new Date(now.getTime() + rt.limits.webhookLeaseSeconds * 1000);
   const claimed = await prisma.$queryRaw<Array<{ id: string; endpointId: string; workspaceId: string; event: string; payload: unknown; attempts: number }>>`UPDATE webhook_deliveries d SET "nextAttemptAt" = ${lease}
     WHERE d.id IN (SELECT d2.id FROM webhook_deliveries d2 JOIN webhook_endpoints e ON e.id = d2."endpointId" JOIN workspaces w ON w.id = d2."workspaceId"

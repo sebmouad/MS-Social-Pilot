@@ -19,7 +19,7 @@ beforeEach(() => {
  mock.entitlement.mockResolvedValue({ workspaceId: 'tenant' }); mock.permission.mockResolvedValue({ pageScope: { all: true } }); mock.deliver.mockResolvedValue('accepted'); mock.eligible.mockResolvedValue(true);
  mock.query.mockImplementation(async strings => {
   const q = sql(strings);
-  if (q.includes("SELECT id FROM rebuild_chat_deliveries WHERE status = 'pending'")) return [{ id:'delivery' }];
+  if (q.includes('FROM rebuild_chat_deliveries WHERE status =') && q.includes("'pending'")) return [{ id: 'delivery', workspaceId: 'tenant' }];
   if (q.includes('WITH candidates')) return [{ id: 'delivery', channelId: 'chat', workspaceId: 'tenant', event: 'publishFailure', source: {eventId:'event',workspaceId:'tenant',kind:'publish_failure',postId:'post'} }];
   if (q.includes('SELECT c.id')) return [{ id: 'chat', kind: 'slack', secret: 'encrypted', events: ['publishFailure'], enabled: true }];
   if (q.includes('SELECT m."userId"')) return [{ userId: 'owner', locale: 'fr' }];

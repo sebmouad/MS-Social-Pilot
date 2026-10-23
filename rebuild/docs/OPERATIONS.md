@@ -205,24 +205,32 @@ grace days, guardrail channel limit); a workspace policy can only narrow them.
   through the normal publish path; cancel them in the queue. Never edit
   `autopilot_policies` by hand: tier changes are audited service writes.
 
-## Staging dry-run (platform/moat batch, 2026-10-23)
+## Staging dry-run (platform/moat batch, 2026-10-23; outbound boundary 2026-10-23)
 
 Root switch `jobs.stagingDryRun` (default off, `Sync schedules`). When on,
 worker publish (`posts` due posts), first-comment (`posts` due first
-comments) and automatic inbox moderation (`inbox`) dispatches are skipped
-and each suppressed batch is audited as `worker.staging_dry_run`
-(`actorId` NULL) with workspace, job, kind, count and a bounded id
-sample, instead of sent. Local scheduling, drafts, reads,
-reconciliation and every user-initiated action are unaffected, so a
-rehearsal exercises the full local pipeline without touching providers.
+comments), automatic inbox moderation (`inbox`), team-chat notifications
+(`notifications` chat deliveries) and outbound webhook deliveries
+(`webhooks` due sends) are skipped and each suppressed batch is audited
+as `worker.staging_dry_run` (`actorId` NULL) with workspace, job, kind,
+count and a bounded id sample, instead of sent. Local scheduling,
+drafts, reads, reconciliation, chat/webhook queueing and every
+user-initiated action (including chat tests and webhook test/redeliver)
+are unaffected, so a rehearsal exercises the full local pipeline
+without touching providers or external receivers. Staging is silent
+outbound: no provider write, no Telegram/Slack message and no webhook
+POST leaves the worker while the switch is on.
 
-- **Rehearse:** switch dry-run on, run the worker (or Run now on `posts`
-  and `inbox`), then inspect Root activity for `worker.staging_dry_run`
-  rows and the job summaries (`skipped=<n>` counts the suppressed
-  dispatches). Switch dry-run back off before leaving rehearsal.
-- **Incidents:** dry-run never changes post, comment or moderation state;
-  suppressed dispatches simply run on the next live tick. There is no
-  per-workspace dry-run: the switch covers the whole installation.
+- **Rehearse:** switch dry-run on, run the worker (or Run now on `posts`,
+  `inbox`, `notifications` and `webhooks`), then inspect Root activity
+  for `worker.staging_dry_run` rows and the job summaries
+  (`skipped=<n>` counts the suppressed publish/moderation dispatches;
+  chat/webhook runs return zero sends with the audit rows as proof).
+  Switch dry-run back off before leaving rehearsal.
+- **Incidents:** dry-run never changes post, comment, moderation, chat
+  or webhook delivery state; suppressed dispatches simply run on the
+  next live tick. There is no per-workspace dry-run: the switch covers
+  the whole installation.
 
 ## Meta webhooks runbook (platform/moat batch, 2026-10-23)
 

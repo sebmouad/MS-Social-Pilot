@@ -11,6 +11,7 @@ import { CHAT_CHANNELS_FEATURE } from '../manifest';
 import type { ChatEvent } from '../contracts';
 import { chatCopy, chatPolicy } from './policy';
 import { deliverChat, type ChatSecret } from './transport';
+import { isStagingDryRun, suppressStagingBatch } from '@/server/jobs/staging';
 
 type Tx = Prisma.TransactionClient;
 type Event = { eventId: string; workspaceId: string; event: ChatEvent; source?: Omit<NotificationEnqueueInput, 'userId'> };
@@ -43,9 +44,13 @@ export async function runChatDeliveries(now = new Date()) {
   const copy = await chatCopy();
   const rows = await prisma.$transaction(async tx => {
     await tx.$executeRaw`UPDATE rebuild_chat_deliveries SET status = 'uncertain', "finishedAt" = ${now} WHERE status = 'sending' AND "claimedAt" < ${new Date(now.getTime() - policy.deliveryLeaseSeconds * 1000)}`;
-    return tx.$queryRaw<Array<{ id: string }>>`SELECT id FROM rebuild_chat_deliveries WHERE status = 'pending' ORDER BY "createdAt", id LIMIT ${policy.deliveryBatchSize}`;
+    return tx.$queryRaw<Array<{ id: string; workspaceId: string }>>`SELECT id, "workspaceId" FROM rebuild_chat_deliveries WHERE status = 'pending' ORDER BY "createdAt", id LIMIT ${policy.deliveryBatchSize}`;
   });
   const result = { accepted: 0, rejected: 0, uncertain: 0, cancelled: 0 };
+  if (rows.length && await isStagingDryRun()) {
+    await suppressStagingBatch('notifications', 'chat_notification', rows.map(row => ({ workspaceId: row.workspaceId, id: row.id })));
+    return result;
+  }
   for (const pending of rows) {
     // Claim each item immediately before I/O; a large batch never ages later claims.
     const token = randomUUID();

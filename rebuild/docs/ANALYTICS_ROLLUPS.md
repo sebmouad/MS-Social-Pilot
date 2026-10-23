@@ -1,13 +1,13 @@
 # Analytics rollups
 
 Analytics-owned precomputation with per-platform stored-data mappers
-(Facebook today). The nightly `analyticsRollups` worker job folds stored
-Page insights into one value per channel, metric and day
-(`analytics_rollup_daily`), then folds those into Monday-to-Sunday weeks
-(`analytics_rollup_weekly`). Overview, explorer and comparison reads
-prefer the rollups when a fresh worker run covers the request and fall
-back to detailed stored reads otherwise. No provider request is made
-anywhere in this pipeline.
+(Facebook and Instagram). The nightly `analyticsRollups` worker job
+folds stored Page and Instagram account insights into one value per
+channel, metric and day (`analytics_rollup_daily`), then folds those
+into Monday-to-Sunday weeks (`analytics_rollup_weekly`). Overview,
+explorer and comparison reads prefer the rollups when a fresh worker
+run covers the request and fall back to detailed stored reads
+otherwise. No provider request is made anywhere in this pipeline.
 
 Status: source/unit evidence only (mocked compute, coverage, guard and
 mapper checks in `tests/analytics-rollups.test.ts`). No production
@@ -24,8 +24,13 @@ timing comparison is recorded here.
 - Weekly rows derive from daily rows, never from raw insights: flows sum
   the week, stocks keep the latest day. Weekly points date at the Monday
   week start.
-- Breakdowns (object/array-valued rows), non-day periods, audience, ads
-  and post cohorts are never rolled up; they always read in detail.
+- Breakdowns (object/array-valued rows, and for Instagram any
+  non-numeric day row), non-day periods, Instagram range totals
+  (`day:range`), audience, ads and post/media cohorts are never rolled
+  up; they always read in detail. Insufficient data stays disclosed:
+  rows without a numeric observation contribute nothing, and any
+  unrolled breakdown in the span forces the whole request back to
+  detailed reads rather than showing a partial total as complete.
 
 ## Worker coverage
 
@@ -52,9 +57,10 @@ request, and it processed every selected channel:
 
 1. Ranges longer than `weeklyThresholdDays` (default 120) try the weekly
    path first: full weeks as weekly points, partial edge weeks as daily
-   points so totals stay exact. A catalog note
-   (`meta.pageAnalyticsCopy.rollupWeeksNote`, EN/FR) discloses the weekly
-   points on every affected day-series metric.
+   points so totals stay exact. A catalog note discloses the weekly
+   points on every affected day-series metric
+   (`meta.pageAnalyticsCopy.rollupWeeksNote` for Facebook,
+   `instagram.policy` copy `rollupWeeksNote` for Instagram, both EN/FR).
 2. Otherwise the daily path covers complete past days; the current day
    always reads in detail, so intraday syncs stay visible.
 3. Anything uncovered (no fresh run, uncovered channel, missing tables

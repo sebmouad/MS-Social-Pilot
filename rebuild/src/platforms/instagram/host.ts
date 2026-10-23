@@ -4,12 +4,13 @@ import { syncInstagramAnalytics } from './jobs';
 import { instagramConnection } from './connection';
 import { instagramInboxHost } from './inbox-host';
 import { instagramAnalyticsHost } from './analytics-host';
+import { computeInstagramDailyRollups } from './rollups';
 
 /** Provider-owned assembly. Shared services select this host through neutral dispatch. */
 export const instagramHost = {
   adapter: configuredInstagramAdapter,
   connection: instagramConnection,
   inbox: instagramInboxHost,
-  analytics: instagramAnalyticsHost,
+  analytics: { ...instagramAnalyticsHost, rollups: { computeDaily: computeInstagramDailyRollups } },
   jobs: { analytics: syncInstagramAnalytics },
 } satisfies PlatformHost;

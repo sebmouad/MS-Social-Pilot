@@ -31,7 +31,14 @@ const PROVIDER_KEYS: Record<AiProviderId, { secret: string; model: string; endpo
   llama: { secret: 'ai.llamaApiKey', model: 'ai.llamaModel', endpoint: 'ai.llamaEndpoint', port: llamaPort },
 };
 
-export type Settings = { port: AiPort; model: string; timeoutMs: number; maxTokens: number; maxInput: number; hourly: number; maxHashtags: number; hashtagBodyMax: number; outputInputMultiplier: number; languageMax: number; txTimeout: number; txWait: number; metering: Metering };
+/** Root secret key for a configured provider id; null when the id is not a shipped provider. */
+export function aiProviderSecretKey(provider: unknown): string | null {
+  return typeof provider === 'string' && (AI_PROVIDERS as readonly string[]).includes(provider)
+    ? PROVIDER_KEYS[provider as AiProviderId].secret
+    : null;
+}
+
+export type Settings = { provider: AiProviderId; port: AiPort; model: string; timeoutMs: number; maxTokens: number; maxInput: number; hourly: number; maxHashtags: number; hashtagBodyMax: number; outputInputMultiplier: number; languageMax: number; txTimeout: number; txWait: number; metering: Metering };
 /** Resolve everything assist needs; null when anything is unconfigured, so customer surfaces stay hidden. */
 export async function settings(deps: AiDeps): Promise<Settings | null> {
   try {
@@ -55,7 +62,7 @@ export async function settings(deps: AiDeps): Promise<Settings | null> {
       if (!apiKey) return null;
       port = keys.port({ apiKey, endpoint });
     }
-    return { port, model, timeoutMs, maxTokens, maxInput, hourly, maxHashtags, hashtagBodyMax, outputInputMultiplier, languageMax, txTimeout, txWait, metering };
+    return { provider, port, model, timeoutMs, maxTokens, maxInput, hourly, maxHashtags, hashtagBodyMax, outputInputMultiplier, languageMax, txTimeout, txWait, metering };
   } catch { return null; }
 }
 

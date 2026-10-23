@@ -3,12 +3,15 @@ import { prisma } from '@/server/data';
 import { runtimeConfig } from '@/server/config/store';
 
 /**
- * Root-guarded rehearsal switch for worker provider writes. When
- * `jobs.stagingDryRun` is on, the worker paths that dispatch to providers
- * (due-post publishing, due first comments, automatic inbox moderation) skip
- * the dispatch and audit what they would have sent instead. Local scheduling,
- * drafts, reads, reconciliation and every user-initiated action are unaffected,
- * so a rehearsal exercises the full local pipeline without touching providers.
+ * Root-guarded rehearsal switch for worker outbound writes. When
+ * `jobs.stagingDryRun` is on, the worker paths that dispatch outward
+ * (due-post publishing, due first comments, automatic inbox moderation,
+ * team-chat notifications and outbound webhook deliveries) skip the dispatch
+ * and audit what they would have sent instead. Local scheduling, drafts,
+ * reads, reconciliation, queueing and every user-initiated action are
+ * unaffected, so a rehearsal exercises the full local pipeline without
+ * touching providers or external receivers. Staging is silent outbound:
+ * no provider write, no chat message and no webhook POST leaves the worker.
  */
 
 /** True when Root switched worker provider writes off. Unreadable config means live behavior, the default. */
@@ -20,7 +23,7 @@ export async function isStagingDryRun(): Promise<boolean> {
   }
 }
 
-export type StagingDryRunKind = 'publish' | 'first_comment' | 'inbox_moderation';
+export type StagingDryRunKind = 'publish' | 'first_comment' | 'inbox_moderation' | 'chat_notification' | 'outbound_webhook';
 
 /** Audit one suppressed worker dispatch batch. Worker rows carry actorId NULL like other worker audits. */
 export async function logStagingDryRunIntent(input: { workspaceId: string; job: string; kind: StagingDryRunKind; count: number; sampleIds: string[] }): Promise<void> {
