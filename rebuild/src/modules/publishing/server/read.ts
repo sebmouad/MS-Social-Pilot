@@ -1,7 +1,7 @@
 
 import { PublishingOperationError, defaultPublishingErrorText, type PublishingErrorText } from '@/modules/publishing/error-catalog';
 import { loadPublishingErrorText } from '@/modules/publishing/server/error-copy';
-import { PostStatus, type Prisma } from '../../../../generated/client';
+import { PostStatus, Prisma } from '../../../../generated/client';
 import { OperationError } from '@/lib/operation-error';
 import { PLANNED_STATUSES } from '@/lib/post-groups';
 import { prisma, listPostPage, listCalendarRange, getTargets } from '@/server/data';
@@ -10,6 +10,7 @@ import { platformModule } from '@/platforms';
 import { FIRST_COMMENT_REJECTED } from '../first-comment-state';
 import { authorizePublishing } from './access';
 import { publishingPostReadQuery } from './read-query';
+import { readChannelProfiles } from '@/modules/settings/channel-profiles/service';
 import { publishingPostVisibilityWhere, selectedPublishingTargetIds } from './read-scope';
 import type { PublishingActor, PublishingFeature } from './types';
 
@@ -46,6 +47,39 @@ export async function readPublishingPostPage(actor: PublishingActor, input: { pa
   const size = await runtimeConfig('publishing.postPageSize');
   const listing = await listPostPage(actor.workspaceId, integer(input.page, 1, undefined, errorText), size, query.scope.targetIds, query.scope.authorId, { where: query.where, order: input.order });
   return { ...listing, posts: await withPlatformNames(actor.workspaceId, listing.posts), channelUnavailable: query.channelUnavailable, filters: query.filters };
+}
+
+/**
+ * Exact draft/approved totals for the approvals board over the same authorized scope as the drafts
+ * page. `approvalStatus` is a raw-SQL-only posts column (absent from the Prisma schema), so the split
+ * cannot reuse `query.where` directly: the scope and channel filter are translated to SQL with the same
+ * rules as `publishingPostReadQuery` (some+every target visibility, group expansion, `a,b` splits).
+ */
+export async function readDraftApprovalSplit(actor: PublishingActor, channelId?: string): Promise<{ drafts: number; approved: number }> {
+  const query = await publishingPostReadQuery(actor, { status: 'draft', ...(channelId === undefined ? {} : { channelId }) }, 'publishing/approvals');
+  const scope = query.scope;
+  let filterIds = channelId ? [channelId] : undefined;
+  if (channelId?.startsWith('channel-group:')) {
+    const profiles = await readChannelProfiles({ userId: actor.userId, workspaceId: actor.workspaceId, allowedChannelIds: scope.targetIds }, 'publishing/posts');
+    filterIds = profiles.groups.find(group => group.id === channelId.slice('channel-group:'.length))?.channelIds ?? [];
+  }
+  if (channelId && !channelId.startsWith('channel-group:') && channelId.includes(',')) filterIds = [...new Set(channelId.split(',').map(id => id.trim()).filter(Boolean))];
+  const rows = await prisma.$queryRaw<Array<{ drafts: string; approved: string }>>(Prisma.sql`
+    SELECT COUNT(*) FILTER (WHERE p."approvalStatus" IS DISTINCT FROM 'approved')::text AS drafts,
+           COUNT(*) FILTER (WHERE p."approvalStatus" = 'approved')::text AS approved
+    FROM posts p
+    WHERE p."workspaceId" = ${actor.workspaceId} AND p.status = 'draft'
+      AND ((EXISTS (SELECT 1 FROM post_targets pt WHERE pt."postId" = p.id AND pt."targetId" = ANY(${scope.targetIds}::text[]))
+            AND NOT EXISTS (SELECT 1 FROM post_targets pt WHERE pt."postId" = p.id AND NOT (pt."targetId" = ANY(${scope.targetIds}::text[]))))
+           OR (NOT EXISTS (SELECT 1 FROM post_targets pt WHERE pt."postId" = p.id) ${scope.authorId === undefined ? Prisma.empty : Prisma.sql`AND p."authorId" = ${scope.authorId}`}))
+      ${filterIds === undefined ? Prisma.empty : Prisma.sql`AND EXISTS (SELECT 1 FROM post_targets pt WHERE pt."postId" = p.id AND pt."targetId" = ANY(${filterIds}::text[]))`}`);
+  const row = rows[0];
+  const drafts = row ? Number(row.drafts) : NaN;
+  const approved = row ? Number(row.approved) : NaN;
+  return {
+    drafts: Number.isSafeInteger(drafts) && drafts >= 0 ? drafts : 0,
+    approved: Number.isSafeInteger(approved) && approved >= 0 ? approved : 0,
+  };
 }
 
 /**

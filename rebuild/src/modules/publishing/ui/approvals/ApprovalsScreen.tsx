@@ -11,7 +11,7 @@ import { loadComposerCopy } from '../../server/composer-copy';
 import { IconChecklist } from '@tabler/icons-react';
 import { InfoTip, PageHeader } from '@/components';
 import { requireViewer } from "@/server/context";
-import { readPublishingPostPage } from "@/modules/publishing/server/read";
+import { readDraftApprovalSplit, readPublishingPostPage } from "@/modules/publishing/server/read";
 import { readPostApprovalStates } from "@/modules/publishing/server/lifecycle";
 import { formatDate } from "@/modules/publishing/ui/publishing-ui";
 import { EmptyPanel } from "../kit/kit";
@@ -48,9 +48,10 @@ export default async function ApprovalsPage({ searchParams }: { searchParams: Pr
     readPublishingPostPage(actor, { status: "pending_approval", order: "created_asc", channelId: channelArg }, "publishing/approvals"),
     readPublishingPostPage(actor, { status: "scheduled", order: "scheduled_asc", channelId: channelArg }, "publishing/approvals"),
   ]);
-  // Approved drafts still carry status draft; the approval workflow state splits them out. The split
-  // is exact on the loaded page (Root page size, 50 by default); larger backlogs continue in Posts.
+  // Approved drafts still carry status draft; the approval workflow state splits them out. Totals are
+  // exact over the whole authorized scope; rows show the loaded page, larger backlogs continue in Posts.
   const approvals = await readPostApprovalStates(viewer.workspaceId, drafts.posts.map(post => post.id)).catch(() => new Map());
+  const split = await readDraftApprovalSplit(actor, channelArg).catch(() => null);
   const isApproved = (id: string) => approvals.get(id)?.status === "approved";
   const draftPosts = drafts.posts.filter(post => !isApproved(post.id));
   const approvedPosts = drafts.posts.filter(post => isApproved(post.id));
@@ -90,9 +91,9 @@ export default async function ApprovalsPage({ searchParams }: { searchParams: Pr
   ]);
   const channelQuery = params.channel ? `&channel=${encodeURIComponent(params.channel)}` : "";
   const stages: PipelineStage[] = [
-    { id: "draft", title: content.copy.approvalsStageDraft, empty: content.copy.approvalsDraftEmpty, total: drafts.total - approvedPosts.length, rows: draftRows, viewAllHref: `/content?status=draft${channelQuery}` },
+    { id: "draft", title: content.copy.approvalsStageDraft, empty: content.copy.approvalsDraftEmpty, total: split?.drafts ?? (drafts.total - approvedPosts.length), rows: draftRows, viewAllHref: `/content?status=draft${channelQuery}` },
     { id: "review", title: content.copy.approvalsStageReview, empty: content.copy.approvalsReviewEmpty, total: review.total, rows: reviewRows, viewAllHref: `/content?status=pending_approval${channelQuery}` },
-    { id: "approved", title: content.copy.approvalsStageApproved, empty: content.copy.approvalsApprovedEmpty, total: approvedPosts.length, rows: approvedRows, viewAllHref: `/content?status=draft${channelQuery}` },
+    { id: "approved", title: content.copy.approvalsStageApproved, empty: content.copy.approvalsApprovedEmpty, total: split?.approved ?? approvedPosts.length, rows: approvedRows, viewAllHref: `/content?status=draft${channelQuery}` },
     { id: "scheduled", title: content.copy.approvalsStageScheduled, empty: content.copy.approvalsScheduledEmpty, total: scheduled.total, rows: scheduledRows, viewAllHref: `/content?status=scheduled${channelQuery}` },
   ];
   const pipelineEmpty = drafts.total + review.total + scheduled.total === 0;

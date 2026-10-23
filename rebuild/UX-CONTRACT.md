@@ -965,10 +965,10 @@ parameter no longer paginates but is still accepted).
 - `/content/approvals` is a Draft · In review · Approved · Scheduled board
   over the same authorized reads (approved = draft status + approved
   workflow state), capped per stage by the `pipelinePerStage` content
-  policy (6) with scoped totals and View-all-in-Posts links that keep
-  the channel scope (review/scheduled exact; the draft/approved split is
-  exact when drafts fit the loaded page, larger backlogs continue in
-  Posts). The header count stays the posts waiting for review.
+  policy (6) with exact scoped totals and View-all-in-Posts links that
+  keep the channel scope (rows show the loaded page per stage; larger
+  backlogs continue in Posts). The header count stays the posts waiting
+  for review.
   Review cards keep their approve/request-changes flow and keyboard
   shortcuts; drafts offer the shared submit action where the viewer may
   manage them (same service, same redirect); every card attaches its
