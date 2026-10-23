@@ -1,9 +1,59 @@
 # Shared agent handoff
 
-Updated 2026-10-23 (correctness sweep; uncommitted working tree), schema **141**.
+Updated 2026-10-23 (inbox-sync + media batch; uncommitted working tree), schema **142**.
 Full goal remains active. No browser, provider, database or production call by
 this lane. Historical records below retain their dates; current source
 reconciliation wins.
+
+## Inbox-sync + media batch — 2026-10-23 (source/unit only, uncommitted)
+
+All work is in the working tree, no commit/push/deploy. `npm run typecheck`
+0 errors; new suites `instagram-inbox-sync` (10), `media-signed-urls` (23),
+`media-share-route` (9), `inbox-sync-freshness` (10), `instagram-signed-media`
+(7) pass, plus `config-validation` (13, schema 142 + new-key assertions),
+`post-attachments` (signed preview), `media-route-auth` (secret mock) and the
+adjacent inbox/instagram/media/composer suites.
+
+- **Instagram inbox background sync** (`platforms/instagram/jobs.ts`,
+  `host.ts`, nested `config.ts` bounds): new `jobs.inbox` hook
+  `syncInstagramInbox` on the shared `sync.inbox.schedule`. Fair workspace
+  ring from the `sync.cursor.instagram-inbox` cursor (wrap-around, bounded
+  slice per workspace, stale-cursor retry); lock-free reads through the
+  existing `adapter.listComments` with per-post retries; writes under the
+  workspace guard + selected-resource lock + channel lock with plan/grant/
+  token/source rechecks and moved-destination guards; system
+  `instagram.inbox_synced` receipts. Comments only; DMs stay missing.
+- **Inbox freshness** (`inbox/server/freshness.ts`, `ui/action-copy.ts`,
+  `ui/InboxActions.tsx`, `ui/InboxScreen.tsx`, `config.ts`): fresh/stale/
+  never-synced header states from stored reads only, gated by new Root
+  `inbox.syncStaleAfterMinutes` (60); no provider fan-out on page load
+  (verified by inspection: stored reads, DB-only checks, pure reply rules).
+  `actionCopy.staleNote` flows into the owning Root catalog.
+- **Signed local-media pipeline** (`publishing/server/media/signed-urls.ts`,
+  `app/api/media/[id]/route.ts`, `app/api/media/route.ts`,
+  `publishing/components/PostAttachments.tsx`, `platforms/instagram/
+  runtime.ts`): HMAC workspace-scoped expiring URLs (new Root
+  `publishing.mediaShareSecret`/`publishing.mediaShareExpirySeconds`),
+  uniform-404 serve path reusing `readWorkspaceImage` checks, relative
+  `signedUrl` upload receipts with composer preview wiring (never
+  persisted), Instagram `localImageUpload` declaration + dispatch mapping
+  gated on mintable delivery (secret + exact HTTPS origin). Images only;
+  stored videos stay refused.
+- **Registry:** `CONFIG_SCHEMA_VERSION` **141 → 142** (three new keys, all
+  consumed and asserted); Instagram worker bounds are nested
+  `instagram.policy` additions with defaults, so saved policies validate.
+  No migration: cursors live in `appSetting`, freshness reuses `fetchedAt`,
+  grants are stateless. No route/tool/MCP change (signed query extends the
+  existing media route; parity-guard passes).
+- **Docs:** `OPERATIONS.md` (signed-media runbook, Instagram job/freshness
+  updates), `UX-CONTRACT.md` behavior rules, `INSTAGRAM_LIVE_RUN.md` §1/§3,
+  `LEGACY_CAPABILITY_PARITY.md` cells, `ARCHITECTURE.md` status, this entry.
+- **Unresolved / next:** live Graph run for the inbox job (rotation timing,
+  comment volume) and for signed-URL container creation (Meta fetch proof);
+  per-channel worker failure state stays in Root job history by design;
+  Facebook's global inbox cursor was left untouched (workspace fairness is
+  Instagram-scoped this batch); browser EN/FR/theme/keyboard pass of the
+  freshness header and composer preview.
 
 ## Correctness sweep — 2026-10-23 (source/unit only, uncommitted)
 

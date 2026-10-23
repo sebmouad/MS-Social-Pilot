@@ -10,10 +10,11 @@ import { jobStopRequested, jobAbortSignal } from '@/server/jobs/job-context';
 import { withRetries, type RetryBackoff } from '@/server/jobs/retry';
 import type { JobSummary } from '@/server/jobs/types';
 import { OperationError } from '@/lib/operation-error';
-import { configuredInstagramCollector, configuredInstagramPolicy } from './runtime';
+import { configuredInstagramAdapter, configuredInstagramCollector, configuredInstagramPolicy } from './runtime';
 import { hasScopes } from './publishing';
 import { object } from './transport';
 import { assertInstagramSource } from './source-binding';
+import { inboxCommentSuppressed, lockInboxChannel, orderInboxCommentBatch } from '@/modules/inbox/server/comment-guard';
 
 const DAY_MS = 86_400_000; // Date protocol conversion, not a scheduling policy.
 const CURSOR_KEY = 'sync.cursor.instagram-analytics';
@@ -94,6 +95,120 @@ export async function syncInstagramAnalytics(now = new Date(), retryLimit = 0, r
       else result.failed++;
     } finally {
       await prisma.appSetting.upsert({ where: { key: CURSOR_KEY }, create: { key: CURSOR_KEY, value: target.id, encrypted: false, updatedAt: now }, update: { value: target.id, updatedAt: now } });
+    }
+  }
+  return result;
+}
+
+const INBOX_CURSOR_KEY = 'sync.cursor.instagram-inbox';
+type InboxCursor = { workspaceId: string; targetId: string };
+function parseInboxCursor(value: unknown): InboxCursor | null {
+  if (!value || typeof value !== 'object') return null;
+  const { workspaceId, targetId } = value as Record<string, unknown>;
+  return typeof workspaceId === 'string' && workspaceId && typeof targetId === 'string' && targetId ? { workspaceId, targetId } : null;
+}
+
+async function inboxAccess(workspaceId: string) {
+  if (await runtimeConfig('platforms.instagram.enabled') !== true) throw new OperationError('forbidden', (await configuredInstagramPolicy()).copy.unavailable.en);
+  await assertWorkspaceJobAccess(workspaceId, { provider: 'instagram', anyFeatureOf: ['inbox/conversations'] });
+}
+
+/** Worker credential check for comment reads: token, comment grants and linked-source selection. */
+async function inboxBinding(target: Target, now: Date) {
+  const current = await prisma.target.findFirst({ where: { id: target.id, workspaceId: target.workspaceId, providerId: target.providerId, socialAccountId: target.socialAccountId, enabled: true, type: 'instagram', socialAccount: { is: { workspaceId: target.workspaceId, provider: 'instagram', invalidatedAt: null } } }, select: { accessToken: true, socialAccountId: true, socialAccount: { select: { scopes: true, tokenExpiresAt: true } } } });
+  const policy = await configuredInstagramPolicy();
+  if (!current?.accessToken || !current.socialAccount || (current.socialAccount.tokenExpiresAt && current.socialAccount.tokenExpiresAt <= new Date(Math.max(now.getTime(), Date.now())))) return null;
+  const credential = { accessToken: decryptSecret(current.accessToken), grantedScopes: current.socialAccount.scopes.split(',').map(scope => scope.trim()).filter(Boolean) };
+  if (!hasScopes(credential, policy.commentScopes)) return null;
+  try { await assertInstagramSource({ workspaceId: target.workspaceId, targetId: target.id, remoteTargetId: target.providerId, accessToken: credential.accessToken, requiredScopes: policy.commentScopes }); } catch { return null; }
+  return { credential, token: current.accessToken };
+}
+
+/**
+ * Fair target ring: workspaces rotate from the saved cursor with wrap-around, and each
+ * visited workspace contributes a bounded slice of its own targets, resuming after its
+ * last synced target. One workspace can neither starve the others nor monopolize a run.
+ */
+async function selectInboxTargets(limit: number, perWorkspace: number, cursor: InboxCursor | null): Promise<Target[]> {
+  const base = { enabled: true, type: 'instagram' as const, socialAccount: { is: { provider: 'instagram', invalidatedAt: null } } };
+  const select = { id: true, workspaceId: true, providerId: true, socialAccountId: true } as const;
+  const ring = (await prisma.target.findMany({ where: base, distinct: ['workspaceId'], select: { workspaceId: true }, orderBy: { workspaceId: 'asc' } })).map(row => row.workspaceId);
+  const ordered = cursor ? [...ring.filter(id => id > cursor.workspaceId), ...ring.filter(id => id <= cursor.workspaceId)] : ring;
+  const selected: Target[] = [];
+  for (const workspaceId of ordered) {
+    if (selected.length >= limit) break;
+    const take = Math.min(perWorkspace, limit - selected.length);
+    const after = cursor && workspaceId === cursor.workspaceId ? cursor.targetId : null;
+    let rows = await prisma.target.findMany({ where: { ...base, workspaceId, ...(after ? { id: { gt: after } } : {}) }, select, orderBy: { id: 'asc' }, take });
+    if (after && rows.length < take) rows = rows.concat(await prisma.target.findMany({ where: { ...base, workspaceId, id: { lte: after } }, select, orderBy: { id: 'asc' }, take: take - rows.length }));
+    selected.push(...rows);
+  }
+  return selected;
+}
+
+/**
+ * Background comment sync for Instagram channels. Comments only: direct messages stay
+ * unimplemented and the reply policy keeps reporting comments-only. Provider reads run
+ * with no lock held through the same adapter listing as manual sync; only the short
+ * upsert below holds the workspace guard and the channel locks.
+ */
+export async function syncInstagramInbox(now = new Date(), retryLimit = 0, retryBackoff?: RetryBackoff): Promise<JobSummary> {
+  const result: JobSummary = { examined: 0, updated: 0, skipped: 0, failed: 0 };
+  if (await runtimeConfig('platforms.instagram.enabled') !== true) return result;
+  const [policy, limit, saved] = await Promise.all([configuredInstagramPolicy(), runtimeConfig('sync.maxItemsPerJob'), prisma.appSetting.findUnique({ where: { key: INBOX_CURSOR_KEY }, select: { value: true } })]);
+  let targets = await selectInboxTargets(limit, policy.inboxTargetsPerWorkspace, parseInboxCursor(saved?.value));
+  if (!targets.length && saved?.value !== undefined && saved?.value !== null) targets = await selectInboxTargets(limit, policy.inboxTargetsPerWorkspace, null);
+  for (const target of targets) {
+    if (jobStopRequested()) break;
+    result.examined++;
+    try {
+      await withWorkspaceOperation(target.workspaceId, async () => undefined);
+      await inboxAccess(target.workspaceId);
+      const initial = await inboxBinding(target, now);
+      if (!initial) { result.skipped++; continue; }
+      const signal = jobAbortSignal(); signal?.throwIfAborted();
+      const adapter = await configuredInstagramAdapter('en', signal ?? undefined);
+      const posts = await prisma.postTarget.findMany({ where: { targetId: target.id, target: { workspaceId: target.workspaceId }, post: { workspaceId: target.workspaceId }, status: 'published', remotePostId: { not: null } }, orderBy: [{ publishedAt: 'desc' }, { id: 'asc' }], take: policy.inboxPostsPerTarget, select: { id: true, remotePostId: true } });
+      const batches: Array<{ post: { id: string; remotePostId: string | null }; rows: Awaited<ReturnType<NonNullable<typeof adapter.listComments>>> }> = [];
+      for (const post of posts) {
+        if (jobStopRequested() || signal?.aborted) break;
+        if (!post.remotePostId) continue;
+        batches.push({ post, rows: orderInboxCommentBatch(await withRetries(() => adapter.listComments!({ credential: initial.credential, targetId: target.providerId, remotePostId: post.remotePostId! }), retryLimit, retryBackoff)) });
+      }
+      signal?.throwIfAborted();
+      const persisted = await withWorkspaceOperation(target.workspaceId, () => withSelectedResourceOperation(target.workspaceId, { kind: 'target', id: target.id }, async (tx, lockSignal) => {
+        await lockInboxChannel(tx, target.workspaceId, target.id);
+        await inboxAccess(target.workspaceId);
+        const current = await inboxBinding(target, now);
+        if (!current || current.token !== initial.token) return false;
+        lockSignal.throwIfAborted();
+        // A destination that moved, unpublished or rebound while Graph was being read keeps its stored comments.
+        const latest = await prisma.postTarget.findMany({ where: { id: { in: batches.map(batch => batch.post.id) }, targetId: target.id, status: 'published', remotePostId: { not: null }, post: { workspaceId: target.workspaceId }, target: { workspaceId: target.workspaceId, enabled: true } }, select: { id: true, remotePostId: true } });
+        const latestById = new Map(latest.map(post => [post.id, post.remotePostId]));
+        let stored = 0;
+        for (const { post, rows } of batches) {
+          if (latestById.get(post.id) !== post.remotePostId) continue;
+          for (const row of rows) {
+            lockSignal.throwIfAborted();
+            if (await inboxCommentSuppressed(tx, target.workspaceId, target.id, row.id, row.parentId)) continue;
+            const data = { parentRemoteId: row.parentId, message: row.text, fromName: row.authorName, fromId: row.authorId, createdTime: row.createdAt, fetchedAt: now };
+            await tx.postComment.upsert({ where: { postTargetId_remoteId: { postTargetId: post.id, remoteId: row.id } }, create: { id: randomUUID(), postTargetId: post.id, remoteId: row.id, ...data }, update: data });
+            stored++;
+          }
+        }
+        lockSignal.throwIfAborted();
+        await inboxAccess(target.workspaceId);
+        const final = await inboxBinding(target, now);
+        if (!final || final.token !== current.token) throw new OperationError('forbidden', policy.copy.permission.en);
+        await tx.$executeRaw`INSERT INTO root_activities (id, action, detail, "createdAt") VALUES (${randomUUID()}, 'instagram.inbox_synced', ${JSON.stringify({ workspaceId: target.workspaceId, targetId: target.id, posts: batches.length, comments: stored })}::jsonb, NOW())`;
+        return true;
+      }));
+      if (persisted) result.updated++; else result.skipped++;
+    } catch (error) {
+      if (error instanceof OperationError && ['forbidden', 'not_found', 'conflict'].includes(error.code)) result.skipped++;
+      else result.failed++;
+    } finally {
+      await prisma.appSetting.upsert({ where: { key: INBOX_CURSOR_KEY }, create: { key: INBOX_CURSOR_KEY, value: { workspaceId: target.workspaceId, targetId: target.id }, encrypted: false, updatedAt: now }, update: { value: { workspaceId: target.workspaceId, targetId: target.id }, updatedAt: now } });
     }
   }
   return result;

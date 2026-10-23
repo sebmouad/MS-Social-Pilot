@@ -371,6 +371,40 @@ describe('library images and drop zone', () => {
     await act(async () => { area.dispatchEvent(event); });
     expect(JSON.parse(output('file-names'))).toEqual(['dropped.png']);
   });
+
+  it('previews an uploaded image through the signed receipt URL without persisting it', async () => {
+    const ref = 'media:123e4567-e89b-42d3-a456-426614174000';
+    const signedUrl = '/api/media/123e4567-e89b-42d3-a456-426614174000?ws=workspace-a&exp=9999999999&sig=test';
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => ({ reference: ref, signedUrl }) })));
+    await render();
+    const picker = container.querySelector<HTMLInputElement>('input[data-testid="local-image-input"]')!;
+    await act(async () => {
+      Object.defineProperty(picker, 'files', { configurable: true, value: [new File(['x'], 'signed.png', { type: 'image/png' })] });
+      picker.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>('[data-testid="prepare"]')!.click();
+      await new Promise(resolve => requestAnimationFrame(() => resolve(undefined)));
+    });
+    expect(container.querySelector('ol[aria-label="Attachment preview"] img')?.getAttribute('src')).toBe(signedUrl);
+    expect(JSON.parse(output('serialized'))).toEqual([{ kind: 'image', url: ref }]);
+  });
+
+  it('falls back to the session preview when the receipt carries no signed URL', async () => {
+    const ref = 'media:123e4567-e89b-42d3-a456-426614174000';
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => ({ reference: ref }) })));
+    await render();
+    const picker = container.querySelector<HTMLInputElement>('input[data-testid="local-image-input"]')!;
+    await act(async () => {
+      Object.defineProperty(picker, 'files', { configurable: true, value: [new File(['x'], 'plain.png', { type: 'image/png' })] });
+      picker.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>('[data-testid="prepare"]')!.click();
+      await new Promise(resolve => requestAnimationFrame(() => resolve(undefined)));
+    });
+    expect(container.querySelector('ol[aria-label="Attachment preview"] img')?.getAttribute('src')).toBe('/api/media/123e4567-e89b-42d3-a456-426614174000');
+  });
 });
 
 it('uses edited French attachment copy and focuses the description field without matching its wording', async () => {

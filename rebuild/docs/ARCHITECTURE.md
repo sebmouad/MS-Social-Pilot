@@ -1,9 +1,62 @@
 # MS Social Pilot architecture
 
-Updated 2026-10-23 (correctness sweep) against the local working tree, configuration schema **141**.
+Updated 2026-10-23 (inbox-sync + media batch) against the local working tree, configuration schema **142**.
 [ARCHITECTURE_CONTRACT.md](ARCHITECTURE_CONTRACT.md) remains binding; §4 gained the owner-approved 2026-10-22 Ads-area decision.
 Current reconciliation below takes precedence over historical batch snapshots.
 Source, automated, browser, live-provider and production evidence remain distinct.
+
+## Inbox-sync + media batch — 2026-10-23 (source only)
+
+Additive Instagram background sync and signed local-media delivery; no
+route, tool or behavior removal, no provider fan-out added on page
+load, no migration. Schema 141 → 142.
+
+- Instagram inbox background sync (Instagram-owned): new
+  `syncInstagramInbox` registered as the module's `jobs.inbox` hook,
+  so the shared `inbox` worker job (`sync.inbox.schedule`) now covers
+  Instagram channels beside Facebook. Comments only (DMs stay
+  unimplemented); provider reads run lock-free through the existing
+  `adapter.listComments`, writes reuse the shared comment guard,
+  suppression and parent-first ordering. Workspaces rotate from the
+  `sync.cursor.instagram-inbox` cursor with a bounded slice per
+  workspace and wrap-around (`instagram.policy`
+  `inboxTargetsPerWorkspace`, `inboxPostsPerTarget`, nested — no new
+  top-level keys); each target rechecks owner plan access, grants,
+  token and linked-source selection before and after its reads, and a
+  destination that moved or unpublished mid-read keeps its stored
+  comments. System receipts use `instagram.inbox_synced`.
+- Inbox freshness (Inbox-owned): the header states fresh ("Last
+  synced \<time\>"), stale (plus "May be out of date" past the new
+  Root `inbox.syncStaleAfterMinutes`, default 60) or never-synced from
+  stored reads only; a completed manual sync clears the note. Page
+  load makes no provider call (stored list/thread reads, DB-only
+  capability checks, pure reply rules); worker failures stay in Root
+  job history. Copy lives in the owning `inbox.customerCopy` catalog
+  (`actionCopy.staleNote`, EN/FR).
+- Signed local-media pipeline (Publishing-owned,
+  `publishing/server/media/signed-urls.ts`): expiring
+  workspace-scoped HMAC URLs (`publishing.mediaShareSecret`,
+  `publishing.mediaShareExpirySeconds`) served by `GET
+  /api/media/[id]?ws=&exp=&sig=` through the same MIME/size checks as
+  the session path, with uniform 404s for every signed failure. `POST
+  /api/media` also returns a relative `signedUrl` preview; the saved
+  post keeps the durable `media:` reference and the composer falls
+  back to the session preview. Instagram consumes the pipeline in its
+  runtime: `localImageUpload` is advertised only while signed delivery
+  is mintable (secret + exact HTTPS `app.publicOrigin`, limits reused
+  from the shared media policies), and dispatch maps stored images to
+  absolute signed URLs before container creation, refusing honestly
+  (rejected, nothing sent) when the pipeline drops mid-flight.
+  Stored videos have no signed path and stay refused.
+
+Typecheck 0 errors; new suites `instagram-inbox-sync` (10),
+`media-signed-urls` (23), `media-share-route` (9),
+`inbox-sync-freshness` (10), `instagram-signed-media` (7) pass, plus
+the extended `config-validation` (schema 142 + new-key assertions),
+`post-attachments` (signed preview) and `media-route-auth`
+(secret-mock) suites and the adjacent inbox/instagram/media/composer
+suites. No browser, provider, database or production run. No
+commit/push/deploy (not authorized this lane).
 
 ## Correctness sweep — 2026-10-23 (source only)
 

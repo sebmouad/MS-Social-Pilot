@@ -839,3 +839,25 @@ Source/unit evidence only; no browser, provider or production run in this batch.
   edges; partial weeks at the range edges keep daily points so totals
   stay exact. Shorter ranges and the current day read exactly as
   before; nothing else on the Analytics screens changes.
+
+## Inbox-sync + media behaviors — 2026-10-23
+
+Source/unit evidence only; no browser, provider or production run in this batch.
+
+- The inbox header states freshness from stored reads only, never a
+  provider call on page load: "Last synced \<time\>" while fresh, the
+  same time plus "May be out of date" past the Root staleness
+  threshold (`inbox.syncStaleAfterMinutes`), and "Not synced yet" when
+  no channel in scope was ever read. A sync that completes in the
+  session clears the stale note. Worker failures stay in Root job
+  history; the customer UI never shows installation internals.
+- Composer local files stay accepted exactly where every selected
+  destination advertises uploaded-image support; a destination whose
+  pipeline is unavailable keeps refusing them with the existing
+  guidance instead of failing at publish time. Upload previews prefer
+  the receipt's signed preview URL and fall back to the session
+  preview; the saved post keeps only the durable `media:` reference.
+- Instagram publishes stored-library images through expiring signed
+  URLs minted at dispatch; public media URLs pass through unchanged.
+  Stored videos and a cleared secret or non-HTTPS origin keep the
+  honest refusal, with nothing sent to the provider.

@@ -130,7 +130,15 @@ defaults to `false`). Full audit and live checklist:
   (publishing/comments/analytics) show missing scopes per connection.
 - **Jobs:** the shared `analytics` job (`sync.analytics.schedule`) runs
   `syncInstagramAnalytics` (account metrics, profile snapshot, media window).
-  Inbox sync is manual per channel; there is no inbox background job.
+  The shared `inbox` job (`sync.inbox.schedule`) runs `syncInstagramInbox`
+  (comments on recent published media, upserted per channel). Workspaces
+  rotate from the `sync.cursor.instagram-inbox` cursor with a bounded slice
+  per workspace (`instagram.policy` `inboxTargetsPerWorkspace`,
+  `inboxPostsPerTarget`); each target rechecks plan access, grants, token
+  and linked-source selection before and after its provider reads, and a
+  destination that moved or unpublished mid-read keeps its stored comments.
+  Receipts use `instagram.inbox_synced` (system rows). Direct messages stay
+  unimplemented; the reply policy keeps reporting comments-only.
 - **Evidence:** per-attempt container/publication intents live in
   `root_activities` (`instagram.publication_step`); the recovery host keeps
   unknown dispatches held and exposes content-free evidence to Root even while
@@ -138,8 +146,47 @@ defaults to `false`). Full audit and live checklist:
 - **Incidents:** missing/expired grants fail closed with reconnect prompts —
   reconnect the parent Facebook Page, then re-run Instagram Connect to rotate
   clones. There is no remote media delete: remove test posts in the Instagram
-  app. Only public HTTPS media URLs publish; stored-library bytes are refused
-  until the signed-URL pipeline exists.
+  app. Stored-library images publish through the signed-URL pipeline below;
+  without it only public HTTPS media URLs publish.
+- **Freshness:** the inbox header shows the last stored channel read and an
+  honest "may be out of date" note past `inbox.syncStaleAfterMinutes`
+  (default 60). Per-channel worker failures stay in Root job history; the
+  customer UI never presents installation job internals.
+
+## Signed media delivery runbook (inbox-sync + media batch, 2026-10-23)
+
+Module: `src/modules/publishing/server/media/signed-urls.ts` (sign/verify/mint),
+served by `GET /api/media/[id]` with `?ws=&exp=&sig=`. Stored workspace images
+stay on local disk; providers that fetch attachments by URL (Instagram) receive
+expiring workspace-scoped HMAC URLs instead of bytes. No public bucket exists.
+
+- **Setup:** set `publishing.mediaShareSecret` in Root (32+ random bytes, hex;
+  e.g. `openssl rand -hex 32`), keep `publishing.mediaShareExpirySeconds`
+  (default 3600) and confirm `app.publicOrigin` is the exact public HTTPS
+  origin. Instagram advertises uploaded-image support only while all three
+  hold; otherwise the composer refuses local files for its destinations and
+  dispatch rejects stored images without sending anything.
+- **Upload:** `POST /api/media` still validates size/MIME through the shared
+  media policies and now also returns a relative `signedUrl` preview while a
+  secret is set. The saved post keeps the durable `media:<id>` reference;
+  the signed URL is never persisted with a draft.
+- **Serve:** the signed query serves one image without a session through the
+  same `readWorkspaceImage` MIME/size checks as the session path. Every
+  signed failure (bad/expired grant, unknown file, missing secret) answers
+  the same 404, so grants cannot be probed apart. The session URL without
+  query is unchanged.
+- **Publish:** Instagram mints one absolute URL per stored image at dispatch
+  and drops the bytes before container creation. A secret cleared between
+  composing and publishing fails that destination honestly (`invalid`,
+  rejected, nothing sent); re-dispatch mints again. Stored videos have no
+  signed path and stay refused.
+- **Rotate:** replace `publishing.mediaShareSecret` in Root; every previously
+  signed URL stops working immediately. In-flight container creations that
+  already fetched their bytes are unaffected.
+- **Incidents:** a leaked URL works until its own expiry only; rotate the
+  secret to kill it. Never extend expiry to "fix" a failed publish: the
+  provider fetches within minutes, so an expired URL at dispatch means the
+  secret or origin changed — check Root instead.
 
 ## Metric alert runbook (engagement batch, 2026-10-22)
 

@@ -17,6 +17,8 @@ export type PostAttachmentDraftItem = PostMediaItem & {
   clientId: string;
   source: 'url' | 'upload';
   file?: File;
+  /** Client-only signed preview from the upload receipt; never serialized into the saved media list. */
+  previewUrl?: string;
   error?: string;
   errorField?: 'alt' | 'attachment';
   /** Link items only: the type follows what the link turns out to be until the person picks one. */
@@ -278,12 +280,13 @@ export function usePostAttachments(options: PostAttachmentOptions): PostAttachme
           const body = new FormData();
           body.append('imageFile', item.file);
           const response = await fetch('/api/media', { method: 'POST', body });
-          const result = await response.json().catch(() => ({})) as { reference?: unknown; error?: unknown };
+          const result = await response.json().catch(() => ({})) as { reference?: unknown; signedUrl?: unknown; error?: unknown };
           if (!response.ok || typeof result.reference !== 'string' || !uploadedImageReference(result.reference)) throw new Error(c.uploadFailed);
+          const previewUrl = typeof result.signedUrl === 'string' && result.signedUrl.startsWith('/api/media/') ? result.signedUrl : undefined;
           flushSync(() => {
             setItems(current => {
               const updated = current.map(existing => existing.clientId === item.clientId
-                ? { ...existing, url: result.reference as string, file: undefined, error: undefined, errorField: undefined }
+                ? { ...existing, url: result.reference as string, file: undefined, ...(previewUrl ? { previewUrl } : {}), error: undefined, errorField: undefined }
                 : existing);
               itemsRef.current = updated;
               return updated;
@@ -462,7 +465,8 @@ export function AuthoringMediaPreview({ controller }: { controller: PostAttachme
   return <ol className={styles.previewList} aria-label={c.preview}>
     {controller.items.map((item, index) => {
       const localId = item.url.startsWith('media:') ? item.url.slice('media:'.length) : '';
-      const src = item.file ? objectUrls[item.clientId] : localId ? (MEDIA_ID.test(localId) ? `/api/media/${encodeURIComponent(localId)}` : '') : safeRemoteUrl(item.url) ? item.url : '';
+      const signedPreview = item.previewUrl?.startsWith('/api/media/') ? item.previewUrl : undefined;
+      const src = item.file ? objectUrls[item.clientId] : localId ? (signedPreview ?? (MEDIA_ID.test(localId) ? `/api/media/${encodeURIComponent(localId)}` : '')) : safeRemoteUrl(item.url) ? item.url : '';
       return <li key={item.clientId}>
         <span>{index + 1}. {item.kind === 'image' ? c.image : c.video}</span>
         {item.kind === 'image' && src ? <img src={src} alt={item.altText?.trim() || c.selectedImage} /> : null}

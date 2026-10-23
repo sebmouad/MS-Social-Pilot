@@ -17,7 +17,7 @@ describe('configuration registry', () => {
     }
   });
   it('keeps operator alerts in the single Root monitoring system', () => {
-    expect(CONFIG_SCHEMA_VERSION).toBe(141);
+    expect(CONFIG_SCHEMA_VERSION).toBe(142);
     for (const key of ['notifications.systemAlertPolicy', 'notifications.systemAlertCopy', 'notifications.systemAlertTelegramToken']) {
       expect(CONFIG_BY_KEY.has(key)).toBe(false);
     }
@@ -62,7 +62,7 @@ describe('configuration registry', () => {
   });
 
   it('covers the operational configuration areas with explicit consumption status', () => {
-    expect(CONFIG_SCHEMA_VERSION).toBe(141);
+    expect(CONFIG_SCHEMA_VERSION).toBe(142);
     expect(safeConfigShape().find(setting => setting.key === 'settings.teamDefaultRole')).toMatchObject({ defaultValue: 'contributor', consumption: 'active', owner: { kind: 'product', id: 'settings' } });
     expect(safeConfigShape().find(setting => setting.key === 'settings.teamDefaultAllChannels')).toMatchObject({ defaultValue: false, consumption: 'active', owner: { kind: 'product', id: 'settings' } });
     expect(CONFIG_BY_KEY.get('settings.teamDefaultRole')!.schema.safeParse('owner').success).toBe(false);
@@ -285,7 +285,7 @@ describe('configuration registry', () => {
   });
 
   it('registers the analytics metric-alert job, schedule, bounds and copy under the Analytics module', () => {
-    expect(CONFIG_SCHEMA_VERSION).toBe(141);
+    expect(CONFIG_SCHEMA_VERSION).toBe(142);
     expect(CONFIG_BY_KEY.get('analytics.alerts.schedule')).toMatchObject({ kind: 'text', defaultValue: '*/10 * * * *', consumption: 'active' });
     expect(CONFIG_BY_KEY.get('analytics.alerts.schedule')!.schema.safeParse('*/10 * * * *').success).toBe(true);
     expect(CONFIG_BY_KEY.get('analytics.alerts.schedule')!.schema.safeParse('not a cron').success).toBe(false);
@@ -298,7 +298,7 @@ describe('configuration registry', () => {
   });
 
   it('registers the platform-moat settings: Meta webhooks, rollups and the staging dry-run', () => {
-    expect(CONFIG_SCHEMA_VERSION).toBe(141);
+    expect(CONFIG_SCHEMA_VERSION).toBe(142);
     expect(CONFIG_BY_KEY.get('meta.webhooksEnabled')).toMatchObject({ kind: 'boolean', defaultValue: true, consumption: 'active' });
     expect(CONFIG_BY_KEY.get('meta.webhookVerifyToken')).toMatchObject({ kind: 'secret', defaultValue: '', consumption: 'active' });
     expect(CONFIG_BY_KEY.get('meta.webhookDeliveryRetentionDays')).toMatchObject({ kind: 'number', defaultValue: 30, consumption: 'active' });
@@ -319,6 +319,25 @@ describe('configuration registry', () => {
       expect(CONFIG_BY_KEY.get(key)!.schema.safeParse(CONFIG_BY_KEY.get(key)!.defaultValue).success).toBe(true);
     }
     expect(CONFIG_BY_KEY.get('jobs.stagingDryRun')!.schema.safeParse(CONFIG_BY_KEY.get('jobs.stagingDryRun')!.defaultValue).success).toBe(true);
+  });
+
+  it('registers the inbox-sync and signed-media settings: stale threshold, share secret and expiry', () => {
+    expect(CONFIG_SCHEMA_VERSION).toBe(142);
+    expect(CONFIG_BY_KEY.get('inbox.syncStaleAfterMinutes')).toMatchObject({ kind: 'number', defaultValue: 60, consumption: 'active' });
+    expect(CONFIG_BY_KEY.get('inbox.syncStaleAfterMinutes')!.schema.safeParse(4).success).toBe(false);
+    expect(CONFIG_BY_KEY.get('inbox.syncStaleAfterMinutes')!.schema.safeParse(10081).success).toBe(false);
+    expect(CONFIG_BY_KEY.get('publishing.mediaShareSecret')).toMatchObject({ kind: 'secret', defaultValue: '', consumption: 'active' });
+    expect(CONFIG_BY_KEY.get('publishing.mediaShareSecret')!.schema.safeParse('x'.repeat(2048)).success).toBe(true);
+    expect(CONFIG_BY_KEY.get('publishing.mediaShareSecret')!.schema.safeParse('x'.repeat(2049)).success).toBe(false);
+    expect(CONFIG_BY_KEY.get('publishing.mediaShareExpirySeconds')).toMatchObject({ kind: 'number', defaultValue: 3600, consumption: 'active' });
+    expect(CONFIG_BY_KEY.get('publishing.mediaShareExpirySeconds')!.schema.safeParse(299).success).toBe(false);
+    expect(CONFIG_BY_KEY.get('publishing.mediaShareExpirySeconds')!.schema.safeParse(604801).success).toBe(false);
+    expect(safeConfigShape().find(setting => setting.key === 'inbox.syncStaleAfterMinutes')).toMatchObject({ consumption: 'active', owner: { kind: 'product', id: 'inbox' } });
+    for (const key of ['publishing.mediaShareSecret', 'publishing.mediaShareExpirySeconds'] as const) {
+      expect(safeConfigShape().find(setting => setting.key === key)).toMatchObject({ consumption: 'active', owner: { kind: 'product', id: 'publishing' } });
+      expect(CONFIG_BY_KEY.get(key)!.schema.safeParse(CONFIG_BY_KEY.get(key)!.defaultValue).success).toBe(true);
+    }
+    expect(CONFIG_BY_KEY.get('inbox.syncStaleAfterMinutes')!.schema.safeParse(CONFIG_BY_KEY.get('inbox.syncStaleAfterMinutes')!.defaultValue).success).toBe(true);
   });
 
   it('audits changes with key, change type, and registry version only', () => {

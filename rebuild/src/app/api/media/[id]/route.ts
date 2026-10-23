@@ -2,12 +2,33 @@ import { requestOrigin } from '@/server/request-origin';
 import { NextResponse } from 'next/server';
 import { requireViewer } from '@/server/context';
 import { deleteUnusedWorkspaceImage, readWorkspaceImage } from '@/modules/publishing/server/media/storage';
+import { verifyMediaShare } from '@/modules/publishing/server/media/signed-urls';
+import { runtimeSecret } from '@/server/config/store';
 import { withWorkspaceOperation } from '@/server/data-control/guard';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  // A valid signed grant serves one stored image without a session, so providers that fetch
+  // attachments by URL can read publish-time bytes. Every signed failure answers 404, like the
+  // share preview route, so grants cannot be probed apart. The session path below is unchanged.
+  const query = new URL(request.url).searchParams;
+  const ws = query.get('ws');
+  const exp = query.get('exp');
+  const sig = query.get('sig');
+  if (ws !== null || exp !== null || sig !== null) {
+    try {
+      const secret = await runtimeSecret('publishing.mediaShareSecret');
+      const grant = { workspaceId: ws ?? '', id, exp: Number(exp), sig: sig ?? '' };
+      if (!secret || !verifyMediaShare(grant, secret)) return NextResponse.json({ error: 'Image not found.' }, { status: 404, headers: { 'cache-control': 'no-store' } });
+      const image = await readWorkspaceImage(grant.workspaceId, id);
+      return new NextResponse(new Uint8Array(image.bytes), { headers: { 'content-type': image.mimeType, 'content-length': String(image.bytes.length), 'content-disposition': 'inline', 'x-content-type-options': 'nosniff', 'cache-control': 'private, no-store' } });
+    } catch {
+      return NextResponse.json({ error: 'Image not found.' }, { status: 404, headers: { 'cache-control': 'no-store' } });
+    }
+  }
   let viewer;
   try { viewer = await requireViewer({ feature: 'publishing/media', channelScoped: true }); }
   catch {
@@ -15,7 +36,6 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     catch { return NextResponse.json({ error: 'Not authorized.' }, { status: 401 }); }
   }
   try {
-    const { id } = await params;
     const image = await readWorkspaceImage(viewer.workspaceId, id);
     return new NextResponse(new Uint8Array(image.bytes), { headers: { 'content-type': image.mimeType, 'content-length': String(image.bytes.length), 'content-disposition': 'inline', 'x-content-type-options': 'nosniff', 'cache-control': 'private, no-store' } });
   } catch {

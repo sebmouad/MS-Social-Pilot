@@ -43,6 +43,8 @@ export const instagramPolicySchema = z.object({
   analyticsLookbackDays: z.number().int().min(1).max(3650).default(30),
   analyticsReadMaxRows: z.number().int().min(1).max(100000).default(10000),
   inboxReplyMaxCharacters: z.number().int().min(1).max(10000).default(2000),
+  inboxTargetsPerWorkspace: z.number().int().min(1).max(100).default(5),
+  inboxPostsPerTarget: z.number().int().min(1).max(250).default(25),
   connectionMaxPages: z.number().int().min(1).max(1000).default(100),
   pageSize: z.number().int().min(1).max(100), maxPages: z.number().int().min(1).max(100),
   pollIntervalMs: z.number().int().min(1).max(60000), pollAttempts: z.number().int().min(1).max(300),
@@ -55,7 +57,7 @@ export const instagramPolicySchema = z.object({
 export type InstagramPolicy = z.infer<typeof instagramPolicySchema>;
 export const INSTAGRAM_POLICY_DEFAULTS: InstagramPolicy = {
   graphBaseUrl: 'https://graph.facebook.com', graphVersion: 'v26.0', requestTimeoutMs: 15000,
-  analyticsLookbackDays: 30, analyticsReadMaxRows: 10000, inboxReplyMaxCharacters: 2000, connectionMaxPages: 100, pageSize: 50, maxPages: 5, pollIntervalMs: 3000, pollAttempts: 100, captionLength: 2200, carouselMax: 10,
+  analyticsLookbackDays: 30, analyticsReadMaxRows: 10000, inboxReplyMaxCharacters: 2000, inboxTargetsPerWorkspace: 5, inboxPostsPerTarget: 25, connectionMaxPages: 100, pageSize: 50, maxPages: 5, pollIntervalMs: 3000, pollAttempts: 100, captionLength: 2200, carouselMax: 10,
   appSecretProofEnabled: true,
   readScopes: ['instagram_basic', 'pages_read_engagement'], publishScopes: ['instagram_basic', 'instagram_content_publish', 'pages_read_engagement'],
   commentScopes: ['instagram_basic', 'instagram_manage_comments', 'pages_read_engagement'], insightScopes: ['instagram_basic', 'instagram_manage_insights', 'pages_read_engagement'],

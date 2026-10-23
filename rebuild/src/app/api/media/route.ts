@@ -6,6 +6,7 @@ import { mediaHolderVisibility } from '@/modules/publishing/server/media-holders
 import { withWorkspaceOperation } from '@/server/data-control/guard';
 import { runtimeConfig } from '@/server/config/store';
 import { MediaBodyTooLarge, readBoundedImageForm } from '@/modules/publishing/server/media/body';
+import { mintMediaSharePath } from '@/modules/publishing/server/media/signed-urls';
 import { MediaStorageUnavailable, MediaValidationError } from '@/modules/publishing/server/media/errors';
 
 export const runtime = 'nodejs';
@@ -39,7 +40,8 @@ export async function POST(request: Request) {
     const file = form.get('imageFile');
     if (!(file instanceof File)) throw new MediaValidationError('invalid_file');
     const image = await withWorkspaceOperation(viewer.workspaceId, () => uploadWorkspaceImage({ userId: viewer.user.id, workspaceId: viewer.workspaceId }, file));
-    return NextResponse.json({ ...image, reference: `media:${image.id}`, url: `/api/media/${image.id}` }, { headers: { 'cache-control': 'no-store' } });
+    const signedUrl = await mintMediaSharePath(viewer.workspaceId, image.id);
+    return NextResponse.json({ ...image, reference: `media:${image.id}`, url: `/api/media/${image.id}`, ...(signedUrl ? { signedUrl } : {}) }, { headers: { 'cache-control': 'no-store' } });
   } catch (error) {
     if (error instanceof MediaBodyTooLarge) return NextResponse.json({ error: error.message }, { status: 413, headers: { 'cache-control': 'no-store' } });
     if (error instanceof MediaStorageUnavailable) return NextResponse.json({ error: error.message }, { status: 503, headers: { 'cache-control': 'no-store' } });

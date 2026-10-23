@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const mocks = vi.hoisted(() => ({ viewer: vi.fn(), config: vi.fn(), upload: vi.fn(), read: vi.fn(), list: vi.fn() }));
+const mocks = vi.hoisted(() => ({ viewer: vi.fn(), config: vi.fn(), secret: vi.fn(), upload: vi.fn(), read: vi.fn(), list: vi.fn() }));
 vi.mock('../src/server/context', () => ({ requireViewer: mocks.viewer }));
-vi.mock('../src/server/config/store', () => ({ runtimeConfig: mocks.config }));
+vi.mock('../src/server/config/store', () => ({ runtimeConfig: mocks.config, runtimeSecret: mocks.secret }));
 vi.mock('@/modules/publishing/server/media/storage', () => ({ uploadWorkspaceImage: mocks.upload, readWorkspaceImage: mocks.read, listWorkspaceImages: mocks.list }));
 vi.mock('../src/server/data-control/guard', () => ({ withWorkspaceOperation: (_id: string, run: () => Promise<unknown>) => run() }));
 vi.mock('../src/modules/publishing/server/media-holders', () => ({ mediaHolderVisibility: async () => null }));
@@ -14,6 +14,7 @@ import { MediaStorageUnavailable, MediaValidationError } from '@/modules/publish
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.viewer.mockResolvedValue({ user: { id: 'user-a' }, workspaceId: 'workspace-a' });
+  mocks.secret.mockResolvedValue(null);
   mocks.config.mockImplementation(async (key: string) => key === 'publishing.maxImageUploadBytes' ? 1024 : key === 'publishing.maxImageUploadRequestOverheadBytes' ? 1024 : undefined);
   mocks.upload.mockResolvedValue({ id: '123e4567-e89b-42d3-a456-426614174000', mimeType: 'image/png', fileName: 'test.png' });
   mocks.read.mockResolvedValue({ bytes: Buffer.from([137, 80, 78, 71]), mimeType: 'image/png', fileName: 'test.png' });

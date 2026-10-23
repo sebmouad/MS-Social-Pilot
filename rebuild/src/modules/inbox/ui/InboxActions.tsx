@@ -58,8 +58,8 @@ async function send(payload: Record<string, unknown>, locale: InboxLocale = 'en'
   }
 }
 
-/** "Last synced" plus Sync now, reporting what the sync found. */
-export function InboxSyncBar({ targetId, lastSynced, disabled = false, locale = 'en' }: { targetId?: string; lastSynced: string | null; timeZone?: string; disabled?: boolean; locale?: InboxLocale }) {
+/** "Last synced" plus Sync now, reporting what the sync found. A stale stored read says so instead of looking current. */
+export function InboxSyncBar({ targetId, lastSynced, stale = false, disabled = false, locale = 'en' }: { targetId?: string; lastSynced: string | null; stale?: boolean; timeZone?: string; disabled?: boolean; locale?: InboxLocale }) {
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
   const [syncedNow, setSyncedNow] = useState<string | null>(null);
@@ -86,9 +86,11 @@ export function InboxSyncBar({ targetId, lastSynced, disabled = false, locale = 
   }
 
   const shown = syncedNow ?? lastSynced;
+  // A sync that just completed in this browser session is current by definition.
+  const showStale = stale && !syncedNow && shown !== null;
   return <div className={styles.sync}>
     <Button variant="secondary" disabled={disabled || busy} aria-busy={busy} onClick={() => void sync()}>{busy ? copy.syncing : copy.syncNow}</Button>
-    <InfoTip name={copy.lastSynced}>{shown ? <>{copy.lastSynced} <strong>{shown}</strong></> : copy.notSynced}</InfoTip>
+    <InfoTip name={copy.lastSynced}>{shown ? <>{copy.lastSynced} <strong>{shown}</strong>{showStale ? <> · {copy.staleNote}</> : null}</> : copy.notSynced}</InfoTip>
     <div role="status" aria-live="polite" className="ui-visually-hidden">{result?.kind === 'ok' ? <span>{result.text}</span> : null}</div>
     {result?.kind === 'error' ? <p role="alert" className={styles.error}>{result.text}</p> : null}
   </div>;

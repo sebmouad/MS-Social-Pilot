@@ -34,13 +34,13 @@ not promise it).
 | Metric catalog coverage | partial | narrow Root-editable defaults (`accountMetrics`: views/reach; `postMetrics`: views, reach, likes, comments, shares, saved, total_interactions); bilingual labels for more; extend through `instagram.policy` after live probing |
 | Comment read (owned media + replies) | implemented | `inbox.ts` (media-owner match, explicit truncation failure) |
 | Comment reply / hide+unhide / delete | implemented | `inbox.ts` + `inbox-host.ts` (shared authorization, locks, audit; delete via the shared durable path) |
-| Inbox background sync | missing | manual sync only (`instagramInboxHost.sync`); no `jobs.inbox` hook — contrast Facebook `syncInbox` |
+| Inbox background sync | implemented | `jobs.ts` `syncInstagramInbox` via the shared `inbox` job (fair workspace ring, per-workspace cursors, fetch-then-write through `adapter.listComments`, plan/grant/token/source rechecks, `instagram.inbox_synced` receipts); comments only, source/unit evidence, no live run |
 | Direct messages, reviews | missing | absent; reply policy reports comments-only |
 | Meta inbound webhooks | missing | no inbound receiver exists for any platform (Facebook likewise); IG sync is poll/manual |
 | Publication recovery registry | implemented | `container-recovery.ts` registered in `src/server/platforms/publication-recovery.ts`; this lane (was the documented before-activation gap) |
 | Token/grant health UI | implemented | `connection.grantHealth` (publishing/comments/analytics rows) via neutral `platformGrantHealth` in `ConnectionsScreen.tsx` |
 | Error kinds + retries | partial | `transport.ts` maps definite 4xx (codes 10/100/190/200) → `rejected`, 429/5xx/transient → `uncertain` + `retryable`; jobs retry via `withRetries`; no usage-header budget accounting (contrast Facebook `graph-usage.ts`) |
-| Stored local media delivery | missing | adapter refuses `localFile`; only public credentialless HTTPS URLs publish — needs the shared tenant-bound signed-URL pipeline (Publishing/media owner) |
+| Stored local media delivery | implemented | Publishing-owned signed-URL pipeline (`publishing.mediaShareSecret`/`mediaShareExpirySeconds`, `GET /api/media/[id]?ws=&exp=&sig=`); Instagram runtime advertises `localImageUpload` only while delivery is mintable and maps stored images to signed URLs at dispatch — images only, source/unit evidence, no live run |
 | Ads | unsupported | correctly declared; IG ads stay in Facebook Ads |
 
 Scope safety (verified in source, unchanged by this lane): no new top-level
@@ -125,9 +125,12 @@ switch off in production until every step passes and test content is cleaned.
   periods, comment/hide/delete round-trips).
 - `instagram.policy` metric defaults beyond the first live probe (extend only
   after the coverage probe confirms period/type per metric).
-- Stored local-media publishing (needs the shared signed-URL pipeline).
-- Inbox background sync, DMs, webhooks, usage-header accounting, remote media
-  deletion — absent by design or gap (see §1); do not promise them.
+- Stored local-media publishing and inbox background sync: implemented at
+  source/unit scope in the 2026-10-23 inbox-sync + media batch (signed URLs
+  minted at dispatch, fair workspace ring with cursors); still need a live
+  Graph run with outcome verification and cleanup before any release claim.
+- DMs, webhooks, usage-header accounting, remote media deletion — absent by
+  design or gap (see §1); do not promise them.
 - Browser EN/FR, theme, keyboard and phone verification of the touched flows;
   real REST/MCP client execution; production cutover gates per
   [CUTOVER.md](CUTOVER.md).

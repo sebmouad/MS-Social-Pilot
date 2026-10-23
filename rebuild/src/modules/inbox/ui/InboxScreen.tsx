@@ -39,6 +39,7 @@ import { readInboxContactDetails } from '@/modules/inbox/server/details';
 import type { InboxContactDetails } from '@/modules/inbox/details';
 import { inboxLocale } from './locale';
 import { inboxScope } from './scope';
+import { inboxSyncStale } from '@/modules/inbox/server/freshness';
 import styles from './inbox.module.css';
 
 const DEFAULT_FILTERS: InboxFilters = { channelId: null, kind: 'message', state: 'open', hidden: 'visible', q: '' };
@@ -203,7 +204,7 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
 
   const abilities = listPage ? await inboxListAbilities(actor, listPage) : new Map();
   const canWriteReplies = [...abilities.values()].some(ability => ability.write);
-  const [progressivePageLimit, previewMaxCharacters] = await Promise.all([runtimeConfig('inbox.progressivePageLimit'), runtimeConfig('inbox.listPreviewMaxCharacters')]);
+  const [progressivePageLimit, previewMaxCharacters, staleAfterMinutes] = await Promise.all([runtimeConfig('inbox.progressivePageLimit'), runtimeConfig('inbox.listPreviewMaxCharacters'), runtimeConfig('inbox.syncStaleAfterMinutes')]);
   const rows = listPage ? inboxListRows(listPage, abilities, baseLocation, requestedThread, locale, catalog, previewMaxCharacters) : [];
   // A scope, data or grant change starts a new browsing surface, invalidating
   // pending continuations and preventing older loaded rows surviving a refresh.
@@ -274,7 +275,7 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
   return <InboxCopyProvider catalog={catalog}><PageFrame module="inbox" scopedAccess><div className={styles.page}>
     <InboxHeader title={copy.title} count={listPage && filters.state === 'open' ? listPage.total : undefined} info={<InfoTip name={copy.title}>{copy.description}</InfoTip>} tabs={tabs} filters={filterRow}
       actions={<>
-        {visibleChannels.length > 0 ? <InboxSyncBar targetId={syncTarget} lastSynced={lastSynced ? formatInboxTime(lastSynced, timeZone, true, locale) : null} timeZone={timeZone} locale={locale} /> : null}
+        {visibleChannels.length > 0 ? <InboxSyncBar targetId={syncTarget} lastSynced={lastSynced ? formatInboxTime(lastSynced, timeZone, true, locale) : null} stale={inboxSyncStale(lastSynced, staleAfterMinutes)} timeZone={timeZone} locale={locale} /> : null}
         {visibleChannels.length > 0 ? <SavedRepliesManager locale={locale} canWrite={canWriteReplies} /> : null}
         <InboxShortcuts locale={locale} />
       </>} />
