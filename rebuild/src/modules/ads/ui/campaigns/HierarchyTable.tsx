@@ -45,6 +45,7 @@ export function HierarchyTable({ caption, rows, locale, actions, details, object
     try { await navigator.clipboard.writeText(row.id); toast.notify({ title: t('text159'), tone: 'success' }); }
     catch { toast.failed(t('text160'), () => void copyId(row), t('text161')); }
   }
+  const objectHref = (row: HierarchyRow) => objectsHref ? `${objectsHref}${objectsHref.includes('?') ? '&' : '?'}${new URLSearchParams({ level: row.level, q: row.name })}` : null;
 
   return <DataTable caption={caption} rows={rows} rowKey={row => row.key} density="compact"
     emptyMessage={t('text162')}
@@ -52,13 +53,13 @@ export function HierarchyTable({ caption, rows, locale, actions, details, object
     rowActions={row => [
       { key: 'copy', label: t('text164'), icon: <IconCopy size={16} />, onSelect: () => void copyId(row) },
       ...(objectsHref ? [{ key: 'open', label: t('text165'), icon: <IconExternalLink size={16} />,
-        onSelect: () => window.location.assign(`${objectsHref}${objectsHref.includes('?') ? '&' : '?'}${new URLSearchParams({ level: row.level, q: row.name })}`) }] : []),
+        onSelect: () => window.location.assign(objectHref(row) ?? objectsHref) }] : []),
     ]}
     columns={[
-      { key: 'name', label: t('text066'), hideCardLabel: true, render: row => <span className="ads-hierarchy__name">
+      { key: 'name', label: t('text066'), hideCardLabel: true, render: row => { const href = objectHref(row); return <span className="ads-hierarchy__name">
         <span className="ui-mod-chip" data-module="ads" aria-hidden="true">{LEVEL_ICON[row.level]}</span>
-        <span>{row.path ? <small className="ads-object-id" title={row.path}>{row.path}</small> : null}<strong>{row.name}</strong><small className="ads-object-id" title={row.id}>{levelWord[row.level]} {t('text166')}{row.id}</small></span>
-      </span> },
+        <span>{row.path ? <small className="ads-object-id" title={row.path}>{row.path}</small> : null}{href ? <strong><a href={href}>{row.name}</a></strong> : <strong>{row.name}</strong>}<small className="ads-object-id" title={row.id}>{levelWord[row.level]} {t('text166')}{row.id}</small></span>
+      </span>; } },
       { key: 'delivery', label: t('text167'), render: row => row.spend > 0 || row.impressions > 0
         ? <Badge tone="success">{t('text168')} {t('text166')}{row.days} {row.days === 1 ? t('text169') : t('text170')}</Badge>
         : <Badge tone="neutral">{t('text171')}</Badge> },

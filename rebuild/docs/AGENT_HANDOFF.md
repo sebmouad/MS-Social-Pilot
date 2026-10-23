@@ -1543,3 +1543,18 @@ Evidence: `npm run typecheck` 0 errors; new `content-ux-gaps-posts` (4) +
 `content-ux-gaps-inbox` (4) pass; neighbors `publishing-ui-round2`,
 `content-v2`, `content-catalog-merge`, `inbox-sync-freshness` pass (59 tests).
 No browser run (matrix needs a --yolo relaunch); deploy pending same.
+
+## 2026-10-23 UX gaps batch 2
+Dead-row hunt across 48 DataTable call sites: notification titles never linked
+anywhere although rows carry post/channel ids; ads hierarchy names were plain
+text although the row menu already filtered the objects manager. Fixes:
+`notificationHref` maps post kinds to the post page, connection kinds to
+/settings/channels, metric/report kinds to /insights/reports, triage to /tasks,
+queue_empty to the channel content list and other channel kinds to the inbox;
+titles link only when the source is still available and the id is safe, else
+plain text. `HierarchyTable` names link to the same filtered manager URL as the
+row menu. No copy/registry/migration/route change.
+
+Evidence: `npm run typecheck` 0 errors; new `content-ux-gaps-links` (5) pass;
+neighbors `notifications-engagement-ui`, `ads-manage-tabs-ui` pass. No browser
+run; deploy pending --yolo relaunch.

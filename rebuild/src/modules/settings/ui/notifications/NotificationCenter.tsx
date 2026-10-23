@@ -20,6 +20,25 @@ type EmailPrefs = NotificationPreferenceView['preferences'];
 
 const UPDATE_CONFIRMATION = 'UPDATE NOTIFICATION PREFERENCES';
 
+const SAFE_ID = /^[A-Za-z0-9_-]{1,200}$/; // Same identifier shape the notification contracts enforce.
+
+/**
+ * Deep link for a notification row, or null when it has no safe destination. A carried post always wins;
+ * channel-scoped inbox alerts open the inbox on that channel; connection problems open the channels list.
+ */
+export function notificationHref(item: Pick<NotificationRow, 'kind' | 'postId' | 'noteId' | 'targetId'>): string | null {
+  const id = (value: string | null | undefined) => value && SAFE_ID.test(value) ? value : null;
+  const postId = id(item.postId);
+  if (postId) return `/content/post/${postId}`;
+  if (item.kind === 'connection_expired' || item.kind === 'token_expiring') return '/settings/channels';
+  if (item.kind === 'metric_alert' || item.kind === 'report_delivered') return '/insights/reports';
+  if (item.kind === 'triage_assigned') return '/tasks';
+  const targetId = id(item.targetId);
+  if (!targetId) return null;
+  if (item.kind === 'queue_empty') return `/content?channel=${targetId}`;
+  return `/inbox?channel=${targetId}`;
+}
+
 /** Badge tone per notification event kind: mentions carry the accent, metric alerts warn, deliveries confirm. The event label still carries the meaning. */
 export function notificationEventTone(kind: NotificationRow['kind']): 'brand' | 'warning' | 'success' | 'neutral' {
   if (kind === 'note_mention' || kind === 'inbox_note_mention') return 'brand';
@@ -171,7 +190,7 @@ export function NotificationCenter({ initialPreferences, initialPage, locale = i
       {!listLoaded && rows.length === 0 && preferences && <div className={styles.emptyState}><p>{t.alertsMissing}</p><Button onClick={() => void loadList(1)}>{t.retry}</Button></div>}
       {listLoaded && rows.length === 0 && <EmptyState title={page > 1 ? t.emptyPageTitle : unreadOnly ? t.emptyUnreadTitle : t.emptyTitle} icon={<IconBell />} action={<Button onClick={() => void loadList(1, false)}>{t.refresh}</Button>}>{page > 1 ? t.emptyPageBody : unreadOnly ? t.emptyUnreadBody : t.emptyBody}</EmptyState>}
       {rows.length > 0 && <DataTable caption={t.tableCaption} rows={rows} rowKey={item => item.id} columns={[
-        { key: 'title', label: t.alert, render: item => <span data-unread={item.readAt ? undefined : 'true'}><span className={styles.title}>{item.title}</span><span className={styles.body}>{item.body}</span></span> },
+        { key: 'title', label: t.alert, render: item => { const href = item.available ? notificationHref(item) : null; return <span data-unread={item.readAt ? undefined : 'true'}>{href ? <a className={styles.title} href={href}>{item.title}</a> : <span className={styles.title}>{item.title}</span>}<span className={styles.body}>{item.body}</span></span>; } },
         { key: 'when', label: t.when, render: item => <time dateTime={new Date(item.createdAt).toISOString()}>{(item as { labels?: { createdAt?: string } }).labels?.createdAt ?? ''}</time> },
         { key: 'email', label: t.emailOutcome, render: item => emailOutcome(item.emailState) },
         { key: 'status', label: t.status, render: item => <span className={styles.badges}>{item.available ? <><Badge tone={item.readAt ? 'neutral' : 'brand'} solid={!item.readAt}>{item.readAt ? t.read : t.unread}</Badge><span aria-hidden="true"> · </span><Badge tone={notificationEventTone(item.kind)}>{eventName(item.kind)}</Badge></> : <Badge tone="neutral">{t.sourceGone}</Badge>}</span> },
