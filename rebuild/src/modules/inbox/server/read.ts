@@ -123,16 +123,15 @@ export async function readInboxList(actor: InboxReadActor, input: unknown = {}, 
     SELECT COALESCE(SUM(c."unreadCount"), 0) AS total FROM conversations c JOIN targets t ON t.id = c."targetId"
     WHERE t."workspaceId" = ${actor.workspaceId} AND t.id IN (${Prisma.join(channelIds)}) ${status('c')} ${narrow('message')} ${messageSearch}`)
     .then(rows => Number(rows[0]?.total ?? 0));
-  const [{ rows, total }, lastSynced, totals, unreadMessage, syncIncomplete] = await Promise.all([
+  const [{ rows, total }, syncMeta, totals, unreadMessage] = await Promise.all([
     activityPage,
-    inboxLastSynced(actor.workspaceId, channelIds),
+    inboxSyncMeta(actor.workspaceId, channelIds),
     kindTotals,
     unreadMessages,
-    inboxSyncIncomplete(actor.workspaceId, channelIds),
   ]);
   const { keys, ...cursors } = pageKeys(rows, take, cursor, fingerprint, limits.cursorMaxCharacters, cursorError);
   const items = await hydrateItems(actor.workspaceId, keys, channelIds);
-  return { ...base, ...cursors, items, total, totals, unread: { message: unreadMessage, comment: 0, review: 0 }, lastSynced, syncIncomplete };
+  return { ...base, ...cursors, items, total, totals, unread: { message: unreadMessage, comment: 0, review: 0 }, lastSynced: syncMeta.lastSynced, syncIncomplete: syncMeta.syncIncomplete };
 }
 
 type ReviewRow = { id: string; targetId: string; reviewerName: string | null; rating: number | null; recommendationType: string | null; reviewText: string | null; createdTime: Date; resolvedAt: Date | null };
@@ -268,22 +267,20 @@ export async function readInboxThread(actor: InboxReadActor, input: unknown, con
   return { thread: { kind, id, remoteId: conversation?.remoteId ?? comment?.remoteId, metadata: threadMetadata.get(id), rating: null, recommendation: null, target: { id: target.id, name: target.name, providerId: target.providerId, provider: target.socialAccount?.provider ?? null }, resolved: Boolean(conversation?.resolvedAt ?? comment?.resolvedAt), hidden: comment?.isHidden ?? false, postText: comment?.postTarget.post.message ?? null, postId: comment?.postTarget.post.id ?? null, entries: [...(comment ? [entry(comment)] : []), ...chronological], lastInbound }, history: { ...cursors, total: Number(counts[0]?.count ?? 0), shown: chronological.length, limit: take, cursor: encoded ?? null } };
 }
 
-/** Whether the latest sync audit overlapping the scope reports bounds-hit channels inside it. No audit, or none overlapping, means no partial claim. */
-export async function inboxSyncIncomplete(workspaceId: string, channelIds: string[]): Promise<boolean> {
-  if (!channelIds.length) return false;
-  const rows = await prisma.$queryRaw<Array<{ detail: unknown }>>`SELECT detail FROM root_activities WHERE action = 'inbox.synced' AND detail->>'workspaceId' = ${workspaceId} AND EXISTS (SELECT 1 FROM jsonb_array_elements_text(CASE WHEN jsonb_typeof(detail->'targetIds') = 'array' THEN detail->'targetIds' ELSE '[]'::jsonb END) AS channel(id) WHERE channel.id = ANY(${channelIds}::text[])) ORDER BY "createdAt" DESC LIMIT 1`;
-  return syncIncompleteFromAudit(rows[0]?.detail, channelIds);
+/** Latest overlapping sync audit plus the refresh timestamps, in one parallel batch: the audit row yields both the newest audit time and the bounds-hit channels. */
+export async function inboxSyncMeta(workspaceId: string, channelIds: string[]): Promise<{ lastSynced: Date | null; syncIncomplete: boolean }> {
+  if (!channelIds.length) return { lastSynced: null, syncIncomplete: false };
+  const [conversations, comments, audit, reviewed] = await Promise.all([
+    prisma.conversation.aggregate({ where: { targetId: { in: channelIds }, target: { workspaceId } }, _max: { fetchedAt: true } }),
+    prisma.postComment.aggregate({ where: { postTarget: { targetId: { in: channelIds }, target: { workspaceId }, post: { workspaceId } } }, _max: { fetchedAt: true } }),
+    prisma.$queryRaw<Array<{ at: Date | null; detail: unknown }>>`SELECT "createdAt" AS at, detail FROM root_activities WHERE action = 'inbox.synced' AND detail->>'workspaceId' = ${workspaceId} AND EXISTS (SELECT 1 FROM jsonb_array_elements_text(CASE WHEN jsonb_typeof(detail->'targetIds') = 'array' THEN detail->'targetIds' ELSE '[]'::jsonb END) AS channel(id) WHERE channel.id = ANY(${channelIds}::text[])) ORDER BY "createdAt" DESC LIMIT 1`,
+    prisma.$queryRaw<Array<{ at: Date | null }>>(Prisma.sql`SELECT MAX(r."fetchedAt") AS at FROM page_reviews r JOIN targets t ON t.id = r."targetId" WHERE t."workspaceId" = ${workspaceId} AND t.id IN (${Prisma.join(channelIds)})`),
+  ]);
+  const times = [conversations._max.fetchedAt, comments._max.fetchedAt, audit[0]?.at ?? null, reviewed[0]?.at ?? null].filter((value): value is Date => value instanceof Date);
+  return { lastSynced: times.length ? new Date(Math.max(...times.map(value => value.getTime()))) : null, syncIncomplete: syncIncompleteFromAudit(audit[0]?.detail, channelIds) };
 }
 
 /** Refresh timestamps only: replies and local workflow actions do not claim provider synchronization. */
 export async function inboxLastSynced(workspaceId: string, channelIds: string[]): Promise<Date | null> {
-  if (!channelIds.length) return null;
-  const [conversations, comments, audited, reviewed] = await Promise.all([
-    prisma.conversation.aggregate({ where: { targetId: { in: channelIds }, target: { workspaceId } }, _max: { fetchedAt: true } }),
-    prisma.postComment.aggregate({ where: { postTarget: { targetId: { in: channelIds }, target: { workspaceId }, post: { workspaceId } } }, _max: { fetchedAt: true } }),
-    prisma.$queryRaw<Array<{ at: Date | null }>>`SELECT MAX("createdAt") AS at FROM root_activities WHERE action = 'inbox.synced' AND detail->>'workspaceId' = ${workspaceId} AND EXISTS (SELECT 1 FROM jsonb_array_elements_text(CASE WHEN jsonb_typeof(detail->'targetIds') = 'array' THEN detail->'targetIds' ELSE '[]'::jsonb END) AS channel(id) WHERE channel.id = ANY(${channelIds}::text[]))`,
-    prisma.$queryRaw<Array<{ at: Date | null }>>(Prisma.sql`SELECT MAX(r."fetchedAt") AS at FROM page_reviews r JOIN targets t ON t.id = r."targetId" WHERE t."workspaceId" = ${workspaceId} AND t.id IN (${Prisma.join(channelIds)})`),
-  ]);
-  const times = [conversations._max.fetchedAt, comments._max.fetchedAt, audited[0]?.at ?? null, reviewed[0]?.at ?? null].filter((value): value is Date => value instanceof Date);
-  return times.length ? new Date(Math.max(...times.map(value => value.getTime()))) : null;
+  return inboxSyncMeta(workspaceId, channelIds).then(meta => meta.lastSynced);
 }
