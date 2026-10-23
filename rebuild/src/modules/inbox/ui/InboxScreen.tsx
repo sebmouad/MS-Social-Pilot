@@ -13,6 +13,7 @@ import { INBOX_QUICK_FILTERS, type InboxFilters, type InboxListPage, type InboxT
 import { readInboxList, readInboxThread } from '@/modules/inbox/server/read';
 import { PageFrame } from '@/server/PageFrame';
 import { requireViewer } from '@/server/context';
+import { canAccessFeature } from '@/server/permissions';
 import { canManageInbox, canManageInboxWorkflow } from '@/modules/inbox/server/actions';
 import { inboxReplyPolicy } from '@/modules/inbox/server/policy';
 import { inboxCapabilities } from '@/modules/inbox/server/providers';
@@ -206,7 +207,7 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
   const abilities = listPage ? await inboxListAbilities(actor, listPage) : new Map();
   const canWriteReplies = [...abilities.values()].some(ability => ability.write);
   const [progressivePageLimit, previewMaxCharacters, staleAfterMinutes] = await Promise.all([runtimeConfig('inbox.progressivePageLimit'), runtimeConfig('inbox.listPreviewMaxCharacters'), runtimeConfig('inbox.syncStaleAfterMinutes')]);
-  const rows = listPage ? inboxListRows(listPage, abilities, baseLocation, requestedThread, locale, catalog, previewMaxCharacters) : [];
+  const rows = listPage ? inboxListRows(listPage, abilities, baseLocation, requestedThread, locale, catalog, previewMaxCharacters, canAccessFeature(viewer.permissions, 'publishing/collaboration')) : [];
   // A scope, data or grant change starts a new browsing surface, invalidating
   // pending continuations and preventing older loaded rows surviving a refresh.
   const listRevision = createHash('sha256').update(JSON.stringify({ actor, constraints, channels: listPage?.channels, locale, baseLocation, cursor: listPage?.cursor, thread: requestedThread, items: listPage?.items, abilities: [...abilities], total: listPage?.total, progressivePageLimit, previewMaxCharacters })).digest('hex');

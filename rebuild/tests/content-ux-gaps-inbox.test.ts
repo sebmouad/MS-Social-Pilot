@@ -15,8 +15,8 @@ const item = (over: Record<string, unknown> = {}) => ({
   context: 'Our launch announcement text', sentiment: null, ...over,
 });
 const page = (items: Array<Record<string, unknown>>) => ({ items, timeZone: 'UTC', cursor: null }) as never;
-const html = (items: Array<Record<string, unknown>>, locale: 'en' | 'fr' = 'en') => {
-  const rows = inboxListRows(page(items), abilities as never, {}, undefined, locale, inboxCustomerCopy, 140);
+const html = (items: Array<Record<string, unknown>>, locale: 'en' | 'fr' = 'en', canOpenPosts = false) => {
+  const rows = inboxListRows(page(items), abilities as never, {}, undefined, locale, inboxCustomerCopy, 140, canOpenPosts);
   const selectables = rows.flatMap(row => row.selectable ? [row.selectable] : []);
   return renderToStaticMarkup(createElement(InboxSelectionProvider, { pageItems: selectables, children: createElement('ul', null, rows.map(row => row.content)) }));
 };
@@ -38,5 +38,20 @@ describe('inbox comment rows', () => {
   it('shows no origin line for messages', () => {
     const out = html([item({ key: 'message:m1', kind: 'message', id: 'm1', context: null })]);
     expect(out).not.toContain('On your post');
+  });
+  it('links the origin post outside the thread anchor for post readers', () => {
+    const out = html([item({ postId: 'p1' })], 'en', true);
+    expect(out).toContain('href="/content/post/p1"');
+    expect(out).toContain('>Open post<');
+    expect(out).toMatch(/<\/a><a[^>]*content\/post\/p1/);
+  });
+  it('shows the origin link in French', () => {
+    const out = html([item({ postId: 'p1' })], 'fr', true);
+    expect(out).toContain('>Ouvrir la publication<');
+  });
+  it('shows no origin link without a post, without access, or for messages', () => {
+    expect(html([item({ postId: null })], 'en', true)).not.toContain('content/post');
+    expect(html([item({ postId: 'p1' })])).not.toContain('content/post');
+    expect(html([item({ key: 'message:m1', kind: 'message', id: 'm1', context: null, postId: 'p1' })], 'en', true)).not.toContain('content/post');
   });
 });
