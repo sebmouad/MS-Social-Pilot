@@ -81,7 +81,7 @@ export async function readAdsDirectory(actor: AdsReadActor, input: unknown = {},
       return typeof value === 'string' && SAFE_ID.test(value) ? value : null;
     } catch { return null; }
   };
-  type Item = AdsObjectFigures & { accountId: string; accountName: string; currency: string | null; parentId: string | null; level: DirectoryLevel; lastDeliveryDate: string | null; lastFetchedAt: string | null };
+  type Item = AdsObjectFigures & { accountId: string; accountName: string; currency: string | null; parentId: string | null; status: string | null; level: DirectoryLevel; lastDeliveryDate: string | null; lastFetchedAt: string | null };
   let items: Item[] = await Promise.all([...groups.values()].map(async group => {
     const latest = [...group].sort((a, b) => b.date.getTime() - a.date.getTime())[0]!;
     const totals = totalsFromRows(group.map(flow));
@@ -90,7 +90,7 @@ export async function readAdsDirectory(actor: AdsReadActor, input: unknown = {},
     return {
       objectId: latest.objectId, name: latest.objectName || latest.objectId, spend: totals.spend, impressions: totals.impressions, clicks: totals.clicks, cpc: totals.cpc, ctr: totals.ctr, cpm: totals.cpm,
       accountId: latest.adAccountId, accountName: latest.adAccount.name, currency: latest.adAccount.currency, level,
-      parentId: await parentFor(providerByAccount.get(latest.adAccountId), level, latest.fields),
+      parentId: await parentFor(providerByAccount.get(latest.adAccountId), level, latest.fields), status: null,
       lastDeliveryDate: delivered ? adsIsoDay(delivered.date) : null, lastFetchedAt: fetched.newestFetchAt,
     };
   }));
@@ -102,8 +102,8 @@ export async function readAdsDirectory(actor: AdsReadActor, input: unknown = {},
     if (!account) continue;
     const key = `${object.adAccountId}:${object.objectId}`;
     const existing = known.get(key);
-    if (existing) { existing.name = object.name ?? existing.name; existing.parentId = object.parentId; continue; }
-    const item: Item = { objectId: object.objectId, name: object.name ?? object.objectId, accountId: account.id, accountName: account.name, currency: account.currency, level, parentId: object.parentId,
+    if (existing) { existing.name = object.name ?? existing.name; existing.parentId = object.parentId; existing.status = object.status ?? existing.status; continue; }
+    const item: Item = { objectId: object.objectId, name: object.name ?? object.objectId, accountId: account.id, accountName: account.name, currency: account.currency, level, parentId: object.parentId, status: object.status,
       spend: 0, impressions: 0, clicks: 0, ctr: null, cpc: null, cpm: null, lastDeliveryDate: null, lastFetchedAt: object.fetchedAt.toISOString() };
     items.push(item); known.set(key, item);
   }

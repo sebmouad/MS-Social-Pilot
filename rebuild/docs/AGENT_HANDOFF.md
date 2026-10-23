@@ -5,6 +5,41 @@ Full goal remains active. No browser, provider, database or production call by
 this lane. Historical records below retain their dates; current source
 reconciliation wins.
 
+## Ads manage tabs — 2026-10-23 (source/unit only, uncommitted)
+
+`/ads/manage` reorganized into Campaigns / Ad sets / Ads / Creatives
+URL tabs (`?level=`), replacing the mixed level-dropdown +
+metrics-sorted table with per-tab stored-data tables. All work is
+ads-module owned (`ui/objects/`, `directory/server.ts`, `copy.ts`).
+
+- **Screen** (`ui/objects/ObjectsScreen.tsx`): `LinkTabs` preserve
+  period/account/search, restart paging, drop inapplicable parent
+  filters; old `?level=campaign|adset|ad` links, legacy sort params
+  and `/ads/campaigns` deep links (`?level=&q=`) keep loading;
+  `level=adgroup` aliases to ad sets. Per-tab tables show name,
+  parent, stored status, spend, last delivery, updated + the existing
+  `ObjectManager` (rename, pause/resume, budget, creative assignment,
+  delete where the platform advertises it). Creation under each list:
+  `CampaignCreateForm`, `AdSetCreatePicker`, `AdCreatePicker`,
+  `CreativeCreateForm` — all through the existing preview/apply
+  management services, policies and scopes.
+- **Creatives tab**: no provider read on page load; `CreativesBrowser`
+  fetches `view=creatives` only on explicit member request with
+  account picker, cursor paging, preview/status columns and honest
+  read-only note (no creative rename/pause/delete exists).
+- **Services**: `readAdsDirectory` items gain additive inventory
+  `status`; no MCP tool, route or registry change (no MCP_PARITY edit,
+  no CONFIG_SCHEMA_VERSION bump); no migration.
+- **Copy**: 12 new `manage*` EN/FR customer keys in `ads.customerCopy`.
+- **Tests**: new `ads-manage-tabs` (routing/params, copy),
+  `ads-manage-directory` (status merge, error paths),
+  `ads-manage-tabs-ui` (pickers, browser incl. error/empty/cursor).
+
+Evidence: `npm run typecheck` 0 errors; 7 new/adjacent suites (43
+tests) + 11 guard/parity/copy suites (146 tests) pass. No browser,
+provider, database or production verification. No commit/push/deploy
+(not authorized this lane).
+
 ## Engagement batch — 2026-10-22 (source/unit only, uncommitted)
 
 Revalidated the brief against the tree first: scheduled reports and

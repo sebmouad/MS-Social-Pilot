@@ -256,6 +256,18 @@ export const adsCustomerCopy = {
 "customRangeLimit": {"en":"Custom ranges can include up to {days} days.","fr":"Les périodes personnalisées peuvent contenir jusqu’à {days} jours."},
 "dailyRowCount": {"en":"{count} daily row{suffix}","fr":"{count} ligne(s) quotidienne(s)"},
 "pagerSummary": {"en":"Showing {from}–{to} of {total} {kind}","fr":"Affichage de {from}–{to} sur {total} {kind}"},
+"manageTabsLabel": {"en": "Manage advertising objects", "fr": "Gérer les objets publicitaires"},
+"manageTabCreatives": {"en": "Creatives", "fr": "Visuels"},
+"manageMoreTabs": {"en": "More", "fr": "Plus"},
+"manageStatus": {"en": "Status", "fr": "État"},
+"manageSynced": {"en": "Updated", "fr": "Mis à jour"},
+"manageNoCampaigns": {"en": "No campaigns are stored for this account yet. Create a campaign first.", "fr": "Aucune campagne enregistrée pour ce compte pour l’instant. Créez d’abord une campagne."},
+"manageNoAdSets": {"en": "No ad sets are stored for this account yet. Create an ad set first.", "fr": "Aucun ensemble enregistré pour ce compte pour l’instant. Créez d’abord un ensemble de publicités."},
+"manageCreateAdSetNote": {"en": "Choose a stored campaign, then create a paused ad set under it.", "fr": "Choisissez une campagne enregistrée, puis créez un ensemble en pause."},
+"manageCreativesList": {"en": "Account creatives", "fr": "Visuels du compte"},
+"manageCreativesEmpty": {"en": "No creatives were returned for this account.", "fr": "Aucun visuel retourné pour ce compte."},
+"manageCreativesReadOnly": {"en": "Creatives can be listed and created here. Renaming, pausing or deleting a creative is not available.", "fr": "Les visuels peuvent être listés et créés ici. Renommer, suspendre ou supprimer un visuel n’est pas disponible."},
+"manageCreativePreview": {"en": "Preview", "fr": "Aperçu"},
   "text001": {
     "en": "Ad accounts",
     "fr": "Comptes publicitaires"

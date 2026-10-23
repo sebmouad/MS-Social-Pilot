@@ -797,3 +797,28 @@ Source/unit evidence only; no browser, provider or production run in this batch.
 - A new assignee gets one triage notification per assignment;
   unassignment and unchanged owners stay silent. Bulk assignment
   notifies per item through the same service.
+
+## Ads manage tabs — 2026-10-23
+
+Source/unit evidence only; no browser, provider or production run in this batch.
+
+- `/ads/manage` is four URL tabs (Campaigns, Ad sets, Ads, Creatives)
+  sharing one period/account header, one search row and the change
+  history below. Tabs are real links (`?level=`); switching keeps the
+  report and search state, restarts paging, and drops a parent filter
+  where it cannot apply. Old `?level=campaign|adset|ad` links and
+  legacy sort choices keep loading; `level=adgroup` reads as ad sets.
+- Each delivery tab lists stored objects with object-suited columns
+  (name, parent where it has one, stored status, period spend, last
+  delivery, updated) and the existing Details manager for
+  rename, pause/resume, budget, creative assignment and delete —
+  only where the account's platform advertises the operation.
+  Creation sits under the list: campaigns directly, ad sets under a
+  stored-campaign picker, paused ads under a stored ad-set picker.
+  A tab with no stored parents says so instead of offering a
+  parentless form.
+- The Creatives tab never reads the provider on page load: the member
+  picks an account and loads its creatives explicitly (preview,
+  name/id, status, with cursor paging). Creation uses the existing
+  unattached-creative form. The tab states plainly that renaming,
+  pausing or deleting a creative is unavailable.

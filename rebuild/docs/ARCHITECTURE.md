@@ -5,6 +5,27 @@ Updated 2026-10-22 (engagement batch) against the local working tree, configurat
 Current reconciliation below takes precedence over historical batch snapshots.
 Source, automated, browser, live-provider and production evidence remain distinct.
 
+## Ads manage tabs — 2026-10-23 (source only)
+
+`/ads/manage` is four URL tabs (Campaigns, Ad sets, Ads, Creatives)
+sharing one header, search and change history. The level dropdown and
+metrics-sorted table are gone; each delivery tab lists stored objects
+with name, parent, stored status, spend, last delivery and updated
+columns plus the existing Details manager (rename, pause/resume,
+budget, creative assignment, delete where advertised) and its create
+form (campaigns directly, ad sets and paused ads under stored-parent
+pickers). The directory now carries the inventory `status` on every
+item (additive field; no MCP tool or route change). The Creatives tab
+lists provider creatives only on explicit member request with cursor
+paging and reuses the unattached-creative form; creative
+rename/pause/delete stay honestly unavailable. Old
+`?level=campaign|adset|ad` links and legacy sort params keep loading.
+No migration, no registry change, schema stays 140. Typecheck 0
+errors; new manage-tabs/directory/UI suites plus touched
+guard/parity/copy suites pass. No browser, provider, database or
+production run. Budgets and start/end dates are not stored inventory,
+so the tables show spend and delivery dates instead.
+
 ## Engagement batch — 2026-10-22 (source only)
 
 Metric alert rules, inbox triage views, stored full-text search and
