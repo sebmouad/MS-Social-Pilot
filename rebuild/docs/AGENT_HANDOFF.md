@@ -1,9 +1,60 @@
 # Shared agent handoff
 
-Updated 2026-10-22 (engagement batch; uncommitted working tree), schema **140**.
+Updated 2026-10-23 (platform/moat batch; uncommitted working tree), schema **141**.
 Full goal remains active. No browser, provider, database or production call by
 this lane. Historical records below retain their dates; current source
 reconciliation wins.
+
+## Platform/moat batch — 2026-10-23 (source/unit only, uncommitted)
+
+Four additive parts, all in the working tree, no commit/push/deploy.
+`npm run typecheck` 0 errors; new suites
+`meta-webhooks` (18), `analytics-rollups` (12), `staging-dry-run` (7),
+`api-v1-contract` (5), `platform-moat-migration` (4) pass, plus
+parity-guard (22), config-validation (12) and the touched
+first-comment/inbox-moderation/page-labels/analytics-copy/overview-order/
+due-publishing suites.
+
+- **Meta webhooks** (`src/platforms/facebook/webhooks.ts`,
+  `webhook-copy.ts`, `src/server/platforms/webhooks-http.ts`,
+  `src/app/api/platforms/[platform]/webhooks/route.ts`): signed
+  ingestion of Page feed/comments/messages into existing stores with
+  idempotent content-free receipts in `meta_webhook_deliveries`, plus
+  the Root Facebook-platform diagnostics panel
+  (`modules/root/server/webhook-deliveries.ts`,
+  `modules/root/ui/RootWebhookDeliveries.tsx`). New keys
+  `meta.webhooksEnabled`, `meta.webhookVerifyToken`,
+  `meta.webhookDeliveryRetentionDays`, `meta.webhookDeliveriesCopy`.
+  Parity-guard exceptions added for both routes. Copy schema/split:
+  keep `module.ts` runtime-import-free (the copy catalog lives in the
+  leaf `webhook-copy.ts`; importing `webhooks.ts` from `module.ts`
+  reintroduces a registry cycle).
+- **Analytics rollups** (`src/modules/analytics/rollups/`,
+  `src/platforms/facebook/rollups.ts`, read preference in
+  `facebookAnalyticsHost.load`): nightly `analyticsRollups` job,
+  `analytics_rollup_daily`/`_weekly`/`_runs` tables, weekly cascade
+  with catalog disclosure. New keys `analytics.rollups.schedule`,
+  `analytics.rollups.policy`; `meta.pageAnalyticsCopy` gained optional
+  `rollupWeeksNote`.
+- **Staging dry-run** (`src/server/jobs/staging.ts` + gates in
+  `jobs/sync.ts`, `first-comment-jobs.ts`, `inbox/moderation.ts`):
+  Root switch `jobs.stagingDryRun` suppresses worker provider
+  dispatches and audits `worker.staging_dry_run` batches.
+- **API v1**: no route change; `docs/API_V1.md` pins the versioned
+  contract (source-checked), `docs/INTEGRATIONS.md` gained the two
+  previously undocumented metric-alert operations.
+- **Migration** `20261103050000_platform_moat` (additive, sorts after
+  engagement alerts). Not applied anywhere: no scratch Postgres was
+  reachable from this lane (docker socket denied, no local server),
+  so apply + a live rollup/webhook rehearsal remain for a lane with a
+  database. Schema 140 -> 141; `security.apiRequestsPerMinute` text
+  now covers inbound webhooks.
+- **Unresolved / next:** live Meta subscription + delivery proof;
+  rollup production timing comparison; dry-run rehearsal on staging;
+  `meta_webhook_deliveries` has no workspace FK by design (retained
+  operational history); weekly Instagram rollups need an Instagram
+  `rollups` mapper; `data-control` recent-table Postgres checks for
+  the four new tables still need a database run.
 
 ## Ads manage tabs — 2026-10-23 (source/unit only, uncommitted)
 

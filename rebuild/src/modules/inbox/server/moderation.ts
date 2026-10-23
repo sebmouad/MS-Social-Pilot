@@ -7,6 +7,7 @@ import { emitWorkspaceAlert } from '@/modules/settings/notifications/producers';
 import { runtimeConfig } from '@/server/config/store';
 import { OperationError } from '@/lib/operation-error';
 import { withWorkspaceOperation } from '@/server/data-control/guard';
+import { isStagingDryRun, suppressStagingBatch } from '@/server/jobs/staging';
 import { loadPermissions } from '@/server/permissions/loader';
 import { inboxCapabilities } from '@/modules/inbox/server/providers';
 import { moderateInboxComment, replyToInbox } from '@/modules/inbox/server/actions';
@@ -223,6 +224,11 @@ export async function runAutomaticInboxModeration(now = new Date()): Promise<{ w
   const [enabled, limit] = await Promise.all([runtimeConfig('inbox.moderationAutoRun'), runtimeConfig('inbox.moderationAutoWorkspaceLimit')]);
   if (enabled !== true || !Number.isSafeInteger(limit) || (limit as number) < 1) return total;
   const workspaces = await prisma.$queryRaw<Array<{ workspaceId: string }>>`SELECT DISTINCT r."workspaceId" FROM moderation_rules r JOIN workspaces w ON w.id = r."workspaceId" WHERE r.enabled = true AND w."suspendedAt" IS NULL ORDER BY r."workspaceId" LIMIT ${limit as number}`;
+  if (workspaces.length && await isStagingDryRun()) {
+    await suppressStagingBatch('inbox', 'inbox_moderation', workspaces.map(row => ({ workspaceId: row.workspaceId, id: row.workspaceId })));
+    total.skipped += workspaces.length;
+    return total;
+  }
   for (const { workspaceId } of workspaces) {
     const owners = await prisma.$queryRaw<Array<{ userId: string }>>`SELECT m."userId" FROM memberships m JOIN users u ON u.id = m."userId" WHERE m."workspaceId" = ${workspaceId} AND m.role::text = 'owner' AND u."disabledAt" IS NULL ORDER BY m."userId"`;
     for (const { userId } of owners) {

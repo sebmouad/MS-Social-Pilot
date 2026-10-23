@@ -7,6 +7,7 @@ import { RootModuleSettings } from '@/modules/root/ui/RootModuleSettings';
 import { RootPlatformPublicationEvidence } from '@/modules/root/ui/RootPlatformPublicationEvidence';
 import { platformModule } from '@/platforms';
 import { RootApiUsage } from '@/modules/root/ui/RootApiUsage';
+import { RootWebhookDeliveries } from '@/modules/root/ui/RootWebhookDeliveries';
 
 export const dynamic = 'force-dynamic';
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
@@ -27,5 +28,6 @@ export default async function RootPlatformModulePage({ params, searchParams }: {
     </section>
     <RootPlatformPublicationEvidence providerId={module.id} operationId={query.operationId} />
     <RootApiUsage providerId={module.id} />
+    <RootWebhookDeliveries providerId={module.id} />
   </RootModuleSettings>;
 }

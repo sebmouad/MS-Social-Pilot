@@ -23,6 +23,7 @@ import { withSelectedResourceOperation } from '@/server/platforms/resource-lock'
 import type { FeatureId } from '@/lib/product';
 import { jobAbortSignal, jobStopRequested } from '@/server/jobs/job-context';
 import { FACEBOOK_ANALYTICS_LOOKBACK_DAYS_SCHEMA } from './module';
+import { purgeExpiredWebhookDeliveries } from './webhooks';
 
 const jobFeatures = {
   publishing: ['publishing/posts'],
@@ -482,5 +483,7 @@ export async function syncInbox(now = new Date(), retryLimit = 0, retryBackoff?:
       else { result.failed++; await logItemFailure('inbox', target.id, error); }
     }
   }
+  // Bounded retention sweep for the webhook delivery log; never fails the sync.
+  try { await purgeExpiredWebhookDeliveries(now); } catch (error) { await logItemFailure('webhookDeliveries', 'retention', error); }
   return result;
 }

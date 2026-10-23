@@ -1,9 +1,53 @@
 # MS Social Pilot architecture
 
-Updated 2026-10-22 (engagement batch) against the local working tree, configuration schema **140**.
+Updated 2026-10-23 (platform/moat batch) against the local working tree, configuration schema **141**.
 [ARCHITECTURE_CONTRACT.md](ARCHITECTURE_CONTRACT.md) remains binding; §4 gained the owner-approved 2026-10-22 Ads-area decision.
 Current reconciliation below takes precedence over historical batch snapshots.
 Source, automated, browser, live-provider and production evidence remain distinct.
+
+## Platform/moat batch — 2026-10-23 (source only)
+
+Additive platform hardening in four parts; no route, tool or behavior
+removal, no provider fan-out added on page load.
+
+- Meta inbound webhooks (Facebook-owned): `POST
+  /api/platforms/facebook/webhooks` verifies `X-Hub-Signature-256`
+  against `meta.appSecret` and ingests Page feed posts, comments and
+  visitor messages idempotently into the existing stores (no provider
+  request; unresolvable events stay unmatched for the next sync);
+  `GET` answers Meta's handshake for the Root secret
+  `meta.webhookVerifyToken`. Content-free receipts land in
+  `meta_webhook_deliveries` (installation operational history, retained
+  under `meta.webhookDeliveryRetentionDays`) and surface in the private
+  Root Facebook-platform diagnostics panel. Contract:
+  [META_WEBHOOKS.md](META_WEBHOOKS.md).
+- Analytics rollups (Analytics-owned tables and worker, per-platform
+  stored-data mappers): the nightly `analyticsRollups` job precomputes
+  `analytics_rollup_daily` and derives `analytics_rollup_weekly` with
+  coverage rows in `analytics_rollup_runs`. Overview, explorer and
+  comparison reads prefer the rollups when a run finished today covers
+  the request (weekly points with a catalog note past
+  `weeklyThresholdDays`, the current day always detailed) and fall back
+  to detailed reads otherwise. Contract:
+  [ANALYTICS_ROLLUPS.md](ANALYTICS_ROLLUPS.md).
+- Staging dry-run: Root switch `jobs.stagingDryRun` (default off) makes
+  the worker publish, first-comment and automatic-moderation paths skip
+  provider dispatches and audit each suppressed batch as
+  `worker.staging_dry_run`. Local scheduling, drafts, reads and
+  user-initiated actions are unaffected.
+- Public API v1: no route change; the existing posts/scheduling,
+  Analytics, Ads, identity and outbound-webhook surface is pinned as
+  the versioned contract in [API_V1.md](API_V1.md), checked against
+  source by `tests/api-v1-contract.test.ts`.
+
+New migration `20261103050000_platform_moat` (four tables, additive).
+Registry keys added: `meta.webhooksEnabled`,
+`meta.webhookVerifyToken`, `meta.webhookDeliveryRetentionDays`,
+`meta.webhookDeliveriesCopy`, `analytics.rollups.schedule`,
+`analytics.rollups.policy`, `jobs.stagingDryRun`;
+`meta.pageAnalyticsCopy` gained the optional bilingual
+`rollupWeeksNote`. Parity-guard exceptions added for the two webhook
+routes; no MCP tool change.
 
 ## Ads manage tabs — 2026-10-23 (source only)
 

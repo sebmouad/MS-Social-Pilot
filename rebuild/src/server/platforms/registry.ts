@@ -108,6 +108,15 @@ export function platformDataCallbacks(provider: string): PlatformHost['dataCallb
   return hostFor(provider)?.dataCallbacks ?? null;
 }
 
+/**
+ * Provider-owned inbound webhooks. Deliberately not gated by the Root enable
+ * switch: each event still resolves only against eligible stored targets, and
+ * the module's own reception switch stays authoritative.
+ */
+export function platformWebhooks(provider: string): PlatformHost['webhooks'] | null {
+  return hostFor(provider)?.webhooks ?? null;
+}
+
 /** The connection flow of an installed, switched-on module. */
 export async function connectionFlow(provider: string): Promise<PlatformHost['connection'] | null> {
   const host = hostFor(provider);

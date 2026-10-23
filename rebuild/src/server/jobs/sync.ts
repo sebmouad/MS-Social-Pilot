@@ -6,6 +6,7 @@ import { canAccessFeature } from '@/server/permissions';
 import { loadPermissions } from '@/server/permissions/loader';
 import { loadEntitlements, canUseFeature } from '@/server/entitlements';
 import { assertWorkspaceNotPurging } from '@/server/data-control/guard';
+import { isStagingDryRun, suppressStagingBatch } from './staging';
 import type { JobSummary } from './types';
 export type { JobSummary } from './types';
 
@@ -18,6 +19,11 @@ export async function publishDuePosts(now = new Date()): Promise<JobSummary> {
     select: { id: true, authorId: true, workspaceId: true, scheduledAt: true },
   });
   const result: JobSummary = { examined: rows.length, updated: 0, skipped: 0, failed: 0 };
+  if (rows.length && await isStagingDryRun()) {
+    await suppressStagingBatch('posts', 'publish', rows.map(row => ({ workspaceId: row.workspaceId, id: row.id })));
+    result.skipped += rows.length;
+    return result;
+  }
   for (const row of rows) {
     try {
       await assertWorkspaceNotPurging(row.workspaceId);

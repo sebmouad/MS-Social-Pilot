@@ -115,6 +115,10 @@ export type PostPerformanceRequest = { workspaceId: string; targetId: string; fr
 
 export interface PlatformAnalyticsHost {
   load(request: AnalyticsProviderRequest): Promise<AnalyticsProviderData>;
+  /** Optional: precompute one daily value per channel/metric from stored insights. No provider request. */
+  rollups?: {
+    computeDaily(input: { workspaceId: string; targetIds: readonly string[]; from: Date; to: Date }): Promise<ChannelRollupRow[]>;
+  };
   /** Stored measures for an authorized channel. Explicit sort uses unknown-last ordering and postId ties; omitted sort retains provider ranking. No provider request. */
   postPerformance?(request: PostPerformanceRequest): Promise<PostPerformance[]>;
   /** Optional: stored per-post measures summed for one already-authorized channel over [from, to). No provider request. */
@@ -181,6 +185,42 @@ export type PlatformDataCallbackResult =
 export interface PlatformLinkCard { title: string | null; description: string | null; imageUrl: string | null; siteName: string | null }
 export interface PlatformLinkPreviewHost { refresh(url: string, signal: AbortSignal): Promise<PlatformLinkCard | null> }
 
+/** One provider-to-app event delivery receipt. Content-free: kinds and counts only, never message text. */
+export interface PlatformWebhookDelivery {
+  id: string; receivedAt: Date; pageId: string;
+  eventKind: 'feed_post' | 'feed_comment' | 'message' | 'unknown';
+  status: 'accepted' | 'duplicate' | 'unmatched' | 'ignored';
+  matchedTargets: number;
+  detail: { verb?: string; written?: number; reason?: string; errors?: string[] };
+}
+
+/** Module-worded labels for the shared Root webhook-deliveries panel. */
+export interface PlatformWebhookDeliveriesCopy {
+  title: string; intro: string; empty: string; unavailable: string;
+  received: string; page: string; kind: string; status: string; targets: string; detail: string;
+  kinds: Record<PlatformWebhookDelivery['eventKind'], string>;
+  statuses: Record<PlatformWebhookDelivery['status'], string>;
+  written: string; verb: string; disabled: string; unknownEvent: string;
+}
+
+/** Provider-owned inbound webhooks: verification handshake, signed ingestion and diagnostics. */
+export interface PlatformWebhooksHost {
+  /** Provider verification handshake (Meta's hub.mode challenge). Never stores. */
+  verifySubscription(query: { mode: string | null; token: string | null; challenge: string | null }): Promise<{ ok: boolean; challenge?: string }>;
+  /** Verify the provider signature and idempotently ingest one raw delivery. No provider request. */
+  ingest(rawBody: string, signature: string | null, now?: Date): Promise<{ received: number; accepted: number; duplicates: number; unmatched: number; ignored: number }>;
+  /** Recent delivery receipts for Root diagnostics, newest first. */
+  readDeliveries(limit: number): Promise<PlatformWebhookDelivery[]>;
+  /** Module-owned panel labels in the requested locale. */
+  copy(locale: 'en' | 'fr'): Promise<PlatformWebhookDeliveriesCopy>;
+}
+
+/** One precomputed daily channel value: latest observation per day for stocks, sum of the day for flows. */
+export interface ChannelRollupRow {
+  targetId: string; metric: string; period: string; day: string;
+  kind: 'flow' | 'stock'; value: number; samples: number; asOf: Date; fetchedAt: Date;
+}
+
 /** One provider throttling scope with the latest value the provider reported; never a quota guarantee. */
 export interface PlatformApiUsageScope {
   scope: string;
@@ -211,6 +251,8 @@ export interface PlatformHost {
   /** Build the engine from Root settings. */
   adapter(): Promise<PlatformAdapter>;
   jobs?: Partial<Record<PlatformJobName, (now: Date, retryLimit: number, retryBackoff: RetryBackoff) => Promise<JobSummary>>>;
+  /** Optional provider-owned inbound webhooks (verification, signed ingestion, diagnostics). */
+  webhooks?: PlatformWebhooksHost;
   /** Provider-signed callbacks for access removal and data erasure; the module verifies the provider's signature. */
   dataCallbacks?: {
     deauthorize(signedRequest: string): Promise<PlatformDataCallbackResult>;

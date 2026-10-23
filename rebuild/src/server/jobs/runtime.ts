@@ -64,6 +64,11 @@ return {
       const result = await runMetricAlerts(now);
       return Object.entries(result).map(([key, value]) => `${key}=${value}`).join(' ');
     }
+    if (job === 'analyticsRollups') {
+      const { runAnalyticsRollups } = await import('@/modules/analytics/rollups/runner');
+      const result = await runAnalyticsRollups(now);
+      return Object.entries(result).map(([key, value]) => `${key}=${value}`).join(' ');
+    }
     if (job === 'notifications') {
       const { deliverNotifications } = await import('@/modules/settings/notifications/delivery');
       const { scanConnectionAlerts } = await import('@/modules/settings/notifications/connection-alerts');

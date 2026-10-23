@@ -1,4 +1,5 @@
 import { FACEBOOK_DATA_DETAIL_CONFIG, FACEBOOK_HISTORY_CONFIG, FACEBOOK_DATA_CONFIG } from './config';
+import { META_WEBHOOK_DELIVERIES_COPY_DEFAULTS, metaWebhookDeliveriesCopySchema } from './webhook-copy';
 import { z } from 'zod';
 import { FACEBOOK_NATIVE_CONFIG, FACEBOOK_NATIVE_TRANSPORT_CONFIG } from './native-config';
 import { entry, url, stringList } from '@/lib/config/entry';
@@ -87,6 +88,10 @@ const facebookConfigEntries = [
   entry({ key: 'api.meta.requestsPerMinute', group: 'Facebook · API rate limits', label: 'Meta requests per minute', kind: 'number', description: 'Application-side request budget for Meta API calls.', defaultValue: 200, schema: z.number().int().min(1).max(100000), consumption: 'planned' }),
   entry({ key: 'meta.graphUsagePolicy', group: 'Facebook · API rate limits', label: 'Graph usage recording policy', kind: 'json', description: 'Records the latest app, ad-account and business-use-case usage Graph reports in response headers for the private Root usage view. minWriteIntervalSeconds throttles database writes per scope; readings older than staleAfterSeconds are marked stale; values at or above warnPercent are highlighted. Readings are Meta-reported estimates, not a quota guarantee.', defaultValue: FACEBOOK_GRAPH_USAGE_POLICY, schema: facebookGraphUsagePolicySchema, consumption: 'active' }),
   entry({ key: 'meta.graphUsageCopy', group: 'Facebook · API rate limits', label: 'Graph usage labels', kind: 'json', description: 'English and French labels for Graph usage scopes and metrics shown in Root.', defaultValue: FACEBOOK_GRAPH_USAGE_COPY, schema: facebookGraphUsageCopySchema, consumption: 'active' }),
+  entry({ key: 'meta.webhooksEnabled', group: 'Facebook · Webhooks', label: 'Receive Meta webhooks', kind: 'boolean', description: 'When on, verified Page feed, comment and message deliveries are ingested into stored tables. The Meta app subscription and verify token are still required; switching off records deliveries as ignored without storing.', defaultValue: true, schema: z.boolean(), consumption: 'active' }),
+  entry({ key: 'meta.webhookVerifyToken', group: 'Facebook · Webhooks', label: 'Meta webhook verify token', kind: 'secret', description: 'Encrypted at rest. Enter the same value in the Meta app dashboard webhook subscription; the verification handshake echoes only for this token. Empty refuses every handshake. The saved value is never returned by the configuration API.', defaultValue: '', schema: z.string().max(500), consumption: 'active' }),
+  entry({ key: 'meta.webhookDeliveryRetentionDays', group: 'Facebook · Webhooks', label: 'Webhook delivery log retention (days)', kind: 'number', description: 'How long content-free webhook delivery receipts are kept for Root diagnostics. The worker inbox job purges older rows.', defaultValue: 30, schema: z.number().int().min(1).max(365), consumption: 'active' }),
+  entry({ key: 'meta.webhookDeliveriesCopy', group: 'Facebook · Webhooks', label: 'Webhook diagnostics copy', kind: 'json', description: 'English and French labels for the private Root webhook-deliveries panel.', defaultValue: META_WEBHOOK_DELIVERIES_COPY_DEFAULTS, schema: metaWebhookDeliveriesCopySchema, consumption: 'active' }),
 ] as const;
 
 /** Every setting remains owned by this adapter, including legacy key namespaces. */

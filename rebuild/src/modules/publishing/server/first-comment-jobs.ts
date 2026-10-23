@@ -6,6 +6,7 @@ import { runtimeConfig } from '@/server/config/store';
 import { OperationError } from '@/lib/operation-error';
 import { sendDueFirstComment } from './first-comment';
 import { assertWorkspaceJobAccess } from '@/server/jobs/access';
+import { isStagingDryRun, suppressStagingBatch } from '@/server/jobs/staging';
 
 type Candidate = {
   postId: string; postTargetId: string; workspaceId: string; authorId: string; provider: string;
@@ -68,6 +69,11 @@ export async function runDueFirstComments(now = new Date()): Promise<DueFirstCom
   if (!positiveInteger(limit) || limit < 1 || !positiveInteger(maxDelayMinutes)) throw new PublishingOperationError('unavailable', 'automaticFirstcommentSettingsAreUnavailable', {}, errorText);
   const rows = await readCandidates(now, limit, maxDelayMinutes);
   const result: DueFirstCommentSummary = { ...empty(), examined: rows.length };
+  if (rows.length && await isStagingDryRun()) {
+    await suppressStagingBatch('posts', 'first_comment', rows.map(row => ({ workspaceId: row.workspaceId, id: row.postTargetId })));
+    result.skipped += rows.length;
+    return result;
+  }
   for (const row of rows) {
     try {
       await assertWorkspaceJobAccess(row.workspaceId, { provider: row.provider, anyFeatureOf: ['publishing/posts'] });

@@ -607,6 +607,7 @@ excepted.
 | GET /api/connections/[platform]/callback | Provider consent callback validates browser OAuth state; autonomous tools initiate consent through mapped start_connection. |
 | GET /api/health | Unauthenticated liveness/readiness probe for proxies and deploy scripts; returns only a status code and worker state, no workspace data. Operators read the same facts through get_root_operations. |
 | GET /api/mcp | MCP HTTP transport negotiation/unsupported-stream response, not a product capability. |
+| GET /api/platforms/[platform]/webhooks | Provider endpoint-verification handshake (Meta hub.mode challenge); the module checks its own verification token and stores nothing. No workspace identity exists. |
 | GET /api/v1/me | Credential introspection returns authenticated key grants/ceilings; protocol-specific identity metadata, not workspace product data. |
 | POST /api/auth/invitations/accept | Interactive invitation redemption binds the current browser identity; workspace MCP credentials cannot bootstrap membership. |
 | POST /api/auth/invitations/enroll | Interactive invitation account enrollment/verification ceremony; not an authenticated workspace operation. |
@@ -629,6 +630,7 @@ excepted.
 | POST /api/oauth/token | OAuth authorization-code/refresh-token exchange; authentication protocol, not a product operation. |
 | POST /api/platforms/[platform]/deauthorize | Provider-signed server-to-server "app removed" callback (Meta); authenticated by the provider's signature, not a workspace identity. Connection removal stays mapped through disconnect_connection. |
 | POST /api/platforms/[platform]/data-deletion | Provider-signed server-to-server erasure request (Meta); authenticated by the provider's signature. Returns a public status URL and code; not a workspace operation. |
+| POST /api/platforms/[platform]/webhooks | Provider-signed server-to-server event delivery (Meta feed, comments, messages); authenticated by the provider's signature and ingested idempotently by the module. No workspace credential exists; receipts stay in the private Root diagnostics panel. |
 | POST /api/sharing/public/[token]/decision | External reviewer share-token decision; separate public reviewer authority from workspace MCP. Advisory approvals/change requests atomically queue author-eligible notices with the answer; applied decisions use Publishing notices. Authenticated link management/feedback and notification reads stay mapped; comments do not queue notices. |
 | POST /api/errors | Browser telemetry sink for the app's own pages: a signed-in browser reports its uncaught errors to the self-hosted recorder (rate limited, scrubbed, Root-bounded). It exposes no product data and no write a person chooses; operators read and resolve the result through the mapped Root error tools. |
 <!-- parity-rest-exceptions:end -->

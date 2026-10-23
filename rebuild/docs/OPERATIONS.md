@@ -204,3 +204,72 @@ grace days, guardrail channel limit); a workspace policy can only narrow them.
   switch `agents.scheduledRunsEnabled` off. Already scheduled posts still send
   through the normal publish path; cancel them in the queue. Never edit
   `autopilot_policies` by hand: tier changes are audited service writes.
+
+## Staging dry-run (platform/moat batch, 2026-10-23)
+
+Root switch `jobs.stagingDryRun` (default off, `Sync schedules`). When on,
+worker publish (`posts` due posts), first-comment (`posts` due first
+comments) and automatic inbox moderation (`inbox`) dispatches are skipped
+and each suppressed batch is audited as `worker.staging_dry_run`
+(`actorId` NULL) with workspace, job, kind, count and a bounded id
+sample, instead of sent. Local scheduling, drafts, reads,
+reconciliation and every user-initiated action are unaffected, so a
+rehearsal exercises the full local pipeline without touching providers.
+
+- **Rehearse:** switch dry-run on, run the worker (or Run now on `posts`
+  and `inbox`), then inspect Root activity for `worker.staging_dry_run`
+  rows and the job summaries (`skipped=<n>` counts the suppressed
+  dispatches). Switch dry-run back off before leaving rehearsal.
+- **Incidents:** dry-run never changes post, comment or moderation state;
+  suppressed dispatches simply run on the next live tick. There is no
+  per-workspace dry-run: the switch covers the whole installation.
+
+## Meta webhooks runbook (platform/moat batch, 2026-10-23)
+
+Module: `src/platforms/facebook/webhooks.ts` (verify, parse, ingest).
+Full contract: [META_WEBHOOKS.md](META_WEBHOOKS.md).
+
+- **Subscribe:** set `meta.webhookVerifyToken` in Root, enter the same
+  value plus `https://<host>/api/platforms/facebook/webhooks` in the Meta
+  app dashboard webhook subscription (Page `feed` and `messages` fields),
+  and confirm the handshake echoes. `meta.webhooksEnabled` stays on.
+- **Diagnose:** Root, Facebook platform page, "Meta webhook deliveries"
+  panel: the 50 most recent content-free receipts (outcome, matched
+  channels, counts). `unmatched` means no eligible stored target, post
+  or thread resolved; those events wait for the next sync. `duplicate`
+  means Meta retried a delivery that already converged.
+- **Rotate:** change `meta.webhookVerifyToken` in Root, then update the
+  Meta dashboard value; deliveries signed with the app secret are
+  unaffected. Changing `meta.appSecret` re-signs every delivery.
+- **Pause:** switch `meta.webhooksEnabled` off. Deliveries are still
+  verified and recorded as ignored without storing.
+- **Incidents:** signature failures (`401`) mean the app secret and Meta
+  disagree; handshake refusals (`403`) mean the verify token disagrees.
+  Receipts older than `meta.webhookDeliveryRetentionDays` (default 30)
+  are purged by the inbox job. Never edit `meta_webhook_deliveries` by
+  hand: receipts are written only by ingestion.
+
+## Analytics rollup runbook (platform/moat batch, 2026-10-23)
+
+Module: `src/modules/analytics/rollups/` (worker + read preference) with
+the Facebook stored-data mapper in
+`src/platforms/facebook/rollups.ts`. Full contract:
+[ANALYTICS_ROLLUPS.md](ANALYTICS_ROLLUPS.md).
+
+- **Precompute:** the `analyticsRollups` job
+  (`analytics.rollups.schedule`, default `30 1 * * *`) folds stored Page
+  insights into `analytics_rollup_daily` and derives
+  `analytics_rollup_weekly`, recording coverage per workspace in
+  `analytics_rollup_runs`. No provider request is made. The summary ends
+  with `workspaces=<n> examined=<n> written=<n> skipped=<n> failed=<n>`.
+- **Reads:** overview, explorer and comparison prefer the rollups when a
+  run finished today covers the request (window plus every selected
+  channel); long ranges render weekly points with a catalog note, the
+  current day always reads in detail, and anything uncovered falls back
+  to detailed reads. The daily path is output-identical to detailed
+  reads.
+- **Incidents:** a missed or failed run only slows reads (they fall
+  back); fix the worker and the next run refreshes the hot lookback.
+  `partial` runs mean a workspace exceeds `batchTargets`: uncovered
+  channels fall back until the batch grows. Never edit the rollup
+  tables by hand; delete nothing to "refresh" them.

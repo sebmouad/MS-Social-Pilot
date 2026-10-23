@@ -14,6 +14,8 @@ import { syncAdsAnalytics, syncInbox, syncPageAnalytics, syncScheduledPostStatus
 import { syncFacebookSubmittedPosts } from './submitted-jobs';
 import { refreshFacebookLinkCard } from './link-preview';
 import { readFacebookGraphUsage } from './graph-usage';
+import { ingestMetaWebhookDelivery, metaWebhookDeliveriesCopy, readMetaWebhookDeliveries, verifyMetaWebhookSubscription } from './webhooks';
+import { computeFacebookDailyRollups } from './rollups';
 
 async function syncFacebookPosts(now?: Date, retryLimit?: number, retryBackoff?: Parameters<typeof syncScheduledPostStatus>[2]) {
   const scheduled = await syncScheduledPostStatus(now, retryLimit, retryBackoff);
@@ -26,7 +28,13 @@ export const facebookHost = {
   adapter: configuredFacebookAdapter,
   diagnostics: facebookDiagnostics,
   ads: { ...facebookAdsHost, operations: facebookAdsOps, configuredOperations: configuredFacebookAdsOps },
-  analytics: facebookAnalyticsHost,
+  analytics: { ...facebookAnalyticsHost, rollups: { computeDaily: computeFacebookDailyRollups } },
+  webhooks: {
+    verifySubscription: verifyMetaWebhookSubscription,
+    ingest: ingestMetaWebhookDelivery,
+    readDeliveries: readMetaWebhookDeliveries,
+    copy: metaWebhookDeliveriesCopy,
+  },
   linkPreview: { refresh: refreshFacebookLinkCard },
   apiUsage: { read: readFacebookGraphUsage },
   inbox: { replyPolicy: facebookReplyPolicy, canManage: canManageFacebookInbox, sync: syncFacebookInbox, reply: replyToFacebookInbox, moderate: moderateFacebookComment, prepareDeleteComment: prepareDeleteFacebookComment, readCommentPresence: readFacebookCommentPresence, reviews: { sync: syncFacebookReviews } },

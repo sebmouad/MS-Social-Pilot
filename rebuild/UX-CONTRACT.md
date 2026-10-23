@@ -822,3 +822,20 @@ Source/unit evidence only; no browser, provider or production run in this batch.
   name/id, status, with cursor paging). Creation uses the existing
   unattached-creative form. The tab states plainly that renaming,
   pausing or deleting a creative is unavailable.
+
+## Platform/moat behaviors — 2026-10-23
+
+Source/unit evidence only; no browser, provider or production run in this batch.
+
+- The Root Facebook-platform page carries a "Meta webhook deliveries"
+  panel listing the 50 most recent content-free receipts (received time
+  in UTC, Page id, event, outcome, matched channels, change/count
+  detail), in English and French from the module catalog. Platforms
+  without inbound webhooks omit the panel. Receipts never contain
+  message text.
+- Analytics ranges longer than the Root weekly threshold render weekly
+  points from precomputed rollups on the affected day-series metrics,
+  with the catalog note explaining the weekly points and the daily
+  edges; partial weeks at the range edges keep daily points so totals
+  stay exact. Shorter ranges and the current day read exactly as
+  before; nothing else on the Analytics screens changes.

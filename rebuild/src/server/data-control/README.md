@@ -31,6 +31,10 @@ migration names already in source. No migration was applied by this lane.
 | `task_checklist_items` | Workspace FK: catalog export/counts/dependency-ordered erasure; composite task FK cascade on task/workspace deletion; author FK SET NULL on account deletion |
 | `metric_alert_rules` | Workspace FK: catalog export/counts/dependency-ordered erasure; channel FK cascade on channel deletion; author FK SET NULL on account deletion |
 | `metric_alert_firings` | Workspace FK: catalog export/counts/dependency-ordered erasure; rule FK cascade on rule deletion |
+| `meta_webhook_deliveries` | Installation inbound-webhook delivery receipts (ids, kinds, verbs, counts; never message text); retained operational history under the Root-configured retention window, like `rebuild_sync_runs` |
+| `analytics_rollup_daily` | Workspace FK: catalog export/counts/dependency-ordered erasure; channel FK cascade on channel deletion |
+| `analytics_rollup_weekly` | Workspace FK: catalog export/counts/dependency-ordered erasure; channel FK cascade on channel deletion |
+| `analytics_rollup_runs` | Workspace FK: catalog export/counts/dependency-ordered erasure; worker coverage history only |
 
 Account appearance is not a new table: `users.theme` and the exact
 `app_settings` key `settings.appearance.user.<userId>.mode` belong to the account.

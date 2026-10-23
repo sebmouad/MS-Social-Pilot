@@ -17,7 +17,7 @@ describe('configuration registry', () => {
     }
   });
   it('keeps operator alerts in the single Root monitoring system', () => {
-    expect(CONFIG_SCHEMA_VERSION).toBe(140);
+    expect(CONFIG_SCHEMA_VERSION).toBe(141);
     for (const key of ['notifications.systemAlertPolicy', 'notifications.systemAlertCopy', 'notifications.systemAlertTelegramToken']) {
       expect(CONFIG_BY_KEY.has(key)).toBe(false);
     }
@@ -62,7 +62,7 @@ describe('configuration registry', () => {
   });
 
   it('covers the operational configuration areas with explicit consumption status', () => {
-    expect(CONFIG_SCHEMA_VERSION).toBe(140);
+    expect(CONFIG_SCHEMA_VERSION).toBe(141);
     expect(safeConfigShape().find(setting => setting.key === 'settings.teamDefaultRole')).toMatchObject({ defaultValue: 'contributor', consumption: 'active', owner: { kind: 'product', id: 'settings' } });
     expect(safeConfigShape().find(setting => setting.key === 'settings.teamDefaultAllChannels')).toMatchObject({ defaultValue: false, consumption: 'active', owner: { kind: 'product', id: 'settings' } });
     expect(CONFIG_BY_KEY.get('settings.teamDefaultRole')!.schema.safeParse('owner').success).toBe(false);
@@ -285,7 +285,7 @@ describe('configuration registry', () => {
   });
 
   it('registers the analytics metric-alert job, schedule, bounds and copy under the Analytics module', () => {
-    expect(CONFIG_SCHEMA_VERSION).toBe(140);
+    expect(CONFIG_SCHEMA_VERSION).toBe(141);
     expect(CONFIG_BY_KEY.get('analytics.alerts.schedule')).toMatchObject({ kind: 'text', defaultValue: '*/10 * * * *', consumption: 'active' });
     expect(CONFIG_BY_KEY.get('analytics.alerts.schedule')!.schema.safeParse('*/10 * * * *').success).toBe(true);
     expect(CONFIG_BY_KEY.get('analytics.alerts.schedule')!.schema.safeParse('not a cron').success).toBe(false);
@@ -295,6 +295,30 @@ describe('configuration registry', () => {
       expect(safeConfigShape().find(setting => setting.key === key)).toMatchObject({ consumption: 'active', owner: { kind: 'product', id: 'analytics' } });
       expect(CONFIG_BY_KEY.get(key)!.schema.safeParse(CONFIG_BY_KEY.get(key)!.defaultValue).success).toBe(true);
     }
+  });
+
+  it('registers the platform-moat settings: Meta webhooks, rollups and the staging dry-run', () => {
+    expect(CONFIG_SCHEMA_VERSION).toBe(141);
+    expect(CONFIG_BY_KEY.get('meta.webhooksEnabled')).toMatchObject({ kind: 'boolean', defaultValue: true, consumption: 'active' });
+    expect(CONFIG_BY_KEY.get('meta.webhookVerifyToken')).toMatchObject({ kind: 'secret', defaultValue: '', consumption: 'active' });
+    expect(CONFIG_BY_KEY.get('meta.webhookDeliveryRetentionDays')).toMatchObject({ kind: 'number', defaultValue: 30, consumption: 'active' });
+    expect(CONFIG_BY_KEY.get('meta.webhookDeliveryRetentionDays')!.schema.safeParse(0).success).toBe(false);
+    expect(CONFIG_BY_KEY.get('meta.webhookDeliveryRetentionDays')!.schema.safeParse(366).success).toBe(false);
+    expect(CONFIG_BY_KEY.get('meta.webhookDeliveriesCopy')).toMatchObject({ kind: 'json', consumption: 'active' });
+    expect(CONFIG_BY_KEY.get('analytics.rollups.schedule')).toMatchObject({ kind: 'text', defaultValue: '30 1 * * *', consumption: 'active' });
+    expect(CONFIG_BY_KEY.get('analytics.rollups.schedule')!.schema.safeParse('30 1 * * *').success).toBe(true);
+    expect(CONFIG_BY_KEY.get('analytics.rollups.schedule')!.schema.safeParse('not a cron').success).toBe(false);
+    expect(CONFIG_BY_KEY.get('analytics.rollups.policy')).toMatchObject({ kind: 'json', consumption: 'active' });
+    expect(CONFIG_BY_KEY.get('jobs.stagingDryRun')).toMatchObject({ kind: 'boolean', defaultValue: false, consumption: 'active' });
+    for (const key of ['meta.webhooksEnabled', 'meta.webhookVerifyToken', 'meta.webhookDeliveryRetentionDays', 'meta.webhookDeliveriesCopy'] as const) {
+      expect(safeConfigShape().find(setting => setting.key === key)).toMatchObject({ consumption: 'active', owner: { kind: 'platform', id: 'facebook' } });
+      expect(CONFIG_BY_KEY.get(key)!.schema.safeParse(CONFIG_BY_KEY.get(key)!.defaultValue).success).toBe(true);
+    }
+    for (const key of ['analytics.rollups.schedule', 'analytics.rollups.policy'] as const) {
+      expect(safeConfigShape().find(setting => setting.key === key)).toMatchObject({ consumption: 'active', owner: { kind: 'product', id: 'analytics' } });
+      expect(CONFIG_BY_KEY.get(key)!.schema.safeParse(CONFIG_BY_KEY.get(key)!.defaultValue).success).toBe(true);
+    }
+    expect(CONFIG_BY_KEY.get('jobs.stagingDryRun')!.schema.safeParse(CONFIG_BY_KEY.get('jobs.stagingDryRun')!.defaultValue).success).toBe(true);
   });
 
   it('audits changes with key, change type, and registry version only', () => {

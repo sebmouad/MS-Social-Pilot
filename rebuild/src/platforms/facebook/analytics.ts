@@ -10,6 +10,8 @@ import { Prisma } from '../../../generated/client';
 import { readFacebookPostPerformance } from './post-performance';
 import { readFacebookGoalMeasures } from './goals';
 import { readFacebookDestinationMeasures } from './destination-measures';
+import { hasUnrolledDayBreakdowns } from './rollups';
+import { readChannelRollupPreference, type ChannelRollupPreference } from '@/modules/analytics/rollups/read';
 import type { AnalyticsAdAccount, AnalyticsAudienceEntry, AnalyticsKind, AnalyticsMetricInput, AnalyticsObservation, AnalyticsProviderData, AnalyticsProviderRequest, AnalyticsTarget } from '@/modules/analytics/server/catalog';
 import { safeNumber } from '@/modules/analytics/server/catalog';
 
@@ -110,7 +112,7 @@ export const FACEBOOK_AD_ANALYTICS_COPY_DEFAULTS = {
   }
 };
 
-type PagePresentation = { locale?: 'en' | 'fr'; metricLabels?: Record<string, { en: string; fr: string }>; pageCopy?: Record<'en' | 'fr', Omit<(typeof FACEBOOK_PAGE_ANALYTICS_COPY_DEFAULTS)['en'], 'postSeries' | 'postSeriesNote'> & { postSeries?: string; postSeriesNote?: string }> };
+type PagePresentation = { locale?: 'en' | 'fr'; metricLabels?: Record<string, { en: string; fr: string }>; pageCopy?: Record<'en' | 'fr', Omit<(typeof FACEBOOK_PAGE_ANALYTICS_COPY_DEFAULTS)['en'], 'postSeries' | 'postSeriesNote' | 'rollupWeeksNote'> & { postSeries?: string; postSeriesNote?: string; rollupWeeksNote?: string }>; weeklySeriesNote?: boolean };
 
 function pageInputs(rows: PageRow[], selected: FacebookTarget[], audienceRows: PageRow[], audienceAsOf?: Date, presentation: PagePresentation = {}): { metrics: AnalyticsMetricInput[]; audience: AnalyticsAudienceEntry[] } {
   const locale = presentation.locale ?? 'en';
@@ -126,7 +128,10 @@ function pageInputs(rows: PageRow[], selected: FacebookTarget[], audienceRows: P
     const coveredResourceIds = [...new Set(numeric.map(row => row.channelId))].sort();
     const updatedAt = new Date(Math.max(...group.map(row => row.fetchedAt.getTime())));
     const baseLabel = `${label(first.metric)}${period !== 'day' ? ` · ${period}` : ''}`;
-    if (numeric.length) metrics.push({ key, label: kind === 'stock' ? `${baseLabel} · ${copy.latest}` : baseLabel, sourceLabel: copy.source, kind, unit: 'count', observations: numeric, ...(/unique|reach/.test(first.metric) ? { aggregationNote: copy.overlap } : {}), coveredResourceIds, ...(kind === 'stock' || period !== 'day' ? { rollup: 'latest-per-channel' as const } : {}), available: selected.length, updatedAt });
+    // Saved catalogs predate the weekly note and keep working: fall back to the shipped default until Root re-saves.
+    const weeklyNote = copy.rollupWeeksNote ?? FACEBOOK_PAGE_ANALYTICS_COPY_DEFAULTS[locale].rollupWeeksNote;
+    const seriesNotes = [/unique|reach/.test(first.metric) ? copy.overlap : undefined, period === 'day' && presentation.weeklySeriesNote ? weeklyNote : undefined].filter((note): note is string => Boolean(note));
+    if (numeric.length) metrics.push({ key, label: kind === 'stock' ? `${baseLabel} · ${copy.latest}` : baseLabel, sourceLabel: copy.source, kind, unit: 'count', observations: numeric, ...(seriesNotes.length ? { aggregationNote: seriesNotes.join(' ') } : {}), coveredResourceIds, ...(kind === 'stock' || period !== 'day' ? { rollup: 'latest-per-channel' as const } : {}), available: selected.length, updatedAt });
     // Keep each stored resource/time snapshot. Re-fetches at the same time
     // select the newest fetch; categories absent from a snapshot stay absent.
     const historyRows = new Map<string, PageRow>();
@@ -408,6 +413,25 @@ export function normalizeFacebookAnalytics(input: { pageRows: PageRow[]; audienc
   return { metrics: [...page.metrics, ...postInputs(input.postRows ?? [], input.selectedTargets, input), ...adInputs(input.adRows, input.selectedAdAccounts, input)], audienceEntries: page.audience, audienceSelected: input.selectedTargets.length };
 }
 
+/**
+ * Resolve the precomputed day-series for this read, if any. A weekly span with
+ * unrolled breakdowns falls back to the daily cascade; anything else uncovered
+ * reads in full detail. Never throws: rollups are a fast path, not a gate.
+ */
+async function resolveDayRollup(workspaceId: string, targetIds: string[], range: { from: Date; to: Date }): Promise<ChannelRollupPreference | null> {
+  try {
+    const preference = await readChannelRollupPreference({ provider: FACEBOOK_PLATFORM_ID, workspaceId, targetIds, from: range.from, to: range.to });
+    if (!preference) return null;
+    if (!await hasUnrolledDayBreakdowns({ workspaceId, targetIds, from: preference.rolledFrom, to: preference.rolledTo })) return preference;
+    if (preference.granularity !== 'weekly') return null;
+    const daily = await readChannelRollupPreference({ provider: FACEBOOK_PLATFORM_ID, workspaceId, targetIds, from: range.from, to: range.to, granularities: ['daily'] });
+    if (!daily || daily.granularity !== 'daily') return null;
+    return await hasUnrolledDayBreakdowns({ workspaceId, targetIds, from: daily.rolledFrom, to: daily.rolledTo }) ? null : daily;
+  } catch {
+    return null;
+  }
+}
+
 /** Facebook-only adapter from the legacy Page and Ads tables to provider-neutral analytics inputs. */
 export const facebookAnalyticsHost = {
   postPerformance: readFacebookPostPerformance,
@@ -434,8 +458,21 @@ export const facebookAnalyticsHost = {
         ? await prisma.adAccount.findMany({ where: { workspaceId: request.workspaceId, socialAccountId: { in: socialAccountIds }, enabled: true, ...(accountCeiling ? { id: { in: [...accountCeiling] } } : {}), socialAccount: { is: { workspaceId: request.workspaceId, provider: 'facebook', invalidatedAt: null } } }, orderBy: { name: 'asc' }, select: { id: true, name: true, currency: true } })
         : [];
     const selectedAdAccountIds = request.selectedAdAccountIds === undefined ? adAccounts.map(item => item.id) : adAccounts.filter(item => request.selectedAdAccountIds!.includes(item.id)).map(item => item.id);
-    const [pageRows, audienceRows, adRows] = await Promise.all([
-      prisma.pageInsight.findMany({ where: { targetId: { in: targetIds }, target: { workspaceId: request.workspaceId, type: 'page', socialAccount: { is: { workspaceId: request.workspaceId, provider: 'facebook', invalidatedAt: null } } }, endTime: { gte: request.range.from, lte: request.range.to } }, orderBy: [{ endTime: 'asc' }, { metric: 'asc' }], select: { metric: true, period: true, endTime: true, numeric: true, value: true, fetchedAt: true, target: { select: { id: true, name: true } } } }),
+    // Precomputed day-series replace the detailed day rows they cover: complete
+    // past days on the daily path (today still reads in detail), the whole range
+    // on the weekly path. Non-day periods, audience, ads and post cohorts always
+    // read in detail; anything uncovered falls back silently to full detail.
+    const rollup = targetIds.length ? await resolveDayRollup(request.workspaceId, targetIds, request.range) : null;
+    const targetNames = new Map(selectedTargets.map(target => [target.id, target.name]));
+    const rollupDayRows: PageRow[] = (rollup?.rows ?? []).flatMap(row => {
+      const name = targetNames.get(row.targetId);
+      return name === undefined ? [] : [{ metric: row.metric, period: row.period, endTime: row.date, numeric: row.value, value: null, fetchedAt: row.fetchedAt, target: { id: row.targetId, name } }];
+    });
+    const dayComplement = !rollup ? {} : rollup.granularity === 'weekly'
+      ? { period: { not: 'day' } }
+      : { OR: [{ period: { not: 'day' } }, { endTime: { gt: rollup.rolledTo } }] };
+    const [detailedPageRows, audienceRows, adRows] = await Promise.all([
+      prisma.pageInsight.findMany({ where: { targetId: { in: targetIds }, target: { workspaceId: request.workspaceId, type: 'page', socialAccount: { is: { workspaceId: request.workspaceId, provider: 'facebook', invalidatedAt: null } } }, endTime: { gte: request.range.from, lte: request.range.to }, ...dayComplement }, orderBy: [{ endTime: 'asc' }, { metric: 'asc' }], select: { metric: true, period: true, endTime: true, numeric: true, value: true, fetchedAt: true, target: { select: { id: true, name: true } } } }),
       prisma.pageInsight.findMany({ where: { targetId: { in: targetIds }, target: { workspaceId: request.workspaceId, type: 'page', socialAccount: { is: { workspaceId: request.workspaceId, provider: 'facebook', invalidatedAt: null } } }, metric: { in: ['page_follows', 'page_fans'] }, numeric: { not: null }, endTime: { lte: request.range.to } }, orderBy: [{ endTime: 'desc' }, { fetchedAt: 'desc' }], select: { metric: true, period: true, endTime: true, numeric: true, value: true, fetchedAt: true, target: { select: { id: true, name: true } } } }),
       selectedAdAccountIds.length ? prisma.adInsight.findMany({ where: { adAccount: { workspaceId: request.workspaceId, id: { in: selectedAdAccountIds }, ...(adTargetCeiling === undefined ? {} : { socialAccountId: { in: socialAccountIds } }), enabled: true, socialAccount: { is: { workspaceId: request.workspaceId, provider: 'facebook', invalidatedAt: null } } }, level: 'account', date: { gte: request.range.from, lte: request.range.to } }, orderBy: [{ date: 'asc' }], select: { date: true, spend: true, impressions: true, clicks: true, reach: true, cpc: true, cpm: true, cpp: true, ctr: true, frequency: true, actions: true, fields: true, fetchedAt: true, adAccount: { select: { id: true, name: true, currency: true } } } }) : Promise.resolve([]),
     ]);
@@ -451,7 +488,7 @@ export const facebookAnalyticsHost = {
         AND ep."createdTime" >= ${request.range.from} AND ep."createdTime" <= ${request.range.to} AND ep."insightsSyncedAt" IS NOT NULL
       ORDER BY ep."createdTime" DESC LIMIT ${presentation['meta.postSeriesMaxPosts'] as number}`))
       .map(row => ({ createdTime: row.createdTime, insights: row.insights, insightsSyncedAt: row.insightsSyncedAt, target: { id: row.targetId, name: row.targetName } }) satisfies PostRow) : [];
-    const normalized = normalizeFacebookAnalytics({ locale, postRows: postRows as PostRow[], metricLabels: presentation['meta.metricLabels'] as PagePresentation['metricLabels'], pageCopy: presentation['meta.pageAnalyticsCopy'] as PagePresentation['pageCopy'], pageRows: pageRows as PageRow[], selectedTargets, audienceRows: audienceRows as PageRow[], adRows: adRows as AdRow[], selectedAdAccounts, audienceAsOf: request.range.to });
+    const normalized = normalizeFacebookAnalytics({ locale, postRows: postRows as PostRow[], metricLabels: presentation['meta.metricLabels'] as PagePresentation['metricLabels'], pageCopy: presentation['meta.pageAnalyticsCopy'] as PagePresentation['pageCopy'], pageRows: [...rollupDayRows, ...detailedPageRows] as PageRow[], selectedTargets, audienceRows: audienceRows as PageRow[], adRows: adRows as AdRow[], selectedAdAccounts, audienceAsOf: request.range.to, weeklySeriesNote: rollup?.granularity === 'weekly' });
     return { targets: visible.map(({ socialAccountId: _socialAccountId, providerId: _pageId, ...target }) => ({ ...target, providerId: FACEBOOK_PLATFORM_ID })), selectedTargets: selectedTargets.map(({ socialAccountId: _socialAccountId, providerId: _pageId, ...target }) => ({ ...target, providerId: FACEBOOK_PLATFORM_ID })), adAccounts, selectedAdAccountIds, ...normalized };
   },
 };

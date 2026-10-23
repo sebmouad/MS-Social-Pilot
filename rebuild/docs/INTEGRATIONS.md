@@ -67,6 +67,10 @@ Lets an MCP client (such as Claude) connect without a pasted key. Code: `modules
 
 ## Analytics and Ads REST v1 parity (2026-10-21)
 
+The versioned contract for this surface is [API_V1.md](API_V1.md),
+checked against source by `tests/api-v1-contract.test.ts`; that
+document wins over this page on any v1 discrepancy.
+
 The module-owned MCP operations are also reachable at
 `/api/v1/analytics/<operation>` and `/api/v1/ads/<operation>`.
 Operation names and argument objects are identical to MCP. The table below lists
@@ -113,6 +117,8 @@ All responses use `Cache-Control: no-store`.
 | `/api/v1/analytics/manage_report_schedule` | POST | `analytics/reports` |
 | `/api/v1/analytics/list_report_runs` | GET / POST | `analytics/reports` |
 | `/api/v1/analytics/generate_report` | POST | `analytics/reports` |
+| `/api/v1/analytics/list_metric_alerts` | GET / POST | `analytics/reports` |
+| `/api/v1/analytics/manage_metric_alert` | POST | `analytics/reports` |
 | `/api/v1/analytics/get_analytics_pins` | GET / POST | `analytics/pins` |
 | `/api/v1/analytics/pin_analytics_metric` | POST | `analytics/pins` |
 | `/api/v1/analytics/unpin_analytics_metric` | POST | `analytics/pins` |
