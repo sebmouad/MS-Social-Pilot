@@ -31,7 +31,10 @@ export type InboxListPage = InboxPageCursors & { /** Present only when quick fil
 export type ThreadEntry = { id: string; author: string; text: string; time: Date; fromChannel: boolean; sentBy: string | null; parentId: string | null; depth: number; hidden: boolean; remoteId?: string; authorId?: string | null; parentRemoteId?: string | null; metadata?: InboxMetadata };
 export type OpenThread = {
   kind: 'message' | 'comment' | 'review'; id: string; rating: number | null; recommendation: 'positive' | 'negative' | null; target: { id: string; name: string; providerId: string; provider: string | null };
-  resolved: boolean; hidden: boolean; postText: string | null; entries: ThreadEntry[];
+  resolved: boolean; hidden: boolean; postText: string | null;
+  /** Local id of the commented post; null for messages, reviews and unlinked threads. */
+  postId: string | null;
+  entries: ThreadEntry[];
   lastInbound: { fromId: string | null; createdTime: Date } | null;
   remoteId?: string;
   metadata?: InboxMetadata;

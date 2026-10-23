@@ -174,7 +174,7 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
     const headActions = canResolve ? <ThreadToolbar id={thread.id} kind={thread.kind} resolved={thread.resolved} hidden={thread.hidden} canResolve={canResolve} canHide={canWrite && capabilities.hide} canDelete={canWrite && capabilities.remove} platformName={badge.platformName} listHref={clearThreadHref} locale={locale} /> : null;
     const main = <>
       <ThreadScroll label={copy.historyLabel} resetKey={`${thread.kind}:${thread.id}:${requestedHistoryCursor ?? ''}`}>
-      {thread.postText ?<p className={styles.postContext}><strong>{copy.onYourPost}</strong>{thread.postText.length > 280 ? `${thread.postText.slice(0, 280)}…` : thread.postText}</p> : null}
+      {thread.postText ?<p className={styles.postContext}><strong>{copy.onYourPost}</strong>{thread.postText.length > 280 ? `${thread.postText.slice(0, 280)}…` : thread.postText}{thread.postId ? <> <a href={`/content/post/${encodeURIComponent(thread.postId)}`}>{copy.openPost}</a></> : null}</p> : null}
       <p className={styles.contextNote}>{thread.kind === 'review' ? reviewLabel(locale, 'note') : copy.syncedNote}</p>
       <div className={styles.historyHead}>
         <h3>{thread.kind === 'comment' ? copy.commentHistory : thread.kind === 'review' ? reviewLabel(locale, 'reviewHistory') : copy.conversationHistory}</h3>

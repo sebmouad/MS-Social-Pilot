@@ -425,4 +425,11 @@ describe('Inbox screen: quick filters, selection and details', () => {
     expect(degraded).toContain('The details could not be loaded.');
     expect(degraded).toContain('Love it');
   });
+
+  it('links the open comment thread to its origin post', async () => {
+    state.thread.mockResolvedValue({ thread: { kind: 'comment', id: '1', rating: null, recommendation: null, target: { id: 'channel', name: 'Atelier', providerId: 'page', provider: 'facebook' }, resolved: false, hidden: false, postText: 'Post', postId: 'post-9', entries: [{ id: '1', author: 'Amina', text: 'Love it', time: new Date('2026-10-20T09:00:00Z'), fromChannel: false, sentBy: null, parentId: null, depth: 0, hidden: false }], lastInbound: null }, history: { total: 0, shown: 0, limit: 50, cursor: null, olderCursor: null, newerCursor: null } });
+    const html = await render({ thread: 'comment:1' });
+    expect(html).toContain('href="/content/post/post-9"');
+    expect(html).toContain('Open post');
+  });
 });

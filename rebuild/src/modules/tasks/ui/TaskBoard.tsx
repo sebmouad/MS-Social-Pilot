@@ -163,7 +163,7 @@ export function TaskBoard({ tasks, assignees, canCreate, limits, today, summary,
     say(t("Task updated.")); router.refresh(); return null;
   }} />;
   const assignee = (task: TaskView) => <span className={styles.assignee}><Avatar name={task.assignee?.name ?? t("Unassigned")} size="sm" decorative />{task.assignee?.name ?? t("Unassigned")}</span>;
-  const postNote = (task: TaskView) => task.post ? <details className={styles.postPreview}><summary>{t("Linked post")}</summary><p>{task.post.preview || t("Untitled post")}</p><Badge>{t(task.post.status.replaceAll('_', ' '))}</Badge></details> : task.postHidden ? <span className={styles.meta}>{t("Linked post is not available to you.")}</span> : null;
+  const postNote = (task: TaskView) => task.post ? <details className={styles.postPreview}><summary>{t("Linked post")}</summary><p><a href={`/content/post/${encodeURIComponent(task.post.id)}`}>{task.post.preview || t("Untitled post")}</a></p><Badge>{t(task.post.status.replaceAll('_', ' '))}</Badge></details> : task.postHidden ? <span className={styles.meta}>{t("Linked post is not available to you.")}</span> : null;
   const checklistNote = (task: TaskView) => task.checklist.total > 0 ? <span className={styles.meta}>{t("Checklist")}: {t("{0} of {1} done", task.checklist.done, task.checklist.total)}</span> : null;
   const rowActions = (task: TaskView) => <div className={styles.actions}>
     {task.canEdit && TASK_TRANSITIONS[task.status].map(status => <Button key={status} size="sm" disabled={busy} onClick={() => move(task, status)}>{verb(status)}</Button>)}

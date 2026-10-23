@@ -1558,3 +1558,15 @@ row menu. No copy/registry/migration/route change.
 Evidence: `npm run typecheck` 0 errors; new `content-ux-gaps-links` (5) pass;
 neighbors `notifications-engagement-ui`, `ads-manage-tabs-ui` pass. No browser
 run; deploy pending --yolo relaunch.
+
+## 2026-10-23 UX gaps batch 3
+Dead post references: task cards showed the linked post preview without a link;
+the open comment thread showed the origin post text without a link. Fixes:
+`TaskBoard` post preview links to the post detail page (id already on
+`TaskView.post`); `OpenThread` gains `postId` (one added select in the comment
+thread query, null for messages/reviews) and `InboxScreen` renders an `openPost`
+link (new EN+FR key) beside the origin excerpt. No registry/migration change.
+
+Evidence: `npm run typecheck` 0 errors; extended `tasks76-ui` +1 and
+`inbox-round3-ui` +1, both suites fully green (46 pass, 1 skip). No browser
+run; deploy pending --yolo relaunch.

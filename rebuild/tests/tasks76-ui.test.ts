@@ -185,3 +185,11 @@ it.runIf(Boolean(process.env.B7_FIXTURE_DIR))('exports the Tasks synthetic compo
     assignees: [], canCreate: true, limits: TASK_DEFAULT_LIMITS, today: '2026-10-22', summary: { todo: 1, doing: 1, done: 1, overdue: 0 }, view: 'board', filtered: false,
   })), 'tasks', fixtureStyles);
 });
+
+describe('Task linked post', () => {
+  it('links the linked post preview to its detail page', async () => {
+    await renderBoard({ tasks: [{ ...task, post: { id: 'post-7', preview: 'Hello world', status: 'published' } }] });
+    const link = container.querySelector('a[href="/content/post/post-7"]');
+    expect(link?.textContent).toContain('Hello world');
+  });
+});
