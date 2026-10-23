@@ -1,9 +1,29 @@
 # MS Social Pilot architecture
 
-Updated 2026-10-23 (UI wave 2 composer + planning) against the local working tree, configuration schema **142**.
+Updated 2026-10-23 (UI waves 3-4 Engage + Measure/Grow polish) against the local working tree, configuration schema **142**.
 [ARCHITECTURE_CONTRACT.md](ARCHITECTURE_CONTRACT.md) remains binding; §4 gained the owner-approved 2026-10-22 Ads-area decision.
 Current reconciliation below takes precedence over historical batch snapshots.
 Source, automated, browser, live-provider and production evidence remain distinct.
+
+## UI waves 3-4 — 2026-10-23 (source/unit only)
+
+Visible-first Engage + Measure/Grow polish on the wave-1 style (reused,
+not redealt): accent-tinted private-message badges in Inbox rows, kind
+tabs and the thread head (icon+label unchanged, lane edges unchanged),
+contact avatar in the thread head, visible stale-freshness badge beside
+Sync now (stored reads only), saved-view chips with the open view tinted,
+search landmark, moderation rule/outcome badges with shared empty states,
+notification-center state/event-kind badge split with unread emphasis,
+equal-height KPI tiles, underline chart-metric switch, ranked Top posts,
+planned-vs-published activity chips, tone badges on stored Ads statuses
+(neutral matcher, raw text kept), and shared empty states plus run badges
+on the writing/scheduled-agents screens. No new user string, no route,
+manifest, feature-id, registry-key or migration change; schema stays 142.
+
+Typecheck 0 errors; new `tests/ui-waves-3-4.test.ts` (10) plus the
+`inbox-sync-freshness` mock fix and a 149-file area sweep (1427) pass.
+No browser, provider, database or production run; BEFORE state is source
+at `92b2fb05`. No commit/push/deploy (not authorized this lane).
 
 ## UI wave 2 — 2026-10-23 (source/unit only)
 

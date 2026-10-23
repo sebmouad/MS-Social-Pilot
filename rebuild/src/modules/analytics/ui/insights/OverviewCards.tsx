@@ -29,6 +29,13 @@ export function TopPostsCard({ copy, posts, infoText, allHref, unavailable }: { 
   </section>;
 }
 
+/** Planned-versus-published tone of a publishing-activity row: what went out reads as success, what is planned as brand, what failed as danger. The label still carries the meaning. */
+export function activityOutcomeTone(id: string): 'success' | 'brand' | 'danger' {
+  if (id === 'scheduled') return 'brand';
+  if (id === 'failed') return 'danger';
+  return 'success';
+}
+
 /** Publishing activity card: counts with links into Content filtered the same way. */
 export function PublishingActivityCard({ copy, counts, hrefs }: {
   copy: InsightsCopy;
@@ -44,8 +51,8 @@ export function PublishingActivityCard({ copy, counts, hrefs }: {
     <div className="insights-card__head">
       <h2 id="insights-activity" className="insights-card__title">{copy.activityTitle}<InfoTip name={copy.activityTitle} blocks={[{ text: copy.activityInfo }]} /></h2>
     </div>
-    <ul className="insights-activity">{rows.map(row => <li key={row.id}>
-      <a href={row.href} aria-label={`${row.label}: ${row.value}. ${copy.activityOpen}`}><span>{row.icon} {row.label}</span><strong>{new Intl.NumberFormat().format(row.value)}</strong></a>
+    <ul className="insights-activity">{rows.map(row => <li key={row.id} data-outcome={activityOutcomeTone(row.id)}>
+      <a href={row.href} aria-label={`${row.label}: ${row.value}. ${copy.activityOpen}`}><span><span className="insights-activity__chip" aria-hidden="true">{row.icon}</span> {row.label}</span><strong>{new Intl.NumberFormat().format(row.value)}</strong></a>
     </li>)}</ul>
   </section>;
 }

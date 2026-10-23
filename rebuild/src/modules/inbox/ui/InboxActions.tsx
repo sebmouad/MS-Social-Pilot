@@ -4,7 +4,7 @@ import { AutoTextarea } from '@/components/AutoTextarea';
 
 import { useEffect, useId, useRef, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
-import { Button, Dialog, InfoTip, Menu } from '@/components';
+import { Badge, Button, Dialog, InfoTip, Menu } from '@/components';
 import { useToast } from '@/components/Toast';
 import { FieldError, useFormValidation } from '@/components/FormValidation';
 import { isOperationErrorCode } from '@/lib/operation-error';
@@ -58,6 +58,13 @@ async function send(payload: Record<string, unknown>, locale: InboxLocale = 'en'
   }
 }
 
+/** Freshness of the stored Inbox read behind the sync bar: never synced, stale, or fresh. A sync that just completed in this browser session is current by definition. */
+export function inboxFreshnessState({ lastSynced, stale = false, syncedNow = null }: { lastSynced: string | null; stale?: boolean; syncedNow?: string | null }): 'never' | 'stale' | 'fresh' {
+  if (syncedNow) return 'fresh';
+  if (lastSynced === null) return 'never';
+  return stale ? 'stale' : 'fresh';
+}
+
 /** "Last synced" plus Sync now, reporting what the sync found. A stale stored read says so instead of looking current. */
 export function InboxSyncBar({ targetId, lastSynced, stale = false, disabled = false, locale = 'en' }: { targetId?: string; lastSynced: string | null; stale?: boolean; timeZone?: string; disabled?: boolean; locale?: InboxLocale }) {
   const [busy, setBusy] = useState(false);
@@ -86,10 +93,11 @@ export function InboxSyncBar({ targetId, lastSynced, stale = false, disabled = f
   }
 
   const shown = syncedNow ?? lastSynced;
-  // A sync that just completed in this browser session is current by definition.
-  const showStale = stale && !syncedNow && shown !== null;
+  const freshness = inboxFreshnessState({ lastSynced, stale, syncedNow });
+  const showStale = freshness === 'stale';
   return <div className={styles.sync}>
     <Button variant="secondary" disabled={disabled || busy} aria-busy={busy} onClick={() => void sync()}>{busy ? copy.syncing : copy.syncNow}</Button>
+    {showStale ? <Badge tone="warning">{copy.staleNote}</Badge> : null}
     <InfoTip name={copy.lastSynced}>{shown ? <>{copy.lastSynced} <strong>{shown}</strong>{showStale ? <> · {copy.staleNote}</> : null}</> : copy.notSynced}</InfoTip>
     <div role="status" aria-live="polite" className="ui-visually-hidden">{result?.kind === 'ok' ? <span>{result.text}</span> : null}</div>
     {result?.kind === 'error' ? <p role="alert" className={styles.error}>{result.text}</p> : null}

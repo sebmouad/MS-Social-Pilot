@@ -901,6 +901,39 @@ navigation only (`src/lib/hubs.ts`).
   name. All touched surfaces are token-driven in light and dark across the
   four themes.
 
+## UI waves 3–4 behaviors — 2026-10-23 (Engage + Measure/Grow polish)
+
+Source/unit evidence only; no browser, provider or production run in this batch.
+Routes, manifests, feature ids and catalog keys are unchanged; no new user
+string was added. Tone is never the only signal: every badge keeps its icon
+or label, and every status keeps its stored text.
+
+- Message, comment and review badges keep their icons and labels; private
+  messages add the accent tint in rows, kind tabs and the thread head, and
+  the solid/dashed/dotted lane edges are unchanged. The open thread head
+  shows the contact avatar beside the title, audience banner and tags.
+- A stale stored Inbox read shows the existing stale note as a visible
+  warning badge beside Sync now (freshness still comes from stored reads
+  only); a sync completed in the session clears it. Saved triage views are
+  chips with the open view tinted; the open view still re-applies the
+  sidebar scope. The search box is a `search` landmark with the same label.
+- Moderation rules show Paused and action badges; the log shows one outcome
+  badge per row (completed, failed with its reason, undone) with shared
+  empty states. The notification center shows read state and event kind as
+  two badges with the same words as before (mentions accent, metric alerts
+  warning, deliveries success), bolds unread titles with an accent dot, and
+  counts unread in a solid badge.
+- KPI tiles share one row height; the chart metric switch keeps its buttons
+  and pressed state with an underline-tab look; Top posts are rank-numbered;
+  the publishing-activity card chips published, scheduled and failed rows
+  apart while keeping their labels and Content links.
+- Ads manage tables show the raw stored status inside a tone badge (active
+  words success, deleted/archived/disapproved danger, the rest neutral);
+  management services, paging and creation flows are unchanged.
+- Writing-agent and scheduled-agent lists use shared empty states; run rows
+  badge their outcome (completed, failed, pending) and scheduled rows badge
+  active/paused. Autopilot tier text and confirmations are unchanged.
+
 ## UI wave 2 behaviors — 2026-10-23 (composer tabs, calendar, pipeline)
 
 Source/unit evidence only; no browser, provider or production run in this batch.

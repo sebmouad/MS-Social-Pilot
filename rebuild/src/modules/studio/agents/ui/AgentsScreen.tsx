@@ -3,10 +3,13 @@ import { useRef, useState, useTransition } from 'react';
 import { IconPencil, IconSparkles, IconTrash } from '@tabler/icons-react';
 import type { Agent, AgentRun } from '../server/service';
 import { AutoTextarea } from '@/components/AutoTextarea';
+import { Badge } from '@/components/Badge';
 import { Button } from '@/components/Button';
+import { EmptyState } from '@/components/EmptyState';
 import { PageHeader } from '@/components/PageHeader';
 import { useConfirm } from '@/components/useConfirm';
 import type { AgentCopy } from '../copy';
+import { agentRunTone } from './status-tone';
 import styles from './agents.module.css';
 export type AgentResult = { agents?: Agent[]; runs?: AgentRun[]; suggestion?: string; error?: string; hasMore?: boolean; pageSize?: number; offset?: number; ok?: boolean; id?: string; runId?: string; reviewRequired?: boolean };
 /** One injected action boundary keeps all mutations in the authenticated shared service. */
@@ -65,7 +68,7 @@ export function AgentsScreen({ agents, runs = [], hasMore = false, pageSize, cop
   <p ref={status} tabIndex={-1} role="status">{feedback}</p>{error ? <p role="alert">{error}</p> : null}
   <div className={styles.workspace}>
    <section className={`ui-panel ${styles.panel}`}><h2>{t.choose}</h2>
-    {!items.length ? <p>{t.empty}</p> : <ul className={styles.list}>{items.map(agent => <li key={agent.id}>
+    {!items.length ? <EmptyState icon={<IconSparkles size={22} />} title={t.empty} /> : <ul className={styles.list}>{items.map(agent => <li key={agent.id}>
      <div className={styles.identity}><strong>{agent.name}</strong><p>{agent.instructions}</p></div>
      <div className={styles.actions}><Button disabled={pending} onClick={() => edit(agent)} aria-label={`${t.edit}: ${agent.name}`}><IconPencil size={16} aria-hidden="true" />{t.edit}</Button><Button variant="danger" disabled={pending} onClick={() => mutate('delete', agent.id)} aria-label={`${t.remove}: ${agent.name}`}><IconTrash size={16} aria-hidden="true" />{t.remove}</Button></div>
     </li>)}</ul>}
@@ -82,11 +85,11 @@ export function AgentsScreen({ agents, runs = [], hasMore = false, pageSize, cop
      <label className="ui-field">{t.material}<AutoTextarea name="material" className="ui-input" value={text} disabled={pending} onChange={e => setText(e.target.value)} required /></label>
      <label className="ui-field">{t.draft}<select name="kind" className="ui-input" value={kind} disabled={pending} onChange={e => setKind(e.target.value)}><option value="post">{t.post}</option><option value="reply">{t.reply}</option></select></label>
      <Button type="submit" disabled={pending}>{pending ? t.busy : t.draft}</Button>
-    </form> : <p>{t.empty}</p>}
+    </form> : <EmptyState icon={<IconSparkles size={22} />} title={t.empty} />}
     <div aria-live="polite">{suggestion ? <article className={styles.suggestion}><h3>{t.suggestion}</h3><p>{t.review}</p><p className={styles.text}>{suggestion}</p></article> : null}</div>
    </section>
   </div>
-  <section className={`ui-panel ${styles.panel}`}><h2>{t.history}</h2>{history.length ? <ol className={styles.list}>{history.map(run => <li key={run.id}><div className={styles.identity}><strong>{run.name ?? t.unknownAgent}</strong><p>{run.kind === 'reply' ? t.reply : t.post} · {run.status === 'completed' ? t.completed : run.status === 'failed' ? t.failedRun : t.pendingRun}</p></div><time dateTime={new Date(run.createdAt).toISOString()}>{new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short', timeZone: 'UTC' }).format(new Date(run.createdAt))} {t.timeZone}</time></li>)}</ol> : <p>{t.noHistory}</p>}
+  <section className={`ui-panel ${styles.panel}`}><h2>{t.history}</h2>{history.length ? <ol className={styles.list}>{history.map(run => <li key={run.id}><div className={styles.identity}><strong>{run.name ?? t.unknownAgent}</strong><p>{run.kind === 'reply' ? t.reply : t.post} · <Badge tone={agentRunTone(run.status)}>{run.status === 'completed' ? t.completed : run.status === 'failed' ? t.failedRun : t.pendingRun}</Badge></p></div><time dateTime={new Date(run.createdAt).toISOString()}>{new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short', timeZone: 'UTC' }).format(new Date(run.createdAt))} {t.timeZone}</time></li>)}</ol> : <EmptyState icon={<IconSparkles size={22} />} title={t.noHistory} />}
    {offset > 0 || more ? <nav className={styles.actions} aria-label={t.history}><Button disabled={pending || offset === 0} onClick={() => start(async () => { try { await refreshHistory(Math.max(0, offset - pageSize)); } catch { setError(t.failed); } })}>{t.previous}</Button><Button disabled={pending || !more} onClick={() => start(async () => { try { await refreshHistory(offset + pageSize); } catch { setError(t.failed); } })}>{t.next}</Button></nav> : null}
   </section>{confirmation}{removal}
  </section>;

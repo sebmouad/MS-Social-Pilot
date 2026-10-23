@@ -1,9 +1,50 @@
 # Shared agent handoff
 
-Updated 2026-10-23 (UI wave 2 composer + planning; uncommitted working tree), schema **142**.
+Updated 2026-10-23 (UI waves 3-4 Engage + Measure/Grow polish; uncommitted working tree), schema **142**.
 Full goal remains active. No browser, provider, database or production call by
 this lane. Historical records below retain their dates; current source
 reconciliation wins.
+
+## UI waves 3-4 — 2026-10-23 (source/unit only, uncommitted)
+
+All work is in the working tree, no commit/push/deploy. `npm run typecheck`
+0 errors; new `tests/ui-waves-3-4.test.ts` (10) passes plus the
+`inbox-sync-freshness` mock fix (Badge mock added, feature-required) and a
+149-file area sweep (1427 passed, 14 skipped). No `lint.mjs` in this tree
+(the handoff-referenced script is absent; no lint gate was runnable).
+
+- **Kind at a glance** (`inbox/ui/InboxTags.tsx` `inboxKindTone` + `brand`
+  tone, `InboxListRows.tsx`, `InboxScreen.tsx`): message badges accent,
+  comment/review neutral, in rows, kind tabs and thread head; lane edges
+  and icon+labels unchanged. Thread head gains the contact `PersonAvatar`
+  (`inbox.module.css` grid).
+- **Freshness/views/search** (`InboxActions.tsx` `inboxFreshnessState`,
+  `inbox-round3.module.css`, `InboxFilterRow.tsx`): stale reads show a
+  warning badge beside Sync now; saved views are chips with the open view
+  tinted; search sits in a `search` landmark. Freshness still stored-reads
+  only; a completed sync clears the badge.
+- **Moderation + notifications** (`ModerationRules.tsx`
+  `moderationOutcomeTone`, `NotificationCenter.tsx`
+  `notificationEventTone`, `notifications.module.css`): Paused/action and
+  log-outcome badges with shared empty states; state/event-kind badge
+  split keeping the same words (existing combined-text test still passes
+  via an aria-hidden separator), unread titles bold with an accent dot,
+  unread count in a solid badge.
+- **Insights** (`OverviewCards.tsx` `activityOutcomeTone`, `insights.css`):
+  equal-height KPI tiles, underline chart-metric switch, ranked Top posts,
+  planned-vs-published activity chips. No catalog change: zero new user
+  strings anywhere (strict `insightsCopy` untouched, no merge needed).
+- **Ads manage** (`objects/status-tone.ts` new, `ObjectsScreen.tsx`):
+  stored status in a tone Badge via a neutral case-insensitive matcher;
+  raw stored text still shows. Covers Campaigns/Ad sets/Ads tabs.
+- **Studio** (`agents/ui/status-tone.ts` new, `AgentsScreen.tsx`,
+  `ScheduledAgents.tsx`): shared empty states, run-outcome and
+  active/paused badges. AI studio and caption tests already used the
+  shared patterns; untouched.
+- **Unresolved / next:** BEFORE/AFTER screenshots and `inspect.mjs`
+  blocked (no local Postgres, no Playwright browsers, no `DATABASE_URL`;
+  BEFORE is source at `92b2fb05`). Next: browser matrix at 1440/768/390
+  light+dark, keyboard walkthrough, tabular-figure check.
 
 ## UI wave 2 — 2026-10-23 (source/unit only, uncommitted)
 

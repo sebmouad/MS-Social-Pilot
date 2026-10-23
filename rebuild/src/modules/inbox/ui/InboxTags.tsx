@@ -16,8 +16,17 @@ const ICONS = {
   negative: <><circle cx="8" cy="8" r="5.5" {...shape} /><path d="M5.6 10.4a3.2 3.2 0 0 1 4.8 0M6 6.4h.01M10 6.4h.01" {...shape} /></>,
 } satisfies Record<string, ReactNode>;
 
-type Tone = "ok" | "warn" | "danger" | "neutral";
-const BADGE_TONE: Record<Tone, BadgeTone> = { ok: "success", warn: "warning", danger: "danger", neutral: "neutral" };
+type Tone = "ok" | "warn" | "danger" | "neutral" | "brand";
+const BADGE_TONE: Record<Tone, BadgeTone> = { ok: "success", warn: "warning", danger: "danger", neutral: "neutral", brand: "brand" };
+
+export type InboxKind = "message" | "comment" | "review";
+/**
+ * Kind badge tone: private messages carry the accent tint so they read apart
+ * from public comments at a glance. The icon plus label still carry the
+ * meaning; tone is never the only signal.
+ */
+const KIND_TONE: Record<InboxKind, Tone> = { message: "brand", comment: "neutral", review: "neutral" };
+export const inboxKindTone = (kind: string): Tone => (KIND_TONE as Record<string, Tone>)[kind] ?? "neutral";
 
 /** Status or kind label for an Inbox item: the shared Badge with an Inbox glyph. The icon never carries meaning alone. */
 export function InboxTag({ icon, tone = "neutral", title, children }: { icon: keyof typeof ICONS; tone?: Tone; title?: string; children: ReactNode }) {

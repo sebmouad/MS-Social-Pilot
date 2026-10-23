@@ -26,7 +26,11 @@
 .table tbody tr:last-child td { border-bottom: 0; }
 .table tbody tr[data-unread="true"] { background: var(--accent-soft); }
 .title,.body,.context { display: block; }
-.title { color: var(--ink); font-weight: 700; }
+.title { color: var(--ink-soft); font-weight: 600; }
+[data-unread="true"] > .title { color: var(--ink); font-weight: 750; }
+[data-unread="true"] > .title::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-inline-end: 8px; border-radius: 50%; background: var(--accent); }
+.badges { display: inline-flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+@media (forced-colors: active) { [data-unread="true"] > .title::before { background: Highlight; forced-color-adjust: none; } }
 .body { margin-top: 4px; max-width: 390px; line-height: 1.45; }
 .context { margin-top: 5px; color: var(--ink-faint); font-size: 11px; }
 .actions { display: flex; gap: 5px; }

@@ -18,6 +18,7 @@
 .insights { display: grid; gap: var(--space-4); min-width: 0; }
 .insights-tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-4); margin: 0; padding: 0; list-style: none; }
 .insights-tiles > li { min-width: 0; }
+.insights-tiles > li > .ui-metric { height: 100%; }
 .insights-tiles__more { justify-self: start; }
 @media (max-width: 1100px) { .insights-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 /* Phone priority 4: four tiles in a 2×2 grid. */
@@ -30,9 +31,10 @@
 .insights-grid { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: var(--space-4); align-items: start; }
 @media (max-width: 1100px) { .insights-grid { grid-template-columns: minmax(0, 1fr); } }
 
-.insights-switch { display: flex; gap: var(--space-1); max-width: 100%; margin: 0; padding: var(--space-1); overflow-x: auto; list-style: none; border-radius: var(--radius-md); background: var(--surface-muted); }
-.insights-switch button { min-height: 32px; padding: 0 var(--space-3); border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--ink-soft); font: inherit; font-size: 13px; font-weight: 600; white-space: nowrap; cursor: pointer; }
-.insights-switch button[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: var(--shadow-raised, none); }
+.insights-switch { display: flex; gap: var(--space-1); max-width: 100%; margin: 0; padding: 0; overflow-x: auto; list-style: none; border-bottom: 1px solid var(--line); }
+.insights-switch button { min-height: 36px; padding: 0 var(--space-3); border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: transparent; color: var(--ink-soft); font: inherit; font-size: 13px; font-weight: 600; white-space: nowrap; cursor: pointer; }
+.insights-switch button:hover { color: var(--ink); }
+.insights-switch button[aria-pressed="true"] { border-bottom-color: var(--accent); color: var(--ink); }
 .insights-switch button:focus-visible { outline: 2px solid var(--focus, currentColor); outline-offset: 2px; }
 /* Long ranges scroll sideways inside the card on phones. */
 .insights-chartscroll { max-width: 100%; overflow-x: auto; }
@@ -41,8 +43,9 @@
 .insights-scrollhint { display: none; margin: 0; color: var(--ink-soft); font-size: 12px; }
 @media (max-width: 760px) { .insights-scrollhint { display: block; } }
 
-.insights-posts { display: grid; margin: 0; padding: 0; list-style: none; }
-.insights-post { display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; align-items: center; gap: var(--space-3); padding: var(--space-2) 0; border-top: 1px solid var(--line-subtle, var(--line)); }
+.insights-posts { display: grid; margin: 0; padding: 0; list-style: none; counter-reset: insights-rank; }
+.insights-post { display: grid; grid-template-columns: auto 40px minmax(0, 1fr) auto; align-items: center; gap: var(--space-3); padding: var(--space-2) 0; border-top: 1px solid var(--line-subtle, var(--line)); counter-increment: insights-rank; }
+.insights-post::before { content: counter(insights-rank); min-width: 2ch; color: var(--ink-faint); font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; text-align: right; }
 .insights-post:first-child { border-top: 0; }
 .insights-post__text { display: grid; gap: 2px; min-width: 0; }
 .insights-post__text strong { overflow: hidden; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
@@ -55,6 +58,10 @@
 .insights-activity li + li { border-top: 1px solid var(--line-subtle); }
 .insights-activity a { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); min-height: 44px; padding: var(--space-2); border-radius: var(--radius-sm); color: inherit; font-size: var(--text-sm); text-decoration: none; }
 .insights-activity a > span { display: inline-flex; align-items: center; gap: var(--space-2); color: var(--ink-soft); }
+.insights-activity__chip { display: inline-grid; place-items: center; width: 30px; height: 30px; border-radius: var(--radius-sm); }
+.insights-activity li[data-outcome="success"] .insights-activity__chip { background: var(--success-soft, var(--surface-muted)); color: var(--success, var(--ink)); }
+.insights-activity li[data-outcome="brand"] .insights-activity__chip { background: var(--accent-soft); color: var(--accent); }
+.insights-activity li[data-outcome="danger"] .insights-activity__chip { background: var(--danger-soft, var(--surface-muted)); color: var(--danger); }
 .insights-activity a:hover { background: var(--surface-hover); }
 .insights-activity strong { font-size: var(--text-lg); font-variant-numeric: tabular-nums; }
 

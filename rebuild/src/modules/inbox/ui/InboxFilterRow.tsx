@@ -50,6 +50,8 @@ export function InboxFilterRow({ action, filters, scope, locale, thread, limit, 
         <TextInput type="number" name="limit" aria-label={copy.perPage} min={1} max={maxLimit} defaultValue={limit} disabled={disabledLimit} />
       </FilterSection>
     </FilterButton>
-    <TextInput type="search" name="q" className={styles.filterSearch} aria-label={screen.search} maxLength={searchMaxCharacters} defaultValue={filters.q} placeholder={copy.searchPlaceholder} />
+    <div role="search" aria-label={screen.search} className={styles.filterSearch}>
+      <TextInput type="search" name="q" aria-label={screen.search} maxLength={searchMaxCharacters} defaultValue={filters.q} placeholder={copy.searchPlaceholder} />
+    </div>
   </form>;
 }

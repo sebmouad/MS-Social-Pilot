@@ -48,8 +48,10 @@
 .threadScroll { display: grid; align-content: start; gap: 16px; min-height: 0; flex: 1 1 auto; overflow-y: auto; overscroll-behavior: contain; padding-inline-end: 4px; }
 .threadScroll:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; border-radius: var(--radius-sm); }
 .back { display: none; align-items: center; min-height: 40px; color: var(--accent); font-size: 13px; font-weight: 650; }
-.threadHead { display: grid; gap: 8px; padding-bottom: 14px; border-bottom: 1px solid var(--line); }
+.threadHead { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 12px; align-items: center; padding-bottom: 14px; border-bottom: 1px solid var(--line); }
 .threadHead h2 { margin: 0; font-size: 19px; letter-spacing: -.02em; overflow-wrap: anywhere; }
+.threadHead > .audience, .threadHead > .threadTags { grid-column: 2; }
+.threadHead > :first-child { grid-row: 1 / span 3; align-self: start; margin-top: 2px; }
 .historyHead { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
 .historyHead h3 { margin: 0; font-size: 14px; }
 .historyHead span, .contextNote { color: var(--ink-soft); font-size: 12px; }

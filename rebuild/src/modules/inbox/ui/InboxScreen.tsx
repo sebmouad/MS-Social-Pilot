@@ -22,8 +22,8 @@ import { InboxSyncBar, ReplyBox, ThreadToolbar } from './InboxActions';
 import { reviewSummary, reviewText } from '@/modules/inbox/reviews-copy';
 import { ThreadTools } from './ThreadTools';
 import { NestedReply } from './NestedReply';
-import { InboxTag } from './InboxTags';
-import { InboxHeader } from './InboxChrome';
+import { InboxTag, inboxKindTone } from './InboxTags';
+import { InboxHeader, PersonAvatar } from './InboxChrome';
 import { InboxFilterRow } from './InboxFilterRow';
 import { InboxSavedViews } from './InboxSavedViews';
 import { ThreadDetailsLayout } from './ThreadDetailsLayout';
@@ -159,11 +159,12 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
       {history.newerCursor ? <a href={inboxHref({ ...historyBase, historyCursor: history.newerCursor })}>{copy.newer}</a> : <span aria-disabled="true">{copy.newer}</span>}
     </nav>;
     const head = <header className={styles.threadHead}>
+      <PersonAvatar name={first?.author ?? thread.entries[0]?.author ?? copy.aVisitor} size={44} />
       <h2>{thread.kind === 'message' ? copy.conversationWith(first?.author ?? copy.aVisitor) : thread.kind === 'review' ? reviewLabel(locale, 'reviewBy', { name: thread.entries[0]?.author ?? copy.aVisitor }) : copy.commentBy(thread.entries[0]?.author ?? copy.aVisitor)}</h2>
       <p className={styles.audience} data-kind={thread.kind}>{thread.kind === 'message' ? copy.audiencePrivate(first?.author ?? copy.aVisitor) : thread.kind === 'review' ? reviewLabel(locale, 'audience') : copy.audiencePublic}</p>
       <div className={styles.threadTags}>
         <ChannelBadge name={thread.target.name} platformName={badge.platformName} mark={badge.mark} />
-        <InboxTag icon={thread.kind === 'message' ? 'message' : thread.kind === 'review' ? 'review' : 'comment'}>{thread.kind === 'message' ? copy.message : thread.kind === 'review' ? reviewLabel(locale, 'review') : copy.comment}</InboxTag>
+        <InboxTag icon={thread.kind === 'message' ? 'message' : thread.kind === 'review' ? 'review' : 'comment'} tone={inboxKindTone(thread.kind)}>{thread.kind === 'message' ? copy.message : thread.kind === 'review' ? reviewLabel(locale, 'review') : copy.comment}</InboxTag>
         {thread.kind === 'review' ? <InboxTag icon="review">{reviewSummary(locale, thread, reviews)}</InboxTag> : null}
         {thread.resolved ? <InboxTag icon="resolved" tone="ok">{copy.resolvedTag}</InboxTag> : <InboxTag icon="needsReply" tone="warn">{copy.openTag}</InboxTag>}
         {thread.hidden ? <InboxTag icon="hidden">{copy.hidden}</InboxTag> : null}
@@ -232,7 +233,7 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
     {KIND_TABS.map(kind => {
       const unread = kind === 'message' ? listPage.unread?.message ?? 0 : 0;
       return <a key={kind} href={kindHref(kind)} className={styles.kindTab} data-kind={kind} aria-current={activeKind === kind ? 'page' : undefined}>
-        <InboxTag icon={kind}>{kindLabel(kind)}</InboxTag>
+        <InboxTag icon={kind} tone={inboxKindTone(kind)}>{kindLabel(kind)}</InboxTag>
         {listPage.totals ? <span className={styles.kindCount}>{listPage.totals[kind]}</span> : null}
         {unread > 0 ? <InboxTag icon="unread" tone="warn">{copy.nUnread(unread)}</InboxTag> : null}
       </a>;

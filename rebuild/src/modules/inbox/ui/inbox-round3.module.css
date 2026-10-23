@@ -46,6 +46,7 @@
 
 .filterRow { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2, 8px); min-width: 0; }
 .filterSearch { flex: 1 1 220px; max-width: 360px; min-width: 0; }
+.filterSearch input { width: 100%; }
 
 .details { min-width: 0; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface-sunken, var(--surface)); }
 .detailsBody { padding: 14px; }
@@ -111,7 +112,19 @@
 /* Saved triage views beside the filter row. */
 .savedViews { display: grid; gap: 8px; min-width: 0; }
 .savedViews h2 { margin: 0; font-size: 13px; font-weight: 750; }
-.savedViews ul { display: flex; flex-wrap: wrap; gap: 6px 12px; margin: 0; padding: 0; list-style: none; }
-.savedViews li { display: inline-flex; align-items: center; gap: 8px; }
+.savedViews ul { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.savedViews li { display: inline-flex; align-items: center; gap: 4px; max-width: 100%; padding: 2px 4px 2px 10px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); }
+.savedViews li a { min-height: 32px; display: inline-flex; align-items: center; color: var(--ink); font-size: 13px; font-weight: 600; text-decoration: none; overflow-wrap: anywhere; }
+.savedViews li a:hover { text-decoration: underline; }
+.savedViews li a[aria-current="page"] { color: var(--accent); font-weight: 750; }
+.savedViews li:has(a[aria-current="page"]) { border-color: var(--accent); background: var(--accent-soft); }
+.savedViews li a:focus-visible, .savedViews li button:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; border-radius: var(--radius-sm); }
+.savedViews li > button, .savedViews li span button { min-height: 32px; padding: 0 8px; border: 0; border-radius: 999px; background: transparent; color: var(--ink-soft); font: inherit; font-size: 12px; cursor: pointer; }
+.savedViews li > button:hover, .savedViews li span button:hover { background: var(--surface-muted); color: var(--ink); }
 .savedViews form { display: flex; flex-wrap: wrap; align-items: end; gap: 8px; }
-.savedViews input { min-height: 36px; }
+.savedViews form label { display: grid; gap: 4px; color: var(--ink-soft); font-size: 12px; font-weight: 650; }
+.savedViews input { min-height: 36px; padding: 0 8px; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface); color: var(--ink); font: inherit; font-size: 14px; }
+.savedViews form > button { min-height: 36px; padding: 0 14px; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface); color: var(--ink); font: inherit; font-size: 13px; font-weight: 650; cursor: pointer; }
+.savedViews form > button:hover:not(:disabled) { background: var(--surface-muted); }
+.savedViews form > button:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.savedViews form > button:disabled { opacity: .6; cursor: wait; }

@@ -4,9 +4,12 @@ import { IconCalendarWeek, IconPencil, IconPlayerPlay, IconTrash } from '@tabler
 import type { ScheduledAgent, ScheduledChannel, ScheduledRun } from '../server/scheduled';
 import type { AutopilotTier, ResolvedAutopilotPolicy } from '../server/autopilot';
 import { AutoTextarea } from '@/components/AutoTextarea';
+import { Badge } from '@/components/Badge';
 import { Button } from '@/components/Button';
+import { EmptyState } from '@/components/EmptyState';
 import { useConfirm } from '@/components/useConfirm';
 import type { AgentCopy } from '../copy';
+import { agentRunTone } from './status-tone';
 import styles from './agents.module.css';
 
 export type ScheduledResult = { agents?: ScheduledAgent[]; channels?: ScheduledChannel[]; history?: ScheduledRun[]; policy?: ResolvedAutopilotPolicy; error?: string; ok?: boolean; id?: string; drafts?: number; maxDrafts?: number; briefMax?: number };
@@ -108,8 +111,8 @@ export function ScheduledAgents({ agents, channels, maxDrafts, briefMax, history
   <h2><IconCalendarWeek size={20} aria-hidden="true" /> {t.scheduledTitle}</h2>
   <p>{t.scheduledIntro}</p>
   <p ref={status} tabIndex={-1} role="status">{feedback}</p>{error ? <p role="alert">{error}</p> : null}
-  {!items.length ? <p>{t.scheduledEmpty}</p> : <ul className={styles.list}>{items.map(agent => <li key={agent.id}>
-   <div className={styles.identity}><strong>{agent.targetName ?? agent.targetId}</strong><p>{agent.brief}</p><p>{dayName(agent.weekday)} · {agent.count} · {agent.enabled ? t.active : t.paused} · {agent.lastRunOn ? `${t.lastRun}: ${agent.lastRunOn}` : t.neverRan}</p></div>
+  {!items.length ? <EmptyState icon={<IconCalendarWeek size={22} />} title={t.scheduledEmpty} /> : <ul className={styles.list}>{items.map(agent => <li key={agent.id}>
+   <div className={styles.identity}><strong>{agent.targetName ?? agent.targetId}</strong><p>{agent.brief}</p><p>{dayName(agent.weekday)} · {agent.count} · <Badge tone={agent.enabled ? 'success' : 'neutral'}>{agent.enabled ? t.active : t.paused}</Badge> · {agent.lastRunOn ? `${t.lastRun}: ${agent.lastRunOn}` : t.neverRan}</p></div>
    <div className={styles.actions}>
     <Button disabled={pending} onClick={() => edit(agent)} aria-label={`${t.edit}: ${agent.targetName ?? agent.targetId}`}><IconPencil size={16} aria-hidden="true" />{t.edit}</Button>
     <Button disabled={pending || !agent.enabled} onClick={() => mutate('run', agent.id)} aria-label={`${t.runScheduled}: ${agent.targetName ?? agent.targetId}`}><IconPlayerPlay size={16} aria-hidden="true" />{t.runScheduled}</Button>
@@ -130,8 +133,8 @@ export function ScheduledAgents({ agents, channels, maxDrafts, briefMax, history
     const agent = items.find(item => item.id === run.agentId);
     const ok = run.code === null;
     const tierName = run.tier === 'manual' || run.tier === 'assisted' || run.tier === 'supervised_auto' ? tierLabel(t, run.tier) : null;
-    return <li key={`${run.agentId}-${run.at}-${index}`}><div className={styles.identity}><strong>{agent?.targetName ?? agent?.targetId ?? t.unknownAgent}</strong><p>{ok ? `${t.completed} · ${t.historyDrafts.replace('{count}', String(run.drafts ?? 0))}${tierName ? ` · ${tierName}` : ''}${typeof run.scheduled === 'number' && run.scheduled > 0 ? ` · ${t.autopilotSends.replace('{count}', String(run.scheduled))}` : ''}` : t.failedRun}</p></div><time dateTime={run.at}>{new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short', timeZone: 'UTC' }).format(new Date(run.at))} {t.timeZone}</time></li>;
-  })}</ol> : <p>{t.noHistory}</p>}
+    return <li key={`${run.agentId}-${run.at}-${index}`}><div className={styles.identity}><strong>{agent?.targetName ?? agent?.targetId ?? t.unknownAgent}</strong><p><Badge tone={agentRunTone(ok ? 'completed' : 'failed')}>{ok ? t.completed : t.failedRun}</Badge>{ok ? ` · ${t.historyDrafts.replace('{count}', String(run.drafts ?? 0))}${tierName ? ` · ${tierName}` : ''}${typeof run.scheduled === 'number' && run.scheduled > 0 ? ` · ${t.autopilotSends.replace('{count}', String(run.scheduled))}` : ''}` : ''}</p></div><time dateTime={run.at}>{new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short', timeZone: 'UTC' }).format(new Date(run.at))} {t.timeZone}</time></li>;
+  })}</ol> : <EmptyState icon={<IconCalendarWeek size={22} />} title={t.noHistory} />}
   {confirmation}{removal}
  </section>;
 }

@@ -30,6 +30,8 @@ import { ObjectManager } from './ObjectManager';
 import { adsHeaderFor } from '../AdsTabsFor';
 import { Button } from '@/components/Button';
 import { ObjectRowLabel } from './ObjectRowLabel';
+import { adsStatusTone } from './status-tone';
+import { Badge } from '@/components/Badge';
 import { labelInstants, workspaceInstantFormatter } from '@/server/instant-labels';
 import { ChangeHistory } from './ChangeHistory';
 import { CampaignCreateForm } from '@/modules/ads/ui/CampaignCreateForm';
@@ -161,7 +163,7 @@ async function AdsObjectsPage({ searchParams }: { searchParams: Promise<Params> 
       <DataTable caption={tabTitle} rows={directory.items} rowKey={row => `${row.accountId}:${row.objectId}`} emptyMessage={t('text075')} columns={[
         { key: 'name', label: t('text066'), render: row => <ObjectRowLabel adAccountId={row.accountId} level={directory.level} objectId={row.objectId} name={row.name} status={row.status}><span className="small-note">{accountName.get(row.accountId) ?? row.accountName} · {row.objectId}</span></ObjectRowLabel> },
         ...(parentLevel ? [{ key: 'parent', label: parentLabel, render: (row: (typeof directory.items)[number]) => parentOf(row) }] : []),
-        { key: 'status', label: t('manageStatus'), render: row => row.status ?? t('text094') },
+        { key: 'status', label: t('manageStatus'), render: row => <Badge tone={adsStatusTone(row.status)}>{row.status ?? t('text094')}</Badge> },
         { key: 'spend', label: t('text019'), align: 'end' as const, render: row => `${row.currency ? `${row.currency} ` : ''}${show(row.spend)}` },
         { key: 'last', label: t('text262'), render: row => row.lastDeliveryDate ?? t('text171') },
         { key: 'updated', label: t('manageSynced'), render: row => row.lastFetchedAt ? row.lastFetchedAt.slice(0, 10) : t('text094') },

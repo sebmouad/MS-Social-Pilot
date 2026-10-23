@@ -2,6 +2,9 @@
 import { useInboxCatalog } from '../ui/copy-context';
 import { useCallback, useEffect, useState } from 'react';
 import { Button } from '@/components/Button';
+import { Badge } from '@/components/Badge';
+import { EmptyState } from '@/components/EmptyState';
+import { IconHistory, IconShieldCheck } from '@tabler/icons-react';
 import { useConfirm } from '@/components/useConfirm';
 import { MODERATION_ACTIONS, MODERATION_MATCHES, moderationConfirmation, moderationRuleProblem, moderationText, type ModerationLocale, type ModerationRuleInput } from '../moderation';
 import styles from './ModerationRules.module.css';
@@ -10,6 +13,13 @@ type Rule = ModerationRuleInput & { id: string };
 type LogRow = { id: string; ruleName: string; targetId: string; authorName: string | null; message: string; action: string; error: string | null; undoneAt: string | null; createdAt: string; undoable: boolean; labels?: { createdAt?: string } };
 type Data = { rules: Rule[]; log: LogRow[]; channels: { id: string; name: string }[]; canTargetAllChannels: boolean };
 const blank = (): ModerationRuleInput => ({ name: '', enabled: true, targetIds: [], match: 'links', keywords: [], action: 'hide', replyText: null, dailyCap: 20, oncePerUser: true });
+
+/** Badge tone of a moderation log outcome: a failure reads as danger, an undone action as neutral, a completed one as success. */
+export function moderationOutcomeTone(row: Pick<LogRow, 'error' | 'undoneAt'>): 'success' | 'danger' | 'neutral' {
+  if (row.error) return 'danger';
+  if (row.undoneAt) return 'neutral';
+  return 'success';
+}
 
 export function ModerationRules({ canWrite, locale = 'en' }: { canWrite: boolean; locale?: ModerationLocale }) {
   const copy = useInboxCatalog('moderationCopy')[locale];
@@ -66,9 +76,9 @@ export function ModerationRules({ canWrite, locale = 'en' }: { canWrite: boolean
       </div>
       <p className={styles.hint}>{t('intro')}</p>
       {!data && !error && <p className={styles.meta} role="status">…</p>}
-      {data && data.rules.length === 0 && !draft && <div><strong>{t('emptyTitle')}</strong><p className={styles.hint}>{t('emptyHint')}</p></div>}
+      {data && data.rules.length === 0 && !draft && <EmptyState icon={<IconShieldCheck size={26} />} title={t('emptyTitle')}>{t('emptyHint')}</EmptyState>}
       {data && data.rules.length > 0 && <ul className={styles.list}>{data.rules.map(rule => <li key={rule.id} className={styles.item}>
-        <strong>{rule.name}{rule.enabled ? '' : ` · ${t('paused')}`}</strong>
+        <span className={styles.row}><strong>{rule.name}</strong>{rule.enabled ? null : <Badge tone="warning">{t('paused')}</Badge>}<Badge>{t(`action.${rule.action}` as 'action.hide')}</Badge></span>
         <span className={styles.meta}>{t(`action.${rule.action}` as 'action.hide')} · {t('when')} {t(`match.${rule.match}` as 'match.links')}{rule.match === 'keywords' ? `: ${rule.keywords.join(', ')}` : ''} · {rule.targetIds.length ? rule.targetIds.map(channelName).join(', ') : t('allChannels')} · {t('dailyCap')}: {rule.dailyCap}</span>
         {canWrite && <div className={styles.row}>
           <Button size="sm" variant="quiet" disabled={busy || Boolean(draft)} onClick={() => startEdit(rule)}>{t('edit')}</Button>
@@ -96,11 +106,11 @@ export function ModerationRules({ canWrite, locale = 'en' }: { canWrite: boolean
     <section className={styles.panel} aria-labelledby="moderation-log-heading">
       <h2 id="moderation-log-heading">{t('logHeading')}</h2>
       <p className={styles.hint}>{t('logHint')}</p>
-      {data && data.log.length === 0 && <div><strong>{t('logEmptyTitle')}</strong><p className={styles.hint}>{t('logEmptyHint')}</p></div>}
+      {data && data.log.length === 0 && <EmptyState icon={<IconHistory size={26} />} title={t('logEmptyTitle')}>{t('logEmptyHint')}</EmptyState>}
       {data && data.log.length > 0 && <ul className={styles.list}>{data.log.map(row => <li key={row.id} className={styles.item}>
         <span className={styles.meta}>{row.labels?.createdAt ?? ''} · {channelName(row.targetId)} · {row.ruleName}</span>
         <span><strong>{row.authorName || t('someone')}</strong>: {row.message}</span>
-        <span className={styles.meta}>{row.error ? t('failed', { reason: row.error }) : row.undoneAt ? t('undone') : t(`done.${row.action}` as 'done.hide')}</span>
+        <span><Badge tone={moderationOutcomeTone(row)}>{row.error ? t('failed', { reason: row.error }) : row.undoneAt ? t('undone') : t(`done.${row.action}` as 'done.hide')}</Badge></span>
         {canWrite && row.undoable && <div><Button size="sm" variant="quiet" disabled={busy} onClick={async () => { const result = await act({ action: 'action.undo', id: row.id, confirmation: moderationConfirmation.undo(row.id) }, t('undoHideConfirm')); if (result) setNotice(t('undoneOk')); }}>{t('undoHide')}</Button></div>}
       </li>)}</ul>}
     </section>

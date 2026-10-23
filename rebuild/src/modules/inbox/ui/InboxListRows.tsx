@@ -8,7 +8,7 @@ import { formatInboxTime } from '../server/threads';
 import { resolveInboxCatalog, type InboxCustomerCopy } from '../customer-copy';
 import { reviewSummary, reviewText } from '../reviews-copy';
 import { PersonAvatar } from './InboxChrome';
-import { InboxTag } from './InboxTags';
+import { InboxTag, inboxKindTone } from './InboxTags';
 import { SelectBox, type SelectableItem } from './InboxSelection';
 import type { InboxRow } from './InboxList';
 import type { InboxLocale } from './copy';
@@ -54,7 +54,7 @@ export function inboxListRows(page: InboxListPage, abilities: Awaited<ReturnType
       <p className={styles.preview}>{item.kind === 'review' && !item.preview ? reviewLabel(locale, 'noText') : item.preview.length > previewMaxCharacters ? `${item.preview.slice(0, previewMaxCharacters)}…` : item.preview}</p>
       <div className={styles.itemMeta}>
         <ChannelBadge name={item.target.name} platformName={badge.platformName} mark={badge.mark} compact />
-        <InboxTag icon={item.kind === 'message' ? 'message' : item.kind === 'review' ? 'review' : 'comment'}>{item.kind === 'message' ? copy.message : item.kind === 'review' ? reviewLabel(locale, 'review') : copy.comment}</InboxTag>
+        <InboxTag icon={item.kind === 'message' ? 'message' : item.kind === 'review' ? 'review' : 'comment'} tone={inboxKindTone(item.kind)}>{item.kind === 'message' ? copy.message : item.kind === 'review' ? reviewLabel(locale, 'review') : copy.comment}</InboxTag>
         {item.kind === 'review' ? <InboxTag icon="review">{reviewSummary(locale, item, reviews)}</InboxTag> : null}
         {item.sentiment ? <InboxTag icon={item.sentiment} tone={SENTIMENT_TONE[item.sentiment]} title={copy.sentimentHint}>{copy.sentiment[item.sentiment]}</InboxTag> : null}
         {item.unread > 0 ? <InboxTag icon="unread" tone="warn">{copy.nUnread(item.unread)}</InboxTag> : null}
