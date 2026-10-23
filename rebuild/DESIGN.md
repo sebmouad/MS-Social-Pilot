@@ -3,28 +3,28 @@ version: alpha
 name: "MS Social Pilot"
 description: "A calm publishing and measurement desk for teams managing selected social channels."
 colors:
-  canvas: "#f5f7f4"
+  canvas: "#f9fafb"
   surface: "#ffffff"
-  ink: "#18231e"
-  inkSoft: "#526159"
-  line: "#dce4de"
-  accent: "#286b4b"
-  accentSoft: "#e4f2e9"
-  warning: "#a15d18"
-  danger: "#ad3b36"
-  focus: "#477ee8"
+  ink: "#111827"
+  inkSoft: "#5f6672"
+  line: "#e5e7eb"
+  accent: "#185FA5"
+  accentSoft: "#E6F1FB"
+  warning: "#92400e"
+  danger: "#c4242a"
+  focus: "#2563eb"
 typography:
   body:
-    fontFamily: "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+    fontFamily: "DM Sans, Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
   data:
     fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace"
 rounded:
   sm: "8px"
   md: "12px"
-  lg: "18px"
+  lg: "16px"
 spacing:
   unit: "4px"
-  content: "32px"
+  content: "24px"
 components:
   button: {}
   panel: {}
@@ -44,9 +44,22 @@ The audience is workspace owners, publishers, analysts, and client reviewers. Th
 
 Do not use pill-shaped control groups that wrap unpredictably, nested settings menus, decorative metrics without clear provenance, or provider setup jargon in customer screens. The design should remain recognizable across Vivid, Meta blue, Warm and Clean, in light and dark modes.
 
-`src/styles/tokens.css` is the canonical runtime source for colors, spacing, radii, and base component styles. Owner decision 2026-10-21: the palette was redesigned to be colorful with icons everywhere. Four themes — **Vivid** (deep indigo rail, one solid color chip per module), **Meta blue** (light rail, blue accent, colorful data), **Warm** (cream and coral) and **Clean** (default for new users; near-white and crisp gray, color only in icons and charts) — each have a light and a dark palette. `data-theme` selects the palette and `data-mode` (`light`, `dark`, `system`) the mode; `system` follows `prefers-color-scheme`. Root sets `theme.default` and `theme.defaultMode`; users switch the mode from the top-bar toggle and the theme in Settings › Appearance. `src/lib/themes.ts` owns names, swatches and modes. A token change updates both files and this document in one batch.
+## UI wave 1 — 2026-10-23 (visible-first shell)
 
-Every theme defines module identity colors `--mod-<module>` (home, publishing, inbox, analytics, ads, tasks, agency, settings, root). Elements tagged `data-module` expose `--mod`, `--mod-soft` and `--mod-ink` (derived with `color-mix`) for icon chips (`.ui-mod-chip`), sidebar page icons and headings. Charts read `--chart-1`…`--chart-8`, `--chart-grid`, `--chart-text`, `--chart-surface` and `--chart-accent` (see docs/CHARTS.md). Icons come from `@tabler/icons-react` through `src/components/icons.tsx` (module and page registry); never hand-draw icon paths. Shared components (tables, Select, Menu, Tabs, PageHeader, MetricCard, toasts, dialogs, forms, filters) and their interaction rules are documented in docs/DESIGN_COMPONENTS.md; their styles live in `src/styles/components.css`. Screens adopt them instead of route-local controls.
+Style dealt from the app-screens library: `accent-ladder`, seed 1827127362, kind creator, brief "social media management workspace". Chosen over editorial-greeting (home-only) and true-black-flat (dark-only) for long team sessions in day and night use. The style's move is kept intact: the full hue lives only on small marks (the filled primary button, the main data hue, the active nav icon) and its pale tints carry every area (active nav row, badges, tracks).
+
+- **Face:** the ladder rebuilt from the brand's own Meta blue instead of the dealt raspberry (`#185FA5` light / `#85B7EB` dark on the default Clean theme; the sheet states the move does not depend on the hue). DM Sans is the dealt typeface, loaded through `next/font` as `--font-brand` with Inter as fallback.
+- **Signature element:** the dispatch rail — the sidebar channel scope where each channel shows its avatar with a connection-health dot, under a workspace switcher that gives every workspace a stable avatar color. Built from the product's own things (workspaces, channels, health), visible on every screen.
+- **Shell:** open plane. The sidebar sits on the page ground (230px, collapsing to a 64px rail) with a hairline separation; the top bar is 48px and holds the command bar. Navigation is five hubs — Create, Plan, Engage, Measure, Grow — regrouping the existing pages without changing any route: Create holds the studio tools (the `/create` composer stays the primary action), Plan the publishing desk plus Tasks once used, Engage the inbox, Measure insights, Grow ads plus Agency once used. Home stays the brand landing; Settings stays in the footer. Hub rows are 34px, 14px labels with plain outline icons; the active hub is the tint fill with the dark ink of the hue (`--accent-soft` / `--accent-ink`, 4.5:1 in every theme and mode). Hub badges show open page mentions (Engage), posts waiting for review (Plan) and open metric alerts (Measure), each counted from its own list's authorized scope and capped at 99+; the count's noun is in the accessible name. Phones show Plan · Engage · Measure · Grow with the raised Create action; the Create hub lives in the overlay menu.
+- **Command bar:** Ctrl/⌘-K everywhere, type to filter, arrows and Enter to open. Three groups — Create shortcuts (the writable module primary actions), Pages, and Channels jumping to the inbox scoped to that profile — with empty groups hidden.
+- **Tokens:** one ground/ink/accent ladder per theme and mode (`--accent-soft`, `--accent-ink` added to all eight palettes plus the four device-match mirrors), shared 4px spacing scale with one 24px gap, card 8 / control 6 radii, and the sheet type scale (title 32, section 18, KPI 24, body 14, small 12) on the existing nine token names. The other three themes keep their hue families under the same ladder discipline. Control borders keep their darker values: the sheet's light control grey fails the 3:1 house floor, and accessibility wins over the sheet there.
+- **Dark parity:** every touched surface (sidebar, hubs, badges, switcher, scope list, command bar, bottom bar, hub tabs) is token-driven in all eight palettes; contrast suites cover the new ladder pairs.
+
+Evidence: `npm run typecheck` 0 errors; new `tests/hubs.test.ts` (20) plus updated `app-shell`, `command-palette-ui` and `ux-reorg-mobile` suites; all theme-contrast and design-token suites pass; `lint.mjs --app` 0 FAIL on the touched sources. Browser screenshots and `inspect.mjs` could not run in this lane (no database: Docker Desktop cannot launch in the sandbox and no local Postgres or Playwright browsers exist); BEFORE state was recorded from source at `469e5745` instead. Full browser-matrix, keyboard walkthrough and DM Sans tabular-figure verification remain open for the next wave.
+
+`src/styles/tokens.css` is the canonical runtime source for colors, spacing, radii, and base component styles. UI wave 1 (2026-10-23) rebuilt the shell on the accent-ladder discipline: four themes — **Vivid** (soft violet ground, violet ladder), **Meta blue** (pale blue ground, blue ladder), **Warm** (warm cream ground, terracotta ladder) and **Clean** (default for new users; near-white ground, blue ladder, color only where it carries meaning) — each have a light and a dark palette. `data-theme` selects the palette and `data-mode` (`light`, `dark`, `system`) the mode; `system` follows `prefers-color-scheme`. Root sets `theme.default` and `theme.defaultMode`; users switch the mode from the top-bar toggle and the theme in Settings › Appearance. `src/lib/themes.ts` owns names, swatches and modes. A token change updates both files and this document in one batch.
+
+Every theme defines module identity colors `--mod-<module>` (home, publishing, inbox, analytics, ads, tasks, agency, settings, root). Elements tagged `data-module` expose `--mod`, `--mod-soft` and `--mod-ink` (derived with `color-mix`) for icon chips (`.ui-mod-chip`) and headings; sidebar hub icons stay plain outline since UI wave 1. Charts read `--chart-1`…`--chart-8`, `--chart-grid`, `--chart-text`, `--chart-surface` and `--chart-accent` (see docs/CHARTS.md). Icons come from `@tabler/icons-react` through `src/components/icons.tsx` (module and page registry); never hand-draw icon paths. Shared components (tables, Select, Menu, Tabs, PageHeader, MetricCard, toasts, dialogs, forms, filters) and their interaction rules are documented in docs/DESIGN_COMPONENTS.md; their styles live in `src/styles/components.css`. Screens adopt them instead of route-local controls.
 
 ## Colors
 
@@ -60,9 +73,9 @@ Inter and the system sans stack carry navigation, forms, and prose. Use a restra
 
 ## Layout
 
-The v2 shell (owner decision 2026-10-21; transitional adapter removed in B9) uses **one collapsible sidebar** holding the work areas and the channel list that scopes every channel-aware page. The sidebar shows the workspace switcher (only with more than one workspace), a primary Create action, the areas Home · Content · Inbox · Insights · Ads (Tasks and Agency appear only when used), then the channel list — All channels, one click-to-scope row per channel with a connection-health dot, and Manage channels — with Settings, Help and the account menu (theme, language, account, Root for owners, sign out) in the footer. Areas use tabs above the content (2026-10-22 organization: Content is Posts · Calendar · Queue · Approvals · Library · Content feeds · AI studio · Writing agents; Insights is Overview · Explore · Audience · Posts · Caption tests · Compare · Reports; the 8th Content tab folds into "More" per `maxVisibleTabs: 7`); Settings uses an in-content section list; Root uses the same shell with its own areas and no channel list. Each page has **one Filter button in its header** (a bottom sheet on phones); filters never live in the sidebar. Number caveats sit behind ⓘ. The default theme for new users is **Clean**; Vivid, Meta blue and Warm stay selectable, each in light and dark plus system mode. The work area stays flexible and readable with a capped content measure and responsive inset. A keyboard skip link leads directly to the main content.
+The v2 shell (owner decision 2026-10-21; transitional adapter removed in B9; UI wave 1 regrouped navigation into hubs on 2026-10-23) uses **one collapsible sidebar** holding five hubs and the channel list that scopes every channel-aware page. The sidebar shows the product mark and name, a colour-coded workspace switcher (a menu with more than one workspace, a named row otherwise), a primary Create action, the hubs Create · Plan · Engage · Measure · Grow (Create holds the studio tools; Tasks joins Plan and Agency joins Grow only when used), then the channel list — All channels, one click-to-scope row per channel with avatar and connection-health dot, and Manage channels — with Settings and the account menu (theme, language, account, Root for owners, sign out) in the footer. Hub badges show open page mentions, posts waiting for review and open metric alerts. Hubs use tabs above the content (Plan is Posts · Calendar · Queue · Approvals · Library · Content feeds; Create is AI studio · Writing agents; Measure is Overview · Explore · Audience · Posts · Caption tests · Compare · Reports; Grow is Accounts · Campaigns · Manage · Analysis · Compare; every hub fits `maxVisibleTabs: 7`); Settings uses an in-content section list; Root uses the same shell with its own navigation and no channel list. Each page has **one Filter button in its header** (a bottom sheet on phones); filters never live in the sidebar. Number caveats sit behind ⓘ. The default theme for new users is **Clean**; Vivid, Meta blue and Warm stay selectable, each in light and dark plus system mode. The work area stays flexible and readable with a capped content measure and responsive inset. A keyboard skip link leads directly to the main content.
 
-Geometry tokens live in `src/styles/tokens.css`: 248px sidebar collapsing to a 64px icon rail (state remembered in the `sp_sidebar` cookie), 56px top bar, 1280px content cap, 32px desktop gutter (24px below 1024px, 16px on phones). Desktop (≥1024px) shows the full sidebar; tablet (760–1023px) starts on the rail with the sidebar as an overlay; phones (≤760px) use a top bar with a channel-scope chip plus a bottom bar with Home, Content, Inbox, a raised central Create button, Insights and Ads, and open the channel list as a bottom sheet. The sidebar overlay, sheets, drawers and dialogs trap focus, close with Escape, return focus to their opener and keep the background inert. Tables own horizontal overflow. The Content calendar becomes an agenda below 720px. Forms and data panels keep natural document scrolling unless a component has its own bounded surface.
+Geometry tokens live in `src/styles/tokens.css`: 230px sidebar collapsing to a 64px icon rail (state remembered in the `sp_sidebar` cookie), 48px top bar, 1280px content cap, 24px desktop gutter (16px on phones). Desktop (≥1024px) shows the full sidebar; tablet (760–1023px) starts on the rail with the sidebar as an overlay; phones (≤760px) use a top bar with a channel-scope chip plus a bottom bar with Plan, Engage, a raised central Create button, Measure and Grow (the Create hub lives in the overlay menu), and open the channel list as a bottom sheet. The sidebar overlay, sheets, drawers and dialogs trap focus, close with Escape, return focus to their opener and keep the background inert. Tables own horizontal overflow. The Content calendar becomes an agenda below 720px. Forms and data panels keep natural document scrolling unless a component has its own bounded surface.
 
 Content leads with the work rather than setup: the Posts tab is a table with a side preview (Feed and Cards were removed by owner decision 2026-10-21) sharing one scoped query with search, status and channel filters, plus Export and Import CSV as explicit secondary actions. A row opens the full post preview — channel identity, actual status/time, text, media/link content, first comment and per-destination outcomes — in a side panel, shareable by URL, with the same row actions as the post page. Do not invent engagement counts, imitate provider-only controls, or mix platform business rules into shared previews. URL and file controls inherit the active theme rather than browser-default light styling.
 

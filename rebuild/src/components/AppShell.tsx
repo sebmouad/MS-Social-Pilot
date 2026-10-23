@@ -3,10 +3,11 @@ import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, 
 import { usePathname, useSearchParams } from "next/navigation";
 import { IconChevronsLeft, IconChevronsRight, IconCheck, IconChevronDown, IconHelp, IconLogout, IconMenu2, IconPlus, IconSettings, IconShieldLock, IconUserCircle, IconX } from "@tabler/icons-react";
 import { MODULES, areaForPath, areaPages, pageForPath, type AreaId, type ModuleId } from "@/lib/product";
+import { HUB_ORDER, hubForPath, hubPages, type HubId } from "@/lib/hubs";
 import { nextChannelScope, parseChannelScope, withChannelScope } from "@/lib/channel-scope";
 import { fill, type ShellCopy, type ShellPolicy } from "@/modules/shell/copy";
 import type { ConnectionState } from "@/lib/connection-status";
-import { ModuleGlyph } from "./icons";
+import { HubGlyph, ModuleGlyph } from "./icons";
 import { CommandPalette } from "./CommandPalette";
 import { ToastProvider } from "./Toast";
 import { ShellCopyProvider } from "./ShellCopy";
@@ -23,13 +24,15 @@ function Mark() {
   return <svg className="shell-mark" viewBox="0 0 32 32" aria-hidden="true"><path d="M5 23.5 12.2 8l4 9 3.2-5.3L27 23.5" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"/><circle cx="23.5" cy="8.5" r="2.5" fill="currentColor"/></svg>;
 }
 
-/** Glyph module id for each sidebar area; colours come from the `--area-*` tokens. */
-const AREA_GLYPH: Record<AreaId, string> = { home: "home", content: "publishing", inbox: "inbox", insights: "analytics", ads: "ads", tasks: "tasks", agency: "agency", settings: "settings" };
-const FIXED_AREAS: readonly AreaId[] = ["home", "content", "inbox", "insights", "ads"];
+/** Hubs that carry a needs-attention badge, in hub order. */
+const BADGED_HUBS: readonly HubId[] = ["engage", "plan", "measure"];
+/** Phone bottom bar: the four page hubs; Create stays the raised central action. */
+const BOTTOM_HUBS: readonly HubId[] = ["plan", "engage", "measure", "grow"];
 const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
-type PaletteCopy = { trigger: string; placeholder: string; noResults: string; hint: string; close: string };
+type PaletteCopy = { trigger: string; placeholder: string; noResults: string; hint: string; close: string; sectionActions: string; sectionPages: string; sectionChannels: string };
 export type ShellChannelProp = { id: string; name: string; pictureUrl: string | null; health: ConnectionState };
+export type HubCounts = { engage?: number; plan?: number; measure?: number };
 
 type AppShellProps = {
   children: ReactNode;
@@ -57,6 +60,8 @@ type AppShellProps = {
   optionalAreas?: readonly AreaId[];
   /** Pending counts shown on area tabs, keyed by page id (for example Approvals). Zero or missing shows no badge. */
   tabCounts?: Readonly<Record<string, number>>;
+  /** Needs-attention counts shown on the hubs (mentions, approvals, alerts). Zero or missing shows no badge. */
+  hubCounts?: Readonly<HubCounts>;
   initialCollapsed?: boolean;
 };
 
@@ -64,7 +69,12 @@ function writeCookie(name: string, value: string, days: number) {
   try { document.cookie = `${name}=${encodeURIComponent(value)}; path=/; max-age=${Math.round(days * 86400)}; samesite=lax`; } catch { /* a blocked cookie only loses the remembered choice */ }
 }
 
-export function AppShell({ children, activeModule, enabledModules, enabledFeatures, writableFeatures = [], rootAccess, userName, workspaceName, workspaceId, workspaces = [], rootNav, installationMode = false, paletteCopy, copy, policy, channels = [], initialScope = [], initialScopeDropped = 0, optionalAreas = [], tabCounts = {}, initialCollapsed = false }: AppShellProps) {
+/** A count badge reads "99+" past 99 so it never stretches its row. */
+export function badgeText(count: number): string {
+  return count > 99 ? "99+" : String(count);
+}
+
+export function AppShell({ children, activeModule, enabledModules, enabledFeatures, writableFeatures = [], rootAccess, userName, workspaceName, workspaceId, workspaces = [], rootNav, installationMode = false, paletteCopy, copy, policy, channels = [], initialScope = [], initialScopeDropped = 0, optionalAreas = [], tabCounts = {}, hubCounts = {}, initialCollapsed = false }: AppShellProps) {
   const pathname = usePathname();
   const search = useSearchParams();
   const theme = useOptionalTheme();
@@ -81,12 +91,21 @@ export function AppShell({ children, activeModule, enabledModules, enabledFeatur
   const sidebarRef = useRef<HTMLElement>(null);
   const menuToggleRef = useRef<HTMLButtonElement>(null);
 
+  const activeHub = installationMode ? undefined : hubForPath(pathname, activeModule);
   const activeArea = installationMode ? undefined : areaForPath(pathname, activeModule);
   const activePage = pageForPath(pathname);
-  const areaOn = (area: AreaId) => areaPages(area, enabledFeatures).length > 0 && (FIXED_AREAS.includes(area) || optionalAreas.includes(area));
-  const areas = (["home", "content", "inbox", "insights", "ads", "tasks", "agency"] as const).filter(areaOn);
+  const primaryAction = installationMode ? undefined : MODULES.map(module => module.primaryAction).find(action => action && enabledFeatures.includes(action.featureId) && writableFeatures.includes(action.featureId));
+  const hubOn = (hub: HubId) => hubPages(hub, enabledFeatures, optionalAreas).length > 0 || (hub === "create" && primaryAction !== undefined);
+  const hubs = HUB_ORDER.filter(hubOn);
+  const hubHref = (hub: HubId) => hubPages(hub, enabledFeatures, optionalAreas)[0]?.href ?? primaryAction?.href ?? "/home";
+  const hubCount = (hub: HubId) => (BADGED_HUBS.includes(hub) ? hubCounts[hub as keyof HubCounts] : undefined) ?? 0;
+  const hubName = (hub: HubId) => {
+    const count = hubCount(hub);
+    return count > 0 ? `${copy.hubs[hub]}, ${fill(copy.hubCounts[hub as keyof ShellCopy["hubCounts"]], { count })}` : copy.hubs[hub];
+  };
+  // Settings keeps its in-content section list; every other customer page belongs to a hub or is the Home landing.
+  const settingsActive = !installationMode && activeArea === "settings";
   const settingsPages = areaPages("settings", enabledFeatures);
-  const areaHref = (area: AreaId) => areaPages(area, enabledFeatures)[0]?.href ?? "/home";
   const pageLabel = (page: { id: string; title: string }) => (copy.pageTitles as Record<string, string>)[page.id] ?? page.title;
   // Every signed-in page shares the root layout's title; name the tab after the current page so history and tabs stay readable.
   const documentTitle = installationMode ? copy.root : activePage ? pageLabel(activePage) : undefined;
@@ -105,13 +124,15 @@ export function AppShell({ children, activeModule, enabledModules, enabledFeatur
       if (tab.right > box.right - 32 || tab.left < box.left) strip.scrollLeft += tab.left - box.left - 16;
     }
   }, [pathname]);
-  const primaryAction = installationMode ? undefined : MODULES.map(module => module.primaryAction).find(action => action && enabledFeatures.includes(action.featureId) && writableFeatures.includes(action.featureId));
-  const tabs = activeArea ? areaPages(activeArea, enabledFeatures).map(page => ({ id: page.id, href: page.href, label: pageLabel(page), ...(tabCounts[page.id] ? { count: tabCounts[page.id] } : {}) })) : [];
+  const tabs = activeHub ? hubPages(activeHub, enabledFeatures, optionalAreas).map(page => ({ id: page.id, href: page.href, label: pageLabel(page), ...(tabCounts[page.id] ? { count: tabCounts[page.id] } : {}) })) : [];
+  const settingsTabs = settingsActive ? settingsPages.map(page => ({ id: page.id, href: page.href, label: pageLabel(page) })) : [];
   // Sections that are not tabs themselves (Library sections, post details) keep their parent tab current: the longest tab route that prefixes the path.
   const underRoute = (route: string) => pathname === route || pathname.startsWith(`${route}/`);
   const activeTabId = tabs.find(tab => tab.id === activePage?.id)?.id
-    ?? (activeArea ? areaPages(activeArea, enabledFeatures).find(page => page.tabRoutes?.some(underRoute))?.id : undefined)
+    ?? (activeHub ? hubPages(activeHub, enabledFeatures, optionalAreas).find(page => page.tabRoutes?.some(underRoute))?.id : undefined)
     ?? [...tabs].filter(tab => underRoute(tab.href)).sort((a, b) => b.href.length - a.href.length)[0]?.id;
+  const activeSettingsId = settingsTabs.find(tab => tab.id === activePage?.id)?.id
+    ?? [...settingsTabs].filter(tab => underRoute(tab.href)).sort((a, b) => b.href.length - a.href.length)[0]?.id;
 
   // ---- channel scope: the URL wins, then the remembered cookie (01 §5) ----
   const channelIds = useMemo(() => channels.map(channel => channel.id), [channels]);
@@ -233,7 +254,7 @@ export function AppShell({ children, activeModule, enabledModules, enabledFeatur
     { key: "signout", label: signingOut ? copy.signingOut : copy.signOut, icon: <IconLogout size={17} stroke={1.75} />, disabled: signingOut, onSelect: () => { void signOut(); } },
   ];
 
-  const onAreaKey = (event: KeyboardEvent<HTMLElement>) => {
+  const onHubKey = (event: KeyboardEvent<HTMLElement>) => {
     if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
     const items = [...event.currentTarget.querySelectorAll<HTMLElement>("a[href]")];
     const index = items.indexOf(document.activeElement as HTMLElement);
@@ -242,13 +263,23 @@ export function AppShell({ children, activeModule, enabledModules, enabledFeatur
     items[(index + (event.key === "ArrowDown" ? 1 : -1) + items.length) % items.length]!.focus();
   };
 
-  const areaLink = (area: AreaId) => <a key={area} href={areaHref(area)} data-area={area} className={`shell-area${activeArea === area ? " is-active" : ""}`} aria-current={activeArea === area && pageForPath(pathname)?.href === areaHref(area) ? "page" : activeArea === area ? "true" : undefined} title={rail ? copy.areas[area] : undefined}>
-    <span className="shell-area__glyph"><ModuleGlyph id={AREA_GLYPH[area]} size={18} /></span><span className="shell-area__label">{copy.areas[area]}</span>
-  </a>;
+  const hubLink = (hub: HubId) => {
+    const count = hubCount(hub);
+    const name = hubName(hub);
+    return <a key={hub} href={hubHref(hub)} data-hub={hub} className={`shell-hub${activeHub === hub ? " is-active" : ""}`}
+      aria-current={activeHub === hub && pageForPath(pathname)?.href === hubHref(hub) ? "page" : activeHub === hub ? "true" : undefined}
+      aria-label={count > 0 ? name : undefined} title={rail || count > 0 ? name : undefined}>
+      <span className="shell-hub__glyph"><HubGlyph id={hub} size={17} /></span><span className="shell-hub__label">{copy.hubs[hub]}</span>
+      {count > 0 && <span className="shell-hub__badge" aria-hidden="true">{badgeText(count)}</span>}
+    </a>;
+  };
   const rail = collapsed && !menuOpen || (compactViewport && !menuOpen);
   const bottomItems: BottomBarItem[] = installationMode
     ? [{ id: "home", href: "/home", label: copy.backToApp, icon: <ModuleGlyph id="home" size={22} />, active: false }, { id: "root", href: "/root", label: copy.root, icon: <ModuleGlyph id="root" size={22} />, active: true }]
-    : FIXED_AREAS.filter(areaOn).map(area => ({ id: area, href: areaHref(area), label: copy.areas[area], icon: <ModuleGlyph id={AREA_GLYPH[area]} size={22} />, active: activeArea === area }));
+    : BOTTOM_HUBS.filter(hubOn).map(hub => {
+      const count = hubCount(hub);
+      return { id: hub, href: hubHref(hub), label: copy.hubs[hub], icon: <HubGlyph id={hub} size={22} />, active: activeHub === hub, ...(count > 0 ? { badge: count, badgeLabel: hubName(hub) } : {}) };
+    });
 
   const sidebarScope = showScope && <section className="shell-channels" aria-label={copy.channels}>
     <h2 className="shell-section-label">{copy.channels}</h2>
@@ -256,69 +287,79 @@ export function AppShell({ children, activeModule, enabledModules, enabledFeatur
       manageHref={enabledFeatures.includes("settings/connections") ? "/settings/channels" : undefined} compact={rail} busy={navigating} />
   </section>;
 
+  const currentWorkspace = workspaces.find(entry => entry.id === workspaceId);
+  const workspaceItems: MenuItem[] = workspaces.map(entry => ({
+    key: entry.id, label: entry.name, disabled: switching,
+    icon: entry.id === workspaceId
+      ? <span className="shell-workspace__current"><Avatar name={entry.name} size="sm" decorative /><IconCheck size={13} stroke={2.5} aria-hidden="true" /></span>
+      : <Avatar name={entry.name} size="sm" decorative />,
+    onSelect: () => { void switchWorkspace(entry.id); },
+  }));
+
   return <ShellCopyProvider copy={copy}><ToastProvider>
-    <div className="shell" data-area={activeArea} data-module={installationMode ? "root" : activeModule} data-rail={rail ? "true" : undefined} data-menu={menuOpen ? "open" : undefined}>
+    <div className="shell" data-area={installationMode ? "root" : activeArea} data-module={installationMode ? "root" : activeModule} data-rail={rail ? "true" : undefined} data-menu={menuOpen ? "open" : undefined}>
       <a className="shell-skip-link" href="#main-content">{copy.skipLink}</a>
       <aside ref={sidebarRef} id="shell-sidebar" className="shell-sidebar" role={menuOpen ? "dialog" : undefined} aria-modal={menuOpen ? true : undefined} aria-label={copy.mainNavigation} tabIndex={menuOpen ? -1 : undefined}>
         <div className="shell-sidebar__head">
-          <a className="shell-brand" href={installationMode ? "/root" : "/home"} aria-label={`Social Pilot, ${installationMode ? copy.root : copy.areas.home}`}><Mark/><span className="shell-wordmark">Social Pilot</span></a>
-          <button type="button" className="shell-sidebar__close" onClick={closeMenu} aria-label={copy.closeMenu}><IconX size={20} stroke={1.9} aria-hidden="true"/></button>
+          <a className="shell-brand" href={installationMode ? "/root" : "/home"} aria-label={`Social Pilot, ${installationMode ? copy.root : copy.areas.home}`}><Mark /><span className="shell-wordmark">Social Pilot</span></a>
+          <button type="button" className="shell-sidebar__close" onClick={closeMenu} aria-label={copy.closeMenu}><IconX size={20} stroke={1.9} aria-hidden="true" /></button>
         </div>
         <div className="shell-workspace">
           <p className="shell-workspace-label" id="shell-workspace-label">{installationMode ? copy.privateInstallation : copy.workspace}</p>
           {!installationMode && workspaces.length > 1
-            ? <select id="shell-workspace" aria-labelledby="shell-workspace-label" className="shell-workspace-select" value={workspaceId} disabled={switching} aria-busy={switching} onChange={event => void switchWorkspace(event.target.value)}>{workspaces.map(workspace => <option key={workspace.id} value={workspace.id}>{workspace.name}</option>)}</select>
-            : <p className="shell-workspace-name">{workspaceName}</p>}
+            ? <Menu label={`${copy.workspace}: ${currentWorkspace?.name ?? workspaceName}`} align="start" className="shell-workspace__menu" items={workspaceItems}
+              trigger={<><Avatar name={currentWorkspace?.name ?? workspaceName} size="sm" decorative /><span className="shell-workspace__name">{currentWorkspace?.name ?? workspaceName}</span><IconChevronDown size={15} stroke={2} aria-hidden="true" className="shell-workspace__chevron" /></>} />
+            : <p className="shell-workspace-name"><Avatar name={workspaceName} size="sm" decorative /><span className="shell-workspace__name">{workspaceName}</span></p>}
           {switching && <p className="shell-workspace-status" role="status">{copy.switchingWorkspace}</p>}
           {workspaceError && <p className="ui-error" role="alert">{workspaceError}</p>}
         </div>
-        {primaryAction && <a className="shell-create ui-button ui-button--primary" href={primaryAction.href} aria-label={rail ? copy.createPost : undefined} title={rail ? copy.createPost : undefined}><IconPlus size={18} stroke={2.2} aria-hidden="true"/><span className="shell-create__label">{copy.createPost}</span></a>}
+        {primaryAction && <a className="shell-create ui-button ui-button--primary" href={primaryAction.href} aria-label={rail ? copy.createPost : undefined} title={rail ? copy.createPost : undefined}><IconPlus size={18} stroke={2.2} aria-hidden="true" /><span className="shell-create__label">{copy.createPost}</span></a>}
         <div className="shell-sidebar__scroll">
-          <nav className="shell-areas" aria-label={copy.mainNavigation} onKeyDown={onAreaKey}>
+          <nav className="shell-hubs" aria-label={copy.mainNavigation} onKeyDown={onHubKey}>
             {installationMode
-              ? <><a href="/home" data-area="home" className="shell-area"><span className="shell-area__glyph"><ModuleGlyph id="home" size={18}/></span><span className="shell-area__label">{copy.backToApp}</span></a><a href="/root" data-area="root" className="shell-area is-active" aria-current="page"><span className="shell-area__glyph"><ModuleGlyph id="root" size={18}/></span><span className="shell-area__label">{copy.root}</span></a></>
-              : areas.map(areaLink)}
+              ? <><a href="/home" className="shell-hub"><span className="shell-hub__glyph"><ModuleGlyph id="home" size={17} /></span><span className="shell-hub__label">{copy.backToApp}</span></a><a href="/root" className="shell-hub is-active" aria-current="page"><span className="shell-hub__glyph"><ModuleGlyph id="root" size={17} /></span><span className="shell-hub__label">{copy.root}</span></a></>
+              : hubs.map(hubLink)}
           </nav>
           {installationMode ? <div className="shell-root-nav">{rootNav}</div> : sidebarScope}
         </div>
         <footer className="shell-sidebar__foot">
-          {!installationMode && settingsPages.length > 0 && <a href={areaHref("settings")} data-area="settings" className={`shell-area${activeArea === "settings" ? " is-active" : ""}`} aria-current={activeArea === "settings" ? "page" : undefined} title={rail ? copy.areas.settings : undefined}><span className="shell-area__glyph"><IconSettings size={18} stroke={1.75} aria-hidden="true"/></span><span className="shell-area__label">{copy.areas.settings}</span></a>}
+          {!installationMode && settingsPages.length > 0 && <a href={settingsPages[0]!.href} className={`shell-hub${settingsActive ? " is-active" : ""}`} aria-current={settingsActive ? "page" : undefined} title={rail ? copy.areas.settings : undefined}><span className="shell-hub__glyph"><IconSettings size={17} stroke={1.75} aria-hidden="true" /></span><span className="shell-hub__label">{copy.areas.settings}</span></a>}
           <div className="shell-user">
-            <Menu label={copy.userMenu} align="start" className="shell-user__menu" items={userItems} trigger={<><Avatar name={userName} size="sm" decorative /><span className="shell-user__name">{userName}</span><IconChevronDown size={15} stroke={2} aria-hidden="true" className="shell-user__chevron"/></>} />
+            <Menu label={copy.userMenu} align="start" className="shell-user__menu" items={userItems} trigger={<><Avatar name={userName} size="sm" decorative /><span className="shell-user__name">{userName}</span><IconChevronDown size={15} stroke={2} aria-hidden="true" className="shell-user__chevron" /></>} />
           </div>
           {accountError && <p className="ui-error" role="alert">{accountError}</p>}
-          <button type="button" className="shell-collapse" aria-expanded={!collapsed} onClick={toggleCollapsed} aria-label={collapsed ? copy.expandSidebar : copy.collapseSidebar} title={collapsed ? copy.expandSidebar : copy.collapseSidebar}>{collapsed ? <IconChevronsRight size={18} stroke={1.9} aria-hidden="true"/> : <IconChevronsLeft size={18} stroke={1.9} aria-hidden="true"/>}</button>
+          <button type="button" className="shell-collapse" aria-expanded={!collapsed} onClick={toggleCollapsed} aria-label={collapsed ? copy.expandSidebar : copy.collapseSidebar} title={collapsed ? copy.expandSidebar : copy.collapseSidebar}>{collapsed ? <IconChevronsRight size={18} stroke={1.9} aria-hidden="true" /> : <IconChevronsLeft size={18} stroke={1.9} aria-hidden="true" />}</button>
         </footer>
       </aside>
-      {menuOpen && <button className="shell-scrim" type="button" aria-label={copy.closeMenu} onClick={closeMenu}/>}
+      {menuOpen && <button className="shell-scrim" type="button" aria-label={copy.closeMenu} onClick={closeMenu} />}
       <div className="shell-main" inert={menuOpen || undefined}>
         <header className="shell-topbar">
           <div className="shell-topbar__start">
-            <button ref={menuToggleRef} className="shell-menu-toggle" type="button" aria-expanded={menuOpen} aria-controls="shell-sidebar" aria-label={copy.openMenu} onClick={() => menuOpen ? closeMenu() : setMenuOpen(true)}><IconMenu2 size={20} stroke={1.9} aria-hidden="true"/></button>
-            {showScope && <button type="button" className="shell-scope-chip" aria-haspopup="dialog" aria-expanded={scopeOpen} onClick={() => setScopeOpen(true)}><span className="shell-scope-chip__label">{scopeLabel}</span><IconChevronDown size={15} stroke={2} aria-hidden="true"/></button>}
-            {installationMode && <span className="shell-root-badge"><ModuleGlyph id="root" size={15}/><span>{copy.rootBadge}</span></span>}
+            <button ref={menuToggleRef} className="shell-menu-toggle" type="button" aria-expanded={menuOpen} aria-controls="shell-sidebar" aria-label={copy.openMenu} onClick={() => menuOpen ? closeMenu() : setMenuOpen(true)}><IconMenu2 size={20} stroke={1.9} aria-hidden="true" /></button>
+            {showScope && <button type="button" className="shell-scope-chip" aria-haspopup="dialog" aria-expanded={scopeOpen} onClick={() => setScopeOpen(true)}><span className="shell-scope-chip__label">{scopeLabel}</span><IconChevronDown size={15} stroke={2} aria-hidden="true" /></button>}
+            {installationMode && <span className="shell-root-badge"><ModuleGlyph id="root" size={15} /><span>{copy.rootBadge}</span></span>}
           </div>
           <div className="shell-topbar__tools">
-            {!installationMode && paletteCopy && <CommandPalette copy={paletteCopy}/>}
+            {!installationMode && paletteCopy && <CommandPalette copy={paletteCopy} />}
           </div>
         </header>
         <main id="main-content" className="shell-content" tabIndex={-1}>
-          {tabs.length > 1 && activeArea !== "settings" && <LinkTabs items={tabs} activeId={activeTabId} label={fill(copy.areaTabsLabel, { area: activeArea ? copy.areas[activeArea] : "" })} maxVisible={policy.maxVisibleTabs} moreLabel={copy.moreTabs} className="shell-tabs"/>}
+          {tabs.length > 1 && !settingsActive && <LinkTabs items={tabs} activeId={activeTabId} label={fill(copy.hubTabsLabel, { hub: activeHub ? copy.hubs[activeHub] : "" })} maxVisible={policy.maxVisibleTabs} moreLabel={copy.moreTabs} className="shell-tabs" />}
           {!installationMode && dropped > 0 && <p className="shell-notice" role="status">{dropped === 1 ? copy.scopeDroppedOne : fill(copy.scopeDroppedMany, { count: dropped })}</p>}
-          {activeArea === "settings" && !installationMode && tabs.length > 1
+          {settingsActive && !installationMode && settingsTabs.length > 1
             ? <div className="shell-settings">
-              {/* Settings sections are an in-content list (left on desktop, a scrolling strip on phones), not area tabs. */}
+              {/* Settings sections are an in-content list (left on desktop, a scrolling strip on phones), not hub tabs. */}
               <nav className="shell-settings__list" aria-label={fill(copy.areaTabsLabel, { area: copy.areas.settings })}>
-                <ul>{tabs.map(tab => <li key={tab.id}><a href={tab.href} aria-current={tab.id === activeTabId ? "page" : undefined}>{tab.label}</a></li>)}</ul>
+                <ul>{settingsTabs.map(tab => <li key={tab.id}><a href={tab.href} aria-current={tab.id === activeSettingsId ? "page" : undefined}>{tab.label}</a></li>)}</ul>
               </nav>
               <div className="shell-settings__body">{children}</div>
             </div>
             : children}
         </main>
       </div>
-      {bottomItems.length > 0 && <BottomBar label={copy.bottomBar} items={bottomItems} create={primaryAction ? { href: primaryAction.href, label: copy.createPost } : undefined}/>}
+      {bottomItems.length > 0 && <BottomBar label={copy.bottomBar} items={bottomItems} create={primaryAction ? { href: primaryAction.href, label: copy.createPost } : undefined} />}
       {scopeOpen && showScope && <Drawer open title={copy.scopeSheetTitle} variant="sheet" closeLabel={copy.close} onClose={() => setScopeOpen(false)}>
-        <ChannelScopeList channels={channels as ScopeChannel[]} selectedIds={scope} onSelect={onSelectChannel} onReset={() => applyScope([])} collapsedCount={policy.channelsCollapsedCount} searchThreshold={policy.channelSearchThreshold} manageHref={enabledFeatures.includes("settings/connections") ? "/settings/channels" : undefined} busy={navigating}/>
+        <ChannelScopeList channels={channels as ScopeChannel[]} selectedIds={scope} onSelect={onSelectChannel} onReset={() => applyScope([])} collapsedCount={policy.channelsCollapsedCount} searchThreshold={policy.channelSearchThreshold} manageHref={enabledFeatures.includes("settings/connections") ? "/settings/channels" : undefined} busy={navigating} />
       </Drawer>}
     </div>
   </ToastProvider></ShellCopyProvider>;

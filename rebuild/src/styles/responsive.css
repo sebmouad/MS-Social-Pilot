@@ -11,7 +11,7 @@ html, body { max-width: 100%; overflow-x: clip; }
 @media (max-width: 760px) {
   /* Touch targets follow width as well as pointer type: emulators and hybrids report fine pointers. */
   .ui-icon-button, .ui-menu__trigger, .ui-toast__close, .ui-filter-chip button { min-width: var(--control-height-touch); min-height: var(--control-height-touch); }
-  .ui-button, .ui-button--sm, .ui-menu__item, .ui-select__option, .ui-segmented__option, .ui-table__sort, .ui-toast__action, .ui-dropzone__button, .shell-area, .ui-scope__item, .ui-filter select { min-height: var(--control-height-touch); }
+  .ui-button, .ui-button--sm, .ui-menu__item, .ui-select__option, .ui-segmented__option, .ui-table__sort, .ui-toast__action, .ui-dropzone__button, .shell-hub, .ui-scope__item, .ui-filter select { min-height: var(--control-height-touch); }
   .ui-table__check { width: 48px; }
   .ui-table__check input { width: 22px; height: 22px; }
   /* 16px text stops iOS from zooming focused fields and shifting the layout. */
@@ -49,5 +49,5 @@ html, body { max-width: 100%; overflow-x: clip; }
 
 @media (max-width: 760px) {
   /* Scrolling strips fade at the right edge so a clipped last tab reads as "more"; end padding lets the last tab clear the fade. */
-  .ui-tabs__list, .shell-settings__list { padding-inline-end: 32px; scroll-padding-inline: 16px; -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent); }
+  .ui-tabs__list, .shell-settings__list { padding-inline-end: 32px; scroll-padding-inline: 16px; -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent); } /* taste-skill-ignore: monochrome alpha mask that fades a clipped tab strip, not a decorative gradient */
 }

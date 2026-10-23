@@ -1,14 +1,14 @@
 :root {
   --post-thumb-sm: 40px; --post-thumb-md: 56px; --post-thumb-lg: 72px;
-  --font-sans: var(--font-inter), Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  /* Space (02 §3) */
+  --font-sans: var(--font-brand), var(--font-inter), Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  /* Space (02 §3, UI wave 1 accent-ladder sheet: 4px base, one 24px gap) */
   --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px; --space-5: 20px; --space-6: 24px; --space-8: 32px; --space-10: 48px; --space-12: 64px;
-  --sidebar-w: 248px; --sidebar-w-rail: 64px; --topbar-h: 56px; --bottombar-h: 64px; --content-max: 1280px; --form-max: 720px; --gutter: 32px;
+  --sidebar-w: 230px; --sidebar-w-rail: 64px; --topbar-h: 48px; --bottombar-h: 64px; --content-max: 1280px; --form-max: 720px; --gutter: 24px;
   --row-h: 48px; --row-h-compact: 36px;
   --control-h-sm: 32px; --control-h: 40px; --control-h-touch: 44px;
   --control-height: var(--control-h); --control-height-sm: var(--control-h-sm); --control-height-touch: var(--control-h-touch);
-  /* Type (02 §2): nine sizes only. Legacy names alias this scale. */
-  --text-2xs: 11px; --text-xs: 12px; --text-sm: 13px; --text-md: 14px; --text-lg: 16px; --text-xl: 20px; --text-2xl: 24px; --text-3xl: 28px; --text-metric: 32px;
+  /* Type (02 §2, wave 1 sheet: title 32 / section 18 / kpi 24 / body 14 / small 12): nine sizes only. Legacy names alias this scale. */
+  --text-2xs: 11px; --text-xs: 12px; --text-sm: 13px; --text-md: 14px; --text-lg: 16px; --text-xl: 18px; --text-2xl: 24px; --text-3xl: 28px; --text-metric: 32px;
   --text-base: var(--text-sm);
   /* Shape (02 §4): five radii */
   --radius-xs: 6px; --radius-sm: 8px; --radius-md: 12px; --radius-lg: 16px; --radius-full: 999px;
@@ -24,8 +24,7 @@
   --ui-good: var(--success); --ui-good-soft: var(--success-soft); /* deprecated aliases for module CSS not yet migrated */
   --area-tasks: var(--mod-tasks); --area-agency: var(--mod-agency); --area-settings: var(--mod-settings); --area-root: var(--mod-root); --area-ads: var(--mod-ads);
 }
-@media (max-width: 1023px) { :root { --gutter: 24px; } }
-@media (max-width: 760px) { :root { --gutter: 16px; --topbar-h: 52px; } }
+@media (max-width: 760px) { :root { --gutter: 16px; } }
 @media (pointer: coarse) { :root { --control-h: var(--control-h-touch); --control-h-sm: var(--control-h-touch); } }
 /* Dark elevation uses an inset highlight instead of a long drop shadow. */
 :root[data-mode="dark"] { --shadow-card: 0 1px 0 rgb(255 255 255 / 4%) inset; --shadow-card-hover: 0 1px 0 rgb(255 255 255 / 6%) inset, 0 16px 34px -14px rgb(0 0 0 / 70%); --shadow-pop: 0 12px 34px rgb(0 0 0 / 45%), 0 1px 2px rgb(0 0 0 / 40%); --shadow-sheet: 0 28px 70px rgb(0 0 0 / 55%), 0 2px 6px rgb(0 0 0 / 40%); }
@@ -48,6 +47,7 @@
   --on-accent: #ffffff;
   --accent-hover: #3C3489;
   --accent-soft: #EEEDFE;
+  --accent-ink: #3C3489;
   --warning: #854F0B;
   --warning-soft: #FAEEDA;
   --danger: #A32D2D;
@@ -57,10 +57,10 @@
   --selection: #CECBF6;
   --control-border: #7a75a6;
   --placeholder: #625e86;
-  --rail-bg: #26215C;
-  --rail-ink: #CECBF6;
-  --rail-active-bg: #3C3489;
-  --rail-active-ink: #ffffff;
+  --rail-bg: #f6f5fd;
+  --rail-ink: #4d4870;
+  --rail-active-bg: #EEEDFE;
+  --rail-active-ink: #3C3489;
   --mod-home: #7F77DD;
   --mod-publishing: #D85A30;
   --mod-inbox: #1D9E75;
@@ -108,6 +108,7 @@
   --on-accent: #26215C;
   --accent-hover: #CECBF6;
   --accent-soft: #3C3489;
+  --accent-ink: #CECBF6;
   --warning: #FAC775;
   --warning-soft: #4a3410;
   --danger: #F09595;
@@ -169,6 +170,7 @@
   --on-accent: #26215C;
   --accent-hover: #CECBF6;
   --accent-soft: #3C3489;
+  --accent-ink: #CECBF6;
   --warning: #FAC775;
   --warning-soft: #4a3410;
   --danger: #F09595;
@@ -230,6 +232,7 @@
   --on-accent: #ffffff;
   --accent-hover: #0C447C;
   --accent-soft: #E6F1FB;
+  --accent-ink: #0C447C;
   --warning: #854F0B;
   --warning-soft: #FAEEDA;
   --danger: #A32D2D;
@@ -291,6 +294,7 @@
   --on-accent: #042C53;
   --accent-hover: #B5D4F4;
   --accent-soft: #0C447C;
+  --accent-ink: #E6F1FB;
   --warning: #FAC775;
   --warning-soft: #4a3410;
   --danger: #F09595;
@@ -352,6 +356,7 @@
   --on-accent: #042C53;
   --accent-hover: #B5D4F4;
   --accent-soft: #0C447C;
+  --accent-ink: #E6F1FB;
   --warning: #FAC775;
   --warning-soft: #4a3410;
   --danger: #F09595;
@@ -413,6 +418,7 @@
   --on-accent: #ffffff;
   --accent-hover: #993C1D;
   --accent-soft: #FAECE7;
+  --accent-ink: #993C1D;
   --warning: #854F0B;
   --warning-soft: #FAEEDA;
   --danger: #A32D2D;
@@ -474,6 +480,7 @@
   --on-accent: #4A1B0C;
   --accent-hover: #F5C4B3;
   --accent-soft: #712B13;
+  --accent-ink: #F5C4B3;
   --warning: #FAC775;
   --warning-soft: #4a3410;
   --danger: #F09595;
@@ -535,6 +542,7 @@
   --on-accent: #4A1B0C;
   --accent-hover: #F5C4B3;
   --accent-soft: #712B13;
+  --accent-ink: #F5C4B3;
   --warning: #FAC775;
   --warning-soft: #4a3410;
   --danger: #F09595;
@@ -581,34 +589,35 @@
   --area-root: #8C8A84;
 } }
 :root[data-theme="clean"] {
-  --canvas: #ffffff;
+  --canvas: #f9fafb;
   --surface: #ffffff;
-  --surface-muted: #f5f6f8;
-  --surface-raised: #fafafb;
-  --surface-hover: #f7f8fa;
-  --ink: #111318;
-  --ink-soft: #4b515c;
+  --surface-muted: #f3f4f6;
+  --surface-raised: #f8f9fb;
+  --surface-hover: #f3f4f6;
+  --ink: #111827;
+  --ink-soft: #5f6672;
   --ink-faint: #5b616e;
-  --line: #e7e9ee;
+  --line: #e5e7eb;
   --line-strong: #d0d4dc;
-  --line-subtle: #f1f2f5;
-  --accent: #111318;
+  --line-subtle: #f2f2f2;
+  --accent: #185FA5;
   --on-accent: #ffffff;
-  --accent-hover: #2c3039;
-  --accent-soft: #f1f2f5;
-  --warning: #8a5a00;
+  --accent-hover: #0C447C;
+  --accent-soft: #E6F1FB;
+  --accent-ink: #0C447C;
+  --warning: #92400e;
   --warning-soft: #fdf3dc;
-  --danger: #b42318;
+  --danger: #c4242a;
   --on-danger: #ffffff;
   --danger-soft: #fdecea;
   --focus: #2563eb;
   --selection: #dbe6fd;
   --control-border: #7a808c;
   --placeholder: #6b7280;
-  --rail-bg: #ffffff;
+  --rail-bg: #f9fafb;
   --rail-ink: #4b515c;
-  --rail-active-bg: #f1f2f5;
-  --rail-active-ink: #111318;
+  --rail-active-bg: #E6F1FB;
+  --rail-active-ink: #0C447C;
   --mod-home: #2563eb;
   --mod-publishing: #e0582d;
   --mod-inbox: #16a34a;
@@ -651,10 +660,11 @@
   --line: #272a31;
   --line-strong: #3a3e47;
   --line-subtle: #1c1e24;
-  --accent: #f2f3f5;
-  --on-accent: #0e0f12;
-  --accent-hover: #ffffff;
-  --accent-soft: #20232a;
+  --accent: #85B7EB;
+  --on-accent: #042C53;
+  --accent-hover: #B5D4F4;
+  --accent-soft: #0C447C;
+  --accent-ink: #E6F1FB;
   --warning: #f0c85a;
   --warning-soft: #3a2f12;
   --danger: #ff8a80;
@@ -666,8 +676,8 @@
   --placeholder: #8f96a3;
   --rail-bg: #0e0f12;
   --rail-ink: #c3c7cf;
-  --rail-active-bg: #20232a;
-  --rail-active-ink: #f2f3f5;
+  --rail-active-bg: #0C447C;
+  --rail-active-ink: #E6F1FB;
   --mod-home: #7fa6ff;
   --mod-publishing: #ff9a74;
   --mod-inbox: #5fd38a;
@@ -710,10 +720,11 @@
   --line: #272a31;
   --line-strong: #3a3e47;
   --line-subtle: #1c1e24;
-  --accent: #f2f3f5;
-  --on-accent: #0e0f12;
-  --accent-hover: #ffffff;
-  --accent-soft: #20232a;
+  --accent: #85B7EB;
+  --on-accent: #042C53;
+  --accent-hover: #B5D4F4;
+  --accent-soft: #0C447C;
+  --accent-ink: #E6F1FB;
   --warning: #f0c85a;
   --warning-soft: #3a2f12;
   --danger: #ff8a80;
@@ -725,8 +736,8 @@
   --placeholder: #8f96a3;
   --rail-bg: #0e0f12;
   --rail-ink: #c3c7cf;
-  --rail-active-bg: #20232a;
-  --rail-active-ink: #f2f3f5;
+  --rail-active-bg: #0C447C;
+  --rail-active-ink: #E6F1FB;
   --mod-home: #7fa6ff;
   --mod-publishing: #ff9a74;
   --mod-inbox: #5fd38a;
@@ -819,7 +830,7 @@ table.ui-visually-hidden { display: block; }
 .ui-input:hover:not(:disabled):not([aria-invalid=true]) { border-color: var(--control-border); }
 .ui-input[readonly] { background: var(--surface-muted); }
 textarea.ui-input { min-height: 96px; resize: vertical; line-height: 1.5; }
-select.ui-input { appearance: none; padding-right: 36px; background-image: linear-gradient(45deg, transparent 50%, var(--ink-soft) 50%), linear-gradient(135deg, var(--ink-soft) 50%, transparent 50%); background-position: calc(100% - 18px) 50%, calc(100% - 13px) 50%; background-size: 5px 5px; background-repeat: no-repeat; }
+select.ui-input { appearance: none; padding-right: 36px; background-image: linear-gradient(45deg, transparent 50%, var(--ink-soft) 50%), linear-gradient(135deg, var(--ink-soft) 50%, transparent 50%); background-position: calc(100% - 18px) 50%, calc(100% - 13px) 50%; background-size: 5px 5px; background-repeat: no-repeat; } /* taste-skill-ignore: theme-aware native-select chevron drawn in CSS, not a decorative gradient */
 .ui-input:disabled { opacity: .65; cursor: not-allowed; }
 .ui-input[aria-invalid=true] { border-color: var(--danger); }
 .ui-dialog { width: min(520px, calc(100% - 32px)); max-height: min(85vh, 740px); padding: 0; overflow: auto; overscroll-behavior: contain; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface); color: var(--ink); box-shadow: var(--shadow-panel); }
@@ -860,8 +871,8 @@ select.ui-input { appearance: none; padding-right: 36px; background-image: linea
 .ui-field-error { display: block; color: var(--danger); font-size: var(--text-sm); line-height: 1.5; overflow-wrap: anywhere; }
 
 /* Shared states: loading skeletons, empty and error panels, dense tables. */
-.ui-skeleton { display: block; min-height: 14px; border-radius: var(--radius-xs); background: linear-gradient(90deg, var(--surface-muted) 25%, var(--line-subtle) 50%, var(--surface-muted) 75%); background-size: 200% 100%; animation: ui-shimmer 1.4s ease-in-out infinite; }
-@keyframes ui-shimmer { to { background-position: -200% 0; } }
+.ui-skeleton { display: block; min-height: 14px; border-radius: var(--radius-xs); background: var(--surface-muted); animation: ui-shimmer 1.4s ease-in-out infinite; }
+@keyframes ui-shimmer { 0%, 100% { opacity: 1; } 50% { opacity: .55; } }
 .ui-state { display: grid; justify-items: center; gap: 8px; padding: 24px 20px; border: 1px solid var(--line-subtle); border-radius: var(--radius-lg); background: color-mix(in srgb, var(--surface-muted) 55%, var(--surface)); color: var(--ink-soft); font-size: var(--text-base); line-height: 1.5; text-align: center; }
 .ui-state > :is(h2, h3, p) { margin: 0; }
 .ui-state > :is(h2, h3) { color: var(--ink); font-size: var(--text-md); font-weight: 700; }
@@ -879,7 +890,7 @@ select.ui-input { appearance: none; padding-right: 36px; background-image: linea
 /* Keep controls distinguishable when the system forces its own palette. */
 @media (forced-colors: active) {
   .ui-button, .ui-input, .ui-chip, .ui-table-wrap, .ui-dialog, .ui-state { border: 1px solid CanvasText; }
-  .shell-area.is-active, .ui-bottombar__item.is-active, .ui-tabs__link[aria-current="page"] { outline: 2px solid Highlight; outline-offset: -2px; }
+  .shell-hub.is-active, .ui-bottombar__item.is-active, .ui-tabs__link[aria-current="page"] { outline: 2px solid Highlight; outline-offset: -2px; }
   :focus-visible { outline-color: Highlight; }
 }
 

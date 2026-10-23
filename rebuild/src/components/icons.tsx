@@ -36,6 +36,16 @@ export function ModuleGlyph({ id, size = 19 }: { id: string; size?: number }) {
   return <Glyph size={size} stroke={1.75} aria-hidden="true" />;
 }
 
+/** Sidebar hub icons (UI wave 1); hubs regroup pages without changing routes. */
+export const HUB_ICONS: Record<string, TablerIcon> = {
+  create: IconSparkles, plan: IconCalendarEvent, engage: IconMessageCircle, measure: IconChartBar, grow: IconSpeakerphone,
+};
+
+export function HubGlyph({ id, size = 17 }: { id: string; size?: number }) {
+  const Glyph = HUB_ICONS[id] ?? IconCircleDot;
+  return <Glyph size={size} stroke={1.75} aria-hidden="true" />;
+}
+
 export function PageGlyph({ href, size = 17 }: { href: string; size?: number }) {
   const Glyph = PAGE_ICONS[href] ?? IconCircleDot;
   return <Glyph size={size} stroke={1.75} aria-hidden="true" />;

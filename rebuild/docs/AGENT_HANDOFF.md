@@ -1,9 +1,58 @@
 # Shared agent handoff
 
-Updated 2026-10-23 (inbox-sync + media batch; uncommitted working tree), schema **142**.
+Updated 2026-10-23 (UI wave 1 visible-first shell; uncommitted working tree), schema **142**.
 Full goal remains active. No browser, provider, database or production call by
 this lane. Historical records below retain their dates; current source
 reconciliation wins.
+
+## UI wave 1 — 2026-10-23 (source/unit only, uncommitted)
+
+All work is in the working tree, no commit/push/deploy. `npm run typecheck`
+0 errors; new `tests/hubs.test.ts` (20) plus updated `app-shell` (19),
+`command-palette-ui` (5) and `ux-reorg-mobile` suites pass, as do all
+theme-contrast/design-token/`shell-v2`/`command-palette` suites;
+`lint.mjs --app` 0 FAIL on the touched sources (14 defended WARNs).
+
+- **Style:** `accent-ladder`, seed 1827127362, kind creator, brief "social
+  media management workspace" (deal recorded in `.taste-skill/
+  direction.json`). Face: brand-blue ladder (`#185FA5`/ `#85B7EB`) in
+  place of the dealt raspberry; DM Sans via `next/font` (`--font-brand`,
+  Inter fallback). Signature element: the dispatch rail (workspace
+  color + channel avatars + health dots in the sidebar).
+- **Hubs** (`src/lib/hubs.ts`, `AppShell.tsx`, `BottomBar.tsx`,
+  `icons.tsx` HUB_ICONS): Create (studio tools), Plan (publishing desk +
+  Tasks when used), Engage (inbox), Measure (insights), Grow (ads +
+  Agency when used). Routes/areas/manifests/feature ids untouched; Home
+  is the brand landing, Settings stays in the footer. Phone bar shows the
+  four page hubs + raised Create; Create hub lives in the overlay menu.
+- **Badges** (`PageFrame.tsx`, `inbox/server/mentions-badge.ts`,
+  `analytics/alerts/server/alerts-badge.ts`): open page mentions
+  (Engage), pending approvals (Plan, reused by the Approvals tab), open
+  alert firings (Measure); each scoped like its list, capped at 99+,
+  0-or-missing hides, failures never block. Noun in the accessible name.
+- **Command bar** (`home/server/commands.ts` `listPaletteTargets`, REST
+  route, `CommandPalette.tsx`): Create shortcuts (writable primary
+  actions), Pages, Channels (`/inbox?channel=<id>` jumps, capped at 50);
+  same server-side `q` filter on all groups; MCP `list_navigation_
+  commands` unchanged (pages discovery; shortcuts need no new tools).
+- **Copy (EN+FR, owning catalogs):** shell `hubs`/`hubTabsLabel`/
+  `hubCounts` (old saved catalogs gain them via `resolveShellCopy`);
+  command `sectionActions`/`sectionPages`/`sectionChannels` + new
+  `resolveCommandCopy` merge used by `PageFrame`. No registry key change;
+  schema stays 142.
+- **Tokens/CSS:** sidebar 230px, topbar 48px, gutter 24px, section 18px,
+  `--accent-ink` in all 8 palettes + 4 device-match mirrors, open-plane
+  rails, tint-active hubs/bottom bar, avatar workspace switcher, grouped
+  palette styles, skeleton flat pulse (lint FAIL fix), select-chevron
+  `taste-skill-ignore` (functional CSS art). Vivid/Warm/Meta keep their
+  hue families under the ladder discipline; control borders keep darker
+  values (3:1 floor beats the sheet).
+- **Unresolved / next:** BEFORE/AFTER screenshots and `inspect.mjs`
+  blocked this lane (Docker Desktop cannot launch in the sandbox —
+  `kLSNoExecutableErr` — no local Postgres, no Playwright browsers, no
+  `DATABASE_URL`; BEFORE recorded from source at `469e5745`). Next wave:
+  full browser matrix at 1440/768/390 light+dark, keyboard walkthrough,
+  DM Sans tabular-figure check, per-screen surfaces.
 
 ## Inbox-sync + media batch — 2026-10-23 (source/unit only, uncommitted)
 

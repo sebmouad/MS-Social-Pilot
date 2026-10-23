@@ -1,9 +1,31 @@
 # MS Social Pilot architecture
 
-Updated 2026-10-23 (inbox-sync + media batch) against the local working tree, configuration schema **142**.
+Updated 2026-10-23 (UI wave 1 visible-first shell) against the local working tree, configuration schema **142**.
 [ARCHITECTURE_CONTRACT.md](ARCHITECTURE_CONTRACT.md) remains binding; §4 gained the owner-approved 2026-10-22 Ads-area decision.
 Current reconciliation below takes precedence over historical batch snapshots.
 Source, automated, browser, live-provider and production evidence remain distinct.
+
+## UI wave 1 — 2026-10-23 (source/unit only)
+
+Visible-first shell rebuild: accent-ladder style (seed 1827127362, kind
+creator) with a brand-blue face and the dispatch-rail signature element;
+five navigation hubs (Create, Plan, Engage, Measure, Grow) over unchanged
+routes/areas/manifests; hub badges (open page mentions, pending approvals,
+open metric alerts); grouped command bar (create shortcuts, pages, channel
+jumps); colour-coded workspace switcher; DM Sans brand face; ladder tokens
+(`--accent-ink` added) in all eight palettes with dark parity on every
+touched surface. No migration, no registry key change, schema stays 142.
+
+Typecheck 0 errors; new `tests/hubs.test.ts` (20) plus updated
+`app-shell`/`command-palette-ui`/`ux-reorg-mobile` suites pass, as do all
+theme-contrast and design-token suites; `lint.mjs --app` reports 0 FAIL on
+the touched sources. No browser, provider, database or production run:
+screenshots and `inspect.mjs` were blocked (Docker Desktop cannot launch
+in this sandbox; no local Postgres or Playwright browsers); BEFORE state
+was recorded from source at `469e5745`. Contract §6 sidebar-area wording
+now reads through the hub regrouping; a follow-up wave owns the
+browser-matrix, keyboard walkthrough and remaining screen surfaces. No
+commit/push/deploy (not authorized this lane).
 
 ## Inbox-sync + media batch — 2026-10-23 (source only)
 

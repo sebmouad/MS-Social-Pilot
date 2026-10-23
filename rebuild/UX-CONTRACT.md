@@ -861,3 +861,42 @@ Source/unit evidence only; no browser, provider or production run in this batch.
   URLs minted at dispatch; public media URLs pass through unchanged.
   Stored videos and a cleared secret or non-HTTPS origin keep the
   honest refusal, with nothing sent to the provider.
+
+## UI wave 1 behaviors — 2026-10-23 (hubs, badges, command bar)
+
+Source/unit evidence only; no browser, provider or production run in this batch.
+Routes, areas, manifests and feature ids are unchanged; hubs regroup pages for
+navigation only (`src/lib/hubs.ts`).
+
+- The sidebar shows five hubs — Create, Plan, Engage, Measure, Grow — with
+  the product mark and name at the top. Create holds the studio tools (the
+  `/create` composer stays the primary action); Plan holds the publishing
+  desk plus Tasks once the workspace uses it; Engage holds the inbox;
+  Measure holds insights; Grow holds ads plus Agency once used. Home stays
+  the brand landing with no hub marked; Settings stays in the footer with
+  its in-content section list. Hub labels, hub tab labels and badge nouns
+  come from the Root-editable shell catalog in English and French.
+- Hub badges count what needs the member: open page mentions on Engage
+  (the same scope and mention rule as the Inbox Mentions quick filter),
+  posts waiting for review on Plan (reused by the Approvals tab), and open
+  metric-alert firings on Measure (the firing list's scope). Zero shows no
+  badge; counts cap at 99+; a failed count shows no badge and never blocks
+  the page. The badge noun is in the link's accessible name ("Plan, 3
+  waiting for review"). Unread customer messages keep their in-list unread
+  state; the Engage badge covers mentions only.
+- The workspace switcher gives every workspace a stable avatar color: a
+  menu with more than one workspace (current entry checked, same exact
+  `SELECT WORKSPACE <id>` confirmation and failure behavior as before), a
+  named row otherwise.
+- The command bar (Ctrl/⌘-K, type to filter, arrows and Enter, Esc to
+  close) searches three groups: Create shortcuts (writable module primary
+  actions only), Pages, and Channels, where each channel jumps to the inbox
+  scoped to that profile through the shared `channel` parameter. Empty
+  groups hide; no match shows the catalog's empty state. Section titles are
+  Root-editable; catalogs saved before wave 1 gain them without losing
+  operator edits.
+- Phones show Plan, Engage, Measure and Grow with the raised central
+  Create action; the Create hub lives in the overlay menu. The collapsed
+  rail shrinks hub badges to a dot with the count kept in the accessible
+  name. All touched surfaces are token-driven in light and dark across the
+  four themes.

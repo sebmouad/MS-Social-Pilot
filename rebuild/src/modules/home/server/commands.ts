@@ -1,13 +1,22 @@
 import { z } from 'zod';
 import { OperationError } from '@/lib/operation-error';
+import { withChannelScope } from '@/lib/channel-scope';
+import type { ConnectionState } from '@/lib/connection-status';
 import { MODULES, PAGES } from '@/lib/product';
 import { runtimeConfig } from '@/server/config/store';
 import { canUseFeature, canUseModule, loadEntitlements } from '@/server/entitlements';
 import { canAccessFeature, canAccessModule } from '@/server/permissions';
 import { loadPermissions } from '@/server/permissions/loader';
+import { shellChannels } from '@/modules/shell/server/channels';
 
 export type CommandActor = { userId: string; workspaceId: string };
 export type CommandItem = { id: string; title: string; href: string; module: string; moduleTitle: string };
+/** A creation shortcut: the same module primary actions as the sidebar Create button. */
+export type CommandAction = { id: string; title: string; href: string };
+/** A channel jump: opens the Inbox scoped to that channel through the shared scope parameter. */
+export type CommandChannel = { id: string; title: string; href: string; health: ConnectionState };
+/** Channels listed by one palette search; the page limit stays on `home.commandPaletteLimit`. */
+const CHANNEL_LIMIT = 50;
 
 const querySchema = z.object({ q: z.string().trim().max(200).optional() }).strict();
 
@@ -40,4 +49,40 @@ export async function listNavigationCommands(actor: CommandActor, input: unknown
     if (items.length >= limit.data) break;
   }
   return { items };
+}
+
+/**
+ * Everything the command bar searches: creation shortcuts, openable pages and
+ * channel jumps. Actions mirror the sidebar Create button (same feature and
+ * write checks); channels mirror the sidebar scope list (same visibility,
+ * member channel limit and health). A failed channel lookup only hides that
+ * section; it never blocks the palette.
+ */
+export async function listPaletteTargets(actor: CommandActor, input: unknown = {}): Promise<{ items: CommandItem[]; actions: CommandAction[]; channels: CommandChannel[] }> {
+  const { items } = await listNavigationCommands(actor, input);
+  const [entitlements, permissions] = await Promise.all([
+    loadEntitlements(actor.userId, actor.workspaceId, { allowInstallationInspection: false }),
+    loadPermissions(actor.userId, actor.workspaceId),
+  ]);
+  if (!entitlements || !permissions) throw new OperationError('unauthorized', 'Sign in to an authorized workspace.');
+  const parsed = querySchema.safeParse(input);
+  const match = parsed.success && parsed.data.q ? parsed.data.q.toLowerCase() : '';
+  const actions: CommandAction[] = [];
+  for (const module of MODULES) {
+    const action = module.primaryAction;
+    if (!action || !canUseModule(entitlements, module.id as Parameters<typeof canUseModule>[1])) continue;
+    if (!canUseFeature(entitlements, action.featureId) || !canAccessFeature(permissions, action.featureId) || !canAccessFeature(permissions, action.featureId, 'write')) continue;
+    if (!canAccessModule(permissions, module.id as Parameters<typeof canAccessModule>[1])) continue;
+    if (match && !`${action.label} create-${module.id}`.toLowerCase().includes(match)) continue;
+    actions.push({ id: `create-${module.id}`, title: action.label, href: action.href });
+  }
+  const scopeIds = permissions.pageScope.all ? undefined : permissions.pageScope.ids;
+  const channels = await shellChannels(actor.workspaceId, scopeIds, CHANNEL_LIMIT).catch(() => []);
+  return {
+    items,
+    actions,
+    channels: channels
+      .filter(channel => !match || `${channel.name} ${channel.id}`.toLowerCase().includes(match))
+      .map(channel => ({ id: channel.id, title: channel.name, href: withChannelScope('/inbox', [channel.id]), health: channel.health })),
+  };
 }

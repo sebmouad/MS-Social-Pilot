@@ -37,30 +37,35 @@ async function renderShell(extra: Partial<ComponentProps<typeof AppShell>> = {},
 }
 const barOrder = () => [...container.querySelectorAll('nav.ui-bottombar a')].map(link => link.getAttribute('aria-label') ?? link.textContent);
 
-describe('reorganized navigation on phones (2026-10-22)', () => {
+describe('reorganized navigation on phones (2026-10-22, hubs wave 1)', () => {
   it.each([
-    ['/content/feeds', 'publishing', 'content', '/content/feeds'],
-    ['/content/ai-studio', 'studio', 'content', '/content/ai-studio'],
-    ['/insights/tests', 'studio', 'insights', '/insights/tests'],
-  ])('BottomBar marks %s under %s and keeps Create raised central', async (path, activeModule, area, tabHref) => {
+    ['/content/feeds', 'publishing', 'plan', '/content/feeds'],
+    ['/insights/tests', 'studio', 'measure', '/insights/tests'],
+  ])('BottomBar marks %s and keeps Create raised central', async (path, activeModule, hub, tabHref) => {
     nav.path = path;
     await renderShell({ activeModule: activeModule as ComponentProps<typeof AppShell>['activeModule'] }, [...FEATURES, 'publishing/queue', 'publishing/approvals', 'publishing/media', 'publishing/feeds', 'studio/ai-studio', 'analytics/posts', 'studio/tests']);
-    expect(barOrder()).toEqual(['Home', 'Content', 'Inbox', 'Create post', 'Insights', 'Ads']);
-    const current = container.querySelector(`nav.ui-bottombar a[data-area="${area}"]`)!;
+    expect(barOrder()).toEqual(['Plan', 'Engage', 'Create post', 'Measure', 'Grow']);
+    const current = container.querySelector(`nav.ui-bottombar a[data-hub="${hub}"]`)!;
     expect(current.getAttribute('aria-current')).toBe('page');
     expect(current.className).toContain('is-active');
     expect(container.querySelector(`nav.ui-tabs--links a[href="${tabHref}"]`)?.getAttribute('aria-current')).toBe('page');
   });
 
-  it('folds the 8th Content tab into the More menu with a touch-sized trigger', async () => {
+  it('marks the Create hub in the overlay menu while the composer stays raised central', async () => {
+    nav.path = '/content/ai-studio';
+    await renderShell({ activeModule: 'studio' }, [...FEATURES, 'publishing/queue', 'publishing/approvals', 'publishing/media', 'publishing/feeds', 'studio/ai-studio', 'studio/agents', 'analytics/posts', 'studio/tests']);
+    expect(barOrder()).toEqual(['Plan', 'Engage', 'Create post', 'Measure', 'Grow']);
+    expect(container.querySelector('nav.ui-bottombar [aria-current]')).toBeNull();
+    expect(container.querySelector('.shell-hubs [data-hub="create"]')?.getAttribute('aria-current')).toBe('page');
+    expect(container.querySelector('nav.ui-tabs--links')?.getAttribute('aria-label')).toBe('Create sections');
+  });
+
+  it('fits every hub within the visible tabs with a touch-sized More trigger', async () => {
     await renderShell({}, [...FEATURES, 'publishing/queue', 'publishing/approvals', 'publishing/media', 'publishing/feeds', 'studio/ai-studio', 'studio/agents']);
     expect([...container.querySelectorAll('nav.ui-tabs--links a')].map(link => link.getAttribute('href'))).toEqual([
-      '/content', '/content/calendar', '/content/queue', '/content/approvals', '/content/library', '/content/feeds', '/content/ai-studio',
+      '/content', '/content/calendar', '/content/queue', '/content/approvals', '/content/library', '/content/feeds',
     ]);
-    const more = container.querySelector<HTMLButtonElement>('.ui-tabs__more button')!;
-    expect(more.getAttribute('aria-haspopup')).toBe('menu');
-    await act(async () => more.click());
-    expect([...container.querySelectorAll('[role="menuitem"]')].map(item => item.textContent)).toEqual(['Writing agents']);
+    expect(container.querySelector('.ui-tabs__more')).toBeNull();
     expect(read('src/styles/shell.css')).toMatch(/\.ui-tabs__more \.ui-menu__trigger \{[^}]*min-height: 44px/);
   });
 

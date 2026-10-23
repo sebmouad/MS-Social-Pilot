@@ -8,12 +8,14 @@ import { requestLocale } from './platforms/request-locale';
 import { canUseFeature, canUseModule } from './entitlements';
 import { canAccessFeature, canAccessModule } from './permissions';
 import { configValueOrDefault } from './config/config-or-default';
-import { COMMAND_COPY, commandCopySchema } from '@/modules/home/command-copy';
+import { COMMAND_COPY, resolveCommandCopy } from '@/modules/home/command-copy';
 import { shellChrome } from '@/modules/shell/server/chrome';
 import { shellChannels } from '@/modules/shell/server/channels';
 import { workspaceUsesTasks } from '@/modules/tasks/server/usage';
 import { loadWorkspaceOperations } from '@/modules/settings/server/workspace-operations';
 import { pendingApprovalCount } from '@/modules/publishing/server/approvals-badge';
+import { openMentionCount } from '@/modules/inbox/server/mentions-badge';
+import { openAlertCount } from '@/modules/analytics/alerts/server/alerts-badge';
 
 export async function PageFrame({ module, children, scopedAccess = false }: { module: ModuleId; children: ReactNode; scopedAccess?: boolean }) {
   const viewer = await requireViewer({ module, channelScoped: scopedAccess });
@@ -21,9 +23,7 @@ export async function PageFrame({ module, children, scopedAccess = false }: { mo
   const enabledFeatures = Object.keys(viewer.entitlements.features).filter(id => canUseFeature(viewer.entitlements, id) && canAccessFeature(viewer.permissions, id));
   const writableFeatures = enabledFeatures.filter(id => canAccessFeature(viewer.permissions, id, 'write'));
   const { copy, policy, locale } = await shellChrome();
-  const raw = await configValueOrDefault('home.commandPaletteCopy').catch(() => COMMAND_COPY);
-  const parsed = commandCopySchema.safeParse(raw);
-  const paletteCopy = (parsed.success ? parsed.data : COMMAND_COPY)[locale];
+  const paletteCopy = resolveCommandCopy(await configValueOrDefault('home.commandPaletteCopy').catch(() => COMMAND_COPY))[locale];
   // The channel list scopes every channel-aware page. A failed lookup only hides the list; it never blocks the page.
   const channels = await shellChannels(viewer.workspaceId, viewer.permissions.pageScope.all ? undefined : viewer.permissions.pageScope.ids, policy.channelListMax).catch(() => []);
   const jar = await cookies();
@@ -38,9 +38,16 @@ export async function PageFrame({ module, children, scopedAccess = false }: { mo
   if (usesTasks || tasksArea) optionalAreas.push('tasks');
   // Agency compares administered (client) workspaces, so plain memberships never summon it.
   if (viewer.workspaces.filter(entry => entry.role === 'owner' || entry.role === 'admin').length > 1) optionalAreas.push('agency');
-  // Pending Approvals show as a badge on the Content tabs.
+  // Hub badges: open page mentions (Engage), posts waiting for review (Plan) and open
+  // metric alerts (Measure). Each count uses its list's own authorized scope and falls
+  // back to 0, so a badge never blocks a page. The Approvals tab reuses the Plan count.
+  const [mentions, approvals, alerts] = await Promise.all([
+    enabledFeatures.includes('inbox/conversations') ? openMentionCount({ userId: viewer.user.id, workspaceId: viewer.workspaceId }) : 0,
+    enabledFeatures.includes('publishing/approvals') ? pendingApprovalCount({ userId: viewer.user.id, workspaceId: viewer.workspaceId }) : 0,
+    enabledFeatures.includes('analytics/reports') ? openAlertCount({ userId: viewer.user.id, workspaceId: viewer.workspaceId }) : 0,
+  ]);
   const tabCounts: Record<string, number> = {};
-  if (module === 'publishing' && enabledFeatures.includes('publishing/approvals')) tabCounts['publishing/approvals'] = await pendingApprovalCount({ userId: viewer.user.id, workspaceId: viewer.workspaceId });
-  return <AppShell tabCounts={tabCounts} activeModule={module} enabledModules={enabledModules} enabledFeatures={enabledFeatures} writableFeatures={writableFeatures} rootAccess={viewer.user.isInstanceOwner} userName={viewer.user.name} workspaceName={viewer.membership.workspace.name} workspaceId={viewer.workspaceId} workspaces={viewer.workspaces.map(item => ({ id: item.workspace.id, name: item.workspace.name }))} paletteCopy={paletteCopy}
+  if (enabledFeatures.includes('publishing/approvals')) tabCounts['publishing/approvals'] = approvals;
+  return <AppShell tabCounts={tabCounts} hubCounts={{ engage: mentions, plan: approvals, measure: alerts }} activeModule={module} enabledModules={enabledModules} enabledFeatures={enabledFeatures} writableFeatures={writableFeatures} rootAccess={viewer.user.isInstanceOwner} userName={viewer.user.name} workspaceName={viewer.membership.workspace.name} workspaceId={viewer.workspaceId} workspaces={viewer.workspaces.map(item => ({ id: item.workspace.id, name: item.workspace.name }))} paletteCopy={paletteCopy}
     copy={copy} policy={policy} channels={channels.map(channel => ({ id: channel.id, name: channel.name, pictureUrl: channel.pictureUrl, health: channel.health }))} initialScope={remembered.ids} initialScopeDropped={remembered.dropped} optionalAreas={optionalAreas} initialCollapsed={jar.get(policy.sidebarCookie)?.value === '1'}>{children}</AppShell>;
 }

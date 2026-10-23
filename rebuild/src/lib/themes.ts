@@ -3,10 +3,10 @@
 export const THEME_COOKIE = 'social-pilot-theme';
 export const MODE_COOKIE = 'social-pilot-mode';
 export const THEMES = [
-  { id: 'vivid', name: 'Vivid', description: 'Deep indigo navigation with a color for every module.', swatches: ['#26215C', '#7F77DD', '#D85A30', '#1D9E75'] },
-  { id: 'meta', name: 'Meta blue', description: 'Clean light navigation with a blue accent and colorful data.', swatches: ['#f3f6fa', '#185FA5', '#378ADD', '#1D9E75'] },
-  { id: 'warm', name: 'Warm', description: 'Cream and coral, rounded and friendly.', swatches: ['#FAEEDA', '#D85A30', '#FAC775', '#1D9E75'] },
-  { id: 'clean', name: 'Clean', description: 'Near-white and crisp gray; color only in icons and charts.', swatches: ['#ffffff', '#111318', '#2563eb', '#16a34a'] },
+  { id: 'vivid', name: 'Vivid', description: 'Soft violet ground with a violet accent ladder.', swatches: ['#f6f5fd', '#534AB7', '#EEEDFE', '#3C3489'] },
+  { id: 'meta', name: 'Meta blue', description: 'Pale blue ground with a blue accent ladder.', swatches: ['#f3f6fa', '#185FA5', '#E6F1FB', '#0C447C'] },
+  { id: 'warm', name: 'Warm', description: 'Warm cream ground with a terracotta accent ladder.', swatches: ['#fdf8f2', '#B4461F', '#FAECE7', '#993C1D'] },
+  { id: 'clean', name: 'Clean', description: 'Near-white ground with a blue accent ladder; color only where it carries meaning.', swatches: ['#f9fafb', '#185FA5', '#E6F1FB', '#0C447C'] },
 ] as const;
 export type ThemeId = typeof THEMES[number]['id'];
 /** Theme for visitors with no saved choice (owner decision 2026-10-21: Clean). Root `theme.default` may override it. */

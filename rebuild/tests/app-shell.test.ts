@@ -40,28 +40,45 @@ async function render(extra: Partial<ComponentProps<typeof AppShell>> = {}, enab
 const text = (selector: string) => container.querySelector(selector)?.textContent ?? '';
 
 describe('single-sidebar app shell', () => {
-  it('lists the work areas in fixed order with the current one marked', async () => {
+  it('lists the five hubs in fixed order with the current one marked', async () => {
     await render();
-    const labels = [...container.querySelectorAll('.shell-areas .shell-area')].map(link => link.textContent);
-    expect(labels).toEqual(['Home', 'Content', 'Inbox', 'Insights', 'Ads']);
-    expect(container.querySelector('.shell-areas [data-area="content"]')?.getAttribute('aria-current')).toBe('page');
-    expect(container.querySelector('.shell-areas [data-area="insights"]')?.getAttribute('aria-current')).toBeNull();
+    const labels = [...container.querySelectorAll('.shell-hubs .shell-hub')].map(link => link.querySelector('.shell-hub__label')?.textContent);
+    expect(labels).toEqual(['Create', 'Plan', 'Engage', 'Measure', 'Grow']);
+    expect(container.querySelector('.shell-hubs [data-hub="plan"]')?.getAttribute('aria-current')).toBe('page');
+    expect(container.querySelector('.shell-hubs [data-hub="measure"]')?.getAttribute('aria-current')).toBeNull();
     expect(container.querySelector('a.shell-create')?.getAttribute('href')).toBe('/create');
   });
 
-  it('shows Tasks and Agency only when the workspace uses them', async () => {
-    await render({}, [...FEATURES, 'tasks/board', 'agency/overview']);
-    expect([...container.querySelectorAll('.shell-areas .shell-area')].map(link => link.textContent)).not.toContain('Tasks');
-    await render({ optionalAreas: ['tasks'] }, [...FEATURES, 'tasks/board', 'agency/overview']);
-    const labels = [...container.querySelectorAll('.shell-areas .shell-area')].map(link => link.textContent);
-    expect(labels).toContain('Tasks');
-    expect(labels).not.toContain('Agency');
+  it('marks no hub on the Home landing and keeps Settings in the footer', async () => {
+    nav.path = '/home';
+    await render({ activeModule: 'home' }, [...FEATURES]);
+    expect(container.querySelector('.shell-hubs [aria-current]')).toBeNull();
+    expect(container.querySelector('nav.ui-tabs--links')).toBeNull();
+    nav.path = '/settings/team';
+    await render({ activeModule: 'settings' }, [...FEATURES, 'settings/team', 'settings/workspace']);
+    expect(container.querySelector('.shell-hubs [aria-current]')).toBeNull();
+    expect(container.querySelector('.shell-sidebar__foot [aria-current="page"]')?.textContent).toBe('Settings');
+    expect([...container.querySelectorAll('.shell-settings__list a')].map(link => link.getAttribute('href'))).toEqual(['/settings/workspace', '/settings/channels', '/settings/team', '/settings/account']);
   });
 
-  it('renders the pages of the current area as link tabs and hides unavailable pages', async () => {
+  it('joins Tasks to Plan and Agency to Grow only when the workspace uses them', async () => {
+    const features = [...FEATURES, 'tasks/board', 'agency/overview', 'agency/clients'];
+    await render({}, features);
+    expect([...container.querySelectorAll('nav.ui-tabs--links a')].map(link => link.getAttribute('href'))).toEqual(['/content', '/content/calendar']);
+    nav.path = '/ads';
+    await render({ activeModule: 'ads' }, features);
+    expect(container.querySelector('nav.ui-tabs--links')).toBeNull();
+    await render({ activeModule: 'ads', optionalAreas: ['tasks', 'agency'] }, features);
+    expect([...container.querySelectorAll('nav.ui-tabs--links a')].map(link => link.getAttribute('href'))).toEqual(['/ads', '/agency', '/agency/clients']);
+    nav.path = '/tasks';
+    await render({ activeModule: 'tasks', optionalAreas: ['tasks'] }, features);
+    expect(container.querySelector('.shell-hubs [data-hub="plan"]')?.getAttribute('aria-current')).toBe('true');
+  });
+
+  it('renders the pages of the current hub as link tabs and hides unavailable pages', async () => {
     await render();
     const tabs = container.querySelector('nav.ui-tabs--links')!;
-    expect(tabs.getAttribute('aria-label')).toBe('Content sections');
+    expect(tabs.getAttribute('aria-label')).toBe('Plan sections');
     expect([...tabs.querySelectorAll('a')].map(link => link.getAttribute('href'))).toEqual(['/content', '/content/calendar']);
     expect(tabs.querySelector('[aria-current="page"]')?.getAttribute('href')).toBe('/content');
     await render({}, ['publishing/posts']);
@@ -83,14 +100,34 @@ describe('single-sidebar app shell', () => {
     expect(container.querySelector('nav.ui-tabs--links [aria-current="page"]')?.getAttribute('href')).toBe('/content');
   });
 
-  it('shows the promoted Feeds and AI studio Content tabs and the Caption tests Insights tab', async () => {
-    await render({}, [...FEATURES, 'publishing/queue', 'publishing/approvals', 'publishing/media', 'publishing/feeds', 'studio/ai-studio']);
+  it('badges the hubs with mentions, approvals and alerts, named for assistive technology', async () => {
+    await render({ hubCounts: { engage: 2, plan: 3, measure: 101 } });
+    expect(container.querySelector('.shell-hubs [data-hub="plan"] .shell-hub__badge')?.textContent).toBe('3');
+    expect(container.querySelector('.shell-hubs [data-hub="plan"]')?.getAttribute('aria-label')).toBe('Plan, 3 waiting for review');
+    expect(container.querySelector('.shell-hubs [data-hub="engage"]')?.getAttribute('aria-label')).toBe('Engage, 2 mentions');
+    expect(container.querySelector('.shell-hubs [data-hub="measure"] .shell-hub__badge')?.textContent).toBe('99+');
+    expect(container.querySelector('.shell-hubs [data-hub="create"] .shell-hub__badge')).toBeNull();
+    expect(container.querySelector('.shell-hubs [data-hub="create"]')?.getAttribute('aria-label')).toBeNull();
+    const bar = container.querySelector('nav.ui-bottombar')!;
+    expect(bar.querySelector('a[data-hub="engage"] .ui-bottombar__badge')?.textContent).toBe('2');
+    expect(bar.querySelector('a[data-hub="engage"]')?.getAttribute('aria-label')).toBe('Engage, 2 mentions');
+    expect(bar.querySelector('a[data-hub="grow"] .ui-bottombar__badge')).toBeNull();
+  });
+
+  it('shows the Feeds Plan tab, the Create hub tabs and the Caption tests Measure tab', async () => {
+    await render({}, [...FEATURES, 'publishing/queue', 'publishing/approvals', 'publishing/media', 'publishing/feeds']);
     expect([...container.querySelectorAll('nav.ui-tabs--links a')].map(link => link.getAttribute('href'))).toEqual([
-      '/content', '/content/calendar', '/content/queue', '/content/approvals', '/content/library', '/content/feeds', '/content/ai-studio',
+      '/content', '/content/calendar', '/content/queue', '/content/approvals', '/content/library', '/content/feeds',
     ]);
     nav.path = '/content/feeds';
     await render({}, [...FEATURES, 'publishing/feeds']);
     expect(container.querySelector('nav.ui-tabs--links [aria-current="page"]')?.getAttribute('href')).toBe('/content/feeds');
+    expect(container.querySelector('.shell-hubs [data-hub="plan"]')?.getAttribute('aria-current')).toBe('true');
+    nav.path = '/content/ai-studio';
+    await render({ activeModule: 'studio' }, [...FEATURES, 'studio/ai-studio', 'studio/agents']);
+    expect([...container.querySelectorAll('nav.ui-tabs--links a')].map(link => link.getAttribute('href'))).toEqual(['/content/ai-studio', '/content/agents']);
+    expect(container.querySelector('nav.ui-tabs--links')?.getAttribute('aria-label')).toBe('Create sections');
+    expect(container.querySelector('.shell-hubs [data-hub="create"]')?.getAttribute('aria-current')).toBe('page');
     nav.path = '/insights/tests';
     await render({ activeModule: 'studio' }, [...FEATURES, 'analytics/posts', 'studio/tests']);
     expect([...container.querySelectorAll('nav.ui-tabs--links a')].map(link => link.getAttribute('href'))).toEqual(['/insights', '/insights/posts', '/insights/tests']);
@@ -130,16 +167,16 @@ describe('single-sidebar app shell', () => {
   it('provides a phone exit from private Root to the customer app', async () => {
     await render({ installationMode: true, rootAccess: true }, []);
     expect(container.querySelector('.ui-bottombar a[href="/home"]')).not.toBeNull();
-    expect(container.querySelector('.shell-areas a[href="/root"]')?.getAttribute('aria-current')).toBe('page');
+    expect(container.querySelector('.shell-hubs a[href="/root"]')?.getAttribute('aria-current')).toBe('page');
     expect(container.querySelector('.shell-root-badge')?.textContent).toContain('Root');
     expect(container.querySelector('.shell-channels')).toBeNull();
   });
 
-  it('shows the phone bottom bar with a Create button between the areas', async () => {
+  it('shows the phone bottom bar with the four page hubs and a Create button between them', async () => {
     await render();
     const bar = container.querySelector('nav.ui-bottombar')!;
     const order = [...bar.querySelectorAll('a')].map(link => link.getAttribute('aria-label') ?? link.textContent);
-    expect(order).toEqual(['Home', 'Content', 'Inbox', 'Create post', 'Insights', 'Ads']);
+    expect(order).toEqual(['Plan', 'Engage', 'Create post', 'Measure', 'Grow']);
   });
 
   it('reports a failed sign-out through the account menu and keeps it retryable', async () => {
@@ -151,15 +188,28 @@ describe('single-sidebar app shell', () => {
     expect(container.querySelector('[role="alert"]')?.textContent).toContain('Could not sign out');
   });
 
-  it('sends the exact workspace confirmation and keeps the selection on refusal', async () => {
+  it('switches workspaces from a colour-coded menu with the exact service confirmation', async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 404 }));
     vi.stubGlobal('fetch', fetchMock);
     await render({ workspaces: [{ id: 'w1', name: 'Current' }, { id: 'b', name: 'Another' }] });
-    const select = container.querySelector<HTMLSelectElement>('#shell-workspace')!;
-    await act(async () => { select.value = 'b'; select.dispatchEvent(new Event('change', { bubbles: true })); });
+    const trigger = container.querySelector<HTMLButtonElement>('.shell-workspace__menu button[aria-haspopup=menu]')!;
+    expect(trigger.getAttribute('aria-label')).toBe('Workspace: Current');
+    expect(trigger.querySelector('.ui-avatar')).not.toBeNull();
+    await act(async () => trigger.click());
+    const items = [...document.querySelectorAll<HTMLElement>('[role=menuitem]')];
+    expect(items.map(item => item.querySelector('.ui-menu__label')?.textContent)).toEqual(['Current', 'Another']);
+    expect(items[0]!.querySelector('.shell-workspace__current')).not.toBeNull();
+    await act(async () => items[1]!.click());
     expect(JSON.parse(fetchMock.mock.calls[0]![1].body)).toEqual({ workspaceId: 'b', confirmation: 'SELECT WORKSPACE b' });
-    expect(select.value).toBe('w1');
+    expect(container.querySelector('.shell-workspace__name')?.textContent).toBe('Current');
     expect(container.querySelector('[role="alert"]')?.textContent).toContain('could not be switched');
+  });
+
+  it('names a single workspace with its colour next to it', async () => {
+    await render({ workspaceName: 'Only', workspaces: [{ id: 'w1', name: 'Only' }] });
+    expect(container.querySelector('.shell-workspace__menu')).toBeNull();
+    expect(container.querySelector('.shell-workspace-name .ui-avatar')).not.toBeNull();
+    expect(text('.shell-workspace-name')).toContain('Only');
   });
 
   it('opens the overlay menu, traps nothing outside, and restores the opener on Escape', async () => {
@@ -195,6 +245,6 @@ describe('single-sidebar app shell', () => {
     await act(async () => container.querySelector<HTMLButtonElement>('.shell-collapse')!.click());
     expect(container.querySelector('.shell')?.getAttribute('data-rail')).toBe('true');
     expect(document.cookie).toContain('sp_sidebar=1');
-    expect(container.querySelector('.shell-area')?.getAttribute('title')).toBe('Home');
+    expect(container.querySelector('.shell-hub')?.getAttribute('title')).toBe('Create');
   });
 });

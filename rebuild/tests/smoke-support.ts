@@ -115,7 +115,7 @@ vi.mock('../generated/client', async (importOriginal) => ({ ...(await importOrig
 
 vi.mock('server-only', () => ({}));
 // next/font is a build-time transform; outside Next it is not callable.
-vi.mock('next/font/google', () => ({ Inter: () => ({ variable: '--font-inter', className: 'inter' }) }));
+vi.mock('next/font/google', () => ({ Inter: () => ({ variable: '--font-inter', className: 'inter' }), DM_Sans: () => ({ variable: '--font-brand', className: 'brand' }) }));
 
 vi.mock('next/headers', () => {
   const cookieJar = () => ({
