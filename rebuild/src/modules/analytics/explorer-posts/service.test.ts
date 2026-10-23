@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-const mocks = vi.hoisted(() => ({ user: vi.fn(), entitlements: vi.fn(), permissions: vi.fn(), catalog: vi.fn(), hook: vi.fn(), config: vi.fn(), use: vi.fn() }));
-vi.mock('@/server/data', () => ({ prisma: { user: { findUnique: mocks.user } } }));
+const mocks = vi.hoisted(() => ({ user: vi.fn(), entitlements: vi.fn(), permissions: vi.fn(), catalog: vi.fn(), hook: vi.fn(), config: vi.fn(), use: vi.fn(), queryRaw: vi.fn() }));
+vi.mock('@/server/data', () => ({ prisma: { user: { findUnique: mocks.user }, $queryRaw: mocks.queryRaw } }));
 vi.mock('@/server/config/store', async () => { const { recordsCopyDefaults } = await import('@/modules/analytics/records-copy'); const { errorCopyDefaults } = await import('@/modules/analytics/error-copy'); return { runtimeConfig: (key: string) => key === 'analytics.recordsCopy' ? Promise.resolve(recordsCopyDefaults) : key === 'analytics.errorCopy' ? Promise.resolve(errorCopyDefaults) : mocks.config(key) }; });
 vi.mock('@/server/entitlements', () => ({ loadEntitlements: mocks.entitlements, entitledPlatformIds: () => ['example'], canUseFeature: mocks.use }));
 vi.mock('@/server/permissions', () => ({ canAccessFeature: () => true }));
@@ -8,7 +8,7 @@ vi.mock('@/server/permissions/loader', () => ({ loadPermissions: mocks.permissio
 vi.mock('@/server/data-control/guard', () => ({ assertWorkspaceNotPurging: vi.fn() }));
 vi.mock('../server/data', () => ({ loadAnalytics: mocks.catalog }));
 vi.mock('@/server/platforms/registry', () => ({ platformAnalytics: async () => ({ postPerformance: mocks.hook }) }));
-import { comparePosts, postsCsv, readPosts, exportPosts, type PostRow } from './service';
+import { comparePosts, postsCsv, readPosts, exportPosts, resolveInternalPostIds, type PostRow } from './service';
 const row = (id: string, value: number | null): PostRow => ({ postId: id, text: '=unsafe,"text"', channelId: 'a', channelName: 'Channel', publishedAt: new Date('2026-01-01'), measuredAt: null, url: null, rankValue: null, rankLabel: 'Rank', measures: [{ key: 'views', label: 'Views', value }] });
 beforeEach(() => {
   vi.resetAllMocks(); mocks.user.mockResolvedValue({ disabledAt: null }); mocks.entitlements.mockResolvedValue({}); mocks.use.mockReturnValue(true);
@@ -51,5 +51,22 @@ describe('published post explorer', () => {
   it('escapes CSV formulas and quotes, distinguishes missing from zero', () => {
     const csv = postsCsv([row('a', null), row('b', 0)], [{ key: 'views', label: 'Views' }]);
     expect(csv).toContain('"\'=unsafe,""text"""'); expect(csv).toContain('"Not available"'); expect(csv).toContain('"0"');
+  });
+});
+describe('internal post links', () => {
+  it('maps channel/remote pairs to internal posts and skips unmapped rows', async () => {
+    mocks.queryRaw.mockResolvedValueOnce([{ postId: 'p1', targetId: 'a', remotePostId: 'r1' }, { postId: 'p2', targetId: 'a', remotePostId: null }]);
+    const map = await resolveInternalPostIds('w', [{ channelId: 'a', postId: 'r1' }, { channelId: 'a', postId: 'r9' }]);
+    expect(map.get(JSON.stringify(['a', 'r1']))).toBe('p1');
+    expect(map.has(JSON.stringify(['a', 'r9']))).toBe(false);
+    const sql = mocks.queryRaw.mock.calls[0][0] as { values: unknown[] };
+    expect(sql.values).toEqual(expect.arrayContaining(['w', ['a'], ['r1', 'r9']]));
+  });
+  it('queries nothing for empty input and fails soft', async () => {
+    await expect(resolveInternalPostIds('w', [])).resolves.toEqual(new Map());
+    await expect(resolveInternalPostIds('w', [{ channelId: '', postId: 'r1' }])).resolves.toEqual(new Map());
+    expect(mocks.queryRaw).not.toHaveBeenCalled();
+    mocks.queryRaw.mockRejectedValueOnce(new Error('down'));
+    await expect(resolveInternalPostIds('w', [{ channelId: 'a', postId: 'r1' }])).resolves.toEqual(new Map());
   });
 });

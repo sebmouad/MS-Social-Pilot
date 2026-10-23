@@ -14,6 +14,8 @@ not deduplicated. The provider hook accepts a neutral measure key, direction and
 offset. The explorer merges the first offset + page size + 1 rows from each
 channel, with stable post/channel tie ordering and unknown measures last. The
 existing ranking behavior remains available to report callers without a sort.
+Rows whose destination was published from this workspace link to the internal
+post page (viewers with post access only); imported history shows no link.
 
 Root key: `analytics.postsPageSize` (default 25, range 1–200), declared in the
 Analytics owning config. MCP additionally caps rows by the current result limit.

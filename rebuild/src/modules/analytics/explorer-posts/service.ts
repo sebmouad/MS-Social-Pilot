@@ -8,6 +8,7 @@ import { z } from 'zod';
 import { OperationError } from '@/lib/operation-error';
 import { runtimeConfig } from '@/server/config/store';
 import { prisma } from '@/server/data';
+import { Prisma } from '../../../../generated/client';
 import { loadEntitlements, canUseFeature, entitledPlatformIds } from '@/server/entitlements';
 import { loadPermissions } from '@/server/permissions/loader';
 import { canAccessFeature } from '@/server/permissions';
@@ -82,4 +83,36 @@ export async function exportPosts(actor: Actor, raw: unknown, locale: 'en' | 'fr
   return postsCsv(data.items, data.measures, locale, await recordsCopy());
 
   } catch (error) { throw await localizeAnalyticsError(error); }
+}
+
+/**
+ * Internal post ids for explorer rows, keyed by JSON `[channelId, remotePostId]`. Published destinations
+ * made in this workspace carry the remote id on their post target; anything else (imported history,
+ * deleted drafts) has no mapping and simply shows no link. The link target re-checks post scope, so
+ * a mapping the viewer may not open resolves to the post page's honest denial, never to data.
+ * A failure returns an empty map: navigation is decoration and must never stop the explorer.
+ */
+export async function resolveInternalPostIds(workspaceId: string, pairs: ReadonlyArray<{ channelId: string; postId: string }>): Promise<Map<string, string>> {
+  const result = new Map<string, string>();
+  const pairKey = (channelId: string, postId: string) => JSON.stringify([channelId, postId]);
+  const targets = new Set<string>();
+  const remotes = new Set<string>();
+  for (const pair of pairs) {
+    if (typeof pair?.channelId !== 'string' || !pair.channelId || typeof pair?.postId !== 'string' || !pair.postId) continue;
+    targets.add(pair.channelId); remotes.add(pair.postId);
+  }
+  if (!targets.size) return result;
+  try {
+    const rows = await prisma.$queryRaw<Array<{ postId: string; targetId: string; remotePostId: string | null }>>(Prisma.sql`
+      SELECT pt."postId", pt."targetId", pt."remotePostId" FROM post_targets pt JOIN posts p ON p.id = pt."postId"
+      WHERE p."workspaceId" = ${workspaceId} AND pt."targetId" = ANY(${[...targets]}::text[]) AND pt."remotePostId" = ANY(${[...remotes]}::text[])`);
+    for (const row of rows) {
+      if (!row.remotePostId) continue;
+      const key = pairKey(row.targetId, row.remotePostId);
+      if (!result.has(key)) result.set(key, row.postId);
+    }
+  } catch {
+    return new Map();
+  }
+  return result;
 }

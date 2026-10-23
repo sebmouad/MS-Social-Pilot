@@ -11,7 +11,8 @@ import { postsTableMeasures, postsTableRows } from '@/modules/analytics/ui/posts
 import { pageChannelScope } from '@/modules/shell/server/scope';
 import { insightsReadInput } from '@/modules/analytics/ui/insights/scope';
 import { workspaceInstantFormatter } from '@/server/instant-labels';
-import { readPosts } from './service';
+import { readPosts, resolveInternalPostIds } from './service';
+import { canAccessFeature } from '@/server/permissions';
 import styles from '@/modules/analytics/ui/reports/workflows.module.css';
 import local from './screen.module.css';
 
@@ -46,7 +47,7 @@ export default async function PostsScreen({ searchParams }: { searchParams: Prom
   </form>;
   return <PageFrame module="analytics" scopedAccess><div className={`${styles.root} ${local.content}`}>
     <PageHeader module="analytics" title={t("Post explorer")} info={<InfoTip name={t("Post explorer")} blocks={[{ text: t("Published posts with stored measures. Measures are snapshots, not period totals. Missing data is not available.") }]} />} filters={toolbar} />
-    <PostsTable copy={copy} rows={postsTableRows(d.items, await workspaceInstantFormatter(viewer.workspaceId, fr ? 'fr' : 'en'))} measures={postsTableMeasures(d.measures, fr ? 'fr' : 'en')} locale={fr ? 'fr' : 'en'} />
+    <PostsTable copy={copy} rows={postsTableRows(d.items, await workspaceInstantFormatter(viewer.workspaceId, fr ? 'fr' : 'en'), canAccessFeature(viewer.permissions, 'publishing/collaboration') ? await resolveInternalPostIds(viewer.workspaceId, d.items) : undefined)} measures={postsTableMeasures(d.measures, fr ? 'fr' : 'en')} locale={fr ? 'fr' : 'en'} />
     {d.input.page > 1 || d.nextPage ? <nav aria-label={t("Pages")} className={styles.pager}>{d.input.page > 1 && <a href={`?${query({ page: String(d.input.page - 1) })}`}>{t("Previous")}</a>}<span>{t("Page")} {d.input.page}</span>{d.nextPage && <a href={`?${query({ page: String(d.nextPage) })}`}>{t("Next")}</a>}</nav> : null}
   </div></PageFrame>;
 }

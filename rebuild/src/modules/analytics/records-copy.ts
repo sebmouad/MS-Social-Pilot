@@ -398,6 +398,10 @@ export const recordsCopyDefaults = {
   "Measured": {
     "en": "Measured",
     "fr": "Mesuré"
+  },
+  "Open in Posts": {
+    "en": "Open in Posts",
+    "fr": "Ouvrir dans Publications"
   }
 };
 export type RecordsCopy = typeof recordsCopyDefaults;

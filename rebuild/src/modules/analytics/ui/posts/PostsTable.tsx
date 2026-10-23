@@ -10,6 +10,8 @@ import '../analytics.css';
 
 export type PostsTableRow = {
   key: string; text: string; url: string | null; channelName: string;
+  /** Internal post page for destinations made in this workspace; absent when there is no mapping. */
+  postHref?: string;
   /** Image, video poster or stored picture to show beside the post; null shows a quiet placeholder. */
   thumbnail?: PostThumbnail | null;
   publishedAt: string | null; measuredAt: string | null;
@@ -63,6 +65,7 @@ export function PostsTable({ rows, measures: allMeasures, locale, emptyAction, c
           <span className="analytics-posts__text">
             {row.url ? <a href={row.url} rel="noreferrer" target="_blank">{row.text || unavailable}<IconExternalLink size={14} aria-hidden="true" /></a> : <span>{row.text || unavailable}</span>}
             <small className="analytics-posts__channel"><Avatar name={row.channelName} size="sm" decorative />{row.channelName}</small>
+            {row.postHref ? <small className="analytics-posts__internal"><a href={row.postHref}>{t("Open in Posts")}</a></small> : null}
           </span>
         </span> },
         { key: 'publishedAt', label: t("Published"), render: row => when(row.publishedAt, row.labels?.publishedAt) },

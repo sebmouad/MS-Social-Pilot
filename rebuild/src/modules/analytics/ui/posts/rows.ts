@@ -11,13 +11,17 @@ type PostItem = {
 };
 
 /** Serializable rows for PostsTable: dates become ISO strings and measures a keyed record. */
-export function postsTableRows(items: readonly PostItem[], instants: InstantFormatter): PostsTableRow[] {
-  return items.map(item => ({
+export function postsTableRows(items: readonly PostItem[], instants: InstantFormatter, internalIds?: ReadonlyMap<string, string>): PostsTableRow[] {
+  return items.map(item => {
+    const internalId = internalIds?.get(JSON.stringify([item.channelId, item.postId]));
+    return {
     key: `${item.channelId}:${item.postId}`, thumbnail: item.thumbnail ?? null, text: item.text, url: item.url, channelName: item.channelName,
+    ...(internalId ? { postHref: `/content/post/${encodeURIComponent(internalId)}` } : {}),
     publishedAt: item.publishedAt?.toISOString() ?? null, measuredAt: item.measuredAt?.toISOString() ?? null,
     measures: Object.fromEntries(item.measures.map(measure => [measure.key, measure.value])),
     labels: { ...(item.publishedAt ? { publishedAt: instants.dateTime(item.publishedAt) } : {}), ...(item.measuredAt ? { measuredAt: instants.dateTime(item.measuredAt) } : {}) },
-  }));
+    };
+  });
 }
 
 /** Measure choices in the viewer's language, falling back to the English label. */
