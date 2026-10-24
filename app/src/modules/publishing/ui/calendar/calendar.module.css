@@ -107,8 +107,8 @@
 }
 /* Redesign: chips take their first channel's colour; today is marked on the day cell and week column. */
 .post:not([data-status="failed"]):not([data-status="partially_failed"]):not([data-status="rejected"]) { border-left-color: var(--chip, var(--mod, var(--accent))); background: color-mix(in srgb, var(--chip, var(--mod, var(--accent))) 9%, var(--surface)); }
-.post { box-shadow: 0 1px 2px color-mix(in srgb, var(--ink) 8%, transparent); transition: box-shadow var(--ease), transform var(--ease); }
-.post:hover { box-shadow: 0 3px 10px color-mix(in srgb, var(--ink) 14%, transparent); }
+.post { box-shadow: 0 1px 2px color-mix(in srgb, var(--ink) 8%, transparent); transition: box-shadow var(--ease), transform var(--ease), border-color var(--ease); }
+.post:hover { transform: translateY(-1px); box-shadow: 0 4px 14px color-mix(in srgb, var(--ink) 14%, transparent); border-color: var(--line-strong); }
 /* Published posts are marked by a dashed edge and a quieter fill, never by opacity, so text keeps full contrast. */
 .post[data-status="published"] { border-left-style: dashed; background: color-mix(in srgb, var(--chip, var(--mod, var(--accent))) 4%, var(--surface)); }
 /* Planned vs outcome (2026-10-22): solid edge = still to go out, dashed edge = sent or resolved. Month, week and the phone agenda share the rule. */

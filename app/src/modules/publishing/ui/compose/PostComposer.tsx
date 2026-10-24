@@ -466,6 +466,26 @@ function PostComposerContent({ copyCatalog = composerCatalogDefaults, profiles, 
     requestClose();
   }
 
+  useEffect(() => {
+    const handleGlobalShortcuts = (e: globalThis.KeyboardEvent) => {
+      if (document.querySelector('dialog[open]') || scheduleOpen) return;
+      if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+        if (!busy && selected.length > 0) {
+          e.preventDefault();
+          if (hasTime) submitWith('schedule');
+          else submitWith('draft');
+        }
+      } else if ((e.metaKey || e.ctrlKey) && (e.key === 's' || e.key === 'S')) {
+        if (!busy) {
+          e.preventDefault();
+          submitWith('draft');
+        }
+      }
+    };
+    window.addEventListener('keydown', handleGlobalShortcuts);
+    return () => window.removeEventListener('keydown', handleGlobalShortcuts);
+  }, [busy, hasTime, selected.length]);
+
   const status = localError ? <p ref={feedbackRef} className={styles.alert} role="alert" tabIndex={-1}><IconAlertTriangle size={16} aria-hidden="true" /><span>{localError}</span></p>
     : state.status === 'error' ? <p ref={feedbackRef} className={styles.alert} role="alert" data-composer-error tabIndex={-1}><IconAlertTriangle size={16} aria-hidden="true" /><span>{state.message} {copy.retained}{state.saveUnconfirmed ? <> <a href="/content" target="_blank" rel="noopener noreferrer">{cc.createOpenContent}</a>.</> : ` ${copy.retry}`}</span></p>
     : saved ? <p ref={feedbackRef} tabIndex={-1} className={styles.ok} role="status"><IconCheck size={16} aria-hidden="true" /><span>{state.queued ? fill(state.queued.status === 'pending_approval' ? copy.addedApproval : copy.added, { time: state.queued.scheduledLabel }) : ui.saved} {copy.opening} {state.destination && <a href={state.destination}>{copy.viewSaved}</a>}</span></p>
@@ -523,7 +543,19 @@ function PostComposerContent({ copyCatalog = composerCatalogDefaults, profiles, 
             <IconSparkles size={14} aria-hidden="true" />
             <span>⚡ Hook Scorer</span>
           </button>
-          <span className={styles.counter} id="composer-message-count">{fillContent(cc.createCounter, { used: message.length.toLocaleString(aiLocale), max: imageRules.maxMessageCharacters.toLocaleString(aiLocale) })}</span>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+            {imageRules.maxMessageCharacters > 0 && (() => {
+              const charPercent = Math.min(100, (message.length / imageRules.maxMessageCharacters) * 100);
+              const charStrokeColor = charPercent >= 100 ? 'var(--danger)' : charPercent >= 90 ? 'var(--warning)' : 'var(--accent)';
+              return (
+                <svg width="18" height="18" viewBox="0 0 20 20" style={{ transform: 'rotate(-90deg)', verticalAlign: 'middle', flexShrink: 0 }} aria-hidden="true">
+                  <circle cx="10" cy="10" r="8" fill="none" stroke="var(--line-strong)" strokeWidth="2.5" opacity="0.35" />
+                  <circle cx="10" cy="10" r="8" fill="none" stroke={charStrokeColor} strokeWidth="2.5" strokeDasharray={50.26} strokeDashoffset={50.26 - (50.26 * charPercent) / 100} strokeLinecap="round" style={{ transition: 'stroke-dashoffset 0.15s ease, stroke 0.15s ease' }} />
+                </svg>
+              );
+            })()}
+            <span className={styles.counter} id="composer-message-count">{fillContent(cc.createCounter, { used: message.length.toLocaleString(aiLocale), max: imageRules.maxMessageCharacters.toLocaleString(aiLocale) })}</span>
+          </div>
         </div>
         {hookAnalysis && hookScorerOpen && (
           <div style={{ background: 'var(--surface-raised)', border: '1px solid var(--line)', borderRadius: 'var(--radius-sm)', padding: '12px', marginTop: '10px' }}>
@@ -640,6 +672,10 @@ function PostComposerContent({ copyCatalog = composerCatalogDefaults, profiles, 
     </div>
 
     <ActionBar label={cc.createActionBar} status={status}>
+      <div style={{ display: 'inline-flex', alignItems: 'center', gap: '10px', fontSize: '11px', color: 'var(--ink-faint)', marginRight: 'auto' }}>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}><kbd className="ui-kbd">⌘</kbd><kbd className="ui-kbd">↵</kbd> {hasTime ? cc.createSchedule : cc.createSaveDraft}</span>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}><kbd className="ui-kbd">⌘</kbd><kbd className="ui-kbd">S</kbd> {cc.createSaveDraft}</span>
+      </div>
       <Button type="button" variant="secondary" disabled={busy} onClick={() => submitWith('draft')}>{cc.createSaveDraft}</Button>
       <div ref={scheduleAnchor} className={styles.splitAnchor}>
         <SplitButton label={mainLabel} variant="primary" disabled={busy} busy={pending || uploading} menuLabel={cc.createMoreWays}

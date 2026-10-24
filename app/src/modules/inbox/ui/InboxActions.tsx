@@ -211,10 +211,37 @@ export function ThreadToolbar({ id, kind, resolved, hidden, canResolve, canHide,
   const canFinishDelete = operation?.state === 'remote_confirmed' && operation.remoteConfirmed && !operation.localConfirmed;
   const cap = copy.cap(reply);
 
+  useEffect(() => {
+    const handleKey = (e: globalThis.KeyboardEvent) => {
+      const tag = (e.target as HTMLElement)?.tagName?.toLowerCase();
+      if (tag === 'input' || tag === 'textarea' || (e.target as HTMLElement)?.isContentEditable) return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.key === 'e' || e.key === 'E') {
+        if (!reply && canResolve && busy === null) {
+          e.preventDefault();
+          void run('resolve', { action: 'resolve', id, kind, resolved: !resolved }, resolved ? copy.reopened : copy.resolvedDone, { action: 'resolve', id, kind, resolved }, resolved ? copy.resolvedDone : copy.reopened);
+        }
+      } else if (e.key === 'r' || e.key === 'R') {
+        const textarea = document.querySelector<HTMLTextAreaElement>('textarea#reply-body, textarea[name="body"], textarea[name="reply"]');
+        if (textarea) {
+          e.preventDefault();
+          textarea.focus();
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [reply, canResolve, busy, id, kind, resolved, copy]);
+
   if (!canResolve) return <p className={styles.readOnly}>{copy.readOnly}</p>;
   return <div className={styles.toolbar}>
     <div className={styles.toolbarButtons}>
-      {!reply && <Button size="sm" variant="secondary" data-inbox-resolve disabled={busy !== null} onClick={() => void run('resolve', { action: 'resolve', id, kind, resolved: !resolved }, resolved ? copy.reopened : copy.resolvedDone, { action: 'resolve', id, kind, resolved }, resolved ? copy.resolvedDone : copy.reopened)}>{resolved ? copy.reopen : copy.markResolved}</Button>}
+      {!reply && <Button size="sm" variant="secondary" data-inbox-resolve disabled={busy !== null} onClick={() => void run('resolve', { action: 'resolve', id, kind, resolved: !resolved }, resolved ? copy.reopened : copy.resolvedDone, { action: 'resolve', id, kind, resolved }, resolved ? copy.resolvedDone : copy.reopened)}>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+          <span>{resolved ? copy.reopen : copy.markResolved}</span>
+          <kbd className="ui-kbd" style={{ fontSize: '10px', height: '17px', minWidth: '17px', padding: '0 4px', opacity: 0.85 }}>E</kbd>
+        </span>
+      </Button>}
       {kind === 'comment' && canHide && <Button size="sm" variant="secondary" disabled={busy !== null} onClick={() => void run('hide', { action: 'moderate', id, hidden: !hidden }, hidden ? copy.visibleDone(cap) : copy.hiddenDone(cap), { action: 'moderate', id, hidden }, hidden ? copy.hiddenDone(cap) : copy.visibleDone(cap))}>{hidden ? copy.unhide(noun) : copy.hide(noun)}</Button>}
       {kind === 'comment' && canDelete && <Button size="sm" variant="quiet" disabled={busy !== null} onClick={() => void openDeleteDialog()}>{copy.delete(noun)}</Button>}
     </div>
@@ -308,13 +335,27 @@ export function ReplyBox({ id, kind, allowed, headline, detail, maxLength = 2000
     </div>
     <label htmlFor={fieldId} className="ui-visually-hidden">{copy.reply}</label>
     <AutoTextarea id={fieldId} name="reply" data-inbox-reply rows={3} maxLength={maxLength} value={text} disabled={!allowed || busy} aria-describedby={[ruleId, countId, validation.fieldProps('reply')['aria-describedby']].filter(Boolean).join(' ')} aria-invalid={Boolean(error) || Boolean(validation.errors.reply) || undefined}
-      placeholder={allowed ? (kind === 'message' ? copy.privatePlaceholder : copy.publicPlaceholder) : copy.unavailable} onChange={event => { updateText(event.target.value); setSent(''); }} />
+      placeholder={allowed ? (kind === 'message' ? copy.privatePlaceholder : copy.publicPlaceholder) : copy.unavailable}
+      onKeyDown={event => {
+        if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
+          if (!empty && !inFlight.current && !busy && allowed) {
+            event.preventDefault();
+            event.currentTarget.form?.requestSubmit();
+          }
+        }
+      }}
+      onChange={event => { updateText(event.target.value); setSent(''); }} />
     <FieldError {...validation.errorProps('reply')} />
     <div className={styles.replyFoot}>
       <span id={countId} className={remaining < 100 ? styles.countLow : styles.count}>{text.length.toLocaleString(locale)} / {maxLength.toLocaleString(locale)} {copy.characters}{remaining < 100 ? ` · ${remaining} ${copy.left}` : ''}</span>
       <div className={styles.replyActions}>
         {onInsertSavedReply ? <Menu label={copy.savedReplies} trigger={<>{copy.savedReplies}</>} items={savedItems} /> : null}
-        <Button type="submit" variant="primary" disabled={!allowed || busy || empty} aria-busy={busy}>{busy ? copy.sending : copy.send}</Button>
+        <Button type="submit" variant="primary" disabled={!allowed || busy || empty} aria-busy={busy}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+            <span>{busy ? copy.sending : copy.send}</span>
+            <kbd className="ui-kbd" style={{ fontSize: '10px', height: '17px', minWidth: '17px', padding: '0 4px', background: 'rgba(255,255,255,0.2)', border: 'none', color: 'inherit' }}>⌘↵</kbd>
+          </span>
+        </Button>
       </div>
     </div>
     <div role="status" aria-live="polite" className={styles.replyStatus}>{sent}</div>

@@ -4,6 +4,8 @@ import { headers } from 'next/headers';
 import { BarChart } from '@/components/charts';
 import { PageHeader } from '@/components/PageHeader';
 import { InfoTip } from '@/components';
+import { Sparkline } from '@/components/Sparkline';
+import { DeltaBadge } from '@/components/DeltaBadge';
 import { PageFrame } from '@/server/PageFrame';
 import { requireViewer } from '@/server/context';
 import { operationFailure } from '@/lib/operation-error';
@@ -106,10 +108,10 @@ export default async function ComparePage({ searchParams }: { searchParams: Prom
           </thead>
           <tbody>
             {[
-              { name: 'Your Brand (Workspace)', platform: 'Instagram & Facebook', followers: '48,600', posts: '12', eng: '4.8%', trend: '+0.6% ▲', own: true },
-              { name: 'Competitor Brand Alpha', platform: 'Instagram', followers: '62,400', posts: '18', eng: '3.2%', trend: '-0.3% ▼', own: false },
-              { name: 'Culinary Pulse Daily', platform: 'Facebook & YouTube', followers: '114,000', posts: '24', eng: '2.9%', trend: '+0.1% ▲', own: false },
-              { name: 'Tastecraft Studio', platform: 'TikTok & Instagram', followers: '34,200', posts: '8', eng: '5.4%', trend: '+1.2% ▲', own: false },
+              { name: 'Your Brand (Workspace)', platform: 'Instagram & Facebook', followers: '48,600', posts: '12', eng: '4.8%', trendVal: 0.6, history: [4.1, 4.3, 4.2, 4.6, 4.5, 4.8], own: true },
+              { name: 'Competitor Brand Alpha', platform: 'Instagram', followers: '62,400', posts: '18', eng: '3.2%', trendVal: -0.3, history: [3.8, 3.6, 3.5, 3.4, 3.3, 3.2], own: false },
+              { name: 'Culinary Pulse Daily', platform: 'Facebook & YouTube', followers: '114,000', posts: '24', eng: '2.9%', trendVal: 0.1, history: [2.7, 2.8, 2.7, 2.9, 2.8, 2.9], own: false },
+              { name: 'Tastecraft Studio', platform: 'TikTok & Instagram', followers: '34,200', posts: '8', eng: '5.4%', trendVal: 1.2, history: [4.2, 4.4, 4.7, 4.9, 5.1, 5.4], own: false },
             ].map(row => (
               <tr key={row.name} style={row.own ? { background: 'var(--accent-soft)', fontWeight: 600 } : undefined}>
                 <th scope="row">
@@ -119,7 +121,12 @@ export default async function ComparePage({ searchParams }: { searchParams: Prom
                 <td className={styles.num}>{row.followers}</td>
                 <td className={styles.num}>{row.posts}</td>
                 <td className={styles.num}>{row.eng}</td>
-                <td><span style={{ color: row.trend.includes('▲') ? 'var(--ui-good, #10b981)' : 'var(--danger)' }}>{row.trend}</span></td>
+                <td>
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                    <Sparkline data={row.history} width={46} height={18} color={row.own ? 'var(--accent)' : 'var(--ink-soft)'} />
+                    <DeltaBadge value={row.trendVal} precision={1} />
+                  </div>
+                </td>
               </tr>
             ))}
           </tbody>

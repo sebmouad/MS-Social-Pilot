@@ -1,7 +1,7 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
-import { IconChevronsLeft, IconChevronsRight, IconCheck, IconChevronDown, IconHelp, IconLogout, IconMenu2, IconPlus, IconSettings, IconShieldLock, IconUserCircle, IconX } from "@tabler/icons-react";
+import { IconChevronsLeft, IconChevronsRight, IconCheck, IconChevronDown, IconHelp, IconLogout, IconMenu2, IconMoon, IconPlus, IconSettings, IconShieldLock, IconSun, IconUserCircle, IconX } from "@tabler/icons-react";
 import { MODULES, areaForPath, areaPages, pageForPath, type AreaId, type ModuleId } from "@/lib/product";
 import { HUB_ORDER, hubForPath, hubPages, type HubId } from "@/lib/hubs";
 import { nextChannelScope, parseChannelScope, withChannelScope } from "@/lib/channel-scope";
@@ -348,6 +348,18 @@ export function AppShell({ children, activeModule, enabledModules, enabledFeatur
             {installationMode && <span className="shell-root-badge"><ModuleGlyph id="root" size={15} /><span>{copy.rootBadge}</span></span>}
           </div>
           <div className="shell-topbar__tools">
+            {theme && (
+              <button
+                type="button"
+                className="ui-icon-button"
+                onClick={() => void theme.setMode(theme.mode === "dark" ? "light" : "dark")}
+                aria-label={theme.mode === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+                title={theme.mode === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+                style={{ width: "32px", height: "32px", borderRadius: "var(--radius-sm)" }}
+              >
+                {theme.mode === "dark" ? <IconSun size={17} stroke={1.8} aria-hidden="true" /> : <IconMoon size={17} stroke={1.8} aria-hidden="true" />}
+              </button>
+            )}
             {!installationMode && paletteCopy && <CommandPalette copy={paletteCopy} />}
           </div>
         </header>

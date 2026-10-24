@@ -131,6 +131,16 @@ export function PostPreview({ post, authorName, authorAvatarUrl, timeZone, varia
     return post.message.match(/#[a-zA-Z0-9_\u00C0-\u017F]+/g) || [];
   }, [post.message]);
 
+  const primaryPlatform = useMemo(() => {
+    const raw = post.targets[0]?.target?.type?.toLowerCase() || post.targets[0]?.target?.platformName?.toLowerCase() || '';
+    if (raw.includes('instagram')) return 'instagram';
+    if (raw.includes('linkedin')) return 'linkedin';
+    if (raw.includes('twitter') || raw.includes('x')) return 'x';
+    if (raw.includes('tiktok')) return 'tiktok';
+    if (raw.includes('facebook')) return 'facebook';
+    return 'neutral';
+  }, [post.targets]);
+
   const articleNode = (
     <article className={styles.preview} data-variant={variant} aria-label={fillCopy(t.previewBy, { name: authorName })}>
       <header className={styles.header}>
@@ -188,6 +198,50 @@ export function PostPreview({ post, authorName, authorAvatarUrl, timeZone, varia
       </div> : null}
 
       {safeLink ? <p className={styles.sharedLink}><a href={safeLink} target="_blank" rel="noopener noreferrer">{t.previewOpenLink}</a></p> : null}
+
+      <div className={styles.platformActionBar} data-platform={primaryPlatform}>
+        {primaryPlatform === 'instagram' ? (
+          <>
+            <div className={styles.platformActionsLeft}>
+              <span title="Like" aria-hidden="true">❤️</span>
+              <span title="Comment" aria-hidden="true">💬</span>
+              <span title="Share" aria-hidden="true">↗️</span>
+            </div>
+            <div className={styles.platformActionsRight}>
+              <span title="Bookmark" aria-hidden="true">🔖</span>
+            </div>
+          </>
+        ) : primaryPlatform === 'linkedin' ? (
+          <>
+            <button type="button" className={styles.platformActionBtn} aria-label="Like">👍 Like</button>
+            <button type="button" className={styles.platformActionBtn} aria-label="Comment">💬 Comment</button>
+            <button type="button" className={styles.platformActionBtn} aria-label="Repost">🔁 Repost</button>
+            <button type="button" className={styles.platformActionBtn} aria-label="Send">↗️ Send</button>
+          </>
+        ) : primaryPlatform === 'x' ? (
+          <>
+            <span title="Reply">💬 14</span>
+            <span title="Repost">🔁 38</span>
+            <span title="Like">❤️ 210</span>
+            <span title="Bookmark">🔖 19</span>
+            <span title="Views">📊 3.8K</span>
+          </>
+        ) : primaryPlatform === 'facebook' ? (
+          <>
+            <button type="button" className={styles.platformActionBtn} aria-label="Like">👍 Like</button>
+            <button type="button" className={styles.platformActionBtn} aria-label="Comment">💬 Comment</button>
+            <button type="button" className={styles.platformActionBtn} aria-label="Share">↗️ Share</button>
+          </>
+        ) : (
+          <>
+            <span>❤️ 1.2K</span>
+            <span>💬 48</span>
+            <span>🔁 19</span>
+            <span>↗️ Share</span>
+          </>
+        )}
+      </div>
+
       {commentUnsupported ? <p className={styles.renderNote} role="note">{rendering!.copy.noFirstComment}</p> : null}
       {post.firstComment?.trim() ? (
         <section className={styles.firstComment} aria-label={t.previewFirstComment}>

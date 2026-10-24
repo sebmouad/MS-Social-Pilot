@@ -74,6 +74,14 @@ export function Sparkline({
       </defs>
       <path className="ui-sparkline__fill" d={areaD} fill={`url(#${gradientId})`} />
       <path className="ui-sparkline__path" d={pathD} stroke="currentColor" />
+      {points.length > 0 && (
+        <circle
+          cx={points[points.length - 1]!.x.toFixed(1)}
+          cy={points[points.length - 1]!.y.toFixed(1)}
+          r="2"
+          fill="currentColor"
+        />
+      )}
     </svg>
   );
 }
