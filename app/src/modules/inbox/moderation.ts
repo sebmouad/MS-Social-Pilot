@@ -9,7 +9,7 @@ import { z } from 'zod';
  */
 export const MODERATION_MATCHES = ['links', 'phones', 'keywords'] as const;
 export type ModerationMatch = (typeof MODERATION_MATCHES)[number];
-export const MODERATION_ACTIONS = ['hide', 'alert', 'reply'] as const;
+export const MODERATION_ACTIONS = ['hide', 'alert', 'reply', 'comment_to_dm'] as const;
 export type ModerationActionKind = (typeof MODERATION_ACTIONS)[number];
 
 const LINK = /(https?:\/\/|www\.)\S+|\b[a-z0-9-]{2,}\.(com|net|org|info|biz|io|co|me|ly|link|xyz|shop|site|online)\b(\/\S*)?/i;
@@ -34,12 +34,15 @@ export function matchesModerationRule(rule: { match: string; keywords: readonly 
   }
 }
 
-/** `{first_name}` and `{page}` (the channel name) filled for one person. */
+/** `{first_name}`, `{author_name}` and `{page}` (the channel name) filled for one person. */
 export function fillModerationReply(template: string, values: { name: string | null; channel: string }): string {
-  const first = values.name?.trim().split(/\s+/)[0] ?? '';
+  const full = values.name?.trim() ?? '';
+  const first = full.split(/\s+/)[0] ?? '';
   return template
+    .replace(/\{\{?\s*author_name\s*\}?\}/g, full)
     .replace(/\{\{?\s*first_name\s*\}?\}/g, first)
     .replace(/\{\{?\s*page\s*\}?\}/g, values.channel)
+    .replace(/\{\{?\s*channel_name\s*\}?\}/g, values.channel)
     .replace(/[ \t]{2,}/g, ' ')
     .replace(/\s+([,.!?])/g, '$1')
     .trim();
@@ -96,8 +99,8 @@ export const moderationCopy = {
     name: 'Rule name', namePlaceholder: 'For example: Hide spam links',
     when: 'When a comment contains', then: 'Then',
     'match.links': 'a link', 'match.phones': 'a phone number', 'match.keywords': 'one of these words',
-    'action.hide': 'Hide it', 'action.alert': 'Record it for the team', 'action.reply': 'Reply as the channel',
-    'done.hide': 'Hidden', 'done.alert': 'Recorded', 'done.reply': 'Replied',
+    'action.hide': 'Hide it', 'action.alert': 'Record it for the team', 'action.reply': 'Reply as the channel', 'action.comment_to_dm': 'Send DM + Reply (Comment-to-DM)',
+    'done.hide': 'Hidden', 'done.alert': 'Recorded', 'done.reply': 'Replied', 'done.comment_to_dm': 'Sent DM & Replied',
     keywords: 'Words to look for', keywordsHint: 'Separate them with commas. Capitals and accents are ignored.',
     replyText: 'Reply', replyHint: 'Use {first_name} for the commenter’s first name and {page} for the channel name.',
     oncePerUser: 'Reply to each person only once',
@@ -125,8 +128,8 @@ export const moderationCopy = {
     name: 'Nom de la règle', namePlaceholder: 'Par exemple : Masquer les liens indésirables',
     when: 'Quand un commentaire contient', then: 'Alors',
     'match.links': 'un lien', 'match.phones': 'un numéro de téléphone', 'match.keywords': 'l’un de ces mots',
-    'action.hide': 'Le masquer', 'action.alert': 'L’enregistrer pour l’équipe', 'action.reply': 'Répondre au nom du canal',
-    'done.hide': 'Masqué', 'done.alert': 'Enregistré', 'done.reply': 'Répondu',
+    'action.hide': 'Le masquer', 'action.alert': 'L’enregistrer pour l’équipe', 'action.reply': 'Répondre au nom du canal', 'action.comment_to_dm': 'Envoyer un MP + Répondre (Comment-to-DM)',
+    'done.hide': 'Masqué', 'done.alert': 'Enregistré', 'done.reply': 'Répondu', 'done.comment_to_dm': 'MP envoyé & Répondu',
     keywords: 'Mots à rechercher', keywordsHint: 'Séparez-les par des virgules. Majuscules et accents sont ignorés.',
     replyText: 'Réponse', replyHint: 'Utilisez {first_name} pour le prénom de la personne et {page} pour le nom du canal.',
     oncePerUser: 'Ne répondre qu’une fois à chaque personne',

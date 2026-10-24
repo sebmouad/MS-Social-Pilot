@@ -29,7 +29,17 @@ export function ContactDetails({ details, locale, timeZone, catalog }: { details
     <details open className={styles.detailsBody}><summary className={styles.detailsTitle}>{copy.title}</summary>
     <div className={styles.person}>
       <PersonAvatar name={details.person.name} size={48} />
-      <div><strong>{details.person.name}</strong><div><ChannelBadge name={details.channel.name} platformName={badge.platformName} mark={badge.mark} compact /></div></div>
+      <div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <strong>{details.person.name}</strong>
+          {details.messageCount >= 5 && (
+            <span style={{ fontSize: '10px', fontWeight: 700, padding: '2px 6px', borderRadius: '4px', background: 'var(--brand-instagram, #e1306c)', color: '#fff' }}>
+              ⭐ VIP
+            </span>
+          )}
+        </div>
+        <div><ChannelBadge name={details.channel.name} platformName={badge.platformName} mark={badge.mark} compact /></div>
+      </div>
     </div>
     {!details.identityKnown ? <p className={styles.detailsNote}>{copy.partial}</p> : null}
     <dl className={styles.facts}>

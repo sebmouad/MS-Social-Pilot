@@ -298,6 +298,14 @@ export function ReplyBox({ id, kind, allowed, headline, detail, maxLength = 2000
   return <form method="post" noValidate className={styles.reply} onSubmit={event => void submit(event)}>
     <p id={ruleId} className={allowed ? styles.ruleOpen : styles.ruleClosed}><span aria-hidden="true">{allowed ? '●' : '■'}</span> <strong>{headline}</strong>{detail ? <span className={styles.ruleDetail}> {detail}</span> : null}</p>
     <p className={styles.replyAudience} data-kind={kind}>{kind === 'message' ? copy.privateNote : copy.publicNote}</p>
+    <div className={styles.aiToneRow} role="group" aria-label="AI Reply Suggestions">
+      <span style={{ fontSize: '11px', color: 'var(--ink-faint)', fontWeight: 600 }}>AI Draft:</span>
+      <button type="button" className={styles.aiToneChip} onClick={() => updateText("Thank you so much for reaching out! We're glad to have you in our community. Let us know if you have any questions! 😊")}>✨ Friendly</button>
+      <button type="button" className={styles.aiToneChip} onClick={() => updateText("Hi there, thank you for letting us know! We're on it and happy to assist you right away.")}>🤝 Supportive</button>
+      <button type="button" className={styles.aiToneChip} onClick={() => updateText("Thanks for asking! You can find the full guide and details linked directly in our bio.")}>❓ FAQ / Link</button>
+      <button type="button" className={styles.aiToneChip} onClick={() => updateText("Bonjour et merci de votre message ! N'hésitez pas si vous avez la moindre question.")}>🇫🇷 French</button>
+      <button type="button" className={styles.aiToneChip} onClick={() => updateText("We truly appreciate your feedback and apologize for any inconvenience. We'd love to make this right—please send us a DM so we can assist directly.")}>🛡️ De-escalate</button>
+    </div>
     <label htmlFor={fieldId} className="ui-visually-hidden">{copy.reply}</label>
     <AutoTextarea id={fieldId} name="reply" data-inbox-reply rows={3} maxLength={maxLength} value={text} disabled={!allowed || busy} aria-describedby={[ruleId, countId, validation.fieldProps('reply')['aria-describedby']].filter(Boolean).join(' ')} aria-invalid={Boolean(error) || Boolean(validation.errors.reply) || undefined}
       placeholder={allowed ? (kind === 'message' ? copy.privatePlaceholder : copy.publicPlaceholder) : copy.unavailable} onChange={event => { updateText(event.target.value); setSent(''); }} />
