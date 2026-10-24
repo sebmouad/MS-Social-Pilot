@@ -39,9 +39,43 @@ export function CalendarBoard({ view, days, timeZone, nowIso, canCreate, filterQ
   const [notice, setNotice] = useState<Notice>(null);
   const [over, setOver] = useState<string | null>(null);
   const [weekLayout, setWeekLayout] = useState<"timeline" | "lanes">("timeline");
+  const [heatmapActive, setHeatmapActive] = useState(false);
+  const [undoState, setUndoState] = useState<{
+    post: BoardPost;
+    previousDate: string;
+    previousTime: string;
+    newDate: string;
+    newTime: string;
+    timer: ReturnType<typeof setTimeout>;
+  } | null>(null);
   const dragged = useRef<BoardPost | null>(null);
   const quietHour = (hour: number) => guardrails ? isAutopilotQuietHourOfDay(guardrails, hour) : false;
   const showQuiet = Boolean(guardrails && guardrails.quietStartHour !== guardrails.quietEndHour);
+
+  const getHeatLevel = (hour: number, dayKey: string) => {
+    if (!heatmapActive) return undefined;
+    const dayOfWeek = new Date(`${dayKey}T12:00:00Z`).getUTCDay();
+    const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+    if (!isWeekend && (hour === 14 || hour === 10)) return "peak";
+    if (!isWeekend && (hour >= 9 && hour <= 16)) return "high";
+    if (isWeekend && (hour >= 12 && hour <= 16)) return "high";
+    if (hour >= 8 && hour <= 20) return "medium";
+    return undefined;
+  };
+
+  const undoLastMove = async () => {
+    if (!undoState) return;
+    clearTimeout(undoState.timer);
+    const { post, previousDate, previousTime } = undoState;
+    setUndoState(null);
+    try {
+      await reschedulePostAction({ postId: post.id, date: previousDate, time: previousTime });
+      setNotice({ kind: "ok", text: `Undone! Post moved back to ${previousDate} ${previousTime}` });
+      router.refresh();
+    } catch {
+      setNotice({ kind: "error", text: "Failed to undo reschedule" });
+    }
+  };
 
   const timeOf = (post: BoardPost) => post.clockLabel ?? new Intl.DateTimeFormat(locale === "fr" ? "fr-FR" : "en-US", { timeZone, hour: "numeric", minute: "2-digit" }).format(new Date(post.whenIso));
   const startMove = (post: BoardPost) => { const wall = post.wallTime ?? instantToWall(new Date(post.whenIso), timeZone); setNotice(null); setMove({ post, step: "choose", date: wall.date, time: wall.time, busy: false, error: "" }); };
@@ -96,8 +130,25 @@ export function CalendarBoard({ view, days, timeZone, nowIso, canCreate, filterQ
     if (!move) return;
     setMove({ ...move, busy: true, error: "" });
     try {
+      const previousWall = move.post.wallTime ?? instantToWall(new Date(move.post.whenIso), timeZone);
       const result = await reschedulePostAction({ postId: move.post.id, date: move.date, time: move.time });
-      if (result.ok) { setNotice({ kind: "ok", text: fillCopy(copy.movedTo, {time: result.displayTime ?? fillCopy(copy.atTime, {date:move.date,time:move.time}), zone:timeZone.replaceAll("_", " ")}) }); setMove(null); router.refresh(); }
+      if (result.ok) {
+        const movedPost = move.post;
+        const targetDate = move.date;
+        const targetTime = move.time;
+        setMove(null);
+        const timer = setTimeout(() => setUndoState(null), 5000);
+        setUndoState({
+          post: movedPost,
+          previousDate: previousWall.date,
+          previousTime: previousWall.time,
+          newDate: targetDate,
+          newTime: targetTime,
+          timer,
+        });
+        setNotice({ kind: "ok", text: fillCopy(copy.movedTo, {time: result.displayTime ?? fillCopy(copy.atTime, {date:targetDate,time:targetTime}), zone:timeZone.replaceAll("_", " ")}) });
+        router.refresh();
+      }
       else setMove(current => current && { ...current, busy: false, error: result.error });
     } catch {
       setMove(current => current && { ...current, busy: false, error: copy.moveFailed });
@@ -138,9 +189,14 @@ export function CalendarBoard({ view, days, timeZone, nowIso, canCreate, filterQ
         </section>;
       })}
     </div> : <>
-      <div className={styles.layoutSwitch} role="group" aria-label={content.calendarLanesLabel}>
-        <button type="button" aria-pressed={weekLayout === "timeline"} onClick={() => setWeekLayout("timeline")}>{content.calendarWeekTimeline}</button>
-        <button type="button" aria-pressed={weekLayout === "lanes"} onClick={() => setWeekLayout("lanes")}>{content.calendarWeekLanes}</button>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap', marginBottom: '8px' }}>
+        <div className={styles.layoutSwitch} role="group" aria-label={content.calendarLanesLabel}>
+          <button type="button" aria-pressed={weekLayout === "timeline"} onClick={() => setWeekLayout("timeline")}>{content.calendarWeekTimeline}</button>
+          <button type="button" aria-pressed={weekLayout === "lanes"} onClick={() => setWeekLayout("lanes")}>{content.calendarWeekLanes}</button>
+        </div>
+        <button type="button" className={styles.heatmapToggle} data-active={heatmapActive} onClick={() => setHeatmapActive(!heatmapActive)}>
+          🔥 Best-Time Heatmap
+        </button>
       </div>
       {weekLayout === "lanes" ? <div className={styles.lanesWrap}><div className={styles.lanes} style={{ gridTemplateColumns: `200px repeat(${days.length}, minmax(160px, 1fr))` }}>
         <span className={styles.laneCorner} aria-hidden="true" />
@@ -166,7 +222,9 @@ export function CalendarBoard({ view, days, timeZone, nowIso, canCreate, filterQ
           const slotInstant = wallTimeToInstant(day.key, time, timeZone);
           const slotEnded = day.slotEndedByHour?.[time] ?? (slotInstant.ok ? slotInstant.instant.getTime() + 3600_000 <= nowMs : day.isPast);
           const dropKey = `s:${day.key}:${hour}`;
-          return <div key={dropKey} role="group" aria-label={`${day.longLabel}, ${hourLabel(hour, locale)}`} className={styles.slot} data-past={slotEnded || undefined} data-quiet={(showQuiet && quietHour(hour) && !slotEnded) || undefined} data-over={over === dropKey || undefined} {...dropProps(dropKey, day.key, time, day.isPast || slotEnded)}>
+          const heatLevel = getHeatLevel(hour, day.key);
+          return <div key={dropKey} role="group" aria-label={`${day.longLabel}, ${hourLabel(hour, locale)}`} className={styles.slot} data-past={slotEnded || undefined} data-quiet={(showQuiet && quietHour(hour) && !slotEnded) || undefined} data-heat={heatLevel} data-over={over === dropKey || undefined} {...dropProps(dropKey, day.key, time, day.isPast || slotEnded)}>
+            {heatLevel === 'peak' && <span className={styles.heatTag}>★ Peak</span>}
             {slotPosts.map(postCard)}
             {canCreate && !slotEnded && day.freeSlots?.filter(free => Number(free.slice(0, 2)) === hour).map(free => freePill(day, free))}
             {canCreate && !slotEnded && <a className={styles.slotAdd} href={newPostHref(day.key, time)} aria-label={fillCopy(copy.newPostLabel, {day:day.longLabel,time:hourLabel(hour, locale)})}><span aria-hidden="true">+</span></a>}
@@ -188,10 +246,25 @@ export function CalendarBoard({ view, days, timeZone, nowIso, canCreate, filterQ
     {rangeIsEmpty && <p className={styles.empty}>{view === "month" ? copy.monthEmpty : copy.weekEmpty} {canCreate ? copy.pickDay : copy.plannedAppear}</p>}
 
     {previewPost?.preview && <Dialog open title={copy.previewTitle} description={copy.previewDescription} onClose={() => setPreviewPost(null)}
-      actions={<><a className="ui-button ui-button--secondary" href={`/content/post/${encodeURIComponent(previewPost.id)}`}>{copy.openDetails}</a><Button variant="secondary" onClick={() => setPreviewPost(null)}>{copy.close}</Button></>}>
+      actions={<>
+        <a className="ui-button ui-button--secondary" href={`/create?duplicate=${encodeURIComponent(previewPost.id)}`}>Duplicate</a>
+        <a className="ui-button ui-button--secondary" href={`/content/post/${encodeURIComponent(previewPost.id)}`}>{copy.openDetails}</a>
+        {previewPost.movable && (
+          <Button variant="secondary" onClick={() => { const p = previewPost; setPreviewPost(null); startMove(p); }}>
+            Reschedule
+          </Button>
+        )}
+        <Button variant="secondary" onClick={() => setPreviewPost(null)}>{copy.close}</Button>
+      </>}>
       <PostPreview post={previewPost.preview} authorName={previewPost.authorName ?? copy.approvalsMember} timeZone={timeZone} />
     </Dialog>}
     <MoveDialog move={move} timeZone={timeZone} nowMs={nowMs} guardrails={guardrails} onChange={setMove} onConfirm={() => void confirmMove()} />
+    {undoState && (
+      <aside className={styles.undoToast} role="alert">
+        <span>Rescheduled to {undoState.newDate} {undoState.newTime}</span>
+        <button type="button" className={styles.undoButton} onClick={() => void undoLastMove()}>Undo</button>
+      </aside>
+    )}
   </div>;
 }
 
