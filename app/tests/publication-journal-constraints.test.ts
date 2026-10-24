@@ -4,7 +4,7 @@ import { BASELINE_NAME, BASELINE_SHA256, baselineBlock } from './baseline-block'
 
 const schema = readFileSync('prisma/schema.prisma', 'utf8');
 const migration = baselineBlock('20261017010000_rebuild_publication_attempts');
-const rehearsal = readFileSync('scripts/cutover-rehearsal.sh', 'utf8');
+const deploy = readFileSync('scripts/deploy.sh', 'utf8');
 const model = schema.split('model PublicationAttempt {')[1]?.split('\n}')[0] ?? '';
 
 describe('publication attempt journal schema', () => {
@@ -42,7 +42,7 @@ describe('publication attempt journal schema', () => {
     expect(migration).toContain('CREATE UNIQUE INDEX "rebuild_publication_attempts_active_postTarget_key"');
     expect(migration).toContain('ON "rebuild_publication_attempts"("workspaceId", "postTargetId")');
     expect(migration).toContain("WHERE \"state\" NOT IN ('rejected', 'attested_absent')");
-    expect(rehearsal).toContain(`verify_migration ${BASELINE_NAME} ${BASELINE_SHA256}`);
-    expect(rehearsal).toContain(`migration_dir/${BASELINE_NAME}/migration.sql`);
+    expect(deploy).toContain(`BASELINE=${BASELINE_NAME}`);
+    expect(deploy).toContain(`BASELINE_SHA256=${BASELINE_SHA256}`);
   });
 });

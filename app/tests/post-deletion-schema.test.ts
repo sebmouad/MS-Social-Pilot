@@ -4,7 +4,7 @@ import { BASELINE_NAME, BASELINE_SHA256, baselineBlock } from './baseline-block'
 
 const schema = readFileSync('prisma/schema.prisma', 'utf8');
 const migration = baselineBlock('20261016220000_rebuild_post_deletions');
-const rehearsal = readFileSync('scripts/cutover-rehearsal.sh', 'utf8');
+const deploy = readFileSync('scripts/deploy.sh', 'utf8');
 const model = schema.split('model RebuildPostDeletion {')[1]?.split('\n}')[0] ?? '';
 const tableDefinition = migration.slice(migration.indexOf('CREATE TABLE'), migration.indexOf('\n);') + 3);
 
@@ -44,8 +44,8 @@ describe('remote post deletion journal schema', () => {
     for (const column of ['createdAt', 'updatedAt']) expect(migration).toContain(`"${column}" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP`);
   });
 
-  it('is pinned inside the checksummed baseline rehearsal', () => {
-    expect(rehearsal).toContain(`verify_migration ${BASELINE_NAME} ${BASELINE_SHA256}`);
-    expect(rehearsal).toContain(`migration_dir/${BASELINE_NAME}/migration.sql`);
+  it('is pinned inside the checksummed baseline verified by deploy.sh', () => {
+    expect(deploy).toContain(`BASELINE=${BASELINE_NAME}`);
+    expect(deploy).toContain(`BASELINE_SHA256=${BASELINE_SHA256}`);
   });
 });

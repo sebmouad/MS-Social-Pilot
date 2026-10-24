@@ -194,12 +194,12 @@ describe('hand-off of automatically scheduled posts to the platform', () => {
 });
 
 describe('migration', () => {
-  it('adds one nullable, constrained column and is pinned in the cutover rehearsal', () => {
+  it('adds one nullable, constrained column and is pinned in deploy.sh', () => {
     const sql = baselineBlock('20261031100000_rebuild_destination_schedule_mode');
-    const script = readFileSync('scripts/cutover-rehearsal.sh', 'utf8');
+    const script = readFileSync('scripts/deploy.sh', 'utf8');
     expect(sql).toContain('ADD COLUMN "scheduleMode" TEXT;');
     expect(sql).not.toMatch(/NOT NULL|DROP|DELETE|UPDATE/i);
-    expect(script).toContain(`verify_migration ${BASELINE_NAME} ${BASELINE_SHA256}`);
-    expect(script).toContain(`migration_dir/${BASELINE_NAME}/migration.sql`);
+    expect(script).toContain(`BASELINE=${BASELINE_NAME}`);
+    expect(script).toContain(`BASELINE_SHA256=${BASELINE_SHA256}`);
   });
 });

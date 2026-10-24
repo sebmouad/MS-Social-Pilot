@@ -1,14 +1,11 @@
-# MS Social Pilot
+# MS Social Pilot (`v1.0.0`)
 
-Modular, multi-workspace social media publishing, engagement, analytics, and paid-media management platform.
+Modular, multi-workspace social media publishing, engagement inbox, analytics, AI studio, and paid-ads platform.
 
-## Project Structure
+## Documentation
 
-- [`app/`](app/README.md) — Self-contained Next.js + TypeScript + Prisma + PostgreSQL application and background worker.
-- [`app/docs/ARCHITECTURE_CONTRACT.md`](app/docs/ARCHITECTURE_CONTRACT.md) — Architectural boundaries, security, and parity rules.
-- [`app/docs/ARCHITECTURE.md`](app/docs/ARCHITECTURE.md) — System architecture and module map.
-- [`app/docs/UI_UX_ROADMAP.md`](app/docs/UI_UX_ROADMAP.md) — UI & UX improvement plan (v1.1 roadmap).
-- [`app/docs/OPERATIONS.md`](app/docs/OPERATIONS.md) — Production host, deployment, backup, and runbooks.
+- [`AGENT.md`](AGENT.md) — Compact architecture, conventions, and operational reference for AI agents and developers.
+- [`PLAN.md`](PLAN.md) — `v1.1+` product feature, visual design system, and UX roadmap.
 
 ## Quick Start
 
@@ -21,8 +18,12 @@ npm test
 npm run dev
 ```
 
-## Production Deployment
+## Unified Install & Update Deployment
 
 ```bash
-bash app/scripts/prod-deploy.sh
+# Deploy or bootstrap remote production server from origin/main:
+bash app/scripts/deploy.sh
+
+# Or install/update directly on a Debian/Ubuntu server:
+sudo bash app/scripts/deploy.sh --local
 ```

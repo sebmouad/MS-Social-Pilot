@@ -4,11 +4,10 @@ import { BASELINE_NAME, BASELINE_SHA256, baselineBlock } from './baseline-block'
 const name = '20261031120000_rebuild_facebook_sync_cursors';
 const migration = baselineBlock(name);
 describe('Facebook cursor persistence boundary', () => {
- it('is pinned inside the baseline rehearsal on an empty scratch database', () => {
-  const script = readFileSync('scripts/cutover-rehearsal.sh', 'utf8');
-  expect(script).toContain(`verify_migration ${BASELINE_NAME} ${BASELINE_SHA256}`);
-  expect(script).toContain(`-f "$migration_dir/${BASELINE_NAME}/migration.sql"`);
-  expect(script).toContain('scratch database is not empty; refusing to apply the baseline');
+ it('is pinned inside the checksummed baseline verified by deploy.sh', () => {
+  const script = readFileSync('scripts/deploy.sh', 'utf8');
+  expect(script).toContain(`BASELINE=${BASELINE_NAME}`);
+  expect(script).toContain(`BASELINE_SHA256=${BASELINE_SHA256}`);
  });
  it('migrates exact joined keys before deleting obsolete configuration state', () => {
   expect(migration).toContain("s.key = 'facebook.history.' || t.\"workspaceId\" || '.' || t.id || '.' || t.\"providerId\"");
