@@ -19,7 +19,7 @@ All application code lives in `app/` (`ms-social-pilot@1.0.0`, Next.js 15 App Ro
 - `app/src/server/` — Auth, RBAC, job leases, mail outbox, audit logging, and GDPR export/erasure (`data-control/`).
 - `app/prisma/` — `schema.prisma` and the single initial SQL schema migration (`prisma/migrations/0001_init/migration.sql`).
 - `app/scripts/` — Only 2 files:
-  - `deploy.sh` — Unified script for fresh server install, production updates, and CLI admin recovery (`--local`, `--set-root <email>`, `--reset-2fa <email>`).
+  - `deploy.sh` — Parameterized install, update, and admin recovery script (`--host`, `--user`, `--key`, `--pass`, `--local`, `--set-root`, `--reset-2fa`).
   - `worker.ts` — Background job worker (`npm run worker`).
 
 ## 2. Core Rules & Conventions
@@ -29,7 +29,7 @@ All application code lives in `app/` (`ms-social-pilot@1.0.0`, Next.js 15 App Ro
 3. **Design Tokens & Bilingual Copy**: Use CSS variables from `src/styles/tokens.css` (never hardcode hex colors in components) and keep user-facing copy in module `config.ts` (`en`/`fr`).
 4. **Additive Migrations**: Add new schema changes as new numbered SQL folders in `app/prisma/migrations/` (e.g. `0002_<name>/migration.sql`).
 
-## 3. Verification Commands
+## 3. Verification & Deployment Commands
 
 Run from `app/`:
 
@@ -38,15 +38,8 @@ npm run typecheck                  # TypeScript strict check (tsc --noEmit)
 npm run build                      # Production Next.js build
 ```
 
-## 4. Production Environment & Deployment
+Deploy to any Debian/Ubuntu server (see [`README.md`](README.md)):
 
-- **Public URL**: `https://social.newsgeet.com`
-- **Production Host**: `root@213.246.45.75` (SSH key `~/.ssh/SebMouadSSH`)
-- **Server Paths**:
-  - Live app: `/srv/ms-social-pilot/app` (previous release: `/srv/ms-social-pilot.prev`, incremental build cache: `/srv/ms-social-pilot-build/app`)
-  - Env file: `/srv/ms-social-pilot/app/.env.production.local` (mode `600`)
-  - Services: `social-pilot` (web on `127.0.0.1:3100`) and `social-pilot-worker`
-- **Deploy / Update Command**:
-  ```bash
-  bash app/scripts/deploy.sh
-  ```
+```bash
+bash app/scripts/deploy.sh --host <ip> --user <user> --key <ssh_key_path>
+```

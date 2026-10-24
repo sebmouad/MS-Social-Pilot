@@ -1,55 +1,75 @@
 #!/usr/bin/env bash
-# Unified MS Social Pilot deployment & administration script (install + update + admin).
+# Standard MS Social Pilot deployment & server bootstrap script (install + update + admin).
 #
-# Usage:
-#   bash app/scripts/deploy.sh                      # Remote install or update from origin/main
-#   sudo bash app/scripts/deploy.sh --local         # Direct on-server install or update (Debian/Ubuntu)
-#   bash app/scripts/deploy.sh --set-root <email>   # Promote an account to Root on production
-#   bash app/scripts/deploy.sh --reset-2fa <email>  # Clear 2FA / passkeys for an account on production
+# Zero hardcoded hosts or keys: supply connection details via CLI flags or env vars.
+#
+# Examples:
+#   # Deploy/install using SSH private key:
+#   bash app/scripts/deploy.sh --host 203.0.113.10 --user root --key ~/.ssh/id_ed25519
+#
+#   # Deploy/install using SSH password:
+#   bash app/scripts/deploy.sh --host 203.0.113.10 --user root --pass "your-ssh-password"
+#
+#   # Direct on-server install/update (no SSH):
+#   sudo bash app/scripts/deploy.sh --local
+#
+#   # Admin helpers:
+#   bash app/scripts/deploy.sh --host 203.0.113.10 --key ~/.ssh/id_ed25519 --set-root you@example.com
+#   bash app/scripts/deploy.sh --host 203.0.113.10 --key ~/.ssh/id_ed25519 --reset-2fa you@example.com
 set -euo pipefail
 
 cd "$(dirname "$0")/.."   # app/
-HOST="${PROD_HOST:-root@213.246.45.75}"
-KEY="${PROD_KEY:-$HOME/.ssh/SebMouadSSH}"
 
-if [ "${1:-}" = "--set-root" ]; then
-  EMAIL="${2:?Usage: deploy.sh --set-root <email>}"
-  ssh -i "$KEY" "$HOST" "sudo -u postgres psql -d social_pilot -v ON_ERROR_STOP=1 -v email='$EMAIL' <<'SQL'
-BEGIN;
-UPDATE users SET \"isInstanceOwner\" = false WHERE \"isInstanceOwner\" = true;
-UPDATE users SET \"isInstanceOwner\" = true, \"disabledAt\" = NULL WHERE lower(email) = lower(:'email');
-INSERT INTO root_activities (id, \"actorId\", action, detail, \"createdAt\")
-VALUES (gen_random_uuid()::text, NULL, 'root.transferred', jsonb_build_object('to', :'email'), NOW());
-COMMIT;
-SQL"
-  echo "Root assigned to $EMAIL."
-  exit 0
-fi
+DEPLOY_HOST="${DEPLOY_HOST:-}"
+DEPLOY_USER="${DEPLOY_USER:-root}"
+DEPLOY_PORT="${DEPLOY_PORT:-22}"
+DEPLOY_KEY="${DEPLOY_KEY:-}"
+DEPLOY_PASS="${DEPLOY_PASS:-}"
+APP_PORT="${APP_PORT:-3100}"
+BUILD_CPU_QUOTA="${BUILD_CPU_QUOTA:-300%}"
+BUILD_NICE="${BUILD_NICE:-10}"
+MODE="remote"
+ADMIN_ACTION=""
+ADMIN_EMAIL=""
 
-if [ "${1:-}" = "--reset-2fa" ]; then
-  EMAIL="${2:?Usage: deploy.sh --reset-2fa <email>}"
-  ssh -i "$KEY" "$HOST" "sudo -u postgres psql -d social_pilot -v ON_ERROR_STOP=1 -v email='$EMAIL' <<'SQL'
-BEGIN;
-UPDATE users SET \"totpSecret\" = NULL, \"totpPendingSecret\" = NULL, \"totpEnabledAt\" = NULL, \"totpLastStep\" = NULL WHERE lower(email) = lower(:'email');
-DELETE FROM recovery_codes WHERE \"userId\" IN (SELECT id FROM users WHERE lower(email) = lower(:'email'));
-DELETE FROM passkeys WHERE \"userId\" IN (SELECT id FROM users WHERE lower(email) = lower(:'email'));
-DELETE FROM trusted_devices WHERE \"userId\" IN (SELECT id FROM users WHERE lower(email) = lower(:'email'));
-DELETE FROM sessions WHERE \"userId\" IN (SELECT id FROM users WHERE lower(email) = lower(:'email'));
-INSERT INTO root_activities (id, \"actorId\", action, detail, \"createdAt\")
-VALUES (gen_random_uuid()::text, NULL, 'user.twoStepReset', jsonb_build_object('email', :'email'), NOW());
-COMMIT;
-SQL"
-  echo "Two-step authentication cleared for $EMAIL."
-  exit 0
-fi
+usage() {
+  cat <<'EOF'
+Usage:
+  bash app/scripts/deploy.sh --host <ip_or_domain> [--user <ssh_user>] [--key <ssh_key_path> | --pass <ssh_password>] [--port <ssh_port>] [--app-port <port>]
+  sudo bash app/scripts/deploy.sh --local [--app-port <port>]
 
-if [ "${1:-}" = "--local" ]; then
+Admin commands:
+  bash app/scripts/deploy.sh --host <ip> [--key <path> | --pass <pw>] --set-root <email>
+  bash app/scripts/deploy.sh --host <ip> [--key <path> | --pass <pw>] --reset-2fa <email>
+
+Environment variables (alternatives to flags):
+  DEPLOY_HOST, DEPLOY_USER (default: root), DEPLOY_PORT (default: 22),
+  DEPLOY_KEY, DEPLOY_PASS, APP_PORT (default: 3100)
+EOF
+}
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --host) DEPLOY_HOST="${2:?--host requires a value}"; shift 2 ;;
+    --user) DEPLOY_USER="${2:?--user requires a value}"; shift 2 ;;
+    --port) DEPLOY_PORT="${2:?--port requires a value}"; shift 2 ;;
+    --key) DEPLOY_KEY="${2:?--key requires a path}"; shift 2 ;;
+    --pass) DEPLOY_PASS="${2:?--pass requires a password}"; shift 2 ;;
+    --app-port) APP_PORT="${2:?--app-port requires a port}"; shift 2 ;;
+    --local) MODE="local"; shift ;;
+    --set-root) ADMIN_ACTION="set-root"; ADMIN_EMAIL="${2:?--set-root requires an email}"; shift 2 ;;
+    --reset-2fa) ADMIN_ACTION="reset-2fa"; ADMIN_EMAIL="${2:?--reset-2fa requires an email}"; shift 2 ;;
+    -h|--help) usage; exit 0 ;;
+    *) echo "Unknown argument: $1" >&2; usage >&2; exit 2 ;;
+  esac
+done
+
+if [ "$MODE" = "local" ]; then
   [ "$EUID" -eq 0 ] || { echo "Run with sudo: sudo bash app/scripts/deploy.sh --local" >&2; exit 1; }
   APP_DIR="$(pwd)"
   APP_USER="${APP_USER:-socialpilot}"
   DB_NAME="${DB_NAME:-social_pilot}"
   DB_USER="${DB_USER:-socialpilot}"
-  PORT="${PORT:-3100}"
 
   if ! command -v node >/dev/null 2>&1 || [ "$(node -p 'process.versions.node.split(".")[0]')" -lt 22 ]; then
     export DEBIAN_FRONTEND=noninteractive
@@ -77,7 +97,7 @@ DATABASE_URL="postgresql://${DB_USER}:${DB_PASS}@127.0.0.1:5432/${DB_NAME}?schem
 ENCRYPTION_KEY="$(openssl rand -hex 32)"
 SESSION_SECRET="$(openssl rand -hex 32)"
 NODE_ENV="production"
-PORT="${PORT}"
+PORT="${APP_PORT}"
 ENV
     chown "$APP_USER:$APP_USER" "$APP_DIR/.env.production.local"
   fi
@@ -87,29 +107,88 @@ ENV
   exit 0
 fi
 
-BUILD_CPU_QUOTA="${BUILD_CPU_QUOTA:-300%}"
-BUILD_NICE="${BUILD_NICE:-10}"
-COMMIT="$(git rev-parse origin/main)"
-echo "Release commit: $COMMIT"
+[ -n "$DEPLOY_HOST" ] || { echo "Error: --host <ip_or_domain> (or DEPLOY_HOST) is required." >&2; usage >&2; exit 2; }
+if [[ "$DEPLOY_HOST" == *@* ]]; then
+  TARGET="$DEPLOY_HOST"
+else
+  TARGET="${DEPLOY_USER}@${DEPLOY_HOST}"
+fi
+
+SSH_OPTS=(-p "$DEPLOY_PORT" -o StrictHostKeyChecking=accept-new)
+SCP_OPTS=(-P "$DEPLOY_PORT" -o StrictHostKeyChecking=accept-new)
+ASKPASS_SCRIPT=""
+cleanup_askpass() { [ -z "$ASKPASS_SCRIPT" ] || rm -f "$ASKPASS_SCRIPT"; }
+trap cleanup_askpass EXIT
+
+if [ -n "$DEPLOY_KEY" ]; then
+  SSH_OPTS+=(-i "$DEPLOY_KEY")
+  SCP_OPTS+=(-i "$DEPLOY_KEY")
+fi
+
+if [ -n "$DEPLOY_PASS" ]; then
+  ASKPASS_SCRIPT="$(mktemp)"
+  chmod 700 "$ASKPASS_SCRIPT"
+  cat > "$ASKPASS_SCRIPT" <<EOF
+#!/usr/bin/env sh
+printf '%s\n' '$DEPLOY_PASS'
+EOF
+  export SSH_ASKPASS="$ASKPASS_SCRIPT"
+  export SSH_ASKPASS_REQUIRE=force
+  export DISPLAY="${DISPLAY:-:0}"
+fi
+
+run_ssh() { ssh "${SSH_OPTS[@]}" "$TARGET" "$@"; }
+run_scp() { scp -q "${SCP_OPTS[@]}" "$@"; }
+
+if [ "$ADMIN_ACTION" = "set-root" ]; then
+  run_ssh "sudo -u postgres psql -d social_pilot -v ON_ERROR_STOP=1 -v email='$ADMIN_EMAIL' <<'SQL'
+BEGIN;
+UPDATE users SET \"isInstanceOwner\" = false WHERE \"isInstanceOwner\" = true;
+UPDATE users SET \"isInstanceOwner\" = true, \"disabledAt\" = NULL WHERE lower(email) = lower(:'email');
+INSERT INTO root_activities (id, \"actorId\", action, detail, \"createdAt\")
+VALUES (gen_random_uuid()::text, NULL, 'root.transferred', jsonb_build_object('to', :'email'), NOW());
+COMMIT;
+SQL"
+  echo "Root assigned to $ADMIN_EMAIL."
+  exit 0
+fi
+
+if [ "$ADMIN_ACTION" = "reset-2fa" ]; then
+  run_ssh "sudo -u postgres psql -d social_pilot -v ON_ERROR_STOP=1 -v email='$ADMIN_EMAIL' <<'SQL'
+BEGIN;
+UPDATE users SET \"totpSecret\" = NULL, \"totpPendingSecret\" = NULL, \"totpEnabledAt\" = NULL, \"totpLastStep\" = NULL WHERE lower(email) = lower(:'email');
+DELETE FROM recovery_codes WHERE \"userId\" IN (SELECT id FROM users WHERE lower(email) = lower(:'email'));
+DELETE FROM passkeys WHERE \"userId\" IN (SELECT id FROM users WHERE lower(email) = lower(:'email'));
+DELETE FROM trusted_devices WHERE \"userId\" IN (SELECT id FROM users WHERE lower(email) = lower(:'email'));
+DELETE FROM sessions WHERE \"userId\" IN (SELECT id FROM users WHERE lower(email) = lower(:'email'));
+INSERT INTO root_activities (id, \"actorId\", action, detail, \"createdAt\")
+VALUES (gen_random_uuid()::text, NULL, 'user.twoStepReset', jsonb_build_object('email', :'email'), NOW());
+COMMIT;
+SQL"
+  echo "Two-step authentication cleared for $ADMIN_EMAIL."
+  exit 0
+fi
+
+COMMIT="$(git rev-parse HEAD)"
+echo "Deploying commit $COMMIT to $TARGET (app port $APP_PORT)..."
 
 ORDER_FILE="$(mktemp)"
 ls prisma/migrations | grep -E '^[0-9]+_' | sort > "$ORDER_FILE"
 COPYFILE_DISABLE=1 tar --no-xattrs -C prisma/migrations -cf - $(cat "$ORDER_FILE") 2>/dev/null \
-  | ssh -i "$KEY" "$HOST" 'rm -rf /var/tmp/deploy-migrations && mkdir -m 755 /var/tmp/deploy-migrations && tar -x -C /var/tmp/deploy-migrations 2>/dev/null'
-scp -q -i "$KEY" "$ORDER_FILE" "$HOST:/var/tmp/deploy-migrations/ORDER"
+  | run_ssh 'rm -rf /var/tmp/deploy-migrations && mkdir -m 755 /var/tmp/deploy-migrations && tar -x -C /var/tmp/deploy-migrations 2>/dev/null'
+run_scp "$ORDER_FILE" "$TARGET:/var/tmp/deploy-migrations/ORDER"
 rm -f "$ORDER_FILE"
 
-ssh -i "$KEY" "$HOST" 'rm -rf /var/tmp/deploy-src && mkdir -p /var/tmp/deploy-src'
+run_ssh 'rm -rf /var/tmp/deploy-src && mkdir -p /var/tmp/deploy-src'
 git -C "$(git rev-parse --show-toplevel)" archive --format=tar --prefix=app/ "$COMMIT:app" \
-  | ssh -i "$KEY" "$HOST" 'tar -x -C /var/tmp/deploy-src'
+  | run_ssh 'tar -x -C /var/tmp/deploy-src'
 
-ssh -i "$KEY" "$HOST" "COMMIT=$COMMIT BUILD_CPU_QUOTA=$BUILD_CPU_QUOTA BUILD_NICE=$BUILD_NICE bash -s" <<'REMOTE'
+run_ssh "COMMIT=$COMMIT APP_PORT=$APP_PORT BUILD_CPU_QUOTA=$BUILD_CPU_QUOTA BUILD_NICE=$BUILD_NICE bash -s" <<'REMOTE'
 set -uo pipefail
 cd /tmp
 NEW=/srv/ms-social-pilot.new; LIVE=/srv/ms-social-pilot; PREV=/srv/ms-social-pilot.prev
 BUILD=/srv/ms-social-pilot-build
 
-# Migrate old /srv/ms-social-pilot-rebuild* directories if present
 if [ -d /srv/ms-social-pilot-rebuild ] && [ ! -d "$LIVE" ]; then
   mv /srv/ms-social-pilot-rebuild "$LIVE"
 fi
@@ -118,8 +197,8 @@ if [ -d /srv/ms-social-pilot-rebuild-build ] && [ ! -d "$BUILD" ]; then
 fi
 rm -rf /srv/ms-social-pilot-rebuild.prev /srv/ms-social-pilot-rebuild.new
 
-# First-time server bootstrap if not yet installed
-if ! command -v node >/dev/null 2>&1 || ! command -v psql >/dev/null 2>&1; then
+# First-time server bootstrap if Node.js 22 or PostgreSQL are missing
+if ! command -v node >/dev/null 2>&1 || [ "$(node -p 'process.versions.node.split(".")[0]')" -lt 22 ] || ! command -v psql >/dev/null 2>&1; then
   export DEBIAN_FRONTEND=noninteractive
   apt-get update -qq && apt-get install -y -qq ca-certificates curl gnupg git openssl build-essential postgresql postgresql-contrib rsync
   install -d -m 0755 /etc/apt/keyrings
@@ -130,7 +209,8 @@ if ! command -v node >/dev/null 2>&1 || ! command -v psql >/dev/null 2>&1; then
   systemctl enable --now postgresql
 fi
 id -u socialpilot >/dev/null 2>&1 || useradd --system --create-home --shell /bin/bash socialpilot
-mkdir -p "$LIVE/app" "$BUILD" /var/backups
+mkdir -p "$LIVE/app" "$BUILD" /var/backups /var/lib/ms-social-pilot
+chown -R socialpilot:socialpilot /var/lib/ms-social-pilot
 
 if [ -d "$LIVE/rebuild" ] && [ ! -f "$LIVE/app/.env.production.local" ]; then
   rm -rf "$LIVE/app" && mv "$LIVE/rebuild" "$LIVE/app"
@@ -153,7 +233,7 @@ DATABASE_URL="postgresql://socialpilot:${DB_PASS}@127.0.0.1:5432/social_pilot?sc
 ENCRYPTION_KEY="$(openssl rand -hex 32)"
 SESSION_SECRET="$(openssl rand -hex 32)"
 NODE_ENV="production"
-PORT="3100"
+PORT="${APP_PORT}"
 ENV
   chown socialpilot:socialpilot "$ENVF"
 fi
@@ -203,14 +283,13 @@ sudo -u postgres psql -d social_pilot -Atc "select format('ALTER %s %s OWNER TO 
   | sudo -u postgres psql -d social_pilot -v ON_ERROR_STOP=1 -1 -q >/dev/null
 echo "Migrations applied: $applied"
 
-# Retire old social-pilot-rebuild* units if present and install clean social-pilot* units
 if [ -f /etc/systemd/system/social-pilot-rebuild.service ]; then
   systemctl stop social-pilot-rebuild social-pilot-rebuild-worker 2>/dev/null || true
   systemctl disable social-pilot-rebuild social-pilot-rebuild-worker 2>/dev/null || true
   rm -f /etc/systemd/system/social-pilot-rebuild.service /etc/systemd/system/social-pilot-rebuild-worker.service
 fi
 
-cat > /etc/systemd/system/social-pilot.service <<'UNIT'
+cat > /etc/systemd/system/social-pilot.service <<UNIT
 [Unit]
 Description=MS Social Pilot web
 After=network.target postgresql.service
@@ -218,7 +297,7 @@ After=network.target postgresql.service
 User=socialpilot
 WorkingDirectory=/srv/ms-social-pilot/app
 EnvironmentFile=/srv/ms-social-pilot/app/.env.production.local
-ExecStart=/usr/bin/env npx next start -H 127.0.0.1 -p 3100
+ExecStart=/usr/bin/env npx next start -H 127.0.0.1 -p ${APP_PORT}
 Restart=on-failure
 MemoryMax=2G
 [Install]
@@ -243,12 +322,11 @@ UNIT
 systemctl daemon-reload
 systemctl enable social-pilot social-pilot-worker >/dev/null 2>&1 || true
 
-PUBLIC_ORIGIN="$(sudo -u postgres psql -d social_pilot -Atc "select value #>> '{}' from app_settings where key='app.publicOrigin'")"
-[ -n "$PUBLIC_ORIGIN" ] || echo "Note: Root app.publicOrigin is empty; set it in Root > Shared controls before browsers can sign in behind the proxy."
+PUBLIC_ORIGIN="$(sudo -u postgres psql -d social_pilot -Atc "select value #>> '{}' from app_settings where key='app.publicOrigin'" 2>/dev/null || true)"
 rm -rf "$PREV"; mv "$LIVE" "$PREV"; mv "$NEW" "$LIVE"
 systemctl restart social-pilot social-pilot-worker
-ok=0; for i in $(seq 1 60); do c=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3100/api/health || true); [ "$c" = 200 ] && { ok=1; break; }; sleep 2; done
-csrf=$(curl -s -o /dev/null -w '%{http_code}' -X POST http://127.0.0.1:3100/api/auth/sign-in -H "Origin: $PUBLIC_ORIGIN" -H 'Content-Type: application/json' -d '{"email":"deploy-probe@example.invalid","password":"x"}' || true)
+ok=0; for i in $(seq 1 60); do c=$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:${APP_PORT}/api/health" || true); [ "$c" = 200 ] && { ok=1; break; }; sleep 2; done
+csrf=$(curl -s -o /dev/null -w '%{http_code}' -X POST "http://127.0.0.1:${APP_PORT}/api/auth/sign-in" -H "Origin: ${PUBLIC_ORIGIN:-http://127.0.0.1:${APP_PORT}}" -H 'Content-Type: application/json' -d '{"email":"deploy-probe@example.invalid","password":"x"}' || true)
 pub=skipped; [ -n "$PUBLIC_ORIGIN" ] && pub=$(curl -s -o /dev/null -w '%{http_code}' "$PUBLIC_ORIGIN/api/health" || true)
 if [ $ok = 1 ] && [ "$csrf" = 401 ] && { [ "$pub" = 200 ] || [ "$pub" = skipped ]; }; then
   echo "DEPLOY OK $COMMIT: local 200, sign-in origin check $csrf (expects 401), public $pub; services $(systemctl is-active social-pilot social-pilot-worker | tr '\n' ' ')"
