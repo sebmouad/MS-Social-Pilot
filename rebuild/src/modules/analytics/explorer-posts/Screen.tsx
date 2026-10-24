@@ -66,7 +66,7 @@ export default async function PostsScreen({ searchParams }: { searchParams: Prom
   </div>;
   return <PageFrame module="analytics" scopedAccess><div className={`${styles.root} ${local.content}`}>
     <PageHeader module="analytics" title={t("Post explorer")} info={<InfoTip name={t("Post explorer")} blocks={[{ text: t("Published posts with stored measures. Measures are snapshots, not period totals. Missing data is not available.") }]} />} filters={toolbar} />
-    <PostsTable copy={copy} rows={postsTableRows(d.items, await workspaceInstantFormatter(viewer.workspaceId, locale), await resolveInternalPostIds(viewer.workspaceId, d.items))} measures={postsTableMeasures(d.measures, locale)} locale={locale} />
+    <PostsTable copy={copy} rows={postsTableRows(d.items, await workspaceInstantFormatter(viewer.workspaceId, locale), await resolveInternalPostIds(viewer.workspaceId, d.items))} measures={postsTableMeasures(d.measures, locale)} locale={locale} sortKey={d.input.sort} sortDirection={d.input.direction} />
     {d.input.page > 1 || d.nextPage ? <nav aria-label={t("Pages")} className={styles.pager}>{d.input.page > 1 && <a href={`?${query({ page: String(d.input.page - 1) })}`}>{t("Previous")}</a>}<span>{t("Page")} {d.input.page}</span>{d.nextPage && <a href={`?${query({ page: String(d.nextPage) })}`}>{t("Next")}</a>}</nav> : null}
   </div></PageFrame>;
 }

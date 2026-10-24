@@ -9,6 +9,8 @@ import { InfoTip } from '@/components';
 import type React from 'react';
 import { readAdObjects } from './service';
 import { ObjectsTrendCharts } from './TrendCharts';
+import { storedFieldRows } from '@/modules/ads/ui/stored-fields';
+import { adsTranslator } from '@/modules/ads/copy';
 import type { AdObject } from './aggregate';
 import styles from '@/modules/analytics/ui/reports/workflows.module.css';
 import local from './screen.module.css';
@@ -17,8 +19,9 @@ type Params = Record<string, string | string[] | undefined>;
 export default async function AdObjectsScreen({ searchParams }: { searchParams: Promise<Params> }) {
   const viewer = await requireViewer({ feature: 'analytics/ads', channelScoped: true });
   const fr = (await headers()).get('accept-language')?.startsWith('fr') ?? false;
+  const locale = fr ? 'fr' : 'en';
   const { records: copy } = await analyticsCopy();
-  const t = (key: keyof typeof copy) => copy[key][fr ? 'fr' : 'en'];
+  const t = (key: keyof typeof copy) => copy[key][locale];
   const missing = t("Not available");
   const raw = await searchParams;
   let data: Awaited<ReturnType<typeof readAdObjects>> | undefined;
@@ -33,8 +36,18 @@ export default async function AdObjectsScreen({ searchParams }: { searchParams: 
     for (const [key, v] of Object.entries(patch)) { if (v === null) q.delete(key); else q.set(key, v); }
     return q.toString();
   };
-  const number = (n: number | null | undefined) => n == null ? missing : new Intl.NumberFormat(fr ? 'fr' : 'en', { maximumFractionDigits: 2 }).format(n);
-  const money = (n: number | null | undefined, currency: string | null) => `${number(n)} · ${currency || missing}`;
+  const number = (n: number | null | undefined) => n == null ? missing : new Intl.NumberFormat(locale, { maximumFractionDigits: 2 }).format(n);
+  const money = (n: number | null | undefined, currency: string | null) => {
+    if (n == null) return `${missing} · ${currency || missing}`;
+    if (currency) {
+      try {
+        return new Intl.NumberFormat(locale, { style: 'currency', currency, minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
+      } catch {
+        // Fallback when currency is not a standard 3-letter ISO code
+      }
+    }
+    return `${number(n)} · ${currency || missing}`;
+  };
   const level = current?.level ?? (value('level') || 'campaign');
   const levelLabel = level === 'campaign' ? t("Campaigns") : level === 'adset' ? t("Ad sets") : t("Ads");
   const selectedAccount = current?.accountId ?? value('accountId');
@@ -45,25 +58,47 @@ export default async function AdObjectsScreen({ searchParams }: { searchParams: 
   ]} />;
   const field = (label: string, control: React.ReactNode) => <label className={local.field}><span>{label}</span>{control}</label>;
   const sidebar = <form action="/ads/analysis" className={local.filters} aria-label={t("Ad-object analysis")}>
-    {field(t("Start (UTC, inclusive)"), <input type="text" name="start" size={10} placeholder={t("YYYY-MM-DD")} defaultValue={data?.period.start ?? value('start')} />)}
-    {field(t("End (UTC, inclusive)"), <input type="text" name="end" size={10} placeholder={t("YYYY-MM-DD")} defaultValue={data?.period.end ?? value('end')} />)}
-    {field(t("Ad account"), <select name="accountId" defaultValue={selectedAccount}>
+    {field(t("Start (UTC, inclusive)"), <input className="ui-input" type="text" name="start" size={10} placeholder={t("YYYY-MM-DD")} defaultValue={data?.period.start ?? value('start')} />)}
+    {field(t("End (UTC, inclusive)"), <input className="ui-input" type="text" name="end" size={10} placeholder={t("YYYY-MM-DD")} defaultValue={data?.period.end ?? value('end')} />)}
+    {field(t("Ad account"), <select className="ui-input" name="accountId" defaultValue={selectedAccount}>
       <option value="">{t("All accessible accounts")}</option>
       {selectedAccount && !options.some(a => a.id === selectedAccount) && <option value={selectedAccount}>{selectedAccount} · {missing}</option>}
       {options.map(a => <option key={a.id} value={a.id}>{a.name} · {a.currency || missing}</option>)}
     </select>)}
-    {field(t("Level"), <select name="level" defaultValue={level}><option value="campaign">{t("Campaigns")}</option><option value="adset">{t("Ad sets")}</option><option value="ad">{t("Ads")}</option></select>)}
-    {field(t("Sort by"), <select name="sort" defaultValue={current?.sort ?? (value('sort') || 'name')}>
+    {field(t("Level"), <select className="ui-input" name="level" defaultValue={level}><option value="campaign">{t("Campaigns")}</option><option value="adset">{t("Ad sets")}</option><option value="ad">{t("Ads")}</option></select>)}
+    {field(t("Sort by"), <select className="ui-input" name="sort" defaultValue={current?.sort ?? (value('sort') || 'name')}>
       {([['name', t("Name")], ['spend', t("Spend")], ['impressions', t("Impressions")], ['clicks', t("Clicks")], ['ctr', t("Click rate")], ['cpc', t("Cost per click")], ['cpm', t("Cost per 1000 impressions")], ['reach', t("Reach snapshot")], ['coveredDays', t("Stored days")], ['lastFetchedAt', t("Last fetched UTC")]]).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
     </select>)}
-    {field(t("Order"), <select name="direction" defaultValue={current?.direction ?? (value('direction') || 'asc')}><option value="asc">{t("Ascending")}</option><option value="desc">{t("Descending")}</option></select>)}
-    {field(t("Parent ID (optional; select one account)"), <input name="parentId" size={10} defaultValue={current?.parentId ?? value('parentId')} />)}
-    {field(t("Object ID (optional; select one account)"), <input name="objectId" size={10} defaultValue={current?.objectId ?? value('objectId')} />)}
+    {field(t("Order"), <select className="ui-input" name="direction" defaultValue={current?.direction ?? (value('direction') || 'asc')}><option value="asc">{t("Ascending")}</option><option value="desc">{t("Descending")}</option></select>)}
+    {field(t("Parent ID (optional; select one account)"), <input className="ui-input" name="parentId" size={10} defaultValue={current?.parentId ?? value('parentId')} />)}
+    {field(t("Object ID (optional; select one account)"), <input className="ui-input" name="objectId" size={10} defaultValue={current?.objectId ?? value('objectId')} />)}
     <div className={local.submit}><Button type="submit" variant="primary" size="sm">{t("Apply")}</Button><a href="/ads/analysis">{t("Reset filters")}</a></div>
   </form>;
   const header = <PageHeader title={t("Ad-object analysis")} info={info} />;
   if (!data) return <PageFrame module="analytics" scopedAccess><div className={local.content}>{header}{sidebar}<section role="alert" className={local.alert}><h2>{t("Ad-object analysis unavailable")}</h2><p>{t("Check your access and filters, or choose a shorter period, then try again.")}</p></section></div></PageFrame>;
   const d = data;
+  const translator = adsTranslator();
+  const renderExtra = (r: AdObject['daily'][number]) => {
+    const entries: Array<{ label: string; value: string }> = [
+      { label: t("Cost per click"), value: r.cpc == null ? missing : money(r.cpc, r.currency) },
+      { label: t("Cost per 1000 impressions"), value: r.cpm == null ? missing : money(r.cpm, r.currency) },
+      { label: 'CPP', value: r.cpp == null ? missing : money(r.cpp, r.currency) },
+      { label: t("Click rate"), value: r.ctr == null ? missing : `${number(r.ctr)}${fr ? '\u202f' : ''}%` },
+      { label: fr ? 'Fréquence' : 'Frequency', value: number(r.frequency) },
+      ...storedFieldRows(r.actions, translator, locale),
+      ...storedFieldRows(r.fields, translator, locale),
+    ];
+    return (
+      <dl className={local.extraList}>
+        {entries.map((entry, idx) => (
+          <div key={`${entry.label}-${idx}`} className={local.extraRow}>
+            <dt>{entry.label}</dt>
+            <dd>{entry.value}</dd>
+          </div>
+        ))}
+      </dl>
+    );
+  };
   const details = (item: AdObject) => <details><summary>{t("Stored daily details")}<span className="ui-visually-hidden"> · {item.name}</span></summary>
     <DataTable caption={`${t("Daily measures")} · ${item.name}`} rows={item.daily} rowKey={row => row.id} columns={[
       { key: 'day', label: t("Day UTC"), render: r => r.date },
@@ -72,7 +107,7 @@ export default async function AdObjectsScreen({ searchParams }: { searchParams: 
       { key: 'impressions', label: t("Impressions"), render: r => number(r.impressions) },
       { key: 'clicks', label: t("Clicks"), render: r => number(r.clicks) },
       { key: 'reach', label: t("Reach snapshot"), render: r => number(r.reach) },
-      { key: 'extra', label: t("Stored ratios, actions and additional fields"), render: r => <pre className={local.raw}>{JSON.stringify({ cpc: r.cpc, cpm: r.cpm, cpp: r.cpp, ctr: r.ctr, frequency: r.frequency, actions: r.actions, fields: r.fields, redactedPaths: r.redactedPaths }, (_key, v: unknown) => v === null ? missing : v, 2)}</pre> },
+      { key: 'extra', label: t("Stored ratios, actions and additional fields"), render: renderExtra },
     ]} />
   </details>;
   return <PageFrame module="analytics" scopedAccess><div className={`${styles.root} ${local.content}`}>{header}{sidebar}

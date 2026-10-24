@@ -1,5 +1,5 @@
 /* Two balanced columns on wide screens: cards keep their natural height. */
-.cards { columns: 2 400px; column-gap: var(--space-4); max-width: 1120px; min-width: 0; }
+.cards { columns: 2 400px; column-gap: var(--space-4); width: 100%; min-width: 0; }
 .cards > * { break-inside: avoid; margin-bottom: var(--space-4); }
 .card { min-width: 0; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface); overflow: hidden; }
 .head { padding: 14px 18px 0; }

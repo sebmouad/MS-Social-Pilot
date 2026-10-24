@@ -1,13 +1,13 @@
 .root-directory { max-width: 1440px; margin: 0 auto; }
 .root-directory .root-config__eyebrow { margin: 0 0 7px; color: var(--accent); font-size: 12px; font-weight: 750; }
-.root-directory-nav { display: grid; gap: 18px; padding: 18px 12px; }
+.root-directory-nav { display: grid; gap: 6px; padding: 4px 0; }
 .root-directory-nav details { min-width: 0; }
-.root-directory-nav summary { padding: 9px 12px; cursor: pointer; color: var(--ink-soft); font-size: 12px; font-weight: 750; }
+.root-directory-nav summary { padding: 6px 8px; cursor: pointer; color: var(--rail-ink); font-size: 13px; font-weight: 650; }
 .root-directory-nav summary:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; border-radius: var(--radius-sm); }
-.root-directory-nav details[open] summary { margin-bottom: 5px; }
-.root-directory-nav .shell-subnav__label { margin: 0 12px 5px; }
-.root-directory-nav a { display: block; padding: 10px 12px; border-radius: var(--radius-sm); color: var(--ink-soft); text-decoration: none; }
-.root-directory-nav a:hover,.root-directory-nav a.is-active { background: var(--surface-muted); color: var(--accent); }
+.root-directory-nav details[open] summary { margin-bottom: 3px; }
+.root-directory-nav .shell-subnav__label { margin: 0 8px 5px; }
+.root-directory-nav a { display: block; padding: 6px 10px; border-radius: var(--radius-sm); color: var(--rail-ink); text-decoration: none; }
+.root-directory-nav a:hover,.root-directory-nav a.is-active { background: var(--rail-active-bg); color: var(--rail-active-ink); }
 .root-directory__head { display: flex; align-items: flex-end; justify-content: space-between; gap: 18px; flex-wrap: wrap; margin-bottom: 22px; }
 .root-directory__head h1 { margin: 3px 0; font-size: clamp(27px, 3vw, 38px); letter-spacing: -.04em; }
 .root-directory__head p { color: var(--ink-soft); }
@@ -18,7 +18,8 @@
 .root-directory th { color: var(--ink-soft); font-weight: 700; }
 .root-directory tbody tr:last-child td { border-bottom: 0; }
 .root-directory__pager { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 15px; }
-.root-directory__pager a { color: var(--accent); }
+.root-directory__pager a { display: inline-flex; align-items: center; min-height: 36px; padding: 0 10px; border-radius: var(--radius-sm); color: var(--accent); font-weight: 600; text-decoration: none; }
+.root-directory__pager a:hover { background: var(--surface-muted); text-decoration: underline; }
 .root-directory__self { color: var(--ink-faint); }
 .root-directory__actions { display: flex; gap: 6px; flex-wrap: wrap; min-width: 280px; }
 .root-directory__create { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; padding: 16px; margin-bottom: 16px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface); }

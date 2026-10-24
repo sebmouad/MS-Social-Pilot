@@ -29,10 +29,10 @@ const DEFAULT_COLUMNS = 2; // Initial metric columns before the viewer chooses; 
  * stored measures, and a bar under the first metric scaled to the largest known value on the page.
  * Per-post history is not stored, so no trend line is drawn.
  */
-export function PostsTable({ rows, measures: allMeasures, locale, emptyAction, copy = recordsCopyDefaults }: {
+export function PostsTable({ rows, measures: allMeasures, locale, emptyAction, copy = recordsCopyDefaults, sortKey, sortDirection }: {
   copy?: RecordsCopy; rows: PostsTableRow[]; measures: PostsTableMeasure[]; locale: 'en' | 'fr'; emptyAction?: React.ReactNode;
+  sortKey?: string; sortDirection?: 'asc' | 'desc';
 }) {
-  const fr = locale === 'fr';
   const t = (key: keyof RecordsCopy) => copy[key][locale];
   const unavailable = t("Not available");
   // A measure with no stored value on this page is not offered: it would only add a column of dashes.
@@ -45,6 +45,16 @@ export function PostsTable({ rows, measures: allMeasures, locale, emptyAction, c
   const when = (value: string | null, label?: string) => value ? <time dateTime={value}>{label ?? ''}</time> : unavailable;
   const chosen = measures.filter(measure => shownKeys.includes(measure.key));
   const peak = (key: string) => Math.max(0, ...rows.map(row => row.measures[key]).filter((value): value is number => typeof value === 'number' && Number.isFinite(value)));
+  const activeSortColumn = sortKey ? (sortKey === 'publishedAt' ? 'publishedAt' : `m:${sortKey}`) : undefined;
+  const handleSort = (columnKey: string) => {
+    const nextSort = columnKey.startsWith('m:') ? columnKey.slice(2) : columnKey;
+    const nextDirection = sortKey === nextSort ? (sortDirection === 'asc' ? 'desc' : 'asc') : 'desc';
+    const url = new URL(window.location.href);
+    url.searchParams.set('sort', nextSort);
+    url.searchParams.set('direction', nextDirection);
+    url.searchParams.delete('page');
+    window.location.assign(`${url.pathname}?${url.searchParams.toString()}`);
+  };
 
   return <div className="analytics-posts">
     {measures.length > 0 && <details className="analytics-posts__columns">
@@ -59,6 +69,7 @@ export function PostsTable({ rows, measures: allMeasures, locale, emptyAction, c
     </details>}
     <DataTable caption={t("Published posts")} rows={rows} rowKey={row => row.key} density="compact"
       emptyIcon={<IconChartBar />} emptyMessage={t("No published posts for this selection and period.")} emptyAction={emptyAction}
+      sort={activeSortColumn ? { key: activeSortColumn, direction: sortDirection === 'asc' ? 'ascending' : 'descending', onChange: handleSort } : undefined}
       columns={[
         { key: 'post', label: t("Post"), hideCardLabel: true, render: row => <span className="analytics-posts__post">
           <span data-module="analytics" className="analytics-posts__media"><PostThumb thumb={row.thumbnail ?? null} size="sm" /></span>
@@ -68,8 +79,8 @@ export function PostsTable({ rows, measures: allMeasures, locale, emptyAction, c
             {row.postHref ? <small className="analytics-posts__internal"><a href={row.postHref}>{t("Open in Posts")}</a></small> : null}
           </span>
         </span> },
-        { key: 'publishedAt', label: t("Published"), render: row => when(row.publishedAt, row.labels?.publishedAt) },
-        ...chosen.map((measure, index) => ({ key: `m:${measure.key}`, label: measure.label, align: 'end' as const, render: (row: PostsTableRow) => {
+        { key: 'publishedAt', label: t("Published"), sortable: Boolean(activeSortColumn), render: row => when(row.publishedAt, row.labels?.publishedAt) },
+        ...chosen.map((measure, index) => ({ key: `m:${measure.key}`, label: measure.label, align: 'end' as const, sortable: Boolean(activeSortColumn), render: (row: PostsTableRow) => {
           const value = row.measures[measure.key];
           if (value === null || value === undefined) return <span title={unavailable}>—</span>;
           const top = peak(measure.key);

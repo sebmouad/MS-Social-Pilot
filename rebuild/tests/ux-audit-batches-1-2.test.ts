@@ -5,6 +5,8 @@ import { describe, expect, it, vi } from 'vitest';
 import { AppShell } from '../src/components/AppShell';
 import { ChannelScopeList } from '../src/components/ChannelScopeList';
 import { CsvExportButton } from '../src/components/CsvExportButton';
+import { formatAudienceLabel } from '../src/modules/analytics/ui/demographics/AudienceCharts';
+import { PostsTable } from '../src/modules/analytics/ui/posts/PostsTable';
 import { uiCopy } from '../src/modules/agency/ui/copy';
 import { ChannelCardActions } from '../src/modules/settings/ui/connections/row-menu';
 import { SHELL_COPY, SHELL_POLICY, type ShellCopy, type ShellPolicy } from '../src/modules/shell/copy';
@@ -134,5 +136,36 @@ describe('UX Audit 2026-10-24 — Batch 1 & Batch 2 regressions', () => {
     expect(html).toContain('Export CSV');
     expect(html).toContain('ui-infotip');
     expect(html).toContain('Exports all matching daily rows.');
+  });
+
+  it('formats raw demographic, country, and locale codes into human-readable Audience labels', () => {
+    expect(formatAudienceLabel('F.25-34', 'en')).toBe('Women · 25-34');
+    expect(formatAudienceLabel('M.18-24', 'fr')).toBe('Hommes · 18-24');
+    expect(formatAudienceLabel('FR', 'en')).toContain('France');
+    expect(formatAudienceLabel('fr_FR', 'en').toLowerCase()).toContain('french');
+  });
+
+  it('enables sortable metric column headers on PostsTable when sortKey is provided', () => {
+    const html = renderToStaticMarkup(
+      createElement(PostsTable, {
+        locale: 'en',
+        sortKey: 'reach',
+        sortDirection: 'desc',
+        measures: [{ key: 'reach', label: 'Reach' }],
+        rows: [
+          {
+            key: 'p1',
+            channelName: 'North Market',
+            publishedAt: '2026-10-20T12:00:00.000Z',
+            measuredAt: '2026-10-20T12:05:00.000Z',
+            text: 'Autumn collection launch',
+            url: null,
+            thumbnail: null,
+            measures: { reach: 1200 },
+          },
+        ],
+      }),
+    );
+    expect(html).toContain('aria-sort="descending"');
   });
 });

@@ -9,9 +9,11 @@
 .card { display: grid; gap: var(--space-3); padding: var(--space-4); border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface); }
 .card:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .cardHead { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-2); }
-.cardHead strong { display: block; font-size: var(--text-md); }
-.when { display: block; color: var(--ink-soft); font-size: var(--text-sm); }
+.cardHead > div { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; min-width: 0; }
+.cardHead strong { font-size: var(--text-md); }
+.when { color: var(--ink-soft); font-size: var(--text-xs); font-variant-numeric: tabular-nums; }
 .cardPreview article { max-width: none; padding: 0; border: 0; background: transparent; }
+.cardPreview article > header { display: none; }
 /* The decision is the focus: the post media stays a bounded preview. */
 .cardPreview article img, .cardPreview article video { max-height: 300px; object-fit: cover; }
 .cardPreview article a:has(> img) { max-height: 300px; }
@@ -20,7 +22,7 @@
 .note label { color: var(--ink-soft); font-size: var(--text-sm); font-weight: 650; }
 .note textarea { width: 100%; min-height: 84px; padding: 10px 12px; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface); color: var(--ink); font: inherit; font-size: var(--text-md); }
 .note textarea:focus-visible { outline: none; border-color: var(--focus); box-shadow: var(--ui-ring); }
-.actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.actions { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); }
 .help { margin: 0; color: var(--ink-soft); font-size: var(--text-sm); }
 /* Approval pipeline (UI wave 2): four stage columns sharing the review cards. Tokens only. */
 .board { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); align-items: start; gap: var(--space-4); }

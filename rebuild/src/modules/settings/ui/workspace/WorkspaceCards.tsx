@@ -79,6 +79,13 @@ export function WorkspaceCards({ locale, copy, workspaceId, workspaceName, canMa
   const textInput = (key: Parameters<typeof text>[0], max: number, label: string, hint?: string) => field(label, <input value={text(key)} maxLength={max} autoComplete="off" onChange={event => set(key, event.target.value)} />, hint);
   const numberInput = (key: 'spamGapMinutes' | 'undoSendSeconds' | 'businessStart' | 'businessEnd', min: number, max: number, label: string, hint?: string) =>
     field(label, <input type="number" inputMode="numeric" min={min} max={max} step={1} required value={Number(value(key))} onChange={event => set(key, Number(event.target.value))} />, hint);
+  const hourSelect = (key: 'businessStart' | 'businessEnd', min: number, max: number, label: string) => {
+    const options = Array.from({ length: max - min + 1 }, (_, index) => {
+      const hour = min + index;
+      return { value: String(hour), label: `${String(hour).padStart(2, '0')}:00` };
+    });
+    return <div className={styles.field}><span>{label}</span><Select aria-label={label} value={String(value(key))} onChange={next => set(key, Number(next))} options={options} /></div>;
+  };
 
   const hoursKeys: Array<keyof WorkspaceOperations> = ['weekStartsOn', 'businessDays', 'businessStart', 'businessEnd'];
   const hoursInvalid = Number(value('businessEnd')) <= Number(value('businessStart')) ? copy.hours.invalid : undefined;
@@ -99,7 +106,7 @@ export function WorkspaceCards({ locale, copy, workspaceId, workspaceName, canMa
     <Card id="ws-hours" copy={copy} title={copy.hours.title} detail={copy.hours.detail} canSave={canManage} dirty={dirtyOf(hoursKeys)} invalid={hoursInvalid} onSave={() => saveOps(hoursKeys)}>
       <div className={styles.field}><span>{ops.weekStartsOn}</span><Select aria-label={ops.weekStartsOn} value={String(value('weekStartsOn'))} onChange={next => set('weekStartsOn', Number(next))} options={ops.dayNames.map((name, index) => ({ value: String(index), label: name }))} /></div>
       <div className={styles.field}><span>{copy.hours.days}</span><div className={styles.days}>{ops.days.map((name, index) => <label key={name} className={styles.day} data-on={value('businessDays').includes(index)}><input type="checkbox" checked={value('businessDays').includes(index)} onChange={() => toggleDay(index)} /><span>{name}</span></label>)}</div></div>
-      <div className={styles.pair}>{numberInput('businessStart', 0, 23, copy.hours.from)}{numberInput('businessEnd', 1, 24, copy.hours.to)}</div>
+      <div className={styles.pair}>{hourSelect('businessStart', 0, 23, copy.hours.from)}{hourSelect('businessEnd', 1, 24, copy.hours.to)}</div>
     </Card>
     <Card id="ws-queue" copy={copy} title={copy.queue.title} detail={copy.queue.detail} canSave={canManage} dirty={dirtyOf(queueKeys)} onSave={() => saveOps(queueKeys)}>
       <div className={styles.pair}>{numberInput('spamGapMinutes', 0, B.spamGapMinutes, copy.queue.gap, ops.spamGapHint)}{numberInput('undoSendSeconds', 0, B.undoSendSeconds, copy.queue.undo, ops.undoSendHint)}</div>

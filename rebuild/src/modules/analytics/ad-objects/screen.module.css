@@ -1,4 +1,9 @@
 .raw { white-space: pre-wrap; overflow-wrap: anywhere; max-width: 32rem; min-width: 12rem; font-size: var(--text-xs); }
+.extraList { display: grid; gap: 3px; min-width: 14rem; max-width: 32rem; margin: 0; font-size: var(--text-xs); }
+.extraRow { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3); padding-block: 2px; border-bottom: 1px solid var(--line-subtle); }
+.extraRow:last-child { border-bottom: 0; }
+.extraRow dt { color: var(--ink-soft); font-weight: 500; }
+.extraRow dd { margin: 0; color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; text-align: end; }
 
 /* One compact filter bar: every field keeps its label above a 32px control. */
 .filters { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--space-3); min-width: 0; padding: var(--space-3) var(--space-4); border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface); }

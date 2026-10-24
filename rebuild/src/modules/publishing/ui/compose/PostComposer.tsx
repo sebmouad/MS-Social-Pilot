@@ -478,6 +478,7 @@ function PostComposerContent({ copyCatalog = composerCatalogDefaults, profiles, 
             <Avatar name={channelName(target)} src={target.pictureUrl} size={24} /><span className={styles.chipName}>{channelName(target)}</span><a href={policy.reconnectHref}>{cc.createReconnect}</a>
           </span>)}
         </div> : <p className={styles.help}>{cc.createChannelsNone}</p>}
+        {blocked.length > 0 && <p className={styles.help}>{fillContent(cc.createChannelBlocked, { name: blocked.map(target => channelName(target)).join(', ') })}</p>}
         {crowded && <p className={styles.help} role="status">{fillComposerCopy(ui.spacingWarning, { minutes: spacingGapMinutes })}</p>}
       </section>
       <section className={styles.section} aria-labelledby={`${titleId}-text`}>
@@ -488,10 +489,6 @@ function PostComposerContent({ copyCatalog = composerCatalogDefaults, profiles, 
           <span className={styles.counter} id="composer-message-count">{fillContent(cc.createCounter, { used: message.length.toLocaleString(aiLocale), max: imageRules.maxMessageCharacters.toLocaleString(aiLocale) })}</span>
         </div>
       </section>
-      <section className={styles.section} aria-labelledby={`${titleId}-languages`}>
-        <div className={styles.sectionHead}><h2 id={`${titleId}-languages`}>{variantCopy.title}</h2></div>
-        {draftPostId ? <PostVariantsEditor postId={draftPostId} locale={aiLocale} copyCatalog={copyCatalog} /> : <p className={styles.help}>{variantCopy.needDraft}</p>}
-      </section>
       <section className={styles.section} aria-labelledby={`${titleId}-media`}>
         <div className={styles.sectionHead}><h2 id={`${titleId}-media`}>{cc.createMedia}</h2></div>
         <PostAttachments controller={attachments} disabled={busy} onPickLibrary={() => setLibraryOpen(true)} {...(aiStatus?.available && aiStatus.altText ? { altTextAssist: { locale: aiLocale } } : {})} />
@@ -500,6 +497,10 @@ function PostComposerContent({ copyCatalog = composerCatalogDefaults, profiles, 
         </label>
         <LinkPreviewCard link={link} locale={aiLocale} disabled={busy} copyCatalog={copyCatalog} />
         <small className={styles.help}>{ui.attachmentSupport}</small>
+      </section>
+      <section className={styles.section} aria-labelledby={`${titleId}-languages`}>
+        <div className={styles.sectionHead}><h2 id={`${titleId}-languages`}>{variantCopy.title}</h2></div>
+        {draftPostId ? <PostVariantsEditor postId={draftPostId} locale={aiLocale} copyCatalog={copyCatalog} /> : <p className={styles.help}>{variantCopy.needDraft}</p>}
       </section>
       <section className={styles.section} aria-labelledby={`${titleId}-comment`}>
         {commentOpen || firstComment.trim() || firstCommentDelayError ? <>

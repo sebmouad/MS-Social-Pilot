@@ -4,13 +4,14 @@ Updated 2026-10-24: batch 18 (`dc82625b`) deployed live (`DEPLOY OK
 dc82625b`), schema **142**. Full goal remains active. Historical records
 below retain their dates; current source reconciliation wins.
 
-## UI/UX audit — 2026-10-24 (Batch 1 & Batch 2 implemented, pushed)
+## UI/UX audit — 2026-10-24 (Batches 1, 2 & 3 + Phone/Root polish implemented, pushed)
 
 [UX_AUDIT_2026-10-24.md](UX_AUDIT_2026-10-24.md) lists the screenshot audit of
-37 routes at 1440/390 on the synthetic preview. Owner-approved Batch 1 (quick
-fixes, items 1–6) and Batch 2 (consistency, items 7–12) are implemented,
-typechecked (`npm run typecheck` 0 errors), and verified across 26 Vitest
-suites (289 tests passed, including new `tests/ux-audit-batches-1-2.test.ts`):
+37 routes at 1440/390 on the synthetic preview. Batch 1 (quick fixes, items
+1–6), Batch 2 (consistency, items 7–12), Phone (390px) tap-target fixes, Ads ›
+Analysis structured list, and Batch 3 + Root sidebar polish are implemented,
+typechecked (`npm run typecheck` 0 errors), and verified across Vitest suites
+(including `tests/ux-audit-batches-1-2.test.ts`):
 
 - **Batch 1 (items 1–6)**:
   - **Sidebar channel names & scope highlight** (`src/styles/shell.css`,
@@ -68,6 +69,29 @@ suites (289 tests passed, including new `tests/ux-audit-batches-1-2.test.ts`):
     kept `.actions` on a single row on desktop, and updated `--mod-agency` across
     all themes from pink to brand-blue/indigo shades (`#185FA5` / `#85B7EB` /
     `#534AB7` / `#378ADD`).
+- **Phone (390px) & Batch 3 + Root Polish**:
+  - **Phone & coarse-pointer tap targets + Root sidebar** (`responsive.css`,
+    `shell.css`, `root-nav.css`, `root-directory.css`, `inbox.module.css`):
+    `44px` minimum tap targets on coarse/phone viewports for `InfoTip` (`ⓘ`),
+    sidebar "Show more / Manage channels", inline `.text-link`, Root sidebar
+    items and directory pagers, and Inbox quick chips/pagers; harmonized
+    `.root-directory-nav` with `--rail-*` sidebar tokens.
+  - **Ads › Analysis structured fields** (`analytics/ad-objects/Screen.tsx`,
+    `screen.module.css`): replaced raw JSON `<pre>` with a semantic `<dl>` using
+    `storedFieldRows(...)`, localized currency formatting, and `.ui-input`
+    filter controls.
+  - **Composer, Approvals & Calendar** (`PostComposer.tsx`,
+    `approvals.module.css`, `calendar.module.css`): moved **Media** immediately
+    after **Post text** and rendered a visible helper line for blocked channels
+    in Composer; removed duplicate author header and aligned actions side-by-side
+    in Approvals cards; brand accent "today" badge and hover/focus `+ New post`
+    reveal in Calendar.
+  - **Insights & Settings › Workspace** (`AudienceCharts.tsx`, `PostsTable.tsx`,
+    `explorer-posts/Screen.tsx`, `WorkspaceCards.tsx`, `cards.module.css`):
+    human-readable audience labels (`formatAudienceLabel`) for demographic,
+    country, and locale codes; sortable column headers (`aria-sort`) on
+    `PostsTable`; formatted `00:00`…`24:00` hour `<Select>` controls for
+    Workspace working hours and full-width `.cards` alignment.
 - **Next**: rerun `scripts/dev/ui-audit.mjs` against the preview server and
   deploy when in an authorized live lane.
 

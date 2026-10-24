@@ -1,15 +1,19 @@
 /* Design v2 B8: Root sidebar with icon chips, grouped by area (overview / people / modules / operations / activity). */
-.root-directory-nav { gap: 4px; }
-.root-directory-nav details { padding: 0; }
-.root-directory-nav summary { display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 4px 8px; border-radius: var(--radius-sm); font-size: 13px; font-weight: 650; list-style: none; }
-.root-directory-nav summary:hover { background: var(--surface-muted); color: var(--ink); }
+.root-directory-nav { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; padding: 4px 0; min-width: 0; }
+.root-directory-nav details { padding: 0; min-width: 0; }
+.root-directory-nav summary { display: flex; align-items: center; gap: 10px; min-height: 38px; padding: 4px 8px; border-radius: var(--radius-sm); color: var(--rail-ink); font-size: 13px; font-weight: 650; list-style: none; cursor: pointer; transition: background var(--ease-fast), color var(--ease-fast); }
+.root-directory-nav summary:hover { background: var(--rail-active-bg); color: var(--rail-active-ink); }
 .root-directory-nav summary::-webkit-details-marker { display: none; }
 .root-directory-nav summary::after { content: ""; width: 7px; height: 7px; margin-left: auto; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(45deg); transition: transform .15s ease; opacity: .6; }
+.root-directory-nav details[open] > summary { color: var(--ink); }
 .root-directory-nav details[open] > summary::after { transform: rotate(-135deg); }
-.root-directory-nav details > a { display: flex; margin-inline-start: 12px; align-items: center; gap: 10px; min-height: 40px; padding: 6px 10px; font-size: 13.5px; font-weight: 550; transition: background .15s ease, color .15s ease; }
-.root-directory-nav details > a:hover { background: var(--surface-muted); color: var(--ink); }
-.root-directory-nav details > a.is-active { background: var(--mod-soft, var(--accent-soft)); color: var(--mod-ink, var(--accent)); font-weight: 700; }
+.root-directory-nav details > a { display: flex; margin-inline-start: 14px; align-items: center; gap: 10px; min-height: 36px; padding: 5px 10px; border-left: 1px solid var(--line-subtle); border-radius: 0 var(--radius-sm) var(--radius-sm) 0; color: var(--rail-ink); font-size: 13.5px; font-weight: 550; text-decoration: none; transition: background .15s ease, color .15s ease, border-color .15s ease; }
+.root-directory-nav details > a:hover { background: var(--rail-active-bg); color: var(--rail-active-ink); border-left-color: var(--accent); }
+.root-directory-nav details > a.is-active { background: var(--rail-active-bg); color: var(--rail-active-ink); border-left-color: var(--mod, var(--accent)); font-weight: 700; }
 .root-directory-nav a:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
-.root-nav-glyph { display: inline-grid; place-items: center; flex: 0 0 auto; width: 28px; height: 28px; border-radius: 8px; background: color-mix(in srgb, var(--mod, var(--accent)) 14%, var(--surface)); color: var(--mod, var(--accent)); }
+.root-nav-glyph { display: inline-grid; place-items: center; flex: 0 0 auto; width: 26px; height: 26px; border-radius: 7px; background: color-mix(in srgb, var(--mod, var(--accent)) 14%, var(--surface)); color: var(--mod, var(--accent)); }
 .root-directory-nav a.is-active .root-nav-glyph { background: var(--mod, var(--accent)); color: var(--on-accent, #fff); }
+@media (max-width: 760px), (pointer: coarse) {
+  .root-directory-nav summary, .root-directory-nav details > a { min-height: var(--control-h-touch); }
+}
 @media (prefers-reduced-motion: reduce) { .root-directory-nav summary::after, .root-directory-nav a { transition: none; } }

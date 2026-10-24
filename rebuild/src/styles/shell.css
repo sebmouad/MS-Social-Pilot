@@ -90,8 +90,8 @@
 .ui-scope__check { position: absolute; top: 50%; right: 8px; width: 16px; height: 16px; margin: 0; transform: translateY(-50%); opacity: 0; }
 .ui-scope__row:hover .ui-scope__check, .ui-scope__check:focus-visible, .ui-scope__check:checked { opacity: 1; }
 .ui-scope__row:hover .ui-scope__name, .ui-scope__check:checked ~ .ui-scope__name { padding-right: 22px; }
-.ui-scope__more, .ui-scope__manage { padding: 6px 8px; border: 0; background: transparent; color: var(--rail-ink); font: inherit; font-size: var(--text-xs); font-weight: 650; text-align: left; text-decoration: none; cursor: pointer; }
-.ui-scope__more:hover, .ui-scope__manage:hover { color: var(--rail-active-ink); text-decoration: underline; }
+.ui-scope__more, .ui-scope__manage { display: inline-flex; align-items: center; min-height: 36px; padding: 6px 8px; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--rail-ink); font: inherit; font-size: var(--text-xs); font-weight: 650; text-align: left; text-decoration: none; cursor: pointer; transition: background var(--ease-fast), color var(--ease-fast); }
+.ui-scope__more:hover, .ui-scope__manage:hover { background: var(--rail-active-bg); color: var(--rail-active-ink); text-decoration: none; }
 .ui-scope__empty { padding: 8px; color: var(--rail-ink); font-size: var(--text-sm); }
 .ui-scope.is-compact .ui-scope__item { justify-content: center; padding: 4px; }
 .ui-scope.is-compact .ui-scope__name { display: none; }
@@ -141,8 +141,9 @@
 
 /* ---- Info tip, filter button, date range ---- */
 .ui-infotip { display: inline-flex; align-items: center; }
-.ui-infotip__trigger { display: inline-grid; place-items: center; width: 24px; height: 24px; padding: 0; border: 0; border-radius: var(--radius-full); background: transparent; color: var(--ink-faint); cursor: pointer; }
+.ui-infotip__trigger { display: inline-grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 0; border-radius: var(--radius-full); background: transparent; color: var(--ink-faint); cursor: pointer; transition: background var(--ease-fast), color var(--ease-fast); }
 .ui-infotip__trigger:hover, .ui-infotip__trigger[aria-expanded=true] { background: var(--surface-muted); color: var(--ink); }
+.ui-infotip__trigger:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .ui-infotip.is-warning .ui-infotip__trigger { color: var(--warning); }
 .ui-infotip__popover { max-width: 320px; }
 .ui-infotip__body { display: grid; gap: 8px; padding: 14px 16px; overflow: auto; font-size: var(--text-sm); line-height: 1.5; }
