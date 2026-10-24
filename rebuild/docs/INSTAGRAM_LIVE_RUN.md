@@ -36,7 +36,7 @@ not promise it).
 | Comment reply / hide+unhide / delete | implemented | `inbox.ts` + `inbox-host.ts` (shared authorization, locks, audit; delete via the shared durable path) |
 | Inbox background sync | implemented | `jobs.ts` `syncInstagramInbox` via the shared `inbox` job (fair workspace ring, per-workspace cursors, fetch-then-write through `adapter.listComments`, plan/grant/token/source rechecks, `instagram.inbox_synced` receipts); comments only, source/unit evidence, no live run |
 | Direct messages, reviews | missing | absent; reply policy reports comments-only |
-| Meta inbound webhooks | missing | no inbound receiver exists for any platform (Facebook likewise); IG sync is poll/manual |
+| Meta inbound webhooks | missing | no inbound receiver exists for Instagram (Facebook has one since the 2026-10-23 platform/moat batch: `/api/platforms/facebook/webhooks`); IG sync is poll/manual |
 | Publication recovery registry | implemented | `container-recovery.ts` registered in `src/server/platforms/publication-recovery.ts`; this lane (was the documented before-activation gap) |
 | Token/grant health UI | implemented | `connection.grantHealth` (publishing/comments/analytics rows) via neutral `platformGrantHealth` in `ConnectionsScreen.tsx` |
 | Error kinds + retries | partial | `transport.ts` maps definite 4xx (codes 10/100/190/200) → `rejected`, 429/5xx/transient → `uncertain` + `retryable`; jobs retry via `withRetries`; no usage-header budget accounting (contrast Facebook `graph-usage.ts`) |

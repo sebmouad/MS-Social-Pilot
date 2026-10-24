@@ -1725,3 +1725,14 @@ stored it (received=1/unmatched=1, receipt row confirmed then deleted).
 verify token in Root settings, add the app subscription in the Meta
 dashboard (callback `https://social.newsgeet.com/api/platforms/facebook/webhooks`).
 Deliberately did not rewire the Meta app subscription unattended.
+
+## More live gates (2026-10-24 ~02:00 UTC)
+Instagram: prod has `platforms.instagram.enabled` at default off, no app
+secret, 0 IG accounts/targets — correctly dormant; the section-2 owner
+checklist prerequisites are not started, nothing actionable unattended.
+Fixed one stale row in INSTAGRAM_LIVE_RUN.md (Facebook inbound webhooks
+exist since the moat batch; IG still poll/manual).
+Perfection backlog re-verified in current source and closed as sound:
+lastSynced is MAX-or-null (`read.ts:280`), publish dry-run gate sits
+upstream of all platforms (`sync.ts:22`, covers Telegram), Facebook inbox
+is full-rescan with incomplete tracking (no cursor) by design.
