@@ -1,13 +1,14 @@
 'use client';
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { IconCommand, IconPlus, IconSearch } from '@tabler/icons-react';
+import { IconCommand, IconPlus, IconSearch, IconMoon, IconSun, IconLayoutSidebar, IconCalendar, IconInbox, IconChefHat, IconChartBar, IconSpeakerphone } from '@tabler/icons-react';
 import type { CommandCopy } from '@/modules/home/command-copy';
 import type { CommandAction, CommandChannel, CommandItem } from '@/modules/home/server/commands';
 import { Avatar } from './Avatar';
 import { Dialog } from './Dialog';
+import { useTheme } from './ThemeProvider';
 
-type PaletteRow = { kind: 'action' | 'page' | 'channel'; key: string; title: string; sub: string; href: string };
+type PaletteRow = { kind: 'action' | 'page' | 'channel'; key: string; title: string; sub: string; href?: string; onSelect?: () => void };
 
 const isList = (value: unknown): value is { items: CommandItem[]; actions?: CommandAction[]; channels?: CommandChannel[] } => {
   if (!value || typeof value !== 'object' || !Array.isArray((value as { items?: unknown }).items)) return false;
@@ -25,6 +26,7 @@ export function CommandPalette({ copy: t }: { copy: CommandCopy }) {
   const [actions, setActions] = useState<CommandAction[]>([]);
   const [items, setItems] = useState<CommandItem[]>([]);
   const [channels, setChannels] = useState<CommandChannel[]>([]);
+  const themeCtx = (() => { try { return useTheme(); } catch { return null; } })();
   const [active, setActive] = useState(0);
   const loaded = useRef(false);
   const load = useCallback(async () => {
@@ -51,15 +53,43 @@ export function CommandPalette({ copy: t }: { copy: CommandCopy }) {
   const groups = useMemo(() => {
     const q = query.trim().toLowerCase();
     const match = (text: string) => !q || text.toLowerCase().includes(q);
+
+    const quickActions: PaletteRow[] = [
+      { kind: 'action', key: 'qa-post', title: 'Create New Post', sub: 'Publishing', href: '/content/post' },
+      { kind: 'action', key: 'qa-cal', title: 'Open Content Calendar', sub: 'Publishing', href: '/content/calendar' },
+      { kind: 'action', key: 'qa-inbox', title: 'Triage Social Inbox', sub: 'Community', href: '/inbox' },
+      { kind: 'action', key: 'qa-recipe', title: 'Run WordPress Recipe Planner', sub: 'Automation', href: '/content/feeds' },
+      { kind: 'action', key: 'qa-insights', title: 'View Analytics & Performance', sub: 'Analytics', href: '/insights' },
+      { kind: 'action', key: 'qa-ads', title: 'Manage Meta Ads', sub: 'Campaigns', href: '/ads/manage' },
+    ];
+
+    if (themeCtx) {
+      quickActions.push({
+        kind: 'action',
+        key: 'qa-theme',
+        title: themeCtx.mode === 'dark' ? 'Switch to Light Theme' : 'Switch to Dark Theme',
+        sub: 'Appearance',
+        onSelect: () => void themeCtx.setMode(themeCtx.mode === 'dark' ? 'light' : 'dark'),
+      });
+    }
+
+    const filteredQuick = quickActions.filter(item => match(`${item.title} ${item.sub} ${item.key}`));
+    const apiActions = actions.filter(item => match(`${item.title} ${item.id}`)).map((item): PaletteRow => ({ kind: 'action', key: item.id, title: item.title, sub: '', href: item.href }));
+    const allActions = [...filteredQuick, ...apiActions];
+
     return [
-      { kind: 'action' as const, label: t.sectionActions, rows: actions.filter(item => match(`${item.title} ${item.id}`)).map((item): PaletteRow => ({ kind: 'action', key: item.id, title: item.title, sub: '', href: item.href })) },
+      { kind: 'action' as const, label: t.sectionActions, rows: allActions },
       { kind: 'page' as const, label: t.sectionPages, rows: items.filter(item => match(`${item.title} ${item.moduleTitle} ${item.id}`)).map((item): PaletteRow => ({ kind: 'page', key: item.id, title: item.title, sub: item.moduleTitle, href: item.href })) },
       { kind: 'channel' as const, label: t.sectionChannels, rows: channels.filter(item => match(`${item.title} ${item.id}`)).map((item): PaletteRow => ({ kind: 'channel', key: item.id, title: item.title, sub: '', href: item.href })) },
     ].filter(group => group.rows.length > 0);
-  }, [query, actions, items, channels, t.sectionActions, t.sectionPages, t.sectionChannels]);
+  }, [query, actions, items, channels, themeCtx, t.sectionActions, t.sectionPages, t.sectionChannels]);
   const flat = useMemo(() => groups.flatMap(group => group.rows), [groups]);
   const current = flat[Math.min(active, Math.max(flat.length - 1, 0))];
-  const go = (row: PaletteRow) => { setOpen(false); router.push(row.href); };
+  const go = (row: PaletteRow) => {
+    setOpen(false);
+    if (row.onSelect) row.onSelect();
+    else if (row.href) router.push(row.href);
+  };
   return <>
     <button type="button" className="shell-palette-trigger" aria-label={t.trigger} onClick={() => setOpen(true)} aria-keyshortcuts="Control+k Meta+k" title={t.trigger}>
       <IconSearch size={15} aria-hidden="true" /><span>{t.trigger}</span><kbd aria-hidden="true"><IconCommand size={12} aria-hidden="true" />K</kbd>

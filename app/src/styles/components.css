@@ -20,6 +20,87 @@
 .ui-icon-button.is-confirm:hover:not(:disabled) { background: var(--success-soft); }
 .ui-icon-button[aria-busy=true] { cursor: progress; }
 
+/* ---- Cards, Elevation & Specular Depth ---- */
+.ui-card-specular, .ui-card-interactive {
+  border: 1px solid var(--line-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+  transition: transform var(--ease-fast), box-shadow var(--ease-fast), border-color var(--ease-fast);
+}
+.ui-card-specular:hover, .ui-card-interactive:hover, .ui-kpi-card:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-card-hover);
+  border-color: var(--line-strong);
+}
+
+.ui-tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Sparklines & Semantic Delta Badges */
+.ui-sparkline {
+  display: inline-block;
+  vertical-align: middle;
+  overflow: visible;
+}
+.ui-sparkline__path {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.75;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.ui-sparkline__fill {
+  opacity: 0.15;
+}
+
+.ui-delta-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 6px;
+  border-radius: var(--radius-full);
+  font-size: var(--text-2xs);
+  font-weight: 700;
+  line-height: 16px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.ui-delta-badge--up {
+  background: var(--success-soft);
+  color: var(--success);
+}
+.ui-delta-badge--down {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+.ui-delta-badge--neutral {
+  background: var(--surface-muted);
+  color: var(--ink-soft);
+}
+
+/* Shimmer wave */
+.ui-skeleton-shimmer {
+  position: relative;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--surface-muted) 80%, var(--surface));
+  border-radius: var(--radius-xs);
+}
+.ui-skeleton-shimmer::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent 0%, color-mix(in srgb, var(--surface-raised) 70%, transparent) 50%, transparent 100%);
+  animation: ui-wave 1.5s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+@keyframes ui-wave {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
 /* ---- Keycaps ---- */
 .ui-kbd { display: inline-flex; align-items: center; justify-content: center; min-width: 20px; height: 20px; padding: 0 6px; border: 1px solid var(--line-strong); border-bottom-width: 2px; border-radius: var(--radius-xs); background: var(--surface-raised); color: var(--ink-soft); font: 600 11px/1 var(--font-sans); white-space: nowrap; }
 

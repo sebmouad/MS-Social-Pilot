@@ -97,7 +97,7 @@
 .ui-scope.is-compact .ui-scope__name { display: none; }
 
 /* ---- Top bar ---- */
-.shell-topbar { position: sticky; z-index: 10; top: 0; display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: var(--topbar-h); padding: 0 var(--gutter); border-bottom: 1px solid var(--line-subtle); background: var(--surface); }
+.shell-topbar { position: sticky; z-index: 10; top: 0; display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: var(--topbar-h); padding: 0 var(--gutter); border-bottom: 1px solid var(--line-subtle); background: var(--surface-glass); backdrop-filter: var(--backdrop-blur); -webkit-backdrop-filter: var(--backdrop-blur); }
 .shell-topbar__start, .shell-topbar__tools { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .shell-menu-toggle, .shell-scope-chip { display: none; }
 .shell-menu-toggle { align-items: center; justify-content: center; gap: 8px; min-height: var(--control-h-sm); padding: 0 10px; border: 1px solid var(--control-border); border-radius: var(--radius-sm); background: var(--surface); color: var(--ink); font: inherit; font-size: var(--text-sm); font-weight: 650; cursor: pointer; }

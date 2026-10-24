@@ -223,7 +223,8 @@ function extractRecipeJson(item: Record<string, unknown>, recipeMetaKey: string,
 function authHeaders(apiToken?: string | null): Record<string, string> {
   const headers: Record<string, string> = { Accept: 'application/json' };
   const token = apiToken?.trim();
-  if (!token) return headers;
+  // A legacy direct-database address saved before the REST connector is not a REST credential.
+  if (!token || /^[a-z][a-z0-9+.-]*:\/\//i.test(token)) return headers;
   if (token.includes(':')) {
     headers['Authorization'] = `Basic ${Buffer.from(token, 'utf8').toString('base64')}`;
   } else {
@@ -302,42 +303,40 @@ export async function openWordpressDb(settings: DbSettings): Promise<WpDb> {
             : null;
         const publishedAt = dateGmt && Number.isFinite(dateGmt.getTime()) && dateGmt.getUTCFullYear() > 1971 ? dateGmt : null;
 
-        const rawCaption =
-          metaValue(item, q.mapping.captionMetaKey) ||
-          stripHtml(renderedOf(item['excerpt'])) ||
-          title;
+        // A configured meta key is authoritative (same contract as the former direct-database join): when it is
+        // set but empty or not exposed over REST, the post is not a candidate. Fallbacks apply only to empty keys.
+        const rawCaption = q.mapping.captionMetaKey
+          ? metaValue(item, q.mapping.captionMetaKey)
+          : stripHtml(renderedOf(item['excerpt'])) || title;
         const caption = normalizeWordpressCaption(rawCaption);
 
-        let imageId = metaValue(item, q.mapping.imageMetaKey).trim();
-        if (!imageId && typeof item['featured_media'] === 'number' && item['featured_media'] > 0) {
+        let imageId = q.mapping.imageMetaKey ? metaValue(item, q.mapping.imageMetaKey).trim() : '';
+        if (!q.mapping.imageMetaKey && typeof item['featured_media'] === 'number' && item['featured_media'] > 0) {
           imageId = String(item['featured_media']);
         }
 
-        // Extract relative path from _embedded featured media or Jetpack/OG URL if available
+        // Cache the embedded featured media path; used directly only when it is the chosen image.
         const embedded = item['_embedded'];
         if (embedded && typeof embedded === 'object') {
           const mediaList = (embedded as Record<string, unknown>)['wp:featuredmedia'];
           if (Array.isArray(mediaList) && mediaList[0] && typeof mediaList[0] === 'object') {
             const mediaObj = mediaList[0] as Record<string, unknown>;
-            const mediaId = String(mediaObj['id'] ?? imageId);
+            const mediaId = String(mediaObj['id'] ?? '');
             const details = mediaObj['media_details'];
             const detailsFile = details && typeof details === 'object' && typeof (details as Record<string, unknown>)['file'] === 'string'
               ? String((details as Record<string, unknown>)['file'])
               : null;
             const sourceUrl = typeof mediaObj['source_url'] === 'string' ? mediaObj['source_url'] : '';
             const relPath = detailsFile || extractRelativeUploadPath(sourceUrl, uploadsPath);
-            if (mediaId && relPath) {
-              mediaCache.set(mediaId, relPath);
-              if (!imageId) imageId = mediaId;
-            }
+            if (mediaId && relPath) mediaCache.set(mediaId, relPath);
           }
         }
-        if (imageId && !mediaCache.has(imageId)) {
+        if (imageId && !/^\d{1,20}$/.test(imageId) && !mediaCache.has(imageId)) {
           const directRel = extractRelativeUploadPath(imageId, uploadsPath);
           if (directRel) mediaCache.set(imageId, directRel);
         }
 
-        const recipe = extractRecipeJson(item, q.mapping.recipeMetaKey, title);
+        const recipe = q.mapping.recipeMetaKey ? metaValue(item, q.mapping.recipeMetaKey) : extractRecipeJson(item, '', title);
         rows.push({ id, title, slug, publishedAt, caption, imageId, recipe });
       }
       return rows;
