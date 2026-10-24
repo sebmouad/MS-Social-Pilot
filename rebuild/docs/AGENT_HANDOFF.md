@@ -1685,3 +1685,30 @@ every-minute cadence. retention missed 01:17 UTC pre-fix (predicted);
 next natural slots: retention tomorrow 01:17 UTC, rollups 23:30 UTC.
 operatorMonitoring's full 1440/d comes from the web-process watchdog, a
 second single-job worker, not the main loop.
+
+## 2026-10-24 batch 16: post-history provider-window fit (6a6dbf75, DEPLOY OK)
+Residual analytics failed=6 (after batch 13) were all `[postHistory]
+AbortError` at exact 60s intervals: each post cost ~14 serial Graph calls
+(7 insight metrics + 7 paged reaction edges) with pageSize=100 and
+pageBudget=2, so any active Page always exhausted the 60s
+`sync.resourceOperationTimeoutMs` window; the cursor only commits on
+success, locking 6 targets into an infinite hourly abort loop (cursors
+stuck at `after: null`, one-year `since`). Fix in `post-history.ts`:
+batch lifetime metrics into one call per post (individual retry when one
+metric poisons the batch, preserving per-metric failure semantics), skip
+the reaction edge fan-out when `post_reactions_by_type_total` is already
+authoritative (skipped edges stay null in provenance, never zero), and
+enrich posts on 4 ordered lanes (`mapPool`). Tests updated to emulate
+batched provider responses; new tests for batch shape, edge skip, and
+order under concurrency. 20/20 post-history + 34/34 related + full suite
+779 files / 12306 tests green, typecheck clean. Production proof pending
+the 02:15 UTC analytics run (expect failed=6 -> 0 and advancing cursors).
+
+## Live gates status (2026-10-24 01:46 UTC)
+Llama: wired as 4th provider (`llamaPort`, OpenAI-compatible) and covered
+by `ai-provider-ports` tests, but production has no Llama key
+(`ai.provider=openai`, keys present only for anthropic/gemini/openai).
+Live check BLOCKED on the owner provisioning a Meta API key.
+Instagram live checklist, dry-run rehearsal, webhook proof: still open.
+retention natural slot: tomorrow 01:17 UTC. Rollups natural slot: today
+23:30 UTC (post-fix).
