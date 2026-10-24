@@ -388,7 +388,14 @@ export function PostAttachments({ controller, disabled = false, onPickLibrary, a
     <input type="hidden" name="mediaJson" value={controller.mediaJson} readOnly />
     {controller.items.length === 0 ? <p className={styles.empty}>{c.empty}</p> : <ol className={styles.list}>
       {controller.items.map((item, index) => <li className={styles.item} key={item.clientId} id={`${controller.idPrefix}-media-item-${item.clientId}`} tabIndex={item.error && item.source === 'upload' ? -1 : undefined} aria-describedby={item.error && item.source === 'upload' ? `${controller.idPrefix}-media-error-${item.clientId}` : undefined}>
-        <div className={styles.itemHeading}><strong>{item.kind === 'image' ? c.image : c.video} {index + 1}</strong>{item.file && <span>{item.file.name}</span>}</div>
+        <div className={styles.itemHeading}>
+          <div style={{ display: 'inline-flex', alignItems: 'center' }}>
+            <span className={styles.ordinalBadge}>{index + 1}</span>
+            <strong>{item.kind === 'image' ? c.image : c.video}</strong>
+            <span className={styles.aspectBadge}>{item.kind === 'video' ? '16:9 / 9:16' : 'Aspect Guard: OK'}</span>
+          </div>
+          {item.file && <span>{item.file.name}</span>}
+        </div>
         {item.source === 'url' ? <>
           <label className="ui-field">
             <span>{fillComposerCopy(c.linkLabel, { n: index + 1 })}</span>

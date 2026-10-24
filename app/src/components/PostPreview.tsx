@@ -1,4 +1,5 @@
-import type { ReactNode } from 'react';
+'use client';
+import { useState, useMemo, type ReactNode } from 'react';
 import { StatusChip } from '@/components/StatusChip';
 import styles from './PostPreview.module.css';
 import { firstCommentLabels, firstCommentState } from '@/modules/publishing/first-comment-state';
@@ -105,6 +106,7 @@ export function formatPostPreviewTime(date: Date, timeZone: string) {
 }
 
 export function PostPreview({ post, authorName, authorAvatarUrl, timeZone, variant = 'feed', actions, mediaOverride, locale = 'en', rendering }: Props) {
+  const [deviceFrame, setDeviceFrame] = useState<'none' | 'mobile' | 'desktop'>('none');
   const media = mediaItems(post.media).flatMap(item => {
     const url = mediaUrl(item);
     return url ? [{ ...item, url }] : [];
@@ -124,54 +126,121 @@ export function PostPreview({ post, authorName, authorAvatarUrl, timeZone, varia
   const commentUnsupported = rendering?.firstComment === 'unsupported' && Boolean(post.firstComment?.trim());
   const commentEmptySlot = rendering?.emptyFirstCommentSlot === true && rendering?.firstComment !== 'unsupported' && !post.firstComment?.trim();
 
-  return <article className={styles.preview} data-variant={variant} aria-label={fillCopy(t.previewBy, { name: authorName })}>
-    <header className={styles.header}>
-      {authorPicture ? <img className={styles.channelAvatar} src={authorPicture} alt="" loading="lazy" /> : <span className={styles.authorAvatar} aria-hidden="true">{initials(authorName)}</span>}
-      <div className={styles.headerText}>
-        <strong>{authorName}</strong>
-        <time dateTime={time.toISOString()}>{timeLabel} {post.displayTime ?? formatPostPreviewTime(time, timeZone)}</time>
-      </div>
-      <StatusChip status={post.status} />
-    </header>
+  const hashtags = useMemo(() => {
+    if (!post.message) return [];
+    return post.message.match(/#[a-zA-Z0-9_\u00C0-\u017F]+/g) || [];
+  }, [post.message]);
 
-    {post.targets.length > 0 ? <ul className={styles.destinations} aria-label={t.previewDestinations}>
-      {post.targets.map(row => {
-        const { status, remoteUrl, target } = row;
-        const picture = webUrl(target.pictureUrl);
-        const destinationUrl = webUrl(remoteUrl);
-        const commentState = firstCommentState(post.firstComment, row);
-        return <li className={styles.destination} key={target.id}>
-          {picture ? <img className={styles.channelAvatar} src={picture} alt="" loading="lazy" /> : <span className={styles.channelFallback} aria-hidden="true">{initials(target.name)}</span>}
-          <span className={styles.channelName}>{target.name}</span>
-          <StatusChip status={status} compact />
-          {status === 'scheduled_remote' ? <ScheduleBadge mode="remote" locale={locale} platformName={target.platformName ?? undefined} />
-            : post.scheduledAt && post.status === 'scheduled' && status === 'pending' ? <ScheduleBadge mode="application" locale={locale} /> : null}
-          {commentState !== 'not_requested' ? <span className={styles.noDestinations}>{commentLabels[commentState]}</span> : null}
-          {destinationUrl ? <a href={destinationUrl} target="_blank" rel="noopener noreferrer">{t.viewPost}</a> : null}
-        </li>;
-      })}
-    </ul> : <p className={styles.noDestinations}>{t.previewNoDestinations}</p>}
+  const articleNode = (
+    <article className={styles.preview} data-variant={variant} aria-label={fillCopy(t.previewBy, { name: authorName })}>
+      <header className={styles.header}>
+        {authorPicture ? <img className={styles.channelAvatar} src={authorPicture} alt="" loading="lazy" /> : <span className={styles.authorAvatar} aria-hidden="true">{initials(authorName)}</span>}
+        <div className={styles.headerText}>
+          <strong>{authorName}</strong>
+          <time dateTime={time.toISOString()}>{timeLabel} {post.displayTime ?? formatPostPreviewTime(time, timeZone)}</time>
+        </div>
+        <StatusChip status={post.status} />
+      </header>
 
-    {hasFailure ? <p className={styles.deliveryNotice} role="status">{t.previewDeliveryNotice}</p> : null}
+      {post.targets.length > 0 ? <ul className={styles.destinations} aria-label={t.previewDestinations}>
+        {post.targets.map(row => {
+          const { status, remoteUrl, target } = row;
+          const picture = webUrl(target.pictureUrl);
+          const destinationUrl = webUrl(remoteUrl);
+          const commentState = firstCommentState(post.firstComment, row);
+          return <li className={styles.destination} key={target.id}>
+            {picture ? <img className={styles.channelAvatar} src={picture} alt="" loading="lazy" /> : <span className={styles.channelFallback} aria-hidden="true">{initials(target.name)}</span>}
+            <span className={styles.channelName}>{target.name}</span>
+            <StatusChip status={status} compact />
+            {status === 'scheduled_remote' ? <ScheduleBadge mode="remote" locale={locale} platformName={target.platformName ?? undefined} />
+              : post.scheduledAt && post.status === 'scheduled' && status === 'pending' ? <ScheduleBadge mode="application" locale={locale} /> : null}
+            {commentState !== 'not_requested' ? <span className={styles.noDestinations}>{commentLabels[commentState]}</span> : null}
+            {destinationUrl ? <a href={destinationUrl} target="_blank" rel="noopener noreferrer">{t.viewPost}</a> : null}
+          </li>;
+        })}
+      </ul> : <p className={styles.noDestinations}>{t.previewNoDestinations}</p>}
 
-    {showCaption ? (post.message.trim() ? <div className={styles.message}>{folded ? <>{folded.head}… <details className={styles.fold}><summary><span className={styles.foldMore}>{rendering!.copy.seeMore}</span><span className={styles.foldLess}>{rendering!.copy.seeLess}</span></summary>{folded.tail}</details></> : post.message}</div> : null)
-      : post.message.trim() ? <p className={styles.renderNote} role="note">{rendering!.copy.noCaption}</p> : null}
+      {hasFailure ? <p className={styles.deliveryNotice} role="status">{t.previewDeliveryNotice}</p> : null}
 
-    {mediaOverride !== undefined ? mediaOverride : media.length ? <div className={styles.media} data-aspect={rendering?.mediaAspect ?? undefined}>
-      {media.map((item, index) => item.kind === 'image'
-        ? <PostImage key={`${item.url}-${index}`} src={item.url} href={item.url} alt={item.altText?.trim() || t.previewImage} locale={locale} linkClassName={styles.imageLink} />
-        : item.kind === 'video'
-          ? <video className={styles.video} controls preload="metadata" aria-label={t.previewVideo} key={`${item.url}-${index}`}>
-              <source src={item.url} />
-              <a href={item.url} target="_blank" rel="noopener noreferrer">{t.previewOpenVideo}</a>
-            </video>
-          : <a className={styles.attachmentLink} href={item.url} target="_blank" rel="noopener noreferrer" key={`${item.url}-${index}`}>{t.previewOpenAttachment}</a>)}
-    </div> : null}
+      {showCaption ? (post.message.trim() ? (
+        <div className={styles.message}>
+          {folded ? <>{folded.head}… <details className={styles.fold}><summary><span className={styles.foldMore}>{rendering!.copy.seeMore}</span><span className={styles.foldLess}>{rendering!.copy.seeLess}</span></summary>{folded.tail}</details></> : post.message}
+        </div>
+      ) : null) : post.message.trim() ? <p className={styles.renderNote} role="note">{rendering!.copy.noCaption}</p> : null}
 
-    {safeLink ? <p className={styles.sharedLink}><a href={safeLink} target="_blank" rel="noopener noreferrer">{t.previewOpenLink}</a></p> : null}
-    {commentUnsupported ? <p className={styles.renderNote} role="note">{rendering!.copy.noFirstComment}</p> : null}
-    {post.firstComment?.trim() ? <section className={styles.firstComment} aria-label={t.previewFirstComment}><strong>{t.previewFirstComment}</strong><p>{post.firstComment}</p></section>
-      : commentEmptySlot ? <p className={styles.emptyCommentSlot} aria-hidden="true">{rendering!.copy.emptyComment}</p> : null}
-    {actions ? <div className={styles.actions}>{actions}</div> : null}
-  </article>;
+      {hashtags.length > 0 ? (
+        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '-4px' }}>
+          <span className={styles.hashtagBadge} data-warning={hashtags.length > 30}>
+            #{hashtags.length} {hashtags.length === 1 ? 'hashtag' : 'hashtags'}{hashtags.length > 30 ? ' (Limit 30 exceeded)' : ''}
+          </span>
+        </div>
+      ) : null}
+
+      {mediaOverride !== undefined ? mediaOverride : media.length ? <div className={styles.media} data-aspect={rendering?.mediaAspect ?? undefined}>
+        {media.map((item, index) => item.kind === 'image'
+          ? <PostImage key={`${item.url}-${index}`} src={item.url} href={item.url} alt={item.altText?.trim() || t.previewImage} locale={locale} linkClassName={styles.imageLink} />
+          : item.kind === 'video'
+            ? <video className={styles.video} controls preload="metadata" aria-label={t.previewVideo} key={`${item.url}-${index}`}>
+                <source src={item.url} />
+                <a href={item.url} target="_blank" rel="noopener noreferrer">{t.previewOpenVideo}</a>
+              </video>
+            : <a className={styles.attachmentLink} href={item.url} target="_blank" rel="noopener noreferrer" key={`${item.url}-${index}`}>{t.previewOpenAttachment}</a>)}
+      </div> : null}
+
+      {safeLink ? <p className={styles.sharedLink}><a href={safeLink} target="_blank" rel="noopener noreferrer">{t.previewOpenLink}</a></p> : null}
+      {commentUnsupported ? <p className={styles.renderNote} role="note">{rendering!.copy.noFirstComment}</p> : null}
+      {post.firstComment?.trim() ? (
+        <section className={styles.firstComment} aria-label={t.previewFirstComment}>
+          <div className={styles.firstCommentHeader}>
+            <strong>{t.previewFirstComment}</strong>
+            <span className={styles.delayBadge}>+15m delay</span>
+          </div>
+          <p>{post.firstComment}</p>
+        </section>
+      ) : commentEmptySlot ? <p className={styles.emptyCommentSlot} aria-hidden="true">{rendering!.copy.emptyComment}</p> : null}
+      {actions ? <div className={styles.actions}>{actions}</div> : null}
+    </article>
+  );
+
+  return (
+    <div className="preview-container">
+      {variant === 'card' && (
+        <div className={styles.deviceControls}>
+          <div className={styles.deviceToggleGroup} role="radiogroup" aria-label="Device Preview">
+            <button type="button" className={styles.deviceButton} data-active={deviceFrame === 'none'} onClick={() => setDeviceFrame('none')}>Standard</button>
+            <button type="button" className={styles.deviceButton} data-active={deviceFrame === 'mobile'} onClick={() => setDeviceFrame('mobile')}>📱 Mobile</button>
+            <button type="button" className={styles.deviceButton} data-active={deviceFrame === 'desktop'} onClick={() => setDeviceFrame('desktop')}>💻 Desktop</button>
+          </div>
+        </div>
+      )}
+
+      {deviceFrame === 'mobile' ? (
+        <div className={styles.mobilePhoneFrame}>
+          <div className={styles.dynamicIsland} />
+          <div className={styles.statusBar}>
+            <span>9:41</span>
+            <div className={styles.statusIcons}>
+              <span>5G</span>
+              <span>100%</span>
+            </div>
+          </div>
+          {articleNode}
+        </div>
+      ) : deviceFrame === 'desktop' ? (
+        <div className={styles.desktopBrowserFrame}>
+          <div className={styles.browserHeader}>
+            <div className={styles.trafficLights}>
+              <span />
+              <span />
+              <span />
+            </div>
+            <div className={styles.browserAddressBar}>social.newsgeet.com</div>
+          </div>
+          {articleNode}
+        </div>
+      ) : (
+        articleNode
+      )}
+    </div>
+  );
 }

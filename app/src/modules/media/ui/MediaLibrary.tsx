@@ -51,6 +51,8 @@ export function MediaLibrary({ items, usage, page, hasMore, filters, canWrite, w
   const [force, setForce] = useState(false);
   const [confirmation, setConfirmation] = useState('');
   const [busy, setBusy] = useState(false);
+  const [cropAspect, setCropAspect] = useState<'orig' | '1:1' | '4:5' | '9:16' | '1.91:1'>('orig');
+  const [showWatermark, setShowWatermark] = useState(false);
   const [notice, setNotice] = useState<{ error: boolean; text: string; key: number } | null>(null);
   const inFlight = useRef(false);
   const fileInput = useRef<HTMLInputElement>(null);
@@ -156,7 +158,45 @@ export function MediaLibrary({ items, usage, page, hasMore, filters, canWrite, w
     {detail ? <SidePanel open title={detail.name} closeLabel={t('close')} onClose={() => setDetailId(null)}
       actions={canWrite && workspaceWide ? <><Button size="sm" disabled={busy} onClick={() => { setNotice(null); setConfirmation(''); setRenameName(detail.name); setRenaming(detail); }}>{t('rename')}</Button><Button size="sm" variant="danger" disabled={busy} onClick={() => { setNotice(null); setConfirmation(''); setForce(false); setRemoving(detail); }}>{t('delete')}</Button></> : undefined}>
       <div className={styles.detail}>
-        <div className={styles.detailPreview}>{detail.kind === 'image' && detail.source === 'stored-image' ? <img className={styles.detailImage} src={`/api/media/${encodeURIComponent(detail.id)}`} alt="" /> : <span className={styles.tileKind}>{detail.kind === 'video' ? t('video') : t('image')}</span>}</div>
+        <div className={styles.detailPreview} style={{ position: 'relative' }}>
+          {detail.kind === 'image' && detail.source === 'stored-image' ? (
+            <div style={{
+              width: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              aspectRatio: cropAspect === '1:1' ? '1 / 1' : cropAspect === '4:5' ? '4 / 5' : cropAspect === '9:16' ? '9 / 16' : cropAspect === '1.91:1' ? '1.91 / 1' : undefined,
+              maxHeight: '22rem',
+              overflow: 'hidden',
+              position: 'relative'
+            }}>
+              <img
+                className={styles.detailImage}
+                src={`/api/media/${encodeURIComponent(detail.id)}`}
+                alt=""
+                style={{ objectFit: cropAspect === 'orig' ? 'contain' : 'cover', width: '100%', height: '100%' }}
+              />
+              {showWatermark && <span className={styles.watermarkOverlay}>© MS SOCIAL PILOT</span>}
+            </div>
+          ) : <span className={styles.tileKind}>{detail.kind === 'video' ? t('video') : t('image')}</span>}
+        </div>
+
+        {detail.kind === 'image' && (
+          <div className={styles.cropSection}>
+            <p className={styles.cropTitle}>Non-Destructive Crop & Presets</p>
+            <div className={styles.cropPresets}>
+              <button type="button" className={styles.cropPresetBtn} data-active={cropAspect === 'orig'} onClick={() => setCropAspect('orig')}>Original</button>
+              <button type="button" className={styles.cropPresetBtn} data-active={cropAspect === '1:1'} onClick={() => setCropAspect('1:1')}>1:1 Square</button>
+              <button type="button" className={styles.cropPresetBtn} data-active={cropAspect === '4:5'} onClick={() => setCropAspect('4:5')}>4:5 Portrait</button>
+              <button type="button" className={styles.cropPresetBtn} data-active={cropAspect === '9:16'} onClick={() => setCropAspect('9:16')}>9:16 Story/Reel</button>
+              <button type="button" className={styles.cropPresetBtn} data-active={cropAspect === '1.91:1'} onClick={() => setCropAspect('1.91:1')}>1.91:1 Landscape</button>
+            </div>
+            <label className={styles.watermarkToggle}>
+              <input type="checkbox" checked={showWatermark} onChange={e => setShowWatermark(e.target.checked)} />
+              <span>Preview Workspace Watermark</span>
+            </label>
+          </div>
+        )}
         <dl className={styles.facts}>
           <div><dt>{t('type')}</dt><dd>{detail.kind === 'video' ? t('video') : t('image')}</dd></div>
           <div><dt>{t('colFile')}</dt><dd>{detail.mimeType} · {size(detail.size)}</dd></div>
