@@ -1732,9 +1732,13 @@ Llama: wired as 4th provider (`llamaPort`, OpenAI-compatible) and covered
 by `ai-provider-ports` tests, but production has no Llama key
 (`ai.provider=openai`, keys present only for anthropic/gemini/openai).
 Live check BLOCKED on the owner provisioning a Meta API key.
-Instagram live checklist, dry-run rehearsal: still open.
-retention natural slot: tomorrow 01:17 UTC. Rollups natural slot: today
-23:30 UTC (post-fix).
+Instagram live checklist, dry-run rehearsal: still open (rehearsal since
+proven, see below). Rollups natural slot: today 23:30 UTC (post-fix) —
+a one-shot check is scheduled for 23:45 UTC (cron 98d4c32c).
+Retention (`17 3 * * *` server-local): tomorrow 02:17 UTC, not 01:17 —
+EU DST ends Oct 25, so 03:17 local falls back to CET (02:17 UTC).
+Live release runs 6a6dbf75 (batch 16); later commits to origin/main are
+docs/evidence only and ride the next app deploy.
 
 ## Webhook proof (2026-10-24 ~01:55 UTC)
 Receiver proven end-to-end against production config: live route returns
