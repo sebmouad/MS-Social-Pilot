@@ -1,1 +1,0 @@
-LANE: performance. OWNED: src/modules/*/server/** read paths, src/app/**/loading.tsx, tests. Find N+1 queries, sequential awaits that can be parallel, missing pagination limits, heavy client components that can be server components, large payloads to client (e.g. /analytics/posts froze Chrome). Fix with tests proving query counts or payload bounds. Root-configurable limits only.

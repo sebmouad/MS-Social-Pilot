@@ -1,1 +1,0 @@
-LANE: Ads object row refresh after change. OWNED: src/modules/ads/ui/objects/**, tests. After a confirmed rename/status/budget change succeeds, the object row label and status must update immediately (router refresh or local state), without reload. Test.

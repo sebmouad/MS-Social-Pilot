@@ -1,1 +1,0 @@
-LANE: Facebook Groups end-to-end check. OWNED: src/platforms/facebook group files, tests. Verify Group discovery/selection/publishing path against legacy behavior and Meta's current Group API availability; fixture tests for denial path; document honestly in GROUPS.md.
