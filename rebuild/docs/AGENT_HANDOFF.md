@@ -1,10 +1,10 @@
 # Shared agent handoff
 
-Updated 2026-10-24: batch 18 (`dc82625b`) deployed live (`DEPLOY OK
-dc82625b`), schema **142**. Full goal remains active. Historical records
+Updated 2026-10-24: UI/UX audit Batches 1–3 (`f75d795b`) deployed live (`DEPLOY OK
+f75d795b`), schema **142**. Full goal remains active. Historical records
 below retain their dates; current source reconciliation wins.
 
-## UI/UX audit — 2026-10-24 (Batches 1, 2 & 3 + Phone/Root polish implemented, pushed)
+## UI/UX audit — 2026-10-24 (Batches 1, 2 & 3 + Phone/Root polish deployed live)
 
 [UX_AUDIT_2026-10-24.md](UX_AUDIT_2026-10-24.md) lists the screenshot audit of
 37 routes at 1440/390 on the synthetic preview. Batch 1 (quick fixes, items
