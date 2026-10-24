@@ -1,8 +1,31 @@
 # Shared agent handoff
 
-Updated 2026-10-24: batch 17 (`b9931114`) deployed live (`DEPLOY OK
-b9931114`), schema **142**. Full goal remains active. Historical records
+Updated 2026-10-24: batch 18 (`dc82625b`) deployed live (`DEPLOY OK
+dc82625b`), schema **142**. Full goal remains active. Historical records
 below retain their dates; current source reconciliation wins.
+
+## Batch 18 — 2026-10-24 (deployed, browser-verified)
+
+User request: "improve UI with graphs". Audit found the overview,
+campaigns, compare, explore and audience screens already chart with
+real data; the genuine gaps were Ads accounts (no charts) and Ads
+analysis (sparklines only):
+
+- **Accounts hero** (`AccountsTrendCharts`): one stacked spend panel
+  per currency plus a shared impressions panel, top 12 accounts by
+  spend with an explicit capped note. Zero new queries (summaries
+  already loaded).
+- **Analysis hero** (`ObjectsTrendCharts`): same pattern over the
+  filtered selection; service aggregates `accountDaily` pre-paging so
+  the hero never disagrees with the table.
+- **Shared `TrendChart`**: lines for several days, grouped bars for a
+  single stored day (no more lone dots); `CampaignCharts` refactored
+  onto it.
+- New copy: ads `text273-276` (EN+FR, narrow-nbsp typography),
+  records "Selection trend / Daily spend / Daily impressions".
+- Evidence: root suite 779 files / 12313 passed / 0 failed, ad-objects
+  suite 29/29, typecheck clean; preview screenshots of both heroes
+  verified (per-currency panels, bar-vs-line switch, legend).
 
 ## Batch 17 — 2026-10-24 (deployed, proven at production scale)
 
