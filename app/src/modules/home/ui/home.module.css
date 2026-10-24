@@ -9,7 +9,8 @@
 .main > *, .rail > * { grid-column: auto; }
 .rail { grid-column: span 4; display: grid; gap: var(--space-4); min-width: 0; }
 .rail > * { grid-column: auto; }
-.card { display: grid; align-content: start; gap: var(--space-3); min-width: 0; padding: var(--space-4) var(--space-5); border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface); }
+.card { display: grid; align-content: start; gap: var(--space-3); min-width: 0; padding: var(--space-4) var(--space-5); border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface); box-shadow: var(--shadow-card); transition: transform var(--ease-fast), box-shadow var(--ease-fast), border-color var(--ease-fast); }
+.card:hover { transform: translateY(-1px); box-shadow: var(--shadow-card-hover); border-color: var(--line-strong); }
 .cardHead { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); min-width: 0; }
 .cardHead h2 { display: inline-flex; align-items: center; gap: var(--space-2); flex: 1; min-width: 0; margin: 0; font-size: var(--text-base); }
 .chip { display: inline-flex; color: var(--mod); }

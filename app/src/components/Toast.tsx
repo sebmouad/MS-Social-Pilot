@@ -41,6 +41,7 @@ function ToastView({ toast, dismissLabel, onDismiss }: { toast: ToastItem; dismi
     <div className="ui-toast__text"><strong>{toast.title}</strong>{toast.description && <p>{toast.description}</p>}</div>
     {toast.action && <button type="button" className="ui-toast__action" onClick={() => { toast.action!.onAction(); onDismiss(); }}>{toast.action.label}</button>}
     <button type="button" className="ui-toast__close" aria-label={dismissLabel} onClick={onDismiss}><IconX size={16} stroke={1.75} aria-hidden="true" /></button>
+    {duration > 0 && <span className="ui-toast__progress" style={{ animationDuration: `${duration}ms`, animationPlayState: paused ? "paused" : "running" }} aria-hidden="true" />}
   </li>;
 }
 

@@ -36,7 +36,8 @@
 .filters select { width: 100%; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); padding: .6rem .7rem; background: var(--surface); color: var(--ink); font: inherit; }
 /* Design v2 S6: library as a grid of thumbnails with usage, size and actions. */
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: var(--space-4); margin: 0; padding: 0; list-style: none; }
-.tile { display: grid; grid-template-rows: auto 1fr auto; min-width: 0; overflow: hidden; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface); box-shadow: var(--shadow-card); }
+.tile { display: grid; grid-template-rows: auto 1fr auto; min-width: 0; overflow: hidden; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface); box-shadow: var(--shadow-card); transition: transform var(--ease-fast), box-shadow var(--ease-fast), border-color var(--ease-fast); }
+.tile:hover { transform: translateY(-1px); box-shadow: var(--shadow-card-hover); border-color: var(--line-strong); }
 .tile .preview { position: relative; display: grid; place-items: center; max-width: none; aspect-ratio: 4 / 3; overflow: hidden; background: var(--surface-muted); white-space: normal; }
 .tileImage { display: block; width: 100%; height: 100%; object-fit: cover; }
 .tileKind { color: var(--ink-soft); font-size: var(--text-md); font-weight: 650; }

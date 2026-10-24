@@ -1,7 +1,7 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
-import { IconChevronsLeft, IconChevronsRight, IconCheck, IconChevronDown, IconHelp, IconLogout, IconMenu2, IconMoon, IconPlus, IconSettings, IconShieldLock, IconSun, IconUserCircle, IconX } from "@tabler/icons-react";
+import { IconChevronsLeft, IconChevronsRight, IconCheck, IconChevronDown, IconHelp, IconKeyboard, IconLogout, IconMenu2, IconMoon, IconPlus, IconSettings, IconShieldLock, IconSun, IconUserCircle, IconX } from "@tabler/icons-react";
 import { MODULES, areaForPath, areaPages, pageForPath, type AreaId, type ModuleId } from "@/lib/product";
 import { HUB_ORDER, hubForPath, hubPages, type HubId } from "@/lib/hubs";
 import { nextChannelScope, parseChannelScope, withChannelScope } from "@/lib/channel-scope";
@@ -18,6 +18,8 @@ import { Menu, type MenuItem } from "./Menu";
 import { Avatar } from "./Avatar";
 import { Drawer } from "./Drawer";
 import { useOptionalTheme, MODES } from "./ThemeProvider";
+import { useShortcut } from "./ShortcutHint";
+import { KeyboardShortcutsModal } from "./KeyboardShortcutsModal";
 import { LANGUAGE_COOKIE, type Language } from "@/lib/language";
 
 function Mark() {
@@ -88,8 +90,18 @@ export function AppShell({ children, activeModule, enabledModules, enabledFeatur
   const [signingOut, setSigningOut] = useState(false);
   const [accountError, setAccountError] = useState("");
   const [navigating, setNavigating] = useState(false);
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const sidebarRef = useRef<HTMLElement>(null);
   const menuToggleRef = useRef<HTMLButtonElement>(null);
+
+  useShortcut("?", () => setShortcutsOpen(true), !shortcutsOpen);
+  useShortcut("mod+/", () => setShortcutsOpen(true), !shortcutsOpen);
+  useShortcut("c", () => { window.location.assign("/create"); }, !shortcutsOpen && !installationMode);
+  useShortcut("g h", () => { window.location.assign("/home"); }, !shortcutsOpen);
+  useShortcut("g c", () => { window.location.assign("/content/calendar"); }, !shortcutsOpen);
+  useShortcut("g i", () => { window.location.assign("/inbox"); }, !shortcutsOpen);
+  useShortcut("g a", () => { window.location.assign("/insights"); }, !shortcutsOpen);
+  useShortcut("g s", () => { window.location.assign("/settings/workspace"); }, !shortcutsOpen);
 
   const activeHub = installationMode ? undefined : hubForPath(pathname, activeModule);
   const activeArea = installationMode ? undefined : areaForPath(pathname, activeModule);
@@ -348,6 +360,16 @@ export function AppShell({ children, activeModule, enabledModules, enabledFeatur
             {installationMode && <span className="shell-root-badge"><ModuleGlyph id="root" size={15} /><span>{copy.rootBadge}</span></span>}
           </div>
           <div className="shell-topbar__tools">
+            <button
+              type="button"
+              className="ui-icon-button"
+              onClick={() => setShortcutsOpen(true)}
+              aria-label="Keyboard Shortcuts (?)"
+              title="Keyboard Shortcuts (?)"
+              style={{ width: "32px", height: "32px", borderRadius: "var(--radius-sm)" }}
+            >
+              <IconKeyboard size={17} stroke={1.8} aria-hidden="true" />
+            </button>
             {theme && (
               <button
                 type="button"
@@ -381,6 +403,7 @@ export function AppShell({ children, activeModule, enabledModules, enabledFeatur
       {scopeOpen && showScope && <Drawer open title={copy.scopeSheetTitle} variant="sheet" closeLabel={copy.close} onClose={() => setScopeOpen(false)}>
         <ChannelScopeList channels={channels as ScopeChannel[]} selectedIds={scope} onSelect={onSelectChannel} onReset={() => applyScope([])} collapsedCount={policy.channelsCollapsedCount} searchThreshold={policy.channelSearchThreshold} manageHref={enabledFeatures.includes("settings/connections") ? "/settings/channels" : undefined} busy={navigating} scopeActive={scopeActive} />
       </Drawer>}
+      <KeyboardShortcutsModal open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
     </div>
   </ToastProvider></ShellCopyProvider>;
 }

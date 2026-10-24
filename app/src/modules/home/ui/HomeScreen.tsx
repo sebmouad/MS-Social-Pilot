@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { IconAlertTriangle, IconArrowUpRight, IconCalendarEvent, IconClockHour4, IconEye, IconHeart, IconInbox, IconLink, IconPlugConnected, IconSpeakerphone, IconUsers } from '@tabler/icons-react';
+import { IconAlertTriangle, IconArrowUpRight, IconCalendarEvent, IconClockHour4, IconEye, IconHeart, IconInbox, IconLink, IconPlugConnected, IconPlus, IconSparkles, IconSpeakerphone, IconUsers } from '@tabler/icons-react';
 import { InfoTip } from '@/components/InfoTip';
 import { ListRow } from '@/components/ListRow';
 import { HomeRetry } from './HomeRetry';
@@ -119,6 +119,30 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   return <PageFrame module="home"><div className={styles.root}>
     <PageHeader module="home" title={viewer.user.name ? `${t.greeting}, ${viewer.user.name}` : t.greeting}
       actions={<><Badge tone="neutral" icon={<IconCalendarEvent size={14} />}>{dayFormat.format(periodStart)} – {dayFormat.format(periodEnd)}</Badge><InfoTip name={t.metrics}><p>{fill(t.period, { n: days })}</p></InfoTip></>} />
+    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', margin: '-4px 0 8px' }}>
+      <a className="ui-button ui-button--primary ui-button--sm" href="/create">
+        <IconPlus size={15} stroke={2.2} />
+        <span>Create Post</span>
+        <kbd className="ui-kbd" style={{ background: 'rgba(255,255,255,0.2)', color: 'inherit', border: 'none', marginLeft: '4px', fontSize: '10px', height: '17px', minWidth: '17px' }}>C</kbd>
+      </a>
+      <a className="ui-button ui-button--secondary ui-button--sm" href="/content/calendar">
+        <IconCalendarEvent size={15} stroke={1.8} />
+        <span>{t.openCalendar}</span>
+      </a>
+      <a className="ui-button ui-button--secondary ui-button--sm" href="/inbox">
+        <IconInbox size={15} stroke={1.8} />
+        <span>{t.moduleNames.inbox}</span>
+        {overview.inbox?.state === 'ready' && overview.inbox.data.open > 0 && (
+          <span style={{ fontSize: '10px', background: 'var(--accent)', color: 'var(--on-accent)', padding: '1px 6px', borderRadius: '999px', fontWeight: 700 }}>
+            {number.format(overview.inbox.data.open)}
+          </span>
+        )}
+      </a>
+      <a className="ui-button ui-button--secondary ui-button--sm" href="/content/ai-studio">
+        <IconSparkles size={15} stroke={1.8} />
+        <span>AI Studio</span>
+      </a>
+    </div>
     {attentionRows.length > 0 && <section className={styles.attention} aria-label={t.attention}>
       <h2>{t.attention}{attention?.partial ? <InfoTip name={t.attention} warning><p>{t.attentionPartialNote}</p></InfoTip> : null}</h2>
       {attentionRows.map(row => <ListRow key={row.key} leading={row.icon} title={row.title} href={row.href} className={row.key === 'failed' || row.key === 'reconnect' ? styles.danger : row.key === 'partial' ? styles.warning : ''} trailing={<span className={styles.review} title={t.attentionReview}><IconArrowUpRight size={16} aria-hidden="true" /></span>} />)}

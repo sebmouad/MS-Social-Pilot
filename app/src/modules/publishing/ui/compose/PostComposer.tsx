@@ -131,7 +131,7 @@ function selectedMediaIssue(targets: TargetChoice[], formats: Record<string, str
   return localUploadIssue(targets, items, ui);
 }
 
-function PostComposerContent({ copyCatalog = composerCatalogDefaults, profiles, targets, templates = [], labels = [], imageRules, schedule, authorName, createdAt, createdAtDisplay, maxFirstCommentDelayMinutes, spacingGapMinutes = 0, aiStatus, aiLocale = 'en', queueAvailable = false, remoteScheduling, autosaveSeconds = 0, initialTargetIds = [], closeHref = '/content' }: { initialTargetIds?: string[]; closeHref?: string; copyCatalog?: ComposerCatalog; autosaveSeconds?: number; remoteScheduling?: { offered: boolean; defaultMode: 'application' | 'remote' }; profiles?: ProfileDirectory; queueAvailable?: boolean; aiStatus?: AiStatus; aiLocale?: 'en' | 'fr'; targets: TargetChoice[]; templates?: ComposerTemplate[]; labels?: Array<{ id: string; name: string }>; imageRules: ImageRules; schedule: Schedule; authorName: string; createdAt: Date; createdAtDisplay: string; maxFirstCommentDelayMinutes: number; spacingGapMinutes?: number }) {
+function PostComposerContent({ copyCatalog = composerCatalogDefaults, profiles, targets, templates = [], labels = [], imageRules, schedule, authorName, createdAt, createdAtDisplay, maxFirstCommentDelayMinutes, spacingGapMinutes = 0, aiStatus, aiLocale = 'en', queueAvailable = false, remoteScheduling, autosaveSeconds = 0, initialTargetIds = [], initialMessage, initialMediaUrls, initialLink, closeHref = '/content' }: { initialTargetIds?: string[]; initialMessage?: string; initialMediaUrls?: string[]; initialLink?: string; closeHref?: string; copyCatalog?: ComposerCatalog; autosaveSeconds?: number; remoteScheduling?: { offered: boolean; defaultMode: 'application' | 'remote' }; profiles?: ProfileDirectory; queueAvailable?: boolean; aiStatus?: AiStatus; aiLocale?: 'en' | 'fr'; targets: TargetChoice[]; templates?: ComposerTemplate[]; labels?: Array<{ id: string; name: string }>; imageRules: ImageRules; schedule: Schedule; authorName: string; createdAt: Date; createdAtDisplay: string; maxFirstCommentDelayMinutes: number; spacingGapMinutes?: number }) {
   const router = useRouter();
   const navigated = useRef<ComposerActionState | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
@@ -139,7 +139,7 @@ function PostComposerContent({ copyCatalog = composerCatalogDefaults, profiles, 
   const [state, formAction, pending] = useActionState(saveWithTransportRecovery.bind(null, copyCatalog.transportFailure[aiLocale]), INITIAL_STATE);
   const saved = state.status === 'success';
   const initial = state.values;
-  const [message, setMessage] = useState(initial.message ?? '');
+  const [message, setMessage] = useState(initial.message ?? initialMessage ?? '');
   const [firstComment, setFirstComment] = useState(initial.firstComment ?? '');
   const [firstCommentDelayMinutes, setFirstCommentDelayMinutes] = useState(initial.firstCommentDelayMinutes ?? '0');
   const [firstCommentDelayError, setFirstCommentDelayError] = useState('');
@@ -147,7 +147,7 @@ function PostComposerContent({ copyCatalog = composerCatalogDefaults, profiles, 
   // would be rejected at save time, so it is dropped here instead of submitted blindly.
   const knownLabel = (id: string | null | undefined) => id && labels.some(label => label.id === id) ? id : '';
   const [labelId, setLabelId] = useState(knownLabel(initial.labelId));
-  const [link, setLink] = useState(initial.link ?? '');
+  const [link, setLink] = useState(initial.link ?? initialLink ?? '');
   const [selectedTargets, setSelectedTargets] = useState<string[]>(initial.targetIds ?? initialTargetIds);
   const [formatChoices, setFormatChoices] = useState<Record<string, string>>(() => parseFormats(initial.destinationFormatsJson));
   const [publishNowFlag, setPublishNowFlag] = useState(false);
@@ -256,7 +256,7 @@ function PostComposerContent({ copyCatalog = composerCatalogDefaults, profiles, 
     return JSON.stringify(out);
   }, [selected, formatChoices]);
   const attachments = usePostAttachments({
-    initialMedia: initialMedia(initial.mediaJson),
+    initialMedia: initial.mediaJson ? initialMedia(initial.mediaJson) : initialMediaUrls?.length ? initialMediaUrls.map(url => ({ kind: 'image' as const, url })) : [],
     maxMedia: imageRules.maxMedia,
     maxAltCharacters: imageRules.maxAltCharacters,
     allowedMimeTypes: uploadRules.allowedMimeTypes,
@@ -557,6 +557,29 @@ function PostComposerContent({ copyCatalog = composerCatalogDefaults, profiles, 
             <span className={styles.counter} id="composer-message-count">{fillContent(cc.createCounter, { used: message.length.toLocaleString(aiLocale), max: imageRules.maxMessageCharacters.toLocaleString(aiLocale) })}</span>
           </div>
         </div>
+        {(() => {
+          const overflows = selected.map(target => {
+            const type = (target.type || target.platformName || '').toLowerCase();
+            const limit = type.includes('twitter') || type.includes('x') ? 280
+              : type.includes('threads') ? 500
+              : type.includes('instagram') ? 2200
+              : type.includes('tiktok') ? 2200
+              : type.includes('linkedin') ? 3000
+              : 63206;
+            const overBy = message.length - limit;
+            return { target, limit, overBy, isOver: overBy > 0 };
+          }).filter(item => item.isOver);
+          if (!overflows.length) return null;
+          return (
+            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '6px' }}>
+              {overflows.map(item => (
+                <span key={item.target.id} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '11px', fontWeight: 650, color: 'var(--danger)', background: 'var(--danger-soft)', padding: '2px 8px', borderRadius: '4px' }}>
+                  ⚠️ {channelName(item.target)}: {item.overBy} chars over {item.limit} limit
+                </span>
+              ))}
+            </div>
+          );
+        })()}
         {hookAnalysis && hookScorerOpen && (
           <div style={{ background: 'var(--surface-raised)', border: '1px solid var(--line)', borderRadius: 'var(--radius-sm)', padding: '12px', marginTop: '10px' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>

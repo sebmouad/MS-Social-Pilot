@@ -58,9 +58,12 @@ export function CommandPalette({ copy: t }: { copy: CommandCopy }) {
       { kind: 'action', key: 'qa-post', title: 'Create New Post', sub: 'Publishing', href: '/content/post' },
       { kind: 'action', key: 'qa-cal', title: 'Open Content Calendar', sub: 'Publishing', href: '/content/calendar' },
       { kind: 'action', key: 'qa-inbox', title: 'Triage Social Inbox', sub: 'Community', href: '/inbox' },
+      { kind: 'action', key: 'qa-ai', title: 'Open Content Multiplier & AI Studio', sub: 'Studio', href: '/content/ai-studio' },
+      { kind: 'action', key: 'qa-media', title: 'Open Media Assets Library', sub: 'Media', href: '/content/library' },
       { kind: 'action', key: 'qa-recipe', title: 'Run WordPress Recipe Planner', sub: 'Automation', href: '/content/feeds' },
       { kind: 'action', key: 'qa-insights', title: 'View Analytics & Performance', sub: 'Analytics', href: '/insights' },
       { kind: 'action', key: 'qa-ads', title: 'Manage Meta Ads', sub: 'Campaigns', href: '/ads/manage' },
+      { kind: 'action', key: 'qa-review', title: 'Client Review & Approval Rooms', sub: 'Sharing', href: '/settings/sharing' },
     ];
 
     if (themeCtx) {

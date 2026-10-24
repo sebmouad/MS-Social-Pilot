@@ -36,6 +36,7 @@ export function CalendarBoard({ view, days, timeZone, nowIso, canCreate, filterQ
   const nowMs = Date.parse(nowIso);
   const [move, setMove] = useState<Move | null>(null);
   const [previewPost, setPreviewPost] = useState<BoardPost | null>(null);
+  const [boardSearch, setBoardSearch] = useState("");
   const [notice, setNotice] = useState<Notice>(null);
   const [over, setOver] = useState<string | null>(null);
   const [weekLayout, setWeekLayout] = useState<"timeline" | "lanes">("timeline");
@@ -93,18 +94,27 @@ export function CalendarBoard({ view, days, timeZone, nowIso, canCreate, filterQ
     onDrop: (event: DragEvent) => dropOn(event, date, time),
   };
 
-  const postCard = (post: BoardPost) => <div key={post.id} className={styles.post} data-status={post.status} data-group={postGroup(post.status)} data-movable={post.movable || undefined} style={post.channels[0] ? { ["--chip" as string]: post.channels[0].mark.color } : undefined}
-    draggable={post.movable} onDragStart={event => { dragged.current = post; event.dataTransfer.effectAllowed = "move"; event.dataTransfer.setData("text/plain", post.id); }} onDragEnd={() => { dragged.current = null; setOver(null); }}>
-    <div className={styles.postMeta}><time dateTime={post.whenIso}>{timeOf(post)}</time><StatusChip status={post.status} compact /></div>
-    <div className={styles.postBody}>
-      {post.preview && postThumbnail(post.preview.media) ? <PostThumb thumb={postThumbnail(post.preview.media)} size="sm" /> : null}
-      <p className={styles.postText} title={post.text}>{post.text || copy.calendarNoText}</p>
-    </div>
-    {post.origin ? <OriginBadge origin={post.origin} compact /> : null}
-    <div className={styles.postChannels}>{post.channels.length ? post.channels.slice(0, 4).map(channel => <ChannelBadge key={channel.id} name={channel.name} platformName={channel.platformName} mark={channel.mark} compact />) : <span className={styles.muted}>{copy.calendarNoChannels}</span>}{post.channels.length > 4 && <span className={styles.muted}>+{post.channels.length - 4}</span>}</div>
-    {post.movable && <button type="button" className={styles.moveButton} aria-haspopup="dialog" onClick={() => startMove(post)}>{copy.move}<span className="ui-visually-hidden">{fillCopy(copy.movePostLabel, {text: post.text.slice(0, 40) || copy.noText, time: timeOf(post)})}</span></button>}
-    {post.preview && <button type="button" className={styles.viewButton} aria-haspopup="dialog" aria-label={fillCopy(copy.viewPostLabel, {text:post.text.slice(0,60) || copy.noText})} onClick={() => setPreviewPost(post)}>{copy.viewPost}</button>}
-  </div>;
+  const postCard = (post: BoardPost) => {
+    const isMatch = !boardSearch.trim()
+      || post.text.toLowerCase().includes(boardSearch.toLowerCase())
+      || post.channels.some(channel => channel.name.toLowerCase().includes(boardSearch.toLowerCase()));
+    return <div key={post.id} className={styles.post} data-status={post.status} data-group={postGroup(post.status)} data-movable={post.movable || undefined}
+      style={{
+        ...(post.channels[0] ? { ["--chip" as string]: post.channels[0].mark.color } : {}),
+        ...(!isMatch ? { opacity: 0.18, filter: 'grayscale(1)', pointerEvents: 'none' as const } : {}),
+      }}
+      draggable={post.movable} onDragStart={event => { dragged.current = post; event.dataTransfer.effectAllowed = "move"; event.dataTransfer.setData("text/plain", post.id); }} onDragEnd={() => { dragged.current = null; setOver(null); }}>
+      <div className={styles.postMeta}><time dateTime={post.whenIso}>{timeOf(post)}</time><StatusChip status={post.status} compact /></div>
+      <div className={styles.postBody}>
+        {post.preview && postThumbnail(post.preview.media) ? <PostThumb thumb={postThumbnail(post.preview.media)} size="sm" /> : null}
+        <p className={styles.postText} title={post.text}>{post.text || copy.calendarNoText}</p>
+      </div>
+      {post.origin ? <OriginBadge origin={post.origin} compact /> : null}
+      <div className={styles.postChannels}>{post.channels.length ? post.channels.slice(0, 4).map(channel => <ChannelBadge key={channel.id} name={channel.name} platformName={channel.platformName} mark={channel.mark} compact />) : <span className={styles.muted}>{copy.calendarNoChannels}</span>}{post.channels.length > 4 && <span className={styles.muted}>+{post.channels.length - 4}</span>}</div>
+      {post.movable && <button type="button" className={styles.moveButton} aria-haspopup="dialog" onClick={() => startMove(post)}>{copy.move}<span className="ui-visually-hidden">{fillCopy(copy.movePostLabel, {text: post.text.slice(0, 40) || copy.noText, time: timeOf(post)})}</span></button>}
+      {post.preview && <button type="button" className={styles.viewButton} aria-haspopup="dialog" aria-label={fillCopy(copy.viewPostLabel, {text:post.text.slice(0,60) || copy.noText})} onClick={() => setPreviewPost(post)}>{copy.viewPost}</button>}
+    </div>;
+  };
 
   const milestoneList = (day: BoardDay) => day.milestones?.length
     ? <ul className={styles.milestones} aria-label={day.longLabel}>{day.milestones.map(item => <li key={item.id} title={item.title}>{item.title}</li>)}</ul> : null;
@@ -159,11 +169,41 @@ export function CalendarBoard({ view, days, timeZone, nowIso, canCreate, filterQ
     <div className={styles.live} role="status" aria-live="polite">{notice?.kind === "ok" ? <p className={styles.noticeOk}>{notice.text}</p> : null}</div>
     {notice?.kind === "error" ? <p className={styles.noticeError} role="alert">{notice.text}</p> : null}
     <p className={styles.hint}>{canCreate ? copy.startNew : ""}{fillCopy(copy.dragHint, {slot:view === "week" ? copy.timeSlot : copy.daySlot,zone:timeZone.replaceAll("_", " ")})}{view === "week" && firstHour > 0 ? copy.earlierHours : ""}</p>
-    <p className={styles.legend} aria-label={copy.calendarLegend}>
-      <span className={styles.legendItem} data-group="planned"><strong>{copy.groupPlanned}</strong> · {copy.groupPlannedHint}</span>
-      <span className={styles.legendItem} data-group="outcome"><strong>{copy.groupOutcome}</strong> · {copy.groupOutcomeHint}</span>
-      {showQuiet && <span className={styles.legendQuiet}>{content.calendarQuietLegend}</span>}
-    </p>
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap', margin: '4px 0 8px' }}>
+      <p className={styles.legend} aria-label={copy.calendarLegend} style={{ margin: 0 }}>
+        <span className={styles.legendItem} data-group="planned"><strong>{copy.groupPlanned}</strong> · {copy.groupPlannedHint}</span>
+        <span className={styles.legendItem} data-group="outcome"><strong>{copy.groupOutcome}</strong> · {copy.groupOutcomeHint}</span>
+        {showQuiet && <span className={styles.legendQuiet}>{content.calendarQuietLegend}</span>}
+      </p>
+      <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
+        <input
+          type="search"
+          placeholder="Filter posts on board..."
+          value={boardSearch}
+          onChange={e => setBoardSearch(e.target.value)}
+          style={{
+            height: '30px',
+            fontSize: '11.5px',
+            padding: '0 24px 0 8px',
+            borderRadius: 'var(--radius-sm)',
+            border: '1px solid var(--control-border)',
+            background: 'var(--surface)',
+            color: 'var(--ink)',
+            width: '180px',
+          }}
+        />
+        {boardSearch && (
+          <button
+            type="button"
+            onClick={() => setBoardSearch('')}
+            style={{ position: 'absolute', right: '6px', border: 'none', background: 'transparent', color: 'var(--ink-faint)', cursor: 'pointer', fontSize: '13px' }}
+            aria-label="Clear filter"
+          >
+            ×
+          </button>
+        )}
+      </div>
+    </div>
 
     {view === "month" ? <div className={styles.monthWrap}>
       <div className={styles.weekdays} aria-hidden="true">{days.slice(0, 7).map(day => <span key={day.key}>{new Intl.DateTimeFormat(locale === "fr" ? "fr-FR" : "en-US", { weekday: "short", timeZone: "UTC" }).format(new Date(`${day.key}T12:00:00Z`))}</span>)}</div>
