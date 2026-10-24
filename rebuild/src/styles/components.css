@@ -241,7 +241,7 @@ th[aria-sort="ascending"], th[aria-sort="descending"] { color: var(--ink); }
 .ui-chip--ok { background: var(--success-soft); color: var(--success); }
 
 /* ---- Metric card ---- */
-.ui-metric { display: grid; align-content: start; gap: 8px; min-width: 0; padding: 18px 20px; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface); box-shadow: var(--card-lift); }
+.ui-metric { display: grid; align-content: start; gap: 8px; min-width: 0; overflow: clip; padding: 18px 20px; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface); box-shadow: var(--card-lift); }
 .ui-metric__top { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
 .ui-metric__heading { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
 .ui-metric:has(> .ui-metric__footer) { display: flex; flex-direction: column; height: 100%; }

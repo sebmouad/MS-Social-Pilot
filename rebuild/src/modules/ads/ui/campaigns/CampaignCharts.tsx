@@ -1,7 +1,7 @@
 'use client';
 import { useAdsText } from '@/modules/ads/ui/AdsCopyProvider';
 import { IconClick, IconCoin, IconEye, IconPercentage } from '@tabler/icons-react';
-import { FunnelChart, TimeSeriesChart } from '@/components/charts';
+import { BarChart, FunnelChart, TimeSeriesChart } from '@/components/charts';
 import { MetricCard } from '@/components/MetricCard';
 import type { AdsSummary } from '@/modules/ads/server/summary';
 
@@ -44,10 +44,16 @@ export function CampaignCharts({ accountName, rows, locale }: { accountName: str
     <div className="ads-campaign-charts__grid">
       <div className="ads-campaign-charts__panel">
         <h3>{t('text151')}</h3>
-        <TimeSeriesChart locale={locale} height={CHART_HEIGHT} label={t('text152', { value0: accountName })}
-          format={currency ? { style: 'currency', currency } : undefined}
-          series={campaigns.filter(row => row.dailyMetrics.length).map(row => ({ id: row.id, name: row.name,
-            points: [...row.dailyMetrics].sort((a, b) => a.date.getTime() - b.date.getTime()).map(entry => ({ t: day(entry.date), v: entry.spend })) }))} />
+        {spendDays.length > 1
+          ? <TimeSeriesChart locale={locale} height={CHART_HEIGHT} label={t('text152', { value0: accountName })}
+            format={currency ? { style: 'currency', currency } : undefined}
+            series={campaigns.filter(row => row.dailyMetrics.length).map(row => ({ id: row.id, name: row.name,
+              points: [...row.dailyMetrics].sort((a, b) => a.date.getTime() - b.date.getTime()).map(entry => ({ t: day(entry.date), v: entry.spend })) }))} />
+          : <BarChart locale={locale} height={CHART_HEIGHT} label={t('text152', { value0: accountName })}
+            format={currency ? { style: 'currency', currency } : undefined}
+            categories={spendDays.map(([date]) => date)}
+            series={campaigns.filter(row => row.dailyMetrics.length).map((row, index) => ({ id: row.id, name: row.name, color: index,
+              values: spendDays.map(([date]) => row.dailyMetrics.find(entry => day(entry.date) === date)?.spend ?? null) }))} />}
       </div>
       <div className="ads-campaign-charts__panel">
         <h3>{t('text153')}</h3>

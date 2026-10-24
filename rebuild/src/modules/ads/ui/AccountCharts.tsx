@@ -17,7 +17,7 @@ export function AccountCharts({ row, locale = 'en' }: { row: AdsSummary; locale?
     <div className="metric-grid">
       <MetricCard module="ads" icon={<IconCoin />} label={spend} value={money(row.spend)} hint={row.currency ?? t('text144')} sparkline={days.map(day => day.spend)} />
       <MetricCard module="ads" icon={<IconEye />} label={t('text020')} value={number.format(row.impressions)} sparkline={days.map(day => day.impressions)} />
-      <MetricCard module="ads" icon={<IconPercentage />} label={t('text025')} value={row.ctr === null ? '—' : new Intl.NumberFormat(locale, { style: 'percent' }).format(row.ctr / 100)} />
+      <MetricCard module="ads" icon={<IconPercentage />} label={t('text025')} value={row.ctr === null ? '—' : new Intl.NumberFormat(locale, { style: 'percent', maximumFractionDigits: 2 }).format(row.ctr / 100)} />
       <MetricCard module="ads" icon={<IconClick />} label={t('text023')} value={money(row.cpc)} />
       <MetricCard module="ads" icon={<IconClick />} label={t('text145')} value="—" unavailable={t('text146')} />
     </div>

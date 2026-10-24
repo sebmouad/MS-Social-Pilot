@@ -136,6 +136,14 @@ describe('Funnel model', () => {
     const zero = buildFunnelModel({ label: 'x', stages: [{ name: 'A', value: 0 }, { name: 'B', value: 5 }] });
     expect(zero.table.rows[1]).toEqual(['B', '5', null, null]);
   });
+  it('places narrow-stage labels outside in ink so they never overflow their segment', () => {
+    const model = buildFunnelModel({ label: 'x', stages: [{ name: 'Impressions', value: 6300 }, { name: 'Clicks', value: 178 }] });
+    const data = opt(model).series[0].data;
+    expect(data[0].label).toBeUndefined();
+    expect(data[1].label).toMatchObject({ position: 'right' });
+    const wide = buildFunnelModel({ label: 'x', stages: [{ name: 'A', value: 100 }, { name: 'B', value: 80 }] });
+    expect(opt(wide).series[0].data[1].label).toBeUndefined();
+  });
 });
 
 describe('Sparkline model', () => {

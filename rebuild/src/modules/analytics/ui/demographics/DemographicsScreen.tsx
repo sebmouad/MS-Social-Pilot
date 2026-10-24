@@ -10,6 +10,7 @@ import { AudienceChart } from './AudienceCharts';
 import { PageFrame } from '@/server/PageFrame';
 import { requireViewer } from '@/server/context';
 import { readDemographics } from '@/modules/analytics/demographics/server/demographics';
+import { demographicsCopyDefaults } from '@/modules/analytics/demographics/copy';
 import { readAnalyticsSnapshot } from '@/modules/analytics/server/read';
 import { pageChannelScope } from '@/modules/shell/server/scope';
 import { insightsReadInput } from '@/modules/analytics/ui/insights/scope';
@@ -24,6 +25,9 @@ export default async function DemographicsPage({ searchParams }: { searchParams:
   const fr = /^\s*fr\b/i.test((await headers()).get('accept-language') ?? '');
   const { demographics: copy } = await analyticsCopy();
   const t = (key: keyof typeof copy) => copy[key][fr ? 'fr' : 'en'];
+  // Saved catalogs predate the truncation notice; fall back to the shipped default until Root re-saves.
+  const notice = (key: 'Showing the latest' | 'of' | 'stored snapshots. Narrow the dates or channels to see older ones.') =>
+    (copy as Record<string, { en: string; fr: string } | undefined>)[key]?.[fr ? 'fr' : 'en'] ?? demographicsCopyDefaults[key][fr ? 'fr' : 'en'];
   const number = new Intl.NumberFormat(fr ? 'fr' : 'en', { maximumFractionDigits: 1 });
   const unknown = t("Not available");
   const when = (date: Date | null) => date ? date.toISOString().replace('T', ' ').replace('.000Z', ' UTC') : unknown;
@@ -63,6 +67,7 @@ export default async function DemographicsPage({ searchParams }: { searchParams:
     {!channels.length && <p className={styles.note}>{t("No channels available.")}</p>}
     {failed && <section id="demographics-error" className={styles.panel}><EmptyState tone="error" title={t("History could not be loaded")} action={<a href="/insights/audience">{t("Reset filters")}</a>}>{t("Review your dates and channels, narrow the period, or retry. Your filters have been retained.")}</EmptyState></section>}
     {data && <section className={styles.panel}><h2>{t("Audience size")}</h2><p>{data.audience.covered ? number.format(data.audience.total) : unknown} · {data.audience.covered} / {data.audience.selected} {t("selected channels")}</p><p>{t("Latest valid figure per covered channel. This is not a count of unique people across networks.")}</p></section>}
+    {data?.historyTruncated && <p className={styles.note} role="status">{notice("Showing the latest")} {number.format(data.historyShownSnapshots)} {notice("of")} {number.format(data.historyTotalSnapshots)} {notice("stored snapshots. Narrow the dates or channels to see older ones.")}</p>}
     {data?.empty && <section className={styles.panel}><EmptyState icon={<IconUsers />} title={t("No stored breakdowns")} action={<a href="/insights/audience">{t("Reset filters")}</a>}>{t("Not available for these channels and dates. Try another period or channel.")}</EmptyState></section>}
     {metrics.map(metric => <section key={metric.key} className={styles.panel}><h2>{metric.label}</h2><p>{metric.sourceLabel} · {metric.unit}</p>
       <p>{t("Channels with stored snapshots")} : {metric.historyCoverage.covered} / {metric.historyCoverage.selected} · {when(metric.historyCoverage.oldestAsOf)} — {when(metric.historyCoverage.newestAsOf)}</p>

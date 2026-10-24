@@ -74,18 +74,31 @@ function ChartCanvas({ option, signature, label, height, focusCount }: CanvasPro
   useEffect(() => {
     let disposed = false;
     let observer: ResizeObserver | undefined;
-    import("./echarts-setup").then(({ init }) => {
-      if (disposed || !host.current) return;
-      const instance = init(host.current, undefined, { renderer: "canvas" }) as unknown as ChartInstance;
-      chart.current = instance;
-      if (typeof ResizeObserver !== "undefined") {
-        observer = new ResizeObserver(() => instance.resize());
-        observer.observe(host.current);
-      }
-      apply();
-    });
+    let visibility: IntersectionObserver | undefined;
+    const start = () => {
+      import("./echarts-setup").then(({ init }) => {
+        if (disposed || !host.current) return;
+        const instance = init(host.current, undefined, { renderer: "canvas" }) as unknown as ChartInstance;
+        chart.current = instance;
+        if (typeof ResizeObserver !== "undefined") {
+          observer = new ResizeObserver(() => instance.resize());
+          observer.observe(host.current);
+        }
+        apply();
+      });
+    };
+    // History views mount hundreds of charts inside closed disclosures; only initialize near-visible
+    // ones so the page stays responsive. Without IntersectionObserver (tests, old browsers), start now.
+    if (typeof IntersectionObserver === "undefined" || !host.current) start();
+    else {
+      visibility = new IntersectionObserver(entries => {
+        if (entries.some(entry => entry.isIntersecting)) { visibility?.disconnect(); visibility = undefined; start(); }
+      }, { rootMargin: "200px" });
+      visibility.observe(host.current);
+    }
     return () => {
       disposed = true;
+      visibility?.disconnect();
       observer?.disconnect();
       chart.current?.dispose();
       chart.current = null;

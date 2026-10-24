@@ -56,9 +56,11 @@ describe('shared responsive CSS (phone 390px, tablet 768px)', () => {
     expect(components).toMatch(/\.ui-page-header__actions \{[^}]*flex-wrap: wrap/);
     expect(components).toContain('.ui-page-header__actions, .ui-page-header__filters.is-inline { flex: 1 0 100%');
   });
-  it('collapses metric grids at tablet, phone and very narrow widths', () => {
-    expect(globals).toContain('@media (max-width: 850px) { .metric-grid { grid-template-columns: repeat(2');
-    expect(responsive).toContain('@media (max-width: 340px) { .metric-grid { grid-template-columns: minmax(0, 1fr)');
+  it('collapses metric grids by container width, down to one column in narrow panels', () => {
+    // Container-responsive (not viewport-responsive): a side panel on a wide screen must collapse too.
+    expect(globals).toContain('.metric-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 168px), 1fr))');
+    expect(globals).toContain('@media (max-width: 500px) { .page-heading h1 { font-size: 26px; } .metric-grid { gap: 10px; }');
+    expect(responsive).not.toContain('.metric-grid { grid-template-columns:');
   });
   it('shows the bottom bar with safe-area padding below 760px', () => {
     const shell = read('src/styles/shell.css');

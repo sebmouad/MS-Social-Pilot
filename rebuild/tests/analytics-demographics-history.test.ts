@@ -65,7 +65,21 @@ describe('stored demographic history', () => {
     expect(result.csv).toContain('"\'=formula,"""');
     expect(mocks.read).toHaveBeenCalledWith(actor, { start: '2026-10-01', end: '2026-10-03', filter: '1', channel: ['a'] }, { feature: 'analytics/demographics', allowedChannelIds: ['a'] });
   });
-  it('refuses oversized history and MCP results rather than returning partial history', async () => {
+  it('trims oversized history oldest-first, keeps each latest snapshot and marks the cut', async () => {
+    mocks.read.mockResolvedValueOnce({ ...snapshot(), exportRowLimit: 6 });
+    const result = await readDemographics(actor);
+    expect(result.historyTruncated).toBe(true);
+    expect(result.historyShownSnapshots).toBe(1);
+    expect(result.historyTotalSnapshots).toBe(2);
+    const metric = result.groups[0]!.metrics[0]!;
+    expect(metric.history).toHaveLength(1);
+    expect(metric.history[0]!.asOf).toEqual(date(2));
+    expect(metric.historyCoverage).toMatchObject({ covered: 1, selected: 2, oldestAsOf: date(2), newestAsOf: date(2) });
+  });
+  it('marks trimmed CSV exports and still refuses undisplayable history and MCP overruns', async () => {
+    mocks.read.mockResolvedValueOnce({ ...snapshot(), exportRowLimit: 6 });
+    const csv = await readDemographics(actor, { format: 'csv' });
+    expect(csv.csv).toContain('"truncated","true"');
     mocks.read.mockResolvedValueOnce({ ...snapshot(), exportRowLimit: 2 });
     await expect(readDemographics(actor)).rejects.toMatchObject({ code: 'invalid_request' });
     await expect(readDemographics({ ...actor, maxResultItems: 1 }, { format: 'csv' })).rejects.toMatchObject({ code: 'invalid_request' });

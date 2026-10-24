@@ -29,6 +29,14 @@ it('renders historical dates, unknowns and a scope-bound export in-page', async 
   expect(html).toContain('format=csv'); expect(html).toContain('channel=a'); expect(html).toContain('filter=1');
   expect(html).not.toContain('<aside');
 });
+it('marks trimmed history with shown/total snapshot counts', async () => {
+  state.read.mockResolvedValue({ ...(await state.read()), historyTruncated: true, historyShownSnapshots: 118, historyTotalSnapshots: 342 });
+  const html = renderToStaticMarkup(await Page({ searchParams: Promise.resolve({}) }));
+  expect(html).toContain('Showing the latest');
+  expect(html).toContain('118');
+  expect(html).toContain('342');
+  expect(html).toContain('stored snapshots. Narrow the dates or channels to see older ones.');
+});
 it('renders French copy and retains invalid filters after read failure without exposing details', async () => {
   state.language = 'fr-FR'; state.read.mockRejectedValue(new Error('private database'));
   const html = renderToStaticMarkup(await Page({ searchParams: Promise.resolve({ start: 'bad-date', filter: '1', channel: 'gone' }) }));

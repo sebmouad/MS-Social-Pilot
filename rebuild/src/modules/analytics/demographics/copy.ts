@@ -110,6 +110,18 @@ export const demographicsCopyDefaults = {
   "Men": {
     "en": "Men",
     "fr": "Hommes"
+  },
+  "Showing the latest": {
+    "en": "Showing the latest",
+    "fr": "Affichage des dernières"
+  },
+  "of": {
+    "en": "of",
+    "fr": "sur"
+  },
+  "stored snapshots. Narrow the dates or channels to see older ones.": {
+    "en": "stored snapshots. Narrow the dates or channels to see older ones.",
+    "fr": "mesures stockées. Réduisez les dates ou les canaux pour voir les plus anciennes."
   }
 };
 export type DemographicsCopy = typeof demographicsCopyDefaults;

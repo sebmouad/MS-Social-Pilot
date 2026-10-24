@@ -64,22 +64,41 @@ export async function readDemographics(actor: Actor, input: unknown = {}) {
     empty: groups.length === 0 && other.length === 0,
   };
   const metrics = [...groups.flatMap(group => group.metrics), ...result.other];
-  const historyItems = metrics.reduce((sum, metric) => sum + metric.history.reduce((count, item) => count + 1 + item.rows.length, 0), 0);
+  const countItems = () => metrics.reduce((sum, metric) => sum + metric.history.reduce((count, item) => count + 1 + item.rows.length, 0), 0);
   const historyLimit = Number(snapshot.exportRowLimit);
-  if (historyItems > 0 && (!Number.isSafeInteger(historyLimit) || historyLimit < 1)) throw await analyticsError('unavailable', "Audience history settings are unavailable.");
-  if (historyItems > historyLimit) throw await analyticsError('invalid_request', "Audience history exceeds the report row limit. Narrow the channels or date range.");
-  const itemCount = historyItems + result.audience.entries.length + result.groups.length + result.other.length + result.options.channels.length + result.options.adAccounts.length + result.options.metrics.length + result.groups.reduce((total, group) => total + group.metrics.length + (group.combined?.rows.length ?? 0) + group.metrics.reduce((rows, metric) => rows + metric.rows.length, 0), 0) + result.other.reduce((total, metric) => total + metric.rows.length, 0);
+  const historyTotalItems = countItems();
+  if (historyTotalItems > 0 && (!Number.isSafeInteger(historyLimit) || historyLimit < 1)) throw await analyticsError('unavailable', "Audience history settings are unavailable.");
+  // Real Pages hold years of daily snapshots, so full history routinely exceeds the row limit. Drop the
+  // oldest snapshots first (each metric always keeps its latest) and mark the cut explicitly, following
+  // the compare/reports truncation precedent; only genuinely undisplayable history still refuses.
+  let historyTruncated = false;
+  let droppedSnapshots = 0;
+  for (let historyItems = historyTotalItems; historyItems > historyLimit;) {
+    const victim = metrics.filter(metric => metric.history.length > 1)
+      .sort((a, b) => b.history.length - a.history.length || a.history[0]!.asOf.getTime() - b.history[0]!.asOf.getTime())[0];
+    if (!victim) throw await analyticsError('invalid_request', "Audience history exceeds the report row limit. Narrow the channels or date range.");
+    historyItems -= 1 + victim.history[0]!.rows.length;
+    victim.history.shift();
+    droppedSnapshots += 1;
+    const times = victim.history.map(item => item.asOf.getTime());
+    victim.historyCoverage = { ...victim.historyCoverage, covered: new Set(victim.history.filter(item => item.rows.some(row => row.value !== null)).map(item => item.resourceId)).size,
+      oldestAsOf: times.length ? new Date(Math.min(...times)) : null };
+    historyTruncated = true;
+  }
+  const historyShownItems = countItems();
+  const historyShownSnapshots = metrics.reduce((sum, metric) => sum + metric.history.length, 0);
+  const itemCount = historyShownItems + result.audience.entries.length + result.groups.length + result.other.length + result.options.channels.length + result.options.adAccounts.length + result.options.metrics.length + result.groups.reduce((total, group) => total + group.metrics.length + (group.combined?.rows.length ?? 0) + group.metrics.reduce((rows, metric) => rows + metric.rows.length, 0), 0) + result.other.reduce((total, metric) => total + metric.rows.length, 0);
   const hiddenRows = [...result.groups.flatMap(group => group.metrics.map(metric => metric.history.length ? 0 : metric.hiddenRows)), ...result.groups.map(group => group.combined?.hiddenRows ?? 0), ...result.other.map(metric => metric.history.length ? 0 : metric.hiddenRows)].reduce((sum, count) => sum + count, 0);
   if (actor.maxResultItems !== undefined && (!Number.isSafeInteger(actor.maxResultItems) || actor.maxResultItems < 1 || itemCount > actor.maxResultItems || hiddenRows > 0)) {
     throw await analyticsError('invalid_request', "This audience breakdown is larger than the current MCP result limit. Narrow the selected channels or date range.");
   }
-  return { ...result, csv: format === 'csv' ? demographicsCsv(metrics) : null };
+  return { ...result, historyTruncated, historyShownItems, historyTotalItems, historyShownSnapshots, historyTotalSnapshots: historyShownSnapshots + droppedSnapshots, csv: format === 'csv' ? demographicsCsv(metrics, historyTruncated) : null };
 
   } catch (error) { throw await localizeAnalyticsError(error); }
 }
 
-/** Quote every cell and neutralize spreadsheet formulas, including category names. */
-export function demographicsCsv(metrics: DemographicMetric[]) {
+/** Quote every cell and neutralize spreadsheet formulas, including category names. A trimmed export ends with an explicit marker row. */
+export function demographicsCsv(metrics: DemographicMetric[], truncated = false) {
   const cell = (value: unknown) => {
     let text = value === null || value === undefined ? 'Not available' : String(value);
     if (/^[\s]*[=+@-]/.test(text)) text = "'" + text;
@@ -90,5 +109,6 @@ export function demographicsCsv(metrics: DemographicMetric[]) {
     metric.key, metric.sourceLabel, metric.unit, item.resourceId, item.resourceLabel, item.asOf.toISOString(), item.fetchedAt.toISOString(),
     metric.historyCoverage.covered, metric.historyCoverage.selected, row.label, row.value, row.share,
   ]);
+  if (truncated) rows.push(['truncated', 'true', '', '', '', '', '', '', '', '', '', '']);
   return rows.map(row => row.map(cell).join(',')).join('\r\n') + '\r\n';
 }

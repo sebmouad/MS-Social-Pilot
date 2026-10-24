@@ -45,8 +45,6 @@ html, body { max-width: 100%; overflow-x: clip; }
   .ui-metric__value { font-size: var(--text-3xl); }
 }
 
-@media (max-width: 340px) { .metric-grid { grid-template-columns: minmax(0, 1fr); } }
-
 @media (max-width: 760px) {
   /* Scrolling strips fade at the right edge so a clipped last tab reads as "more"; end padding lets the last tab clear the fade. */
   .ui-tabs__list, .shell-settings__list { padding-inline-end: 32px; scroll-padding-inline: 16px; -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent); } /* taste-skill-ignore: monochrome alpha mask that fades a clipped tab strip, not a decorative gradient */
