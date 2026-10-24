@@ -4,14 +4,13 @@
 
 ## Database preparation
 
-Use a fresh, dedicated database on a loopback host with a name ending in `_preview` or `_test`. Start the throwaway PostgreSQL container with `scripts/dev/test-db.sh` (Docker Desktop must be running), create the empty preview database, then apply the baseline migration. From `rebuild/`:
+Use a fresh, dedicated database on a loopback host with a name ending in `_preview` or `_test`. Start the throwaway PostgreSQL container with `scripts/dev/test-db.sh` (Docker Desktop must be running), then rebuild the database with `scripts/dev/qa-db.sh`, which drops, recreates, migrates (baseline plus every post-baseline migration in order) and records `_prisma_migrations` the same way `scripts/prod-deploy.sh` does. From `rebuild/`:
 
 ```sh
-psql 'postgresql://postgres:postgres@127.0.0.1:55432/postgres' -c 'CREATE DATABASE social_pilot_rebuild_preview'
-psql 'postgresql://postgres:postgres@127.0.0.1:55432/social_pilot_rebuild_preview' -v ON_ERROR_STOP=1 -f prisma/migrations/20261103000000_baseline/migration.sql
+QA_DB_REBUILD_CONFIRM=REBUILD_LOCAL_QA scripts/dev/qa-db.sh 'postgresql://postgres:postgres@127.0.0.1:55432/social_pilot_rebuild_preview'
 ```
 
-Apply the baseline without a wrapping transaction (no `-1`/`--single-transaction` flag): it contains `ALTER TYPE ... ADD VALUE`, which PostgreSQL forbids inside a transaction block. Run these commands only against the newly created, empty, local preview database. Do not point them at production or an existing customer database. The seeder independently refuses a database that already contains any user or workspace outside the `preview_` ID namespace.
+The script refuses anything that is not a loopback `_preview`/`_test` database. Migrations apply without a wrapping transaction (no `-1`/`--single-transaction` flag): they contain `ALTER TYPE ... ADD VALUE`, which PostgreSQL forbids inside a transaction block. Never hand-apply only the baseline: post-baseline migrations carry real schema, and skipping them drifts the local database behind the code. The seeder independently refuses a database that already contains any user or workspace outside the `preview_` ID namespace.
 
 ## Seed the fixture
 
