@@ -15,7 +15,7 @@ import Screen from './Screen';
 import { GET } from '@/app/api/analytics/ad-objects/route';
 import { adObjectsMcp } from './mcp';
 import { OperationError } from '@/lib/operation-error';
-const data = () => ({ input: { level: 'campaign', page: 1, sort: 'spend', direction: 'desc' }, period: { start: '2026-10-01', end: '2026-10-03' }, options: [{ id: 'a', name: 'Account' }], items: [{ key: 'key', accountId: 'a', accountName: 'Account', objectId: 'c', name: 'Campaign', currency: null, spend: null, impressions: 0, clicks: 2, reach: 20, reachDate: '2026-10-01', cpc: null, cpm: null, ctr: 2, coveredDays: 1, requestedDays: 3, lastFetchedAt: null, daily: [] }], coverage: { selectedAccounts: 1, coveredAccounts: 1, unknownParentObjects: 0 }, page: 1, nextPage: null, total: 1, csv: null });
+const data = () => ({ input: { level: 'campaign', page: 1, sort: 'spend', direction: 'desc' }, period: { start: '2026-10-01', end: '2026-10-03' }, options: [{ id: 'a', name: 'Account' }], items: [{ key: 'key', accountId: 'a', accountName: 'Account', objectId: 'c', name: 'Campaign', currency: null, spend: null, impressions: 0, clicks: 2, reach: 20, reachDate: '2026-10-01', cpc: null, cpm: null, ctr: 2, coveredDays: 1, requestedDays: 3, lastFetchedAt: null, daily: [] }], coverage: { selectedAccounts: 1, coveredAccounts: 1, unknownParentObjects: 0 }, accountDaily: [], page: 1, nextPage: null, total: 1, csv: null });
 beforeEach(() => { vi.clearAllMocks(); m.viewer.mockResolvedValue({ user: { id: 'u' }, workspaceId: 'w' }); m.headers.mockResolvedValue(new Headers()); m.read.mockResolvedValue(data()); });
 it('HTTP returns the shared read and CSV, masks storage errors and preserves typed denials', async () => {
   const response = await GET(new Request('https://example.test/api/analytics/ad-objects?accountId=a'));
@@ -35,6 +35,9 @@ it('renders bilingual coverage, unknown values, sidebar filters, CSV and account
   expect(html).toContain('Not available'); expect(html).toContain('1 / 3'); expect(html).toContain('format=csv'); expect(html).toContain('level=adset'); expect(html).toContain('parentId=c'); expect(html).toContain('accountId=a'); expect(html).toContain('snapshot');
   m.headers.mockResolvedValueOnce(new Headers({ 'accept-language': 'fr' }));
   const french = renderToStaticMarkup(await Screen({ searchParams: Promise.resolve({}) })); expect(french).toContain('Non disponible'); expect(french).toContain('Campagnes');
+  m.read.mockResolvedValueOnce({ ...data(), accountDaily: [{ accountId: 'a', accountName: 'Account', currency: 'USD', daily: [{ date: '2026-10-01', spend: 10, impressions: 100 }] }] });
+  const hero = renderToStaticMarkup(await Screen({ searchParams: Promise.resolve({}) }));
+  expect(hero).toContain('Selection trend'); expect(hero).toContain('Daily spend · USD'); expect(hero).toContain('Daily impressions');
 });
 it('preserves submitted filter context on safe recovery and has a deliberate empty state', async () => {
   m.read.mockRejectedValueOnce(new Error('secret'));

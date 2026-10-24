@@ -6,6 +6,7 @@ import { buildHeatmapModel } from '../src/components/charts/HeatmapChart';
 import { buildFunnelModel } from '../src/components/charts/FunnelChart';
 import { buildSparklineModel } from '../src/components/charts/Sparkline';
 import { buildPyramidModel } from '../src/components/charts/AudiencePyramid';
+import { trendMode } from '../src/components/charts/TrendChart';
 import { numberFormatter, dateFormatters, UNKNOWN } from '../src/components/charts/format';
 import type { ChartEnv } from '../src/components/charts/theme';
 
@@ -156,6 +157,14 @@ describe('Sparkline model', () => {
     expect(o.series[0].lineStyle.color).toBe('#p2');
     expect(o.series[0].areaStyle).toBeTruthy();
     expect(model.table.rows[1]).toEqual(['b', UNKNOWN]);
+  });
+});
+
+describe('Trend mode', () => {
+  it('draws lines for several days and bars for a single stored day', () => {
+    expect(trendMode([{ id: 'a', name: 'A', points: [{ t: '2026-10-22', v: 1 }, { t: '2026-10-23', v: 2 }] }])).toBe('line');
+    expect(trendMode([{ id: 'a', name: 'A', points: [{ t: '2026-10-23', v: 1 }] }, { id: 'b', name: 'B', points: [{ t: '2026-10-23', v: 3 }] }])).toBe('bar');
+    expect(trendMode([])).toBe('bar');
   });
 });
 

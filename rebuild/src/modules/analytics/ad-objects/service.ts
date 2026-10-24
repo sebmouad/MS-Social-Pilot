@@ -79,12 +79,31 @@ export async function readAdObjects(actor: Actor, raw: unknown = {}) {
   const page = Math.min(input.page, Math.max(1, Math.ceil(matching.length / size)));
   const items = input.format === 'csv' ? matching : matching.slice((page - 1) * size, page * size);
   const options = accounts.map(account => ({ id: account.id, name: account.name, currency: account.currency }));
+  // Selection-wide daily totals per account for the trend hero: computed pre-paging over the same
+  // filtered objects as the table, so the chart never disagrees with the selection. Sibling objects
+  // are disjoint delivery, so within one account/currency the days add up; a day is unknown only when
+  // none of its objects reported.
+  const accountDaily = [...matching.reduce((byAccount, item) => {
+    const days = byAccount.get(item.accountId) ?? { accountId: item.accountId, accountName: item.accountName, currency: item.currency, days: new Map<string, { spend: number | null; impressions: number | null }>() };
+    for (const row of item.daily) {
+      const dayKey = row.date.slice(0, 10);
+      const day = days.days.get(dayKey) ?? { spend: null, impressions: null };
+      if (row.spend !== null) day.spend = (day.spend ?? 0) + row.spend;
+      if (row.impressions !== null) day.impressions = (day.impressions ?? 0) + row.impressions;
+      days.days.set(dayKey, day);
+    }
+    byAccount.set(item.accountId, days);
+    return byAccount;
+  }, new Map<string, { accountId: string; accountName: string; currency: string | null; days: Map<string, { spend: number | null; impressions: number | null }> }>()).values()]
+    .map(account => ({ accountId: account.accountId, accountName: account.accountName, currency: account.currency,
+      daily: [...account.days].sort(([a], [b]) => a.localeCompare(b)).map(([date, day]) => ({ date, spend: day.spend, impressions: day.impressions })) }))
+    .sort((a, b) => a.accountName.localeCompare(b.accountName));
   const coverage = { selectedAccounts: selected.length, coveredAccounts: new Set(matching.map(item => item.accountId)).size, requestedDays,
     unknownParentObjects: input.level === 'campaign' ? 0 : atLevel.filter(item => !item.parentId || !item.parentConsistent).length };
   const itemCount = items.reduce((total, item) => total + 1 + item.daily.length, 0) + options.length;
   if ((input.format === 'csv' && itemCount > maxRows) || (actor.maxResultItems !== undefined && itemCount > actor.maxResultItems)) throw bad();
   const csv = input.format === 'csv' ? adObjectsCsv(items, period.start, period.end, input.locale, await recordsCopy()) : null;
-  const result = { input, period, options, items, coverage, total: matching.length, page, pageSize: size, nextPage: input.format === 'json' && page * size < matching.length ? page + 1 : null, csv };
+  const result = { input, period, options, items, accountDaily, coverage, total: matching.length, page, pageSize: size, nextPage: input.format === 'json' && page * size < matching.length ? page + 1 : null, csv };
   if (Buffer.byteLength(JSON.stringify(result), 'utf8') > maxBytes) throw bad();
   return result;
 

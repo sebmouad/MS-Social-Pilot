@@ -26,6 +26,9 @@
 .content :global(.ui-table-shell), .content :global(.ui-table-wrap) { min-width: 0; max-width: 100%; }
 @media (max-width: 620px) { .field { flex: 1 1 calc(50% - var(--space-3)); } .field span { max-width: none; } .submit { flex: 1 1 100%; margin-left: 0; } }
 .hint { margin: 0; color: var(--ink-faint); font-size: var(--text-xs); }
+.trend { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 380px), 1fr)); gap: var(--space-4); }
+.trend > div { min-width: 0; padding: var(--space-3) var(--space-4); border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface); }
+.trend h3 { margin: 0 0 var(--space-2); font-size: var(--text-sm); }
 .name { min-width: 200px; max-width: 300px; }
 .field select { max-width: 200px; }
 .content td details summary { cursor: pointer; color: var(--accent); font-size: var(--text-sm); font-weight: 600; white-space: nowrap; }

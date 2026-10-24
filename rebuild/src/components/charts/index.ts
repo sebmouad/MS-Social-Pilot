@@ -10,6 +10,8 @@ export { FunnelChart } from "./FunnelChart";
 export type { FunnelChartProps, FunnelStage } from "./FunnelChart";
 export { Sparkline } from "./Sparkline";
 export type { SparklineProps } from "./Sparkline";
+export { TrendChart, trendMode } from "./TrendChart";
+export type { TrendChartProps } from "./TrendChart";
 export { AudiencePyramid } from "./AudiencePyramid";
 export type { AudiencePyramidProps, PyramidSide } from "./AudiencePyramid";
 export type { ChartBaseProps, ChartTable } from "./ChartShell";

@@ -8,6 +8,7 @@ import { PageHeader } from '@/components/PageHeader';
 import { InfoTip } from '@/components';
 import type React from 'react';
 import { readAdObjects } from './service';
+import { ObjectsTrendCharts } from './TrendCharts';
 import type { AdObject } from './aggregate';
 import styles from '@/modules/analytics/ui/reports/workflows.module.css';
 import local from './screen.module.css';
@@ -82,6 +83,8 @@ export default async function AdObjectsScreen({ searchParams }: { searchParams: 
         <a className="ui-button ui-button--secondary ui-button--sm" download href={`/api/analytics/ad-objects?${query({ format: 'csv', locale: fr ? 'fr' : 'en' })}`}>{t("Export selection (CSV)")}</a>
       </div>
     </div>
+    <ObjectsTrendCharts accounts={d.accountDaily} locale={fr ? 'fr' : 'en'}
+      labels={{ trend: t("Selection trend"), spend: t("Daily spend"), impressions: t("Daily impressions"), unknownCurrency: missing }} />
     <DataTable caption={levelLabel} rows={d.items} rowKey={r => r.key} emptyMessage={t("No stored objects for these filters. Try another account or period. Unknown parent links are excluded from drill-down.")} columns={[
       { key: 'name', label: t("Object"), render: r => <span className={`${local.object} ${local.name}`}><strong>{r.name}</strong><small>{r.accountName} · {r.objectId}</small></span> },
       { key: 'spend', label: t("Stored spend"), render: r => money(r.spend, r.currency) },

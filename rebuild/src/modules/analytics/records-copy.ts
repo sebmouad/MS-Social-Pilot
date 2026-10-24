@@ -402,6 +402,18 @@ export const recordsCopyDefaults = {
   "Open in Posts": {
     "en": "Open in Posts",
     "fr": "Ouvrir dans Publications"
+  },
+  "Selection trend": {
+    "en": "Selection trend",
+    "fr": "Tendance de la sélection"
+  },
+  "Daily spend": {
+    "en": "Daily spend",
+    "fr": "Dépense quotidienne"
+  },
+  "Daily impressions": {
+    "en": "Daily impressions",
+    "fr": "Impressions quotidiennes"
   }
 };
 export type RecordsCopy = typeof recordsCopyDefaults;

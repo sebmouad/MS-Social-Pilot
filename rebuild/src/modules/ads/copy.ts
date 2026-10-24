@@ -1355,6 +1355,22 @@ export const adsCustomerCopy = {
   "text272": {
     "en": "No partial report is shown. Narrow the account or date range, then try again.",
     "fr": "Aucun rapport partiel n’est affiché. Réduisez les comptes ou la période et réessayez."
+  },
+  "text273": {
+    "en": "Portfolio trend",
+    "fr": "Tendance du portefeuille"
+  },
+  "text274": {
+    "en": "Daily spend · {value0}",
+    "fr": "Dépense quotidienne · {value0}"
+  },
+  "text275": {
+    "en": "Daily impressions",
+    "fr": "Impressions quotidiennes"
+  },
+  "text276": {
+    "en": "Showing {value0} of {value1} accounts; the rest are in the table below.",
+    "fr": "{value0} comptes affichés sur {value1} ; les autres sont dans le tableau ci-dessous."
   }
 };
 export const adsCustomerCopySchema = z.object(Object.fromEntries(Object.keys(adsCustomerCopy).map(key => [key, z.object({ en: z.string().min(1).max(4000), fr: z.string().min(1).max(4000) }).strict()])) as { [K in keyof typeof adsCustomerCopy]: z.ZodObject<{ en: z.ZodString; fr: z.ZodString }> }).strict();

@@ -16,6 +16,7 @@ import { canUseFeature } from '@/server/entitlements';
 import { canAccessFeature } from '@/server/permissions';
 import { loadAdsOutputPolicy } from '@/modules/ads/server/output-policy';
 import { AccountsTable, type AccountRow } from './AccountsTable';
+import { AccountsTrendCharts, type AccountTrend } from './AccountsTrend';
 import { AdsHeader } from './AdsHeader';
 import { AdsReportPager } from './AdsReportPager';
 import { AdsReportExport } from './AdsReportExport';
@@ -52,6 +53,9 @@ async function AdsPage({ searchParams }: { searchParams: Promise<AdsSearchParams
   const summaries = new Map(summarizeInsights(dataset.insights, 'account').map(row => [row.accountId, row]));
   const scoped = filters.accountId ? dataset.accounts.filter(account => account.id === filters.accountId) : dataset.accounts;
   const page = pageAdsRows(scoped, requestedPage, dataset.pageSize);
+  const trends: AccountTrend[] = scoped.map(account => ({ id: account.id, name: account.name, currency: account.currency,
+    daily: [...(summaries.get(account.id)?.dailyMetrics ?? [])].sort((a, b) => a.date.getTime() - b.date.getTime())
+      .map(day => ({ date: day.date.toISOString().slice(0, 10), spend: day.spend, impressions: day.impressions })) }));
   const rows: AccountRow[] = page.items.map(account => ({
     id: account.id, name: account.name, actId: account.actId, currency: account.currency, enabled: account.enabled,
     lastSyncedAt: account.lastSyncedAt?.toISOString() ?? null, summary: summaries.get(account.id) ?? null,
@@ -65,6 +69,7 @@ async function AdsPage({ searchParams }: { searchParams: Promise<AdsSearchParams
     {!dataset.accounts.length
       ? <EmptyState title={ui.emptyTitle} icon={<IconAd />} action={<a className="ui-button ui-button--primary ui-button--md" href="/settings/channels">{ui.emptyAction}</a>}>{ui.emptyBody}</EmptyState>
       : <section className="insights-accounts" aria-label={ui.caption}>
+        <AccountsTrendCharts accounts={trends} locale={locale} />
         <AccountsTable rows={rows} copy={ui} locale={locale} campaignsHref={adsQuery(filters, '/ads/campaigns')} rowLabel={ui.colAccount} />
         <AdsReportPager filters={filters} path={PATH} kind="accounts" page={page} />
         {exportPolicy && dataset.maxRows ? <div className="ads-report-export"><AdsReportExport filters={filters} maxRows={dataset.maxRows} maxBytes={exportPolicy.exportMaxBytes} fileName={exportPolicy.exportFileName} /></div> : null}

@@ -95,6 +95,17 @@ it('requires page scalars rather than JavaScript coercion of booleans or arrays'
   for (const page of [true, null, ['1']]) await expect(readAdObjects(actor, { page })).rejects.toMatchObject({ code: 'invalid_request' });
 });
 
+it('aggregates selection-wide account daily totals pre-paging for the trend hero', async () => {
+  m.data.mockResolvedValue({ insights: [
+    { ...insight('campaign', 'c1'), id: 'a-c1', objectName: 'c1', date: new Date('2026-10-01Z'), spend: 10, impressions: 100 },
+    { ...insight('campaign', 'c2'), id: 'a-c2', objectId: 'c2', objectName: 'c2', date: new Date('2026-10-01Z'), spend: 5, impressions: 50 },
+    { ...insight('campaign', 'c1'), id: 'a-c1-2', objectName: 'c1', date: new Date('2026-10-02Z'), spend: 7, impressions: 70 },
+  ] });
+  const result = await readAdObjects(actor, { start: '2026-10-01', end: '2026-10-03' });
+  expect(result.accountDaily).toEqual([{ accountId: 'a', accountName: 'a', currency: 'USD', daily: [
+    { date: '2026-10-01', spend: 15, impressions: 150 }, { date: '2026-10-02', spend: 7, impressions: 70 },
+  ] }]);
+});
 it('sorts the full filtered selection before paging and CSV with stable ties', async () => {
   m.data.mockResolvedValue({ insights: [
     { ...insight('campaign', 'a'), spend: 10 }, { ...insight('campaign', 'b'), spend: 90 },
