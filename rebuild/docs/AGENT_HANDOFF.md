@@ -1737,6 +1737,7 @@ proven, see below). Rollups natural slot: today 23:30 UTC (post-fix) —
 a one-shot check is scheduled for 23:45 UTC (cron 98d4c32c).
 Retention (`17 3 * * *` server-local): tomorrow 02:17 UTC, not 01:17 —
 EU DST ends Oct 25, so 03:17 local falls back to CET (02:17 UTC).
+One-shot check scheduled for 02:30 UTC Oct 25 (cron 174f72d4).
 Live release runs 6a6dbf75 (batch 16); later commits to origin/main are
 docs/evidence only and ride the next app deploy.
 
