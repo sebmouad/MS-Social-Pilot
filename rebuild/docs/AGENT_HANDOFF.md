@@ -1,10 +1,31 @@
 # Shared agent handoff
 
-Updated 2026-10-23 (weakness-hunt batches 6-11 pushed to origin/main as
-`2f20e94d`; production still runs the earlier release until the next
-`prod-deploy.sh`), schema **142**. Full goal remains active. No browser,
-provider, database or production call by this lane. Historical records
+Updated 2026-10-24: batch 17 (`b9931114`) deployed live (`DEPLOY OK
+b9931114`), schema **142**. Full goal remains active. Historical records
 below retain their dates; current source reconciliation wins.
+
+## Batch 17 — 2026-10-24 (deployed, proven at production scale)
+
+User report: "insights/audience don't work, ads graphs not well
+displayed". Root causes found by reproducing with real-data volumes:
+
+- **Audience**: default 30-day window holds 992 snapshots / 10,361+
+  items vs the 5000 `analytics.reportExportRows` limit, and
+  `readDemographics` refused outright → "History could not be loaded".
+  Now trims oldest-first (each metric keeps its latest), marks with a
+  shown/total notice (EN+FR, stale-catalog fallback) and a
+  `truncated,true` CSV marker row; refuses only undisplayable history.
+  MCP result-budget refusal unchanged.
+- **Charts**: `ChartCanvas` mounts lazily on visibility (history views
+  mount 100+ charts inside closed disclosures).
+- **Ads**: `.metric-grid` is container-responsive (side-panel KPIs no
+  longer overlap at 4-across), cards clip sparklines, CTR uses 2
+  decimals like the table, funnel labels move outside narrow segments,
+  single-day spend renders a bar instead of a lone dot.
+- Evidence: full suite 12309 passed / 0 failed; preview end-to-end at
+  prod scale (121 snapshots → notice "latest 109 of 121", 0 JS errors,
+  CSV marker present, temp rows removed); prod SQL lower bound 10,361
+  items proves the old code threw here.
 
 ## Weakness-hunt batches 6-11 — 2026-10-23 (pushed, sandbox lane)
 
