@@ -7,6 +7,27 @@ export type HistoryProgress = { after: string | null; since: string; until: stri
 const obj = (v: unknown): Record<string, unknown> => v && typeof v === 'object' && !Array.isArray(v) ? v as Record<string, unknown> : {};
 const number = (v: unknown): number | null => (typeof v === 'number' || typeof v === 'string' && v.trim()) && Number.isFinite(Number(v)) && Number(v) >= 0 ? Number(v) : null;
 const aliases: Record<string, string> = { post_impressions: 'impressions', post_impressions_unique: 'reach', post_engaged_users: 'engagement', post_clicks: 'clicks', post_video_views: 'video_views', post_video_view_time: 'video_watch_time' };
+/** Posts enriched concurrently per feed page; serial reads never fit the provider window on active Pages. */
+const HISTORY_POST_LANES = 4;
+
+/** Bounded parallel map that preserves input order; the first rejection wins. */
+async function mapPool<T, R>(items: readonly T[], lanes: number, run: (item: T) => Promise<R>): Promise<R[]> {
+  const results = new Array<R>(items.length);
+  let next = 0;
+  await Promise.all(Array.from({ length: Math.max(1, Math.min(lanes, items.length)) }, async () => {
+    while (next < items.length) {
+      const index = next++;
+      results[index] = await run(items[index]!);
+    }
+  }));
+  return results;
+}
+
+/** True when the reactions metric already yielded authoritative per-type values. */
+function validReactionMetric(insights: Record<string, unknown>): boolean {
+  const categories = Object.entries(obj(insights.post_reactions_by_type_total));
+  return categories.length > 0 && categories.every(([, value]) => number(value) !== null);
+}
 
 function hasVideo(post: Record<string, unknown>): boolean {
   const attachments = (value: unknown): boolean => {
@@ -22,7 +43,7 @@ function hasVideo(post: Record<string, unknown>): boolean {
 /** Keep observations separate: edge visibility and insights can disagree at the same fetch. */
 function resolveReactions(insights: Record<string, unknown>, post: Record<string, unknown>, edges: Record<string, number>, complete: boolean, observedAt: Date) {
   const categories = Object.entries(obj(insights.post_reactions_by_type_total));
-  const validInsights = categories.length > 0 && categories.every(([, value]) => number(value) !== null);
+  const validInsights = validReactionMetric(insights);
   const insightTotal = validInsights ? categories.reduce((sum, [, value]) => sum + number(value)!, 0) : null;
   const summaryTotal = number(obj(obj(post.reactions).summary).total_count);
   const edgeTotal = complete ? Object.values(edges).reduce((sum, value) => sum + value, 0) : null;
@@ -79,43 +100,74 @@ export function createFacebookPostHistory(config: FacebookConfig, policyInput: z
       if (seen.has(identity)) throw new Error('Repeated history cursor.');
       seen.add(identity);
       const batch = await page(`${encodeURIComponent(pageId)}/${policy.edge}`, token, { fields: [...new Set(['id', 'created_time', ...(policy.edge === 'feed' ? ['from'] : []), ...policy.fields])].join(','), limit: String(config.pageSize), since: String(Math.floor(Date.parse(progress.since) / 1000)), until: String(Math.floor(Date.parse(progress.until) / 1000)), ...(progress.after ? { after: progress.after } : {}) });
+      const due: Array<{ post: Record<string, unknown>; createdTime: Date }> = [];
       for (const raw of batch.rows) {
         const post = obj(raw); const createdTime = new Date(String(post.created_time));
         if (typeof post.id !== 'string' || !Number.isFinite(createdTime.getTime())) throw new Error('Invalid history post identity.');
         if (createdTime.getTime() < Date.parse(progress.since) || createdTime.getTime() > Date.parse(progress.until)) continue;
         // A feed can include visitor posts. Missing authorship is unknown, never Page-owned.
         if (policy.edge === 'feed' && obj(post.from).id !== pageId) continue;
+        due.push({ post, createdTime });
+      }
+      const enriched = await mapPool(due, HISTORY_POST_LANES, async ({ post, createdTime }) => {
         const insights: Record<string, unknown> = {};
         const postFailures: string[] = [];
         for (const [key, value] of [['shares', obj(post.shares).count], ['comments', obj(obj(post.comments).summary).total_count]] as const) { const n = number(value); if (n !== null) insights[key] = n; }
-        for (const metric of new Set(policy.metrics)) {
-          // Eligibility is based on provider metadata, never a speculative call on every photo/text post.
-          if (metric.startsWith('post_video_') && !hasVideo(post)) continue;
+        // Eligibility is based on provider metadata, never a speculative call on every photo/text post.
+        const eligible = [...new Set(policy.metrics)].filter(metric => !metric.startsWith('post_video_') || hasVideo(post));
+        const applyRows = (rows: unknown[], wanted: Set<string>) => {
+          for (const rawMetric of rows) {
+            const item = obj(rawMetric);
+            if (typeof item.name !== 'string' || !wanted.has(item.name)) continue;
+            const values = Array.isArray(item.values) ? item.values : [];
+            const value = obj(values.at(-1)).value ?? obj(item.total_value).value;
+            if (value !== undefined) insights[aliases[item.name] ?? item.name] = number(value) ?? value;
+          }
+        };
+        const readMetric = async (metric: string) => {
+          const data = await page(`${encodeURIComponent(post.id as string)}/insights`, token, { metric, period: 'lifetime', limit: String(config.pageSize) }, { timeWindow: true });
+          // Insights always return time-window paging links (previous/next) even for one lifetime value; they are not a continuation of this metric.
+          applyRows(data.rows, new Set([metric]));
+        };
+        if (eligible.length) {
           try {
-            const data = await page(`${encodeURIComponent(post.id)}/insights`, token, { metric, period: 'lifetime', limit: String(config.pageSize) }, { timeWindow: true });
-            // Insights always return time-window paging links (previous/next) even for one lifetime value; they are not a continuation of this metric.
-            for (const rawMetric of data.rows) { const item = obj(rawMetric); if (item.name !== metric) continue; const values = Array.isArray(item.values) ? item.values : []; const value = obj(values.at(-1)).value ?? obj(item.total_value).value; if (value !== undefined) insights[aliases[metric] ?? metric] = number(value) ?? value; }
-          } catch { signal?.throwIfAborted(); failures.push(metric); postFailures.push(metric); }
+            const data = await page(`${encodeURIComponent(post.id as string)}/insights`, token, { metric: eligible.join(','), period: 'lifetime', limit: String(config.pageSize) }, { timeWindow: true });
+            applyRows(data.rows, new Set(eligible));
+          } catch {
+            signal?.throwIfAborted();
+            // One refused metric poisons the batch; retry individually so surviving metrics still persist.
+            for (const metric of eligible) {
+              try { await readMetric(metric); }
+              catch { signal?.throwIfAborted(); failures.push(metric); postFailures.push(metric); }
+            }
+          }
         }
         const edgeReactions: Record<string, number> = {};
-        let reactionsComplete = policy.reactionTypes.length > 0;
-        for (const type of new Set(policy.reactionTypes)) {
-          try {
-            let after: string | null = null; let total = 0; let complete = false; const cursors = new Set<string>();
-            for (let j = 0; j < config.maxPages; j++) {
-              const key = after ?? ''; if (cursors.has(key)) throw new Error('Repeated reaction cursor.'); cursors.add(key);
-              const data = await page(`${encodeURIComponent(post.id)}/reactions`, token, { type, fields: 'id', limit: String(config.pageSize), ...(after ? { after } : {}) });
-              total += data.rows.length; after = data.after; if (!after) { complete = true; break; }
-            }
-            if (!complete) throw new Error('Reaction budget exceeded.');
-            edgeReactions[type.toLowerCase()] = total;
-          } catch { signal?.throwIfAborted(); reactionsComplete = false; failures.push(`reactions_${type}`); postFailures.push(`reactions_${type}`); }
+        let reactionsComplete = false;
+        // The reactions metric already wins over edges; only fan out to the
+        // reaction edges when it (and therefore the fast path) came back empty.
+        // Skipped edges stay unknown (null), never zero, in the provenance.
+        if (!validReactionMetric(insights)) {
+          reactionsComplete = policy.reactionTypes.length > 0;
+          for (const type of new Set(policy.reactionTypes)) {
+            try {
+              let after: string | null = null; let total = 0; let complete = false; const cursors = new Set<string>();
+              for (let j = 0; j < config.maxPages; j++) {
+                const key = after ?? ''; if (cursors.has(key)) throw new Error('Repeated reaction cursor.'); cursors.add(key);
+                const data = await page(`${encodeURIComponent(post.id as string)}/reactions`, token, { type, fields: 'id', limit: String(config.pageSize), ...(after ? { after } : {}) });
+                total += data.rows.length; after = data.after; if (!after) { complete = true; break; }
+              }
+              if (!complete) throw new Error('Reaction budget exceeded.');
+              edgeReactions[type.toLowerCase()] = total;
+            } catch { signal?.throwIfAborted(); reactionsComplete = false; failures.push(`reactions_${type}`); postFailures.push(`reactions_${type}`); }
+          }
         }
         resolveReactions(insights, post, edgeReactions, reactionsComplete, now);
         insights.collectionFailures = [...new Set(postFailures)];
         const text = (key: string) => typeof post[key] === 'string' ? post[key] as string : null;
-        posts.push({ remoteId: post.id, message: text('message'), permalink: text('permalink_url'), statusType: text('status_type'), pictureUrl: text('full_picture'), createdTime, insights });
-      }
+        return { remoteId: post.id as string, message: text('message'), permalink: text('permalink_url'), statusType: text('status_type'), pictureUrl: text('full_picture'), createdTime, insights };
+      });
+      for (const entry of enriched) posts.push(entry);
       progress.after = batch.after; progress.complete = !batch.after;
       if (progress.complete) break;
     }
