@@ -1,14 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 vi.mock('../src/server/data-control/guard', () => ({ withWorkspaceOperation: (_workspaceId: string, operation: () => Promise<unknown>) => operation() }));
 
-const state = vi.hoisted(() => ({ targets: vi.fn(), freshTarget: vi.fn(), upsert: vi.fn(), observations: vi.fn(), settingRead: vi.fn(), settingWrite: vi.fn(), access: vi.fn() }));
+const state = vi.hoisted(() => ({ targets: vi.fn(), freshTarget: vi.fn(), upsert: vi.fn(), observations: vi.fn(), settingRead: vi.fn(), settingWrite: vi.fn(), access: vi.fn(), history: vi.fn(async () => ({ posts: [], failures: [], progress: {} })), windowMs: 60000 }));
 vi.mock('../src/server/jobs/access', () => ({ assertWorkspaceJobAccess: state.access }));
 vi.mock('../src/server/platforms/resource-lock', () => ({ withSelectedResourceOperation: async (_workspaceId: string, _resource: unknown, run: (tx: unknown, signal: AbortSignal) => Promise<unknown>) => run({ pageInsight: { upsert: state.upsert }, appSetting: { findUnique: async () => null, upsert: async () => ({}) }, externalPost: { upsert: async () => ({}) }, $queryRaw: async () => [], $executeRaw: async () => 1 }, new AbortController().signal) }));
 vi.mock('../src/server/data', () => ({ prisma: { $queryRaw: async () => [], target: { findMany: state.targets, findFirst: state.freshTarget }, pageInsight: { upsert: state.upsert }, appSetting: { findUnique: state.settingRead, upsert: state.settingWrite } } }));
-vi.mock('../src/platforms/facebook/runtime', () => ({ configuredFacebookEngine: async () => ({ getPageInsightObservations: state.observations, getPostHistory: async () => ({ posts: [], failures: [], progress: {} }) }), configuredFacebookAdapter: vi.fn() }));
+vi.mock('../src/platforms/facebook/runtime', () => ({ configuredFacebookEngine: async () => ({ getPageInsightObservations: state.observations, getPostHistory: state.history }), configuredFacebookAdapter: vi.fn() }));
 vi.mock('../src/server/secret-crypto', () => ({ decryptSecret: (value: string) => value }));
 let facebookEnabled = true;
-vi.mock('../src/server/config/store', () => ({ runtimeConfig: async (key: string) => key === 'platforms.facebook.enabled' ? facebookEnabled : key === 'meta.pageInsightReadScopes' ? ['read_insights', 'pages_read_engagement'] : key === 'meta.pageAnalyticsLookbackDays' ? 7 : ((await import('../src/lib/config/registry')).CONFIG_BY_KEY.get(key as never)?.defaultValue ?? 100) }));
+vi.mock('../src/server/config/store', () => ({ runtimeConfig: async (key: string) => key === 'platforms.facebook.enabled' ? facebookEnabled : key === 'meta.pageInsightReadScopes' ? ['read_insights', 'pages_read_engagement'] : key === 'meta.pageAnalyticsLookbackDays' ? 7 : key === 'sync.resourceOperationTimeoutMs' ? state.windowMs : ((await import('../src/lib/config/registry')).CONFIG_BY_KEY.get(key as never)?.defaultValue ?? 100) }));
 
 import { syncPageAnalytics } from '../src/platforms/facebook/jobs';
 import { OperationError } from '../src/lib/operation-error';
@@ -48,6 +48,21 @@ describe('Page analytics ingestion', () => {
     state.observations.mockResolvedValue(observations);
     expect(await syncPageAnalytics(new Date('2026-01-04T12:00:00Z'))).toEqual({ examined: 1, updated: 1, skipped: 0, failed: 1 });
     expect(state.upsert).toHaveBeenCalledTimes(1);
+  });
+
+  it('persists observations when post history aborts mid-window', async () => {
+    state.observations.mockResolvedValue([{ metric: 'page_views_total', period: 'day', endTime: new Date('2026-01-03T00:00:00Z'), value: 9, numeric: 9 }]);
+    // The provider window (5ms) expires while history is still in flight (50ms),
+    // the same shape as the production 60s aborts.
+    state.windowMs = 5;
+    const abort = new Error('This operation was aborted'); abort.name = 'AbortError';
+    state.history.mockImplementationOnce(async () => { await new Promise(resolve => setTimeout(resolve, 50)); throw abort; });
+    try {
+      expect(await syncPageAnalytics(new Date('2026-01-04T12:00:00Z'))).toEqual({ examined: 1, updated: 1, skipped: 0, failed: 1 });
+      expect(state.upsert).toHaveBeenCalledTimes(1);
+    } finally {
+      state.windowMs = 60000;
+    }
   });
 
   it('does not call Facebook or read connected data while the engine is disabled in Root', async () => {

@@ -217,7 +217,13 @@ async function fetchPageAnalytics(target: PageTarget, now: Date, today: Date, re
     try {
       const historyEngine = await configuredFacebookEngine({ signal });
       history = await historyEngine.getPostHistory(historyBinding.token, target.providerId, now, startCursor);
-    } catch (historyError) { signal.throwIfAborted(); failedMetrics++; await logItemFailure('postHistory', target.id, historyError); }
+    } catch (historyError) {
+      // Worker shutdown still aborts the target; a spent provider window only forfeits history.
+      // Observations already fetched persist below instead of being discarded with the abort.
+      if (jobAbortSignal()?.aborted) throw historyError;
+      failedMetrics++;
+      await logItemFailure('postHistory', target.id, historyError);
+    }
     if (history?.failures.length) failedMetrics++;
     return { observations, history, startCursor, failedMetrics };
   });
