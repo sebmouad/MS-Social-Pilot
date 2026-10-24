@@ -13,7 +13,7 @@
 /* Design v2 S4: the queue on the left, the weekly queue times on the right. */
 .layout { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: var(--space-6); align-items: start; }
 .main { display: grid; gap: var(--space-4); min-width: 0; }
-.main > h2, .sidePanel > h2 { margin: 0; font-size: var(--text-lg); }
+.main > h2, .sidePanel > h2 { margin: 0; font-size: var(--text-lg); overflow-wrap: anywhere; }
 .side { display: grid; gap: var(--space-4); position: sticky; top: calc(var(--topbar-h) + 16px); min-width: 0; }
 .sidePanel { display: grid; gap: var(--space-3); min-width: 0; padding: var(--space-4); border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface); }
 .automation { padding: var(--space-3) var(--space-4); border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface); }

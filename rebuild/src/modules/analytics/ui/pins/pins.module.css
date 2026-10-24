@@ -1,6 +1,6 @@
 /* Pins: a one-line add bar, then pinned metrics as an even grid of tiles. */
 .root { display: grid; gap: var(--space-4); min-width: 0; }
-.add { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); padding: var(--space-3) var(--space-4); border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface); }
+.add { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); padding: var(--space-3) var(--space-4); border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface); min-width: 0; max-width: 100%; }
 .add h2 { margin: 0; font-size: var(--text-sm); }
 .add form { display: flex; flex: 1 1 360px; flex-wrap: wrap; align-items: center; gap: var(--space-2); min-width: 0; }
 .add select { flex: 1 1 260px; max-width: 520px; min-height: var(--control-h-sm); padding: 0 var(--space-2); border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface); color: var(--ink); font: inherit; font-size: var(--text-sm); min-width: 0; }
