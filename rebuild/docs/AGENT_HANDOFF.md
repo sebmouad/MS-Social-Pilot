@@ -1701,8 +1701,31 @@ authoritative (skipped edges stay null in provenance, never zero), and
 enrich posts on 4 ordered lanes (`mapPool`). Tests updated to emulate
 batched provider responses; new tests for batch shape, edge skip, and
 order under concurrency. 20/20 post-history + 34/34 related + full suite
-779 files / 12306 tests green, typecheck clean. Production proof pending
-the 02:15 UTC analytics run (expect failed=6 -> 0 and advancing cursors).
+779 files / 12306 tests green, typecheck clean. PROVEN at the 02:15 UTC
+run: outcome ok (was failed), 147s (was 610s), examined=12 updated=1205
+(was 324) failed=0 (was 6); all 10 history cursors completed fresh
+year-windows (complete=true). The infinite abort loop is broken.
+(Note: cursor `updatedAt` is stamped with run start, not commit time.)
+
+## Matrix rerun verdict (2026-10-24 ~02:14 UTC)
+V2 rerun 544/544 cells: 208 findings, ALL preview-dev-server transport
+flaps (`ERR_CONNECTION_REFUSED` / `ERR_INCOMPLETE_CHUNKED_ENCODING`,
+one 60s goto timeout) on 9 routes — zero app, overflow, contrast or
+keyboard findings (0 screenshots). V2b scoped rerun cleared 8 of the 9;
+`/content/library` flapped twice more, then passed 32/32 with 0 findings
+on a fresh preview (v2d). Matrix effectively green; every route passed
+clean in at least one stable run. Triage note: the report's `failures`
+field includes `fatal MISSING_ROUTE_FAMILY` entries in scoped
+(MATRIX_ONLY) runs — always recount from cell findings.
+
+## Dry-run rehearsal (2026-10-24 ~02:18 UTC, QA lane)
+Seeded one due scheduled post + pending target in QA, switched
+`jobs.stagingDryRun` on, ran `posts` via runNow: summary `skipped=1`,
+`worker.staging_dry_run` audit row in `root_activities` (job=posts,
+kind=publish, count=1, actorId NULL), seed post/target untouched
+(still scheduled/pending — nothing dispatched). The run's `failed=1`
+came from the platform hook's synthetic-token read (fail-closed, QA
+only). Seed rows deleted, flag switched back off. QA restored.
 
 ## Live gates status (2026-10-24 01:46 UTC)
 Llama: wired as 4th provider (`llamaPort`, OpenAI-compatible) and covered
