@@ -23,7 +23,7 @@ import { canAccessFeature } from "@/server/permissions";
 import { adjacentCalendarMonth, addDaysToKey, calendarMonth, instantToWall, isDateKey, postCalendarDate, wallTimeToInstant, weekOffsetOfKey, weekStartKey, workspaceDateKey } from "@/lib/calendar-dates";
 import { loadWorkspaceOperations } from "@/modules/settings/server/workspace-operations";
 import { channelBadgeInfo } from "@/lib/channel-badge";
-import { formatPostPreviewTime } from "@/components/PostPreview";
+import { formatPostPreviewTime } from "@/lib/post-preview-time";
 import { moveCandidates } from "@/lib/reschedule";
 import { loadBoardMilestones } from "@/modules/calendar-extras/server/board";
 import { CalendarBoard } from "./CalendarBoard";

@@ -17,7 +17,7 @@ import { publishingDestinationChoices } from '@/modules/publishing/server/destin
 import { formatDate } from "@/modules/publishing/ui/publishing-ui";
 import { EmptyPanel, type FilterChip } from "../kit/kit";
 import { pageLocale } from "../kit/locale";
-import { formatPostPreviewTime } from "@/components/PostPreview";
+import { formatPostPreviewTime } from "@/lib/post-preview-time";
 import { PostsTable, type PostsTableRow } from "./PostsTable";
 import { PostsHeaderTools } from "./PostsHeaderTools";
 import { ImportCsv } from "./ImportCsv";

@@ -15,7 +15,7 @@ import { readLabelPage } from '@/modules/publishing/server/labels';
 import { publishingDestinationChoices } from '@/modules/publishing/server/destinations';
 import { pageChannelScope } from '@/modules/shell/server/scope';
 import { isDateKey } from '@/lib/calendar-dates';
-import { formatPostPreviewTime } from '@/components/PostPreview';
+import { formatPostPreviewTime } from '@/lib/post-preview-time';
 import { PostComposer } from './PostComposer';
 import { aiStatus } from '@/modules/studio/server/ai';
 import { loadWorkspaceOperations } from '@/modules/settings/server/workspace-operations';

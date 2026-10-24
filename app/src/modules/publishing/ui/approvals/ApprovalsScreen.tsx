@@ -1,5 +1,5 @@
 import { approvalNotice } from '../posts/notices';
-import { formatPostPreviewTime } from '@/components/PostPreview';
+import { formatPostPreviewTime } from '@/lib/post-preview-time';
 import { loadPublishingCopy, loadPublishingNoticeCopy } from '../../server/customer-copy';
 import { PublishingCopyProvider } from '../kit/CopyProvider';
 import { loadPublishingActionCopy } from '../../server/action-copy';

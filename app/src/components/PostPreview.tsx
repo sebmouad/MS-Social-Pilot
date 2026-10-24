@@ -101,9 +101,8 @@ function initials(value: string) {
   return value.trim().split(/\s+/).filter(Boolean).slice(0, 2).map(part => part[0]?.toUpperCase()).join('') || '?';
 }
 
-export function formatPostPreviewTime(date: Date, timeZone: string) {
-  return new Intl.DateTimeFormat('en-US', { timeZone, dateStyle: 'medium', timeStyle: 'short' }).format(date);
-}
+import { formatPostPreviewTime } from '@/lib/post-preview-time';
+export { formatPostPreviewTime };
 
 export function PostPreview({ post, authorName, authorAvatarUrl, timeZone, variant = 'feed', actions, mediaOverride, locale = 'en', rendering }: Props) {
   const [deviceFrame, setDeviceFrame] = useState<'none' | 'mobile' | 'desktop'>('none');
