@@ -1634,3 +1634,54 @@ and creative rows are honestly dead (aggregates/remote picker data).
 
 Evidence: `npm run typecheck` 0 errors; extended `calendar-wave2-ui` +1, suite
 green (6 pass). No browser run; deploy pending --yolo relaunch.
+
+## 2026-10-23 UX gaps batches 6-11
+Batch 6 (5dd45cae): exact draft/approved totals. Batch 7 (72730698):
+explorer internal post links. Batch 8 (1e46216e): dry-run email
+suppression (outward dispatches stay silent, rows stay pending). Batch 9
+(061ba36b): creatives title/body + copy-id. Batch 10 (707708ae): inbox
+origin-post link. Batch 11 (2f20e94d): unconditional `/content/post/*`
+cross-link convention (post page re-checks scope). Full suite green
+(779 files, 12296 passed). Batch 4 caused one query-budget regression,
+fixed (542b3c89) and re-verified.
+
+Evidence: full vitest suite green; typecheck 0 errors. Deployed via
+prod-deploy.sh (DEPLOY OK). V2 browser matrix 544/544 triaged on
+preview :3200 (fresh QA DB, localhost not 127.0.0.1).
+
+## 2026-10-24 batch 12: matrix overflow fixes (e1a9041d)
+Constrained tab strips, pins bar, compare top and queue slot row.
+Browser-verified 0px overflow. Pushed, deployed with batch 13.
+
+## 2026-10-24 batch 13: analytics window-abort fix (5b1423ae)
+Post-history sync aborted mid-window discarded already-fetched
+observations. Fix persists insights incrementally; mutation-proven
+(test fails pre-fix). Production 01:15 UTC run: failed 10 -> 6,
+updated=324 persisted (was updated=0 on the 23:15 run). Residual
+failed=6 needs per-item diagnosis at the 02:15 run (watch worker log).
+
+## 2026-10-24 batch 14: QA rebuild script (df45f34c)
+`scripts/dev/qa-db.sh` rebuilds the QA Postgres database (migrations +
+seed) after drift (missing `_prisma_migrations`, missing tables);
+`db_sql` closes stdin so loops calling it are not eaten. Docs fixed
+(PREVIEW/OPERATIONS/ARCHITECTURE referenced the old flow).
+
+## 2026-10-24 batch 15: scheduler starvation fix (a826eb02, DEPLOY OK)
+Root cause, proven against production `rebuild_sync_runs` history: the
+worker tick spent launch budget (maxConcurrentJobs=4) in priority order
+and no-op re-launches on later ticks of the same minute consumed budget
+too, so jobs ordered past the 4th due match were never evaluated at
+crowded minutes. analyticsAlerts, sharingDeadlines and captionTests had
+ZERO runs ever; webhooks (384/d), workspaceExports (536/d), aiVideos
+(412/720), analyticsReports (72/288, only :05/:25/:55), feedsPoll (missed
+:00) and postExports (missed :00/:15/:20/:30) were partial. The predicted
+slot table matched observed histograms exactly before the fix. Fix:
+tick skips already-ran-this-minute jobs BEFORE spending budget
+(`worker.ts`); `launch()` keeps its guards for races and runNow.
+Regression test fails pre-fix (verified via stash), passes post-fix.
+Production proof within minutes of deploy: sharingDeadlines 01:25:07,
+analyticsAlerts + captionTests 01:30, webhooks/workspaceExports back to
+every-minute cadence. retention missed 01:17 UTC pre-fix (predicted);
+next natural slots: retention tomorrow 01:17 UTC, rollups 23:30 UTC.
+operatorMonitoring's full 1440/d comes from the web-process watchdog, a
+second single-job worker, not the main loop.
