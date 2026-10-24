@@ -402,3 +402,16 @@ function composerError(error: unknown, errorText: PublishingErrorText = defaultP
   if (message === 'intent') return errorText('chooseWhetherToSaveADraftOrScheduleThe');
   return errorText('weCouldNotSaveThisPostYourDetailsAre');
 }
+
+export async function refreshPostMetricsAction(postId: string): Promise<{ ok: boolean; message: string; results?: import('../../server/sync-post-metrics').SyncedPostMetricResult[] }> {
+  try {
+    const viewer = await requireViewer({ feature: 'publishing/posts', channelScoped: true });
+    const { syncPostMetrics } = await import('../../server/sync-post-metrics');
+    const results = await syncPostMetrics(viewer.workspaceId, postId);
+    revalidatePath('/content');
+    revalidatePath(`/content/post/${encodeURIComponent(postId)}`);
+    return { ok: true, message: `Synced metrics for ${results.length} channel(s)`, results };
+  } catch (error) {
+    return { ok: false, message: error instanceof Error ? error.message : 'Failed to refresh post metrics' };
+  }
+}

@@ -30,6 +30,13 @@ export type PostPreviewPost = {
     /** platformName is the installed module's customer-facing name, added by the Publishing read model. */
     target: { id: string; type: string; name: string; pictureUrl: string | null; platformName?: string | null };
   }>;
+  metrics?: {
+    likes?: number;
+    comments?: number;
+    shares?: number;
+    reach?: number;
+    views?: number;
+  };
 };
 
 /**
@@ -63,6 +70,14 @@ type Props = {
   mediaOverride?: ReactNode;
   /** Per-channel rendering; absent keeps the neutral preview. */
   rendering?: PostPreviewRendering;
+  /** Real platform metrics for engagement bar display */
+  metrics?: {
+    likes?: number;
+    comments?: number;
+    shares?: number;
+    reach?: number;
+    views?: number;
+  };
 };
 
 type MediaItem = { kind: string; url: string; altText?: string };
@@ -104,8 +119,9 @@ function initials(value: string) {
 import { formatPostPreviewTime } from '@/lib/post-preview-time';
 export { formatPostPreviewTime };
 
-export function PostPreview({ post, authorName, authorAvatarUrl, timeZone, variant = 'feed', actions, mediaOverride, locale = 'en', rendering }: Props) {
+export function PostPreview({ post, authorName, authorAvatarUrl, timeZone, variant = 'feed', actions, mediaOverride, locale = 'en', rendering, metrics }: Props) {
   const [deviceFrame, setDeviceFrame] = useState<'none' | 'mobile' | 'desktop'>('none');
+  const postMetrics = metrics ?? post.metrics;
   const media = mediaItems(post.media).flatMap(item => {
     const url = mediaUrl(item);
     return url ? [{ ...item, url }] : [];
@@ -202,9 +218,9 @@ export function PostPreview({ post, authorName, authorAvatarUrl, timeZone, varia
         {primaryPlatform === 'instagram' ? (
           <>
             <div className={styles.platformActionsLeft}>
-              <span title="Like" aria-hidden="true">❤️</span>
-              <span title="Comment" aria-hidden="true">💬</span>
-              <span title="Share" aria-hidden="true">↗️</span>
+              <span title="Like" aria-hidden="true">❤️ {postMetrics?.likes !== undefined ? postMetrics.likes : ''}</span>
+              <span title="Comment" aria-hidden="true">💬 {postMetrics?.comments !== undefined ? postMetrics.comments : ''}</span>
+              <span title="Share" aria-hidden="true">↗️ {postMetrics?.shares !== undefined && postMetrics.shares > 0 ? postMetrics.shares : ''}</span>
             </div>
             <div className={styles.platformActionsRight}>
               <span title="Bookmark" aria-hidden="true">🔖</span>
@@ -212,31 +228,48 @@ export function PostPreview({ post, authorName, authorAvatarUrl, timeZone, varia
           </>
         ) : primaryPlatform === 'linkedin' ? (
           <>
-            <button type="button" className={styles.platformActionBtn} aria-label="Like">👍 Like</button>
-            <button type="button" className={styles.platformActionBtn} aria-label="Comment">💬 Comment</button>
-            <button type="button" className={styles.platformActionBtn} aria-label="Repost">🔁 Repost</button>
+            <button type="button" className={styles.platformActionBtn} aria-label="Like">
+              👍 Like {postMetrics?.likes ? `(${postMetrics.likes})` : ''}
+            </button>
+            <button type="button" className={styles.platformActionBtn} aria-label="Comment">
+              💬 Comment {postMetrics?.comments ? `(${postMetrics.comments})` : ''}
+            </button>
+            <button type="button" className={styles.platformActionBtn} aria-label="Repost">
+              🔁 Repost {postMetrics?.shares ? `(${postMetrics.shares})` : ''}
+            </button>
             <button type="button" className={styles.platformActionBtn} aria-label="Send">↗️ Send</button>
           </>
         ) : primaryPlatform === 'x' ? (
           <>
-            <span title="Reply">💬 14</span>
-            <span title="Repost">🔁 38</span>
-            <span title="Like">❤️ 210</span>
+            <span title="Reply">💬 {postMetrics?.comments ?? 14}</span>
+            <span title="Repost">🔁 {postMetrics?.shares ?? 38}</span>
+            <span title="Like">❤️ {postMetrics?.likes ?? 210}</span>
             <span title="Bookmark">🔖 19</span>
-            <span title="Views">📊 3.8K</span>
+            <span title="Views">📊 {postMetrics?.reach || postMetrics?.views ? (postMetrics.reach || postMetrics.views)!.toLocaleString(locale) : '3.8K'}</span>
           </>
         ) : primaryPlatform === 'facebook' ? (
           <>
-            <button type="button" className={styles.platformActionBtn} aria-label="Like">👍 Like</button>
-            <button type="button" className={styles.platformActionBtn} aria-label="Comment">💬 Comment</button>
-            <button type="button" className={styles.platformActionBtn} aria-label="Share">↗️ Share</button>
+            <button type="button" className={styles.platformActionBtn} aria-label="Like">
+              👍 Like {postMetrics?.likes ? `(${postMetrics.likes})` : ''}
+            </button>
+            <button type="button" className={styles.platformActionBtn} aria-label="Comment">
+              💬 Comment {postMetrics?.comments ? `(${postMetrics.comments})` : ''}
+            </button>
+            <button type="button" className={styles.platformActionBtn} aria-label="Share">
+              ↗️ Share {postMetrics?.shares ? `(${postMetrics.shares})` : ''}
+            </button>
+            {postMetrics && (postMetrics.reach || postMetrics.views) ? (
+              <span className={styles.platformActionBtn} style={{ cursor: 'default' }}>
+                👁️ {(postMetrics.reach || postMetrics.views)!.toLocaleString(locale)} reach
+              </span>
+            ) : null}
           </>
         ) : (
           <>
-            <span>❤️ 1.2K</span>
-            <span>💬 48</span>
-            <span>🔁 19</span>
-            <span>↗️ Share</span>
+            <span>❤️ {postMetrics?.likes ?? 0}</span>
+            <span>💬 {postMetrics?.comments ?? 0}</span>
+            {postMetrics?.shares ? <span>🔁 {postMetrics.shares}</span> : null}
+            {postMetrics && (postMetrics.reach || postMetrics.views) ? <span>👁️ {(postMetrics.reach || postMetrics.views)!.toLocaleString(locale)} reach</span> : null}
           </>
         )}
       </div>

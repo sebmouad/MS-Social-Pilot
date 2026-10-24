@@ -1,6 +1,8 @@
 'use client';
 import { usePublishingCopy } from '../kit/CopyProvider';
 import { StatusChip } from '@/components';
+import { IconMessageCircle, IconShare, IconThumbUp } from '@tabler/icons-react';
+import type { PostPerformanceMetrics } from '../../server/post-reach';
 import { postContentSummary } from '@/modules/publishing/content-summary';
 import { AttentionHint, AvatarStack, MediaThumb, ScheduleBadge, isSafeImageUrl } from '../kit/kit';
 import { type KitLocale } from '../kit/copy';
@@ -47,11 +49,57 @@ export function PostCell({ post, locale = 'en' }: { post: Row; locale?: KitLocal
   </div>;
 }
 
-/** Stored reach for one post row; an em dash when no destination has measured it yet. */
-export function ReachCell({ reach, locale = 'en' }: { reach?: { value: number | null; measured: number } | null; locale?: KitLocale }) {
+/** Stored reach and real platform metrics for one post row; an em dash when no destination has measured it yet. */
+export function ReachCell({ reach, locale = 'en' }: { reach?: PostPerformanceMetrics | { value: number | null; measured: number } | null; locale?: KitLocale }) {
   const copy = usePublishingCopy(locale);
-  if (!reach || reach.value === null) return <span aria-label={copy.reachUnavailable}>—</span>;
-  return <span>{reach.value.toLocaleString(locale)}</span>;
+  if (!reach || (reach.value === null && reach.measured === 0)) {
+    return <span className={styles.emptyMetric} aria-label={copy.reachUnavailable}>—</span>;
+  }
+
+  const metrics = reach as Partial<PostPerformanceMetrics>;
+  const likes = metrics.likes ?? 0;
+  const comments = metrics.comments ?? 0;
+  const shares = metrics.shares ?? 0;
+  const reachVal = metrics.reach ?? metrics.value ?? 0;
+  const views = metrics.views ?? 0;
+
+  const hasAnyData = reach.measured > 0 || reachVal > 0 || likes > 0 || comments > 0 || shares > 0 || views > 0;
+  if (!hasAnyData && reach.value === null) {
+    return <span className={styles.emptyMetric} aria-label={copy.reachUnavailable}>—</span>;
+  }
+
+  const titleText = `${reachVal.toLocaleString(locale)} reach · ${likes.toLocaleString(locale)} likes · ${comments.toLocaleString(locale)} comments · ${shares.toLocaleString(locale)} shares${views > 0 ? ` · ${views.toLocaleString(locale)} views` : ''}`;
+
+  return (
+    <div className={styles.metricsCell} title={titleText}>
+      <div className={styles.reachPrimary}>
+        <span className={styles.reachNumber}>{reachVal.toLocaleString(locale)}</span>
+        <span className={styles.reachLabel}>reach</span>
+      </div>
+      {(likes > 0 || comments > 0 || shares > 0) && (
+        <div className={styles.metricBadges}>
+          {likes > 0 && (
+            <span className={styles.metricBadge} title={`${likes.toLocaleString(locale)} likes / reactions`}>
+              <IconThumbUp size={11} aria-hidden="true" />
+              <span>{likes.toLocaleString(locale)}</span>
+            </span>
+          )}
+          {comments > 0 && (
+            <span className={styles.metricBadge} title={`${comments.toLocaleString(locale)} comments`}>
+              <IconMessageCircle size={11} aria-hidden="true" />
+              <span>{comments.toLocaleString(locale)}</span>
+            </span>
+          )}
+          {shares > 0 && (
+            <span className={styles.metricBadge} title={`${shares.toLocaleString(locale)} shares`}>
+              <IconShare size={11} aria-hidden="true" />
+              <span>{shares.toLocaleString(locale)}</span>
+            </span>
+          )}
+        </div>
+      )}
+    </div>
+  );
 }
 
 export function ChannelsCell({ post, locale = 'en' }: { post: Row; locale?: KitLocale }) {

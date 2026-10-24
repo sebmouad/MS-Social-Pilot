@@ -45,3 +45,33 @@
   /* Filter, search and Export share one line; active chips wrap below. */
   .search { flex: 1 1 120px; min-width: 0; }
 }
+
+/* Rich platform metrics display */
+.metricsCell { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; }
+.reachPrimary { display: inline-flex; align-items: baseline; gap: 3px; }
+.reachNumber { font-size: var(--text-md); font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; }
+.reachLabel { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--ink-faint); }
+.metricBadges { display: inline-flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 4px; }
+.metricBadge {
+  display: inline-flex; align-items: center; gap: 3px;
+  padding: 1px 6px; border-radius: var(--radius-pill, 9999px);
+  background: var(--surface-muted); color: var(--ink-soft);
+  font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums;
+  line-height: 1.4; border: 1px solid var(--line);
+}
+.emptyMetric { color: var(--ink-faint); font-size: var(--text-md); }
+.phoneMetrics { color: var(--ink-soft); font-size: 12px; font-weight: 600; }
+
+.panelMetricsSection { margin-top: var(--space-3); padding-top: var(--space-3); border-top: 1px solid var(--line); }
+.panelSectionTitle { margin: 0 0 var(--space-2); color: var(--ink-soft); font-size: var(--text-sm); font-weight: 700; }
+.panelMetricsGrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: var(--space-3); }
+.panelMetricCard {
+  background: var(--surface-muted); padding: 8px 10px;
+  border-radius: var(--radius-sm); border: 1px solid var(--line);
+  text-align: center;
+}
+.metricVal { font-size: 16px; font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; }
+.metricLbl { font-size: 10px; font-weight: 600; color: var(--ink-faint); text-transform: uppercase; letter-spacing: 0.03em; margin-top: 2px; }
+.destMetrics { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+.destMetrics span { display: inline-flex; align-items: center; gap: 2px; }
+

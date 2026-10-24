@@ -28,6 +28,8 @@ import { readRecycle } from '@/modules/publishing/collaboration/server/recycle';
 import { readPostVersions } from '@/modules/publishing/collaboration/server/versions';
 import { readCollaborationLabels } from '@/modules/publishing/collaboration/server/label-choices';
 import { PostPanel } from '@/modules/publishing/ui/collaboration/PostPanel';
+import { loadPostReach } from '@/modules/publishing/server/post-reach';
+import { PostPerformanceCard } from './PostPerformanceCard';
 
 async function PostCollaborationPageContent({ params, searchParams }: { params: Promise<{ postId: string }>; searchParams?: Promise<Record<string, string | string[] | undefined>> }) {
   ensurePublishingCollaboration();
@@ -45,13 +47,15 @@ async function PostCollaborationPageContent({ params, searchParams }: { params: 
   try {
     const paging = parsePostCollaborationSearch(await searchParams ?? {});
     const pageUrl = (notesPage: number, versionsPage: number) => `/content/post/${encodeURIComponent(postId)}?${new URLSearchParams({ notesPage: String(notesPage), versionsPage: String(versionsPage) })}`;
-    const [assigned, labels, fields, notes, versions, recycle, listing] = await Promise.all([
+    const [assigned, labels, fields, notes, versions, recycle, listing, metricsMap] = await Promise.all([
       readPostLabels(actor, postId), readCollaborationLabels(actor), readPostFieldValues(actor, postId), readPostNotes(actor, { postId, page: paging.notesPage }), readPostVersions(actor, { postId, page: paging.versionsPage }),
       caps.recycle ? readRecycle(actor, { postId }) : Promise.resolve(null),
       // The post itself, through the same visibility rules as the Posts list; a failure only hides the summary.
       readPublishingPostPage(actor, { postId }).catch(() => null),
+      loadPostReach(actor.workspaceId, [postId]).catch(() => new Map()),
     ]);
     const post = listing?.posts[0];
+    const postMetrics = metricsMap.get(postId) ?? null;
     const timeZone = viewer.membership.workspace.timezone;
     // Times are formatted here so the browser never applies its own time-zone data.
     const stampFormat = new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short', timeZone });
@@ -61,10 +65,11 @@ async function PostCollaborationPageContent({ params, searchParams }: { params: 
       <PageHeader module="publishing" title={copy.postTitle} info={<InfoTip name={copy.postTitle}>{content.copy.postDetailInfo}</InfoTip>}
         breadcrumbs={<a href="/content">{content.copy.postDetailBack}</a>} />
       {post ? <section aria-label={copy.postTitle} className={styles.summary}>
-        <PostPreview post={post as PostPreviewPost} authorName={post.authorId === viewer.user.id ? viewer.user.name : memberName} timeZone={timeZone} locale={locale} variant="card" />
+        <PostPreview post={post as PostPreviewPost} authorName={post.authorId === viewer.user.id ? viewer.user.name : memberName} timeZone={timeZone} locale={locale} variant="card" metrics={postMetrics ?? undefined} />
         {/* The preview already lists each destination with its status; offer the recovery action instead of repeating them. */}
         {canPublish ? <div className={styles.destinations}><RetryFailedDestinations postId={post.id} count={retryableDestinationCount(post)} /></div> : null}
       </section> : null}
+      {post ? <PostPerformanceCard postId={post.id} initialMetrics={postMetrics} locale={locale} timeZone={timeZone} /> : null}
       {(notes.page > 1 || notes.hasMore || versions.page > 1 || versions.hasMore) && <nav aria-label={copy.postNav} className={styles.paging}>
         {(notes.page > 1 || notes.hasMore) && <span>{fillComposerCopy(copy.notesPage, { page: notes.page })}</span>}
         {notes.page > 1 && <a href={pageUrl(notes.page - 1, versions.page)}>{copy.newerNotes}</a>}
