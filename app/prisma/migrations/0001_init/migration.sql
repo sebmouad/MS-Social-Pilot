@@ -149,7 +149,6 @@
 --   20261101100100_rebuild_post_exports  e5f8825c4bbe5e153da3a56bd18fd3d6668d0ea2765930f9a20afd396d9ce53c
 --   20261102120000_rebuild_inbox_note_mentions  59d5aed5183c5bb7a59832abf7692d85a1259b9d14ee0c891fb02a8c441fe817
 
--- ===== source 001/140: 20260810093237_init_postgres (sha256:19c72b6f7a863000a85aead9763ecb3a10755e455223e952139f5b8055253b1e) =====
 -- CreateEnum
 CREATE TYPE "WorkspaceRole" AS ENUM ('owner', 'admin', 'editor', 'contributor');
 
@@ -701,7 +700,6 @@ ALTER TABLE "email_logs" ADD CONSTRAINT "email_logs_workspaceId_fkey" FOREIGN KE
 -- AddForeignKey
 ALTER TABLE "activity_logs" ADD CONSTRAINT "activity_logs_workspaceId_fkey" FOREIGN KEY ("workspaceId") REFERENCES "workspaces"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
--- ===== source 002/140: 20260810142617_analytics_module (sha256:e7a2e72e7956758ab7cd28105b634dbdd621d431ea85254c78aad52d0c61deba) =====
 -- AlterTable
 ALTER TABLE "targets" ADD COLUMN     "fanCount" INTEGER,
 ADD COLUMN     "followersCount" INTEGER,
@@ -753,7 +751,6 @@ ALTER TABLE "page_insights" ADD CONSTRAINT "page_insights_targetId_fkey" FOREIGN
 -- AddForeignKey
 ALTER TABLE "metric_availability" ADD CONSTRAINT "metric_availability_targetId_fkey" FOREIGN KEY ("targetId") REFERENCES "targets"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
--- ===== source 003/140: 20260810183448_tier2_tier3_edges (sha256:6a975fe8177daebfe754c69b4a7bf8e0e63054eae7cc73e35e49cee646730085) =====
 -- CreateTable
 CREATE TABLE "post_comments" (
     "id" TEXT NOT NULL,
@@ -1054,7 +1051,6 @@ ALTER TABLE "ad_accounts" ADD CONSTRAINT "ad_accounts_socialAccountId_fkey" FORE
 -- AddForeignKey
 ALTER TABLE "ad_insights" ADD CONSTRAINT "ad_insights_adAccountId_fkey" FOREIGN KEY ("adAccountId") REFERENCES "ad_accounts"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
--- ===== source 004/140: 20260811003638_app_settings (sha256:f1dd0fe5ae74f99ec88a4baf767711d9e7484b33ad62c1829f1e1aeb907e5b14) =====
 -- CreateTable
 CREATE TABLE "app_settings" (
     "key" TEXT NOT NULL,
@@ -1069,7 +1065,6 @@ CREATE TABLE "app_settings" (
 -- AddForeignKey
 ALTER TABLE "app_settings" ADD CONSTRAINT "app_settings_updatedById_fkey" FOREIGN KEY ("updatedById") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
--- ===== source 005/140: 20260811074315_post_media_keys (sha256:f2d6c8c0eda32d0ed84085cbd4992513b3665ea7a0131f55d3f57fb7913753d9) =====
 -- AlterTable
 ALTER TABLE "posts" ADD COLUMN     "mediaKeys" TEXT[] DEFAULT ARRAY[]::TEXT[];
 
@@ -1096,32 +1091,27 @@ FROM (
 ) AS k
 WHERE p.id = k.post_id;
 
--- ===== source 006/140: 20260811220702_instagram_target (sha256:edee59e8d25a90cc2d2e645e042c7bd7fe12f29f47575fa57bf49d8fca57b792) =====
 -- AlterEnum
 ALTER TYPE "TargetType" ADD VALUE 'instagram';
 
--- ===== source 007/140: 20260812070000_link_click_visitor_index (sha256:d760606cac0684708808e9a7d0723db7fd768147da191be1c82843cd790eec45) =====
 -- A click is one visitor arriving, not one page load. Recording one now asks
 -- whether the same visitor already followed this link a moment ago, and this
 -- index is what makes that question cheap.
 CREATE INDEX "link_clicks_shortLinkId_ipHash_createdAt_idx"
   ON "link_clicks"("shortLinkId", "ipHash", "createdAt");
 
--- ===== source 008/140: 20260812090000_target_reviews_backfilled (sha256:3dc9c8a19d3278151b7f7b9670f594410f960062defe68524f821e1440f03db1) =====
 -- One ratings fetch reaches five hundred reviews. A Page with more is read
 -- over several syncs, each ending where the last one started, and its average
 -- rating is computed from a partial set until the walk reaches the beginning.
 -- This records that it has.
 ALTER TABLE "targets" ADD COLUMN "reviewsBackfilled" BOOLEAN NOT NULL DEFAULT false;
 
--- ===== source 009/140: 20260812100000_target_block_reason (sha256:6c20e84bf412c668bd1de90ef2487a0c88ccbc1b5bc30ef1cf27ccae9ab25e38) =====
 -- The reason a destination cannot publish, as a code rather than a sentence.
 -- The sentence is written by a background job that cannot know who will read
 -- it, and half this product's audience reads French. `publishBlocker` keeps
 -- the English text as a fallback for rows written before this column existed.
 ALTER TABLE "targets" ADD COLUMN "publishBlockerCode" TEXT;
 
--- ===== source 010/140: 20260812140000_worker_heartbeat (sha256:7ca3c094849e70eb7516eef55b9c623d382e5598c529ae995d466196a3e4370c) =====
 -- One row per running scheduler worker, so the setup screen can tell an
 -- installation whose worker has never been started from one that is working.
 CREATE TABLE "worker_heartbeats" (
@@ -1134,7 +1124,6 @@ CREATE TABLE "worker_heartbeats" (
 
 CREATE INDEX "worker_heartbeats_seenAt_idx" ON "worker_heartbeats"("seenAt");
 
--- ===== source 011/140: 20260929090000_instance_owner_and_indexes (sha256:94e8d81b1ac62feaf4ab10d967137bbf283a42a70178193e657730190d8f821d) =====
 -- Instance-wide configuration used to be gated on "owner of the active
 -- workspace", and everybody who registers owns a workspace of their own. The
 -- flag names the one person who installed the server instead.
@@ -1176,7 +1165,6 @@ CREATE INDEX "posts_originPostId_idx" ON "posts"("originPostId");
 
 CREATE INDEX "posts_sourceFeedItemId_idx" ON "posts"("sourceFeedItemId");
 
--- ===== source 012/140: 20261010090000_first_comment (sha256:5229a7248fd2549d287250d876a7cb357b7f3fa9b2e59dd97c01d015ef01b335) =====
 -- A first comment, posted as the Page under the post when it goes out.
 ALTER TABLE "posts" ADD COLUMN "firstComment" TEXT;
 
@@ -1186,11 +1174,9 @@ ALTER TABLE "post_targets" ADD COLUMN "firstCommentId" TEXT,
 ADD COLUMN "firstCommentAt" TIMESTAMP(3),
 ADD COLUMN "firstCommentError" TEXT;
 
--- ===== source 013/140: 20261010120000_external_post_picture (sha256:32f35e4e86cfe12c96604679fd6aab7294b59e3cf15dbb5f4754d8febc9d1b5e) =====
 -- The picture Facebook shows with a post found on the Page.
 ALTER TABLE "external_posts" ADD COLUMN "pictureUrl" TEXT;
 
--- ===== source 014/140: 20261010140000_worker_runs_and_missing_posts (sha256:6eb3ca53fc8cfcb6d03e5c563822f9601fcb4da3c2ffabbcb232772bc88777a3) =====
 -- A post Facebook no longer has, so the syncs stop asking about it.
 ALTER TABLE "post_targets" ADD COLUMN "remoteMissingAt" TIMESTAMP(3);
 
@@ -1202,7 +1188,6 @@ CREATE TABLE "worker_job_runs" (
     CONSTRAINT "worker_job_runs_pkey" PRIMARY KEY ("name")
 );
 
--- ===== source 015/140: 20261011090000_page_groups_labels_access (sha256:fdd9471fea3cfc86fde42236b792bea882ad2c409714d4053a6cda8198b3474d) =====
 -- DropIndex
 DROP INDEX "queue_slots_workspaceId_dayOfWeek_hour_minute_key";
 
@@ -1320,7 +1305,6 @@ ALTER TABLE "post_labels" ADD CONSTRAINT "post_labels_labelId_fkey" FOREIGN KEY 
 -- distinct in a unique index. This one makes the shared times unique too.
 CREATE UNIQUE INDEX "queue_slots_shared_time_key" ON "queue_slots"("workspaceId", "dayOfWeek", "hour", "minute") WHERE "targetId" IS NULL;
 
--- ===== source 016/140: 20261011150000_formats_snippets_sharing_reports (sha256:cb18371c7a709bfc5579ebb40cbb075229622868a6c1067939c6ebf8eb795c68) =====
 -- AlterTable
 ALTER TABLE "posts" ADD COLUMN     "format" TEXT NOT NULL DEFAULT 'post';
 
@@ -1438,7 +1422,6 @@ ALTER TABLE "report_schedules" ADD CONSTRAINT "report_schedules_workspaceId_fkey
 ALTER TABLE "report_schedules" ADD CONSTRAINT "report_schedules_templateId_fkey" FOREIGN KEY ("templateId") REFERENCES "report_templates"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 
--- ===== source 017/140: 20261012031949_worker_status_graph_usage (sha256:c13029e9966f7f865757101b7b3c6755dbbc75447a2c1f072e4a680fb3dcb562) =====
 -- AlterTable
 ALTER TABLE "worker_job_runs" ADD COLUMN     "durationMs" INTEGER,
 ADD COLUMN     "failures" INTEGER NOT NULL DEFAULT 0,
@@ -1459,7 +1442,6 @@ CREATE TABLE "graph_usage" (
 );
 
 
--- ===== source 018/140: 20261012032237_target_first_read (sha256:f9262ed3eb5788c3be7161f89ce52036330ff2c9de914fdc69c6a99490fd090a) =====
 -- AlterTable
 ALTER TABLE "targets" ADD COLUMN     "firstReadAt" TIMESTAMP(3);
 
@@ -1468,12 +1450,10 @@ ALTER TABLE "targets" ADD COLUMN     "firstReadAt" TIMESTAMP(3);
 -- jobs already; only Pages connected from now on wait for a first read.
 UPDATE "targets" SET "firstReadAt" = CURRENT_TIMESTAMP;
 
--- ===== source 019/140: 20261012034047_workspace_week_start (sha256:aba9becfbf0ec8eb034f87e2456f62ca087975a04e42accab652e8ea1ab6024e) =====
 -- AlterTable
 ALTER TABLE "workspaces" ADD COLUMN     "weekStartsOn" INTEGER NOT NULL DEFAULT 1;
 
 
--- ===== source 020/140: 20261012034454_inbox_resolved (sha256:e7707529b2a3d3aa2350a308026fce08d32289e60875f9a28eb4b7c7b914024e) =====
 -- AlterTable
 ALTER TABLE "conversations" ADD COLUMN     "resolvedAt" TIMESTAMP(3);
 
@@ -1481,7 +1461,6 @@ ALTER TABLE "conversations" ADD COLUMN     "resolvedAt" TIMESTAMP(3);
 ALTER TABLE "post_comments" ADD COLUMN     "resolvedAt" TIMESTAMP(3);
 
 
--- ===== source 021/140: 20261012035406_notification_matrix (sha256:1dbe137dab9477855357844e51e5194575c42cb33a7a3d94d1c693da96e5d8af) =====
 -- AlterTable
 ALTER TABLE "conversation_messages" ADD COLUMN     "firstSeenAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP;
 
@@ -1515,7 +1494,6 @@ ALTER TABLE "notification_mutes" ADD CONSTRAINT "notification_mutes_userId_fkey"
 ALTER TABLE "notification_mutes" ADD CONSTRAINT "notification_mutes_targetId_fkey" FOREIGN KEY ("targetId") REFERENCES "targets"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 
--- ===== source 022/140: 20261012035930_report_ai_recap (sha256:4889ce94473bb34d6cc1ba1f7d0867f8d3e52ec29cd6657afc6de445bbde347a) =====
 -- AlterEnum
 ALTER TYPE "AiGenerationKind" ADD VALUE 'recap';
 
@@ -1524,7 +1502,6 @@ ALTER TABLE "report_schedules" ADD COLUMN     "aiRecap" BOOLEAN NOT NULL DEFAULT
 ADD COLUMN     "createdById" TEXT;
 
 
--- ===== source 023/140: 20261012050005_queue_empty_notice (sha256:de2899a94a91f1551e593eabfd7ba7a719b94b8be0a1b95e2967b9564432bf9f) =====
 -- AlterTable
 ALTER TABLE "notification_settings" ADD COLUMN     "onQueueEmpty" BOOLEAN NOT NULL DEFAULT true;
 
@@ -1533,17 +1510,14 @@ ALTER TABLE "targets" ADD COLUMN     "queueEmptyNotifiedAt" TIMESTAMP(3),
 ADD COLUMN     "queueFilledAt" TIMESTAMP(3);
 
 
--- ===== source 024/140: 20261012050443_draft_updated_notice (sha256:51967d33df9e0842b09cacaece30699f38aeacd96f3af80054e72ad8e9693daf) =====
 -- AlterTable
 ALTER TABLE "notification_settings" ADD COLUMN     "onDraftUpdated" BOOLEAN NOT NULL DEFAULT true;
 
 
--- ===== source 025/140: 20261012052950_user_theme (sha256:1830346f4ad5c713759d085e037d628f464086b44b47914b6aebf9bf74802895) =====
 -- AlterTable
 ALTER TABLE "users" ADD COLUMN     "theme" TEXT NOT NULL DEFAULT 'facebook';
 
 
--- ===== source 026/140: 20261012054631_session_devices (sha256:0e909694b59ab1308159285e3c5fe8130df00e68049b37feb384798df3bf728f) =====
 -- AlterTable
 ALTER TABLE "sessions" ADD COLUMN     "country" TEXT,
 ADD COLUMN     "ip" TEXT,
@@ -1554,19 +1528,16 @@ ADD COLUMN     "userAgent" TEXT;
 ALTER TABLE "users" ADD COLUMN     "knownDevices" TEXT[] DEFAULT ARRAY[]::TEXT[];
 
 
--- ===== source 027/140: 20261012065921_feed_website_share (sha256:40f31b52f976e3b3554a2e2d093f7a60b9e1ae0ec299ab0ead82572f98710e86) =====
 -- AlterTable
 ALTER TABLE "feed_sources" ADD COLUMN     "hashtags" TEXT NOT NULL DEFAULT '',
 ADD COLUMN     "kind" TEXT NOT NULL DEFAULT 'rss',
 ADD COLUMN     "spreadMinutes" INTEGER NOT NULL DEFAULT 0;
 
 
--- ===== source 028/140: 20261012070327_spam_gap (sha256:3e6b25754c2512e7976e17691179125d51faaf792e82ac0b4dfcecb4016f5c1a) =====
 -- AlterTable
 ALTER TABLE "workspaces" ADD COLUMN     "spamGapMinutes" INTEGER NOT NULL DEFAULT 20;
 
 
--- ===== source 029/140: 20261012082501_moderation_rules (sha256:ea6dc3bc3cf99441f400c7dc62c9890c9fcd0aef0c0cd0437795a7eb7b3c2eb3) =====
 -- AlterTable
 ALTER TABLE "notification_settings" ADD COLUMN     "onModerationAlert" BOOLEAN NOT NULL DEFAULT true;
 
@@ -1632,7 +1603,6 @@ ALTER TABLE "moderation_actions" ADD CONSTRAINT "moderation_actions_workspaceId_
 ALTER TABLE "moderation_actions" ADD CONSTRAINT "moderation_actions_ruleId_fkey" FOREIGN KEY ("ruleId") REFERENCES "moderation_rules"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 
--- ===== source 030/140: 20261012083846_saved_replies (sha256:8e12589b2aaff72134563784d9037a663af71df958a28e060d3bbc3b35532027) =====
 -- CreateTable
 CREATE TABLE "saved_replies" (
     "id" TEXT NOT NULL,
@@ -1652,7 +1622,6 @@ CREATE INDEX "saved_replies_workspaceId_idx" ON "saved_replies"("workspaceId");
 ALTER TABLE "saved_replies" ADD CONSTRAINT "saved_replies_workspaceId_fkey" FOREIGN KEY ("workspaceId") REFERENCES "workspaces"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 
--- ===== source 031/140: 20261012085109_caption_tests (sha256:849572b34009052cbac20f46e5ac2cec00f46b84892bd13de28dc0cad4104a4b) =====
 -- AlterTable
 ALTER TABLE "posts" ADD COLUMN     "captionLabel" TEXT,
 ADD COLUMN     "captionTestId" TEXT;
@@ -1693,7 +1662,6 @@ ALTER TABLE "posts" ADD CONSTRAINT "posts_captionTestId_fkey" FOREIGN KEY ("capt
 ALTER TABLE "caption_tests" ADD CONSTRAINT "caption_tests_workspaceId_fkey" FOREIGN KEY ("workspaceId") REFERENCES "workspaces"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 
--- ===== source 032/140: 20261012090000_api_tokens_chat_channels_page_voice (sha256:66da56a5563fa19b255202a514192e2fa6b7379e5cd9779b15aa2fa0cd1dedda) =====
 -- AlterEnum
 -- This migration adds more than one value to an enum.
 -- With PostgreSQL versions 11 and earlier, this is not possible
@@ -1762,13 +1730,11 @@ ALTER TABLE "api_tokens" ADD CONSTRAINT "api_tokens_userId_fkey" FOREIGN KEY ("u
 ALTER TABLE "chat_channels" ADD CONSTRAINT "chat_channels_workspaceId_fkey" FOREIGN KEY ("workspaceId") REFERENCES "workspaces"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 
--- ===== source 033/140: 20261012090622_best_time_mode (sha256:687653e4f84d3596ea87d474e2c8b47f4e5dd99afd81051d0005155599e927e3) =====
 -- AlterTable
 ALTER TABLE "workspaces" ADD COLUMN     "bestTimeMode" TEXT NOT NULL DEFAULT 'suggest',
 ADD COLUMN     "bestTimesRunAt" TIMESTAMP(3);
 
 
--- ===== source 034/140: 20261012091935_audience (sha256:13b7f3582855ce232cb4a86099022dc26d5c703797afeb998006e779d686838d) =====
 -- AlterTable
 ALTER TABLE "targets" ADD COLUMN     "audienceCalendars" TEXT[] DEFAULT ARRAY[]::TEXT[],
 ADD COLUMN     "audienceCountries" TEXT[] DEFAULT ARRAY[]::TEXT[],
@@ -1782,12 +1748,10 @@ ADD COLUMN     "audienceLanguages" TEXT[] DEFAULT ARRAY[]::TEXT[],
 ADD COLUMN     "audienceTimezone" TEXT;
 
 
--- ===== source 035/140: 20261012093838_ai_translate (sha256:97003931814da94c446ca425f5b5e58ae2af55728b09380c3652635eb7228682) =====
 -- AlterEnum
 ALTER TYPE "AiGenerationKind" ADD VALUE 'translate';
 
 
--- ===== source 036/140: 20261012100746_short_link_target (sha256:a8b7c9a6bd92154a6af8be88f55d4b4d783575686787c22853e945e364b063a7) =====
 -- AlterTable
 ALTER TABLE "short_links" ADD COLUMN     "targetId" TEXT;
 
@@ -1798,7 +1762,6 @@ CREATE INDEX "short_links_targetId_idx" ON "short_links"("targetId");
 ALTER TABLE "short_links" ADD CONSTRAINT "short_links_targetId_fkey" FOREIGN KEY ("targetId") REFERENCES "targets"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 
--- ===== source 037/140: 20261012101604_uptime_days (sha256:375eee2f5dda7e3a24ba14b190a7332c8cc4b6b30f06db059b9fd763ae473247) =====
 -- CreateTable
 CREATE TABLE "uptime_days" (
     "day" TEXT NOT NULL,
@@ -1809,7 +1772,6 @@ CREATE TABLE "uptime_days" (
 );
 
 
--- ===== source 038/140: 20261012101918_error_events (sha256:641e5782bb183ddb31b1995dd613a502469d3cb0c3e1631739e1fb7769111891) =====
 -- CreateTable
 CREATE TABLE "error_events" (
     "id" TEXT NOT NULL,
@@ -1835,7 +1797,6 @@ CREATE UNIQUE INDEX "error_events_fingerprint_key" ON "error_events"("fingerprin
 CREATE INDEX "error_events_lastSeenAt_idx" ON "error_events"("lastSeenAt");
 
 
--- ===== source 039/140: 20261012103124_workspace_exports (sha256:a2ccf6139ca2c68a9e85eaf6f1ef8a0a2c160c083dfc1c8b7df2ece7df881fc3) =====
 -- CreateTable
 CREATE TABLE "workspace_exports" (
     "id" TEXT NOT NULL,
@@ -1863,7 +1824,6 @@ CREATE INDEX "workspace_exports_status_idx" ON "workspace_exports"("status");
 ALTER TABLE "workspace_exports" ADD CONSTRAINT "workspace_exports_workspaceId_fkey" FOREIGN KEY ("workspaceId") REFERENCES "workspaces"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 
--- ===== source 040/140: 20261012104601_media_variants_watermark (sha256:db6f3ff260656ec0fe4f3c1da64e651fa82c6a431fb32f4ccce6d0a4b8a567b6) =====
 -- AlterTable
 ALTER TABLE "media" ADD COLUMN     "derivedFromId" TEXT,
 ADD COLUMN     "variant" TEXT;
@@ -1878,7 +1838,6 @@ CREATE UNIQUE INDEX "media_derivedFromId_variant_key" ON "media"("derivedFromId"
 ALTER TABLE "media" ADD CONSTRAINT "media_derivedFromId_fkey" FOREIGN KEY ("derivedFromId") REFERENCES "media"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 
--- ===== source 041/140: 20261012105721_key_dates_seasons (sha256:7d09cb1e5282a587b519a5e4e40b083e97ee6876ef857dd45d0d80cad53c30a9) =====
 -- CreateTable
 CREATE TABLE "public_holidays" (
     "country" TEXT NOT NULL,
@@ -1945,12 +1904,10 @@ ALTER TABLE "key_dates" ADD CONSTRAINT "key_dates_workspaceId_fkey" FOREIGN KEY 
 ALTER TABLE "seasonal_modes" ADD CONSTRAINT "seasonal_modes_workspaceId_fkey" FOREIGN KEY ("workspaceId") REFERENCES "workspaces"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 
--- ===== source 042/140: 20261012120000_undo_send (sha256:191f2533a0c6e34d681f6b2f013a8139c58678e4de8e1b1c95cce7d46c3361e2) =====
 -- AlterTable
 ALTER TABLE "workspaces" ADD COLUMN     "undoSendSeconds" INTEGER NOT NULL DEFAULT 30;
 
 
--- ===== source 043/140: 20261012130000_webhooks (sha256:4a5b2154d4c79ecfbd2c6b8dfd24c78f70e3ced6a469b3366ab39d1c36e2e400) =====
 -- CreateTable
 CREATE TABLE "webhook_endpoints" (
     "id" TEXT NOT NULL,
@@ -2002,7 +1959,6 @@ ALTER TABLE "webhook_endpoints" ADD CONSTRAINT "webhook_endpoints_workspaceId_fk
 ALTER TABLE "webhook_deliveries" ADD CONSTRAINT "webhook_deliveries_endpointId_fkey" FOREIGN KEY ("endpointId") REFERENCES "webhook_endpoints"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 
--- ===== source 044/140: 20261012140000_content_mix (sha256:30d189e80238ab1bad70372f3f63e772ee574174711760d03097110b77e4ea32) =====
 -- AlterTable
 ALTER TABLE "workspaces" ADD COLUMN     "mixAutoFill" BOOLEAN NOT NULL DEFAULT false;
 
@@ -2036,7 +1992,6 @@ ALTER TABLE "content_mix_rules" ADD CONSTRAINT "content_mix_rules_groupId_fkey" 
 ALTER TABLE "content_mix_rules" ADD CONSTRAINT "content_mix_rules_labelId_fkey" FOREIGN KEY ("labelId") REFERENCES "labels"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 
--- ===== source 045/140: 20261012150000_other_networks (sha256:1e322d71f230e921a47f3845753a11af5ed1e547ed9f8ec3badf480440f80b50) =====
 -- AlterEnum
 -- This migration adds more than one value to an enum.
 -- With PostgreSQL versions 11 and earlier, this is not possible
@@ -2057,7 +2012,6 @@ ALTER TABLE "social_accounts" ADD COLUMN     "meta" JSONB,
 ADD COLUMN     "refreshToken" TEXT;
 
 
--- ===== source 046/140: 20261012160000_post_templates (sha256:5590d6d3075f32ed91004d65b5a24771d6cecfd768b0eb23b49bde85d7be708f) =====
 -- CreateTable
 CREATE TABLE "post_templates" (
     "id" TEXT NOT NULL,
@@ -2084,12 +2038,10 @@ ALTER TABLE "post_templates" ADD CONSTRAINT "post_templates_workspaceId_fkey" FO
 ALTER TABLE "post_templates" ADD CONSTRAINT "post_templates_labelId_fkey" FOREIGN KEY ("labelId") REFERENCES "labels"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 
--- ===== source 047/140: 20261012170000_post_target_removed_at (sha256:ae168effcaed45ecdffdec5286a02e6edd94c550e3d16d6c56e09c5d93be8114) =====
 -- AlterTable
 ALTER TABLE "post_targets" ADD COLUMN     "removedAt" TIMESTAMP(3);
 
 
--- ===== source 048/140: 20261012180000_post_versions (sha256:2850e64f3ffa97b0ed08f4d4e1be8776d2a5b5f207a6ad6a9e8f79ede95f11f0) =====
 -- CreateTable
 CREATE TABLE "post_versions" (
     "id" TEXT NOT NULL,
@@ -2122,7 +2074,6 @@ ALTER TABLE "post_versions" ADD CONSTRAINT "post_versions_postId_fkey" FOREIGN K
 ALTER TABLE "post_versions" ADD CONSTRAINT "post_versions_authorId_fkey" FOREIGN KEY ("authorId") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 
--- ===== source 049/140: 20261012200000_post_notes (sha256:1c9b47fae3e6bfdcb7a99821cfe237611aea8e5eb4eddd429f075529fa694ead) =====
 -- AlterTable
 ALTER TABLE "notification_settings" ADD COLUMN     "onNoteMention" BOOLEAN NOT NULL DEFAULT true;
 
@@ -2151,7 +2102,6 @@ ALTER TABLE "post_notes" ADD CONSTRAINT "post_notes_postId_fkey" FOREIGN KEY ("p
 ALTER TABLE "post_notes" ADD CONSTRAINT "post_notes_authorId_fkey" FOREIGN KEY ("authorId") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 
--- ===== source 050/140: 20261012220000_calendar_feeds (sha256:8613b6e838e917be4a3f7af875bfdbb48a3eaf469b8ed4fed6567d26451b0770) =====
 -- CreateTable
 CREATE TABLE "calendar_feeds" (
     "id" TEXT NOT NULL,
@@ -2180,7 +2130,6 @@ ALTER TABLE "calendar_feeds" ADD CONSTRAINT "calendar_feeds_workspaceId_fkey" FO
 ALTER TABLE "calendar_feeds" ADD CONSTRAINT "calendar_feeds_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 
--- ===== source 051/140: 20261013090000_ai_generation_cost (sha256:ea3851f6f1126cc30f6c38a9d1052014741eed2990f5c3b8c4078e344dfedd51) =====
 -- AlterTable
 ALTER TABLE "ai_generations" ADD COLUMN     "costUsd" DOUBLE PRECISION,
 ADD COLUMN     "provider" TEXT;
@@ -2189,7 +2138,6 @@ ADD COLUMN     "provider" TEXT;
 CREATE INDEX "ai_generations_createdAt_idx" ON "ai_generations"("createdAt");
 
 
--- ===== source 052/140: 20261013090000_page_goals (sha256:49f90e442521d25d031076b9f1b31a0b89147738bb276cc6d5c4ecc728231769) =====
 -- CreateTable
 CREATE TABLE "page_goals" (
     "id" TEXT NOT NULL,
@@ -2216,7 +2164,6 @@ ALTER TABLE "page_goals" ADD CONSTRAINT "page_goals_workspaceId_fkey" FOREIGN KE
 ALTER TABLE "page_goals" ADD CONSTRAINT "page_goals_targetId_fkey" FOREIGN KEY ("targetId") REFERENCES "targets"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 
--- ===== source 053/140: 20261013100000_root_section (sha256:4c1e0bdb6645f3d5cbc03b381ff1f0910e74e87628bbde266b29708c12d2546d) =====
 -- AlterTable
 ALTER TABLE "users" ADD COLUMN     "disabledAt" TIMESTAMP(3);
 
@@ -2238,7 +2185,6 @@ CREATE INDEX "root_activities_createdAt_idx" ON "root_activities"("createdAt");
 ALTER TABLE "root_activities" ADD CONSTRAINT "root_activities_actorId_fkey" FOREIGN KEY ("actorId") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 
--- ===== source 054/140: 20261013110000_chart_notes (sha256:f6d642cfc6038e7e58c73e0198d39cbb92d636ddd038d2233b8364f64f2a6817) =====
 -- CreateTable
 CREATE TABLE "chart_notes" (
     "id" TEXT NOT NULL,
@@ -2266,7 +2212,6 @@ ALTER TABLE "chart_notes" ADD CONSTRAINT "chart_notes_targetId_fkey" FOREIGN KEY
 ALTER TABLE "chart_notes" ADD CONSTRAINT "chart_notes_authorId_fkey" FOREIGN KEY ("authorId") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 
--- ===== source 055/140: 20261013110000_two_step (sha256:e8f745ee1c178287e5191b322bd5f6d82b3f6c4c67c4302b97a233cb51ab2aae) =====
 -- AlterTable
 ALTER TABLE "sessions" ADD COLUMN     "challenge" TEXT,
 ADD COLUMN     "pending" TEXT;
@@ -2341,7 +2286,6 @@ ALTER TABLE "trusted_devices" ADD CONSTRAINT "trusted_devices_userId_fkey" FOREI
 ALTER TABLE "passkeys" ADD CONSTRAINT "passkeys_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 
--- ===== source 056/140: 20261013120000_backup_runs (sha256:56bca95fa60ab7c4bd36e559580386120bf950994ebff39d7d0fab8039d8484a) =====
 -- CreateTable
 CREATE TABLE "backup_runs" (
     "id" TEXT NOT NULL,
@@ -2358,7 +2302,6 @@ CREATE TABLE "backup_runs" (
 CREATE INDEX "backup_runs_kind_finishedAt_idx" ON "backup_runs"("kind", "finishedAt");
 
 
--- ===== source 057/140: 20261013130000_inbox_response_time (sha256:62addc197fb19cdd760abffce2681b74943233c6ba6374374b587d9efbb8f5e7) =====
 -- AlterTable
 ALTER TABLE "conversation_messages" ADD COLUMN     "sentById" TEXT;
 
@@ -2371,7 +2314,6 @@ ADD COLUMN     "businessEnd" INTEGER NOT NULL DEFAULT 18,
 ADD COLUMN     "businessStart" INTEGER NOT NULL DEFAULT 9;
 
 
--- ===== source 058/140: 20261013130000_system_alerts (sha256:fe8b414cc0eb47f4c8cf7b6f12bc61bdf6fc2014f9dcb0df8cfd69f6fcfa24f9) =====
 -- CreateTable
 CREATE TABLE "system_alerts" (
     "id" TEXT NOT NULL,
@@ -2390,7 +2332,6 @@ CREATE INDEX "system_alerts_key_resolvedAt_idx" ON "system_alerts"("key", "resol
 CREATE INDEX "system_alerts_openedAt_idx" ON "system_alerts"("openedAt");
 
 
--- ===== source 059/140: 20261013140000_client_invitations (sha256:6bec812fdfb0b78c1bc0a35a02d26680f6125a025410138711141522338aea2d) =====
 -- CreateTable
 CREATE TABLE "client_invitations" (
     "id" TEXT NOT NULL,
@@ -2416,7 +2357,6 @@ CREATE INDEX "client_invitations_email_idx" ON "client_invitations"("email");
 ALTER TABLE "client_invitations" ADD CONSTRAINT "client_invitations_invitedById_fkey" FOREIGN KEY ("invitedById") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 
--- ===== source 060/140: 20261014090000_root_modules (sha256:7ea057fcd4058f187013adb4d99809e20d72d6bfc4d637e44a875d17245e1c06) =====
 -- AlterTable
 ALTER TABLE "memberships" ADD COLUMN     "disabledModules" TEXT[] DEFAULT ARRAY[]::TEXT[];
 
@@ -2425,12 +2365,10 @@ ALTER TABLE "workspaces" ADD COLUMN     "disabledModules" TEXT[] DEFAULT ARRAY[]
 ADD COLUMN     "suspendedAt" TIMESTAMP(3);
 
 
--- ===== source 061/140: 20261015090000_pinned_metrics (sha256:ce17639305c003cb32f3811b810701bddf5c89abcfe7e7cc9b9ae7ce696f0895) =====
 -- AlterTable
 ALTER TABLE "users" ADD COLUMN     "pinnedMetrics" TEXT[] DEFAULT ARRAY[]::TEXT[];
 
 
--- ===== source 062/140: 20261016090000_negative_comment_alert (sha256:a5dccf307e66cf884a6a15c648afcb732568eb3eb33a7b0ad4bace8432e953d5) =====
 -- AlterEnum
 ALTER TYPE "AiGenerationKind" ADD VALUE 'sentiment';
 
@@ -2444,7 +2382,6 @@ ALTER TABLE "targets" ADD COLUMN     "negativeAlertAt" TIMESTAMP(3);
 ALTER TABLE "workspaces" ADD COLUMN     "watchNegativeComments" BOOLEAN NOT NULL DEFAULT false;
 
 
--- ===== source 063/140: 20261016100000_trending_topics (sha256:f32efebe21db9d3390d4d0f045ea1338c86d5d0154c9dd17cd2ea6622fd0cb92) =====
 -- AlterTable
 ALTER TABLE "workspaces" ADD COLUMN     "trendKeywords" TEXT[] DEFAULT ARRAY[]::TEXT[];
 
@@ -2469,12 +2406,10 @@ CREATE INDEX "trending_topics_country_fetchedAt_idx" ON "trending_topics"("count
 CREATE UNIQUE INDEX "trending_topics_country_title_key" ON "trending_topics"("country", "title");
 
 
--- ===== source 064/140: 20261016110000_ai_alt_text (sha256:feae4148901564f2a1e2a2ef48d7d182b9e0ffd07a75d87007ffce48020d6de7) =====
 -- AlterEnum
 ALTER TYPE "AiGenerationKind" ADD VALUE 'altText';
 
 
--- ===== source 065/140: 20261016120000_email_tokens (sha256:ddac77d64019d0c0daeb85dc89d7442c00004957bb1ae6f4be5d787981d7b8d5) =====
 -- AlterTable
 ALTER TABLE "users" ADD COLUMN     "emailVerifiedAt" TIMESTAMP(3);
 
@@ -2505,7 +2440,6 @@ CREATE INDEX "email_tokens_userId_purpose_idx" ON "email_tokens"("userId", "purp
 ALTER TABLE "email_tokens" ADD CONSTRAINT "email_tokens_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 
--- ===== source 066/140: 20261017090000_developer_features (sha256:5b4d4c087cff261ebf96f6f517eca6f3150ab58af1571418e6a6f34414081672) =====
 -- Developer features (API keys, MCP, outgoing webhooks) are off unless root
 -- turns them on for a workspace.
 ALTER TABLE "workspaces" ADD COLUMN "developerFeatures" BOOLEAN NOT NULL DEFAULT false;
@@ -2518,20 +2452,16 @@ WHERE "id" IN (
   SELECT "workspaceId" FROM "webhook_endpoints"
 );
 
--- ===== source 067/140: 20261017100000_viewer_role (sha256:a438f91ffa20f7d26eba8691107fe73926e4f00dbc580da0f019d3512fbe954b) =====
 -- A read-only member: sees its channels, changes nothing.
 ALTER TYPE "WorkspaceRole" ADD VALUE IF NOT EXISTS 'viewer';
 
--- ===== source 068/140: 20261017110000_client_role (sha256:826e1a7330a9f537b88eacd34f9b7e50548f1e75355bf9fc676621ca749d0527) =====
 -- The agency's customer as a member: sees calendar and approvals, plus what the workspace opens to clients.
 ALTER TYPE "WorkspaceRole" ADD VALUE IF NOT EXISTS 'client';
 
 ALTER TABLE "workspaces" ADD COLUMN "clientAccess" TEXT[] DEFAULT ARRAY['analytics']::TEXT[];
 
--- ===== source 069/140: 20261017120000_share_link_decides (sha256:ba3fbbc271d4c8a74f2f45ffef196b50c22c6e471f5aecffd18b81da5e6f18b4) =====
 ALTER TABLE "share_links" ADD COLUMN "decides" BOOLEAN NOT NULL DEFAULT false, ADD COLUMN "publishAnywayHours" INTEGER;
 
--- ===== source 070/140: 20261017130000_plans (sha256:cc4d9bb8cdf1b74929d56b7f8185683e2cbcc3f079ef1660005890c2997f244e) =====
 CREATE TABLE "plans" (
   "id" TEXT NOT NULL,
   "key" TEXT NOT NULL,
@@ -2564,16 +2494,12 @@ INSERT INTO "plans" ("id","key","name","position","priceMonthly","priceYearly","
  ('plan_agency','agency','Agency',3,9900,99000,200,40,NULL,NULL,NULL,2000,ARRAY['clients','whiteLabel','api']::TEXT[],false),
  ('plan_agency_plus','agency_plus','Agency+',4,24900,249000,100,120,NULL,NULL,NULL,6000,ARRAY['clients','whiteLabel','api']::TEXT[],false);
 
--- ===== source 071/140: 20261018120000_telegram (sha256:67ee49f9b302770454e0ff34ded8de424b71a29d7c725b3f8ad12892b4c2537a) =====
 ALTER TYPE "TargetType" ADD VALUE IF NOT EXISTS 'telegram';
 
--- ===== source 072/140: 20261018130000_youtube (sha256:44b1fabca320240db3942c94fa708be481212bbab856d3d23ab380228ca436ad) =====
 ALTER TYPE "TargetType" ADD VALUE IF NOT EXISTS 'youtube';
 
--- ===== source 073/140: 20261018140000_tiktok (sha256:39efb3bf02843273d367b88a528e12e2172024021327bcdff6ac2d304176405f) =====
 ALTER TYPE "TargetType" ADD VALUE IF NOT EXISTS 'tiktok';
 
--- ===== source 074/140: 20261019090000_saved_views (sha256:8db9a5758c44c5b7170db32edcc3eb4293f2a3998f3007ce86bc8fa2bef43683) =====
 CREATE TABLE "saved_views" (
     "id" TEXT NOT NULL,
     "workspaceId" TEXT NOT NULL,
@@ -2592,14 +2518,11 @@ ALTER TABLE "saved_views" ADD CONSTRAINT "saved_views_workspaceId_fkey" FOREIGN 
 
 ALTER TABLE "saved_views" ADD CONSTRAINT "saved_views_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
--- ===== source 075/140: 20261019100000_inbox_assignee (sha256:407392b0061fdef4a62510eda287de8960dc0f13abe895c82a200f2882b5866b) =====
 ALTER TABLE "post_comments" ADD COLUMN "assigneeId" TEXT;
 ALTER TABLE "conversations" ADD COLUMN "assigneeId" TEXT;
 
--- ===== source 076/140: 20261019110000_post_target_message_override (sha256:212ba08986a78b554e0ef657cce60730db5d8bf9f9ad67a4c1a8a9d14e78577f) =====
 ALTER TABLE "post_targets" ADD COLUMN "messageOverride" TEXT;
 
--- ===== source 077/140: 20261019120000_inbox_notes (sha256:672b27a1ae6043bf86bb62cc08fbb225cfd2a1d00ee20a487b1a843d73bf48b7) =====
 CREATE TABLE "inbox_notes" (
     "id" TEXT NOT NULL,
     "workspaceId" TEXT NOT NULL,
@@ -2618,7 +2541,6 @@ ALTER TABLE "inbox_notes" ADD CONSTRAINT "inbox_notes_workspaceId_fkey" FOREIGN 
 
 ALTER TABLE "inbox_notes" ADD CONSTRAINT "inbox_notes_authorId_fkey" FOREIGN KEY ("authorId") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
--- ===== source 078/140: 20261019130000_bio_page (sha256:6ab8aa72a42bf30b70a1c4f68bab2cfa1f845025a8c74b5b3622317997abd93f) =====
 CREATE TABLE "bio_pages" (
     "id" TEXT NOT NULL,
     "workspaceId" TEXT NOT NULL,
@@ -2651,10 +2573,8 @@ CREATE INDEX "bio_links_pageId_position_idx" ON "bio_links"("pageId", "position"
 ALTER TABLE "bio_pages" ADD CONSTRAINT "bio_pages_workspaceId_fkey" FOREIGN KEY ("workspaceId") REFERENCES "workspaces"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 ALTER TABLE "bio_links" ADD CONSTRAINT "bio_links_pageId_fkey" FOREIGN KEY ("pageId") REFERENCES "bio_pages"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
--- ===== source 079/140: 20261019140000_ai_avoid_words (sha256:5191c7dfb49f4994bf9e7c723f3cc0b1a24377ea4638d811d273a9796138472d) =====
 ALTER TABLE "workspaces" ADD COLUMN "aiAvoidWords" TEXT;
 
--- ===== source 080/140: 20261019150000_tasks (sha256:b2454c2408fac409d84c1077656d90f3a84e245a91fcb899fa2682b213ac46e7) =====
 CREATE TABLE "tasks" (
     "id" TEXT NOT NULL,
     "workspaceId" TEXT NOT NULL,
@@ -2675,10 +2595,8 @@ CREATE INDEX "tasks_workspaceId_status_idx" ON "tasks"("workspaceId", "status");
 
 ALTER TABLE "tasks" ADD CONSTRAINT "tasks_workspaceId_fkey" FOREIGN KEY ("workspaceId") REFERENCES "workspaces"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
--- ===== source 081/140: 20261019160000_post_target_skip_media (sha256:fd5ab020e603481229a052d599bb880c5bf38fa0f332e6e1783b092547ab8b47) =====
 ALTER TABLE "post_targets" ADD COLUMN "skipMedia" BOOLEAN NOT NULL DEFAULT false;
 
--- ===== source 082/140: 20261019170000_custom_fields (sha256:ffa0d1d6b7d0185dbdc183e46d587d698a3746613a8652c9dea8d949709c4360) =====
 CREATE TABLE "custom_fields" (
     "id" TEXT NOT NULL,
     "workspaceId" TEXT NOT NULL,
@@ -2708,15 +2626,12 @@ ALTER TABLE "custom_fields" ADD CONSTRAINT "custom_fields_workspaceId_fkey" FORE
 ALTER TABLE "post_field_values" ADD CONSTRAINT "post_field_values_postId_fkey" FOREIGN KEY ("postId") REFERENCES "posts"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 ALTER TABLE "post_field_values" ADD CONSTRAINT "post_field_values_fieldId_fkey" FOREIGN KEY ("fieldId") REFERENCES "custom_fields"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
--- ===== source 083/140: 20261019180000_client_approval_step (sha256:031284fc863689ab4807f14a9a94fa7523fdbe2d91edf0bac8cf70cc546d5fdd) =====
 ALTER TABLE "workspaces" ADD COLUMN "clientApprovalAfterTeam" BOOLEAN NOT NULL DEFAULT false;
 ALTER TABLE "posts" ADD COLUMN "teamApprovedById" TEXT;
 ALTER TABLE "posts" ADD COLUMN "teamApprovedAt" TIMESTAMP(3);
 
--- ===== source 084/140: 20261019190000_ai_image_kind (sha256:e5b188707c823e599c0473eb60f0ec0b6e8a9f38c63d2ffd6ba0ab20220bd710) =====
 ALTER TYPE "AiGenerationKind" ADD VALUE IF NOT EXISTS 'image';
 
--- ===== source 085/140: 20261019200000_ai_agents (sha256:8f40ca0748ad570c365bf3293a7c2ba463461dffee2cff928b86edd676001232) =====
 CREATE TABLE "ai_agents" (
     "id" TEXT NOT NULL,
     "workspaceId" TEXT NOT NULL,
@@ -2736,13 +2651,10 @@ CREATE INDEX "ai_agents_workspaceId_idx" ON "ai_agents"("workspaceId");
 
 ALTER TABLE "ai_agents" ADD CONSTRAINT "ai_agents_workspaceId_fkey" FOREIGN KEY ("workspaceId") REFERENCES "workspaces"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
--- ===== source 086/140: 20261020100000_post_place (sha256:dafea0f0feed49e2e09449b91199bf80e7e14b791f80a85b2ed8301c02eca5b9) =====
 ALTER TABLE "posts" ADD COLUMN "place" TEXT;
 
--- ===== source 087/140: 20261020110000_post_text_background (sha256:dd468df943f8948a083358afca1ccd124e1668bbc2ca3aca25346d727beaac84) =====
 ALTER TABLE "posts" ADD COLUMN "textBackground" TEXT;
 
--- ===== source 088/140: 20261020120000_ai_videos (sha256:09e34187895ee98a7e50457e89109661b9d47c2e3f06244fca2c0971b42570e9) =====
 ALTER TYPE "AiGenerationKind" ADD VALUE IF NOT EXISTS 'video';
 
 CREATE TABLE "ai_videos" (
@@ -2765,10 +2677,8 @@ CREATE INDEX "ai_videos_status_idx" ON "ai_videos"("status");
 
 ALTER TABLE "ai_videos" ADD CONSTRAINT "ai_videos_workspaceId_fkey" FOREIGN KEY ("workspaceId") REFERENCES "workspaces"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
--- ===== source 089/140: 20261020130000_ai_voice_kind (sha256:1aeca1314c51d71825dbd43f5f1f9da624d955be7361d6b92f77d0483bf26757) =====
 ALTER TYPE "AiGenerationKind" ADD VALUE IF NOT EXISTS 'voice';
 
--- ===== source 090/140: 20261021100000_oauth_connector (sha256:40cb48ce755b3b64d5b45edee1164671e7b92cb3854eff94fc7bf4a62701fb7a) =====
 CREATE TABLE "OAuthClient" (
     "id" TEXT NOT NULL,
     "name" TEXT NOT NULL,
@@ -2795,7 +2705,6 @@ CREATE UNIQUE INDEX "OAuthCode_codeHash_key" ON "OAuthCode"("codeHash");
 
 ALTER TABLE "OAuthCode" ADD CONSTRAINT "OAuthCode_clientId_fkey" FOREIGN KEY ("clientId") REFERENCES "OAuthClient"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
--- ===== source 091/140: 20261022100000_changelog (sha256:47ce1a91528bd9263f66252dcc43bc6c99ee82e7c99a6a5427dd598fcf3d5869) =====
 CREATE TABLE "changelog_entries" (
     "id" TEXT NOT NULL,
     "publishedOn" DATE NOT NULL,
@@ -2807,7 +2716,6 @@ CREATE TABLE "changelog_entries" (
 
 CREATE INDEX "changelog_entries_publishedOn_idx" ON "changelog_entries"("publishedOn");
 
--- ===== source 092/140: 20261022200000_root_admin_settings (sha256:d6f57204f010bff549284a785e77df3a98305c2fea1b07989dfda5fea6b07c75) =====
 -- Preserve saved values and metadata; an existing canonical key always wins.
 UPDATE app_settings AS source
 SET key = 'root.admin.' || substr(source.key, length('root.legacy.') + 1)
@@ -2817,7 +2725,6 @@ WHERE source.key LIKE 'root.legacy.%'
     WHERE target.key = 'root.admin.' || substr(source.key, length('root.legacy.') + 1)
   );
 
--- ===== source 093/140: 20261024100000_workspace_data_purges (sha256:0f32e4ae733c07e8796babfa6e38ceddf0184fa240d1ae2e3d971643fc74a54e) =====
 -- Persist both halves of workspace data deletion so a crash after database
 -- commit can resume filesystem cleanup without reopening the deleted rows.
 CREATE TABLE "workspace_data_purges" (
@@ -2872,7 +2779,6 @@ BEGIN
   END LOOP;
 END $$;
 
--- ===== source 094/140: 20261101120000_ads_object_inventory (sha256:a6ea92c28d7697c4d229c6c90e068cc6da6b1d5575864b43e1d0976a31b50861) =====
 -- Object identity is independent of delivery. Account deletion erases its inventory.
 CREATE TABLE ads_objects (
   "adAccountId" TEXT NOT NULL REFERENCES ad_accounts(id) ON DELETE CASCADE,
@@ -2885,7 +2791,6 @@ CREATE TABLE ads_objects (
   PRIMARY KEY ("adAccountId", level, "objectId")
 );
 
--- ===== source 095/140: 20261015120000_mcp_api_keys (sha256:988d873c33229b439818d079d72c8bc49ffec93cbfe081ee4061ef93d2b2b3f4) =====
 CREATE TABLE "mcp_api_keys" (
   "id" TEXT NOT NULL,
   "workspaceId" TEXT NOT NULL,
@@ -2907,7 +2812,6 @@ CREATE UNIQUE INDEX "mcp_api_keys_tokenHash_key" ON "mcp_api_keys"("tokenHash");
 CREATE INDEX "mcp_api_keys_workspaceId_createdAt_idx" ON "mcp_api_keys"("workspaceId", "createdAt");
 CREATE INDEX "mcp_api_keys_expiresAt_idx" ON "mcp_api_keys"("expiresAt");
 
--- ===== source 096/140: 20261023100000_rebuild_worker_jobs (sha256:5fb7962a2c720f8a3f30480c4c5afa6f0d48c92a8f2ee58047fb96ccf04a7205) =====
 -- Distributed lease and append-only outcome history for the replacement worker.
 CREATE TABLE "rebuild_job_leases" (
   "name" TEXT NOT NULL,
@@ -2934,7 +2838,6 @@ CREATE TABLE "rebuild_sync_runs" (
 CREATE INDEX "rebuild_sync_runs_job_startedAt_idx" ON "rebuild_sync_runs"("job", "startedAt");
 CREATE INDEX "rebuild_sync_runs_finishedAt_idx" ON "rebuild_sync_runs"("finishedAt");
 
--- ===== source 097/140: 20261016190000_rebuild_inbox_deletions (sha256:457327ad55d02af41eefe00f56021923abe5e13cf7ca668a96c064fa714acc57) =====
 -- Durable, content-free recovery journal for Inbox remote deletions.
 CREATE TABLE "rebuild_inbox_deletions" (
   "id" TEXT NOT NULL,
@@ -2972,7 +2875,6 @@ CREATE UNIQUE INDEX "rebuild_inbox_deletions_workspaceId_provider_targetId_remot
 CREATE INDEX "rebuild_inbox_deletions_workspaceId_targetId_updatedAt_idx"
   ON "rebuild_inbox_deletions"("workspaceId", "targetId", "updatedAt");
 
--- ===== source 098/140: 20261016220000_rebuild_post_deletions (sha256:80e406ae33000a349d07f9e428563d20083bc36c65956a969a5e7ccc77c32f07) =====
 -- Durable, content-free recovery journal and tombstones for remote post deletion.
 CREATE TABLE "rebuild_post_deletions" (
   "id" TEXT NOT NULL,
@@ -3014,7 +2916,6 @@ CREATE INDEX "rebuild_post_deletions_workspaceId_targetId_updatedAt_idx"
 CREATE INDEX "rebuild_post_deletions_localPostIds_gin_idx"
   ON "rebuild_post_deletions" USING GIN ("localPostIds");
 
--- ===== source 099/140: 20261017010000_rebuild_publication_attempts (sha256:03973b6fb80dcf2580c5e39f0d2be8fd5715f47c1a953127ce939638bfece267) =====
 -- Durable, content-free publication intent, receipt, and resolution journal.
 -- Identifier bounds are fixed integrity caps (2048 characters) independent of runtime configuration.
 CREATE TABLE "rebuild_publication_attempts" (
@@ -3074,7 +2975,6 @@ CREATE INDEX "rebuild_publication_attempts_workspaceId_targetId_updatedAt_idx"
 CREATE INDEX "rebuild_publication_attempts_workspaceId_postId_postTargetId_idx"
   ON "rebuild_publication_attempts"("workspaceId", "postId", "postTargetId");
 
--- ===== source 100/140: 20261017020000_rebuild_facebook_media_steps (sha256:897464050aedf8c727fd695cc9b1fead0810d6c08606f3074c4d70529940a0e1) =====
 -- Content-free intent and receipt journal for Facebook's unpublished photo uploads.
 -- Provider objects remain recoverable across a process crash without retaining media bytes or URLs.
 CREATE TABLE "rebuild_facebook_media_steps" (
@@ -3134,7 +3034,6 @@ CREATE UNIQUE INDEX "rebuild_facebook_media_steps_known_remote_id_key"
   ON "rebuild_facebook_media_steps"("workspaceId", "targetId", "phase", "remoteId")
   WHERE "remoteId" IS NOT NULL;
 
--- ===== source 101/140: 20261017030000_rebuild_facebook_media_deletions (sha256:3f5df63bf339fe532581f14738d089ca5f20a4c245f581f1587573b5bfe6cca5) =====
 CREATE TABLE rebuild_facebook_media_deletions (
   id text PRIMARY KEY,
   "workspaceId" text NOT NULL,
@@ -3215,7 +3114,6 @@ CREATE TRIGGER rebuild_facebook_media_deletions_binding_immutable_trigger
   BEFORE UPDATE ON rebuild_facebook_media_deletions
   FOR EACH ROW EXECUTE FUNCTION rebuild_facebook_media_deletions_binding_immutable();
 
--- ===== source 102/140: 20261017040000_rebuild_facebook_media_resolution (sha256:3227fbe5f381a25c87955ac809ef605fe1f2d51d9bb4f3ca4e5e9ce743c2a844) =====
 -- Immutable operator attestations and delayed provider-result evidence for
 -- Facebook's content-free multi-photo and staged-photo deletion journals.
 ALTER TABLE rebuild_facebook_media_steps
@@ -3349,7 +3247,6 @@ CREATE TRIGGER rebuild_facebook_media_resolutions_immutable_trigger
   BEFORE UPDATE ON rebuild_facebook_media_resolutions
   FOR EACH ROW EXECUTE FUNCTION rebuild_facebook_media_resolutions_immutable();
 
--- ===== source 103/140: 20261018150000_rebuild_notifications (sha256:b60b92752dc3019e15156f1ecb4cb58d29b5de4a6676dd141ac13a955277b067) =====
 CREATE TABLE rebuild_notifications (
   id TEXT PRIMARY KEY CHECK (length(id) BETWEEN 1 AND 2048),
   "eventId" TEXT NOT NULL CHECK (length("eventId") BETWEEN 1 AND 2048),
@@ -3394,7 +3291,6 @@ CREATE INDEX rebuild_notifications_delivery_lease_idx
   ON rebuild_notifications ("claimUntil", id)
   WHERE "emailState" = 'sending';
 
--- ===== source 104/140: 20261018170000_rebuild_ads_operations (sha256:61f575314590e45e8eafc7cb8088677fec2a78b39210b82187b6f2c05197d6d2) =====
 CREATE TABLE ads_management_operations (
   id TEXT PRIMARY KEY,
   "workspaceId" TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
@@ -3427,7 +3323,6 @@ CREATE UNIQUE INDEX ads_management_operations_open_object
 CREATE INDEX ads_management_operations_history
   ON ads_management_operations ("workspaceId", "adAccountId", "createdAt" DESC, id);
 
--- ===== source 105/140: 20261018190000_rebuild_ads_creation (sha256:749fc69e2937588b95e7b050ebb49525e30b2624915abd2bdc92de6e92a899d0) =====
 -- Extend the same durable journal; do not create a separate creation write path.
 ALTER TABLE ads_management_operations
   DROP CONSTRAINT "ads_management_operations_operationType_check";
@@ -3436,7 +3331,6 @@ ALTER TABLE ads_management_operations
     "operationType" IN ('status.set','budget.set','rename','creative.assign','delete','campaign.create','adset.create')
   );
 
--- ===== source 106/140: 20261018193000_rebuild_purge_write_gates (sha256:5250ec9a2e1176d59f8dd97b6b86d622187b87bd2d3944c41c7a411d157b51d6) =====
 -- Reconcile the database erasure guard for schema-built legacy installations.
 -- The existing purge table and all customer rows are preserved. This prerequisite
 -- must run before new workspace-owned module tables install the shared gate.
@@ -3489,7 +3383,6 @@ BEGIN
   END LOOP;
 END $$;
 
--- ===== source 107/140: 20261025100000_rebuild_task_comments (sha256:648427469b965c3c5572b131c4834f772f1fdfe6884a0fd8c32aebc3588750ea) =====
 -- Task comments for the rebuild Tasks module. Additive: one new table and one
 -- unique index on the existing tasks table. Existing rows are not rewritten.
 --
@@ -3536,12 +3429,10 @@ ALTER TABLE "task_comments" ADD CONSTRAINT "task_comments_authorId_fkey"
 CREATE TRIGGER rebuild_workspace_purge_write_gate BEFORE INSERT OR UPDATE ON "task_comments"
   FOR EACH ROW EXECUTE FUNCTION rebuild_reject_purging_workspace_write();
 
--- ===== source 108/140: 20261018230000_rebuild_sharing_expiry (sha256:28d4f9da65ed866f6139aa982d4756906cd329080dccf6cf2d87dee32e59d263) =====
 -- Legacy links without an expiry remain stored but are not publicly served by the rebuild.
 -- Owners can rotate/recreate them with an explicit bounded lifetime.
 ALTER TABLE "share_links" ADD COLUMN "expiresAt" TIMESTAMP(3);
 
--- ===== source 109/140: 20261018233000_rebuild_mcp_resource_scope (sha256:465a5d76679b45d7cb3fa6560b9d6a32501e56faab1922107547452a0b5519ab) =====
 -- NULL preserves pre-scope credential behavior; new credentials use a validated versioned ceiling.
 ALTER TABLE "mcp_api_keys" ADD COLUMN "resourceScope" JSONB;
 ALTER TABLE "mcp_api_keys" ADD CONSTRAINT "mcp_api_keys_resource_scope_shape" CHECK (
@@ -3554,7 +3445,6 @@ ALTER TABLE "mcp_api_keys" ADD CONSTRAINT "mcp_api_keys_resource_scope_shape" CH
   )
 );
 
--- ===== source 110/140: 20261019010000_rebuild_report_runs (sha256:caa0c553569cf9f984e973ceb6e3ee858750209c6d2931e1316d3323b4357c4a) =====
 -- Additive report evidence and bounded manual download receipts. Existing
 -- report_templates/report_schedules, recipients and aiRecap are preserved.
 CREATE TABLE report_runs (
@@ -3591,7 +3481,6 @@ CREATE INDEX report_runs_channel_history ON report_runs ("workspaceId", "targetI
 CREATE INDEX report_runs_open_leases ON report_runs ("leaseUntil", id) WHERE status IN ('claimed','generating','delivering');
 CREATE INDEX report_runs_output_expiry ON report_runs ("outputExpiresAt", id) WHERE output IS NOT NULL;
 
--- ===== source 111/140: 20261019011000_rebuild_report_purge_gate (sha256:122e813070361737ba1a89d775d2f92922dadd36423debb83411e0d5a4aa5d9e) =====
 -- The earlier reviewed purge gate predates report_runs. Join the same lock and
 -- erasure guard without rewriting the already-applied report history migration.
 DO $$
@@ -3603,7 +3492,6 @@ END $$;
 CREATE TRIGGER rebuild_workspace_purge_write_gate BEFORE INSERT OR UPDATE ON report_runs
   FOR EACH ROW EXECUTE FUNCTION rebuild_reject_purging_workspace_write();
 
--- ===== source 112/140: 20261019020000_rebuild_destination_formats (sha256:30325cdda1951cde93fab77a12bc349caa4422861fe133f68320ac3b979af6c6) =====
 -- Additive neutral per-destination intent. NULL retains an existing legacy
 -- destination's post-level format; newly authored destinations store an ID.
 ALTER TABLE post_targets ADD COLUMN "formatId" text;
@@ -3614,7 +3502,6 @@ ALTER TABLE post_versions ADD COLUMN "destinationFormats" jsonb NOT NULL DEFAULT
 ALTER TABLE post_versions ADD CONSTRAINT rebuild_version_destination_formats_object
   CHECK (jsonb_typeof("destinationFormats") = 'object');
 
--- ===== source 113/140: 20261019030000_rebuild_facebook_native_journal (sha256:3ef505dccb5156ea1d84472998d19fb8427b1232669f57ca98a8ac6cd1e04d46) =====
 -- Facebook native publishing receipts are a child of the neutral publication
 -- claim. This journal stores bounded, content-free protocol evidence only.
 CREATE UNIQUE INDEX "rebuild_publication_attempts_workspaceId_id_key"
@@ -3840,7 +3727,6 @@ CREATE TRIGGER rebuild_workspace_purge_write_gate
   BEFORE INSERT OR UPDATE ON "rebuild_facebook_native_journal"
   FOR EACH ROW EXECUTE FUNCTION public.rebuild_reject_purging_workspace_write();
 
--- ===== source 114/140: 20261019040000_rebuild_facebook_native_status_proofs (sha256:253e8fb4f18b4cf60fcce16702772dd166358e641fb875c2781cb84d8dc767d4) =====
 -- Provider-owned observations of native publication status. This ledger is a
 -- child of the existing publication claim and grants no dispatch authority.
 CREATE TABLE "rebuild_facebook_native_status_proofs" (
@@ -3964,7 +3850,6 @@ CREATE TRIGGER rebuild_workspace_purge_write_gate
   BEFORE INSERT OR UPDATE ON "rebuild_facebook_native_status_proofs"
   FOR EACH ROW EXECUTE FUNCTION public.rebuild_reject_purging_workspace_write();
 
--- ===== source 115/140: 20261019050000_rebuild_publication_submissions (sha256:91011f00b776d402038d74ff1862e5ab352bbeb500d386b5000172a17ffb5931) =====
 -- Provider submission is a durable receipt state that precedes local projection.
 -- Preserve the prior state/timestamp branches verbatim and extend them additively.
 ALTER TABLE "rebuild_publication_attempts"
@@ -3990,7 +3875,6 @@ ALTER TABLE "rebuild_publication_attempts"
       OR ("state" = 'submitted' AND "reason" = 'provider_submission' AND "remotePostId" IS NOT NULL AND "receiptAt" IS NOT NULL AND "projectedAt" IS NULL AND "attestedAt" IS NULL AND "attestedBy" IS NULL)
     ) IS TRUE);
 
--- ===== source 116/140: 20261019060000_rebuild_template_comment_delay (sha256:4c2f5699a826b8008003718084ee13eb0e4ee37e8e861ffdaf4a8a0a292bcfc5) =====
 ALTER TABLE "post_templates"
   ADD COLUMN "firstCommentDelayMinutes" INTEGER NOT NULL DEFAULT 0,
   ADD CONSTRAINT "post_templates_firstCommentDelayMinutes_check" CHECK ("firstCommentDelayMinutes" >= 0);
@@ -3999,7 +3883,6 @@ ALTER TABLE "post_versions"
   ADD COLUMN "firstCommentDelayMinutes" INTEGER NOT NULL DEFAULT 0,
   ADD CONSTRAINT "post_versions_firstCommentDelayMinutes_check" CHECK ("firstCommentDelayMinutes" >= 0);
 
--- ===== source 117/140: 20261026100000_rebuild_oauth_connectors (sha256:58514dc2c438333ac8fb74d632254e230d1d8e69967cc61b2076676eba9879d5) =====
 -- OAuth connectors for MCP clients (dynamic client registration + authorization code with PKCE).
 -- Additive only: two new tables, no change to existing tables. Replaces the legacy "OAuthClient"/"OAuthCode"
 -- tables, which stay untouched until cutover cleanup. Codes are stored only as SHA-256 hashes; the access
@@ -4043,7 +3926,6 @@ CREATE INDEX "mcp_oauth_codes_clientId_idx" ON "mcp_oauth_codes"("clientId");
 CREATE INDEX "mcp_oauth_codes_expiresAt_idx" ON "mcp_oauth_codes"("expiresAt");
 CREATE INDEX "mcp_oauth_clients_createdAt_idx" ON "mcp_oauth_clients"("createdAt");
 
--- ===== source 118/140: 20261027100000_rebuild_workspace_exports (sha256:1d154d62c8422a6f8ac99a92c2975da9e7d211dc018950cc4f3a411c4e96acac) =====
 CREATE TABLE public.rebuild_workspace_exports (
   id TEXT PRIMARY KEY,
   "workspaceId" TEXT NOT NULL REFERENCES public.workspaces(id) ON DELETE CASCADE,
@@ -4082,7 +3964,6 @@ END $$;
 CREATE TRIGGER rebuild_export_file_cleanup AFTER DELETE ON public.rebuild_workspace_exports
   FOR EACH ROW EXECUTE FUNCTION public.rebuild_queue_export_file_cleanup();
 
--- ===== source 119/140: 20261028100000_rebuild_alert_delivery (sha256:ed079e77ebb54ab01b46811686237c72308a11e43b75dfc9b9c9b0304801f36b) =====
 ALTER TABLE rebuild_notifications ADD COLUMN "accountId" TEXT REFERENCES social_accounts(id) ON DELETE CASCADE;
 ALTER TABLE rebuild_notifications DROP CONSTRAINT rebuild_notifications_kind_check;
 ALTER TABLE rebuild_notifications ADD CONSTRAINT rebuild_notifications_kind_check CHECK (kind IN ('note_mention','mix_dry','publish_failure','connection_expired','token_expiring','approval_request','approval_decision','inbox_digest','queue_empty','draft_updated','moderation_alert','negative_spike'));
@@ -4094,14 +3975,12 @@ ALTER TABLE rebuild_notifications ADD CONSTRAINT rebuild_notifications_context_s
  OR (kind IN ('connection_expired','token_expiring') AND "accountId" IS NOT NULL)
 );
 
--- ===== source 120/140: 20261029100000_rebuild_channel_profiles (sha256:eaad76b014a355047385425fee74caa5fd656c942f461016f98b96c32142f7f4) =====
 -- Channel labels are customer metadata, independent of provider categories and post labels.
 CREATE TABLE rebuild_channel_profiles (
   "targetId" TEXT PRIMARY KEY REFERENCES targets(id) ON DELETE CASCADE,
   labels TEXT[] NOT NULL DEFAULT '{}'
 );
 
--- ===== source 121/140: 20261030100000_rebuild_facebook_native_story_proofs (sha256:a74d6f4c546dd7f36f464636171bfe61d850dc42cca7786340c0169119fc680e) =====
 -- Let the native status-proof ledger record observations of Facebook Story
 -- publications. Additive: the table, its rows and every other rule are kept.
 -- A Story keeps two journal identities (the staged photo/video and the final
@@ -4198,11 +4077,9 @@ BEGIN
 END;
 $$;
 
--- ===== source 122/140: 20261030100000_rebuild_review_resolution (sha256:bf99bb579b7d989d3ec1ec2651d8db216cbcaa44d8fe7d0e10ccb1448e08e68e) =====
 -- Reviews in the Inbox can be resolved and reopened locally, like conversations and comments.
 ALTER TABLE page_reviews ADD COLUMN "resolvedAt" TIMESTAMP(3);
 
--- ===== source 123/140: 20261030110000_rebuild_ads_creative_creation (sha256:2109fc4f75cf1f528a6940a14979b1a5b60e6b79f3d9f269dc19507001703aec) =====
 -- Extend the existing durable creation journal; no automatic replay of held writes.
 ALTER TABLE ads_management_operations DROP CONSTRAINT ads_operations_operation_kind;
 ALTER TABLE ads_management_operations ADD CONSTRAINT ads_operations_operation_kind CHECK (
@@ -4219,7 +4096,6 @@ ALTER TABLE ads_management_operations ADD CONSTRAINT ads_operations_creative_sha
 CREATE INDEX ads_creation_receipt_lookup ON root_activities ((detail->>'workspaceId'), (detail->>'operationId'), "createdAt" DESC)
   WHERE action = 'ads.creation_receipt';
 
--- ===== source 124/140: 20261030120000_rebuild_workspace_watermark (sha256:c950bc2f869e81840eb4dc9d06d5749559855ca40556b1e955203d5cfd6a30ce) =====
 -- Workspace branding only. Originals and legacy per-channel watermark JSON are untouched.
 CREATE TABLE rebuild_workspace_watermarks (
   "workspaceId" text PRIMARY KEY REFERENCES workspaces(id) ON DELETE CASCADE,
@@ -4232,7 +4108,6 @@ CREATE TRIGGER rebuild_workspace_watermarks_purge_gate
 BEFORE INSERT OR UPDATE ON rebuild_workspace_watermarks
 FOR EACH ROW EXECUTE FUNCTION public.rebuild_reject_purging_workspace_write();
 
--- ===== source 125/140: 20261030130000_rebuild_comment_sentiment (sha256:a617901b60682c7200d5e8d561df615ac2302ef1fe0677fe246e7dba38b093e4) =====
 -- Additive; existing legacy labels remain untrusted until classified with provenance.
 ALTER TABLE post_comments
   ADD COLUMN "sentimentAttemptedAt" TIMESTAMP(3),
@@ -4254,7 +4129,6 @@ CREATE TRIGGER rebuild_comment_sentiment_invalidation
   EXECUTE FUNCTION rebuild_invalidate_comment_sentiment();
 CREATE INDEX post_comments_sentiment_pending_idx ON post_comments ("sentimentAttemptedAt", "createdTime") WHERE sentiment IS NULL;
 
--- ===== source 126/140: 20261030130000_rebuild_person_mcp_keys (sha256:ce14b0b7867c5a86a1c92290c173462964bd081213b90b037314f6dc64d789ff) =====
 -- Separate person-only credentials: no workspace or write grants can be stored.
 CREATE TABLE person_mcp_keys (
   id TEXT PRIMARY KEY,
@@ -4270,7 +4144,6 @@ CREATE TABLE person_mcp_keys (
 );
 CREATE INDEX person_mcp_keys_user_active ON person_mcp_keys ("userId", "expiresAt") WHERE "revokedAt" IS NULL;
 
--- ===== source 127/140: 20261030140000_rebuild_facebook_native_schedule_changes (sha256:08e1dd1d976c8dfc97207847a47fe8e671f2eeaf5987f9ab9272f9d00c17886e) =====
 -- Facebook native provider-held schedule changes (cancel / reschedule of a
 -- published native Video) are child intents of the native journal. One row per
 -- change, bound to the journal row, its workspace and the immutable remote id.
@@ -4365,7 +4238,6 @@ CREATE TRIGGER rebuild_workspace_purge_write_gate
   BEFORE INSERT OR UPDATE ON "rebuild_facebook_native_schedule_changes"
   FOR EACH ROW EXECUTE FUNCTION public.rebuild_reject_purging_workspace_write();
 
--- ===== source 128/140: 20261031100000_rebuild_destination_schedule_mode (sha256:19fb66c945d4610accd4712bf769147409f5ba8a33632f360ec8c7d88671339b) =====
 -- Scheduling place per destination (post target): 'application' (our worker publishes at the time)
 -- or 'remote' (the destination's platform holds the post). Additive and nullable: NULL means the
 -- destination follows the post-level choice stored in posts."publishMode" (legacy and existing rows).
@@ -4373,7 +4245,6 @@ ALTER TABLE "post_targets" ADD COLUMN "scheduleMode" TEXT;
 ALTER TABLE "post_targets" ADD CONSTRAINT "post_targets_scheduleMode_check"
   CHECK ("scheduleMode" IS NULL OR "scheduleMode" IN ('application', 'remote'));
 
--- ===== source 129/140: 20261031120000_rebuild_facebook_sync_cursors (sha256:d7226dcf14f8c673e39de1d441e6f6bb1271d993c4bec263f20aabe12e24028e) =====
 BEGIN;
 -- Provider job state belongs outside the Root configuration registry.
 -- Direct workspace FK participates in the catalog-driven export and erasure.
@@ -4410,7 +4281,6 @@ DELETE FROM app_settings WHERE key LIKE 'facebook.history.%';
 CREATE INDEX rebuild_facebook_sync_cursors_target_idx ON rebuild_facebook_sync_cursors ("targetId");
 COMMIT;
 
--- ===== source 130/140: 20261031140000_rebuild_wordpress_sources (sha256:cce64edcfbcf19553f7eafe661f86fb067d8d0152e08712d05dc1745121c4642) =====
 BEGIN;
 -- Recipe sources read from a WordPress site (read-only, by the application) and a ledger of what was planned.
 -- Direct workspace FKs participate in the catalog-driven export and erasure.
@@ -4471,7 +4341,6 @@ CREATE TRIGGER rebuild_workspace_purge_write_gate BEFORE INSERT OR UPDATE ON "wo
   FOR EACH ROW EXECUTE FUNCTION rebuild_reject_purging_workspace_write();
 COMMIT;
 
--- ===== source 131/140: 20261022180000_rebuild_uptime_samples (sha256:20fe4458ee87befda8eec716968b3c7717e44fe94619f19bfb7170c01c9fab11) =====
 -- Persistence idempotency for sampled minutes; daily totals remain legacy-compatible.
 CREATE TABLE rebuild_uptime_samples (
   minute TIMESTAMP(3) NOT NULL,
@@ -4490,7 +4359,6 @@ CREATE TABLE rebuild_monitoring_deliveries (
 );
 CREATE INDEX rebuild_monitoring_deliveries_status_created ON rebuild_monitoring_deliveries(status, "createdAt");
 
--- ===== source 132/140: 20261022190000_rebuild_chat_deliveries (sha256:758df8d7f9d3716776bb501a54c2a5ab41e365ed5ef210429e8e87bbe60b41cf) =====
 -- Content-free transactional outbox. Transport claims commit before external I/O;
 -- a lost claim becomes uncertain, never pending again.
 CREATE UNIQUE INDEX chat_channels_id_workspace_id ON chat_channels(id, "workspaceId");
@@ -4517,7 +4385,6 @@ CREATE TRIGGER rebuild_workspace_purge_write_gate
   BEFORE INSERT OR UPDATE ON public.rebuild_chat_deliveries
   FOR EACH ROW EXECUTE FUNCTION public.rebuild_reject_purging_workspace_write();
 
--- ===== source 133/140: 20261031150000_rebuild_supplementary_purge_gates (sha256:f3f22b82d60a3bbbbacd5b152b3ceb577a3d39d126fd0ecdc09151e106f09768) =====
 -- OAuthCode is a legacy compatibility table without a workspace FK. Use the
 -- same parent lock/check as directly owned tables. Do not add FKs over unaudited
 -- historical orphan records. Deletes remain allowed for erasure/account cleanup.
@@ -4575,7 +4442,6 @@ CREATE TRIGGER rebuild_workspace_purge_write_gate
   BEFORE INSERT OR UPDATE ON public.rebuild_channel_profiles
   FOR EACH ROW EXECUTE FUNCTION public.rebuild_reject_purging_channel_profile_write();
 
--- ===== source 134/140: 20261031160000_rebuild_read_path_indexes (sha256:afada5e8886f5b725e5ba1907315048ccb11b6d9c300939d649220c9b9638762) =====
 -- Posts: workspace equality followed by the complete, deterministic list ordering.
 -- The same btree supports ascending Home/queue and descending Posts scans.
 CREATE INDEX IF NOT EXISTS rebuild_posts_workspace_schedule_order
@@ -4594,13 +4460,11 @@ CREATE INDEX IF NOT EXISTS rebuild_posts_workspace_created_order
 CREATE INDEX IF NOT EXISTS rebuild_page_insights_target_time_metric
   ON page_insights ("targetId", "endTime", metric);
 
--- ===== source 135/140: 20261031170000_rebuild_inbox_metadata (sha256:0f64264b7fbdb9108ffd77fd4dff7b8a233d6c227ec6a57652b9f88c8f63f870) =====
 -- Optional neutral provider observations; existing rows retain unknown metadata.
 ALTER TABLE conversations ADD COLUMN "inboxMetadata" JSONB;
 ALTER TABLE conversation_messages ADD COLUMN "inboxMetadata" JSONB;
 ALTER TABLE post_comments ADD COLUMN "inboxMetadata" JSONB;
 
--- ===== source 136/140: 20261031170000_rebuild_search_trigrams (sha256:2a5c27ac493fedbed7174ebb1c2bab19d0f33f220a341cb23b271f42e5cf572e) =====
 -- Optional acceleration for existing literal ILIKE searches. No data changes.
 -- Managed installations may forbid extension installation or omit its package.
 -- Those cases must not prevent the rest of the release from migrating.
@@ -4643,7 +4507,6 @@ BEGIN
 END;
 $migration$;
 
--- ===== source 137/140: 20261031180000_rebuild_ads_ad_creation (sha256:1769fa24129e6d74119e84d0677a2baf0c935cb73a4e722ae0a443b7fbc7120f) =====
 -- Add paused-ad creation to the existing request-id / open-object journal.
 -- Preserve all recorded requests, receipts, states, indexes and resolution guards.
 ALTER TABLE ads_management_operations DROP CONSTRAINT ads_operations_operation_kind;
@@ -4651,7 +4514,6 @@ ALTER TABLE ads_management_operations ADD CONSTRAINT ads_operations_operation_ki
   "operationType" IN ('status.set','budget.set','rename','creative.assign','delete','campaign.create','adset.create','creative.create','ad.create')
 );
 
--- ===== source 138/140: 20261101100000_rebuild_writing_agents (sha256:e70e49f442d3fadde389b6f6990898ab60e157d1617da55080a06dee3c18525e) =====
 CREATE TABLE rebuild_writing_agents (
  id text PRIMARY KEY, "workspaceId" text NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
  name text NOT NULL, instructions text NOT NULL, voice text NOT NULL,
@@ -4669,7 +4531,6 @@ CREATE TABLE rebuild_writing_agent_runs (
 );
 CREATE INDEX ON rebuild_writing_agent_runs ("workspaceId", "createdAt" DESC, id);
 
--- ===== source 139/140: 20261101100100_rebuild_post_exports (sha256:e5f8825c4bbe5e153da3a56bd18fd3d6668d0ea2765930f9a20afd396d9ce53c) =====
 CREATE TABLE rebuild_post_exports (
  id text PRIMARY KEY, "workspaceId" text NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
  "userId" text NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -4692,6 +4553,329 @@ CREATE TABLE rebuild_post_export_runs (
 );
 CREATE INDEX ON rebuild_post_export_runs ("workspaceId", "exportId", attempt);
 
--- ===== source 140/140: 20261102120000_rebuild_inbox_note_mentions (sha256:59d5aed5183c5bb7a59832abf7692d85a1259b9d14ee0c891fb02a8c441fe817) =====
 -- Inbox private-note @mentions: store the resolved member ids on the note so delivery can re-verify them.
 ALTER TABLE inbox_notes ADD COLUMN IF NOT EXISTS "mentionIds" TEXT[] NOT NULL DEFAULT '{}';
+-- Per-task checklist items for the Tasks module (design v2 B7 leftover, lane 56).
+-- Additive: one new table. Existing rows are not rewritten.
+--
+-- Workspace boundary: an item's (taskId, workspaceId) must name an existing
+-- task of that same workspace. The composite foreign key makes a cross-workspace
+-- item unrepresentable, whatever code path writes it.
+-- Lifecycle:
+--   * deleting a task or its workspace deletes the items (ON DELETE CASCADE),
+--     so workspace erasure and exports need no table-specific handling;
+--   * deleting a user keeps the item but clears the author (ON DELETE SET NULL).
+
+CREATE TABLE "task_checklist_items" (
+  "id" TEXT NOT NULL,
+  "taskId" TEXT NOT NULL,
+  "workspaceId" TEXT NOT NULL,
+  "text" TEXT NOT NULL,
+  "done" BOOLEAN NOT NULL DEFAULT false,
+  "position" INTEGER NOT NULL DEFAULT 0,
+  "createdById" TEXT,
+  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT "task_checklist_items_pkey" PRIMARY KEY ("id"),
+  -- Ceiling matches the largest value Root may configure for tasks.checklistItemMaxCharacters.
+  CONSTRAINT "task_checklist_items_text_check" CHECK (char_length(btrim("text")) > 0 AND char_length("text") <= 20000)
+);
+
+-- Ordered checklist of one task, and the author lookup used by SET NULL.
+CREATE INDEX "task_checklist_items_taskId_position_id_idx" ON "task_checklist_items"("taskId", "position", "id");
+CREATE INDEX "task_checklist_items_workspaceId_idx" ON "task_checklist_items"("workspaceId");
+CREATE INDEX "task_checklist_items_createdById_idx" ON "task_checklist_items"("createdById");
+
+ALTER TABLE "task_checklist_items" ADD CONSTRAINT "task_checklist_items_workspaceId_fkey"
+  FOREIGN KEY ("workspaceId") REFERENCES "workspaces"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "task_checklist_items" ADD CONSTRAINT "task_checklist_items_task_fkey"
+  FOREIGN KEY ("taskId", "workspaceId") REFERENCES "tasks"("id", "workspaceId") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "task_checklist_items" ADD CONSTRAINT "task_checklist_items_createdById_fkey"
+  FOREIGN KEY ("createdById") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- New tables must join the workspace purge write gate, otherwise an item could
+-- be written while the workspace is being erased.
+CREATE TRIGGER rebuild_workspace_purge_write_gate BEFORE INSERT OR UPDATE ON "task_checklist_items"
+  FOR EACH ROW EXECUTE FUNCTION rebuild_reject_purging_workspace_write();
+-- Optional-area activation for Tasks (design v2 B7 leftover, lane 56; 01 section 4):
+-- a workspace owner can show the Tasks area in Settings › Workspace before the
+-- workspace has any task. Additive nullable-safe column: existing rows read as
+-- not activated, and the area still appears once the workspace has a task.
+
+ALTER TABLE "workspaces" ADD COLUMN "tasksAreaEnabled" BOOLEAN NOT NULL DEFAULT false;
+-- Supervised autopilot tiers, per-language post variants and link-preview cache (idea batch 2).
+-- Additive only: three new tables plus one nullable column. Existing rows are not rewritten.
+--
+-- Workspace boundary: every new workspace-owned row references workspaces(id) with
+-- ON DELETE CASCADE, so workspace erasure and exports need no table-specific handling.
+-- Lifecycle:
+--   * deleting a workspace deletes its autopilot policy and variants (ON DELETE CASCADE);
+--   * deleting a post deletes its language variants (ON DELETE CASCADE);
+--   * deleting a user keeps the autopilot policy but clears the author (ON DELETE SET NULL);
+--   * link_preview_cache is installation-wide and expires by fetchedAt/expiresAt; no FK.
+
+CREATE TABLE "autopilot_policies" (
+  "workspaceId" TEXT NOT NULL,
+  "tier" TEXT NOT NULL DEFAULT 'assisted',
+  "guardrails" JSONB NOT NULL DEFAULT '{}'::jsonb,
+  "updatedById" TEXT,
+  "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT "autopilot_policies_pkey" PRIMARY KEY ("workspaceId"),
+  CONSTRAINT "autopilot_policies_tier_check" CHECK ("tier" IN ('manual', 'assisted', 'supervised_auto')),
+  CONSTRAINT "autopilot_policies_guardrails_check" CHECK (jsonb_typeof("guardrails") = 'object')
+);
+
+CREATE TABLE "post_language_variants" (
+  "id" TEXT NOT NULL,
+  "postId" TEXT NOT NULL,
+  "workspaceId" TEXT NOT NULL,
+  "locale" TEXT NOT NULL,
+  "message" TEXT NOT NULL,
+  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT "post_language_variants_pkey" PRIMARY KEY ("id"),
+  CONSTRAINT "post_language_variants_post_locale_unique" UNIQUE ("postId", "locale"),
+  -- BCP 47 short tags only: language, optionally with a region (en, fr, fr-CA).
+  CONSTRAINT "post_language_variants_locale_check" CHECK ("locale" ~ '^[a-z]{2}(-[A-Z]{2})?$'),
+  CONSTRAINT "post_language_variants_message_check" CHECK (char_length(btrim("message")) > 0 AND char_length("message") <= 100000)
+);
+
+CREATE INDEX "post_language_variants_postId_idx" ON "post_language_variants"("postId");
+CREATE INDEX "post_language_variants_workspaceId_idx" ON "post_language_variants"("workspaceId");
+
+ALTER TABLE "post_language_variants" ADD CONSTRAINT "post_language_variants_postId_fkey"
+  FOREIGN KEY ("postId") REFERENCES "posts"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "post_language_variants" ADD CONSTRAINT "post_language_variants_workspaceId_fkey"
+  FOREIGN KEY ("workspaceId") REFERENCES "workspaces"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "autopilot_policies" ADD CONSTRAINT "autopilot_policies_workspaceId_fkey"
+  FOREIGN KEY ("workspaceId") REFERENCES "workspaces"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "autopilot_policies" ADD CONSTRAINT "autopilot_policies_updatedById_fkey"
+  FOREIGN KEY ("updatedById") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- Effective destination language for variant selection. Null follows the workspace default
+-- locale; the variant fallback rule is documented in publishing/server/post-variants.ts.
+ALTER TABLE "targets" ADD COLUMN "locale" TEXT;
+ALTER TABLE "targets" ADD CONSTRAINT "targets_locale_check" CHECK ("locale" IS NULL OR "locale" ~ '^[a-z]{2}(-[A-Z]{2})?$');
+
+CREATE TABLE "link_preview_cache" (
+  "urlHash" TEXT NOT NULL,
+  "url" TEXT NOT NULL,
+  "preview" JSONB NOT NULL,
+  "fetchedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "expiresAt" TIMESTAMP(3) NOT NULL,
+  CONSTRAINT "link_preview_cache_pkey" PRIMARY KEY ("urlHash"),
+  CONSTRAINT "link_preview_cache_preview_check" CHECK (jsonb_typeof("preview") = 'object')
+);
+CREATE INDEX "link_preview_cache_expiresAt_idx" ON "link_preview_cache"("expiresAt");
+
+-- New tables must join the workspace purge write gate, otherwise a row could
+-- be written while the workspace is being erased. The shared cache table has no
+-- workspace column, so it stays outside the gate like other shared storage.
+CREATE TRIGGER rebuild_workspace_purge_write_gate BEFORE INSERT OR UPDATE ON "autopilot_policies"
+  FOR EACH ROW EXECUTE FUNCTION rebuild_reject_purging_workspace_write();
+CREATE TRIGGER rebuild_workspace_purge_write_gate BEFORE INSERT OR UPDATE ON "post_language_variants"
+  FOR EACH ROW EXECUTE FUNCTION rebuild_reject_purging_workspace_write();
+-- Engagement batch: metric alert rules with worker-evaluated firings, new
+-- notification email switches, and full-text search indexes over stored
+-- inbox messages and comments. Additive only: two new tables, three new
+-- nullable-safe columns with defaults, two expression indexes. Existing rows
+-- are not rewritten.
+--
+-- Workspace boundary: every new workspace-owned row references workspaces(id)
+-- with ON DELETE CASCADE, so workspace erasure and exports need no
+-- table-specific handling (discovery is FK-based; see
+-- src/server/data-control/index.ts).
+-- Lifecycle:
+--   * deleting a workspace deletes its alert rules and firings (CASCADE);
+--   * deleting a channel (target) deletes its alert rules and their firings;
+--   * deleting a user keeps rules/firings but clears the author (SET NULL);
+--   * notification_settings switches default to true (email on) for new rows;
+--     existing rows gain the same default, matching the other alert switches.
+
+CREATE TABLE "metric_alert_rules" (
+  "id" TEXT NOT NULL,
+  "workspaceId" TEXT NOT NULL,
+  "targetId" TEXT NOT NULL,
+  "name" TEXT NOT NULL,
+  "metric" TEXT NOT NULL,
+  "operator" TEXT NOT NULL,
+  "threshold" DOUBLE PRECISION NOT NULL,
+  "windowDays" INTEGER NOT NULL,
+  "enabled" BOOLEAN NOT NULL DEFAULT true,
+  "createdById" TEXT,
+  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT "metric_alert_rules_pkey" PRIMARY KEY ("id"),
+  CONSTRAINT "metric_alert_rules_metric_check" CHECK ("metric" IN ('followers', 'views', 'engagements', 'posts')),
+  CONSTRAINT "metric_alert_rules_operator_check" CHECK ("operator" IN ('above', 'below')),
+  CONSTRAINT "metric_alert_rules_threshold_check" CHECK ("threshold" >= 0 AND "threshold" <= 1000000000),
+  CONSTRAINT "metric_alert_rules_window_check" CHECK ("windowDays" IN (7, 30)),
+  CONSTRAINT "metric_alert_rules_name_check" CHECK (char_length(btrim("name")) > 0 AND char_length("name") <= 80)
+);
+
+CREATE TABLE "metric_alert_firings" (
+  "id" TEXT NOT NULL,
+  "workspaceId" TEXT NOT NULL,
+  "ruleId" TEXT NOT NULL,
+  "periodStart" TIMESTAMP(3) NOT NULL,
+  "periodEnd" TIMESTAMP(3) NOT NULL,
+  "actual" DOUBLE PRECISION NOT NULL,
+  "state" TEXT NOT NULL DEFAULT 'fired',
+  "firedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "resolvedAt" TIMESTAMP(3),
+  CONSTRAINT "metric_alert_firings_pkey" PRIMARY KEY ("id"),
+  CONSTRAINT "metric_alert_firings_state_check" CHECK ("state" IN ('fired', 'resolved'))
+);
+
+-- One open firing per rule; resolved history is kept.
+CREATE UNIQUE INDEX "metric_alert_firings_open_rule_uniq" ON "metric_alert_firings"("ruleId") WHERE "state" = 'fired';
+CREATE INDEX "metric_alert_firings_workspace_idx" ON "metric_alert_firings"("workspaceId", "firedAt" DESC);
+CREATE INDEX "metric_alert_rules_workspace_idx" ON "metric_alert_rules"("workspaceId", "targetId");
+
+ALTER TABLE "metric_alert_rules" ADD CONSTRAINT "metric_alert_rules_workspaceId_fkey"
+  FOREIGN KEY ("workspaceId") REFERENCES "workspaces"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "metric_alert_rules" ADD CONSTRAINT "metric_alert_rules_targetId_fkey"
+  FOREIGN KEY ("targetId") REFERENCES "targets"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "metric_alert_rules" ADD CONSTRAINT "metric_alert_rules_createdById_fkey"
+  FOREIGN KEY ("createdById") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "metric_alert_firings" ADD CONSTRAINT "metric_alert_firings_workspaceId_fkey"
+  FOREIGN KEY ("workspaceId") REFERENCES "workspaces"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "metric_alert_firings" ADD CONSTRAINT "metric_alert_firings_ruleId_fkey"
+  FOREIGN KEY ("ruleId") REFERENCES "metric_alert_rules"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+CREATE TRIGGER rebuild_workspace_purge_write_gate BEFORE INSERT OR UPDATE ON "metric_alert_rules"
+  FOR EACH ROW EXECUTE FUNCTION rebuild_reject_purging_workspace_write();
+CREATE TRIGGER rebuild_workspace_purge_write_gate BEFORE INSERT OR UPDATE ON "metric_alert_firings"
+  FOR EACH ROW EXECUTE FUNCTION rebuild_reject_purging_workspace_write();
+
+ALTER TABLE "notification_settings"
+  ADD COLUMN "onMetricAlert" BOOLEAN NOT NULL DEFAULT true,
+  ADD COLUMN "onReportDelivered" BOOLEAN NOT NULL DEFAULT true,
+  ADD COLUMN "onTriageAssigned" BOOLEAN NOT NULL DEFAULT true;
+
+-- Ranked full-text search over stored inbox content. The `simple`
+-- configuration keeps matching predictable across English and French text
+-- without language-specific stemming or stop words.
+CREATE INDEX "conversation_messages_fts_idx" ON "conversation_messages"
+  USING gin (to_tsvector('simple', coalesce("message", '') || ' ' || coalesce("fromName", '')));
+CREATE INDEX "post_comments_fts_idx" ON "post_comments"
+  USING gin (to_tsvector('simple', coalesce("message", '') || ' ' || coalesce("fromName", '')));
+-- Platform/moat batch: Meta inbound-webhook delivery log and Analytics
+-- precomputed daily/weekly rollups. Additive only: four new tables.
+-- Existing rows are not rewritten.
+--
+-- Workspace boundary:
+--   * meta_webhook_deliveries is installation operational history (like
+--     rebuild_sync_runs): content-free delivery receipts (ids, kinds,
+--     verbs, counts — never message text), retained under the Root
+--     meta.webhookDeliveryRetentionDays bound. No workspace FK on purpose:
+--     one event fans out to every workspace holding the Page, and unmatched
+--     events belong to no workspace.
+--   * analytics_rollup_daily / analytics_rollup_weekly are workspace-owned
+--     derivatives of stored insights (one value per target/metric/day or
+--     week). Every row references workspaces(id) and targets(id) with
+--     ON DELETE CASCADE, so workspace erasure and channel deletion need no
+--     table-specific handling (discovery is FK-based; see
+--     src/server/data-control/index.ts).
+--   * analytics_rollup_runs records worker coverage (window + targets) so
+--     readers can prefer rollups only when a completed run covers the
+--     request, and otherwise fall back to detailed stored reads.
+-- Lifecycle:
+--   * deleting a workspace deletes its rollup rows and run records (CASCADE);
+--   * deleting a channel (target) deletes its rollup rows (CASCADE);
+--   * run records keep no target FK (historical coverage snapshot only).
+
+CREATE TABLE "meta_webhook_deliveries" (
+  "id" TEXT NOT NULL,
+  "provider" TEXT NOT NULL,
+  "eventId" TEXT NOT NULL,
+  "pageId" TEXT NOT NULL,
+  "eventKind" TEXT NOT NULL,
+  "status" TEXT NOT NULL,
+  "matchedTargets" INTEGER NOT NULL DEFAULT 0,
+  "detail" JSONB NOT NULL DEFAULT '{}',
+  "receivedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT "meta_webhook_deliveries_pkey" PRIMARY KEY ("id"),
+  CONSTRAINT "meta_webhook_deliveries_event_uniq" UNIQUE ("eventId"),
+  CONSTRAINT "meta_webhook_deliveries_status_check" CHECK ("status" IN ('accepted', 'duplicate', 'unmatched', 'ignored')),
+  CONSTRAINT "meta_webhook_deliveries_kind_check" CHECK ("eventKind" IN ('feed_post', 'feed_comment', 'message', 'unknown'))
+);
+CREATE INDEX "meta_webhook_deliveries_provider_idx" ON "meta_webhook_deliveries"("provider", "receivedAt" DESC);
+
+CREATE TABLE "analytics_rollup_daily" (
+  "id" TEXT NOT NULL,
+  "workspaceId" TEXT NOT NULL,
+  "provider" TEXT NOT NULL,
+  "targetId" TEXT NOT NULL,
+  "metric" TEXT NOT NULL,
+  "period" TEXT NOT NULL DEFAULT 'day',
+  "day" DATE NOT NULL,
+  "kind" TEXT NOT NULL,
+  "value" DOUBLE PRECISION NOT NULL,
+  "samples" INTEGER NOT NULL,
+  "asOf" TIMESTAMP(3) NOT NULL,
+  "fetchedAt" TIMESTAMP(3) NOT NULL,
+  "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT "analytics_rollup_daily_pkey" PRIMARY KEY ("id"),
+  CONSTRAINT "analytics_rollup_daily_kind_check" CHECK ("kind" IN ('flow', 'stock')),
+  CONSTRAINT "analytics_rollup_daily_samples_check" CHECK ("samples" >= 1)
+);
+CREATE UNIQUE INDEX "analytics_rollup_daily_target_uniq" ON "analytics_rollup_daily"("targetId", "metric", "period", "day");
+CREATE INDEX "analytics_rollup_daily_workspace_idx" ON "analytics_rollup_daily"("workspaceId", "provider", "day");
+
+CREATE TABLE "analytics_rollup_weekly" (
+  "id" TEXT NOT NULL,
+  "workspaceId" TEXT NOT NULL,
+  "provider" TEXT NOT NULL,
+  "targetId" TEXT NOT NULL,
+  "metric" TEXT NOT NULL,
+  "period" TEXT NOT NULL DEFAULT 'day',
+  "weekStart" DATE NOT NULL,
+  "kind" TEXT NOT NULL,
+  "value" DOUBLE PRECISION NOT NULL,
+  "samples" INTEGER NOT NULL,
+  "asOf" TIMESTAMP(3) NOT NULL,
+  "fetchedAt" TIMESTAMP(3) NOT NULL,
+  "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT "analytics_rollup_weekly_pkey" PRIMARY KEY ("id"),
+  CONSTRAINT "analytics_rollup_weekly_kind_check" CHECK ("kind" IN ('flow', 'stock')),
+  CONSTRAINT "analytics_rollup_weekly_samples_check" CHECK ("samples" >= 1)
+);
+CREATE UNIQUE INDEX "analytics_rollup_weekly_target_uniq" ON "analytics_rollup_weekly"("targetId", "metric", "period", "weekStart");
+CREATE INDEX "analytics_rollup_weekly_workspace_idx" ON "analytics_rollup_weekly"("workspaceId", "provider", "weekStart");
+
+CREATE TABLE "analytics_rollup_runs" (
+  "id" TEXT NOT NULL,
+  "workspaceId" TEXT NOT NULL,
+  "provider" TEXT NOT NULL,
+  "granularity" TEXT NOT NULL,
+  "windowFrom" TIMESTAMP(3) NOT NULL,
+  "windowTo" TIMESTAMP(3) NOT NULL,
+  "targetIds" JSONB NOT NULL DEFAULT '[]',
+  "status" TEXT NOT NULL,
+  "examined" INTEGER NOT NULL DEFAULT 0,
+  "written" INTEGER NOT NULL DEFAULT 0,
+  "startedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "finishedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT "analytics_rollup_runs_pkey" PRIMARY KEY ("id"),
+  CONSTRAINT "analytics_rollup_runs_granularity_check" CHECK ("granularity" IN ('daily', 'weekly')),
+  CONSTRAINT "analytics_rollup_runs_status_check" CHECK ("status" IN ('completed', 'partial', 'failed'))
+);
+CREATE INDEX "analytics_rollup_runs_workspace_idx" ON "analytics_rollup_runs"("workspaceId", "provider", "granularity", "finishedAt" DESC);
+
+ALTER TABLE "analytics_rollup_daily" ADD CONSTRAINT "analytics_rollup_daily_workspaceId_fkey"
+  FOREIGN KEY ("workspaceId") REFERENCES "workspaces"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "analytics_rollup_daily" ADD CONSTRAINT "analytics_rollup_daily_targetId_fkey"
+  FOREIGN KEY ("targetId") REFERENCES "targets"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "analytics_rollup_weekly" ADD CONSTRAINT "analytics_rollup_weekly_workspaceId_fkey"
+  FOREIGN KEY ("workspaceId") REFERENCES "workspaces"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "analytics_rollup_weekly" ADD CONSTRAINT "analytics_rollup_weekly_targetId_fkey"
+  FOREIGN KEY ("targetId") REFERENCES "targets"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "analytics_rollup_runs" ADD CONSTRAINT "analytics_rollup_runs_workspaceId_fkey"
+  FOREIGN KEY ("workspaceId") REFERENCES "workspaces"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+CREATE TRIGGER rebuild_workspace_purge_write_gate BEFORE INSERT OR UPDATE ON "analytics_rollup_daily"
+  FOR EACH ROW EXECUTE FUNCTION rebuild_reject_purging_workspace_write();
+CREATE TRIGGER rebuild_workspace_purge_write_gate BEFORE INSERT OR UPDATE ON "analytics_rollup_weekly"
+  FOR EACH ROW EXECUTE FUNCTION rebuild_reject_purging_workspace_write();
+CREATE TRIGGER rebuild_workspace_purge_write_gate BEFORE INSERT OR UPDATE ON "analytics_rollup_runs"
+  FOR EACH ROW EXECUTE FUNCTION rebuild_reject_purging_workspace_write();

@@ -1,34 +1,47 @@
 #!/usr/bin/env bash
-# Unified MS Social Pilot deployment script (install + update).
+# Unified MS Social Pilot deployment & administration script (install + update + admin).
 #
-# Modes:
-#   1. Remote install or update from a developer checkout (default):
-#        bash app/scripts/deploy.sh
-#   2. Direct on-server install or update on Debian/Ubuntu:
-#        sudo bash app/scripts/deploy.sh --local
-#
-# On first run against a fresh server, installs Node.js 22, PostgreSQL, system user,
-# database, bootstrap .env.production.local, and systemd units (web + worker).
-# On subsequent runs, takes a pg_dump backup, performs an incremental CPU-capped build,
-# applies any new additive SQL migrations, swaps the release directory, restarts services,
-# and verifies local + public /api/health and /api/auth/sign-in Origin protection.
+# Usage:
+#   bash app/scripts/deploy.sh                      # Remote install or update from origin/main
+#   sudo bash app/scripts/deploy.sh --local         # Direct on-server install or update (Debian/Ubuntu)
+#   bash app/scripts/deploy.sh --set-root <email>   # Promote an account to Root on production
+#   bash app/scripts/deploy.sh --reset-2fa <email>  # Clear 2FA / passkeys for an account on production
 set -euo pipefail
 
 cd "$(dirname "$0")/.."   # app/
-BASELINE=20261103000000_baseline
-BASELINE_SHA256=8abd5224f753f0cb845f9bd748e12e8db3cb7dbb4f1348c714e1d62231e0f8dd
+HOST="${PROD_HOST:-root@213.246.45.75}"
+KEY="${PROD_KEY:-$HOME/.ssh/SebMouadSSH}"
 
-verify_baseline() {
-  local path="prisma/migrations/$BASELINE/migration.sql" actual
-  [ -f "$path" ] || { echo "Baseline migration missing: $path" >&2; exit 1; }
-  if command -v sha256sum >/dev/null 2>&1; then
-    actual="$(sha256sum "$path" | awk '{print $1}')"
-  else
-    actual="$(shasum -a 256 "$path" | awk '{print $1}')"
-  fi
-  [ "$actual" = "$BASELINE_SHA256" ] || { echo "Baseline checksum mismatch: $actual != $BASELINE_SHA256" >&2; exit 1; }
-}
-verify_baseline
+if [ "${1:-}" = "--set-root" ]; then
+  EMAIL="${2:?Usage: deploy.sh --set-root <email>}"
+  ssh -i "$KEY" "$HOST" "sudo -u postgres psql -d social_pilot -v ON_ERROR_STOP=1 -v email='$EMAIL' <<'SQL'
+BEGIN;
+UPDATE users SET \"isInstanceOwner\" = false WHERE \"isInstanceOwner\" = true;
+UPDATE users SET \"isInstanceOwner\" = true, \"disabledAt\" = NULL WHERE lower(email) = lower(:'email');
+INSERT INTO root_activities (id, \"actorId\", action, detail, \"createdAt\")
+VALUES (gen_random_uuid()::text, NULL, 'root.transferred', jsonb_build_object('to', :'email'), NOW());
+COMMIT;
+SQL"
+  echo "Root assigned to $EMAIL."
+  exit 0
+fi
+
+if [ "${1:-}" = "--reset-2fa" ]; then
+  EMAIL="${2:?Usage: deploy.sh --reset-2fa <email>}"
+  ssh -i "$KEY" "$HOST" "sudo -u postgres psql -d social_pilot -v ON_ERROR_STOP=1 -v email='$EMAIL' <<'SQL'
+BEGIN;
+UPDATE users SET \"totpSecret\" = NULL, \"totpPendingSecret\" = NULL, \"totpEnabledAt\" = NULL, \"totpLastStep\" = NULL WHERE lower(email) = lower(:'email');
+DELETE FROM recovery_codes WHERE \"userId\" IN (SELECT id FROM users WHERE lower(email) = lower(:'email'));
+DELETE FROM passkeys WHERE \"userId\" IN (SELECT id FROM users WHERE lower(email) = lower(:'email'));
+DELETE FROM trusted_devices WHERE \"userId\" IN (SELECT id FROM users WHERE lower(email) = lower(:'email'));
+DELETE FROM sessions WHERE \"userId\" IN (SELECT id FROM users WHERE lower(email) = lower(:'email'));
+INSERT INTO root_activities (id, \"actorId\", action, detail, \"createdAt\")
+VALUES (gen_random_uuid()::text, NULL, 'user.twoStepReset', jsonb_build_object('email', :'email'), NOW());
+COMMIT;
+SQL"
+  echo "Two-step authentication cleared for $EMAIL."
+  exit 0
+fi
 
 if [ "${1:-}" = "--local" ]; then
   [ "$EUID" -eq 0 ] || { echo "Run with sudo: sudo bash app/scripts/deploy.sh --local" >&2; exit 1; }
@@ -76,13 +89,11 @@ fi
 
 BUILD_CPU_QUOTA="${BUILD_CPU_QUOTA:-300%}"
 BUILD_NICE="${BUILD_NICE:-10}"
-HOST="${PROD_HOST:-root@213.246.45.75}"
-KEY="${PROD_KEY:-$HOME/.ssh/SebMouadSSH}"
 COMMIT="$(git rev-parse origin/main)"
 echo "Release commit: $COMMIT"
 
 ORDER_FILE="$(mktemp)"
-ls prisma/migrations | grep -E '^[0-9]{14}_' | sort > "$ORDER_FILE"
+ls prisma/migrations | grep -E '^[0-9]+_' | sort > "$ORDER_FILE"
 COPYFILE_DISABLE=1 tar --no-xattrs -C prisma/migrations -cf - $(cat "$ORDER_FILE") 2>/dev/null \
   | ssh -i "$KEY" "$HOST" 'rm -rf /var/tmp/deploy-migrations && mkdir -m 755 /var/tmp/deploy-migrations && tar -x -C /var/tmp/deploy-migrations 2>/dev/null'
 scp -q -i "$KEY" "$ORDER_FILE" "$HOST:/var/tmp/deploy-migrations/ORDER"
@@ -95,8 +106,17 @@ git -C "$(git rev-parse --show-toplevel)" archive --format=tar --prefix=app/ "$C
 ssh -i "$KEY" "$HOST" "COMMIT=$COMMIT BUILD_CPU_QUOTA=$BUILD_CPU_QUOTA BUILD_NICE=$BUILD_NICE bash -s" <<'REMOTE'
 set -uo pipefail
 cd /tmp
-NEW=/srv/ms-social-pilot-rebuild.new; LIVE=/srv/ms-social-pilot-rebuild; PREV=/srv/ms-social-pilot-rebuild.prev
-BUILD=/srv/ms-social-pilot-rebuild-build
+NEW=/srv/ms-social-pilot.new; LIVE=/srv/ms-social-pilot; PREV=/srv/ms-social-pilot.prev
+BUILD=/srv/ms-social-pilot-build
+
+# Migrate old /srv/ms-social-pilot-rebuild* directories if present
+if [ -d /srv/ms-social-pilot-rebuild ] && [ ! -d "$LIVE" ]; then
+  mv /srv/ms-social-pilot-rebuild "$LIVE"
+fi
+if [ -d /srv/ms-social-pilot-rebuild-build ] && [ ! -d "$BUILD" ]; then
+  mv /srv/ms-social-pilot-rebuild-build "$BUILD"
+fi
+rm -rf /srv/ms-social-pilot-rebuild.prev /srv/ms-social-pilot-rebuild.new
 
 # First-time server bootstrap if not yet installed
 if ! command -v node >/dev/null 2>&1 || ! command -v psql >/dev/null 2>&1; then
@@ -141,6 +161,7 @@ fi
 T=$(date +%Y%m%d-%H%M%S); B=/var/backups/socialpilot-deploy-$T; mkdir -m 700 -p "$B"
 sudo -u postgres pg_dump -Fc social_pilot > "$B/social_pilot.dump" && chmod 600 "$B/social_pilot.dump" || { echo "Backup failed; nothing changed"; exit 1; }
 echo "Backup: $B"
+ls -dt /var/backups/socialpilot-deploy-* 2>/dev/null | tail -n +3 | xargs -r rm -rf
 
 rm -rf "$BUILD/node_modules" "$BUILD/rebuild"
 rsync -a --delete --exclude 'app/node_modules' --exclude 'app/.next' --exclude 'app/generated' --exclude 'app/.lock-sum' /var/tmp/deploy-src/ "$BUILD/"
@@ -158,21 +179,20 @@ rm -rf "$NEW"; cp -a "$BUILD" "$NEW"
 
 sudo -u postgres psql -d social_pilot -v ON_ERROR_STOP=1 -q -c 'CREATE TABLE IF NOT EXISTS "_prisma_migrations" ("id" VARCHAR(36) PRIMARY KEY NOT NULL, "checksum" VARCHAR(64) NOT NULL, "finished_at" TIMESTAMPTZ, "migration_name" VARCHAR(255) NOT NULL, "logs" TEXT, "rolled_back_at" TIMESTAMPTZ, "started_at" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP, "applied_steps_count" INTEGER NOT NULL DEFAULT 0)' >/dev/null
 DONE="$(sudo -u postgres psql -d social_pilot -Atc "select migration_name from _prisma_migrations where finished_at is not null and rolled_back_at is null")"
-BASELINE=20261103000000_baseline
-if ! printf '%s\n' "$DONE" | grep -qx "$BASELINE" && [ -d "/var/tmp/deploy-migrations/$BASELINE" ]; then
-  OLD_COUNT="$(sudo -u postgres psql -d social_pilot -Atc "select count(*) from _prisma_migrations where finished_at is not null and rolled_back_at is null and migration_name <> '$BASELINE'")"
-  if [ "$OLD_COUNT" -gt 0 ]; then
-    f="/var/tmp/deploy-migrations/$BASELINE/migration.sql"
-    sudo -u postgres psql -d social_pilot -q -c "insert into _prisma_migrations (id, checksum, finished_at, migration_name, logs, rolled_back_at, started_at, applied_steps_count) values (gen_random_uuid()::text, '$(sha256sum "$f" | cut -d' ' -f1)', now(), '$BASELINE', 'baseline marked applied: squashed history already recorded', null, now(), 1)" >/dev/null
-    DONE="$(sudo -u postgres psql -d social_pilot -Atc "select migration_name from _prisma_migrations where finished_at is not null and rolled_back_at is null")"
-    echo "Baseline $BASELINE marked applied ($OLD_COUNT squashed migrations already recorded); not re-run."
+INIT_MIG=0001_init
+if ! printf '%s\n' "$DONE" | grep -qx "$INIT_MIG" && [ -d "/var/tmp/deploy-migrations/$INIT_MIG" ]; then
+  EXISTING_TABLES="$(sudo -u postgres psql -d social_pilot -Atc "select count(*) from information_schema.tables where table_schema='public' and table_name='users'")"
+  if [ "$EXISTING_TABLES" -gt 0 ]; then
+    f="/var/tmp/deploy-migrations/$INIT_MIG/migration.sql"
+    sudo -u postgres psql -d social_pilot -q -c "DELETE FROM _prisma_migrations; INSERT INTO _prisma_migrations (id, checksum, finished_at, migration_name, logs, rolled_back_at, started_at, applied_steps_count) VALUES (gen_random_uuid()::text, '$(sha256sum "$f" | cut -d' ' -f1)', now(), '$INIT_MIG', 'initial v1.0.0 schema marked applied', null, now(), 1)" >/dev/null
+    DONE="$INIT_MIG"
+    echo "Initial migration $INIT_MIG marked applied on existing database."
   fi
 fi
 applied=0
 while read -r m; do
   printf '%s\n' "$DONE" | grep -qx "$m" && continue
   f="/var/tmp/deploy-migrations/$m/migration.sql"
-  # No single-transaction flag: migrations may contain ALTER TYPE ... ADD VALUE.
   sudo -u postgres psql -d social_pilot -v ON_ERROR_STOP=1 -q < "$f" >/dev/null 2>/tmp/deploy-mig-err.txt || { echo "Migration $m failed; live release untouched"; head -5 /tmp/deploy-mig-err.txt; exit 1; }
   sudo -u postgres psql -d social_pilot -q -c "insert into _prisma_migrations (id, checksum, finished_at, migration_name, logs, rolled_back_at, started_at, applied_steps_count) values (gen_random_uuid()::text, '$(sha256sum "$f" | cut -d' ' -f1)', now(), '$m', null, null, now(), 1)" >/dev/null
   applied=$((applied+1))
@@ -183,14 +203,21 @@ sudo -u postgres psql -d social_pilot -Atc "select format('ALTER %s %s OWNER TO 
   | sudo -u postgres psql -d social_pilot -v ON_ERROR_STOP=1 -1 -q >/dev/null
 echo "Migrations applied: $applied"
 
-cat > /etc/systemd/system/social-pilot-rebuild.service <<'UNIT'
+# Retire old social-pilot-rebuild* units if present and install clean social-pilot* units
+if [ -f /etc/systemd/system/social-pilot-rebuild.service ]; then
+  systemctl stop social-pilot-rebuild social-pilot-rebuild-worker 2>/dev/null || true
+  systemctl disable social-pilot-rebuild social-pilot-rebuild-worker 2>/dev/null || true
+  rm -f /etc/systemd/system/social-pilot-rebuild.service /etc/systemd/system/social-pilot-rebuild-worker.service
+fi
+
+cat > /etc/systemd/system/social-pilot.service <<'UNIT'
 [Unit]
 Description=MS Social Pilot web
 After=network.target postgresql.service
 [Service]
 User=socialpilot
-WorkingDirectory=/srv/ms-social-pilot-rebuild/app
-EnvironmentFile=/srv/ms-social-pilot-rebuild/app/.env.production.local
+WorkingDirectory=/srv/ms-social-pilot/app
+EnvironmentFile=/srv/ms-social-pilot/app/.env.production.local
 ExecStart=/usr/bin/env npx next start -H 127.0.0.1 -p 3100
 Restart=on-failure
 MemoryMax=2G
@@ -198,14 +225,14 @@ MemoryMax=2G
 WantedBy=multi-user.target
 UNIT
 
-cat > /etc/systemd/system/social-pilot-rebuild-worker.service <<'UNIT'
+cat > /etc/systemd/system/social-pilot-worker.service <<'UNIT'
 [Unit]
 Description=MS Social Pilot worker
 After=network.target postgresql.service
 [Service]
 User=socialpilot
-WorkingDirectory=/srv/ms-social-pilot-rebuild/app
-EnvironmentFile=/srv/ms-social-pilot-rebuild/app/.env.production.local
+WorkingDirectory=/srv/ms-social-pilot/app
+EnvironmentFile=/srv/ms-social-pilot/app/.env.production.local
 ExecStart=/usr/bin/env node --import tsx scripts/worker.ts
 Restart=on-failure
 MemoryMax=1G
@@ -214,20 +241,20 @@ WantedBy=multi-user.target
 UNIT
 
 systemctl daemon-reload
-systemctl enable social-pilot-rebuild social-pilot-rebuild-worker >/dev/null 2>&1 || true
+systemctl enable social-pilot social-pilot-worker >/dev/null 2>&1 || true
 
 PUBLIC_ORIGIN="$(sudo -u postgres psql -d social_pilot -Atc "select value #>> '{}' from app_settings where key='app.publicOrigin'")"
 [ -n "$PUBLIC_ORIGIN" ] || echo "Note: Root app.publicOrigin is empty; set it in Root > Shared controls before browsers can sign in behind the proxy."
 rm -rf "$PREV"; mv "$LIVE" "$PREV"; mv "$NEW" "$LIVE"
-systemctl restart social-pilot-rebuild social-pilot-rebuild-worker
+systemctl restart social-pilot social-pilot-worker
 ok=0; for i in $(seq 1 60); do c=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3100/api/health || true); [ "$c" = 200 ] && { ok=1; break; }; sleep 2; done
 csrf=$(curl -s -o /dev/null -w '%{http_code}' -X POST http://127.0.0.1:3100/api/auth/sign-in -H "Origin: $PUBLIC_ORIGIN" -H 'Content-Type: application/json' -d '{"email":"deploy-probe@example.invalid","password":"x"}' || true)
 pub=skipped; [ -n "$PUBLIC_ORIGIN" ] && pub=$(curl -s -o /dev/null -w '%{http_code}' "$PUBLIC_ORIGIN/api/health" || true)
 if [ $ok = 1 ] && [ "$csrf" = 401 ] && { [ "$pub" = 200 ] || [ "$pub" = skipped ]; }; then
-  echo "DEPLOY OK $COMMIT: local 200, sign-in origin check $csrf (expects 401), public $pub; services $(systemctl is-active social-pilot-rebuild social-pilot-rebuild-worker | tr '\n' ' ')"
+  echo "DEPLOY OK $COMMIT: local 200, sign-in origin check $csrf (expects 401), public $pub; services $(systemctl is-active social-pilot social-pilot-worker | tr '\n' ' ')"
 else
   echo "!! Health failed (local ok=$ok, sign-in=$csrf, public=$pub); restoring previous release"
-  rm -rf "$NEW"; mv "$LIVE" "$NEW"; mv "$PREV" "$LIVE"; systemctl restart social-pilot-rebuild social-pilot-rebuild-worker
+  rm -rf "$NEW"; mv "$LIVE" "$NEW"; mv "$PREV" "$LIVE"; systemctl restart social-pilot social-pilot-worker
   echo "Previous release restored. Database backup: $B"; exit 1
 fi
 REMOTE
