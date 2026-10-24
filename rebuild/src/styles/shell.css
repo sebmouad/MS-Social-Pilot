@@ -36,8 +36,9 @@
 .shell-workspace__current > svg { position: absolute; right: -5px; bottom: -5px; width: 15px; height: 15px; padding: 1px; border-radius: var(--radius-full); background: var(--accent); color: var(--on-accent); }
 .shell-workspace-status { margin: 6px 0 0; font-size: var(--text-xs); }
 .shell-create { flex: 0 0 auto; width: 100%; min-height: var(--control-h); border-radius: var(--radius-sm); font-size: var(--text-md); text-decoration: none; }
-.shell-sidebar__scroll { display: flex; flex: 1; flex-direction: column; gap: 18px; min-height: 0; overflow: auto; overscroll-behavior: contain; margin: 0 -4px; padding: 0 4px; }
-.shell-hubs { display: grid; gap: 2px; }
+.shell-sidebar__scroll { display: flex; flex: 1; flex-direction: column; gap: 18px; min-width: 0; min-height: 0; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; margin: 0 -4px; padding: 0 4px; }
+.shell-hubs { display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px; min-width: 0; }
+.shell-channels { display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px; min-width: 0; }
 .shell-section-label { margin: 0 0 6px; padding: 0 8px; color: var(--rail-ink); font-size: var(--text-xs); font-weight: 600; opacity: .85; }
 
 /* Hub row: 34 px, plain outline icon; the active row is a tint fill with the dark ink of the one hue. */
@@ -71,12 +72,12 @@
 .shell[data-rail="true"] .shell-hub__badge { position: absolute; top: 3px; inset-inline-end: 6px; width: 8px; min-width: 0; height: 8px; padding: 0; overflow: hidden; text-indent: -999px; line-height: 0; }
 
 /* ---- Channel scope list ---- */
-.ui-scope { display: grid; gap: 6px; }
+.ui-scope { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; min-width: 0; }
 .ui-scope__search { display: flex; align-items: center; gap: 8px; min-height: 36px; padding: 0 10px; border: 1px solid var(--control-border); border-radius: var(--radius-sm); background: var(--surface); color: var(--ink-faint); }
 .ui-scope__search input { flex: 1; min-width: 0; border: 0; background: transparent; color: var(--ink); font: inherit; font-size: var(--text-sm); outline: none; }
-.ui-scope__list { display: grid; gap: 1px; margin: 0; padding: 0; list-style: none; }
-.ui-scope__row { position: relative; }
-.ui-scope__item { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 36px; padding: 4px 8px; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--rail-ink); font: inherit; font-size: var(--text-md); font-weight: 500; text-align: left; cursor: pointer; }
+.ui-scope__list { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1px; min-width: 0; margin: 0; padding: 0; list-style: none; }
+.ui-scope__list > li, .ui-scope__row { position: relative; min-width: 0; }
+.ui-scope__item { display: flex; align-items: center; gap: 10px; width: 100%; min-width: 0; min-height: 36px; padding: 4px 8px; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--rail-ink); font: inherit; font-size: var(--text-md); font-weight: 500; text-align: left; cursor: pointer; overflow: hidden; }
 .ui-scope__item:hover { background: var(--rail-active-bg); color: var(--rail-active-ink); }
 .ui-scope__item.is-selected { background: var(--rail-active-bg); color: var(--rail-active-ink); font-weight: 700; }
 .ui-scope__item:disabled { opacity: .6; cursor: progress; }

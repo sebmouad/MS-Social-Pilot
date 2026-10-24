@@ -67,7 +67,7 @@ describe('calendar wave 2: list, lanes and guardrails', () => {
     await render('week');
     await act(async () => [...container.querySelectorAll('button')].find(button => button.textContent === 'By channel')!.dispatchEvent(new MouseEvent('click', { bubbles: true })));
     const heads = [...container.querySelectorAll('[class*="laneHead"]')];
-    expect(heads.map(head => head.textContent)).toEqual(['News2 post(s)', 'Studio2 post(s)']);
+    expect(heads.map(head => head.textContent)).toEqual(['News2 posts', 'Studio2 posts']);
     const joint = [...container.querySelectorAll('[class*="laneCell"]')].filter(cell => cell.textContent?.includes('Joint noon post'));
     expect(joint).toHaveLength(2);
     const studioOnly = [...container.querySelectorAll('[class*="laneCell"]')].filter(cell => cell.textContent?.includes('Studio morning post'));

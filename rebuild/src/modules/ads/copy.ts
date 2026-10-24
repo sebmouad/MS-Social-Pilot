@@ -548,9 +548,13 @@ export const adsCustomerCopy = {
     "en": "Apply",
     "fr": "Appliquer"
   },
+  "resultOne": {
+    "en": "result ·",
+    "fr": "résultat ·"
+  },
   "text071": {
-    "en": "result(s) ·",
-    "fr": "résultat(s) ·"
+    "en": "results ·",
+    "fr": "résultats ·"
   },
   "text072": {
     "en": "to",

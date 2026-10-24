@@ -40,11 +40,11 @@ export function ConnectionRowMenu({ id, name, platformId, manageLabel, disconnec
 }
 
 /** Account card buttons: [Manage channels] [Reconnect] and "⋯" with Disconnect (the retain-or-delete dialog stays unchanged). */
-export function ChannelCardActions({ id, name, platformId, needsReconnect, ...labels }: { id: string; name: string; platformId: string; needsReconnect: boolean } & Labels) {
+export function ChannelCardActions({ id, name, platformId, needsReconnect: _needsReconnect, ...labels }: { id: string; name: string; platformId: string; needsReconnect: boolean } & Labels) {
   const { busy, reconnect } = useReconnect(platformId, labels);
   return <div className={styles.cardActions}>
     <Button variant="secondary" size="sm" onClick={() => navigate(id, 'manage')} disabled={busy}>{labels.manageLabel}</Button>
-    <Button variant={needsReconnect ? 'primary' : 'secondary'} size="sm" onClick={() => void reconnect()} disabled={busy}>{busy ? labels.busyLabel : labels.reconnectLabel}</Button>
+    <Button variant="secondary" size="sm" onClick={() => void reconnect()} disabled={busy}>{busy ? labels.busyLabel : labels.reconnectLabel}</Button>
     <Menu label={`${labels.actionsLabel}: ${name}`} items={[{ key: 'disconnect', label: labels.disconnectLabel, icon: <IconPlugConnectedX size={16} />, disabled: busy, danger: true, onSelect: () => navigate(id, 'disconnect') }]} />
   </div>;
 }

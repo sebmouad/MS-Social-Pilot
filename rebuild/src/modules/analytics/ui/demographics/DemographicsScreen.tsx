@@ -14,6 +14,9 @@ import { demographicsCopyDefaults } from '@/modules/analytics/demographics/copy'
 import { readAnalyticsSnapshot } from '@/modules/analytics/server/read';
 import { pageChannelScope } from '@/modules/shell/server/scope';
 import { insightsReadInput } from '@/modules/analytics/ui/insights/scope';
+import { InsightsFilterRow } from '@/modules/analytics/ui/insights/InsightsFilterRow';
+import { insightsCopyDefaults, insightsPolicyDefaults, resolveInsightsCopy } from '@/modules/analytics/ui/insights/insights-config';
+import { presetRange, resolvePeriod } from '@/modules/analytics/ui/insights/period';
 import styles from '@/modules/analytics/ui/reports/workflows.module.css';
 
 type Search = Record<string, string | string[] | undefined>;
@@ -23,12 +26,13 @@ const values = (v: Search[string]) => v === undefined ? [] : Array.isArray(v) ? 
 export default async function DemographicsPage({ searchParams }: { searchParams: Promise<Search> }) {
   const viewer = await requireViewer({ feature: 'analytics/demographics', channelScoped: true });
   const fr = /^\s*fr\b/i.test((await headers()).get('accept-language') ?? '');
+  const locale = fr ? 'fr' : 'en';
   const { demographics: copy } = await analyticsCopy();
-  const t = (key: keyof typeof copy) => copy[key][fr ? 'fr' : 'en'];
+  const t = (key: keyof typeof copy) => copy[key][locale];
   // Saved catalogs predate the truncation notice; fall back to the shipped default until Root re-saves.
   const notice = (key: 'Showing the latest' | 'of' | 'stored snapshots. Narrow the dates or channels to see older ones.') =>
-    (copy as Record<string, { en: string; fr: string } | undefined>)[key]?.[fr ? 'fr' : 'en'] ?? demographicsCopyDefaults[key][fr ? 'fr' : 'en'];
-  const number = new Intl.NumberFormat(fr ? 'fr' : 'en', { maximumFractionDigits: 1 });
+    (copy as Record<string, { en: string; fr: string } | undefined>)[key]?.[locale] ?? demographicsCopyDefaults[key][locale];
+  const number = new Intl.NumberFormat(locale, { maximumFractionDigits: 1 });
   const unknown = t("Not available");
   const when = (date: Date | null) => date ? date.toISOString().replace('T', ' ').replace('.000Z', ' UTC') : unknown;
   const params = await searchParams;
@@ -37,7 +41,10 @@ export default async function DemographicsPage({ searchParams }: { searchParams:
   let failed = false;
   // The sidebar's channel list scopes the page; the page keeps only its date range.
   const scope = await pageChannelScope(viewer, params);
-  try { data = await readDemographics({ userId: viewer.user.id, workspaceId: viewer.workspaceId }, insightsReadInput(params, scope.ids)); }
+  const presetPeriod = first(params.period) ? resolvePeriod(params, insightsPolicyDefaults) : null;
+  const readInput = insightsReadInput(params, scope.ids, presetPeriod ? { start: presetPeriod.start, end: presetPeriod.end } : {});
+  delete readInput.period;
+  try { data = await readDemographics({ userId: viewer.user.id, workspaceId: viewer.workspaceId }, readInput); }
   catch { failed = true; }
   if (!data) {
     try { options = await readAnalyticsSnapshot({ userId: viewer.user.id, workspaceId: viewer.workspaceId }, {}, { feature: 'analytics/demographics' }); }
@@ -54,13 +61,23 @@ export default async function DemographicsPage({ searchParams }: { searchParams:
     const valid = /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(Date.parse(`${value}T00:00:00Z`)) && new Date(`${value}T00:00:00Z`).toISOString().slice(0, 10) === value;
     return <label className={styles.inlineField}><span>{label}</span><input className="ui-input" type={!value || valid ? 'date' : 'text'} name={name} defaultValue={value} aria-describedby={failed ? 'demographics-error' : undefined} /></label>;
   };
-  // One compact toolbar on the title row: the period, Apply and the CSV export. The sidebar scopes the channels.
-  const filters = <form noValidate action="/insights/audience" className={styles.toolbar} aria-label={t("Date range (UTC)")}>
+  const now = new Date();
+  const presets = insightsPolicyDefaults.rangePresets.map(item => ({ id: item.id, label: item.label[locale], ...presetRange(item, now) }));
+  const activeStart = first(params.start) || data?.period.start || options?.period.start || '';
+  const activeEnd = first(params.end) || data?.period.end || options?.period.end || '';
+  const matchedPreset = presets.find(item => item.id === first(params.period)) ?? presets.find(item => item.start === activeStart && item.end === activeEnd);
+  const periodValue = { preset: matchedPreset?.id ?? (activeStart && activeEnd ? 'custom' : insightsPolicyDefaults.defaultPreset), start: activeStart, end: activeEnd };
+  const ui = resolveInsightsCopy(insightsCopyDefaults as never, locale);
+  // One compact toolbar on the title row: the period picker and CSV export (or the inline recovery form after an invalid date).
+  const filters = failed ? <form noValidate action="/insights/audience" className={styles.toolbar} aria-label={t("Date range (UTC)")}>
     {dateField('start', t("From"))}{dateField('end', t("To"))}
     {scope.ids.length ? <input type="hidden" name="channel" value={scope.ids.join(',')} /> : null}
     <Button type="submit" variant="secondary" size="sm">{t("Apply filters")}</Button>
+  </form> : <div className={styles.toolbar}>
+    <InsightsFilterRow presets={presets} period={periodValue} compare={false} showCompare={false} writePresetDates
+      labels={{ period: ui.datePeriod, compare: ui.compareToggle, active: ui.activeFilters, remove: ui.removeFilter, reset: ui.resetFilters, filters: t("Date range (UTC)"), customSummary: t("Date range (UTC)") }} />
     {data && <a className="ui-button ui-button--quiet ui-button--sm" href={`/api/analytics/demographics?${query}`} download><IconDownload size={16} aria-hidden="true" />{t("Export full history (CSV)")}</a>}
-  </form>;
+  </div>;
   const metrics = data ? [...data.groups.flatMap(group => group.metrics), ...data.other] : [];
   return <PageFrame module="analytics" scopedAccess><div className={styles.root}>
     <PageHeader module="analytics" title={t("Audience history")} info={<InfoTip name={t("Audience history")} blocks={[{ text: t("Stored age, gender, country, city and language categories, as supplied by the provider. Each snapshot stands alone; counts are never added across dates or sources.") }]} />} filters={filters} />

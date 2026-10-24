@@ -2,6 +2,7 @@
 import { useAdsText } from '@/modules/ads/ui/AdsCopyProvider';
 import { IconClick, IconCoin, IconEye, IconPercentage } from '@tabler/icons-react';
 import { FunnelChart, TrendChart } from '@/components/charts';
+import { InfoTip } from '@/components/InfoTip';
 import { MetricCard } from '@/components/MetricCard';
 import type { AdsSummary } from '@/modules/ads/server/summary';
 
@@ -50,11 +51,10 @@ export function CampaignCharts({ accountName, rows, locale }: { accountName: str
             points: [...row.dailyMetrics].sort((a, b) => a.date.getTime() - b.date.getTime()).map(entry => ({ t: day(entry.date), v: entry.spend })) }))} />
       </div>
       <div className="ads-campaign-charts__panel">
-        <h3>{t('text153')}</h3>
+        <h3 style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>{t('text153')} <InfoTip name={t('text153')}>{t('text155')}</InfoTip></h3>
         <FunnelChart locale={locale} height={CHART_HEIGHT} label={t('text154', { value0: accountName })} stages={[
           { name: t('text020'), value: impressions }, { name: t('text022'), value: clicks }, { name: t('text145'), value: null },
         ]} />
-        <p className="small-note">{t('text155')}</p>
       </div>
     </div>
   </section>;

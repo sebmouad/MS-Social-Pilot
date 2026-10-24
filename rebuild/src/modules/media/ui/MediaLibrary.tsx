@@ -26,6 +26,22 @@ export function MediaLibrary({ items, usage, page, hasMore, filters, canWrite, w
   const errorText = (body: unknown) => body && typeof body === 'object' && 'error' in body && typeof (body as { error: unknown }).error === 'string' ? (body as { error: string }).error : t('unconfirmed');
   const [assets, setAssets] = useState(items);
   useEffect(() => setAssets(items), [items]);
+  const [searchQuery, setSearchQuery] = useState(filters.q);
+  const [kindFilter, setKindFilter] = useState(filters.kind);
+  const [usageFilter, setUsageFilter] = useState(filters.usage);
+  useEffect(() => { setSearchQuery(filters.q); setKindFilter(filters.kind); setUsageFilter(filters.usage); }, [filters.q, filters.kind, filters.usage]);
+  const filterFormRef = useRef<HTMLFormElement>(null);
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const submitFilters = (nextQ: string, nextKind: string, nextUsage: string) => {
+    const s = new URLSearchParams();
+    if (nextKind) s.set('kind', nextKind);
+    if (nextUsage) s.set('usage', nextUsage);
+    if (nextQ.trim()) s.set('q', nextQ.trim());
+    const href = `${PATH}${s.toString() ? `?${s}` : ''}`;
+    const nav = router as { push?: (url: string) => void };
+    if (typeof nav.push === 'function') nav.push(href);
+    else filterFormRef.current?.requestSubmit();
+  };
   const [importing, setImporting] = useState(false);
   const [url, setUrl] = useState(''); const [name, setName] = useState('');
   const [detailId, setDetailId] = useState<string | null>(null);
@@ -42,8 +58,15 @@ export function MediaLibrary({ items, usage, page, hasMore, filters, canWrite, w
   const percent = Math.min(100, Math.round((usage.usedBytes / Math.max(1, usage.quotaBytes)) * 100));
   const importWord = `IMPORT MEDIA ${url.trim()}`;
   const deleteWord = removing ? (force ? `DELETE IN-USE MEDIA ${removing.id}` : `DELETE MEDIA ${removing.id}`) : '';
-  const query = (p: number) => { const s = new URLSearchParams(); if (filters.kind) s.set('kind', filters.kind); if (filters.usage) s.set('usage', filters.usage); if (filters.q) s.set('q', filters.q); s.set('page', String(p)); return `${PATH}?${s}`; };
-  const filtered = Boolean(filters.q || filters.kind || filters.usage);
+  const query = (p: number) => { const s = new URLSearchParams(); if (kindFilter) s.set('kind', kindFilter); if (usageFilter) s.set('usage', usageFilter); if (searchQuery) s.set('q', searchQuery); s.set('page', String(p)); return `${PATH}?${s}`; };
+  const filtered = Boolean(searchQuery || kindFilter || usageFilter);
+  const visibleAssets = assets.filter(a => {
+    if (kindFilter && a.kind !== kindFilter) return false;
+    if (usageFilter === 'used' && !a.inUse) return false;
+    if (usageFilter === 'unused' && a.inUse) return false;
+    if (searchQuery.trim() && !a.name.toLowerCase().includes(searchQuery.trim().toLowerCase())) return false;
+    return true;
+  });
   const usedLabel = (count: number) => count === 1 ? t('usedByOne') : t('usedBy', { count });
   // The open sheet follows the live list, so a rename inside it updates the title without closing.
   const detail = detailId ? assets.find(a => a.id === detailId) ?? null : null;
@@ -88,11 +111,16 @@ export function MediaLibrary({ items, usage, page, hasMore, filters, canWrite, w
 
   return <div className={styles.root}>
     {notice && !importing && !removing && !renaming && <RouteNotice error={notice.error} focusKey={`media-notice:${notice.key}`}>{notice.text}</RouteNotice>}
-    <form action={PATH} method="get" className={styles.filters} role="search">
-      <div className={styles.field}><label htmlFor="media-q">{t('search')}</label><input id="media-q" name="q" defaultValue={filters.q} maxLength={maxSearch} placeholder={t('searchPlaceholder')} /></div>
-      <div className={styles.field}><label htmlFor="media-kind">{t('type')}</label><select id="media-kind" name="kind" defaultValue={filters.kind}><option value="">{t('typeAll')}</option><option value="image">{t('typeImage')}</option><option value="video">{t('typeVideo')}</option></select></div>
-      <div className={styles.field}><label htmlFor="media-usage">{t('use')}</label><select id="media-usage" name="usage" defaultValue={filters.usage}><option value="">{t('useAll')}</option><option value="used">{t('useUsed')}</option><option value="unused">{t('useUnused')}</option></select></div>
-      <Button type="submit" variant="secondary">{t('apply')}</Button>{filtered && <a href={PATH}>{t('clear')}</a>}
+    <form ref={filterFormRef} action={PATH} method="get" className={styles.filters} role="search">
+      <div className={styles.field}><label htmlFor="media-q">{t('search')}</label><input id="media-q" name="q" type="search" value={searchQuery} maxLength={maxSearch} placeholder={t('searchPlaceholder')} onChange={e => {
+        const next = e.target.value;
+        setSearchQuery(next);
+        if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+        searchTimerRef.current = setTimeout(() => submitFilters(next, kindFilter, usageFilter), 250);
+      }} /></div>
+      <div className={styles.field}><label htmlFor="media-kind">{t('type')}</label><select id="media-kind" name="kind" value={kindFilter} onChange={e => { const next = e.target.value; setKindFilter(next); submitFilters(searchQuery, next, usageFilter); }}><option value="">{t('typeAll')}</option><option value="image">{t('typeImage')}</option><option value="video">{t('typeVideo')}</option></select></div>
+      <div className={styles.field}><label htmlFor="media-usage">{t('use')}</label><select id="media-usage" name="usage" value={usageFilter} onChange={e => { const next = e.target.value; setUsageFilter(next); submitFilters(searchQuery, kindFilter, next); }}><option value="">{t('useAll')}</option><option value="used">{t('useUsed')}</option><option value="unused">{t('useUnused')}</option></select></div>
+      {filtered && <a href={PATH}>{t('clear')}</a>}
       {canWrite && <>
         <Button type="button" variant="primary" disabled={busy} onClick={() => fileInput.current?.click()}>{busy ? t('uploading') : t('upload')}</Button>
         <input ref={fileInput} type="file" accept="image/png,image/jpeg,image/gif,image/webp" hidden aria-label={t('upload')} onChange={e => { const file = e.target.files?.[0]; e.target.value = ''; if (file) void performUpload(file); }} />
@@ -103,8 +131,8 @@ export function MediaLibrary({ items, usage, page, hasMore, filters, canWrite, w
       <div className={styles.meter} role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent} aria-label={t('storageBar')}><span style={{ width: `${percent}%` }} /></div>
       <span className={styles.meta}>{usage.assetCount === 1 ? t('fileCountOne') : t('fileCount', { count: usage.assetCount })}</span></section>
     {usageMayBeIncomplete && <p className={styles.help}>{t('usageIncomplete')}</p>}
-    {assets.length ? <ul className={styles.grid} aria-label={t('tableCaption')}>
-      {assets.map(a => <li key={a.id} className={styles.tile}>
+    {visibleAssets.length ? <ul className={styles.grid} aria-label={t('tableCaption')}>
+      {visibleAssets.map(a => <li key={a.id} className={styles.tile}>
         <div className={styles.preview}>{a.kind === 'image' && a.source === 'stored-image' ? <img className={styles.tileImage} src={`/api/media/${encodeURIComponent(a.id)}`} alt="" loading="lazy" /> : <span className={styles.tileKind}>{a.kind === 'video' ? t('video') : t('image')}</span>}
           <span className={`${styles.badge}${a.inUse ? ` ${styles.badgeUsed}` : ''}`}>{a.inUse ? usedLabel(a.holderCount) : t('unused')}</span></div>
         <div className={styles.tileBody}>

@@ -28,7 +28,12 @@ export function InboxFilterRow({ action, filters, scope, locale, thread, limit, 
   const [kind, setKind] = useState(filters.kind === 'all' ? 'message' : filters.kind);
   const [state, setState] = useState(filters.state);
   const [hidden, setHidden] = useState(filters.hidden);
+  const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const apply = () => setTimeout(() => form.current?.requestSubmit(), 0);
+  const scheduleSearch = () => {
+    if (searchTimer.current) clearTimeout(searchTimer.current);
+    searchTimer.current = setTimeout(() => form.current?.requestSubmit(), 250);
+  };
   return <form ref={form} method="get" action={action} noValidate className={styles.filterRow}>
     {thread ? <input type="hidden" name="thread" value={thread} /> : null}
     {scope ? <input type="hidden" name="channel" value={scope} /> : null}
@@ -51,7 +56,7 @@ export function InboxFilterRow({ action, filters, scope, locale, thread, limit, 
       </FilterSection>
     </FilterButton>
     <div role="search" aria-label={screen.search} className={styles.filterSearch}>
-      <TextInput type="search" name="q" aria-label={screen.search} maxLength={searchMaxCharacters} defaultValue={filters.q} placeholder={copy.searchPlaceholder} />
+      <TextInput type="search" name="q" aria-label={screen.search} maxLength={searchMaxCharacters} defaultValue={filters.q} placeholder={copy.searchPlaceholder} onChange={scheduleSearch} />
     </div>
   </form>;
 }

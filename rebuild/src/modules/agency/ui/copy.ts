@@ -26,13 +26,25 @@ export const customerCopy = {
     "en": "of",
     "fr": "sur"
   },
+  "channel cannot publish": {
+    "en": "channel cannot publish",
+    "fr": "canal ne peut pas publier"
+  },
   "channels cannot publish": {
     "en": "channels cannot publish",
     "fr": "canaux ne peuvent pas publier"
   },
+  "failed post": {
+    "en": "failed post",
+    "fr": "publication en échec"
+  },
   "failed posts": {
     "en": "failed posts",
     "fr": "publications en échec"
+  },
+  "overdue task": {
+    "en": "overdue task",
+    "fr": "tâche en retard"
   },
   "overdue tasks": {
     "en": "overdue tasks",

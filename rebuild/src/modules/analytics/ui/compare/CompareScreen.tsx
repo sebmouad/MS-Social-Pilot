@@ -18,6 +18,17 @@ type Search = Record<string, string | string[] | undefined>;
 const list = (value: string | string[] | undefined) => value === undefined ? [] : Array.isArray(value) ? value : [value];
 const first = (value: string | string[] | undefined) => (Array.isArray(value) ? value[0] : value) ?? '';
 const LABEL: Record<string, string> = { comparable: 'Compared', missing: 'Unknown on one side', coverage_changed: 'Different coverage', not_comparable: 'Not comparable' };
+const DAY_MS = 86_400_000;
+const isoDay = (date: Date) => date.toISOString().slice(0, 10);
+
+function defaultComparePeriods(now = new Date()) {
+  const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  const aEnd = isoDay(today);
+  const aStart = isoDay(new Date(today.getTime() - 27 * DAY_MS));
+  const bEnd = isoDay(new Date(today.getTime() - 28 * DAY_MS));
+  const bStart = isoDay(new Date(today.getTime() - 55 * DAY_MS));
+  return { aStart, aEnd, bStart, bEnd, start: aStart, end: aEnd };
+}
 
 export default async function ComparePage({ searchParams }: { searchParams: Promise<Search> }) {
   const viewer = await requireViewer({ feature: 'analytics/compare', channelScoped: true });
@@ -25,7 +36,14 @@ export default async function ComparePage({ searchParams }: { searchParams: Prom
   const locale = /^\s*fr\b/i.test((await headers()).get('accept-language') ?? '') ? 'fr' : 'en';
   const t = workspaceText(copy, locale);
   const formatValue = (value: number | null | undefined, unit: string, displayTotal?: string) => formatAnalyticsValue(value, unit, displayTotal, locale, copy);
-  const rawParams = await searchParams; const parsed = comparisonSearchSchema.safeParse(rawParams); const params = parsed.success ? parsed.data : {};
+  const rawParams = await searchParams;
+  const parsed = comparisonSearchSchema.safeParse(rawParams);
+  const defaults = defaultComparePeriods();
+  const rawData = parsed.success ? parsed.data : {};
+  const hasExplicitModeOrDates = Boolean(rawData.mode || rawData.aStart || rawData.aEnd || rawData.bStart || rawData.bEnd || rawData.start || rawData.end);
+  const params = parsed.success && !hasExplicitModeOrDates
+    ? { mode: 'period' as const, ...defaults, ...rawData }
+    : rawData;
   const input = parsed.success ? comparisonInputFromSearch(params) : null;
   let data: Awaited<ReturnType<typeof readAnalyticsComparison>> | null = null; let failure = '';
   const actor = { userId: viewer.user.id, workspaceId: viewer.workspaceId };

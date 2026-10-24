@@ -7,16 +7,31 @@ import './insights.css';
 export type InsightsPresetOption = { id: string; label: string; start: string; end: string };
 export type InsightsChip = { key: string; label: string; value: string };
 
+function useSafeNavigation() {
+  let router: ReturnType<typeof useRouter> | null = null;
+  let pathname = '';
+  let params = new URLSearchParams();
+  try { router = useRouter(); } catch { /* SSR test fallback */ }
+  try { pathname = usePathname() ?? ''; } catch { /* SSR test fallback */ }
+  try {
+    const search = useSearchParams();
+    if (search) params = new URLSearchParams(search.toString());
+  } catch { /* SSR test fallback */ }
+  return { router, pathname, params };
+}
+
 /**
  * The Insights filter row (design v2 S9): the period picker with its compare switch, then the page's one Filter
  * button for everything else. Both write the address, so a view can be shared; the sidebar's `channel` scope and
  * every other parameter are kept, and paging restarts.
  */
-export function InsightsFilterRow({ presets, period, compare, showCompare = true, chips = [], activeCount = 0, labels, children, hidePeriod = false, names = { from: 'start', to: 'end' }, customPeriod }: {
+export function InsightsFilterRow({ presets, period, compare, showCompare = true, chips = [], activeCount = 0, labels, children, hidePeriod = false, names = { from: 'start', to: 'end' }, customPeriod, writePresetDates = false }: {
   /** Address parameters of a typed range; Ads uses `since`/`until`. */
   names?: { from: string; to: string };
   /** Preset id written for a typed range when the page needs one (Ads: `custom`); otherwise the preset parameter is removed. */
   customPeriod?: string;
+  /** Also write explicit start/end dates when a preset is chosen. */
+  writePresetDates?: boolean;
   presets: InsightsPresetOption[];
   period: { preset: string; start: string; end: string };
   compare: boolean;
@@ -29,15 +44,13 @@ export function InsightsFilterRow({ presets, period, compare, showCompare = true
   children?: ReactNode;
   hidePeriod?: boolean;
 }) {
-  const router = useRouter();
-  const pathname = usePathname();
-  const params = useSearchParams();
+  const { router, pathname, params } = useSafeNavigation();
   const push = (patch: Record<string, string | null>) => {
     const next = new URLSearchParams(params.toString());
     for (const [key, value] of Object.entries(patch)) { if (value) next.set(key, value); else next.delete(key); }
     for (const paging of ['page', 'pointPage', 'rowPage', 'offset']) next.delete(paging);
     const query = next.toString();
-    router.push(`${pathname}${query ? `?${query}` : ''}`);
+    router?.push(`${pathname}${query ? `?${query}` : ''}`);
   };
   const clearAll = () => {
     const next = new URLSearchParams();
@@ -46,7 +59,7 @@ export function InsightsFilterRow({ presets, period, compare, showCompare = true
     const kind = params.get('kind');
     if (kind) next.set('kind', kind);
     const query = next.toString();
-    router.push(`${pathname}${query ? `?${query}` : ''}`);
+    router?.push(`${pathname}${query ? `?${query}` : ''}`);
   };
   const customSummary = `${period.start} – ${period.end}`;
   return <div className="insights-filterrow" role="group" aria-label={labels.filters}>
@@ -54,7 +67,10 @@ export function InsightsFilterRow({ presets, period, compare, showCompare = true
       value={{ preset: period.preset, from: period.start, to: period.end }} customSummary={period.preset === 'custom' ? customSummary : labels.customSummary}
       onChange={value => {
         if (value.preset === 'custom') push({ period: customPeriod ?? null, [names.from]: value.from ?? null, [names.to]: value.to ?? null });
-        else push({ period: value.preset, [names.from]: null, [names.to]: null });
+        else {
+          const matched = presets.find(item => item.id === value.preset);
+          push({ period: value.preset, [names.from]: writePresetDates ? (matched?.start ?? null) : null, [names.to]: writePresetDates ? (matched?.end ?? null) : null });
+        }
       }}
       compare={showCompare ? { checked: compare, onChange: checked => push({ compare: checked ? 'previous' : null }), label: labels.compare } : undefined} />}
     {children && <FilterButton title={labels.filters} activeCount={activeCount} onClear={clearAll} closeOnDone>
@@ -70,14 +86,12 @@ export function InsightsFilterRow({ presets, period, compare, showCompare = true
 
 /** Writes one address parameter from a Filter-button field and keeps the rest (including the channel scope). */
 export function useInsightsParam(name: string): [string, (value: string) => void] {
-  const router = useRouter();
-  const pathname = usePathname();
-  const params = useSearchParams();
+  const { router, pathname, params } = useSafeNavigation();
   return [params.get(name) ?? '', value => {
     const next = new URLSearchParams(params.toString());
     if (value) next.set(name, value); else next.delete(name);
     for (const paging of ['page', 'pointPage', 'rowPage', 'offset']) next.delete(paging);
     const query = next.toString();
-    router.push(`${pathname}${query ? `?${query}` : ''}`);
+    router?.push(`${pathname}${query ? `?${query}` : ''}`);
   }];
 }

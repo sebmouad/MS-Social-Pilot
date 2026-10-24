@@ -179,7 +179,7 @@
 .detailsToggle { display: inline-flex; align-items: center; gap: 6px; min-height: var(--control-h, 36px); padding: 0 10px; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface); color: var(--ink); font: inherit; font-size: 13px; cursor: pointer; }
 .detailsToggle:hover { background: var(--surface-muted); }
 .detailsToggle:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
-.filterTools { display: grid; gap: 8px; min-width: 0; }
+.filterTools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-width: 0; }
 .quickRow { display: flex; flex: 0 0 auto; gap: 6px; padding: 10px 12px; overflow-x: auto; border-bottom: 1px solid var(--line-subtle, var(--line)); scrollbar-width: thin; }
 .quickChip { flex: 0 0 auto; display: inline-flex; align-items: center; min-height: 32px; padding: 0 12px; border: 1px solid var(--line-strong); border-radius: 999px; background: var(--surface); color: var(--ink); font-size: 13px; font-weight: 600; text-decoration: none; white-space: nowrap; }
 .quickChip:hover { background: var(--surface-muted); }

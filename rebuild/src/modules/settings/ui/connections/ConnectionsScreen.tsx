@@ -12,7 +12,7 @@ import { ConnectionManager } from './manager';
 import { connectablePlatforms, platformConnectsWithCredentials, platformGrantHealth } from '@/server/platforms/registry';
 import { summarizeConnectionHealth, connectionHealthText, type ConnectionHealthCopyKey } from '@/lib/connection-health';
 import { ChannelCardActions } from './row-menu';
-import { Avatar, DataTable, EmptyState } from '@/components';
+import { Avatar, DataTable, EmptyState, InfoTip } from '@/components';
 import { GrantChips } from './GrantChips';
 import cardStyles from './connections.module.css';
 import { IconPlugConnected } from '@tabler/icons-react';
@@ -44,7 +44,7 @@ export default async function ConnectionsPage({ searchParams }: { searchParams: 
   const dayFormat = new Intl.DateTimeFormat(locale, { dateStyle: 'medium' });
   const notice = (key: string, tone: 'status' | 'alert', message: string) => params.notice === key && <p className={styles['settings-note']} role={tone}>{message}</p>;
 
-  return <PageFrame module="settings"><SettingsPage copy={uiCopy} tab="channelsAccounts" active="settings/connections" title={t.title} description={t.description} locale={locale}>
+  return <PageFrame module="settings"><SettingsPage copy={uiCopy} tab="channelsAccounts" active="settings/connections" title={t.title} description={t.description} info={<InfoTip name={t.title}>{t.footnote}</InfoTip>} locale={locale}>
     <ConnectionManager locale={locale} statusLabels={statusLabels} sources={accounts.map(account => ({ ...account, platformName: providerName(account.provider) }))} canManage={canManage} platforms={connectable} initiallyOpen={params.select === '1'} initialSourceId={params.source} initialAction={params.action === 'disconnect' ? 'disconnect' : params.action === 'manage' ? 'manage' : undefined} />
     {notice('connected_partial', 'status', t.connectedPartial)}
     {notice('connected', 'status', t.connected)}
@@ -90,6 +90,5 @@ export default async function ConnectionsPage({ searchParams }: { searchParams: 
     </SettingsPanel>
     </>}
     <SettingsPanel title={c.groupsTitle} detail={c.groupsDetail}><a href="/settings/channels/groups">{c.groupsOpen}</a></SettingsPanel>
-    <p className={styles['settings-note']}>{t.footnote}</p>
   </SettingsPage></PageFrame>;
 }

@@ -5,6 +5,7 @@ import { loadAdsCopy } from '@/modules/ads/server/copy';
 import { customerText } from '@/modules/ads/copy';
 import { AdsCopyProvider } from '@/modules/ads/ui/AdsCopyProvider';
 import { EmptyState } from '@/components/EmptyState';
+import { InfoTip } from '@/components/InfoTip';
 import { IconAd, IconSpeakerphone } from '@tabler/icons-react';
 import { adsHeaderFor } from '../AdsTabsFor';
 import { AdsReportPager } from '../AdsReportPager';
@@ -101,10 +102,9 @@ async function CampaignsPage({ searchParams }: { searchParams: Promise<AdsSearch
         { value: 'campaign', label: t('text057') }, { value: 'adset', label: t('text058') }, { value: 'ad', label: t('text059') },
       ];
       return <section className="panel ads-results-panel" key={accountId}>
-        <div className="analytics-panel-title"><div><h2>{rows[0]?.accountName ?? account?.name ?? t('text044')}</h2><p className="small-note">{account?.actId}{account?.currency ? ` · ${account.currency}` : ''}</p></div><span className="badge">{rows.length} {t('text045')}</span></div>
+        <div className="analytics-panel-title"><div><div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}><h2>{rows[0]?.accountName ?? account?.name ?? t('text044')}</h2><InfoTip name={rows[0]?.accountName ?? account?.name ?? t('text044')} blocks={[{ text: t('hierarchyNote') }, { text: t('text054') }]} /></div><p className="small-note">{account?.actId}{account?.currency ? ` · ${account.currency}` : ''}</p></div><span className="badge">{rows.length} {t('text045')}</span></div>
         <CampaignCharts accountName={rows[0]?.accountName ?? account?.name ?? t('text044')} rows={rows} locale={locale} />
         {reconnectAccounts.has(accountId) ? <p className="small-note" role="note">{t('needsReconnectAccount', { account: rows[0]?.accountName ?? account?.name ?? t('text044') })} <a href="/settings/channels">{t('needsReconnectAction')}</a></p> : null}
-        <p className="small-note">{t('hierarchyNote')}</p>
         {levels.map(level => {
           const resolveParent = parentResolvers.get(accountId);
           const known = summaries.filter(row => row.accountId === accountId);
@@ -144,7 +144,6 @@ async function CampaignsPage({ searchParams }: { searchParams: Promise<AdsSearch
     {accounts.filter(account => (!filters.accountId || account.id === filters.accountId) && creativeAvailability.get(account.id)).map(account => <section className="panel" key={`creative:${account.id}`}><CreativeCreateForm adAccountId={account.id} accountName={account.name} ownerScope={{ userId: viewer.user.id, workspaceId }} locale={locale} /></section>)}
     {objectPage.pageCount > 1 ? pager : null}
     {canExport && exportPolicy && dataset.maxRows ? <div className="ads-report-export"><AdsReportExport filters={filters} maxRows={dataset.maxRows} maxBytes={exportPolicy.exportMaxBytes} fileName={exportPolicy.exportFileName} /></div> : null}
-    <p className="ads-read-only-note">{t('text054')}</p>
     </>}
   </div></PageFrame>;
 }

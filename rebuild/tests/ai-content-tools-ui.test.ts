@@ -134,10 +134,29 @@ describe('Create with AI screen', () => {
     await click('Confirm');
     expect(container.querySelector('[role="alert"]')!.textContent).toContain('could not finish'); expect(container.querySelector('textarea')!.value).toBe('A red kite');
   });
-  it('shows an unavailable state instead of a stub when a kind is off, and the budget note', async () => {
-    await act(async () => root.render(studio({ status: status({ image: { available: false, sizes: [], defaultSize: null, promptMaxCharacters: null }, usage: { month: '2026-10', requests: 3, spentUsd: 4, unpricedRequests: 0, budgetUsd: 10, remainingUsd: 6 } }) })));
-    expect(container.textContent).toContain('This is not available for your workspace right now.'); expect(container.textContent).toContain('$6');
-    expect(container.querySelector('textarea')).toBeNull();
+  it('hides disabled tool tabs, redirects stale ?tab= to the first available tab, and shows the unavailable state when all tools are off', async () => {
+    window.history.replaceState(null, '', '/content/ai-studio?tab=image');
+    await act(async () => root.render(studio({
+      status: status({
+        image: { available: false, sizes: [], defaultSize: null, promptMaxCharacters: null },
+        usage: { month: '2026-10', requests: 3, spentUsd: 4, unpricedRequests: 0, budgetUsd: 10, remainingUsd: 6 },
+      }),
+    })));
+    const tabs = [...container.querySelectorAll('[role="tab"]')].map(tab => tab.textContent?.trim());
+    expect(tabs).toEqual(['Video', 'Voice', 'Post check']);
+    expect(window.location.search).toBe('?tab=video');
+    expect(container.textContent).toContain('$6');
+
+    await act(async () => root.render(studio({
+      canCheck: false,
+      status: status({
+        image: { available: false, sizes: [], defaultSize: null, promptMaxCharacters: null },
+        video: { available: false, aspectRatios: [], defaultAspectRatio: null, promptMaxCharacters: null },
+        voice: { available: false, voices: [], defaultVoice: null, textMaxCharacters: null },
+      }),
+    })));
+    expect(container.querySelectorAll('[role="tab"]')).toHaveLength(0);
+    expect(container.textContent).toContain('This is not available for your workspace right now.');
   });
   it('lists videos with their state and renders French', async () => {
     await act(async () => root.render(studio({ copy: TOOLS_COPY.fr, locale: 'fr', videos: [{ id: 'v1', prompt: 'Vagues', aspectRatio: '16:9', status: 'working', mediaId: null, error: null, createdAt: '2026-10-22T00:00:00.000Z' }] })));

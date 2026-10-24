@@ -27,6 +27,7 @@ import { adsDirectoryManagementPort } from '@/modules/ads/directory/management-p
 import { pageSearchRecord } from '@/modules/ads/analysis/query';
 import { AdsFiltersSidebar } from '@/modules/ads/ui/ads-filters';
 import { ObjectManager } from './ObjectManager';
+import { ManageSearchFilter } from './ManageSearchFilter';
 import { adsHeaderFor } from '../AdsTabsFor';
 import { Button } from '@/components/Button';
 import { ObjectRowLabel } from './ObjectRowLabel';
@@ -43,7 +44,20 @@ import { platformAds } from '@/server/platforms/registry';
 
 type Params = AdsSearchParams & { level?: string; q?: string; sort?: string; direction?: string; parentId?: string; offset?: string };
 const first = (value: string | string[] | undefined) => (Array.isArray(value) ? undefined : value);
-const number = new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 });
+function formatMoney(locale: string, currency: string | null | undefined, value: number | null, fallback: string) {
+  if (value === null || !Number.isFinite(value)) return fallback;
+  if (currency) {
+    try { return new Intl.NumberFormat(locale, { style: 'currency', currency, maximumFractionDigits: 2 }).format(value); } catch { /* fall back */ }
+  }
+  return `${currency ? `${currency} ` : ''}${new Intl.NumberFormat(locale, { maximumFractionDigits: 2 }).format(value)}`;
+}
+function formatIsoDay(locale: string, value: string | null | undefined, fallback: string) {
+  if (!value) return fallback;
+  const day = value.slice(0, 10);
+  const parsed = Date.parse(`${day}T00:00:00Z`);
+  if (!Number.isFinite(parsed)) return value;
+  return new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeZone: 'UTC' }).format(parsed);
+}
 
 
 async function AdsObjectsPage({ searchParams }: { searchParams: Promise<Params> }) {
@@ -51,7 +65,6 @@ async function AdsObjectsPage({ searchParams }: { searchParams: Promise<Params> 
   const locale = adsLocale((await headers()).get('accept-language'));
   const catalogs = await loadAdsCopy();
   const t = (key: Parameters<typeof customerText>[2], values?: Record<string, string | number>) => customerText(catalogs.customer, locale, key, values);
-  const show = (value: number | null) => value === null ? t('text094') : number.format(value);
   const viewer = await requireViewer({ feature: 'ads/objects', channelScoped: true });
   const params = await searchParams;
   const actor = { userId: viewer.user.id, workspaceId: viewer.workspaceId };
@@ -69,21 +82,26 @@ async function AdsObjectsPage({ searchParams }: { searchParams: Promise<Params> 
     { id: 'ad', href: manageTabHref(rawValues, 'ad'), label: t('text059') },
     { id: 'creative', href: manageTabHref(rawValues, 'creative'), label: t('manageTabCreatives') },
   ]} />;
-  const hidden = (['period', 'since', 'until', 'account', 'level', 'sort', 'direction'] as const).map(key => {
-    const value = key === 'level' ? level : first(params[key]);
-    return value ? <input key={key} type="hidden" name={key} value={value} /> : null;
-  });
+  const hiddenParams = Object.fromEntries(
+    (['period', 'since', 'until', 'account', 'level', 'sort', 'direction'] as const).map(key => [key, key === 'level' ? level : first(params[key])]),
+  );
   // The shared Ads header carries period and account; a period the header cannot parse falls back to the full filter form.
   let headerFilters: AdsFilters | null = null;
   try { headerFilters = parseAdsFilters(params, accounts.map(account => account.id), undefined, policy); } catch { headerFilters = null; }
   const header = headerFilters
     ? await adsHeaderFor({ title: tabTitle, locale, policy, filters: headerFilters, accounts, periodLabel: t('text081'), customLabel: t('text083') })
     : <><AdsFiltersSidebar catalogs={catalogs} locale={locale} accounts={accounts} input={params} action="/ads/manage" policy={policy} /><PageHeader module="ads" title={tabTitle} /></>;
-  const sidebar = <>
-    <form noValidate method="get" action="/ads/manage" className="ads-extra-filters" aria-label={t('text055')}>{hidden}
-      <label>{t('text060')}<input name="q" defaultValue={first(params.q) ?? ''} maxLength={policy.maxFilterCharacters} /></label>
-      {level === 'adset' || level === 'ad' ? <label>{t('text061')}<input name="parentId" defaultValue={first(params.parentId) ?? ''} maxLength={Math.min(policy.maxFilterCharacters, managementPolicy.parentIdMaxCharacters)} /></label> : null}
-      <Button type="submit" size="sm">{t('text070')}</Button></form></>;
+  const sidebar = <ManageSearchFilter
+    ariaLabel={t('text055')}
+    searchLabel={t('text060')}
+    parentLabel={t('text061')}
+    initialQuery={first(params.q) ?? ''}
+    initialParentId={first(params.parentId) ?? ''}
+    maxFilterCharacters={policy.maxFilterCharacters}
+    maxParentCharacters={Math.min(policy.maxFilterCharacters, managementPolicy.parentIdMaxCharacters)}
+    showParent={level === 'adset' || level === 'ad'}
+    hiddenParams={hiddenParams}
+  />;
   let values: Record<string, string | undefined>;
   try {
     values = pageSearchRecord(params, ['period', 'since', 'until', 'account', 'level', 'parentId', 'q', 'sort', 'direction', 'offset'], policy.maxFilterCharacters);
@@ -157,16 +175,16 @@ async function AdsObjectsPage({ searchParams }: { searchParams: Promise<Params> 
     {header}
     {tabs}
     {sidebar}
-    <p className="small-note">{directory.total} {t('text071')} {directory.range.from} {t('text072')} {directory.range.to}</p>
+    <p className="small-note">{directory.total.toLocaleString(locale)} {t(directory.total === 1 ? 'resultOne' : 'text071')} {formatIsoDay(locale, directory.range.from, directory.range.from)} {t('text072')} {formatIsoDay(locale, directory.range.to, directory.range.to)}</p>
     <section className="panel">
       {directory.freshness.status === 'stale' ? <p className="small-note">{t('text073')}</p> : null}
       <DataTable caption={tabTitle} rows={directory.items} rowKey={row => `${row.accountId}:${row.objectId}`} emptyMessage={t('text075')} columns={[
         { key: 'name', label: t('text066'), render: row => <ObjectRowLabel adAccountId={row.accountId} level={directory.level} objectId={row.objectId} name={row.name} status={row.status}><span className="small-note">{accountName.get(row.accountId) ?? row.accountName} · {row.objectId}</span></ObjectRowLabel> },
         ...(parentLevel ? [{ key: 'parent', label: parentLabel, render: (row: (typeof directory.items)[number]) => parentOf(row) }] : []),
         { key: 'status', label: t('manageStatus'), render: row => <Badge tone={adsStatusTone(row.status)}>{row.status ?? t('text094')}</Badge> },
-        { key: 'spend', label: t('text019'), align: 'end' as const, render: row => `${row.currency ? `${row.currency} ` : ''}${show(row.spend)}` },
-        { key: 'last', label: t('text262'), render: row => row.lastDeliveryDate ?? t('text171') },
-        { key: 'updated', label: t('manageSynced'), render: row => row.lastFetchedAt ? row.lastFetchedAt.slice(0, 10) : t('text094') },
+        { key: 'spend', label: t('text019'), align: 'end' as const, render: row => formatMoney(locale, row.currency, row.spend, t('text094')) },
+        { key: 'last', label: t('text262'), render: row => formatIsoDay(locale, row.lastDeliveryDate, t('text171')) },
+        { key: 'updated', label: t('manageSynced'), render: row => formatIsoDay(locale, row.lastFetchedAt, t('text094')) },
         { key: 'manage', label: t('text264'), render: row => <ObjectManager adAccountId={row.accountId} level={directory.level} objectId={row.objectId} name={row.name} /> },
       ]} />
       <nav aria-label={t('text076')}>{directory.offset > 0 ? <a href={pageLink(Math.max(0, directory.offset - directory.limit))}>{t('text077')}</a> : null}{' '}{directory.nextOffset !== null ? <a href={pageLink(directory.nextOffset)}>{t('text078')}</a> : null}</nav>

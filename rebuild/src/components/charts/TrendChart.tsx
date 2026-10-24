@@ -2,12 +2,13 @@
 import { BarChart } from "./BarChart";
 import { TimeSeriesChart, type TimeSeries } from "./TimeSeriesChart";
 import type { ChartBaseProps } from "./ChartShell";
-import type { NumberFormat } from "./format";
+import { dateFormatters, toTime, type NumberFormat } from "./format";
 
 export type TrendChartProps = ChartBaseProps & {
   series: TimeSeries[];
   format?: NumberFormat;
   stacked?: boolean;
+  timeZone?: string;
 };
 
 /** A one-day "trend" is a comparison, not a line: distinct day count decides bars vs lines. */
@@ -21,8 +22,13 @@ export function trendMode(series: readonly TimeSeries[]): 'bar' | 'line' {
  */
 export function TrendChart({ series, format, stacked, ...props }: TrendChartProps) {
   if (trendMode(series) === 'line') return <TimeSeriesChart {...props} format={format} stacked={stacked} series={series} />;
-  const categories = [...new Set(series.flatMap(item => item.points.map(point => String(point.t))))].sort();
+  const rawDates = [...new Set(series.flatMap(item => item.points.map(point => String(point.t))))].sort();
+  const fmt = dateFormatters(props.locale ?? 'en', 'day', props.timeZone ?? 'UTC');
+  const categories = rawDates.map(date => {
+    const time = toTime(date);
+    return Number.isFinite(time) ? fmt.axis(time) : date;
+  });
   return <BarChart {...props} format={format} categories={categories}
     series={series.map((item, position) => ({ id: item.id, name: item.name, color: item.color ?? position,
-      values: categories.map(date => item.points.find(point => String(point.t) === date)?.v ?? null) }))} />;
+      values: rawDates.map(date => item.points.find(point => String(point.t) === date)?.v ?? null) }))} />;
 }

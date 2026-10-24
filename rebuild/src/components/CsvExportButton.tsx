@@ -2,6 +2,7 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Button } from '@/components/Button';
+import { InfoTip } from '@/components/InfoTip';
 
 type CsvExportCopy = {
   heading: string;
@@ -127,9 +128,12 @@ export function CsvExportButton({ href, expectedFormat, rowCountHeader, maxRows,
     }
   }
 
-  return <section aria-label={copy.heading}>
-    <p className="small-note">{copy.help}</p>
-    <Button onClick={download} disabled={busy}>{busy ? copy.pending : copy.action}</Button>
+  return <section className="ui-csv-export" aria-label={copy.heading}>
+    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+      <Button onClick={download} disabled={busy}>{busy ? copy.pending : copy.action}</Button>
+      <InfoTip name={copy.heading}>{copy.help}</InfoTip>
+    </div>
+    <span className="ui-visually-hidden">{copy.help}</span>
     {feedback ? <p ref={feedbackRef} tabIndex={-1} role={feedback.kind === 'error' ? 'alert' : 'status'} className={feedback.kind === 'error' ? 'ui-error' : 'small-note'}>{feedback.text}</p> : null}
   </section>;
 }

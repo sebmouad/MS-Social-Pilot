@@ -33,13 +33,31 @@ type Params = AdsSearchParams & { compare?: string; level?: string; sort?: strin
 type Group = AdsComparisonResult['groups'][number];
 type ObjectRow = Group['objects'][number];
 const first = (value: string | string[] | undefined) => (Array.isArray(value) ? undefined : value);
+function formatMoney(locale: string, currency: string | null | undefined, value: number | null, fallback: string) {
+  if (value === null || !Number.isFinite(value)) return fallback;
+  if (currency) {
+    try { return new Intl.NumberFormat(locale, { style: 'currency', currency, maximumFractionDigits: 2 }).format(value); } catch { /* fall back */ }
+  }
+  return `${currency ? `${currency} ` : ''}${new Intl.NumberFormat(locale, { maximumFractionDigits: 2 }).format(value)}`;
+}
+function formatIsoDay(locale: string, value: string) {
+  const day = value.slice(0, 10);
+  const parsed = Date.parse(`${day}T00:00:00Z`);
+  if (!Number.isFinite(parsed)) return value;
+  return new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeZone: 'UTC' }).format(parsed);
+}
 
 function Kpis({ group, locale, catalogs }: { group: Group; locale: AdsLocale; catalogs: Awaited<ReturnType<typeof loadAdsCopy>> }) {
   const t = (key: AdsCopyKey, values?: Record<string, string | number>) => adsText(locale, key, values, catalogs.analysis);
   const number = new Intl.NumberFormat(locale, { maximumFractionDigits: 2 });
   const show = (value: number | null) => (value === null ? t('unknown') : number.format(value));
+  const showKpi = (key: string, value: number | null) => {
+    if (value === null) return t('unknown');
+    if ((key === 'spend' || key === 'cpc' || key === 'cpm') && group.currency) return formatMoney(locale, group.currency, value, t('unknown'));
+    return `${show(value)}${key === 'ctr' ? '%' : ''}`;
+  };
   return <dl className="ads-compare-grid">{group.kpis.map(kpi => <div key={kpi.key}>
-    <dt>{adsKpiLabel(locale, kpi.key, catalogs.analysis)}</dt><dd>{kpi.key === 'spend' && group.currency ? `${group.currency} ` : ''}{show(kpi.current)}{kpi.key === 'ctr' && kpi.current !== null ? '%' : ''}</dd>
+    <dt>{adsKpiLabel(locale, kpi.key, catalogs.analysis)}</dt><dd>{showKpi(kpi.key, kpi.current)}</dd>
     <dd className="small-note">{kpi.changePercent === null ? (group.previous ? t('noChange') : t('noEarlier')) : `${t('vsEarlier', { percent: `${kpi.changePercent > 0 ? '+' : ''}${kpi.changePercent}%` })}${kpi.goodWhen === 'neutral' || kpi.direction === 'flat' ? '' : (kpi.direction === 'up') === (kpi.goodWhen === 'up') ? t('better') : t('worse')}`}</dd>
   </div>)}</dl>;
 }
@@ -98,34 +116,34 @@ async function AdsComparePage({ searchParams }: { searchParams: Promise<Params> 
     { key: 'name', label: t('col.name'), render: row => <>{row.name}<br /><span className="small-note">{row.accountName}</span>
       <ObjectPerformance copy={catalogs.analysis} row={row} locale={locale} currency={currency} compare={result.compare === 'previous'} />
       {Object.keys(row.actions).length ? <details><summary>{t('metricDetails')}</summary><p className="small-note">{t('periodActions')}</p><dl>{Object.entries(row.actions).map(([key, count]) => <div key={key}><dt>{key.replace(/_/g, ' ')}</dt><dd>{number.format(count)}</dd></div>)}</dl></details> : null}</> },
-    { key: 'spend', label: t('col.spend'), align: 'end', render: row => `${currency ? `${currency} ` : ''}${show(row.spend)}` },
+    { key: 'spend', label: t('col.spend'), align: 'end', render: row => formatMoney(locale, currency, row.spend, t('unknown')) },
     { key: 'share', label: t('col.share'), align: 'end', render: row => row.sharePercent === null ? t('unknown') : <><meter min={0} max={100} value={row.sharePercent} aria-label={t('col.share')} /> {row.sharePercent}%</> },
     { key: 'impressions', label: t('col.impressions'), align: 'end', render: row => show(row.impressions) },
     { key: 'clicks', label: t('col.clicks'), align: 'end', render: row => show(row.clicks) },
     { key: 'ctr', label: t('col.ctr'), align: 'end', render: row => row.ctr === null ? t('unknown') : `${show(row.ctr)}%` },
-    { key: 'cpc', label: t('col.cpc'), align: 'end', render: row => show(row.cpc) },
-    { key: 'cpm', label: t('col.cpm'), align: 'end', render: row => show(row.cpm) },
+    { key: 'cpc', label: t('col.cpc'), align: 'end', render: row => formatMoney(locale, currency, row.cpc, t('unknown')) },
+    { key: 'cpm', label: t('col.cpm'), align: 'end', render: row => formatMoney(locale, currency, row.cpm, t('unknown')) },
     { key: 'reach', label: t('col.reach'), align: 'end', render: row => show(row.reachPeakDay) },
   ];
   return <PageFrame module="ads"><div className="page-stack">
     {header()}
     {sidebar}
     <div className="ads-compare-status">
-      <p className="small-note" role="status">{t('rangeLine', { from: result.range.from, to: result.range.to })}{result.previousRange ? t('earlierLine', { from: result.previousRange.from, to: result.previousRange.to }) : ''}</p>
+      <p className="small-note" role="status">{t('rangeLine', { from: formatIsoDay(locale, result.range.from), to: formatIsoDay(locale, result.range.to) })}{result.previousRange ? t('earlierLine', { from: formatIsoDay(locale, result.previousRange.from), to: formatIsoDay(locale, result.previousRange.to) }) : ''}</p>
       {result.groups.length ? <ComparisonExport href={`/api/ads/compare?${exportQuery.toString()}`} locale={locale} maxBytes={outputPolicy.exportMaxBytes} /> : null}
     </div>
     {!result.groups.length ? <section className="panel empty-state"><h2>{t('emptyTitle')}</h2><p>{t('emptyHint')}</p></section> : result.groups.map(group => <section key={group.key} className="panel" aria-labelledby={`g-${group.key}`}>
       <h2 id={`g-${group.key}`}>{result.compare === 'accounts' ? group.accounts[0]?.name : `${group.currency ?? t('unknown')} · ${group.accounts.map(account => account.name).join(', ')}`}</h2>
       {!group.hasData ? <p>{t('noGroupData')}</p> : <>
         <p className="small-note">{group.freshness.status === 'stale' ? t('staleData') : ''}{group.freshness.newestFetchAt ? t('updatedAt', { when: new Date(group.freshness.newestFetchAt).toLocaleString(locale) }) : t('updateUnknown')}{group.totals ? t('dayCount', { days: group.totals.days }) : ''}
-          {group.coverage ? ` ${t('coverageLine', { from: group.coverage.firstDay, to: group.coverage.lastDay })}` : ''}</p>
+          {group.coverage ? ` ${t('coverageLine', { from: formatIsoDay(locale, group.coverage.firstDay), to: formatIsoDay(locale, group.coverage.lastDay) })}` : ''}</p>
         <ul className="small-note" aria-label={t('updatedAt', { when: '' })}>{group.accounts.map(account => <li key={account.id}>{account.lastSyncedAt ? t('syncedLine', { account: account.name, when: new Date(account.lastSyncedAt).toLocaleString(locale) }) : t('neverSynced', { account: account.name })}</li>)}</ul>
         {group.accountTotalsAvailable ? <Kpis group={group} locale={locale} catalogs={catalogs} /> : <p className="small-note">{t('noAccountTotals')}</p>}
         {group.findings.length ? <ul aria-label={t('findingsLabel')}>{group.findings.map(finding => <li key={finding.key}>{adsFindingText(locale, finding.key, finding.params, catalogs.analysis)}</li>)}</ul> : null}
         {group.accountTotalsAvailable && <TimeSeriesChart locale={locale} label={`${group.accounts.map(account => account.name).join(', ')} · ${t('col.spend')}`} format={group.currency ? { style: 'currency', currency: group.currency } : undefined}
           series={[{ id: 'spend', name: t('col.spend'), points: group.trend.map(day => ({ t: day.date, v: day.spend })) }]} />}
         {group.accountTotalsAvailable ? <details><summary>{t('dailyTrend')}</summary><DataTable caption={t('dailyCaption')} rows={group.trend} rowKey={row => row.date} columns={[
-          { key: 'date', label: t('day'), render: row => row.date }, { key: 'spend', label: t('col.spend'), align: 'end', render: row => show(row.spend) }, { key: 'clicks', label: t('col.clicks'), align: 'end', render: row => show(row.clicks) }]} /></details>
+          { key: 'date', label: t('day'), render: row => formatIsoDay(locale, row.date) }, { key: 'spend', label: t('col.spend'), align: 'end', render: row => formatMoney(locale, group.currency, row.spend, t('unknown')) }, { key: 'clicks', label: t('col.clicks'), align: 'end', render: row => show(row.clicks) }]} /></details>
           : null}
         {Object.keys(group.actions).length ? <details><summary>{t('actionsTitle')}</summary><p className="small-note">{t('actionsHint')}</p><DataTable caption={t('actionsTitle')} rows={Object.entries(group.actions)} rowKey={([key]) => key} columns={[
           { key: 'type', label: t('actionsTitle'), render: ([key]) => key.replace(/_/g, ' ') }, { key: 'count', label: t('col.count'), align: 'end', render: ([, count]) => number.format(count) }]} /></details> : null}

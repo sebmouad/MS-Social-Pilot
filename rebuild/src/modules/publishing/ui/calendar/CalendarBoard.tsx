@@ -146,7 +146,7 @@ export function CalendarBoard({ view, days, timeZone, nowIso, canCreate, filterQ
         <span className={styles.laneCorner} aria-hidden="true" />
         {days.map(day => <div key={day.key} className={styles.laneDayHead} data-today={day.isToday || undefined}><time dateTime={day.key} aria-label={day.longLabel + (day.isToday ? copy.todaySuffix : "")}>{day.label}</time>{day.isToday && <span className={styles.todayTag}>{copy.today}</span>}</div>)}
         {lanes.map(lane => [
-          <div key={lane.id} className={styles.laneHead}><span className={styles.laneDot} style={lane.color ? { background: lane.color } : undefined} aria-hidden="true" /><span className={styles.laneName}>{lane.name}</span><span className={styles.muted}>{fillContent(content.calendarLanePosts, { count: laneCount(lane.id) })}</span></div>,
+          <div key={lane.id} className={styles.laneHead}><span className={styles.laneDot} style={lane.color ? { background: lane.color } : undefined} aria-hidden="true" /><span className={styles.laneName}>{lane.name}</span><span className={styles.muted}>{fillContent(laneCount(lane.id) === 1 ? content.calendarLanePostsOne : content.calendarLanePosts, { count: laneCount(lane.id) })}</span></div>,
           ...days.map(day => {
             const dropKey = `n:${lane.id || "none"}:${day.key}`;
             return <div key={dropKey} role="group" aria-label={`${lane.name}, ${day.longLabel}`} className={styles.laneCell} data-today={day.isToday || undefined} data-past={day.isPast || undefined} data-over={over === dropKey || undefined} {...dropProps(dropKey, day.key, undefined, day.isPast)}>

@@ -106,6 +106,7 @@ export const contentCopyDefaults = {
   contentSearch: m('Search posts', 'Rechercher des publications'),
   contentSearchPlaceholder: m('Search text or first comment', 'Rechercher dans le texte ou le premier commentaire'),
   contentSearchGo: m('Search', 'Rechercher'),
+  contentCountOne: m('{count} post', '{count} publication'),
   contentCount: m('{count} posts', '{count} publications'),
   contentChannelUnavailable: m('The selected channel is not available any more, so nothing is shown for it.', 'Le canal sélectionné n’est plus disponible, donc rien n’est affiché pour lui.'),
   // ---- Content › Posts ----
@@ -139,7 +140,8 @@ export const contentCopyDefaults = {
   calendarWeekLanes: m('By channel', 'Par canal'),
   calendarLanesLabel: m('Week layout', 'Disposition de la semaine'),
   calendarNoChannel: m('No channel', 'Aucun canal'),
-  calendarLanePosts: m('{count} post(s)', '{count} publication(s)'),
+  calendarLanePostsOne: m('{count} post', '{count} publication'),
+  calendarLanePosts: m('{count} posts', '{count} publications'),
   calendarQuietHours: m('Quiet hours {start}–{end}: automatic sends pause then. Scheduled posts still go out.', 'Heures silencieuses {start}–{end} : les envois automatiques sont en pause. Les publications programmées partent quand même.'),
   calendarQuietLegend: m('Shaded hours are autopilot quiet hours', 'Les heures ombrées sont les heures silencieuses du pilote automatique'),
   calendarCapReached: m('Daily automatic-send cap reached ({count}/{cap}). Further automatic sends wait for tomorrow; scheduled posts still go out.', 'Plafond quotidien d’envois automatiques atteint ({count}/{cap}). Les prochains envois automatiques attendront demain ; les publications programmées partent quand même.'),

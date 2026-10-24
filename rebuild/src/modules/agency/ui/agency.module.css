@@ -29,10 +29,11 @@
 .tiles dd { margin: .25rem 0 0; font-size: 1.5rem; font-weight: 750; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
 .tiles dd span { color: var(--ink-soft); font-size: .75rem; font-weight: 600; letter-spacing: 0; }
 .tiles > div[data-tone="warn"] dd { color: var(--danger); }
-.actions { display: flex; flex-wrap: wrap; gap: .4rem; min-width: 9rem; }
+.actions { display: flex; flex-wrap: nowrap; align-items: center; gap: .4rem; white-space: nowrap; }
+@media (max-width: 720px) { .actions { flex-wrap: wrap; white-space: normal; } }
 .action { display: inline-grid; gap: .25rem; }
 .actionError { color: var(--danger); font-size: .75rem; max-width: 16rem; }
 .sectionHead { display: flex; align-items: center; justify-content: space-between; gap: .75rem; flex-wrap: wrap; }
 .section h3 { margin: .4rem 0 0; font-size: .9rem; }
 
-.metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr)); gap: 12px; }
+.metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap: 12px; }

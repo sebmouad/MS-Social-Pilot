@@ -21,19 +21,20 @@ export async function SectionTabs({ tab, locale, title }: { tab: SectionTabKey; 
   return <LinkTabs items={items.map(item => ({ id: item.key, href: item.href, label: sections.tabs[item.key] }))} activeId={tab} label={fill(sections.tabsLabel, { section: title })} moreLabel="…" maxVisible={items.length} />;
 }
 
-export function SettingsPage({ title, description, children, copy = settingsUiCopy, locale = 'en', tab }: {
+export function SettingsPage({ title, description, info, children, copy = settingsUiCopy, locale = 'en', tab }: {
   copy?: SettingsUiCopy;
   locale?: 'en' | 'fr';
   active: FeatureId;
   title: string;
   description: string;
+  info?: ReactNode;
   /** Tab of the section this page belongs to; omit on pages without tabs. The section list itself lives in the shell. */
   tab?: SectionTabKey;
   children: ReactNode;
 }) {
   const tabs = tab ? <SectionTabs tab={tab} locale={locale} title={title} /> : null;
   return <SettingsCopyProvider copy={copy}><div className={styles['settings-page']} data-module="settings">
-    <PageHeader module="settings" title={title} description={description} tabs={tabs} />
+    <PageHeader module="settings" title={title} description={description} info={info} tabs={tabs} />
     {children}
   </div></SettingsCopyProvider>;
 }

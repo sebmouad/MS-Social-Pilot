@@ -154,6 +154,7 @@ export const insightsPolicyDefaults: InsightsPolicy = {
     { id: '7', label: { en: 'Last 7 days', fr: '7 derniers jours' }, days: 7 },
     { id: '28', label: { en: 'Last 28 days', fr: '28 derniers jours' }, days: 28 },
     { id: '90', label: { en: 'Last 90 days', fr: '90 derniers jours' }, days: 90 },
+    { id: '365', label: { en: 'Last 365 days', fr: '365 derniers jours' }, days: 365 },
     { id: 'month', label: { en: 'This month', fr: 'Ce mois-ci' }, span: 'month' },
     { id: 'last-month', label: { en: 'Last month', fr: 'Mois dernier' }, span: 'lastMonth' },
   ],

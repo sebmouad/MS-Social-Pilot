@@ -4,15 +4,72 @@ Updated 2026-10-24: batch 18 (`dc82625b`) deployed live (`DEPLOY OK
 dc82625b`), schema **142**. Full goal remains active. Historical records
 below retain their dates; current source reconciliation wins.
 
-## UI/UX audit — 2026-10-24 (findings only, next action)
+## UI/UX audit — 2026-10-24 (Batch 1 & Batch 2 implemented, pushed)
 
 [UX_AUDIT_2026-10-24.md](UX_AUDIT_2026-10-24.md) lists the screenshot audit of
-37 routes at 1440/390 on the synthetic preview. Owner-approved next work:
-batch 1 (quick fixes) and batch 2 (consistency), in that file. Root causes are
-already confirmed for the sidebar ellipsis, Approvals overflow, Tasks/Agency
-tabs and AI studio stubs. **Nothing is implemented yet**; production is
-unchanged at `dc82625b`. Rerun the audit with `scripts/dev/ui-audit.mjs`
-against the preview (synthetic data only) after each batch.
+37 routes at 1440/390 on the synthetic preview. Owner-approved Batch 1 (quick
+fixes, items 1–6) and Batch 2 (consistency, items 7–12) are implemented,
+typechecked (`npm run typecheck` 0 errors), and verified across 26 Vitest
+suites (289 tests passed, including new `tests/ux-audit-batches-1-2.test.ts`):
+
+- **Batch 1 (items 1–6)**:
+  - **Sidebar channel names & scope highlight** (`src/styles/shell.css`,
+    `ChannelScopeList.tsx`, `AppShell.tsx`): constrained `.shell-sidebar__scroll`,
+    `.ui-scope`, `.ui-scope__list`, `.ui-scope__row`, and `.ui-scope__item` with
+    `minmax(0, 1fr)` / `min-width: 0` / `overflow: hidden` so long channel names
+    truncate with an ellipsis, and gated "All channels" `.is-selected` on
+    `scopeActive` (true only on channel-scoped areas).
+  - **Approvals board at 1440px** (`publishing/ui/approvals/approvals.module.css`):
+    responsive `repeat(auto-fit, minmax(min(100%, 260px), 1fr))` grid with a
+    2-column breakpoint at `1400px`.
+  - **Tasks & Agency tabs** (`AppShell.tsx`): `effectiveOptionalAreas` always
+    includes the active optional area (`tasks` or `agency`) so its tab is
+    rendered and selected even when `optionalAreas` omits it.
+  - **AI Studio tabs** (`AiStudioScreen.tsx`, `AiStudioPage.tsx`): disabled
+    tools are hidden from the tab bar, stale `?tab=` parameters redirect to the
+    first enabled tool, and the unavailable empty state renders only when all
+    four tools are disabled.
+  - **Plurals (EN & FR)** (`agency/ui/copy.ts`, `AgencyScreen.tsx`,
+    `publishing/ui/content-copy.ts`, `ApprovalPipeline.tsx`, `CalendarBoard.tsx`,
+    `ads/copy.ts`, `ObjectsScreen.tsx`): singular/plural keys for Agency status
+    counts (`1 channel cannot publish`, `1 failed post`, `1 overdue task`),
+    Publishing counts (`1 post`), and Ads Manage results (`1 result` / `results ·`).
+  - **Locale formatting in Ads** (`TrendChart.tsx`, `ObjectsScreen.tsx`,
+    `ads/ui/compare/CompareScreen.tsx`, `ObjectPerformance.tsx`): currency codes
+    formatted via `Intl.NumberFormat`, ISO `YYYY-MM-DD` dates formatted via
+    `Intl.DateTimeFormat`, and single-day bar chart categories formatted via
+    `dateFormatters(...).axis`.
+- **Batch 2 (items 7–12)**:
+  - **Unified period picker & Compare defaults** (`insights-config.ts`,
+    `InsightsFilterRow.tsx`, `DemographicsScreen.tsx`, `explorer-posts/Screen.tsx`,
+    `analytics/ui/compare/CompareScreen.tsx`, `ComparisonFilters.tsx`): added
+    `365` to `analytics.insightsPolicy.rangePresets`, standardized Audience,
+    Posts, and Compare onto `DateRangePicker`, and defaulted `/insights/compare`
+    to the 28-day policy window vs the preceding 28-day window.
+  - **Live search & compact Inbox saved views** (`MediaLibrary.tsx`,
+    `ManageSearchFilter.tsx`, `ObjectsScreen.tsx`, `InboxFilterRow.tsx`,
+    `InboxSavedViews.tsx`, `InboxScreen.tsx`, `inbox.module.css`): live search
+    without Apply buttons in Library, Ads Manage, and Inbox; saved views moved
+    into a `Views ▾` popover menu on the filter toolbar; default `kind=message`
+    excluded from active filter chips on initial load.
+  - **Single primary button per view** (`settings/ui/connections/row-menu.tsx`,
+    `TaskBoard.tsx`): account-card `Reconnect` changed to `variant="secondary"`
+    and duplicate toolbar `New task` hidden when the unfiltered empty state renders.
+  - **Shared select & disclosure styling** (`AddressSelect.tsx`,
+    `explorer-posts/Screen.tsx`, `settings/ui/workspace/cards.module.css`):
+    `.ui-input` styling on Insights Posts sort selects and shared chevron/hover
+    styling on the Workspace UTM `<details>` disclosure.
+  - **Disclaimers behind `ⓘ`** (`CsvExportButton.tsx`, `CampaignsScreen.tsx`,
+    `CampaignCharts.tsx`, `ConnectionsScreen.tsx`, `settings/ui/_components.tsx`):
+    export notes, per-account campaign notes, and the Channels footer note moved
+    into `InfoTip` (`ⓘ`) triggers.
+  - **Agency KPI tiles & `--mod-agency` token** (`src/styles/tokens.css`,
+    `agency.module.css`): widened `.metrics` tiles to `minmax(240px, 1fr)`,
+    kept `.actions` on a single row on desktop, and updated `--mod-agency` across
+    all themes from pink to brand-blue/indigo shades (`#185FA5` / `#85B7EB` /
+    `#534AB7` / `#378ADD`).
+- **Next**: rerun `scripts/dev/ui-audit.mjs` against the preview server and
+  deploy when in an authorized live lane.
 
 ## Batch 18 — 2026-10-24 (deployed, browser-verified)
 

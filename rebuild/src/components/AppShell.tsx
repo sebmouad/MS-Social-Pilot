@@ -94,10 +94,16 @@ export function AppShell({ children, activeModule, enabledModules, enabledFeatur
   const activeHub = installationMode ? undefined : hubForPath(pathname, activeModule);
   const activeArea = installationMode ? undefined : areaForPath(pathname, activeModule);
   const activePage = pageForPath(pathname);
+  const effectiveOptionalAreas = useMemo(
+    () => activeArea && (activeArea === "tasks" || activeArea === "agency") && !optionalAreas.includes(activeArea)
+      ? [...optionalAreas, activeArea]
+      : optionalAreas,
+    [activeArea, optionalAreas],
+  );
   const primaryAction = installationMode ? undefined : MODULES.map(module => module.primaryAction).find(action => action && enabledFeatures.includes(action.featureId) && writableFeatures.includes(action.featureId));
-  const hubOn = (hub: HubId) => hubPages(hub, enabledFeatures, optionalAreas).length > 0 || (hub === "create" && primaryAction !== undefined);
+  const hubOn = (hub: HubId) => hubPages(hub, enabledFeatures, effectiveOptionalAreas).length > 0 || (hub === "create" && primaryAction !== undefined);
   const hubs = HUB_ORDER.filter(hubOn);
-  const hubHref = (hub: HubId) => hubPages(hub, enabledFeatures, optionalAreas)[0]?.href ?? primaryAction?.href ?? "/home";
+  const hubHref = (hub: HubId) => hubPages(hub, enabledFeatures, effectiveOptionalAreas)[0]?.href ?? primaryAction?.href ?? "/home";
   const hubCount = (hub: HubId) => (BADGED_HUBS.includes(hub) ? hubCounts[hub as keyof HubCounts] : undefined) ?? 0;
   const hubName = (hub: HubId) => {
     const count = hubCount(hub);
@@ -124,12 +130,13 @@ export function AppShell({ children, activeModule, enabledModules, enabledFeatur
       if (tab.right > box.right - 32 || tab.left < box.left) strip.scrollLeft += tab.left - box.left - 16;
     }
   }, [pathname]);
-  const tabs = activeHub ? hubPages(activeHub, enabledFeatures, optionalAreas).map(page => ({ id: page.id, href: page.href, label: pageLabel(page), ...(tabCounts[page.id] ? { count: tabCounts[page.id] } : {}) })) : [];
+  const activeHubPages = activeHub ? hubPages(activeHub, enabledFeatures, effectiveOptionalAreas) : [];
+  const tabs = activeHubPages.map(page => ({ id: page.id, href: page.href, label: pageLabel(page), ...(tabCounts[page.id] ? { count: tabCounts[page.id] } : {}) }));
   const settingsTabs = settingsActive ? settingsPages.map(page => ({ id: page.id, href: page.href, label: pageLabel(page) })) : [];
   // Sections that are not tabs themselves (Library sections, post details) keep their parent tab current: the longest tab route that prefixes the path.
   const underRoute = (route: string) => pathname === route || pathname.startsWith(`${route}/`);
   const activeTabId = tabs.find(tab => tab.id === activePage?.id)?.id
-    ?? (activeHub ? hubPages(activeHub, enabledFeatures, optionalAreas).find(page => page.tabRoutes?.some(underRoute))?.id : undefined)
+    ?? activeHubPages.find(page => page.tabRoutes?.some(underRoute))?.id
     ?? [...tabs].filter(tab => underRoute(tab.href)).sort((a, b) => b.href.length - a.href.length)[0]?.id;
   const activeSettingsId = settingsTabs.find(tab => tab.id === activePage?.id)?.id
     ?? [...settingsTabs].filter(tab => underRoute(tab.href)).sort((a, b) => b.href.length - a.href.length)[0]?.id;
@@ -281,10 +288,11 @@ export function AppShell({ children, activeModule, enabledModules, enabledFeatur
       return { id: hub, href: hubHref(hub), label: copy.hubs[hub], icon: <HubGlyph id={hub} size={22} />, active: activeHub === hub, ...(count > 0 ? { badge: count, badgeLabel: hubName(hub) } : {}) };
     });
 
+  const scopeActive = !settingsActive && activeArea !== "tasks" && activeArea !== "agency";
   const sidebarScope = showScope && <section className="shell-channels" aria-label={copy.channels}>
     <h2 className="shell-section-label">{copy.channels}</h2>
     <ChannelScopeList channels={channels as ScopeChannel[]} selectedIds={scope} onSelect={onSelectChannel} onReset={() => applyScope([])} collapsedCount={policy.channelsCollapsedCount} searchThreshold={policy.channelSearchThreshold}
-      manageHref={enabledFeatures.includes("settings/connections") ? "/settings/channels" : undefined} compact={rail} busy={navigating} />
+      manageHref={enabledFeatures.includes("settings/connections") ? "/settings/channels" : undefined} compact={rail} busy={navigating} scopeActive={scopeActive} />
   </section>;
 
   const currentWorkspace = workspaces.find(entry => entry.id === workspaceId);
@@ -359,7 +367,7 @@ export function AppShell({ children, activeModule, enabledModules, enabledFeatur
       </div>
       {bottomItems.length > 0 && <BottomBar label={copy.bottomBar} items={bottomItems} create={primaryAction ? { href: primaryAction.href, label: copy.createPost } : undefined} />}
       {scopeOpen && showScope && <Drawer open title={copy.scopeSheetTitle} variant="sheet" closeLabel={copy.close} onClose={() => setScopeOpen(false)}>
-        <ChannelScopeList channels={channels as ScopeChannel[]} selectedIds={scope} onSelect={onSelectChannel} onReset={() => applyScope([])} collapsedCount={policy.channelsCollapsedCount} searchThreshold={policy.channelSearchThreshold} manageHref={enabledFeatures.includes("settings/connections") ? "/settings/channels" : undefined} busy={navigating} />
+        <ChannelScopeList channels={channels as ScopeChannel[]} selectedIds={scope} onSelect={onSelectChannel} onReset={() => applyScope([])} collapsedCount={policy.channelsCollapsedCount} searchThreshold={policy.channelSearchThreshold} manageHref={enabledFeatures.includes("settings/connections") ? "/settings/channels" : undefined} busy={navigating} scopeActive={scopeActive} />
       </Drawer>}
     </div>
   </ToastProvider></ShellCopyProvider>;

@@ -29,7 +29,7 @@ async function call<T>(url: string, body: unknown, fallback: string): Promise<{ 
 }
 
 /** Pictures, video and voice from a description, plus the advice a post gets before it is scheduled. */
-export function AiStudioScreen({ status, videos: initialVideos, channels, canCheck, copy: t, locale }: { status: MediaStatus; videos: Video[]; channels: Channel[]; canCheck: boolean; copy: ToolsCopy; locale: 'en' | 'fr' }) {
+export function AiStudioScreen({ status, videos: initialVideos, channels, canCheck, copy: t, locale, initialTab }: { status: MediaStatus; videos: Video[]; channels: Channel[]; canCheck: boolean; copy: ToolsCopy; locale: 'en' | 'fr'; initialTab?: string }) {
   const [pending, start] = useTransition();
   const [ask, dialog] = useConfirm({ title: t.confirm, cancel: t.cancel, confirm: t.confirm, danger: false });
   const [error, setError] = useState(''); const [notice, setNotice] = useState('');
@@ -171,17 +171,40 @@ export function AiStudioScreen({ status, videos: initialVideos, channels, canChe
     </div> : null}
   </div>;
 
+  const tabItems = [
+    ...(status.image.available ? [{ id: 'image', label: t.tabImage, icon: <IconPhoto size={16} />, content: imageTab }] : []),
+    ...(status.video.available ? [{ id: 'video', label: t.tabVideo, icon: <IconVideo size={16} />, count: videos.filter(video => video.status === 'working').length || undefined, content: videoTab }] : []),
+    ...(status.voice.available ? [{ id: 'voice', label: t.tabVoice, icon: <IconMicrophone size={16} />, content: voiceTab }] : []),
+    ...(canCheck ? [{ id: 'check', label: t.tabCheck, icon: <IconTrendingUp size={16} />, content: checkTab }] : []),
+  ];
+  const availableIds = tabItems.map(item => item.id);
+  const firstTabId = availableIds[0];
+  const [activeTab, setActiveTab] = useState<string | undefined>(() => (initialTab && availableIds.includes(initialTab) ? initialTab : firstTabId));
+  useEffect(() => {
+    if (activeTab && availableIds.includes(activeTab)) return;
+    setActiveTab(firstTabId);
+  }, [activeTab, availableIds, firstTabId]);
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const url = new URL(window.location.href);
+    const paramTab = url.searchParams.get('tab');
+    if (!paramTab) return;
+    if (availableIds.includes(paramTab)) {
+      setActiveTab(paramTab);
+    } else {
+      if (firstTabId) url.searchParams.set('tab', firstTabId);
+      else url.searchParams.delete('tab');
+      window.history.replaceState(window.history.state, '', url);
+      setActiveTab(firstTabId);
+    }
+  }, [availableIds, firstTabId]);
+
   return <section className={styles.root} data-module="publishing" aria-busy={pending}>
     <PageHeader module="publishing" title={t.title} description={t.intro} />
     {budgetNote ? <p className={styles.budget}>{budgetNote}</p> : null}
     <p ref={live} tabIndex={-1} role="status" className={notice ? styles.noticeOn : styles.noticeOff}>{notice}</p>
     {error ? <p role="alert" className={styles.error}>{error}</p> : null}
-    <Tabs label={t.title} items={[
-      { id: 'image', label: t.tabImage, icon: <IconPhoto size={16} />, content: imageTab },
-      { id: 'video', label: t.tabVideo, icon: <IconVideo size={16} />, count: videos.filter(video => video.status === 'working').length || undefined, content: videoTab },
-      { id: 'voice', label: t.tabVoice, icon: <IconMicrophone size={16} />, content: voiceTab },
-      { id: 'check', label: t.tabCheck, icon: <IconTrendingUp size={16} />, content: checkTab },
-    ]} />
+    {tabItems.length === 0 ? unavailable : <Tabs label={t.title} items={tabItems} value={activeTab} onChange={setActiveTab} />}
     {dialog}
   </section>;
 }

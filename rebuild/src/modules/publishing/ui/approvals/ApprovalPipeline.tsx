@@ -65,7 +65,7 @@ export function ApprovalPipeline({ stages, locale = 'en', timeZone, viewerId, ca
   const { copy: content } = useContent();
   return <div className={styles.board} role="group" aria-label={content.approvalsBoardLabel}>
     {stages.map(stage => <section key={stage.id} className={styles.stage} aria-labelledby={`pipeline-${stage.id}`}>
-      <div className={styles.stageHead}><h2 id={`pipeline-${stage.id}`}>{stage.title}</h2><span className={styles.stageCount}>{fillContent(content.contentCount, { count: stage.total.toLocaleString(locale) })}</span></div>
+      <div className={styles.stageHead}><h2 id={`pipeline-${stage.id}`}>{stage.title}</h2><span className={styles.stageCount}>{fillContent(stage.total === 1 ? content.contentCountOne : content.contentCount, { count: stage.total.toLocaleString(locale) })}</span></div>
       {stage.rows.length ? <ul className={styles.stageList}>{stage.rows.map(row => <li key={row.id}>
         {stage.id === 'review'
           ? <><ReviewCard row={row} locale={locale} timeZone={timeZone} canReview={canReview} reviewAction={reviewAction} /><Thread row={row} timeZone={timeZone} viewerId={viewerId} canWriteNotes={canWriteNotes} canModerateNotes={canModerateNotes} /></>

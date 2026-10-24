@@ -26,9 +26,9 @@ function Status({ item, locale = 'en', copy }: { item: AgencyWorkspace; copy?: C
   const metrics = item.metrics;
   return <>
     {item.needsAttention ? <Badge tone="warning">{t("Needs attention")}</Badge> : <Badge tone="success">{t("Healthy")}</Badge>}
-    {metrics && (metrics.disconnected ?? 0) > 0 && <span className={styles.meta}>{metrics.disconnected} {t("of")} {metrics.channels} {t("channels cannot publish")}</span>}
-    {metrics && (metrics.failed ?? 0) > 0 && <span className={styles.meta}>{metrics.failed} {t("failed posts")}</span>}
-    {metrics && (metrics.overdueTasks ?? 0) > 0 && <span className={styles.meta}>{metrics.overdueTasks} {t("overdue tasks")}</span>}
+    {metrics && (metrics.disconnected ?? 0) > 0 && <span className={styles.meta}>{metrics.disconnected} {t("of")} {metrics.channels} {t(metrics.channels === 1 ? "channel cannot publish" : "channels cannot publish")}</span>}
+    {metrics && (metrics.failed ?? 0) > 0 && <span className={styles.meta}>{metrics.failed} {t(metrics.failed === 1 ? "failed post" : "failed posts")}</span>}
+    {metrics && (metrics.overdueTasks ?? 0) > 0 && <span className={styles.meta}>{metrics.overdueTasks} {t(metrics.overdueTasks === 1 ? "overdue task" : "overdue tasks")}</span>}
   </>;
 }
 

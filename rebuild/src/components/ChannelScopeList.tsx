@@ -23,10 +23,12 @@ type ChannelScopeListProps = {
   compact?: boolean;
   /** Disabled while a navigation is pending. */
   busy?: boolean;
+  /** Whether the current page is filtered by the channel scope. */
+  scopeActive?: boolean;
 };
 
 /** Channel list that scopes every channel-aware page. Click = only this channel; Ctrl/⌘-click or the checkbox adds or removes one. */
-export function ChannelScopeList({ channels, selectedIds, onSelect, onReset, collapsedCount, searchThreshold, manageHref, compact = false, busy = false }: ChannelScopeListProps) {
+export function ChannelScopeList({ channels, selectedIds, onSelect, onReset, collapsedCount, searchThreshold, manageHref, compact = false, busy = false, scopeActive = true }: ChannelScopeListProps) {
   const copy = useShellCopy();
   const [showAll, setShowAll] = useState(false);
   const [query, setQuery] = useState("");
@@ -52,7 +54,7 @@ export function ChannelScopeList({ channels, selectedIds, onSelect, onReset, col
   return <div className={`ui-scope${compact ? " is-compact" : ""}`}>
     {searchable && !compact && <label className="ui-scope__search"><IconSearch size={15} aria-hidden="true" /><input type="search" aria-label={copy.searchChannels} placeholder={copy.searchChannels} value={query} autoComplete="off" onChange={event => setQuery(event.target.value)} /></label>}
     <ul className="ui-scope__list" onKeyDown={onKey}>
-      <li><button type="button" data-scope-item className={`ui-scope__item${allSelected ? " is-selected" : ""}`} aria-pressed={allSelected} disabled={busy} onClick={onReset} title={compact ? copy.allChannels : undefined}>
+      <li><button type="button" data-scope-item className={`ui-scope__item${allSelected && scopeActive ? " is-selected" : ""}`} aria-pressed={allSelected} disabled={busy} onClick={onReset} title={compact ? copy.allChannels : undefined}>
         <span className="ui-scope__all" aria-hidden="true">{channels.length}</span>
         <span className="ui-scope__name">{copy.allChannels}</span>
       </button></li>
