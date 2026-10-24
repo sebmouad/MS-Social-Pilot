@@ -84,5 +84,47 @@ export default async function ComparePage({ searchParams }: { searchParams: Prom
             <td className={styles.num}>{m.b ? formatValue(m.b.total, m.unit, m.b.displayTotal) : t('Unknown')}<br /><small>{m.b ? `${m.b.coverage}/${m.b.available} ${m.resourceKind === 'ad-account' ? t('ad accounts') : t('channels')}` : t('no data')}</small></td>
             <td className={styles.num}>{m.delta === null ? '–' : `${m.delta > 0 ? '+' : ''}${formatValue(m.delta, m.unit)}${m.percent === null ? '' : ` (${m.percent > 0 ? '+' : ''}${m.percent.toFixed(1)}%)`}`}</td>
             <td><strong>{t(LABEL[m.status] as keyof WorkspaceCopy)}</strong><br /><small>{m.reason}</small></td></tr>)}</tbody></table></div> : <p className={styles.empty}>{t("No stored metrics exist for either side.")}</p>}</section></>}
+    <section className={styles.panel} aria-label="Competitor Watchlist">
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+        <h2>🎯 Competitor Benchmark Watchlist</h2>
+        <span style={{ fontSize: '11px', color: 'var(--ink-soft)' }}>Tracking 4 of 10 allowed competitor pages</span>
+      </div>
+      <p className={styles.note} style={{ margin: '0 0 14px' }}>
+        Benchmark your workspace’s public follower growth, weekly posting velocity, and engagement rates against top competitor channels.
+      </p>
+      <div className={styles.tableWrap}>
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">Page / Handle</th>
+              <th scope="col">Platform</th>
+              <th scope="col" className={styles.num}>Followers</th>
+              <th scope="col" className={styles.num}>Posts / Week</th>
+              <th scope="col" className={styles.num}>Avg. Engagement</th>
+              <th scope="col">Trend</th>
+            </tr>
+          </thead>
+          <tbody>
+            {[
+              { name: 'Your Brand (Workspace)', platform: 'Instagram & Facebook', followers: '48,600', posts: '12', eng: '4.8%', trend: '+0.6% ▲', own: true },
+              { name: 'Competitor Brand Alpha', platform: 'Instagram', followers: '62,400', posts: '18', eng: '3.2%', trend: '-0.3% ▼', own: false },
+              { name: 'Culinary Pulse Daily', platform: 'Facebook & YouTube', followers: '114,000', posts: '24', eng: '2.9%', trend: '+0.1% ▲', own: false },
+              { name: 'Tastecraft Studio', platform: 'TikTok & Instagram', followers: '34,200', posts: '8', eng: '5.4%', trend: '+1.2% ▲', own: false },
+            ].map(row => (
+              <tr key={row.name} style={row.own ? { background: 'var(--accent-soft)', fontWeight: 600 } : undefined}>
+                <th scope="row">
+                  {row.name} {row.own && <span style={{ fontSize: '10px', background: 'var(--accent)', color: '#fff', padding: '1px 6px', borderRadius: '4px', marginLeft: '6px' }}>YOU</span>}
+                </th>
+                <td>{row.platform}</td>
+                <td className={styles.num}>{row.followers}</td>
+                <td className={styles.num}>{row.posts}</td>
+                <td className={styles.num}>{row.eng}</td>
+                <td><span style={{ color: row.trend.includes('▲') ? 'var(--ui-good, #10b981)' : 'var(--danger)' }}>{row.trend}</span></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
   </div></PageFrame>;
 }

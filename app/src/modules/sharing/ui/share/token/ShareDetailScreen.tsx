@@ -39,6 +39,22 @@ export default async function SharePage({ params, searchParams }: { params: Prom
     <header className={styles.header}>{link.workspaceLogoUrl && /* eslint-disable-next-line @next/next/no-img-element */ <img className={styles.logo} src={link.workspaceLogoUrl} alt="" referrerPolicy="no-referrer" />}<strong>{link.workspaceName}</strong><Badge tone="brand">{t.share.kinds[link.kind] ?? link.kind}</Badge></header>
     <div className={styles.body}>
       <PageHeader title={link.title} description={[copy.intro, link.description].filter(Boolean).join(' ') || undefined} />
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', padding: '12px 16px', background: 'var(--surface-raised)', border: '1px solid var(--line-subtle)', borderRadius: 'var(--radius-md)', marginBottom: '4px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{ fontSize: '16px' }}>🔐</span>
+          <div>
+            <strong style={{ fontSize: '13px', display: 'block' }}>Passwordless Client Review Room</strong>
+            <span style={{ fontSize: '11px', color: 'var(--ink-soft)' }}>
+              Secure magic link access · Review upcoming posts and provide timestamped approval without logging in.
+            </span>
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
+          <span style={{ fontSize: '11px', fontWeight: 650, padding: '4px 10px', borderRadius: '999px', background: 'var(--accent-soft)', color: 'var(--accent)' }}>
+            {view.posts.filter(p => p.status === 'planned').length} Pending Review
+          </span>
+        </div>
+      </div>
       {link.kind === 'portal' && <nav aria-label={t.share.sections} className={styles.tabs}>
         <a aria-current={mode === 'review' ? 'page' : undefined} href="?tab=review"><IconChecklist size={16} aria-hidden="true" />{t.share.tabReview}</a>
         <a aria-current={mode === 'calendar' ? 'page' : undefined} href="?tab=calendar"><IconCalendarEvent size={16} aria-hidden="true" />{t.share.tabCalendar}</a>

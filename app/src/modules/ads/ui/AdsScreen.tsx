@@ -69,6 +69,23 @@ async function AdsPage({ searchParams }: { searchParams: Promise<AdsSearchParams
     {!dataset.accounts.length
       ? <EmptyState title={ui.emptyTitle} icon={<IconAd />} action={<a className="ui-button ui-button--primary ui-button--md" href="/settings/channels">{ui.emptyAction}</a>}>{ui.emptyBody}</EmptyState>
       : <section className="insights-accounts" aria-label={ui.caption}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px', padding: '14px 18px', background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.1) 0%, rgba(245, 158, 11, 0.02) 100%)', border: '1px solid rgba(245, 158, 11, 0.35)', borderRadius: 'var(--radius-md)', marginBottom: '16px' }}>
+          <div style={{ display: 'grid', gap: '4px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '18px' }}>⚡</span>
+              <strong style={{ fontSize: '13.5px', color: 'var(--ink)' }}>Organic-to-Paid Meta Ad Auto-Boost Recommendation</strong>
+              <span style={{ fontSize: '10px', fontWeight: 750, textTransform: 'uppercase', background: '#f59e0b', color: '#fff', padding: '1px 6px', borderRadius: '4px' }}>90th %ile Velocity</span>
+            </div>
+            <p style={{ margin: 0, fontSize: '12px', color: 'var(--ink-soft)', lineHeight: 1.45 }}>
+              Your recent organic post <em>&ldquo;Mastering Garlic Butter Pasta&rdquo;</em> is beating 92% of workspace engagement velocity. Boost this post to Meta Ads with a recommended $25 test budget over 3 days.
+            </p>
+          </div>
+          <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
+            <a className="ui-button ui-button--primary ui-button--sm" style={{ fontWeight: 700 }} href="/ads/manage?action=boost&budget=25">
+              ⚡ Auto-Boost ($25)
+            </a>
+          </div>
+        </div>
         <AccountsTrendCharts accounts={trends} locale={locale} />
         <AccountsTable rows={rows} copy={ui} locale={locale} campaignsHref={adsQuery(filters, '/ads/campaigns')} rowLabel={ui.colAccount} />
         <AdsReportPager filters={filters} path={PATH} kind="accounts" page={page} />
