@@ -6,7 +6,7 @@ import { CONFIG_REGISTRY } from '@/lib/config/registry';
 import { prisma } from '@/server/data';
 import { runtimeConfig, runtimeSecret } from '@/server/config/store';
 import { cronMatches } from '@/server/jobs/cron';
-import { REBUILD_WORKER_PREFIX } from '@/server/jobs/identity';
+import { WORKER_PREFIX } from '@/server/jobs/identity';
 import { requireActiveRoot } from './operations';
 import type { HealthStatus, ModuleHealthDeclaration } from './module-health-types';
 import { OperationError } from '@/lib/operation-error';
@@ -62,7 +62,7 @@ export async function loadRootModuleHealth(actorId: string, scopeId?: string) {
     })) : [];
     const jobs = scope.health.jobHistory ? await Promise.all(scope.jobs.map(async job => {
       try {
-        const run = await prisma.rebuildSyncRun.findFirst({ where: { job: job.name, owner: { startsWith: REBUILD_WORKER_PREFIX } }, orderBy: [{ startedAt: 'desc' }, { id: 'desc' }], select: { id: true, startedAt: true, finishedAt: true, outcome: true } });
+        const run = await prisma.syncRun.findFirst({ where: { job: job.name, owner: { startsWith: WORKER_PREFIX } }, orderBy: [{ startedAt: 'desc' }, { id: 'desc' }], select: { id: true, startedAt: true, finishedAt: true, outcome: true } });
         return { name: job.name, ...jobHealth(run, enabled ? await runtimeConfig(job.configKey) : null, now, grace, lookbackMinutes) };
       } catch { return { name: job.name, ...jobHealth(null, null, now, grace, lookbackMinutes) }; }
     })) : [];
@@ -70,12 +70,12 @@ export async function loadRootModuleHealth(actorId: string, scopeId?: string) {
       try {
         const count = name === 'scheduledPosts' ? await prisma.post.count({ where: { status: 'scheduled', scheduledAt: { lte: now }, targets: { some: { status: 'pending' } } } })
           : name === 'publicationAttempts' ? await prisma.publicationAttempt.count({ where: { ...(scope.kind === 'platform' ? { provider: scope.id.slice('platform:'.length) } : {}), state: { in: ['started', 'uncertain', 'submitted', 'receipt_recorded'] } } })
-          : await prisma.rebuildWorkspaceExport.count({ where: { status: { in: ['requested', 'running'] }, expiresAt: { gt: now } } });
+          : await prisma.workspaceExport.count({ where: { status: { in: ['requested', 'running'] }, expiresAt: { gt: now } } });
         // A count alone does not prove failure without an age/SLA policy.
         return { name, count, status: count === 0 ? 'pass' as HealthStatus : 'unknown' as HealthStatus };
       } catch { return { name, count: null, status: 'unknown' as HealthStatus }; }
     }));
-    const worker = scope.kind === 'shared' ? await prisma.$queryRaw<Array<{ seenAt: Date }>>`SELECT "seenAt" FROM worker_heartbeats WHERE LEFT("workerId", ${REBUILD_WORKER_PREFIX.length}::int) = ${REBUILD_WORKER_PREFIX} ORDER BY "seenAt" DESC LIMIT 1`.then(rows => ({ seenAt: rows[0]?.seenAt.toISOString() ?? null, status: !rows[0] || rows[0].seenAt > now ? 'unknown' as HealthStatus : now.getTime() - rows[0].seenAt.getTime() > grace * 1000 ? 'fail' as HealthStatus : 'pass' as HealthStatus })).catch(() => ({ seenAt: null, status: 'unknown' as HealthStatus })) : null;
+    const worker = scope.kind === 'shared' ? await prisma.$queryRaw<Array<{ seenAt: Date }>>`SELECT "seenAt" FROM worker_heartbeats WHERE LEFT("workerId", ${WORKER_PREFIX.length}::int) = ${WORKER_PREFIX} ORDER BY "seenAt" DESC LIMIT 1`.then(rows => ({ seenAt: rows[0]?.seenAt.toISOString() ?? null, status: !rows[0] || rows[0].seenAt > now ? 'unknown' as HealthStatus : now.getTime() - rows[0].seenAt.getTime() > grace * 1000 ? 'fail' as HealthStatus : 'pass' as HealthStatus })).catch(() => ({ seenAt: null, status: 'unknown' as HealthStatus })) : null;
     const statuses = [...(worker ? [worker.status] : []), ...configuration.map(c => c.status), ...jobs.flatMap(j => [j.freshness, j.outcome]), ...queues.map(q => q.status)];
     const status: HealthStatus = statuses.includes('fail') ? 'fail' : !statuses.length || statuses.includes('unknown') || !jobs.length || !queues.length ? 'unknown' : 'pass';
     return { id: scope.id, kind: scope.kind, title: scope.title, status, available, configuration, jobs, queues, worker, durationMs: Math.round(performance.now() - from) };

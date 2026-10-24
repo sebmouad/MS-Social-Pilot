@@ -24,7 +24,7 @@ export async function reconcileInboxDeletions(now = new Date()): Promise<JobSumm
   const idle = new Date(now.getTime() - minAge);
   const oldest = new Date(now.getTime() - maxAge);
   const rows = await prisma.$queryRaw<Candidate[]>`SELECT id, "workspaceId", "targetId", provider, "remoteId", "localItemId", state, "actorId"
-    FROM rebuild_inbox_deletions
+    FROM inbox_deletions
     WHERE (state = 'remote_confirmed' OR (state IN ('started', 'uncertain') AND "createdAt" >= ${oldest}::timestamp)) AND "updatedAt" <= ${idle}::timestamp
     ORDER BY "updatedAt" ASC, id ASC LIMIT ${batch}`;
   for (const row of rows) {
@@ -33,7 +33,7 @@ export async function reconcileInboxDeletions(now = new Date()): Promise<JobSumm
       const outcome = await withWorkspaceOperation(row.workspaceId, async () => withInboxChannelOperation(row.workspaceId, row.targetId, async signal => {
         // Recheck inside the channel lock: a manual action may have settled it, and a live dispatch holds this lock.
         const fresh = (await prisma.$queryRaw<Candidate[]>`SELECT id, "workspaceId", "targetId", provider, "remoteId", "localItemId", state, "actorId"
-          FROM rebuild_inbox_deletions WHERE id = ${row.id} AND "workspaceId" = ${row.workspaceId}`)[0];
+          FROM inbox_deletions WHERE id = ${row.id} AND "workspaceId" = ${row.workspaceId}`)[0];
         if (!fresh || !['started', 'uncertain', 'remote_confirmed'].includes(fresh.state)) return 'skipped' as const;
         const actor = { userId: fresh.actorId, workspaceId: fresh.workspaceId };
         if (fresh.state === 'remote_confirmed') { await finish(fresh, actor, { source: 'reconciliation' }); return 'finalized' as const; }
@@ -51,12 +51,12 @@ export async function reconcileInboxDeletions(now = new Date()): Promise<JobSumm
         signal.throwIfAborted();
         if (presence !== 'absent') {
           // Rotate fairly through held rows; no state change, no resend.
-          await prisma.$executeRaw`UPDATE rebuild_inbox_deletions SET "updatedAt" = CURRENT_TIMESTAMP WHERE id = ${fresh.id} AND "workspaceId" = ${fresh.workspaceId} AND state = ${fresh.state}`;
+          await prisma.$executeRaw`UPDATE inbox_deletions SET "updatedAt" = CURRENT_TIMESTAMP WHERE id = ${fresh.id} AND "workspaceId" = ${fresh.workspaceId} AND state = ${fresh.state}`;
           return 'held' as const;
         }
         const [timeout, maxWait] = await Promise.all([runtimeConfig('inbox.workflowTransactionTimeoutMs'), runtimeConfig('inbox.workflowTransactionMaxWaitMs')]);
         const confirmed = await prisma.$transaction(async tx => {
-          const count = await tx.$executeRaw`UPDATE rebuild_inbox_deletions SET state = 'remote_confirmed', reason = 'local_pending', "remoteConfirmedAt" = CURRENT_TIMESTAMP, "updatedAt" = CURRENT_TIMESTAMP
+          const count = await tx.$executeRaw`UPDATE inbox_deletions SET state = 'remote_confirmed', reason = 'local_pending', "remoteConfirmedAt" = CURRENT_TIMESTAMP, "updatedAt" = CURRENT_TIMESTAMP
             WHERE id = ${fresh.id} AND "workspaceId" = ${fresh.workspaceId} AND state IN ('started', 'uncertain')`;
           if (count !== 1) return false;
           await tx.$executeRaw`INSERT INTO root_activities (id, "actorId", action, detail, "createdAt") VALUES (${randomUUID()}, ${fresh.actorId}, 'inbox.comment_deletion_reconciled', ${JSON.stringify({ workspaceId: fresh.workspaceId, targetId: fresh.targetId, itemId: fresh.localItemId, operationId: fresh.id, previousState: fresh.state, evidence: 'absent_from_post_listing' })}::jsonb, NOW())`;

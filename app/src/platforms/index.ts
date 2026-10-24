@@ -44,6 +44,23 @@ export const PLATFORM_CONFIG = [...LINKEDIN_CONFIG, ...PINTEREST_CONFIG, ...BLUE
 
 export type PlatformId = (typeof PLATFORM_MODULES)[number]['id'];
 
+export const PRIMARY_PLATFORM_IDS: readonly PlatformId[] = ['facebook', 'instagram'] as const;
+
+/**
+ * Canonical capability matrix for all 11 installed social connectors.
+ * Primary connectors (Facebook, Instagram) are enabled by default; secondary/beta connectors
+ * default to disabled and can be toggled live by Root Admin in `/root/platforms` or `/root/config`.
+ */
+export const PLATFORM_CAPABILITY_MATRIX = PLATFORM_MODULES.map((m) => ({
+  id: m.id,
+  name: m.name,
+  tier: (PRIMARY_PLATFORM_IDS.includes(m.id as PlatformId) ? 'primary' : 'secondary') as 'primary' | 'secondary',
+  enabledKey: m.enabledKey,
+  requiredSettings: m.requiredSettings,
+  channelKinds: m.channelKinds,
+  capabilities: m.capabilities,
+}));
+
 export function platformModule(id: string): PlatformModule | undefined {
   return (PLATFORM_MODULES as readonly PlatformModule[]).find((module) => module.id === id);
 }

@@ -26,7 +26,7 @@ export const instagramContainerJournal: InstagramJournalFactory = request => {
     const id = `instagram:${operationId}:${phase}:${ordinal}`;
     await prisma.$transaction(async tx => {
       const parent = await tx.$queryRaw<Array<{ id: string }>>`
-        SELECT a.id FROM rebuild_publication_attempts a
+        SELECT a.id FROM publication_attempts a
         JOIN targets t ON t.id=a."targetId" AND t."workspaceId"=a."workspaceId"
         JOIN social_accounts s ON s.id=t."socialAccountId" AND s."workspaceId"=t."workspaceId"
         WHERE a.id=${operationId} AND a.provider='instagram' AND a.state='started'
@@ -42,7 +42,7 @@ export const instagramContainerJournal: InstagramJournalFactory = request => {
         const prior = await tx.$queryRaw<Array<{ blocked: boolean }>>`
           SELECT EXISTS (
             SELECT 1 FROM root_activities r
-            JOIN rebuild_publication_attempts a ON a.id=r.detail->>'operationId'
+            JOIN publication_attempts a ON a.id=r.detail->>'operationId'
             WHERE r.action='instagram.publication_step' AND r.detail->>'phase'='publish'
               AND r.detail->>'state' IN ('started','recorded')
               AND a."workspaceId"=${context!.workspaceId} AND a."postTargetId"=${context!.postTargetId}

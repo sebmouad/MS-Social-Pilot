@@ -34,8 +34,8 @@ export async function assertFacebookNativeSettled(
   const rows = targetIds === undefined
     ? await tx.$queryRaw<Array<{ operationId: string }>>`
       SELECT j."operationId"
-      FROM rebuild_facebook_native_journal j
-      JOIN rebuild_publication_attempts a
+      FROM facebook_native_journal j
+      JOIN publication_attempts a
         ON a."workspaceId" = j."workspaceId" AND a.id = j."operationId"
       WHERE j."workspaceId" = ${workspaceId}
         AND a.provider = 'facebook'
@@ -45,7 +45,7 @@ export async function assertFacebookNativeSettled(
           OR (j.state = 'confirmed' AND NOT j.conflicted
             AND a.state IN ('receipt_recorded', 'projected')
             AND j."remoteId" IS NOT NULL AND a."remotePostId" = j."remoteId"
-            AND EXISTS (SELECT 1 FROM rebuild_facebook_native_status_proofs p
+            AND EXISTS (SELECT 1 FROM facebook_native_status_proofs p
               WHERE p."workspaceId" = j."workspaceId" AND p."operationId" = j."operationId"
                 AND p."payloadHash" = j."payloadHash" AND p.format = j.format
                 AND p."remoteTargetId" = j."remoteTargetId" AND p."remoteId" = j."remoteId"
@@ -54,8 +54,8 @@ export async function assertFacebookNativeSettled(
       LIMIT 1`
     : await tx.$queryRaw<Array<{ operationId: string }>>`
       SELECT j."operationId"
-      FROM rebuild_facebook_native_journal j
-      JOIN rebuild_publication_attempts a
+      FROM facebook_native_journal j
+      JOIN publication_attempts a
         ON a."workspaceId" = j."workspaceId" AND a.id = j."operationId"
       WHERE j."workspaceId" = ${workspaceId}
         AND j."targetId" = ANY(${[...targetIds]}::text[])
@@ -66,7 +66,7 @@ export async function assertFacebookNativeSettled(
           OR (j.state = 'confirmed' AND NOT j.conflicted
             AND a.state IN ('receipt_recorded', 'projected')
             AND j."remoteId" IS NOT NULL AND a."remotePostId" = j."remoteId"
-            AND EXISTS (SELECT 1 FROM rebuild_facebook_native_status_proofs p
+            AND EXISTS (SELECT 1 FROM facebook_native_status_proofs p
               WHERE p."workspaceId" = j."workspaceId" AND p."operationId" = j."operationId"
                 AND p."payloadHash" = j."payloadHash" AND p.format = j.format
                 AND p."remoteTargetId" = j."remoteTargetId" AND p."remoteId" = j."remoteId"
@@ -80,18 +80,18 @@ export async function assertFacebookNativeSettled(
   // (started or uncertain) also holds removal; the table exists only once its
   // additive migration is applied, so absence means there is nothing to hold.
   const present = await tx.$queryRaw<{ present: boolean }[]>`
-    SELECT to_regclass('rebuild_facebook_native_schedule_changes') IS NOT NULL AS present`;
+    SELECT to_regclass('facebook_native_schedule_changes') IS NOT NULL AS present`;
   if (present[0]?.present !== true) return;
   const pending = targetIds === undefined
     ? await tx.$queryRaw<Array<{ changeId: string }>>`
       SELECT c."changeId"
-      FROM rebuild_facebook_native_schedule_changes c
+      FROM facebook_native_schedule_changes c
       WHERE c."workspaceId" = ${workspaceId} AND c.state IN ('started', 'uncertain')
       LIMIT 1`
     : await tx.$queryRaw<Array<{ changeId: string }>>`
       SELECT c."changeId"
-      FROM rebuild_facebook_native_schedule_changes c
-      JOIN rebuild_facebook_native_journal j
+      FROM facebook_native_schedule_changes c
+      JOIN facebook_native_journal j
         ON j."workspaceId" = c."workspaceId" AND j."operationId" = c."publishOperationId"
       WHERE c."workspaceId" = ${workspaceId} AND j."targetId" = ANY(${[...targetIds]}::text[])
         AND c.state IN ('started', 'uncertain')
@@ -109,13 +109,13 @@ export async function assertFacebookNativeResolution(
 ): Promise<void> {
   const rows = await tx.$queryRaw<NativeJournalResolutionRow[]>`
     SELECT j.state, j."knownIds", j."remoteId", j.conflicted, a.provider AS "parentProvider",
-      EXISTS (SELECT 1 FROM rebuild_facebook_native_status_proofs p
+      EXISTS (SELECT 1 FROM facebook_native_status_proofs p
         WHERE p."workspaceId" = j."workspaceId" AND p."operationId" = j."operationId"
           AND p."payloadHash" = j."payloadHash" AND p.format = j.format
           AND p."remoteTargetId" = j."remoteTargetId" AND p."remoteId" = j."remoteId"
           AND p.accepted AND p.outcome = 'published' AND p."appliedRevision" = j.revision) AS "hasAcceptedProof"
-    FROM rebuild_facebook_native_journal j
-    LEFT JOIN rebuild_publication_attempts a
+    FROM facebook_native_journal j
+    LEFT JOIN publication_attempts a
       ON a."workspaceId" = j."workspaceId" AND a.id = j."operationId"
     WHERE j."workspaceId" = ${workspaceId} AND j."operationId" = ${operationId}
     LIMIT 1 FOR UPDATE OF j`;
@@ -193,8 +193,8 @@ export async function readFacebookNativeEvidence(operationId?: string, resultCap
     ? await prisma.$queryRaw<NativeJournalEvidenceRow[]>`
       SELECT j."operationId", j."workspaceId", j."targetId", j."remoteTargetId", j.format, j.state,
         j."remoteId", j."knownIds", j.steps, j.revision, j.conflicted, j."createdAt", j."updatedAt", a.state AS "parentState", a."remotePostId" AS "parentRemoteId"
-      FROM rebuild_facebook_native_journal j
-      JOIN rebuild_publication_attempts a
+      FROM facebook_native_journal j
+      JOIN publication_attempts a
         ON a."workspaceId" = j."workspaceId" AND a.id = j."operationId"
       WHERE a.provider = 'facebook'
       ORDER BY j."updatedAt" DESC, j."operationId" DESC
@@ -202,8 +202,8 @@ export async function readFacebookNativeEvidence(operationId?: string, resultCap
     : await prisma.$queryRaw<NativeJournalEvidenceRow[]>`
       SELECT j."operationId", j."workspaceId", j."targetId", j."remoteTargetId", j.format, j.state,
         j."remoteId", j."knownIds", j.steps, j.revision, j.conflicted, j."createdAt", j."updatedAt", a.state AS "parentState", a."remotePostId" AS "parentRemoteId"
-      FROM rebuild_facebook_native_journal j
-      JOIN rebuild_publication_attempts a
+      FROM facebook_native_journal j
+      JOIN publication_attempts a
         ON a."workspaceId" = j."workspaceId" AND a.id = j."operationId"
       WHERE a.provider = 'facebook' AND j."operationId" = ${operationId}
       ORDER BY j."updatedAt" DESC, j."operationId" DESC
@@ -274,12 +274,12 @@ export async function readFacebookNativeProofEvidence(operationId?: string, resu
     ? await prisma.$queryRaw<NativeStatusProofEvidenceRow[]>`
       SELECT p.id, p."operationId", p."workspaceId", p.format, p."remoteTargetId", p."remoteId", p."actorId",
         p.outcome, p.detail, p."observedRevision", p."appliedRevision", p.accepted, p."observedAt", p."createdAt"
-      FROM rebuild_facebook_native_status_proofs p
+      FROM facebook_native_status_proofs p
       ORDER BY p."createdAt" DESC, p.id DESC LIMIT ${limit + 1}`
     : await prisma.$queryRaw<NativeStatusProofEvidenceRow[]>`
       SELECT p.id, p."operationId", p."workspaceId", p.format, p."remoteTargetId", p."remoteId", p."actorId",
         p.outcome, p.detail, p."observedRevision", p."appliedRevision", p.accepted, p."observedAt", p."createdAt"
-      FROM rebuild_facebook_native_status_proofs p
+      FROM facebook_native_status_proofs p
       WHERE p."operationId" = ${operationId}
       ORDER BY p."createdAt" DESC, p.id DESC LIMIT ${limit + 1}`;
   const items = rows.slice(0, limit).map(row => ({
@@ -329,17 +329,17 @@ export async function readFacebookNativeScheduleEvidence(operationId?: string, r
   if (typeof configuredLimit !== 'number' || !Number.isSafeInteger(configuredLimit) || configuredLimit < 1) throw unavailable();
   const limit = Math.min(configuredLimit, resultCap ?? configuredLimit);
   const present = await prisma.$queryRaw<{ present: boolean }[]>`
-    SELECT to_regclass('rebuild_facebook_native_schedule_changes') IS NOT NULL AS present`;
+    SELECT to_regclass('facebook_native_schedule_changes') IS NOT NULL AS present`;
   const rows = present[0]?.present !== true ? [] : operationId === undefined
     ? await prisma.$queryRaw<NativeScheduleChangeEvidenceRow[]>`
       SELECT c."changeId", c."workspaceId", c."publishOperationId", c.kind, c."scheduledUnix", c."remoteId",
         c."remoteTargetId", c.revision, c.state, c."createdAt", c."updatedAt"
-      FROM rebuild_facebook_native_schedule_changes c
+      FROM facebook_native_schedule_changes c
       ORDER BY c."updatedAt" DESC, c."changeId" DESC LIMIT ${limit + 1}`
     : await prisma.$queryRaw<NativeScheduleChangeEvidenceRow[]>`
       SELECT c."changeId", c."workspaceId", c."publishOperationId", c.kind, c."scheduledUnix", c."remoteId",
         c."remoteTargetId", c.revision, c.state, c."createdAt", c."updatedAt"
-      FROM rebuild_facebook_native_schedule_changes c
+      FROM facebook_native_schedule_changes c
       WHERE c."publishOperationId" = ${operationId}
       ORDER BY c."updatedAt" DESC, c."changeId" DESC LIMIT ${limit + 1}`;
   const items = rows.slice(0, limit).map(row => ({

@@ -119,7 +119,7 @@ export async function removeWorkspaceStorage(mediaRoot: string, workspaceId: str
   validateWorkspaceId(workspaceId);
   const root = await canonicalMediaRoot(mediaRoot);
   const { prisma } = await import('@/server/data');
-  const cleanupRoots = await prisma.$queryRaw<Array<{ mediaRoot: string }>>`SELECT DISTINCT "mediaRoot" FROM rebuild_export_file_cleanups WHERE "workspaceId" = ${workspaceId}`;
+  const cleanupRoots = await prisma.$queryRaw<Array<{ mediaRoot: string }>>`SELECT DISTINCT "mediaRoot" FROM export_file_cleanups WHERE "workspaceId" = ${workspaceId}`;
   const oldRoots = new Set<string>();
   for (const item of cleanupRoots) {
     if (await assertDirectory(item.mediaRoot)) oldRoots.add(await canonicalMediaRoot(item.mediaRoot));
@@ -157,6 +157,6 @@ export async function removeWorkspaceStorage(mediaRoot: string, workspaceId: str
       if (!isMissing(error)) throw error;
     }
   }
-  await prisma.$executeRaw`DELETE FROM rebuild_export_file_cleanups WHERE "workspaceId" = ${workspaceId}`;
+  await prisma.$executeRaw`DELETE FROM export_file_cleanups WHERE "workspaceId" = ${workspaceId}`;
   return totals;
 }

@@ -168,7 +168,7 @@ export async function listNotifications(actor: NotificationActor, input: { page?
   const limit = await bounds();
   const page = query.page ?? 1;
   const copy = await notificationEventCopy();
-  const rows = await protect(prisma.$queryRaw<NotificationDbRow[]>`SELECT id, kind, "createdAt", "updatedAt", "readAt", "emailSentAt", "emailState", "postId", "noteId", "targetId", "labelId", "accountId", "eventId", "userId", "workspaceId" FROM rebuild_notifications WHERE "workspaceId" = ${actor.workspaceId} AND "userId" = ${actor.userId} AND (${query.unreadOnly ?? false} = false OR "readAt" IS NULL) ORDER BY "createdAt" DESC, id DESC LIMIT ${limit.pageSize + 1} OFFSET ${(page - 1) * limit.pageSize}`);
+  const rows = await protect(prisma.$queryRaw<NotificationDbRow[]>`SELECT id, kind, "createdAt", "updatedAt", "readAt", "emailSentAt", "emailState", "postId", "noteId", "targetId", "labelId", "accountId", "eventId", "userId", "workspaceId" FROM notifications WHERE "workspaceId" = ${actor.workspaceId} AND "userId" = ${actor.userId} AND (${query.unreadOnly ?? false} = false OR "readAt" IS NULL) ORDER BY "createdAt" DESC, id DESC LIMIT ${limit.pageSize + 1} OFFSET ${(page - 1) * limit.pageSize}`);
   const items: NotificationRow[] = [];
   for (const row of rows.slice(0, limit.pageSize)) {
     const context: NotificationEnqueueInput = {
@@ -197,7 +197,7 @@ export async function markNotificationRead(actor: NotificationActor, input: unkn
   const limit = await bounds(); await authorize(actor, true);
   return protect(withWorkspaceOperation(actor.workspaceId, () => prisma.$transaction(async tx => {
     await lockActor(tx, actor, true);
-    const result = await tx.$executeRaw`UPDATE rebuild_notifications SET "readAt" = COALESCE("readAt", NOW()), "updatedAt" = NOW() WHERE id = ${value.id} AND "workspaceId" = ${actor.workspaceId} AND "userId" = ${actor.userId}`;
+    const result = await tx.$executeRaw`UPDATE notifications SET "readAt" = COALESCE("readAt", NOW()), "updatedAt" = NOW() WHERE id = ${value.id} AND "workspaceId" = ${actor.workspaceId} AND "userId" = ${actor.userId}`;
     if (result !== 1) throw missing();
     await audit(tx, actor, 'notifications.read', { notificationId: value.id });
     await lockActor(tx, actor, true);
@@ -210,7 +210,7 @@ export async function deleteNotification(actor: NotificationActor, input: unknow
   const limit = await bounds(); await authorize(actor, true);
   return protect(withWorkspaceOperation(actor.workspaceId, () => prisma.$transaction(async tx => {
     await lockActor(tx, actor, true);
-    const result = await tx.$executeRaw`DELETE FROM rebuild_notifications WHERE id = ${value.id} AND "workspaceId" = ${actor.workspaceId} AND "userId" = ${actor.userId}`;
+    const result = await tx.$executeRaw`DELETE FROM notifications WHERE id = ${value.id} AND "workspaceId" = ${actor.workspaceId} AND "userId" = ${actor.userId}`;
     if (result !== 1) throw missing();
     await audit(tx, actor, 'notifications.deleted', { notificationId: value.id });
     await lockActor(tx, actor, true);
@@ -231,7 +231,7 @@ export async function enqueueNotification(tx: Tx, input: NotificationEnqueueInpu
   // in-app item is still created; email starts cancelled when the member opted out.
   const emailAllowed = await recipientAllowsNotification(tx, value);
   const id = `nt_${randomUUID()}`;
-  const inserted = await tx.$executeRaw`INSERT INTO rebuild_notifications (id, "eventId", "workspaceId", "userId", kind, "postId", "noteId", "targetId", "labelId", "accountId", "createdAt", "emailState", attempt, "nextAt") VALUES (${id}, ${value.eventId}, ${value.workspaceId}, ${value.userId}, ${value.kind}, ${value.postId ?? null}, ${value.noteId ?? null}, ${value.targetId ?? null}, ${value.labelId ?? null}, ${value.accountId ?? null}, NOW(), ${emailAllowed ? 'pending' : 'cancelled'}, 0, ${emailAllowed ? new Date() : null}) ON CONFLICT ("workspaceId", "eventId", "userId") DO NOTHING`;
+  const inserted = await tx.$executeRaw`INSERT INTO notifications (id, "eventId", "workspaceId", "userId", kind, "postId", "noteId", "targetId", "labelId", "accountId", "createdAt", "emailState", attempt, "nextAt") VALUES (${id}, ${value.eventId}, ${value.workspaceId}, ${value.userId}, ${value.kind}, ${value.postId ?? null}, ${value.noteId ?? null}, ${value.targetId ?? null}, ${value.labelId ?? null}, ${value.accountId ?? null}, NOW(), ${emailAllowed ? 'pending' : 'cancelled'}, 0, ${emailAllowed ? new Date() : null}) ON CONFLICT ("workspaceId", "eventId", "userId") DO NOTHING`;
   return { id: inserted === 1 ? id : '', inserted: inserted === 1 };
 }
 

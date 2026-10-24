@@ -69,7 +69,7 @@ async function readPool(s: WordpressSettings, source: SourceRow, ports: PlannerP
   try {
     const now = ports.now();
     const health = await cachedPoolHealth(`${source.id}|${JSON.stringify([source.workspaceId, source.config, source.targetIds, source.allTargets, s, auth.actor])}`, s.poolCacheSeconds, now, async () => {
-      const db = await openDatabase(ports, s);
+      const db = await openDatabase(ports, s, source.siteUrl);
       if (!db) throw new Error('library_unavailable');
       try { return await computePoolHealth({ settings: s, ports, db, source, now }); } finally { await db.close(); }
     });
@@ -89,7 +89,7 @@ export async function readRecipeSource(actor: FeedActor, input: unknown = {}, de
     const source = row && visible(auth, row) ? row : null;
     const page = query.page ?? 1;
     const ports = { ...defaultPlannerPorts(), ...deps };
-    const configured = Boolean(await ports.databaseUrl().catch(() => null));
+    const configured = Boolean(source?.siteUrl || s.siteUrl || await ports.databaseUrl().catch(() => null));
     const poolReady = Boolean(source) && s.enabled && configured;
     const [pages, plans, counts, pool] = await Promise.all([
       selectablePages(actor.workspaceId, s, auth),
@@ -201,7 +201,7 @@ export async function retryRecipeSlotsNow(actor: FeedActor, input: unknown, deps
   if (!s.enabled) throw new OperationError('unavailable', 'Recipe planning is not available right now.');
   if (!source.enabled) throw new OperationError('conflict', 'This recipe source is paused. Resume it to plan posts.');
   const ports = { ...defaultPlannerPorts(), ...deps };
-  const db = await openDatabase(ports, s);
+  const db = await openDatabase(ports, s, source.siteUrl);
   if (!db) throw new OperationError('unavailable', 'The recipe library could not be reached. Try again later.');
   try {
     const outcome = await retryRecipeSlots({ settings: s, ports, db, now: ports.now() }, source, auth);
@@ -230,7 +230,7 @@ export async function previewRecipeSource(actor: FeedActor, input: unknown = {},
   await parse(z.object({}).strict(), input);
   const { source } = await authorizedSource(actor);
   const ports = { ...defaultPlannerPorts(), ...deps };
-  const db = await openDatabase(ports, s);
+  const db = await openDatabase(ports, s, source.siteUrl);
   if (!db) throw await feedsError('unavailable', 'The recipe library could not be reached. Try again later.');
   try {
     const config = configOf(s, source);
@@ -261,7 +261,7 @@ export async function runRecipePlannerNow(actor: FeedActor, input: unknown, deps
   if (!s.enabled) throw await feedsError('unavailable', 'Recipe planning is not available right now.');
   if (!source.enabled) throw await feedsError('conflict', 'This recipe source is paused. Resume it to plan posts.');
   const ports = { ...defaultPlannerPorts(), ...deps };
-  const db = await openDatabase(ports, s);
+  const db = await openDatabase(ports, s, source.siteUrl);
   if (!db) throw await feedsError('unavailable', 'The recipe library could not be reached. Try again later.');
   const now = ports.now();
   try {

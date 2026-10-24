@@ -42,20 +42,20 @@ export async function lockInboxChannel(tx: Prisma.TransactionClient, workspaceId
 /** Never discard unresolved evidence or remove the resource needed to recover. */
 export async function assertInboxDeletionsSettled(tx: Prisma.TransactionClient, workspaceId: string, targetIds?: string[]): Promise<void> {
   const rows = targetIds === undefined
-    ? await tx.$queryRaw<Array<{ pending: boolean }>>`SELECT EXISTS (SELECT 1 FROM rebuild_inbox_deletions WHERE "workspaceId" = ${workspaceId} AND state IN ('started', 'uncertain', 'remote_confirmed')) AS pending`
-    : await tx.$queryRaw<Array<{ pending: boolean }>>`SELECT EXISTS (SELECT 1 FROM rebuild_inbox_deletions WHERE "workspaceId" = ${workspaceId} AND "targetId" = ANY(${targetIds}) AND state IN ('started', 'uncertain', 'remote_confirmed')) AS pending`;
+    ? await tx.$queryRaw<Array<{ pending: boolean }>>`SELECT EXISTS (SELECT 1 FROM inbox_deletions WHERE "workspaceId" = ${workspaceId} AND state IN ('started', 'uncertain', 'remote_confirmed')) AS pending`
+    : await tx.$queryRaw<Array<{ pending: boolean }>>`SELECT EXISTS (SELECT 1 FROM inbox_deletions WHERE "workspaceId" = ${workspaceId} AND "targetId" = ANY(${targetIds}) AND state IN ('started', 'uncertain', 'remote_confirmed')) AS pending`;
   if (rows[0]?.pending === true) throw new OperationError('conflict', await inboxServiceText('service16'));
 }
 
 /** Called inside a channel-locked persistence transaction, including worker sync. */
 export async function inboxCommentSuppressed(tx: Prisma.TransactionClient, workspaceId: string, targetId: string, remoteId: string, parentRemoteId?: string | null): Promise<boolean> {
-  const rows = await tx.$queryRaw<Array<{ id: string }>>`SELECT id FROM rebuild_inbox_deletions WHERE "workspaceId" = ${workspaceId} AND "targetId" = ${targetId}
+  const rows = await tx.$queryRaw<Array<{ id: string }>>`SELECT id FROM inbox_deletions WHERE "workspaceId" = ${workspaceId} AND "targetId" = ${targetId}
     AND state <> 'rejected' AND ("remoteId" = ${remoteId} OR "remoteId" = ${parentRemoteId ?? remoteId}
       OR ${remoteId} = ANY("suppressedRemoteIds") OR ${parentRemoteId ?? remoteId} = ANY("suppressedRemoteIds"))`;
   if (!rows.length) return false;
   // Retain newly observed stale descendants too, so later sync windows cannot
   // restore their children after the original local rows have disappeared.
-  for (const row of rows) await tx.$executeRaw`UPDATE rebuild_inbox_deletions SET "suppressedRemoteIds" = array_append("suppressedRemoteIds", ${remoteId})
+  for (const row of rows) await tx.$executeRaw`UPDATE inbox_deletions SET "suppressedRemoteIds" = array_append("suppressedRemoteIds", ${remoteId})
     WHERE id = ${row.id} AND "workspaceId" = ${workspaceId} AND NOT (${remoteId} = ANY("suppressedRemoteIds"))`;
   return true;
 }

@@ -22,7 +22,7 @@ const missing = async () => new OperationError('not_found', await inboxServiceTe
 
 async function findJournal(workspaceId: string, itemId: string) {
   const rows = await prisma.$queryRaw<Journal[]>`SELECT id, "workspaceId", "targetId", provider, "remoteId", "localItemId", state
-    FROM rebuild_inbox_deletions WHERE "workspaceId" = ${workspaceId} AND ("localItemId" = ${itemId} OR ${itemId} = ANY("localAliases")) ORDER BY "createdAt" DESC, id DESC LIMIT 1`;
+    FROM inbox_deletions WHERE "workspaceId" = ${workspaceId} AND ("localItemId" = ${itemId} OR ${itemId} = ANY("localAliases")) ORDER BY "createdAt" DESC, id DESC LIMIT 1`;
   return rows[0];
 }
 
@@ -46,7 +46,7 @@ async function storedFamily(tx: Prisma.TransactionClient, workspaceId: string, t
 }
 
 async function findRemoteJournal(workspaceId: string, provider: string, targetId: string, remoteId: string) {
-  const rows = await prisma.$queryRaw<Journal[]>`SELECT id, "workspaceId", "targetId", provider, "remoteId", "localItemId", state FROM rebuild_inbox_deletions
+  const rows = await prisma.$queryRaw<Journal[]>`SELECT id, "workspaceId", "targetId", provider, "remoteId", "localItemId", state FROM inbox_deletions
     WHERE "workspaceId" = ${workspaceId} AND provider = ${provider} AND "targetId" = ${targetId} AND "remoteId" = ${remoteId}`;
   return rows[0];
 }
@@ -77,7 +77,7 @@ export async function finish(row: Journal, actor: InboxReadActor, auditExtra: Re
   // Completion, cleanup and its domain audit either all commit or all roll back.
   return prisma.$transaction(async tx => {
     const locked = await tx.$queryRaw<Journal[]>`SELECT id, "workspaceId", "targetId", provider, "remoteId", "localItemId", state
-      FROM rebuild_inbox_deletions WHERE id = ${row.id} AND "workspaceId" = ${actor.workspaceId} FOR UPDATE`;
+      FROM inbox_deletions WHERE id = ${row.id} AND "workspaceId" = ${actor.workspaceId} FOR UPDATE`;
     const current = locked[0];
     if (!current) throw await missing();
     if (current.state !== 'remote_confirmed') return receipt(current);
@@ -86,7 +86,7 @@ export async function finish(row: Journal, actor: InboxReadActor, auditExtra: Re
       postTarget: { targetId: current.targetId, target: { workspaceId: actor.workspaceId }, post: { workspaceId: actor.workspaceId } },
       remoteId: { in: family.remoteIds },
     } });
-    await tx.$executeRaw`UPDATE rebuild_inbox_deletions SET state = 'completed', reason = NULL, "completedAt" = CURRENT_TIMESTAMP, "updatedAt" = CURRENT_TIMESTAMP,
+    await tx.$executeRaw`UPDATE inbox_deletions SET state = 'completed', reason = NULL, "completedAt" = CURRENT_TIMESTAMP, "updatedAt" = CURRENT_TIMESTAMP,
       "localAliases" = ARRAY(SELECT DISTINCT unnest("localAliases" || ${family.aliases}::text[])),
       "suppressedRemoteIds" = ARRAY(SELECT DISTINCT unnest("suppressedRemoteIds" || ${family.remoteIds}::text[]))
       WHERE id = ${current.id} AND "workspaceId" = ${actor.workspaceId}`;
@@ -140,7 +140,7 @@ export async function deleteInboxCommentDurably(actor: InboxReadActor, input: { 
       const [timeout, maxWait] = await Promise.all([runtimeConfig('inbox.workflowTransactionTimeoutMs'), runtimeConfig('inbox.workflowTransactionMaxWaitMs')]);
       const inserted = await prisma.$transaction(async tx => {
         const family = await storedFamily(tx, actor.workspaceId, targetId, item.remoteId);
-        const rows = await tx.$queryRaw<Journal[]>`INSERT INTO rebuild_inbox_deletions (id, "workspaceId", "targetId", provider, "remoteId", "localItemId", "actorId", state, "localAliases", "suppressedRemoteIds")
+        const rows = await tx.$queryRaw<Journal[]>`INSERT INTO inbox_deletions (id, "workspaceId", "targetId", provider, "remoteId", "localItemId", "actorId", state, "localAliases", "suppressedRemoteIds")
           VALUES (${operationId}, ${actor.workspaceId}, ${targetId}, ${provider}, ${item.remoteId}, ${input.id}, ${actor.userId}, 'started', ${family.aliases}::text[], ${family.remoteIds}::text[])
           ON CONFLICT ("workspaceId", provider, "targetId", "remoteId") DO NOTHING
           RETURNING id, "workspaceId", "targetId", provider, "remoteId", "localItemId", state`;
@@ -156,10 +156,10 @@ export async function deleteInboxCommentDurably(actor: InboxReadActor, input: { 
       // Intent is committed before dispatch. No timer clears it for another try.
       try { signal.throwIfAborted(); await dispatch(signal); }
       catch {
-        await prisma.$executeRaw`UPDATE rebuild_inbox_deletions SET state = 'uncertain', reason = 'transport_unconfirmed', "updatedAt" = CURRENT_TIMESTAMP WHERE id = ${operationId} AND state = 'started'`;
+        await prisma.$executeRaw`UPDATE inbox_deletions SET state = 'uncertain', reason = 'transport_unconfirmed', "updatedAt" = CURRENT_TIMESTAMP WHERE id = ${operationId} AND state = 'started'`;
         return receipt({ ...claimed, state: 'uncertain' });
       }
-      await prisma.$executeRaw`UPDATE rebuild_inbox_deletions SET state = 'remote_confirmed', reason = 'local_pending', "remoteConfirmedAt" = CURRENT_TIMESTAMP, "updatedAt" = CURRENT_TIMESTAMP WHERE id = ${operationId} AND state = 'started'`;
+      await prisma.$executeRaw`UPDATE inbox_deletions SET state = 'remote_confirmed', reason = 'local_pending', "remoteConfirmedAt" = CURRENT_TIMESTAMP, "updatedAt" = CURRENT_TIMESTAMP WHERE id = ${operationId} AND state = 'started'`;
       const confirmed = { ...claimed, state: 'remote_confirmed' as const };
       try { return await finish(confirmed, actor); }
       catch { return receipt(confirmed); }
@@ -173,7 +173,7 @@ export async function finishInboxDeletion(actor: InboxReadActor, input: { operat
   await authorizeInbox(actor, constraints, 'write');
   return withWorkspaceOperation(actor.workspaceId, async () => {
     const access = await authorizeInbox(actor, constraints, 'write');
-    const rows = await prisma.$queryRaw<Journal[]>`SELECT id, "workspaceId", "targetId", provider, "remoteId", "localItemId", state FROM rebuild_inbox_deletions WHERE id = ${input.operationId} AND "workspaceId" = ${actor.workspaceId}`;
+    const rows = await prisma.$queryRaw<Journal[]>`SELECT id, "workspaceId", "targetId", provider, "remoteId", "localItemId", state FROM inbox_deletions WHERE id = ${input.operationId} AND "workspaceId" = ${actor.workspaceId}`;
     const row = rows[0];
     if (!row || !access.channelIds.includes(row.targetId)) throw await missing();
     return withInboxChannelOperation(actor.workspaceId, row.targetId, async () => {

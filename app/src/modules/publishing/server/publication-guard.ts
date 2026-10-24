@@ -11,7 +11,7 @@ export async function assertPublicationAttemptsSettled(tx: Prisma.TransactionCli
   const errorText = await loadPublishingErrorText();
   if (targetIds?.length === 0) return;
   const rows = await tx.$queryRaw<Array<{ id: string }>>`
-    SELECT id FROM rebuild_publication_attempts WHERE "workspaceId" = ${workspaceId}
+    SELECT id FROM publication_attempts WHERE "workspaceId" = ${workspaceId}
       AND state = ANY(${UNRESOLVED_PUBLICATION_STATES}::text[])
       AND (${targetIds === undefined} OR "targetId" = ANY(${[...(targetIds ?? [])]}::text[]))
       AND (${postId === undefined} OR "postId" = ${postId ?? ''}) LIMIT 1`;

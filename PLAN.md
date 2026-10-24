@@ -1,126 +1,151 @@
 # PLAN.md — Product, Design & UX Master Plan (`v1.1+`)
 
-Comprehensive product and design evolution roadmap for **MS Social Pilot**, combining best-in-class patterns from **Buffer**, **Sprout Social**, **Hootsuite**, **Later**, **Typefully**, **Metricool**, **Publer**, **Linear**, **Raycast**, and **Superhuman** with AI-native workflows.
+Actionable, file-anchored product and design roadmap for **MS Social Pilot**, combining best-in-class patterns from **Linear**, **Raycast**, **Buffer**, **Later**, **Typefully**, **Superhuman**, **Sprout Social**, **Metricool**, **Publer**, and **Planable**.
+
+> **For AI Agents**: Each phase below is self-contained and lists the exact target files, UI components, and acceptance criteria so you can implement any phase cleanly without breaking existing workflows.
 
 ---
 
-## Architecture of the Master Plan
+## Roadmap Overview
 
 ```mermaid
 flowchart TD
-  ROOT["MS Social Pilot v1.1+ Master Plan"] --> P1["1. Visual Design System & Micro-Craft (Linear / Raycast)"]
-  ROOT --> P2["2. Tactile Composer & Visual Planner (Buffer / Later / Typefully)"]
-  ROOT --> P3["3. High-Velocity Social Inbox & CRM (Superhuman / Sprout)"]
-  ROOT --> P4["4. AI Growth Engine & Automation (Publer / Custom Moat)"]
-  ROOT --> P5["5. Executive Analytics, Listening & Paid Ads (Metricool / Hootsuite)"]
-  ROOT --> P6["6. Agency Collaboration & Client Portal (Planable / Sprout)"]
+  ROOT["MS Social Pilot v1.1+ Master Plan"] --> P1["Phase 1 (P0): Shell, Visual Micro-Craft & Deep Cmd+K"]
+  ROOT --> P2["Phase 2 (P0): Tactile Composer & Visual Feed Planner"]
+  ROOT --> P3["Phase 3 (P1): Interactive Drag-and-Drop Calendar & Heatmap"]
+  ROOT --> P4["Phase 4 (P1): Superhuman Inbox & Comment-to-DM Automation"]
+  ROOT --> P5["Phase 5 (P1): AI Content Multiplier & CMS Autopilot"]
+  ROOT --> P6["Phase 6 (P2): Client Review Rooms, Competitor Watchlist & Ad Boost"]
 ```
 
 ---
 
-## 1. Visual Design System & Micro-Craft *(Inspired by Linear, Raycast & Vercel)*
+## Phase 1 (P0) — Shell, Visual Micro-Craft & Deep `Cmd+K`
+*Inspired by Linear, Raycast & Vercel*
 
-### 1.1 Layered Glassmorphism & Specular Depth (`app/src/styles/tokens.css`, `shell.css`)
-- **Translucent Floating Chrome**: Apply `backdrop-filter: blur(14px) saturate(1.5)` and `color-mix(in srgb, var(--surface) 84%, transparent)` to sticky topbars, calendar headers, and floating bulk-action toolbars so scrolling content glides cleanly beneath.
-- **1px Specular Borders & Subtle Elevation**: Use hairlines (`1px solid var(--line-subtle)`) paired with soft multi-layer shadows (`--shadow-card`) and a `-1px` hover lift on interactive KPI cards, post tiles, and channel pills.
-- **Authentic Network Brand Accents**: Tint platform badges, composer tabs, and chart series with balanced light/dark brand tokens (Facebook Blue, Instagram Magenta/Sunset, YouTube Red, TikTok Cyan/Rose, LinkedIn Blue, X Monochrome, Threads, Pinterest).
+### Target Files
+- `app/src/styles/tokens.css`
+- `app/src/styles/shell.css`
+- `app/src/styles/components.css`
+- `app/src/components/AppShell.tsx`
+- `app/src/components/CommandPalette.tsx`
 
-### 1.2 Data-Dense Typography & Inline Visuals (`app/src/styles/components.css`)
-- **Tabular Numerals Everywhere**: Enforce `font-variant-numeric: tabular-nums` across all metrics, counters, timers, and currency columns.
-- **Inline 48px SVG Sparklines & Sparkbars**: Embed mini trend sparklines and proportional fill bars directly inside Analytics, Top Posts, and Ads tables so users spot outliers before reading digits.
-- **Semantic Delta Pills**: Standardize period-over-period badges (`+18.4% ▲` in emerald tint, `-3.1% ▼` in amber/rose tint) with hover tooltips showing exact prior-period values.
-
-### 1.3 Spring Choreography & Geometry-Matched Skeletons
-- **Spring Physics (`cubic-bezier(0.22, 1, 0.36, 1)`)**: Smooth `180ms` transitions on sidebar rail collapse (`[`), drawers, popovers, and active tab indicators.
-- **Zero-Spinner Shimmer Skeletons**: Replace loading text with layout-exact shimmer skeletons for the Calendar grid, Inbox split pane, and Insights charts.
-
----
-
-## 2. Tactile Composer & Visual Planner *(Inspired by Buffer, Later & Typefully)*
-
-### 2.1 Live Multi-Network Device Frame Previews (`/content/post`)
-- **Pixel-Accurate Network Frames**: Side-by-side live previews simulating mobile/desktop cards for Facebook Feed/Reels, Instagram Feed/Carousel/Stories/Reels, X/Threads multi-post threads, LinkedIn posts, YouTube Shorts, and TikTok vertical video.
-- **Live Character Fold & Hashtag Meter**: Highlight where each network truncates text (`...more` fold line), count hashtags/mentions against network limits, and warn on link-preview suppression.
-- **First-Comment Timeline Preview**: Render the scheduled first comment (and its delay badge, e.g. `+15m after publish`) directly below the simulated post card.
-
-### 2.2 Visual Grid Planner & Drag-and-Drop Media Studio (`/content/post`, `/content/media`)
-- **Instagram & TikTok 9-Grid Visual Feed Preview *(Later-style)***: Preview how upcoming scheduled posts will look arranged in a 3×3 profile grid alongside already-published posts, with drag-and-drop grid reordering.
-- **Drag-to-Reorder Carousel Thumbnails**: Reorder multi-photo uploads via drag-and-drop with live ordinal badges (`1`, `2`, `3`) and instant aspect-ratio warnings (`4:5`, `9:16`, `1.91:1`).
-- **Built-In Canvas Cropper & Brand Watermark Studio**: Non-destructive aspect-ratio presets, one-click workspace brand watermark/frame stamping, custom video cover frame picker, and automatic EN/FR subtitle (`.srt`) generation.
-
-### 2.3 Interactive Drag-and-Drop Calendar (`/content/calendar`)
-- **Slot-to-Slot Drag Rescheduling**: Drag scheduled post cards across days, hours, or channel swimlanes in Month, Week, and Day views with optimistic updates and a 5-second undo toast.
-- **Best-Time Heatmap Overlay *(Sprout/Metricool-style)***: Shade calendar time slots by historical audience engagement intensity so creators drop posts into dark-tinted peak slots effortlessly.
-- **Click-to-Peek Post Popover**: Click any calendar card to view full media, per-channel publish status, approval stage, and team comments—and **Approve**, **Duplicate**, or **Reschedule** without leaving the calendar.
+### Implementation Checklist
+- [ ] **1.1 Translucent Glassmorphic Chrome (`tokens.css`, `shell.css`)**:
+  - Add `--surface-glass: color-mix(in srgb, var(--surface) 84%, transparent)` and `--backdrop-blur: blur(14px) saturate(1.5)`.
+  - Apply translucent sticky headers to `.shell-topbar`, calendar sticky headers, and floating bulk-action bars with `1px solid var(--line-subtle)` borders.
+- [ ] **1.2 Brand Accent Tokens & Specular Cards (`tokens.css`, `components.css`)**:
+  - Add authentic light/dark brand color tokens for Facebook, Instagram, YouTube, TikTok, Pinterest, LinkedIn, X, and Threads.
+  - Add subtle `-1px` hover lift and specular border highlights on interactive KPI cards and channel pills.
+- [ ] **1.3 Inline 48px SVG Sparklines & Semantic Delta Pills (`components.css`)**:
+  - Create a reusable `<Sparkline data={number[]} />` SVG component and `<DeltaBadge value={number} />` (`+18.4% ▲` emerald / `-3.1% ▼` rose) with `font-variant-numeric: tabular-nums`.
+- [ ] **1.4 Geometry-Matched Shimmer Skeletons (`components.css`)**:
+  - Replace plain loading text with layout-exact `.skeleton-shimmer` placeholders for Calendar grids, Inbox threads, and Insights cards.
+- [ ] **1.5 Deep Actionable `Cmd+K` Command Palette (`CommandPalette.tsx`)**:
+  - Add instant zero-navigation commands: *Create Post for [Channel]*, *Switch Theme (Light/Dark)*, *Switch Language (EN/FR)*, *Collapse/Expand Sidebar (`[`)*, *Run WordPress Recipe Planner*, and *Jump to Unresolved Inbox*.
 
 ---
 
-## 3. High-Velocity Social Inbox & Audience CRM *(Inspired by Superhuman & Sprout Social)*
+## Phase 2 (P0) — Tactile Composer & Visual Feed Planner
+*Inspired by Buffer, Later & Typefully*
 
-### 3.1 Keyboard-First Triage (`/inbox`)
-- **Single-Key Triage Flow**:
-  - `j` / `k` — Next / previous thread
-  - `e` — Resolve thread and auto-advance to the next unread item
-  - `r` — Focus reply composer
-  - `a` — Assign to team member
-  - `/` — Open saved-reply snippet & variable menu (`{{author_name}}`, `{{channel_name}}`)
-  - `?` — Keyboard shortcut cheat sheet modal
-- **Pinned Parent Post Context Card**: Keep a collapsible card at the top of comment threads displaying the parent post's thumbnail, caption, publish date, and live reactions.
+### Target Files
+- `app/src/app/(workspace)/content/post/ComposerWorkspace.tsx`
+- `app/src/app/(workspace)/content/post/PostPreview.tsx`
+- `app/src/modules/media/ui/MediaLibrary.tsx`
 
-### 3.2 Comment-to-DM Automation Recipes *(ManyChat / Publer-style)*
-- **Keyword Trigger Flows**: When a user comments a trigger keyword (e.g. `"RECIPE"`, `"GUIDE"`, `"LINK"`, `"PRICE"`) on a Facebook or Instagram post, automatically:
-  1. Like and reply publicly with a rotating friendly variation.
-  2. Send a private DM containing the link, recipe card, or offer code.
-- **Audience Mini-CRM & VIP Badges**: Display commenter interaction history (past comments, sentiment score, VIP/repeat-engager badge) in a right-hand contact drawer.
-- **1-Click AI Reply Tone Chips**: Instant reply drafts above the composer (*Friendly*, *Supportive*, *Answer FAQ*, *Translate EN/FR*, *De-escalate*).
-
----
-
-## 4. AI Growth Engine & Content Repurposing *(Inspired by Typefully & Publer)*
-
-### 4.1 1-to-Many Smart Content Multiplier (`/content/ai-studio`, `/content/post`)
-- **URL / Article / Recipe to Multi-Channel Campaign**: Paste a blog URL, YouTube link, or WordPress recipe and generate a complete cross-channel campaign in one click:
-  - Instagram 5-slide visual carousel + Reel script
-  - Facebook conversational post + delayed recipe first comment
-  - X / Threads numbered thread with hook variants
-  - LinkedIn executive post
-  - TikTok / Shorts spoken hook + caption
-- **AI Hook & Virality Scorer**: Score draft hooks (0–100) for curiosity, clarity, and platform fit, offering 3 punchier alternatives before scheduling.
-
-### 4.2 "Fill My Week" Calendar Autopilot & Evergreen Booster (`/content/calendar`, `/content/agents`)
-- **1-Click Weekly Schedule Generator**: Analyze `bestTimes`, WordPress/RSS recipe pools, and content pillars to auto-populate empty calendar slots for the next 7 days in a single reviewable batch.
-- **Evergreen Auto-Detector**: Flag published posts that beat the workspace's 90th-percentile engagement rate within 48 hours and offer 1-click recycling with AI-refreshed captions.
+### Implementation Checklist
+- [ ] **2.1 Pixel-Accurate Device Frame Previews (`PostPreview.tsx`)**:
+  - Render realistic mobile/desktop preview cards for **Facebook Feed/Reels**, **Instagram Feed/Carousel/Stories/Reels**, **YouTube Shorts**, **TikTok**, **LinkedIn**, and **X/Threads**.
+  - Show live `...more` text-truncation fold lines, hashtag count meters (e.g., `5 / 30`), and a visual preview of the scheduled **First Comment** (`+15m delay` badge) directly beneath the post card.
+- [ ] **2.2 Drag-to-Reorder Carousel & Aspect-Ratio Guardrails (`ComposerWorkspace.tsx`)**:
+  - Allow drag-and-drop reordering of multi-image uploads with ordinal badges (`1`, `2`, `3`) and live aspect-ratio badges (`4:5`, `9:16`, `1:1`) that warn before publishing if an image violates network constraints.
+- [ ] **2.3 Instagram & TikTok 9-Grid Visual Planner (`ComposerWorkspace.tsx`)**:
+  - Add a **Grid Preview** tab showing how upcoming scheduled posts will appear arranged in a 3×3 profile grid alongside already-published posts.
+- [ ] **2.4 In-Browser Image Cropper & Watermark Preview (`MediaLibrary.tsx`)**:
+  - Add non-destructive aspect-ratio crop presets (`1:1`, `4:5`, `9:16`, `1.91:1`), live workspace watermark preview (`workspace_watermarks`), and custom video cover frame selection.
 
 ---
 
-## 5. Executive Analytics, Competitor Listening & Paid Ads *(Inspired by Metricool & Hootsuite)*
+## Phase 3 (P1) — Interactive Drag-and-Drop Calendar & Heatmap
+*Inspired by Sprout Social & Metricool*
 
-### 5.1 Cross-Filtered Insights & Competitor Watchlist (`/insights`)
-- **Click-to-Filter Interactive Timeline**: Clicking any day or week bar on the ECharts timeline filters the Top Posts and Channel Breakdown tables below to that exact window.
-- **Competitor Benchmark Watchlist**: Track public follower growth, posting cadence, format mix, and engagement rates for up to 10 competitor pages side-by-side with your own channels.
-- **Smart UTM Builder & Revenue Attribution**: Auto-append `utm_source`, `utm_medium`, and `utm_campaign` to links in Composer and track link clicks through to conversions.
+### Target Files
+- `app/src/app/(workspace)/content/calendar/CalendarWorkspace.tsx`
+- `app/src/modules/publishing/server/lifecycle.ts`
 
-### 5.2 Paid + Organic Synergy & Ads Funnel (`/ads`)
-- **Auto-Boost High Performers**: Automatically suggest (or trigger via rule) a `$10–$50` Meta Ad boost when an organic Facebook/Instagram post crosses an engagement velocity threshold.
-- **Campaign -> Ad Set -> Ad Breadcrumb Drilldown**: Click a Campaign row in `/ads/manage` to filter Ad Sets and Ads with a dismissible breadcrumb pill, paired with visual spend/CTR sparkbars and creative fatigue warnings.
+### Implementation Checklist
+- [ ] **3.1 Slot-to-Slot Drag Rescheduling (`CalendarWorkspace.tsx`)**:
+  - Enable HTML5 / pointer drag-and-drop on scheduled post cards across days and hour slots in Month, Week, and Day views.
+  - Perform optimistic UI updates with a 5-second **Undo** toast that calls the reschedule endpoint.
+- [ ] **3.2 Best-Time Engagement Heatmap Overlay (`CalendarWorkspace.tsx`)**:
+  - Add a **Heatmap Toggle** that shades calendar hour slots based on historical audience activity (`bestTimes`) so users can drop posts directly into high-engagement windows.
+- [ ] **3.3 Click-to-Peek Post Approval & Quick-Edit Popover (`CalendarWorkspace.tsx`)**:
+  - Clicking any calendar card opens a rich popover showing full media, caption, first comment, per-channel status, and 1-click **Approve**, **Duplicate**, **Reschedule**, or **Edit** actions without leaving the calendar.
+- [ ] **3.4 Hover `+ Schedule` on Empty Slots (`CalendarWorkspace.tsx`)**:
+  - Hovering any empty day/hour cell reveals a subtle `+` button that opens the Composer pre-filled with that exact date and time.
 
 ---
 
-## 6. Agency Collaboration & Client Portal *(Inspired by Planable & Sprout)*
+## Phase 4 (P1) — Superhuman Inbox & Comment-to-DM Automation
+*Inspired by Superhuman, Sprout Social & ManyChat*
 
-### 6.1 Passwordless Magic-Link Client Review Rooms (`/sharing`, `/agency`)
-- **White-Label External Review Portal**: Generate expiring, brand-customized magic links where external agency clients inspect upcoming posts in realistic feed/calendar views and click **Approve** or **Request Changes** with timestamped comments—no login required.
-- **Executive White-Label PDF & Live Report Links**: 1-click agency-branded monthly performance decks with custom executive summaries written by AI and editable chart annotations.
+### Target Files
+- `app/src/app/(workspace)/inbox/InboxWorkspace.tsx`
+- `app/src/modules/inbox/server/`
+
+### Implementation Checklist
+- [ ] **4.1 Single-Key Triage Shortcuts (`InboxWorkspace.tsx`)**:
+  - `j` / `k` — Next / previous conversation or comment thread.
+  - `e` — Mark resolved and auto-advance to the next unread thread.
+  - `r` — Focus reply composer.
+  - `a` — Assign thread to a teammate.
+  - `/` — Open saved-reply snippet picker with dynamic variables (`{{author_name}}`, `{{channel_name}}`).
+  - `?` — Open keyboard shortcut cheat-sheet modal.
+- [ ] **4.2 Pinned Parent Post Context & Audience Mini-CRM (`InboxWorkspace.tsx`)**:
+  - Pin a collapsible card at the top of comment threads showing the parent post's thumbnail, caption, permalink, and reaction counts.
+  - Show commenter history (past comments, sentiment badge, repeat-engager VIP badge) in a right-hand drawer.
+- [ ] **4.3 1-Click AI Reply Tone Chips (`InboxWorkspace.tsx`)**:
+  - Add instant AI draft chips above the reply box: *Friendly*, *Supportive*, *Answer FAQ*, *Translate EN/FR*, *De-escalate*.
+- [ ] **4.4 Keyword Comment-to-DM Automation (`src/modules/inbox/server/`)**:
+  - When a user comments a trigger keyword (e.g., `"RECIPE"`, `"LINK"`, `"GUIDE"`) on a Facebook or Instagram post, automatically like the comment, post a public reply variation, and send a private DM with the link or recipe card.
 
 ---
 
-## Prioritized Implementation Roadmap
+## Phase 5 (P1) — AI Content Multiplier & CMS Autopilot
+*Inspired by Typefully & Publer*
 
-| Phase | Focus | Key Deliverables | Target Files |
-| :--- | :--- | :--- | :--- |
-| **Phase 1 (P0)** | **Shell, Design Polish & Deep `Cmd+K`** | Glassmorphic topbar/bars, inline sparklines/delta pills, shimmer skeletons, and zero-nav `Cmd+K` quick actions (theme/rail/channel jumps) | `src/styles/*`, `AppShell.tsx`, `CommandPalette.tsx` |
-| **Phase 2 (P0)** | **Tactile Composer & Visual Grid** | Side-by-side device frames, fold/hashtag meters, drag-to-reorder carousel, 9-grid Instagram preview, and in-browser image cropper | `ComposerWorkspace.tsx`, `PostPreview.tsx`, `media/ui/*` |
-| **Phase 3 (P1)** | **Interactive Calendar & Quick-Peek** | Drag-and-drop slot rescheduling, best-time heatmap tinting, click-to-peek approval popover, and empty-slot `+ Schedule` button | `CalendarWorkspace.tsx` |
-| **Phase 4 (P1)** | **Superhuman Inbox & Comment-to-DM** | Keyboard triage (`j`/`k`/`e`/`r`/`/`), pinned parent post card, 1-click AI tone chips, and keyword Comment-to-DM automation rules | `InboxWorkspace.tsx`, `inbox/server/*` |
-| **Phase 5 (P1)** | **AI Multiplier & "Fill My Week"** | 1-to-many cross-network repurposing engine, AI hook scorer, evergreen auto-detector, and 1-click weekly calendar autopilot | `studio/*`, `publishing/*` |
-| **Phase 6 (P2)** | **Client Portal, Competitors & Ad Boost** | Passwordless client approval rooms, competitor watchlist, auto-UTM builder, and organic-to-paid ad boost rules | `sharing/*`, `agency/*`, `insights/*`, `ads/*` |
+### Target Files
+- `app/src/modules/studio/`
+- `app/src/modules/feeds/wordpress/`
+- `app/src/modules/feeds/ui/RecipeSource.tsx`
+
+### Implementation Checklist
+- [ ] **5.1 1-to-Many Smart Content Multiplier (`/content/ai-studio`)**:
+  - Paste any WordPress URL, blog article, or recipe and generate a coordinated multi-network campaign in one click (Instagram 5-slide carousel + Reel script, Facebook post + delayed recipe first comment, LinkedIn post, X/Threads thread, TikTok hook).
+- [ ] **5.2 AI Hook & Virality Scorer (`ComposerWorkspace.tsx`)**:
+  - Score draft hooks (0–100) for curiosity, clarity, and platform fit, and suggest 3 punchier alternatives inline.
+- [ ] **5.3 Universal CMS & Schema.org Adapter (`src/modules/feeds/`)**:
+  - Extend the WordPress REST planner UI with a 1-click **Test Connection & Inspect Fields** button that previews detected REST post types, custom meta keys, and Schema.org `Recipe` / `Article` fields live.
+- [ ] **5.4 Evergreen Outperformer Booster (`src/modules/publishing/`)**:
+  - Automatically flag published posts that beat the workspace's 90th-percentile engagement rate within 48 hours and offer 1-click evergreen recycling with AI-refreshed captions.
+
+---
+
+## Phase 6 (P2) — Client Review Rooms, Competitor Watchlist & Ad Boost
+*Inspired by Planable, Metricool & Hootsuite*
+
+### Target Files
+- `app/src/modules/sharing/`
+- `app/src/modules/agency/`
+- `app/src/modules/ads/`
+- `app/src/app/(workspace)/insights/`
+
+### Implementation Checklist
+- [ ] **6.1 Passwordless Magic-Link Client Approval Rooms (`/share/[token]`)**:
+  - Allow agency clients to view upcoming scheduled posts in realistic feed/calendar views via an expiring magic link and click **Approve** or **Request Changes** with timestamped feedback—no login required.
+- [ ] **6.2 Cross-Filtered Insights & Competitor Watchlist (`/insights`)**:
+  - Clicking any bar on the ECharts timeline filters the Top Posts table below to that exact date window.
+  - Benchmark public follower growth, posting frequency, and engagement rates against up to 10 watched competitor pages.
+- [ ] **6.3 Organic-to-Paid Meta Ad Auto-Boost (`/ads`)**:
+  - Suggest or automatically trigger a `$10–$50` Meta Ad boost when an organic Facebook/Instagram post crosses an engagement velocity threshold, plus interactive Campaign → Ad Set → Ad breadcrumb drilldowns in `/ads/manage`.

@@ -1,4 +1,4 @@
-import { REBUILD_WORKER_PREFIX } from '@/server/jobs/identity';
+import { WORKER_PREFIX } from '@/server/jobs/identity';
 import { randomUUID } from 'node:crypto';
 import { sendTransactionalMail } from '@/server/mail';
 import { mailCopySchema } from '../config';
@@ -21,7 +21,7 @@ const policyFor = async () => monitoringPolicySchema.parse(await runtimeConfig('
 export async function runOperatorMonitoring(now: Date = new Date(), actorId?: string) {
   const policy = await policyFor();
   const [heartbeat, failures, accounts, backups, offsiteAge] = await Promise.all([
-    prisma.$queryRaw<Array<{ seenAt: Date }>>`SELECT "seenAt" FROM worker_heartbeats WHERE LEFT("workerId", ${REBUILD_WORKER_PREFIX.length}::int) = ${REBUILD_WORKER_PREFIX} ORDER BY "seenAt" DESC LIMIT 1`,
+    prisma.$queryRaw<Array<{ seenAt: Date }>>`SELECT "seenAt" FROM worker_heartbeats WHERE LEFT("workerId", ${WORKER_PREFIX.length}::int) = ${WORKER_PREFIX} ORDER BY "seenAt" DESC LIMIT 1`,
     prisma.$queryRaw<Array<{ count: number }>>`SELECT COUNT(*)::int AS count FROM post_targets WHERE status = 'failed' AND "updatedAt" >= ${new Date(now.getTime() - policy.publishFailureWindowSeconds * 1000)}`,
     prisma.$queryRaw<Array<{ disconnected: number; expiring: number }>>`SELECT COUNT(*) FILTER (WHERE "invalidatedAt" IS NOT NULL)::int AS disconnected, COUNT(*) FILTER (WHERE "invalidatedAt" IS NULL AND "tokenExpiresAt" > ${now} AND "tokenExpiresAt" <= ${new Date(now.getTime() + policy.tokenExpiryWarningDays * 86400000)})::int AS expiring FROM social_accounts`,
     prisma.$queryRaw<Array<{ status: string; lastOk: Date | null }>>`SELECT status, (SELECT MAX("finishedAt") FROM backup_runs WHERE kind = 'offsite' AND status = 'ok') AS "lastOk" FROM backup_runs ORDER BY "finishedAt" DESC LIMIT 1`,
@@ -49,13 +49,13 @@ export async function runOperatorMonitoring(now: Date = new Date(), actorId?: st
       if (check.firing && !existing.length) {
         await tx.$executeRaw`INSERT INTO system_alerts (id, key, detail, "openedAt") VALUES (${randomUUID()}, ${check.key}, ${JSON.stringify(check.detail)}::jsonb, ${now})`;
         const eventId = randomUUID();
-        await tx.$executeRaw`INSERT INTO rebuild_monitoring_deliveries (id, key, state, status) VALUES (${eventId}, ${check.key}, 'open', 'pending')`;
+        await tx.$executeRaw`INSERT INTO monitoring_deliveries (id, key, state, status) VALUES (${eventId}, ${check.key}, 'open', 'pending')`;
         await enqueueOperatorIncident(tx, { eventId, state: 'open', workspaceId: policy.chatWorkspaceId });
         opened.push(check.key);
       } else if (!check.firing && existing.length) {
         await tx.$executeRaw`UPDATE system_alerts SET "resolvedAt" = ${now} WHERE key = ${check.key} AND "resolvedAt" IS NULL`;
         const eventId = randomUUID();
-        await tx.$executeRaw`INSERT INTO rebuild_monitoring_deliveries (id, key, state, status) VALUES (${eventId}, ${check.key}, 'resolved', 'pending')`;
+        await tx.$executeRaw`INSERT INTO monitoring_deliveries (id, key, state, status) VALUES (${eventId}, ${check.key}, 'resolved', 'pending')`;
         await enqueueOperatorIncident(tx, { eventId, state: 'resolved', workspaceId: policy.chatWorkspaceId });
         resolved.push(check.key);
       }
@@ -64,9 +64,9 @@ export async function runOperatorMonitoring(now: Date = new Date(), actorId?: st
     const minute = new Date(Math.floor(now.getTime() / 60000) * 60000);
     const day = minute.toISOString().slice(0, 10);
     for (const component of [...(app ? ['app'] : []), ...(worker ? ['worker'] : [])]) {
-      await tx.$executeRaw`WITH claimed AS (INSERT INTO rebuild_uptime_samples (minute, component) VALUES (${minute}, ${component}) ON CONFLICT DO NOTHING RETURNING component) INSERT INTO uptime_days (day, component, minutes) SELECT ${day}, component, 1 FROM claimed ON CONFLICT (day, component) DO UPDATE SET minutes = LEAST(uptime_days.minutes + 1, 1440)`;
+      await tx.$executeRaw`WITH claimed AS (INSERT INTO uptime_samples (minute, component) VALUES (${minute}, ${component}) ON CONFLICT DO NOTHING RETURNING component) INSERT INTO uptime_days (day, component, minutes) SELECT ${day}, component, 1 FROM claimed ON CONFLICT (day, component) DO UPDATE SET minutes = LEAST(uptime_days.minutes + 1, 1440)`;
     }
-    await tx.$executeRaw`DELETE FROM rebuild_uptime_samples WHERE minute < ${new Date(now.getTime() - policy.historyDays * 86400000)}`;
+    await tx.$executeRaw`DELETE FROM uptime_samples WHERE minute < ${new Date(now.getTime() - policy.historyDays * 86400000)}`;
     if (actorId) await writeRootAudit(tx, actorId, 'root.monitoring_evaluated', { opened, resolved, app, worker });
     return { opened, resolved, checks, uptime: { app, worker } };
   });
@@ -104,7 +104,7 @@ export async function readRootOperatorMonitoring(actorId: string, resultCap?: nu
   const [alerts, uptime, deliveries, incidentHistory] = await Promise.all([
     prisma.$queryRaw<Array<{ id: string; key: string; openedAt: Date }>>`SELECT id, key, "openedAt" FROM system_alerts WHERE "resolvedAt" IS NULL ORDER BY "openedAt" DESC, id LIMIT ${limit}`,
     prisma.$queryRaw<Array<{ day: string; component: string; minutes: number }>>`SELECT day, component, minutes FROM uptime_days WHERE day >= ${firstDay} AND component IN ('app', 'worker') ORDER BY day, component LIMIT ${Math.min(policy.historyDays * 2, resultCap ?? policy.historyDays * 2)}`,
-    prisma.$queryRaw<Array<{ id: string; key: string; state: string; status: string; createdAt: Date; finishedAt: Date | null }>>`SELECT id, key, state, status, "createdAt", "finishedAt" FROM rebuild_monitoring_deliveries ORDER BY "createdAt" DESC, id LIMIT ${limit}`,
+    prisma.$queryRaw<Array<{ id: string; key: string; state: string; status: string; createdAt: Date; finishedAt: Date | null }>>`SELECT id, key, state, status, "createdAt", "finishedAt" FROM monitoring_deliveries ORDER BY "createdAt" DESC, id LIMIT ${limit}`,
     prisma.$queryRaw<Array<{ id: string; key: string; openedAt: Date; resolvedAt: Date | null }>>`SELECT id, key, "openedAt", "resolvedAt" FROM system_alerts ORDER BY "openedAt" DESC, id LIMIT ${limit}`,
   ]);
   return { incidentHistory: incidentHistory.map(row => ({ ...row, openedAt: row.openedAt.toISOString(), resolvedAt: row.resolvedAt?.toISOString() ?? null })), alerts: alerts.map(row => ({ ...row, openedAt: row.openedAt.toISOString() })), uptime, deliveries: deliveries.map(row => ({ ...row, createdAt: row.createdAt.toISOString(), finishedAt: row.finishedAt?.toISOString() ?? null })), policy, confirmation: MONITORING_CONFIRMATION, testConfirmation: MONITORING_TEST_CONFIRMATION };
@@ -120,7 +120,7 @@ export async function testRootOperatorMonitoring(actorId: string, confirmation: 
   const id = randomUUID();
   await rootTransaction(async tx => {
     await lockRootActor(tx, actorId);
-    await tx.$executeRaw`INSERT INTO rebuild_monitoring_deliveries (id, key, state, status) VALUES (${id}, ${'monitoring.test'}, 'open', 'pending')`;
+    await tx.$executeRaw`INSERT INTO monitoring_deliveries (id, key, state, status) VALUES (${id}, ${'monitoring.test'}, 'open', 'pending')`;
     await enqueueOperatorIncident(tx, { eventId: id, state: 'test', workspaceId: policy.chatWorkspaceId });
     await writeRootAudit(tx, actorId, 'root.monitoring_test_queued', { id });
   });
@@ -131,8 +131,8 @@ export async function testRootOperatorMonitoring(actorId: string, confirmation: 
 async function deliverMonitoringAlerts(policy: Awaited<ReturnType<typeof policyFor>>) {
   const copy = mailCopySchema.parse(await runtimeConfig('root.monitoringMailCopy'));
   const rows = await rootTransaction(async tx => {
-    await tx.$executeRaw`UPDATE rebuild_monitoring_deliveries SET status = 'uncertain' WHERE status = 'sending' AND "claimedAt" < NOW() - ${policy.deliveryLeaseSeconds} * INTERVAL '1 second'`;
-    return tx.$queryRaw<Array<{ id: string; key: string; state: 'open' | 'resolved' }>>`WITH candidates AS (SELECT id FROM rebuild_monitoring_deliveries WHERE status = 'pending' ORDER BY "createdAt", id LIMIT ${policy.deliveryBatchSize} FOR UPDATE SKIP LOCKED) UPDATE rebuild_monitoring_deliveries d SET status = 'sending', "claimedAt" = NOW() FROM candidates c WHERE d.id = c.id RETURNING d.id, d.key, d.state`;
+    await tx.$executeRaw`UPDATE monitoring_deliveries SET status = 'uncertain' WHERE status = 'sending' AND "claimedAt" < NOW() - ${policy.deliveryLeaseSeconds} * INTERVAL '1 second'`;
+    return tx.$queryRaw<Array<{ id: string; key: string; state: 'open' | 'resolved' }>>`WITH candidates AS (SELECT id FROM monitoring_deliveries WHERE status = 'pending' ORDER BY "createdAt", id LIMIT ${policy.deliveryBatchSize} FOR UPDATE SKIP LOCKED) UPDATE monitoring_deliveries d SET status = 'sending', "claimedAt" = NOW() FROM candidates c WHERE d.id = c.id RETURNING d.id, d.key, d.state`;
   });
   const recipients = await prisma.$queryRaw<Array<{ email: string; locale: string }>>`SELECT email, locale FROM users WHERE "isInstanceOwner" = true AND "disabledAt" IS NULL ORDER BY id LIMIT 1`;
   for (const row of rows) {
@@ -141,6 +141,6 @@ async function deliverMonitoringAlerts(policy: Awaited<ReturnType<typeof policyF
       const recipient = recipients[0]; const text = copy[recipient.locale === 'fr' ? 'fr' : 'en'];
       try { status = (await sendTransactionalMail({ to: recipient.email, subject: row.key === 'monitoring.test' ? text.test : text[row.state], text: text.body.replace('{key}', row.key), template: 'system-alert' })).status; } catch { status = 'uncertain'; }
     }
-    await prisma.$executeRaw`UPDATE rebuild_monitoring_deliveries SET status = ${status}, "finishedAt" = NOW() WHERE id = ${row.id} AND status = 'sending'`;
+    await prisma.$executeRaw`UPDATE monitoring_deliveries SET status = ${status}, "finishedAt" = NOW() WHERE id = ${row.id} AND status = 'sending'`;
   }
 }

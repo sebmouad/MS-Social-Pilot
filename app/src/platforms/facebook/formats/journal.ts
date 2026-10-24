@@ -74,7 +74,7 @@ export function createFacebookNativeJournal(input: FacebookNativeJournalScope, o
     return database.$transaction(work, limits);
   };
   async function parent(tx: Prisma.TransactionClient): Promise<Parent> {
-    const rows = await tx.$queryRaw<Parent[]>`SELECT * FROM rebuild_publication_attempts
+    const rows = await tx.$queryRaw<Parent[]>`SELECT * FROM publication_attempts
       WHERE id=${scope.operationId} AND "workspaceId"=${scope.workspaceId} FOR UPDATE`;
     const row = rows[0];
     if (!row || row.provider !== 'facebook' || row.postId !== scope.postId || row.postTargetId !== scope.postTargetId ||
@@ -82,7 +82,7 @@ export function createFacebookNativeJournal(input: FacebookNativeJournalScope, o
     return row;
   }
   async function child(tx: Prisma.TransactionClient): Promise<Row | null> {
-    const rows = await tx.$queryRaw<Row[]>`SELECT * FROM rebuild_facebook_native_journal
+    const rows = await tx.$queryRaw<Row[]>`SELECT * FROM facebook_native_journal
       WHERE "workspaceId"=${scope.workspaceId} AND "operationId"=${scope.operationId} FOR UPDATE`;
     const row = rows[0];
     if (row) assertBinding(scope, row);
@@ -111,7 +111,7 @@ export function createFacebookNativeJournal(input: FacebookNativeJournalScope, o
         const existing = await child(tx);
         if (existing) return { created: false as const, existing: record(existing) };
         if (claim.state !== 'started' || !await live(tx)) throw conflict();
-        await tx.$executeRaw`INSERT INTO rebuild_facebook_native_journal
+        await tx.$executeRaw`INSERT INTO facebook_native_journal
           ("operationId","workspaceId","postId","postTargetId","targetId","actorId","remoteTargetId",format,"sourceFormatId","payloadHash","ownerToken")
           VALUES (${scope.operationId},${scope.workspaceId},${scope.postId},${scope.postTargetId},${scope.targetId},${scope.actorId},${scope.remoteTargetId},${scope.format},${scope.sourceFormatId},${scope.payloadHash},${ownerToken}::uuid)`;
         return { created: true as const };
@@ -143,7 +143,7 @@ export function createFacebookNativeJournal(input: FacebookNativeJournalScope, o
         if (!active && ids.length === row.knownIds.length && JSON.stringify(steps) === JSON.stringify(row.steps ?? []) && remoteId === (row.remoteId ?? null)) {
           return { applied: false, revision: undefined };
         }
-        const changed = await tx.$executeRaw`UPDATE rebuild_facebook_native_journal
+        const changed = await tx.$executeRaw`UPDATE facebook_native_journal
           SET state=${state}, "knownIds"=${JSON.stringify(ids)}::jsonb, steps=${JSON.stringify(steps)}::jsonb,
             "remoteId"=${remoteId}, conflicted=${row.conflicted || !active}, revision=revision+1, "updatedAt"=clock_timestamp()
           WHERE "workspaceId"=${scope.workspaceId} AND "operationId"=${scope.operationId}

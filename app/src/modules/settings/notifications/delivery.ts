@@ -46,19 +46,19 @@ async function execute<T>(workspaceId: string, policy: Awaited<ReturnType<typeof
 
 async function uncertainExpired(now: Date, workspaceId: string | undefined) {
   const filter = workspaceId ?? null;
-  return prisma.$executeRaw`WITH changed AS (UPDATE rebuild_notifications SET "emailState" = 'uncertain', "claimToken" = NULL, "claimUntil" = NULL, "nextAt" = NULL, "safeReason" = 'claim_expired', "updatedAt" = NOW() WHERE "emailState" = 'sending' AND "claimUntil" <= ${now} AND (${filter}::text IS NULL OR "workspaceId" = ${filter}) RETURNING id, "workspaceId", kind, attempt)
+  return prisma.$executeRaw`WITH changed AS (UPDATE notifications SET "emailState" = 'uncertain', "claimToken" = NULL, "claimUntil" = NULL, "nextAt" = NULL, "safeReason" = 'claim_expired', "updatedAt" = NOW() WHERE "emailState" = 'sending' AND "claimUntil" <= ${now} AND (${filter}::text IS NULL OR "workspaceId" = ${filter}) RETURNING id, "workspaceId", kind, attempt)
     INSERT INTO activity_logs (id, "workspaceId", "actorId", action, detail, "createdAt")
     SELECT ${`notif_expired_${randomUUID()}_`} || id, "workspaceId", NULL, 'notifications.delivery', jsonb_build_object('notificationId', id, 'kind', kind, 'state', 'uncertain', 'attempt', attempt), NOW() FROM changed`;
 }
 
 async function claim(tx: Tx, id: string, now: Date, policy: Awaited<ReturnType<typeof runtimeBounds>>): Promise<{ claim: Claim | null; outcome: 'skipped' | null }> {
   const rows = await tx.$queryRaw<Candidate[]>`SELECT n.id, n."workspaceId", n."userId", n."eventId", n.kind, n."postId", n."noteId", n."targetId", n."labelId", n."accountId", n.attempt
-    FROM rebuild_notifications n WHERE n.id = ${id} AND n."emailState" = 'pending' AND n."nextAt" <= ${now} FOR UPDATE OF n`;
+    FROM notifications n WHERE n.id = ${id} AND n."emailState" = 'pending' AND n."nextAt" <= ${now} FOR UPDATE OF n`;
   const row = rows[0];
   if (!row) return { claim: null, outcome: 'skipped' };
   const token = randomUUID();
   const claimUntil = new Date(now.getTime() + policy.claimLeaseSeconds * 1000);
-  const changed = await tx.$executeRaw`UPDATE rebuild_notifications SET "emailState" = 'sending', attempt = attempt + 1, "lastAttemptAt" = ${now}, "updatedAt" = NOW(), "claimToken" = ${token}, "claimUntil" = ${claimUntil}, "nextAt" = NULL, "safeReason" = NULL WHERE id = ${id} AND "emailState" = 'pending' AND "nextAt" <= ${now}`;
+  const changed = await tx.$executeRaw`UPDATE notifications SET "emailState" = 'sending', attempt = attempt + 1, "lastAttemptAt" = ${now}, "updatedAt" = NOW(), "claimToken" = ${token}, "claimUntil" = ${claimUntil}, "nextAt" = NULL, "safeReason" = NULL WHERE id = ${id} AND "emailState" = 'pending' AND "nextAt" <= ${now}`;
   if (changed !== 1) return { claim: null, outcome: 'skipped' };
   await auditDelivery(tx, { ...row, attempt: row.attempt + 1 }, 'sending');
   const copy = localizedNotificationCopy(policy.eventCopy[row.kind], await txLocale(tx, row.userId));
@@ -107,19 +107,19 @@ async function lockEventResources(tx: Tx, row: Candidate) {
 async function deliverUnderGuards(claimed: Claim, now: Date, policy: Awaited<ReturnType<typeof runtimeBounds>>, ioStarted: { value: boolean }) {
   const { candidate, token } = claimed;
   return withWorkspaceOperation(candidate.workspaceId, () => prisma.$transaction(async tx => {
-    const current = await tx.$queryRaw<Array<{ email: string; emailVerifiedAt: Date | null; disabledAt: Date | null }>>`SELECT u.email, u."emailVerifiedAt", u."disabledAt" FROM rebuild_notifications n JOIN users u ON u.id = n."userId" JOIN memberships m ON m."userId" = u.id AND m."workspaceId" = n."workspaceId" WHERE n.id = ${candidate.id} AND n."workspaceId" = ${candidate.workspaceId} AND n."userId" = ${candidate.userId} AND n."emailState" = 'sending' AND n."claimToken" = ${token} AND n."claimUntil" > clock_timestamp() FOR UPDATE OF n, m, u`;
+    const current = await tx.$queryRaw<Array<{ email: string; emailVerifiedAt: Date | null; disabledAt: Date | null }>>`SELECT u.email, u."emailVerifiedAt", u."disabledAt" FROM notifications n JOIN users u ON u.id = n."userId" JOIN memberships m ON m."userId" = u.id AND m."workspaceId" = n."workspaceId" WHERE n.id = ${candidate.id} AND n."workspaceId" = ${candidate.workspaceId} AND n."userId" = ${candidate.userId} AND n."emailState" = 'sending' AND n."claimToken" = ${token} AND n."claimUntil" > clock_timestamp() FOR UPDATE OF n, m, u`;
     const user = current[0];
     if (!user) {
-      await tx.$executeRaw`UPDATE rebuild_notifications SET "emailState" = 'uncertain', "claimToken" = NULL, "claimUntil" = NULL, "nextAt" = NULL, "safeReason" = 'claim_expired', "updatedAt" = NOW() WHERE id = ${candidate.id} AND "emailState" = 'sending' AND "claimToken" = ${token} AND "claimUntil" <= clock_timestamp()`;
+      await tx.$executeRaw`UPDATE notifications SET "emailState" = 'uncertain', "claimToken" = NULL, "claimUntil" = NULL, "nextAt" = NULL, "safeReason" = 'claim_expired', "updatedAt" = NOW() WHERE id = ${candidate.id} AND "emailState" = 'sending' AND "claimToken" = ${token} AND "claimUntil" <= clock_timestamp()`;
       return { state: 'uncertain' as const };
     }
     if (!user || user.disabledAt || !user.emailVerifiedAt || !/^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/.test(user.email)) {
-      const changed = await tx.$executeRaw`UPDATE rebuild_notifications SET "emailState" = 'cancelled', "claimToken" = NULL, "claimUntil" = NULL, "nextAt" = NULL, "safeReason" = 'recipient_unavailable', "updatedAt" = NOW() WHERE id = ${candidate.id} AND "claimToken" = ${token}`;
+      const changed = await tx.$executeRaw`UPDATE notifications SET "emailState" = 'cancelled', "claimToken" = NULL, "claimUntil" = NULL, "nextAt" = NULL, "safeReason" = 'recipient_unavailable', "updatedAt" = NOW() WHERE id = ${candidate.id} AND "claimToken" = ${token}`;
       if (changed === 1) await auditDelivery(tx, candidate, 'cancelled');
       return { state: changed === 1 ? 'cancelled' : 'uncertain' as const };
     }
     if (!await lockEventResources(tx, candidate)) {
-      const changed = await tx.$executeRaw`UPDATE rebuild_notifications SET "emailState" = 'cancelled', "claimToken" = NULL, "claimUntil" = NULL, "nextAt" = NULL, "safeReason" = 'resource_unavailable', "updatedAt" = NOW() WHERE id = ${candidate.id} AND "claimToken" = ${token}`;
+      const changed = await tx.$executeRaw`UPDATE notifications SET "emailState" = 'cancelled', "claimToken" = NULL, "claimUntil" = NULL, "nextAt" = NULL, "safeReason" = 'resource_unavailable', "updatedAt" = NOW() WHERE id = ${candidate.id} AND "claimToken" = ${token}`;
       if (changed === 1) await auditDelivery(tx, candidate, 'cancelled');
       return { state: changed === 1 ? 'cancelled' : 'uncertain' as const };
     }
@@ -129,7 +129,7 @@ async function deliverUnderGuards(claimed: Claim, now: Date, policy: Awaited<Ret
       if (!(error instanceof OperationError && ['unauthorized', 'forbidden', 'not_found'].includes(error.code))) throw error;
     }
     if (!eligible) {
-      const changed = await tx.$executeRaw`UPDATE rebuild_notifications SET "emailState" = 'cancelled', "claimToken" = NULL, "claimUntil" = NULL, "nextAt" = NULL, "safeReason" = 'authorization_changed', "updatedAt" = NOW() WHERE id = ${candidate.id} AND "claimToken" = ${token}`;
+      const changed = await tx.$executeRaw`UPDATE notifications SET "emailState" = 'cancelled', "claimToken" = NULL, "claimUntil" = NULL, "nextAt" = NULL, "safeReason" = 'authorization_changed', "updatedAt" = NOW() WHERE id = ${candidate.id} AND "claimToken" = ${token}`;
       if (changed === 1) await auditDelivery(tx, candidate, 'cancelled');
       return { state: changed === 1 ? 'cancelled' : 'uncertain' as const };
     }
@@ -148,7 +148,7 @@ async function deliverUnderGuards(claimed: Claim, now: Date, policy: Awaited<Ret
     const state = result === 'retry' && candidate.attempt >= policy.maxAttempts ? 'failed' : result === 'retry' ? 'pending' : result;
     const nextAt = state === 'pending' ? new Date(now.getTime() + policy.retryDelaySeconds * 1000) : null;
     const reason = result === 'retry' ? 'mail_unavailable' : result === 'failed' ? 'mail_failed' : result === 'uncertain' ? 'mail_uncertain' : null;
-    const changed = await tx.$executeRaw`UPDATE rebuild_notifications SET "emailState" = ${state}, "claimToken" = NULL, "claimUntil" = NULL, "nextAt" = ${nextAt}, "safeReason" = ${reason}, "emailSentAt" = CASE WHEN ${state} = 'sent' THEN NOW() ELSE NULL END, "updatedAt" = NOW() WHERE id = ${candidate.id} AND "workspaceId" = ${candidate.workspaceId} AND "userId" = ${candidate.userId} AND "emailState" = 'sending' AND "claimToken" = ${token}`;
+    const changed = await tx.$executeRaw`UPDATE notifications SET "emailState" = ${state}, "claimToken" = NULL, "claimUntil" = NULL, "nextAt" = ${nextAt}, "safeReason" = ${reason}, "emailSentAt" = CASE WHEN ${state} = 'sent' THEN NOW() ELSE NULL END, "updatedAt" = NOW() WHERE id = ${candidate.id} AND "workspaceId" = ${candidate.workspaceId} AND "userId" = ${candidate.userId} AND "emailState" = 'sending' AND "claimToken" = ${token}`;
     if (changed === 1) await auditDelivery(tx, candidate, state);
     return { state: changed === 1 ? state : 'uncertain' };
   }, { timeout: policy.deliveryOperationTimeoutMs, maxWait: policy.deliveryOperationMaxWaitMs }));
@@ -159,7 +159,7 @@ async function retryBeforeIo(claimed: Claim, now: Date, policy: Awaited<ReturnTy
   const state = candidate.attempt >= policy.maxAttempts ? 'failed' : 'pending';
   const nextAt = state === 'pending' ? new Date(now.getTime() + policy.retryDelaySeconds * 1000) : null;
   return execute(candidate.workspaceId, policy, async tx => {
-  const changed = await tx.$executeRaw`UPDATE rebuild_notifications SET "emailState" = ${state}, "claimToken" = NULL, "claimUntil" = NULL, "nextAt" = ${nextAt}, "safeReason" = 'preflight_unavailable', "emailSentAt" = NULL, "updatedAt" = NOW() WHERE id = ${candidate.id} AND "workspaceId" = ${candidate.workspaceId} AND "emailState" = 'sending' AND "claimToken" = ${claimed.token}`;
+  const changed = await tx.$executeRaw`UPDATE notifications SET "emailState" = ${state}, "claimToken" = NULL, "claimUntil" = NULL, "nextAt" = ${nextAt}, "safeReason" = 'preflight_unavailable', "emailSentAt" = NULL, "updatedAt" = NOW() WHERE id = ${candidate.id} AND "workspaceId" = ${candidate.workspaceId} AND "emailState" = 'sending' AND "claimToken" = ${claimed.token}`;
   if (changed === 1) await auditDelivery(tx, candidate, state);
   return changed === 1 ? state : 'uncertain';
   });
@@ -171,7 +171,7 @@ export async function deliverNotifications(now: Date = new Date(), workspaceId?:
   const stats = emptyStats();
   stats.uncertain += await uncertainExpired(now, workspaceId);
   const workspace = workspaceId ?? null;
-  const ids = await prisma.$queryRaw<Array<{ id: string; workspaceId: string }>>`SELECT n.id, n."workspaceId" FROM rebuild_notifications n JOIN workspaces w ON w.id = n."workspaceId" WHERE n."emailState" = 'pending' AND n."nextAt" <= ${now} AND w."suspendedAt" IS NULL AND (${workspace}::text IS NULL OR n."workspaceId" = ${workspace}) ORDER BY n."nextAt", n."createdAt", n.id LIMIT ${policy.deliveryBatchSize}`;
+  const ids = await prisma.$queryRaw<Array<{ id: string; workspaceId: string }>>`SELECT n.id, n."workspaceId" FROM notifications n JOIN workspaces w ON w.id = n."workspaceId" WHERE n."emailState" = 'pending' AND n."nextAt" <= ${now} AND w."suspendedAt" IS NULL AND (${workspace}::text IS NULL OR n."workspaceId" = ${workspace}) ORDER BY n."nextAt", n."createdAt", n.id LIMIT ${policy.deliveryBatchSize}`;
   // Dry-run rehearsals stay silent outbound: audit the batch and leave the rows pending for the next live pass.
   if (ids.length && await isStagingDryRun()) {
     await suppressStagingBatch('notifications', 'email_notification', ids);
@@ -188,7 +188,7 @@ export async function deliverNotifications(now: Date = new Date(), workspaceId?:
       if (!claimed) { stats.skipped += 1; continue; }
     } catch {
       try {
-        const deferred = await prisma.$executeRaw`UPDATE rebuild_notifications SET "nextAt" = ${new Date(now.getTime() + policy.retryDelaySeconds * 1000)}, "safeReason" = 'preflight_unavailable' WHERE id = ${item.id} AND "workspaceId" = ${item.workspaceId} AND "emailState" = 'pending' AND "nextAt" <= ${now}`;
+        const deferred = await prisma.$executeRaw`UPDATE notifications SET "nextAt" = ${new Date(now.getTime() + policy.retryDelaySeconds * 1000)}, "safeReason" = 'preflight_unavailable' WHERE id = ${item.id} AND "workspaceId" = ${item.workspaceId} AND "emailState" = 'pending' AND "nextAt" <= ${now}`;
         if (deferred !== 1) stats.skipped += 1;
       } catch { stats.skipped += 1; }
       continue;
@@ -213,7 +213,7 @@ export async function deliverNotifications(now: Date = new Date(), workspaceId?:
   }
   const cutoff = new Date(now.getTime() - policy.retentionDays * 86_400_000);
   const purgeWorkspace = workspaceId ?? null;
-  stats.purged = Number(await prisma.$executeRaw`WITH deleted AS (DELETE FROM rebuild_notifications WHERE id IN (SELECT id FROM rebuild_notifications WHERE "createdAt" < ${cutoff} AND "emailState" IN ('sent', 'failed', 'cancelled') AND (${purgeWorkspace}::text IS NULL OR "workspaceId" = ${purgeWorkspace}) ORDER BY "createdAt" ASC, id ASC LIMIT ${policy.deliveryBatchSize}) RETURNING id, "workspaceId", kind, attempt)
+  stats.purged = Number(await prisma.$executeRaw`WITH deleted AS (DELETE FROM notifications WHERE id IN (SELECT id FROM notifications WHERE "createdAt" < ${cutoff} AND "emailState" IN ('sent', 'failed', 'cancelled') AND (${purgeWorkspace}::text IS NULL OR "workspaceId" = ${purgeWorkspace}) ORDER BY "createdAt" ASC, id ASC LIMIT ${policy.deliveryBatchSize}) RETURNING id, "workspaceId", kind, attempt)
     INSERT INTO activity_logs (id, "workspaceId", "actorId", action, detail, "createdAt")
     SELECT ${`notif_retention_${randomUUID()}_`} || id, "workspaceId", NULL, 'notifications.retention', jsonb_build_object('notificationId', id, 'kind', kind, 'attempt', attempt), NOW() FROM deleted`);
   return stats;

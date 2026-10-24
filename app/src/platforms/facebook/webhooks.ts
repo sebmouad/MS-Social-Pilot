@@ -192,7 +192,7 @@ async function eligibleTargets(pageId: string): Promise<MatchedTarget[]> {
 async function storeFeedPost(targetId: string, event: MetaWebhookEvent, now: Date): Promise<boolean> {
   if (!event.postId) return false;
   await prisma.$executeRaw`INSERT INTO external_posts (id, "targetId", "remoteId", message, permalink, "statusType", "pictureUrl", "createdTime", insights, "insightsSyncedAt", "fetchedAt")
-    VALUES (${`rebuild_${randomUUID()}`}, ${targetId}, ${event.postId}, ${event.text}, NULL, NULL, NULL, ${event.createdAt ?? now}, NULL, NULL, ${now})
+    VALUES (${`fb_${randomUUID()}`}, ${targetId}, ${event.postId}, ${event.text}, NULL, NULL, NULL, ${event.createdAt ?? now}, NULL, NULL, ${now})
     ON CONFLICT ("targetId", "remoteId") DO UPDATE SET message = EXCLUDED.message, "fetchedAt" = EXCLUDED."fetchedAt"`;
   return true;
 }

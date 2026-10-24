@@ -1,6 +1,5 @@
-// Compatibility view for the fresh app. This schema maps selected legacy
-// tables and columns; some services write through these mappings. It is not
-// a migration schema and must not be pushed to the existing database.
+// MS Social Pilot — Primary Prisma Schema
+// Maps PostgreSQL tables managed by prisma/migrations/.
 generator client {
   provider = "prisma-client-js"
   output   = "../generated/client"
@@ -132,7 +131,7 @@ model AppSetting {
 }
 
 model Workspace {
-  reportRuns RebuildReportRun[]
+  reportRuns ReportRun[]
   id             String          @id
   name           String
   slug           String          @unique
@@ -147,10 +146,10 @@ model Workspace {
   instagramAccounts InstagramAccount[]
   mcpApiKeys     McpApiKey[]
   dataPurge      WorkspaceDataPurge?
-  exports RebuildWorkspaceExport[]
+  exports WorkspaceExport[]
 
-  inboxDeletions RebuildInboxDeletion[]
-  postDeletions  RebuildPostDeletion[]
+  inboxDeletions InboxDeletion[]
+  postDeletions  PostDeletion[]
   publicationAttempts PublicationAttempt[]
 
   @@map("workspaces")
@@ -234,7 +233,7 @@ model SocialAccount {
 }
 
 model Target {
-  reportRuns RebuildReportRun[]
+  reportRuns ReportRun[]
   id              String         @id
   workspaceId     String
   socialAccountId String?
@@ -508,7 +507,7 @@ model AdInsight {
 }
 
 /// Atomic cross-process lock for one scheduled rebuild job.
-model RebuildJobLease {
+model JobLease {
   name           String   @id
   owner          String
   token          String
@@ -516,11 +515,11 @@ model RebuildJobLease {
   updatedAt      DateTime @default(now())
 
   @@index([leaseExpiresAt])
-  @@map("rebuild_job_leases")
+  @@map("job_leases")
 }
 
 /// Append-only operational history for Root job health and incident review.
-model RebuildSyncRun {
+model SyncRun {
   id         String    @id
   job        String
   owner      String
@@ -533,11 +532,11 @@ model RebuildSyncRun {
 
   @@index([job, startedAt])
   @@index([finishedAt])
-  @@map("rebuild_sync_runs")
+  @@map("sync_runs")
 }
 
 /// Durable Inbox deletion recovery and content-free tombstones.
-model RebuildInboxDeletion {
+model InboxDeletion {
   id                  String    @id
   workspaceId         String
   targetId            String
@@ -557,11 +556,11 @@ model RebuildInboxDeletion {
 
   @@unique([workspaceId, provider, targetId, remoteId])
   @@index([workspaceId, targetId, updatedAt])
-  @@map("rebuild_inbox_deletions")
+  @@map("inbox_deletions")
 }
 
 /// Durable, content-free recovery journal and tombstones for remote post deletion.
-model RebuildPostDeletion {
+model PostDeletion {
   id                 String    @id
   workspaceId        String
   targetId           String
@@ -580,7 +579,7 @@ model RebuildPostDeletion {
 
   @@index([workspaceId, targetId, updatedAt])
   @@index([localPostIds], type: Gin)
-  @@map("rebuild_post_deletions")
+  @@map("post_deletions")
 }
 
 /// Durable, content-free provider publication attempt and receipt journal.
@@ -606,12 +605,12 @@ model PublicationAttempt {
 
   @@index([workspaceId, targetId, updatedAt])
   @@index([workspaceId, postId, postTargetId])
-  @@map("rebuild_publication_attempts")
+  @@map("publication_attempts")
 }
 
 
 /// Durable report outcomes; content receipts are retained only for manual downloads.
-model RebuildReportRun {
+model ReportRun {
   id String @id
   workspaceId String
   scheduleId String?
@@ -656,7 +655,7 @@ model SavedView {
   @@map("saved_views")
 }
 
-model RebuildWorkspaceExport {
+model WorkspaceExport {
   id String @id
   workspaceId String
   requestedById String
@@ -671,18 +670,167 @@ model RebuildWorkspaceExport {
   bytes Int?
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
-  @@index([status, createdAt], map: "rebuild_workspace_exports_due")
-  @@index([workspaceId, createdAt], map: "rebuild_workspace_exports_workspace")
-  @@map("rebuild_workspace_exports")
+  @@index([status, createdAt], map: "workspace_exports_due")
+  @@index([workspaceId, createdAt], map: "workspace_exports_workspace")
+  @@map("workspace_exports")
 }
 
 // Deletion outbox: no FK so file cleanup survives erasure and a worker restart.
-model RebuildExportFileCleanup {
+model ExportFileCleanup {
   id String @id
   workspaceId String
   mediaRoot String
   nextAttemptAt DateTime @default(now())
 
-  @@index([workspaceId], map: "rebuild_export_file_cleanups_workspace")
-  @@map("rebuild_export_file_cleanups")
+  @@index([workspaceId], map: "export_file_cleanups_workspace")
+  @@map("export_file_cleanups")
 }
+
+/// WordPress / CMS recipe & content source configured per workspace.
+model WordpressRecipeSource {
+  id          String   @id
+  workspaceId String   @unique
+  name        String
+  siteUrl     String
+  enabled     Boolean  @default(false)
+  allTargets  Boolean  @default(true)
+  targetIds   Json     @default("[]")
+  config      Json     @default("{}")
+  lastRunAt   DateTime?
+  lastError   String?
+  lastSummary Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  plans       WordpressRecipePlan[]
+
+  @@map("wordpress_recipe_sources")
+}
+
+/// Planned slot ledger for WordPress / CMS recipe automation.
+model WordpressRecipePlan {
+  id          String   @id
+  workspaceId String
+  sourceId    String
+  targetId    String
+  wpPostId    String
+  slotAt      DateTime
+  state       String
+  postId      String?
+  title       String
+  permalink   String?
+  reason      String?
+  skipped     Json     @default("[]")
+  claimedAt   DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  source      WordpressRecipeSource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+
+  @@unique([sourceId, targetId, slotAt])
+  @@index([workspaceId, sourceId, slotAt])
+  @@map("wordpress_recipe_plans")
+}
+
+/// In-app and email notification ledger.
+model Notification {
+  id                String    @id
+  workspaceId       String
+  recipientId       String
+  eventId           String
+  kind              String
+  context           Json      @default("{}")
+  readAt            DateTime?
+  emailStatus       String
+  emailAttempts     Int       @default(0)
+  emailNextAttemptAt DateTime?
+  emailClaimToken   String?
+  emailClaimedAt    DateTime?
+  emailSentAt       DateTime?
+  emailLastError    String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@unique([workspaceId, eventId, recipientId], map: "notifications_event_recipient_uq")
+  @@index([workspaceId, recipientId, createdAt(sort: Desc), id(sort: Desc)], map: "notifications_recipient_page_idx")
+  @@map("notifications")
+}
+
+/// Outbound Slack / Discord / Telegram chat channel webhooks.
+model ChatChannel {
+  id          String   @id
+  workspaceId String
+  name        String
+  kind        String
+  secret      String
+  events      String[] @default([])
+  enabled     Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([workspaceId])
+  @@map("chat_channels")
+}
+
+/// Durable delivery queue for outbound chat notifications.
+model ChatDelivery {
+  id           String    @id
+  workspaceId  String
+  channelId    String
+  eventId      String
+  event        String
+  operatorOnly Boolean   @default(false)
+  source       Json?
+  status       String    @default("pending")
+  claimToken   String?
+  claimedAt    DateTime?
+  createdAt    DateTime  @default(now())
+  finishedAt   DateTime?
+
+  @@unique([workspaceId, channelId, eventId, event])
+  @@index([status, createdAt], map: "chat_deliveries_pending")
+  @@map("chat_deliveries")
+}
+
+/// Custom AI writing personas per workspace.
+model WritingAgent {
+  id           String   @id
+  workspaceId  String
+  name         String
+  instructions String
+  voice        String
+  createdById  String
+  updatedAt    DateTime @default(now())
+
+  @@unique([id, workspaceId])
+  @@index([workspaceId, id])
+  @@map("writing_agents")
+}
+
+/// Execution log for custom AI writing agents.
+model WritingAgentRun {
+  id          String    @id
+  workspaceId String
+  agentId     String?
+  createdById String
+  kind        String
+  status      String
+  errorCode   String?
+  createdAt   DateTime  @default(now())
+  completedAt DateTime?
+
+  @@index([workspaceId, createdAt(sort: Desc), id])
+  @@map("writing_agent_runs")
+}
+
+/// Workspace watermark image configuration.
+model WorkspaceWatermark {
+  workspaceId String   @id
+  mediaId     String
+  position    String
+  opacity     Int
+  scale       Int
+  updatedById String
+  updatedAt   DateTime @default(now())
+
+  @@map("workspace_watermarks")
+}
+

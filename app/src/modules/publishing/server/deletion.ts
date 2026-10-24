@@ -38,7 +38,7 @@ async function history(actor: PublishingActor, postId: string) {
   const errorText = await loadPublishingErrorText();
   const max = await runtimeConfig('publishing.deletionMaxAliases');
   const rows = await prisma.$queryRaw<Journal[]>`SELECT id, "workspaceId", "targetId", provider, "remoteId", "localPostIds", "localPostTargetIds", state
-    FROM rebuild_post_deletions WHERE "workspaceId" = ${actor.workspaceId} AND ${postId} = ANY("localPostIds") ORDER BY "createdAt" DESC, id DESC LIMIT ${max + 1}`;
+    FROM post_deletions WHERE "workspaceId" = ${actor.workspaceId} AND ${postId} = ANY("localPostIds") ORDER BY "createdAt" DESC, id DESC LIMIT ${max + 1}`;
   if (rows.length > max) throw new PublishingOperationError('unavailable', 'thisDeletionHistoryNeedsAdministratorReview', {}, errorText);
   if (actor.allowedTargetIds !== undefined && rows.some(row => !actor.allowedTargetIds!.includes(row.targetId))) throw missing(errorText);
   return rows;
@@ -76,7 +76,7 @@ export async function getPostDeletion(actor: PublishingActor, input: { postId: s
   return result(access.actor, input.postId);
 }
 async function remoteJournal(workspaceId: string, provider: string, targetId: string, remoteId: string) {
-  const rows = await prisma.$queryRaw<Journal[]>`SELECT id, "workspaceId", "targetId", provider, "remoteId", "localPostIds", "localPostTargetIds", state FROM rebuild_post_deletions
+  const rows = await prisma.$queryRaw<Journal[]>`SELECT id, "workspaceId", "targetId", provider, "remoteId", "localPostIds", "localPostTargetIds", state FROM post_deletions
     WHERE "workspaceId" = ${workspaceId} AND provider = ${provider} AND "targetId" = ${targetId} AND "remoteId" = ${remoteId} AND state <> 'rejected'`;
   return rows[0];
 }
@@ -97,12 +97,12 @@ async function checkWriter(actor: PublishingActor, role: string, postId: string,
 export async function recordPostDeletionOutcomeInTransaction(tx: Prisma.TransactionClient, actorId: string, input: { operationId: string; workspaceId: string; outcome: 'deleted' | 'not_deleted' }): Promise<{ ok: true; operationId: string; state: 'remote_confirmed' | 'rejected' }> {
   const errorText = await loadPublishingErrorText();
   if (!['deleted', 'not_deleted'].includes(input.outcome)) throw new PublishingOperationError('invalid_request', 'chooseAValidDeletionOutcome', {}, errorText);
-  const rows = await tx.$queryRaw<Journal[]>`SELECT id, "workspaceId", "targetId", provider, "remoteId", "localPostIds", "localPostTargetIds", state FROM rebuild_post_deletions WHERE id = ${input.operationId} AND "workspaceId" = ${input.workspaceId} FOR UPDATE`;
+  const rows = await tx.$queryRaw<Journal[]>`SELECT id, "workspaceId", "targetId", provider, "remoteId", "localPostIds", "localPostTargetIds", state FROM post_deletions WHERE id = ${input.operationId} AND "workspaceId" = ${input.workspaceId} FOR UPDATE`;
   const row = rows[0];
   if (!row) throw missing(errorText);
   if (!['started', 'uncertain'].includes(row.state)) throw new PublishingOperationError('conflict', 'thisDeletionAlreadyHasARecordedOutcome', {}, errorText);
   const state = input.outcome === 'deleted' ? 'remote_confirmed' : 'rejected';
-  await tx.$executeRaw`UPDATE rebuild_post_deletions SET state = ${state}, reason = ${input.outcome === 'deleted' ? 'local_pending' : 'external_not_deleted'}, "remoteConfirmedAt" = ${input.outcome === 'deleted' ? new Date() : null}, "updatedAt" = CURRENT_TIMESTAMP WHERE id = ${row.id} AND "workspaceId" = ${input.workspaceId}`;
+  await tx.$executeRaw`UPDATE post_deletions SET state = ${state}, reason = ${input.outcome === 'deleted' ? 'local_pending' : 'external_not_deleted'}, "remoteConfirmedAt" = ${input.outcome === 'deleted' ? new Date() : null}, "updatedAt" = CURRENT_TIMESTAMP WHERE id = ${row.id} AND "workspaceId" = ${input.workspaceId}`;
   await audit(tx, actorId, input.workspaceId, 'publishing.post_deletion_outcome_recorded', { operationId: row.id, targetId: row.targetId, outcome: input.outcome, verification: 'external_human_attestation' });
   return { ok: true, operationId: row.id, state };
 }
@@ -114,7 +114,7 @@ async function finish(actor: PublishingActor, postId: string, signal: AbortSigna
   if (current.localConfirmed || current.state !== 'local_pending') return current;
   await withPublishingTransaction(signal, async tx => {
     const post = await tx.post.findFirst({ where: { id: postId, workspaceId: actor.workspaceId }, select: { id: true, targets: { select: { targetId: true, remotePostId: true } } } });
-    const rows = await tx.$queryRaw<Journal[]>`SELECT id, "workspaceId", "targetId", provider, "remoteId", "localPostIds", "localPostTargetIds", state FROM rebuild_post_deletions WHERE "workspaceId" = ${actor.workspaceId} AND ${postId} = ANY("localPostIds") AND state <> 'rejected' ORDER BY id FOR UPDATE`;
+    const rows = await tx.$queryRaw<Journal[]>`SELECT id, "workspaceId", "targetId", provider, "remoteId", "localPostIds", "localPostTargetIds", state FROM post_deletions WHERE "workspaceId" = ${actor.workspaceId} AND ${postId} = ANY("localPostIds") AND state <> 'rejected' ORDER BY id FOR UPDATE`;
     if (rows.some(row => !confirmed(row)) || post?.targets.some(target => target.remotePostId && !rows.some(row => row.targetId === target.targetId && row.remoteId === target.remotePostId && confirmed(row)))) throw new PublishingOperationError('conflict', 'confirmEveryPlatformDeletionBeforeRemovingThisLocalPost', {}, errorText);
     const max = await runtimeConfig('publishing.deletionMaxAliases');
     const aliasPosts = new Set<string>();
@@ -123,7 +123,7 @@ async function finish(actor: PublishingActor, postId: string, signal: AbortSigna
       if (aliases.length > max || new Set([...row.localPostIds, ...aliases.map(alias => alias.postId)]).size > max || new Set([...row.localPostTargetIds, ...aliases.map(alias => alias.id)]).size > max) throw new PublishingOperationError('unavailable', 'thisDeletionHasTooManyStoredReferencesAskAn', {}, errorText);
       for (const alias of aliases) aliasPosts.add(alias.postId);
       await tx.postTarget.updateMany({ where: { id: { in: aliases.map(alias => alias.id) }, targetId: row.targetId, remotePostId: row.remoteId, post: { workspaceId: actor.workspaceId } }, data: { status: 'cancelled', remotePostId: null, remoteUrl: null } });
-      await tx.$executeRaw`UPDATE rebuild_post_deletions SET state = 'completed', reason = NULL, "completedAt" = COALESCE("completedAt", CURRENT_TIMESTAMP), "updatedAt" = CURRENT_TIMESTAMP,
+      await tx.$executeRaw`UPDATE post_deletions SET state = 'completed', reason = NULL, "completedAt" = COALESCE("completedAt", CURRENT_TIMESTAMP), "updatedAt" = CURRENT_TIMESTAMP,
         "localPostIds" = ARRAY(SELECT DISTINCT unnest("localPostIds" || ${aliases.map(alias => alias.postId)}::text[])), "localPostTargetIds" = ARRAY(SELECT DISTINCT unnest("localPostTargetIds" || ${aliases.map(alias => alias.id)}::text[])) WHERE id = ${row.id}`;
     }
     for (const id of aliasPosts) {
@@ -194,7 +194,7 @@ export async function deletePostDurably(actor: PublishingActor, postId: string, 
         // Attach a newly encountered local alias without creating another remote request.
         await withPublishingTransaction(signal, async tx => {
           if (new Set([...existing.localPostIds, postId]).size > max || new Set([...existing.localPostTargetIds, row.id]).size > max) throw new PublishingOperationError('unavailable', 'thisDeletionHasTooManyStoredReferences', {}, errorText);
-          await tx.$executeRaw`UPDATE rebuild_post_deletions SET "localPostIds" = ARRAY(SELECT DISTINCT unnest("localPostIds" || ARRAY[${postId}])), "localPostTargetIds" = ARRAY(SELECT DISTINCT unnest("localPostTargetIds" || ARRAY[${row.id}])), "updatedAt" = CURRENT_TIMESTAMP WHERE id = ${existing.id}`;
+          await tx.$executeRaw`UPDATE post_deletions SET "localPostIds" = ARRAY(SELECT DISTINCT unnest("localPostIds" || ARRAY[${postId}])), "localPostTargetIds" = ARRAY(SELECT DISTINCT unnest("localPostTargetIds" || ARRAY[${row.id}])), "updatedAt" = CURRENT_TIMESTAMP WHERE id = ${existing.id}`;
         });
         if (!confirmed(existing)) return result(actor, postId);
         continue;
@@ -210,20 +210,20 @@ export async function deletePostDurably(actor: PublishingActor, postId: string, 
     for (const item of prepared) {
       const operationId = randomUUID();
       await withPublishingTransaction(signal, async tx => {
-        await tx.$executeRaw`INSERT INTO rebuild_post_deletions (id, "workspaceId", "targetId", provider, "remoteId", "actorId", "localPostIds", "localPostTargetIds", state)
+        await tx.$executeRaw`INSERT INTO post_deletions (id, "workspaceId", "targetId", provider, "remoteId", "actorId", "localPostIds", "localPostTargetIds", state)
           VALUES (${operationId}, ${actor.workspaceId}, ${item.row.targetId}, ${item.provider}, ${item.row.remotePostId}, ${actor.userId}, ${[...new Set([postId, ...item.aliases.map(alias => alias.postId)])]}::text[], ${[...new Set([item.row.id, ...item.aliases.map(alias => alias.id)])]}::text[], 'started')`;
         await audit(tx, actor.userId, actor.workspaceId, 'publishing.post_deletion_started', { postId, postTargetId: item.row.id, operationId });
       });
       try { signal.throwIfAborted(); await item.dispatch(); }
       catch {
         try { await withPublishingTransaction(signal, async tx => {
-          await tx.$executeRaw`UPDATE rebuild_post_deletions SET state = 'uncertain', reason = 'transport_unconfirmed', "updatedAt" = CURRENT_TIMESTAMP WHERE id = ${operationId} AND state = 'started'`;
+          await tx.$executeRaw`UPDATE post_deletions SET state = 'uncertain', reason = 'transport_unconfirmed', "updatedAt" = CURRENT_TIMESTAMP WHERE id = ${operationId} AND state = 'started'`;
           await audit(tx, actor.userId, actor.workspaceId, 'publishing.post_deletion_uncertain', { postId, operationId });
         }); } catch { /* The committed started intent remains non-repeatable. */ }
         return result(actor, postId);
       }
       try { await withPublishingTransaction(signal, async tx => {
-        await tx.$executeRaw`UPDATE rebuild_post_deletions SET state = 'remote_confirmed', reason = 'local_pending', "remoteConfirmedAt" = CURRENT_TIMESTAMP, "updatedAt" = CURRENT_TIMESTAMP WHERE id = ${operationId} AND state = 'started'`;
+        await tx.$executeRaw`UPDATE post_deletions SET state = 'remote_confirmed', reason = 'local_pending', "remoteConfirmedAt" = CURRENT_TIMESTAMP, "updatedAt" = CURRENT_TIMESTAMP WHERE id = ${operationId} AND state = 'started'`;
         await audit(tx, actor.userId, actor.workspaceId, 'publishing.remote_post_deleted', { postId, postTargetId: item.row.id, operationId });
       }); } catch { return result(actor, postId); }
     }

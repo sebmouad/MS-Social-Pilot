@@ -191,7 +191,7 @@ async function currentPageBinding(target: PageTarget, now: Date): Promise<{ toke
   return { token: decryptSecret(fresh.accessToken ?? fresh.socialAccount.accessToken) };
 }
 async function readHistoryCursor(db: Pick<typeof prisma, '$queryRaw'>, target: PageTarget): Promise<HistoryProgress | undefined> {
-  const rows = await db.$queryRaw<Array<{ cursor: HistoryProgress }>>`SELECT cursor FROM rebuild_facebook_sync_cursors WHERE "workspaceId" = ${target.workspaceId} AND "targetId" = ${target.id} AND kind = 'post_history' AND "providerId" = ${target.providerId}`;
+  const rows = await db.$queryRaw<Array<{ cursor: HistoryProgress }>>`SELECT cursor FROM facebook_sync_cursors WHERE "workspaceId" = ${target.workspaceId} AND "targetId" = ${target.id} AND kind = 'post_history' AND "providerId" = ${target.providerId}`;
   return rows[0]?.cursor;
 }
 
@@ -258,17 +258,17 @@ export async function syncPageAnalytics(now = new Date(), retryLimit = 0, retryB
             for (const post of history.posts) {
               signal.throwIfAborted();
               await tx.$executeRaw`INSERT INTO external_posts (id, "targetId", "remoteId", message, permalink, "statusType", "pictureUrl", "createdTime", insights, "insightsSyncedAt", "fetchedAt")
-                VALUES (${`rebuild_${randomUUID()}`}, ${target.id}, ${post.remoteId}, ${post.message}, ${post.permalink}, ${post.statusType}, ${post.pictureUrl}, ${post.createdTime}, ${JSON.stringify(post.insights)}::jsonb, ${now}, ${now})
+                VALUES (${`fb_${randomUUID()}`}, ${target.id}, ${post.remoteId}, ${post.message}, ${post.permalink}, ${post.statusType}, ${post.pictureUrl}, ${post.createdTime}, ${JSON.stringify(post.insights)}::jsonb, ${now}, ${now})
                 ON CONFLICT ("targetId", "remoteId") DO UPDATE SET message = EXCLUDED.message, permalink = EXCLUDED.permalink, "statusType" = EXCLUDED."statusType", "pictureUrl" = EXCLUDED."pictureUrl", insights = EXCLUDED.insights, "insightsSyncedAt" = EXCLUDED."insightsSyncedAt", "fetchedAt" = EXCLUDED."fetchedAt"`;
               persistedCount++;
             }
-            await tx.$executeRaw`INSERT INTO rebuild_facebook_sync_cursors ("workspaceId", "targetId", "providerId", kind, cursor, "updatedAt") VALUES (${target.workspaceId}, ${target.id}, ${target.providerId}, 'post_history', ${JSON.stringify(history.progress)}::jsonb, ${now}) ON CONFLICT ("workspaceId", "targetId", kind) DO UPDATE SET "providerId" = EXCLUDED."providerId", cursor = EXCLUDED.cursor, "updatedAt" = EXCLUDED."updatedAt"`;
+            await tx.$executeRaw`INSERT INTO facebook_sync_cursors ("workspaceId", "targetId", "providerId", kind, cursor, "updatedAt") VALUES (${target.workspaceId}, ${target.id}, ${target.providerId}, 'post_history', ${JSON.stringify(history.progress)}::jsonb, ${now}) ON CONFLICT ("workspaceId", "targetId", kind) DO UPDATE SET "providerId" = EXCLUDED."providerId", cursor = EXCLUDED.cursor, "updatedAt" = EXCLUDED."updatedAt"`;
           }
           for (const { metric, period, endTime, value, numeric } of fetched.observations) {
             signal.throwIfAborted();
             await tx.pageInsight.upsert({
               where: { targetId_metric_period_endTime: { targetId: target.id, metric, period, endTime } },
-              create: { id: `rebuild_${randomUUID()}`, targetId: target.id, metric, period, endTime, value: value === null ? Prisma.JsonNull : value as Prisma.InputJsonValue, numeric, fetchedAt: now },
+              create: { id: `fb_${randomUUID()}`, targetId: target.id, metric, period, endTime, value: value === null ? Prisma.JsonNull : value as Prisma.InputJsonValue, numeric, fetchedAt: now },
               update: { value: value === null ? Prisma.JsonNull : value as Prisma.InputJsonValue, numeric, fetchedAt: now },
             });
             persistedCount++;
@@ -353,7 +353,7 @@ export async function syncAdsAnalytics(now = new Date(), retryLimit = 0, retryBa
             const cpc = finite(row.cpc); const cpm = finite(row.cpm); const cpp = finite(row.cpp); const ctr = finite(row.ctr); const frequency = finite(row.frequency);
             await tx.adInsight.upsert({
               where: { adAccountId_level_objectId_date: { adAccountId: account.id, level, objectId, date } },
-              create: { id: `rebuild_${randomUUID()}`, adAccountId: account.id, level, objectId, objectName, date, spend, impressions, clicks, reach, cpc, cpm, cpp, ctr, frequency, actions: row.actions === undefined ? undefined : row.actions as Prisma.InputJsonValue, fields: row as unknown as Prisma.InputJsonValue, fetchedAt: now },
+              create: { id: `fb_${randomUUID()}`, adAccountId: account.id, level, objectId, objectName, date, spend, impressions, clicks, reach, cpc, cpm, cpp, ctr, frequency, actions: row.actions === undefined ? undefined : row.actions as Prisma.InputJsonValue, fields: row as unknown as Prisma.InputJsonValue, fetchedAt: now },
               update: { objectName, spend, impressions, clicks, reach, cpc, cpm, cpp, ctr, frequency, actions: row.actions === undefined ? undefined : row.actions as Prisma.InputJsonValue, fields: row as unknown as Prisma.InputJsonValue, fetchedAt: now },
             });
             persistedCount++;
@@ -452,7 +452,7 @@ export async function syncInbox(now = new Date(), retryLimit = 0, retryBackoff?:
             signal.throwIfAborted();
             const stored = await tx.conversation.upsert({
               where: { targetId_remoteId: { targetId: target.id, remoteId: conversation.id } },
-              create: { id: `rebuild_${randomUUID()}`, targetId: target.id, remoteId: conversation.id, snippet: conversation.snippet, unreadCount: conversation.unreadCount, messageCount: conversation.messageCount, updatedTime: conversation.updatedAt, fetchedAt: now },
+              create: { id: `fb_${randomUUID()}`, targetId: target.id, remoteId: conversation.id, snippet: conversation.snippet, unreadCount: conversation.unreadCount, messageCount: conversation.messageCount, updatedTime: conversation.updatedAt, fetchedAt: now },
               update: { snippet: conversation.snippet, unreadCount: conversation.unreadCount, messageCount: conversation.messageCount, updatedTime: conversation.updatedAt, fetchedAt: now },
               select: { id: true },
             });
@@ -460,7 +460,7 @@ export async function syncInbox(now = new Date(), retryLimit = 0, retryBackoff?:
             for (const message of conversation.messages) {
               const storedMessage = await tx.conversationMessage.upsert({
                 where: { conversationId_remoteId: { conversationId: stored.id, remoteId: message.id } },
-                create: { id: `rebuild_${randomUUID()}`, conversationId: stored.id, remoteId: message.id, fromName: message.fromName, fromId: message.fromId, message: message.text, createdTime: message.createdAt },
+                create: { id: `fb_${randomUUID()}`, conversationId: stored.id, remoteId: message.id, fromName: message.fromName, fromId: message.fromId, message: message.text, createdTime: message.createdAt },
                 update: { fromName: message.fromName, fromId: message.fromId, message: message.text, createdTime: message.createdAt },
               });
               if ('metadata' in message) await storeInboxMetadata(tx, { workspaceId: target.workspaceId, targetId: target.id }, 'message', storedMessage.id, (message as { metadata?: unknown }).metadata);
@@ -473,7 +473,7 @@ export async function syncInbox(now = new Date(), retryLimit = 0, retryBackoff?:
             if (await inboxCommentSuppressed(tx, target.workspaceId, target.id, comment.id, comment.parentId)) continue;
             const storedComment = await tx.postComment.upsert({
               where: { postTargetId_remoteId: { postTargetId: batch.postTargetId, remoteId: comment.id } },
-              create: { id: `rebuild_${randomUUID()}`, postTargetId: batch.postTargetId, remoteId: comment.id, parentRemoteId: comment.parentId, message: comment.message, fromName: comment.fromName, fromId: comment.fromId, likeCount: comment.likeCount, replyCount: comment.replyCount, isHidden: comment.isHidden, createdTime: comment.createdAt, fetchedAt: now },
+              create: { id: `fb_${randomUUID()}`, postTargetId: batch.postTargetId, remoteId: comment.id, parentRemoteId: comment.parentId, message: comment.message, fromName: comment.fromName, fromId: comment.fromId, likeCount: comment.likeCount, replyCount: comment.replyCount, isHidden: comment.isHidden, createdTime: comment.createdAt, fetchedAt: now },
               update: { parentRemoteId: comment.parentId, message: comment.message, fromName: comment.fromName, fromId: comment.fromId, likeCount: comment.likeCount, replyCount: comment.replyCount, isHidden: comment.isHidden, fetchedAt: now },
             });
             if ('metadata' in comment) await storeInboxMetadata(tx, { workspaceId: target.workspaceId, targetId: target.id }, 'comment', storedComment.id, (comment as { metadata?: unknown }).metadata);

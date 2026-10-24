@@ -53,7 +53,7 @@ async function guarded<T>(actor: WatermarkActor, apply: boolean, write: boolean,
 
 export async function readWatermark(actor: WatermarkActor): Promise<WatermarkState> {
   return protect(() => guarded(actor, false, false, async tx => {
-    const rows = await tx.$queryRaw<Row[]>`SELECT position, opacity, scale FROM rebuild_workspace_watermarks WHERE "workspaceId" = ${actor.workspaceId}`;
+    const rows = await tx.$queryRaw<Row[]>`SELECT position, opacity, scale FROM workspace_watermarks WHERE "workspaceId" = ${actor.workspaceId}`;
     return rows[0] ? watermarkOptions.parse({ position: rows[0].position, opacity: rows[0].opacity, scale: rows[0].scale }) : null;
   }));
 }
@@ -69,7 +69,7 @@ export async function changeWatermark(actor: WatermarkActor, input: unknown) {
         const maxPixels = Number(await runtimeConfig('media.inspectMaxPixels'));
         let image: { id: string; mimeType: string; fileName: string } | undefined;
         if (value.action === 'remove') {
-          await tx.$executeRaw`DELETE FROM rebuild_workspace_watermarks WHERE "workspaceId" = ${actor.workspaceId}`;
+          await tx.$executeRaw`DELETE FROM workspace_watermarks WHERE "workspaceId" = ${actor.workspaceId}`;
         } else if (value.action === 'save') {
           let logo: Buffer;
           if (value.logoBase64 !== undefined) {
@@ -84,13 +84,13 @@ export async function changeWatermark(actor: WatermarkActor, input: unknown) {
             } catch { throw invalid(); }
             if (logo.length > maxBytes) throw invalid();
           } else {
-            const previous = await tx.$queryRaw<Row[]>`SELECT logo FROM rebuild_workspace_watermarks WHERE "workspaceId" = ${actor.workspaceId}`;
+            const previous = await tx.$queryRaw<Row[]>`SELECT logo FROM workspace_watermarks WHERE "workspaceId" = ${actor.workspaceId}`;
             if (!previous[0]) throw invalid();
             logo = Buffer.from(previous[0].logo);
           }
-          await tx.$executeRaw`INSERT INTO rebuild_workspace_watermarks ("workspaceId", logo, position, opacity, scale) VALUES (${actor.workspaceId}, ${logo}, ${value.position}, ${value.opacity}, ${value.scale}) ON CONFLICT ("workspaceId") DO UPDATE SET logo = EXCLUDED.logo, position = EXCLUDED.position, opacity = EXCLUDED.opacity, scale = EXCLUDED.scale`;
+          await tx.$executeRaw`INSERT INTO workspace_watermarks ("workspaceId", logo, position, opacity, scale) VALUES (${actor.workspaceId}, ${logo}, ${value.position}, ${value.opacity}, ${value.scale}) ON CONFLICT ("workspaceId") DO UPDATE SET logo = EXCLUDED.logo, position = EXCLUDED.position, opacity = EXCLUDED.opacity, scale = EXCLUDED.scale`;
         } else {
-          const rows = await tx.$queryRaw<Row[]>`SELECT logo, position, opacity, scale FROM rebuild_workspace_watermarks WHERE "workspaceId" = ${actor.workspaceId}`;
+          const rows = await tx.$queryRaw<Row[]>`SELECT logo, position, opacity, scale FROM workspace_watermarks WHERE "workspaceId" = ${actor.workspaceId}`;
           const row = rows[0];
           if (!row) throw new OperationError('not_found', 'No workspace watermark is configured.');
           const options = watermarkOptions.parse({ position: row.position, opacity: row.opacity, scale: row.scale });

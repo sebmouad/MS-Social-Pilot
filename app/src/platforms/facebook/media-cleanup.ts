@@ -65,8 +65,8 @@ async function loadCandidate(stepId: string): Promise<Candidate> {
       s."remoteTargetId", s."remoteId" AS "remotePhotoId", a.provider, a.state AS "parentState",
       a."remotePostId" AS "parentRemotePostId", pt."remotePostId" AS "projectedRemotePostId",
       a."postId" AS "parentPostId", a."postTargetId" AS "parentPostTargetId", a."targetId" AS "parentTargetId", a."actorId" AS "parentActorId"
-    FROM rebuild_facebook_media_steps s
-    JOIN rebuild_publication_attempts a ON a.id=s."operationId" AND a."workspaceId"=s."workspaceId"
+    FROM facebook_media_steps s
+    JOIN publication_attempts a ON a.id=s."operationId" AND a."workspaceId"=s."workspaceId"
     JOIN targets t ON t.id=s."targetId" AND t."workspaceId"=s."workspaceId" AND t."providerId"=s."remoteTargetId"
     LEFT JOIN post_targets pt ON pt.id=s."postTargetId" AND pt."postId"=s."postId"
     WHERE s.id=${stepId} AND s.phase='photo' AND s.state IN ('recorded','attested_present') AND s."remoteId" IS NOT NULL
@@ -84,7 +84,7 @@ async function lockAndValidate(tx: Prisma.TransactionClient, candidate: Candidat
   const parents = await tx.$queryRaw<Array<{ workspaceId: string; postId: string; postTargetId: string; targetId: string; actorId: string; provider: string; parentState: string; parentRemotePostId: string | null; projectedRemotePostId: string | null }>>`
     SELECT a."workspaceId", a."postId", a."postTargetId", a."targetId", a."actorId", a.provider,
       a.state AS "parentState", a."remotePostId" AS "parentRemotePostId", pt."remotePostId" AS "projectedRemotePostId"
-    FROM rebuild_publication_attempts a
+    FROM publication_attempts a
     LEFT JOIN post_targets pt ON pt.id=a."postTargetId" AND pt."postId"=a."postId"
     WHERE a.id=${candidate.operationId} AND a."workspaceId"=${candidate.workspaceId} FOR UPDATE OF a`;
   const lockedParent = parents[0];
@@ -94,8 +94,8 @@ async function lockAndValidate(tx: Prisma.TransactionClient, candidate: Candidat
       s."remoteTargetId", s."remoteId", s.phase, s.ordinal, s.state, a.provider, a.state AS "parentState",
       a."remotePostId" AS "parentRemotePostId", pt."remotePostId" AS "projectedRemotePostId",
       a."postId" AS "parentPostId", a."postTargetId" AS "parentPostTargetId", a."targetId" AS "parentTargetId", a."actorId" AS "parentActorId"
-    FROM rebuild_facebook_media_steps s
-    JOIN rebuild_publication_attempts a ON a.id=s."operationId" AND a."workspaceId"=s."workspaceId"
+    FROM facebook_media_steps s
+    JOIN publication_attempts a ON a.id=s."operationId" AND a."workspaceId"=s."workspaceId"
     LEFT JOIN post_targets pt ON pt.id=s."postTargetId" AND pt."postId"=s."postId"
     WHERE s."workspaceId"=${candidate.workspaceId} AND s."operationId"=${candidate.operationId}
     ORDER BY s.phase, s.ordinal, s.id FOR UPDATE OF s`;
@@ -114,7 +114,7 @@ async function lockAndValidate(tx: Prisma.TransactionClient, candidate: Candidat
   const feed = rows.find(row => row.phase === 'feed');
   if (feed && feed.state !== 'rejected') throw failure('conflict', 'A Facebook feed step exists; staged photos can only be deleted after a definite provider rejection.');
   const existing = await tx.$queryRaw<DeletionRow[]>`
-    SELECT id, "mediaStepId", "operationId", state FROM rebuild_facebook_media_deletions
+    SELECT id, "mediaStepId", "operationId", state FROM facebook_media_deletions
     WHERE "workspaceId"=${candidate.workspaceId} AND "mediaStepId"=${candidate.id}
     ORDER BY "createdAt" DESC, id DESC FOR UPDATE`;
   const active = existing.find(row => !['rejected', 'attested_present'].includes(row.state));
@@ -128,12 +128,12 @@ async function startDeletion(actorId: string, candidate: Candidate) {
     const locked = await lockAndValidate(tx, candidate);
     if (locked.active?.state === 'confirmed' || locked.active?.state === 'attested_deleted') return { id: locked.active.id, replay: true };
     if (locked.parent.parentState === 'started') {
-      const frozen = await tx.$executeRaw`UPDATE rebuild_publication_attempts SET state='uncertain', reason='outcome_unknown', "updatedAt"=CURRENT_TIMESTAMP
+      const frozen = await tx.$executeRaw`UPDATE publication_attempts SET state='uncertain', reason='outcome_unknown', "updatedAt"=CURRENT_TIMESTAMP
         WHERE id=${candidate.operationId} AND "workspaceId"=${candidate.workspaceId} AND state='started'`;
       if (frozen !== 1) throw failure('conflict', 'The Facebook publication changed before cleanup could be recorded.');
     }
     const id = randomUUID();
-    await tx.$executeRaw`INSERT INTO rebuild_facebook_media_deletions
+    await tx.$executeRaw`INSERT INTO facebook_media_deletions
       (id, "workspaceId", "mediaStepId", "operationId", "postId", "postTargetId", "targetId", "remoteTargetId", "remotePhotoId", "actorId", state)
       VALUES (${id}, ${candidate.workspaceId}, ${candidate.id}, ${candidate.operationId}, ${candidate.postId}, ${candidate.postTargetId},
         ${candidate.targetId}, ${candidate.remoteTargetId}, ${candidate.remotePhotoId}, ${actorId}, 'started')`;
@@ -145,7 +145,7 @@ async function startDeletion(actorId: string, candidate: Candidate) {
 async function finishDeletion(actorId: string, candidate: Candidate, deletionId: string, state: 'uncertain' | 'confirmed' | 'rejected') {
   return transaction(async tx => {
     const rows = await tx.$queryRaw<DeletionRow[]>`
-      SELECT id, "mediaStepId", "operationId", state FROM rebuild_facebook_media_deletions
+      SELECT id, "mediaStepId", "operationId", state FROM facebook_media_deletions
       WHERE id=${deletionId} AND "workspaceId"=${candidate.workspaceId}`;
     if (rows.length !== 1 || rows[0].mediaStepId !== candidate.id || rows[0].operationId !== candidate.operationId || !['started', 'uncertain', 'attested_deleted', 'attested_present', 'conflict'].includes(rows[0].state)) {
       throw failure('conflict', 'The Facebook photo deletion receipt cannot be matched to its intent.');

@@ -9,7 +9,7 @@ import type { FacebookNativeAttemptRecord, FacebookNativeAttemptStore } from './
  * Durable, tenant-bound store for provider-held schedule changes (cancel / reschedule of a native Video).
  * It implements the same attempt port as the publication journal so schedule.ts needs no change: the publication
  * operation id reads the parent journal row, `<op>:cancel` and `<op>:reschedule:<unix>` read/write child rows in
- * rebuild_facebook_native_schedule_changes. Each child is bound to the parent journal row, workspace and remote id,
+ * facebook_native_schedule_changes. Each child is bound to the parent journal row, workspace and remote id,
  * is created at most once, and only its creator may settle it. A confirmed cancel is the only thing that can move
  * the parent journal to `deleted`. Trusted host port: the caller has already authorized the operation.
  */
@@ -57,12 +57,12 @@ export function createFacebookNativeScheduleStore(input: FacebookNativeScheduleS
   };
   async function journal(tx: Prisma.TransactionClient): Promise<Journal | null> {
     const rows = await tx.$queryRaw<Journal[]>`SELECT "operationId", format, state, "knownIds", "remoteTargetId", "remoteId", conflicted
-      FROM rebuild_facebook_native_journal WHERE "workspaceId"=${scope.workspaceId} AND "operationId"=${scope.publishOperationId} FOR UPDATE`;
+      FROM facebook_native_journal WHERE "workspaceId"=${scope.workspaceId} AND "operationId"=${scope.publishOperationId} FOR UPDATE`;
     return rows[0] ?? null;
   }
   async function change(tx: Prisma.TransactionClient, id: string): Promise<Change | null> {
     const rows = await tx.$queryRaw<Change[]>`SELECT "changeId", kind, "remoteId", "remoteTargetId", "ownerToken", revision, state
-      FROM rebuild_facebook_native_schedule_changes WHERE "workspaceId"=${scope.workspaceId} AND "changeId"=${id} FOR UPDATE`;
+      FROM facebook_native_schedule_changes WHERE "workspaceId"=${scope.workspaceId} AND "changeId"=${id} FOR UPDATE`;
     return rows[0] ?? null;
   }
   const childRecord = (row: Change): FacebookNativeAttemptRecord => ({ operationId: row.changeId, format: 'video', state: row.state,
@@ -86,7 +86,7 @@ export function createFacebookNativeScheduleStore(input: FacebookNativeScheduleS
           return { created: false as const, existing: childRecord(existing) };
         }
         if (parent.conflicted || (parent.state !== 'published' && parent.state !== 'confirmed')) throw conflict();
-        await tx.$executeRaw`INSERT INTO rebuild_facebook_native_schedule_changes
+        await tx.$executeRaw`INSERT INTO facebook_native_schedule_changes
           ("changeId","workspaceId","publishOperationId",kind,"scheduledUnix","remoteId","remoteTargetId","ownerToken")
           VALUES (${proposed.operationId},${scope.workspaceId},${scope.publishOperationId},${parsed.kind},${parsed.unix}::bigint,${remoteId},${targetId},${ownerToken}::uuid)`;
         return { created: true as const };
@@ -105,7 +105,7 @@ export function createFacebookNativeScheduleStore(input: FacebookNativeScheduleS
           if (parent.state !== 'published' && parent.state !== 'confirmed') return false;
           const cancelled = await change(tx, cancelId);
           if (!cancelled || cancelled.state !== 'deleted' || cancelled.remoteId !== parent.remoteId) return false;
-          const changed = await tx.$executeRaw`UPDATE rebuild_facebook_native_journal
+          const changed = await tx.$executeRaw`UPDATE facebook_native_journal
             SET state='deleted', revision=revision+1, "updatedAt"=clock_timestamp()
             WHERE "workspaceId"=${scope.workspaceId} AND "operationId"=${scope.publishOperationId} AND state=${parent.state}`;
           return changed === 1;
@@ -122,7 +122,7 @@ export function createFacebookNativeScheduleStore(input: FacebookNativeScheduleS
         if (!row || row.ownerToken !== ownerToken || row.revision !== expectedRevision) return { applied: false, revision: undefined };
         if (expectedStates && !expectedStates.includes(row.state)) return { applied: false, revision: undefined };
         const next = patch.state ?? row.state;
-        const changed = await tx.$executeRaw`UPDATE rebuild_facebook_native_schedule_changes
+        const changed = await tx.$executeRaw`UPDATE facebook_native_schedule_changes
           SET state=${next}, revision=revision+1, "updatedAt"=clock_timestamp()
           WHERE "workspaceId"=${scope.workspaceId} AND "changeId"=${operationId} AND "ownerToken"=${ownerToken}::uuid AND revision=${row.revision}`;
         return { applied: changed === 1, revision: changed === 1 ? row.revision + 1 : undefined };

@@ -5,7 +5,7 @@ import { Prisma } from '../../../generated/client';
 import { prisma } from '@/server/data';
 import { runtimeConfig } from '@/server/config/store';
 import { OperationError } from '@/lib/operation-error';
-import { REBUILD_WORKER_PREFIX } from '@/server/jobs/identity';
+import { WORKER_PREFIX } from '@/server/jobs/identity';
 
 export async function requireActiveRoot(actorId: string, db = prisma) {
   const actor = await db.user.findUnique({ where: { id: actorId }, select: { isInstanceOwner: true, disabledAt: true } });
@@ -26,8 +26,8 @@ export async function loadRootOperations(actorId: string, moduleId?: string, res
   const [runs, heartbeats] = await Promise.all([
     prisma.$queryRaw<Array<{ id: string; job: string; startedAt: Date; finishedAt: Date | null; outcome: string; attempts: number; hasError: boolean }>>(Prisma.sql`
       SELECT id, job, "startedAt", "finishedAt", outcome, attempts, (error IS NOT NULL) AS "hasError"
-      FROM rebuild_sync_runs WHERE job IN (${Prisma.join(names)}) ORDER BY "startedAt" DESC, id DESC LIMIT ${Math.min(limit, resultCap ?? limit)}`),
-    prisma.$queryRaw<Array<{ seenAt: Date }>>`SELECT "seenAt" FROM worker_heartbeats WHERE LEFT("workerId", ${REBUILD_WORKER_PREFIX.length}::int) = ${REBUILD_WORKER_PREFIX} ORDER BY "seenAt" DESC LIMIT 1`,
+      FROM sync_runs WHERE job IN (${Prisma.join(names)}) ORDER BY "startedAt" DESC, id DESC LIMIT ${Math.min(limit, resultCap ?? limit)}`),
+    prisma.$queryRaw<Array<{ seenAt: Date }>>`SELECT "seenAt" FROM worker_heartbeats WHERE LEFT("workerId", ${WORKER_PREFIX.length}::int) = ${WORKER_PREFIX} ORDER BY "seenAt" DESC LIMIT 1`,
   ]);
   const seenAt = heartbeats[0]?.seenAt ?? null;
   return { moduleHealth, enabled, timeZone, jobs, worker: { state: seenAt ? Date.now() - seenAt.getTime() > staleSeconds * 1000 ? 'stale' as const : 'fresh' as const : 'never' as const, seenAt: seenAt?.toISOString() ?? null },

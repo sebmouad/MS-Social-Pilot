@@ -133,23 +133,23 @@ return {
   },
   async tryLease(job, leaseOwner, token, until) {
     const rows = await prisma.$queryRaw<Array<{ name: string }>>`
-      INSERT INTO rebuild_job_leases (name, owner, token, "leaseExpiresAt", "updatedAt")
+      INSERT INTO job_leases (name, owner, token, "leaseExpiresAt", "updatedAt")
       VALUES (${job}, ${leaseOwner}, ${token}, ${until}, NOW())
       ON CONFLICT (name) DO UPDATE SET owner = EXCLUDED.owner, token = EXCLUDED.token,
         "leaseExpiresAt" = EXCLUDED."leaseExpiresAt", "updatedAt" = NOW()
-      WHERE rebuild_job_leases."leaseExpiresAt" <= NOW()
+      WHERE job_leases."leaseExpiresAt" <= NOW()
       RETURNING name`;
     return rows.length === 1;
   },
   async renewLease(job, token, until) {
-    const count = await prisma.$executeRaw`UPDATE rebuild_job_leases SET "leaseExpiresAt" = ${until}, "updatedAt" = NOW() WHERE name = ${job} AND token = ${token}`;
+    const count = await prisma.$executeRaw`UPDATE job_leases SET "leaseExpiresAt" = ${until}, "updatedAt" = NOW() WHERE name = ${job} AND token = ${token}`;
     return count === 1;
   },
   async releaseLease(job, token) {
-    await prisma.$executeRaw`DELETE FROM rebuild_job_leases WHERE name = ${job} AND token = ${token}`;
+    await prisma.$executeRaw`DELETE FROM job_leases WHERE name = ${job} AND token = ${token}`;
   },
   async writeRun(run) {
-    await prisma.$executeRaw`INSERT INTO rebuild_sync_runs (id, job, owner, "startedAt", "finishedAt", outcome, attempts, summary, error)
+    await prisma.$executeRaw`INSERT INTO sync_runs (id, job, owner, "startedAt", "finishedAt", outcome, attempts, summary, error)
       VALUES (${run.id}, ${run.job}, ${run.owner}, ${run.startedAt}, ${run.finishedAt}, ${run.outcome}, ${run.attempts}, ${run.summary ?? null}, ${run.error ?? null})`;
     const failed = run.outcome === 'failed';
     await prisma.$executeRaw`INSERT INTO worker_job_runs (name, "startedAt", "finishedAt", "durationMs", outcome, summary, "lastError", "lastErrorAt", failures)
@@ -161,7 +161,7 @@ return {
       ON CONFLICT ("workerId") DO UPDATE SET "seenAt" = EXCLUDED."seenAt", jobs = EXCLUDED.jobs`;
   },
   async alreadyRanThisMinute(job, from, until) {
-    const rows = await prisma.$queryRaw<Array<{ present: boolean }>>`SELECT EXISTS (SELECT 1 FROM rebuild_sync_runs WHERE job = ${job} AND "startedAt" >= ${from} AND "startedAt" < ${until}) AS present`;
+    const rows = await prisma.$queryRaw<Array<{ present: boolean }>>`SELECT EXISTS (SELECT 1 FROM sync_runs WHERE job = ${job} AND "startedAt" >= ${from} AND "startedAt" < ${until}) AS present`;
     return rows[0]?.present === true;
   },
   logger: log,

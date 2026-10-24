@@ -57,7 +57,7 @@ export async function syncPublicationStatus(actor: PublishingActor, postId: stri
   const errorText = await loadPublishingErrorText();
   return withPublishingOperation(actor, { postId, allowPublicationRecovery: true }, async ({ actor: currentActor, signal }) => {
     const initial = await authorizedPost(currentActor, postId);
-    const parents = await prisma.$queryRaw<PublicationRow[]>`SELECT * FROM rebuild_publication_attempts
+    const parents = await prisma.$queryRaw<PublicationRow[]>`SELECT * FROM publication_attempts
       WHERE "workspaceId"=${actor.workspaceId} AND "postId"=${postId} AND state NOT IN ('rejected','attested_absent')`;
     let synced = 0;
     for (const item of initial.post.targets) {

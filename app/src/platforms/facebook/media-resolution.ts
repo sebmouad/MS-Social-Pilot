@@ -112,8 +112,8 @@ async function loadStepCandidate(stepId: string): Promise<StepCandidate> {
       s.phase, s.ordinal, s.state, s."remoteId", t."providerId", a.provider AS "parentProvider", a.state AS "parentState",
       a."remotePostId" AS "parentRemotePostId", a."postId" AS "parentPostId", a."postTargetId" AS "parentPostTargetId",
       a."targetId" AS "parentTargetId", a."actorId" AS "parentActorId", pt."remotePostId" AS "projectedRemotePostId"
-    FROM rebuild_facebook_media_steps s
-    JOIN rebuild_publication_attempts a ON a.id=s."operationId" AND a."workspaceId"=s."workspaceId"
+    FROM facebook_media_steps s
+    JOIN publication_attempts a ON a.id=s."operationId" AND a."workspaceId"=s."workspaceId"
     LEFT JOIN targets t ON t.id=s."targetId" AND t."workspaceId"=s."workspaceId"
     LEFT JOIN post_targets pt ON pt.id=s."postTargetId" AND pt."postId"=s."postId"
     WHERE s.id=${stepId} AND s.phase IN ('photo','feed')
@@ -131,9 +131,9 @@ async function loadDeletionCandidate(deletionId: string): Promise<DeletionCandid
       a.provider AS "parentProvider", a.state AS "parentState", a."remotePostId" AS "parentRemotePostId",
       a."postId" AS "parentPostId", a."postTargetId" AS "parentPostTargetId", a."targetId" AS "parentTargetId", a."actorId" AS "parentActorId",
       pt."remotePostId" AS "projectedRemotePostId"
-    FROM rebuild_facebook_media_deletions d
-    JOIN rebuild_facebook_media_steps s ON s.id=d."mediaStepId" AND s."workspaceId"=d."workspaceId"
-    JOIN rebuild_publication_attempts a ON a.id=d."operationId" AND a."workspaceId"=d."workspaceId"
+    FROM facebook_media_deletions d
+    JOIN facebook_media_steps s ON s.id=d."mediaStepId" AND s."workspaceId"=d."workspaceId"
+    JOIN publication_attempts a ON a.id=d."operationId" AND a."workspaceId"=d."workspaceId"
     LEFT JOIN targets t ON t.id=d."targetId" AND t."workspaceId"=d."workspaceId"
     LEFT JOIN post_targets pt ON pt.id=d."postTargetId" AND pt."postId"=d."postId"
     WHERE d.id=${deletionId}
@@ -149,14 +149,14 @@ async function lockOperation(tx: Prisma.TransactionClient, candidate: StepCandid
   const parents = await tx.$queryRaw<Array<{ workspaceId: string; postId: string; postTargetId: string; targetId: string; actorId: string; parentProvider: string; parentState: string; parentRemotePostId: string | null; projectedRemotePostId: string | null }>>`
     SELECT a."workspaceId", a."postId", a."postTargetId", a."targetId", a."actorId", a.provider AS "parentProvider",
       a.state AS "parentState", a."remotePostId" AS "parentRemotePostId", pt."remotePostId" AS "projectedRemotePostId"
-    FROM rebuild_publication_attempts a LEFT JOIN post_targets pt ON pt.id=a."postTargetId" AND pt."postId"=a."postId"
+    FROM publication_attempts a LEFT JOIN post_targets pt ON pt.id=a."postTargetId" AND pt."postId"=a."postId"
     WHERE a.id=${candidate.operationId} AND a."workspaceId"=${candidate.workspaceId} FOR UPDATE OF a`;
   const parent = parents[0];
   if (!parent) throw operationError('conflict', 'Facebook recovery evidence no longer has a publication attempt.');
   const rawRows = await tx.$queryRaw<Array<Omit<StepCandidate, 'parentProvider' | 'parentState' | 'parentRemotePostId' | 'parentPostId' | 'parentPostTargetId' | 'parentTargetId' | 'parentActorId'>>>`
     SELECT s.id, s."workspaceId", s."operationId", s."postId", s."postTargetId", s."targetId", s."actorId", s."remoteTargetId",
       s.phase, s.ordinal, s.state, s."remoteId", t."providerId", pt."remotePostId" AS "projectedRemotePostId"
-    FROM rebuild_facebook_media_steps s
+    FROM facebook_media_steps s
     LEFT JOIN targets t ON t.id=s."targetId" AND t."workspaceId"=s."workspaceId"
     LEFT JOIN post_targets pt ON pt.id=s."postTargetId" AND pt."postId"=s."postId"
     WHERE s."workspaceId"=${candidate.workspaceId} AND s."operationId"=${candidate.operationId}
@@ -220,9 +220,9 @@ export async function resolveFacebookMedia(userId: string, input: PlatformPublic
             d."remotePhotoId", d."actorId", d.state, s.phase, s.ordinal, s.state AS "stepState", s."remoteId" AS "stepRemoteId", t."providerId",
             a.provider AS "parentProvider", a.state AS "parentState", a."remotePostId" AS "parentRemotePostId",
             a."postId" AS "parentPostId", a."postTargetId" AS "parentPostTargetId", a."targetId" AS "parentTargetId", a."actorId" AS "parentActorId"
-          FROM rebuild_facebook_media_deletions d
-          JOIN rebuild_facebook_media_steps s ON s.id=d."mediaStepId" AND s."workspaceId"=d."workspaceId"
-          JOIN rebuild_publication_attempts a ON a.id=d."operationId" AND a."workspaceId"=d."workspaceId"
+          FROM facebook_media_deletions d
+          JOIN facebook_media_steps s ON s.id=d."mediaStepId" AND s."workspaceId"=d."workspaceId"
+          JOIN publication_attempts a ON a.id=d."operationId" AND a."workspaceId"=d."workspaceId"
           LEFT JOIN targets t ON t.id=d."targetId" AND t."workspaceId"=d."workspaceId"
           WHERE d.id=${action.subjectId} AND d."workspaceId"=${candidate.workspaceId} AND d."operationId"=${candidate.operationId}
           FOR UPDATE OF d`;
@@ -238,7 +238,7 @@ export async function resolveFacebookMedia(userId: string, input: PlatformPublic
           source: 'operator', outcome: action.actionId === 'record_photo_deleted' ? 'delete_deleted' : 'delete_present',
           eventActorId: userId, remoteId: null };
         const state = action.actionId === 'record_photo_deleted' ? 'attested_deleted' : 'attested_present';
-        await tx.$executeRaw`UPDATE rebuild_facebook_media_deletions SET state=${state}, "attestedAt"=CURRENT_TIMESTAMP,
+        await tx.$executeRaw`UPDATE facebook_media_deletions SET state=${state}, "attestedAt"=CURRENT_TIMESTAMP,
           "attestedBy"=${userId}, "updatedAt"=CURRENT_TIMESTAMP WHERE id=${deletion.id} AND state IN ('started','uncertain')`;
       } else {
         const step = rows.find(row => row.id === action.subjectId);
@@ -254,7 +254,7 @@ export async function resolveFacebookMedia(userId: string, input: PlatformPublic
             throw operationError('conflict', 'Confirm every ordered photo ID before attesting the Facebook feed.');
           }
           const deletions = await tx.$queryRaw<Array<{ state: string }>>`
-            SELECT state FROM rebuild_facebook_media_deletions WHERE "workspaceId"=${step.workspaceId} AND "operationId"=${step.operationId} FOR UPDATE`;
+            SELECT state FROM facebook_media_deletions WHERE "workspaceId"=${step.workspaceId} AND "operationId"=${step.operationId} FOR UPDATE`;
           if (deletions.some(deletion => ['started', 'uncertain', 'confirmed', 'attested_deleted', 'conflict'].includes(deletion.state))) {
             throw operationError('conflict', 'A staged-photo deletion is active or confirmed; verify the photo set before attesting the feed.');
           }
@@ -262,10 +262,10 @@ export async function resolveFacebookMedia(userId: string, input: PlatformPublic
         if (isPhotoPresent || isFeedPresent) {
           const phase = isPhotoPresent ? 'photo' : 'feed';
           const duplicates = await tx.$queryRaw<Array<{ id: string }>>`
-            SELECT id FROM rebuild_facebook_media_steps WHERE "workspaceId"=${step.workspaceId} AND "targetId"=${step.targetId}
+            SELECT id FROM facebook_media_steps WHERE "workspaceId"=${step.workspaceId} AND "targetId"=${step.targetId}
               AND phase=${phase} AND "remoteId"=${remoteId} AND id<>${step.id} LIMIT 1 FOR UPDATE`;
           const historical = await tx.$queryRaw<Array<{ id: string }>>`
-            SELECT id FROM rebuild_facebook_media_resolutions WHERE "workspaceId"=${step.workspaceId} AND "targetId"=${step.targetId}
+            SELECT id FROM facebook_media_resolutions WHERE "workspaceId"=${step.workspaceId} AND "targetId"=${step.targetId}
               AND phase=${phase} AND "remoteId"=${remoteId} AND "mediaStepId"<>${step.id} LIMIT 1 FOR UPDATE`;
           if (duplicates.length || historical.length) throw operationError('conflict', 'This Facebook ID is already bound to another upload step.');
         }
@@ -273,13 +273,13 @@ export async function resolveFacebookMedia(userId: string, input: PlatformPublic
         const outcome = isPhotoPresent ? 'photo_present' : isFeedPresent ? 'feed_present'
           : step.phase === 'photo' ? 'photo_absent' : 'feed_absent';
         event = { ...bindingFromStep(step), source: 'operator', outcome, eventActorId: userId, remoteId: present ? remoteId : null };
-        await tx.$executeRaw`UPDATE rebuild_facebook_media_steps SET state=${present ? 'attested_present' : 'attested_absent'},
+        await tx.$executeRaw`UPDATE facebook_media_steps SET state=${present ? 'attested_present' : 'attested_absent'},
           "remoteId"=${present ? remoteId! : null}, "receiptAt"=NULL, "rejectedAt"=NULL,
           "attestedAt"=CURRENT_TIMESTAMP, "attestedBy"=${userId}, "updatedAt"=CURRENT_TIMESTAMP
           WHERE id=${step.id} AND "workspaceId"=${step.workspaceId} AND state IN ('started','uncertain')`;
       }
       if (parent.parentState === 'started') {
-        const frozen = await tx.$executeRaw`UPDATE rebuild_publication_attempts SET state='uncertain', reason='outcome_unknown', "updatedAt"=CURRENT_TIMESTAMP
+        const frozen = await tx.$executeRaw`UPDATE publication_attempts SET state='uncertain', reason='outcome_unknown', "updatedAt"=CURRENT_TIMESTAMP
           WHERE id=${candidate.operationId} AND "workspaceId"=${candidate.workspaceId} AND state='started'`;
         if (frozen !== 1) throw operationError('conflict', 'The Facebook publication changed before its outcome could be recorded.');
       }

@@ -1,153 +1,5 @@
--- Baseline schema (lane 47, 2026-10-22): squash of the 140 reviewed
--- migrations below, concatenated verbatim in deploy ORDER (see
--- scripts/cutover-rehearsal.sh for the reviewed order). Production already
--- applied the old migrations: prod-deploy.sh marks this baseline as applied
--- without re-running it there (resolve semantics). Fresh databases apply this
--- file once, WITHOUT a wrapping transaction: it contains
--- ALTER TYPE ... ADD VALUE, which PostgreSQL forbids inside a transaction block.
--- Verify integrity with tests/baseline-migration.test.ts (per-source SHA-256).
---
--- Sources (name + SHA-256 of the original migration.sql):
---   20260810093237_init_postgres  19c72b6f7a863000a85aead9763ecb3a10755e455223e952139f5b8055253b1e
---   20260810142617_analytics_module  e7a2e72e7956758ab7cd28105b634dbdd621d431ea85254c78aad52d0c61deba
---   20260810183448_tier2_tier3_edges  6a975fe8177daebfe754c69b4a7bf8e0e63054eae7cc73e35e49cee646730085
---   20260811003638_app_settings  f1dd0fe5ae74f99ec88a4baf767711d9e7484b33ad62c1829f1e1aeb907e5b14
---   20260811074315_post_media_keys  f2d6c8c0eda32d0ed84085cbd4992513b3665ea7a0131f55d3f57fb7913753d9
---   20260811220702_instagram_target  edee59e8d25a90cc2d2e645e042c7bd7fe12f29f47575fa57bf49d8fca57b792
---   20260812070000_link_click_visitor_index  d760606cac0684708808e9a7d0723db7fd768147da191be1c82843cd790eec45
---   20260812090000_target_reviews_backfilled  3dc9c8a19d3278151b7f7b9670f594410f960062defe68524f821e1440f03db1
---   20260812100000_target_block_reason  6c20e84bf412c668bd1de90ef2487a0c88ccbc1b5bc30ef1cf27ccae9ab25e38
---   20260812140000_worker_heartbeat  7ca3c094849e70eb7516eef55b9c623d382e5598c529ae995d466196a3e4370c
---   20260929090000_instance_owner_and_indexes  94e8d81b1ac62feaf4ab10d967137bbf283a42a70178193e657730190d8f821d
---   20261010090000_first_comment  5229a7248fd2549d287250d876a7cb357b7f3fa9b2e59dd97c01d015ef01b335
---   20261010120000_external_post_picture  32f35e4e86cfe12c96604679fd6aab7294b59e3cf15dbb5f4754d8febc9d1b5e
---   20261010140000_worker_runs_and_missing_posts  6eb3ca53fc8cfcb6d03e5c563822f9601fcb4da3c2ffabbcb232772bc88777a3
---   20261011090000_page_groups_labels_access  fdd9471fea3cfc86fde42236b792bea882ad2c409714d4053a6cda8198b3474d
---   20261011150000_formats_snippets_sharing_reports  cb18371c7a709bfc5579ebb40cbb075229622868a6c1067939c6ebf8eb795c68
---   20261012031949_worker_status_graph_usage  c13029e9966f7f865757101b7b3c6755dbbc75447a2c1f072e4a680fb3dcb562
---   20261012032237_target_first_read  f9262ed3eb5788c3be7161f89ce52036330ff2c9de914fdc69c6a99490fd090a
---   20261012034047_workspace_week_start  aba9becfbf0ec8eb034f87e2456f62ca087975a04e42accab652e8ea1ab6024e
---   20261012034454_inbox_resolved  e7707529b2a3d3aa2350a308026fce08d32289e60875f9a28eb4b7c7b914024e
---   20261012035406_notification_matrix  1dbe137dab9477855357844e51e5194575c42cb33a7a3d94d1c693da96e5d8af
---   20261012035930_report_ai_recap  4889ce94473bb34d6cc1ba1f7d0867f8d3e52ec29cd6657afc6de445bbde347a
---   20261012050005_queue_empty_notice  de2899a94a91f1551e593eabfd7ba7a719b94b8be0a1b95e2967b9564432bf9f
---   20261012050443_draft_updated_notice  51967d33df9e0842b09cacaece30699f38aeacd96f3af80054e72ad8e9693daf
---   20261012052950_user_theme  1830346f4ad5c713759d085e037d628f464086b44b47914b6aebf9bf74802895
---   20261012054631_session_devices  0e909694b59ab1308159285e3c5fe8130df00e68049b37feb384798df3bf728f
---   20261012065921_feed_website_share  40f31b52f976e3b3554a2e2d093f7a60b9e1ae0ec299ab0ead82572f98710e86
---   20261012070327_spam_gap  3e6b25754c2512e7976e17691179125d51faaf792e82ac0b4dfcecb4016f5c1a
---   20261012082501_moderation_rules  ea6dc3bc3cf99441f400c7dc62c9890c9fcd0aef0c0cd0437795a7eb7b3c2eb3
---   20261012083846_saved_replies  8e12589b2aaff72134563784d9037a663af71df958a28e060d3bbc3b35532027
---   20261012085109_caption_tests  849572b34009052cbac20f46e5ac2cec00f46b84892bd13de28dc0cad4104a4b
---   20261012090000_api_tokens_chat_channels_page_voice  66da56a5563fa19b255202a514192e2fa6b7379e5cd9779b15aa2fa0cd1dedda
---   20261012090622_best_time_mode  687653e4f84d3596ea87d474e2c8b47f4e5dd99afd81051d0005155599e927e3
---   20261012091935_audience  13b7f3582855ce232cb4a86099022dc26d5c703797afeb998006e779d686838d
---   20261012093838_ai_translate  97003931814da94c446ca425f5b5e58ae2af55728b09380c3652635eb7228682
---   20261012100746_short_link_target  a8b7c9a6bd92154a6af8be88f55d4b4d783575686787c22853e945e364b063a7
---   20261012101604_uptime_days  375eee2f5dda7e3a24ba14b190a7332c8cc4b6b30f06db059b9fd763ae473247
---   20261012101918_error_events  641e5782bb183ddb31b1995dd613a502469d3cb0c3e1631739e1fb7769111891
---   20261012103124_workspace_exports  a2ccf6139ca2c68a9e85eaf6f1ef8a0a2c160c083dfc1c8b7df2ece7df881fc3
---   20261012104601_media_variants_watermark  db6f3ff260656ec0fe4f3c1da64e651fa82c6a431fb32f4ccce6d0a4b8a567b6
---   20261012105721_key_dates_seasons  7d09cb1e5282a587b519a5e4e40b083e97ee6876ef857dd45d0d80cad53c30a9
---   20261012120000_undo_send  191f2533a0c6e34d681f6b2f013a8139c58678e4de8e1b1c95cce7d46c3361e2
---   20261012130000_webhooks  4a5b2154d4c79ecfbd2c6b8dfd24c78f70e3ced6a469b3366ab39d1c36e2e400
---   20261012140000_content_mix  30d189e80238ab1bad70372f3f63e772ee574174711760d03097110b77e4ea32
---   20261012150000_other_networks  1e322d71f230e921a47f3845753a11af5ed1e547ed9f8ec3badf480440f80b50
---   20261012160000_post_templates  5590d6d3075f32ed91004d65b5a24771d6cecfd768b0eb23b49bde85d7be708f
---   20261012170000_post_target_removed_at  ae168effcaed45ecdffdec5286a02e6edd94c550e3d16d6c56e09c5d93be8114
---   20261012180000_post_versions  2850e64f3ffa97b0ed08f4d4e1be8776d2a5b5f207a6ad6a9e8f79ede95f11f0
---   20261012200000_post_notes  1c9b47fae3e6bfdcb7a99821cfe237611aea8e5eb4eddd429f075529fa694ead
---   20261012220000_calendar_feeds  8613b6e838e917be4a3f7af875bfdbb48a3eaf469b8ed4fed6567d26451b0770
---   20261013090000_ai_generation_cost  ea3851f6f1126cc30f6c38a9d1052014741eed2990f5c3b8c4078e344dfedd51
---   20261013090000_page_goals  49f90e442521d25d031076b9f1b31a0b89147738bb276cc6d5c4ecc728231769
---   20261013100000_root_section  4c1e0bdb6645f3d5cbc03b381ff1f0910e74e87628bbde266b29708c12d2546d
---   20261013110000_chart_notes  f6d642cfc6038e7e58c73e0198d39cbb92d636ddd038d2233b8364f64f2a6817
---   20261013110000_two_step  e8f745ee1c178287e5191b322bd5f6d82b3f6c4c67c4302b97a233cb51ab2aae
---   20261013120000_backup_runs  56bca95fa60ab7c4bd36e559580386120bf950994ebff39d7d0fab8039d8484a
---   20261013130000_inbox_response_time  62addc197fb19cdd760abffce2681b74943233c6ba6374374b587d9efbb8f5e7
---   20261013130000_system_alerts  fe8b414cc0eb47f4c8cf7b6f12bc61bdf6fc2014f9dcb0df8cfd69f6fcfa24f9
---   20261013140000_client_invitations  6bec812fdfb0b78c1bc0a35a02d26680f6125a025410138711141522338aea2d
---   20261014090000_root_modules  7ea057fcd4058f187013adb4d99809e20d72d6bfc4d637e44a875d17245e1c06
---   20261015090000_pinned_metrics  ce17639305c003cb32f3811b810701bddf5c89abcfe7e7cc9b9ae7ce696f0895
---   20261016090000_negative_comment_alert  a5dccf307e66cf884a6a15c648afcb732568eb3eb33a7b0ad4bace8432e953d5
---   20261016100000_trending_topics  f32efebe21db9d3390d4d0f045ea1338c86d5d0154c9dd17cd2ea6622fd0cb92
---   20261016110000_ai_alt_text  feae4148901564f2a1e2a2ef48d7d182b9e0ffd07a75d87007ffce48020d6de7
---   20261016120000_email_tokens  ddac77d64019d0c0daeb85dc89d7442c00004957bb1ae6f4be5d787981d7b8d5
---   20261017090000_developer_features  5b4d4c087cff261ebf96f6f517eca6f3150ab58af1571418e6a6f34414081672
---   20261017100000_viewer_role  a438f91ffa20f7d26eba8691107fe73926e4f00dbc580da0f019d3512fbe954b
---   20261017110000_client_role  826e1a7330a9f537b88eacd34f9b7e50548f1e75355bf9fc676621ca749d0527
---   20261017120000_share_link_decides  ba3fbbc271d4c8a74f2f45ffef196b50c22c6e471f5aecffd18b81da5e6f18b4
---   20261017130000_plans  cc4d9bb8cdf1b74929d56b7f8185683e2cbcc3f079ef1660005890c2997f244e
---   20261018120000_telegram  67ee49f9b302770454e0ff34ded8de424b71a29d7c725b3f8ad12892b4c2537a
---   20261018130000_youtube  44b1fabca320240db3942c94fa708be481212bbab856d3d23ab380228ca436ad
---   20261018140000_tiktok  39efb3bf02843273d367b88a528e12e2172024021327bcdff6ac2d304176405f
---   20261019090000_saved_views  8db9a5758c44c5b7170db32edcc3eb4293f2a3998f3007ce86bc8fa2bef43683
---   20261019100000_inbox_assignee  407392b0061fdef4a62510eda287de8960dc0f13abe895c82a200f2882b5866b
---   20261019110000_post_target_message_override  212ba08986a78b554e0ef657cce60730db5d8bf9f9ad67a4c1a8a9d14e78577f
---   20261019120000_inbox_notes  672b27a1ae6043bf86bb62cc08fbb225cfd2a1d00ee20a487b1a843d73bf48b7
---   20261019130000_bio_page  6ab8aa72a42bf30b70a1c4f68bab2cfa1f845025a8c74b5b3622317997abd93f
---   20261019140000_ai_avoid_words  5191c7dfb49f4994bf9e7c723f3cc0b1a24377ea4638d811d273a9796138472d
---   20261019150000_tasks  b2454c2408fac409d84c1077656d90f3a84e245a91fcb899fa2682b213ac46e7
---   20261019160000_post_target_skip_media  fd5ab020e603481229a052d599bb880c5bf38fa0f332e6e1783b092547ab8b47
---   20261019170000_custom_fields  ffa0d1d6b7d0185dbdc183e46d587d698a3746613a8652c9dea8d949709c4360
---   20261019180000_client_approval_step  031284fc863689ab4807f14a9a94fa7523fdbe2d91edf0bac8cf70cc546d5fdd
---   20261019190000_ai_image_kind  e5b188707c823e599c0473eb60f0ec0b6e8a9f38c63d2ffd6ba0ab20220bd710
---   20261019200000_ai_agents  8f40ca0748ad570c365bf3293a7c2ba463461dffee2cff928b86edd676001232
---   20261020100000_post_place  dafea0f0feed49e2e09449b91199bf80e7e14b791f80a85b2ed8301c02eca5b9
---   20261020110000_post_text_background  dd468df943f8948a083358afca1ccd124e1668bbc2ca3aca25346d727beaac84
---   20261020120000_ai_videos  09e34187895ee98a7e50457e89109661b9d47c2e3f06244fca2c0971b42570e9
---   20261020130000_ai_voice_kind  1aeca1314c51d71825dbd43f5f1f9da624d955be7361d6b92f77d0483bf26757
---   20261021100000_oauth_connector  40cb48ce755b3b64d5b45edee1164671e7b92cb3854eff94fc7bf4a62701fb7a
---   20261022100000_changelog  47ce1a91528bd9263f66252dcc43bc6c99ee82e7c99a6a5427dd598fcf3d5869
---   20261022200000_root_admin_settings  d6f57204f010bff549284a785e77df3a98305c2fea1b07989dfda5fea6b07c75
---   20261024100000_workspace_data_purges  0f32e4ae733c07e8796babfa6e38ceddf0184fa240d1ae2e3d971643fc74a54e
---   20261101120000_ads_object_inventory  a6ea92c28d7697c4d229c6c90e068cc6da6b1d5575864b43e1d0976a31b50861
---   20261015120000_mcp_api_keys  988d873c33229b439818d079d72c8bc49ffec93cbfe081ee4061ef93d2b2b3f4
---   20261023100000_rebuild_worker_jobs  5fb7962a2c720f8a3f30480c4c5afa6f0d48c92a8f2ee58047fb96ccf04a7205
---   20261016190000_rebuild_inbox_deletions  457327ad55d02af41eefe00f56021923abe5e13cf7ca668a96c064fa714acc57
---   20261016220000_rebuild_post_deletions  80e406ae33000a349d07f9e428563d20083bc36c65956a969a5e7ccc77c32f07
---   20261017010000_rebuild_publication_attempts  03973b6fb80dcf2580c5e39f0d2be8fd5715f47c1a953127ce939638bfece267
---   20261017020000_rebuild_facebook_media_steps  897464050aedf8c727fd695cc9b1fead0810d6c08606f3074c4d70529940a0e1
---   20261017030000_rebuild_facebook_media_deletions  3f5df63bf339fe532581f14738d089ca5f20a4c245f581f1587573b5bfe6cca5
---   20261017040000_rebuild_facebook_media_resolution  3227fbe5f381a25c87955ac809ef605fe1f2d51d9bb4f3ca4e5e9ce743c2a844
---   20261018150000_rebuild_notifications  b60b92752dc3019e15156f1ecb4cb58d29b5de4a6676dd141ac13a955277b067
---   20261018170000_rebuild_ads_operations  61f575314590e45e8eafc7cb8088677fec2a78b39210b82187b6f2c05197d6d2
---   20261018190000_rebuild_ads_creation  749fc69e2937588b95e7b050ebb49525e30b2624915abd2bdc92de6e92a899d0
---   20261018193000_rebuild_purge_write_gates  5250ec9a2e1176d59f8dd97b6b86d622187b87bd2d3944c41c7a411d157b51d6
---   20261025100000_rebuild_task_comments  648427469b965c3c5572b131c4834f772f1fdfe6884a0fd8c32aebc3588750ea
---   20261018230000_rebuild_sharing_expiry  28d4f9da65ed866f6139aa982d4756906cd329080dccf6cf2d87dee32e59d263
---   20261018233000_rebuild_mcp_resource_scope  465a5d76679b45d7cb3fa6560b9d6a32501e56faab1922107547452a0b5519ab
---   20261019010000_rebuild_report_runs  caa0c553569cf9f984e973ceb6e3ee858750209c6d2931e1316d3323b4357c4a
---   20261019011000_rebuild_report_purge_gate  122e813070361737ba1a89d775d2f92922dadd36423debb83411e0d5a4aa5d9e
---   20261019020000_rebuild_destination_formats  30325cdda1951cde93fab77a12bc349caa4422861fe133f68320ac3b979af6c6
---   20261019030000_rebuild_facebook_native_journal  3ef505dccb5156ea1d84472998d19fb8427b1232669f57ca98a8ac6cd1e04d46
---   20261019040000_rebuild_facebook_native_status_proofs  253e8fb4f18b4cf60fcce16702772dd166358e641fb875c2781cb84d8dc767d4
---   20261019050000_rebuild_publication_submissions  91011f00b776d402038d74ff1862e5ab352bbeb500d386b5000172a17ffb5931
---   20261019060000_rebuild_template_comment_delay  4c2f5699a826b8008003718084ee13eb0e4ee37e8e861ffdaf4a8a0a292bcfc5
---   20261026100000_rebuild_oauth_connectors  58514dc2c438333ac8fb74d632254e230d1d8e69967cc61b2076676eba9879d5
---   20261027100000_rebuild_workspace_exports  1d154d62c8422a6f8ac99a92c2975da9e7d211dc018950cc4f3a411c4e96acac
---   20261028100000_rebuild_alert_delivery  ed079e77ebb54ab01b46811686237c72308a11e43b75dfc9b9c9b0304801f36b
---   20261029100000_rebuild_channel_profiles  eaad76b014a355047385425fee74caa5fd656c942f461016f98b96c32142f7f4
---   20261030100000_rebuild_facebook_native_story_proofs  a74d6f4c546dd7f36f464636171bfe61d850dc42cca7786340c0169119fc680e
---   20261030100000_rebuild_review_resolution  bf99bb579b7d989d3ec1ec2651d8db216cbcaa44d8fe7d0e10ccb1448e08e68e
---   20261030110000_rebuild_ads_creative_creation  2109fc4f75cf1f528a6940a14979b1a5b60e6b79f3d9f269dc19507001703aec
---   20261030120000_rebuild_workspace_watermark  c950bc2f869e81840eb4dc9d06d5749559855ca40556b1e955203d5cfd6a30ce
---   20261030130000_rebuild_comment_sentiment  a617901b60682c7200d5e8d561df615ac2302ef1fe0677fe246e7dba38b093e4
---   20261030130000_rebuild_person_mcp_keys  ce14b0b7867c5a86a1c92290c173462964bd081213b90b037314f6dc64d789ff
---   20261030140000_rebuild_facebook_native_schedule_changes  08e1dd1d976c8dfc97207847a47fe8e671f2eeaf5987f9ab9272f9d00c17886e
---   20261031100000_rebuild_destination_schedule_mode  19fb66c945d4610accd4712bf769147409f5ba8a33632f360ec8c7d88671339b
---   20261031120000_rebuild_facebook_sync_cursors  d7226dcf14f8c673e39de1d441e6f6bb1271d993c4bec263f20aabe12e24028e
---   20261031140000_rebuild_wordpress_sources  cce64edcfbcf19553f7eafe661f86fb067d8d0152e08712d05dc1745121c4642
---   20261022180000_rebuild_uptime_samples  20fe4458ee87befda8eec716968b3c7717e44fe94619f19bfb7170c01c9fab11
---   20261022190000_rebuild_chat_deliveries  758df8d7f9d3716776bb501a54c2a5ab41e365ed5ef210429e8e87bbe60b41cf
---   20261031150000_rebuild_supplementary_purge_gates  f3f22b82d60a3bbbbacd5b152b3ceb577a3d39d126fd0ecdc09151e106f09768
---   20261031160000_rebuild_read_path_indexes  afada5e8886f5b725e5ba1907315048ccb11b6d9c300939d649220c9b9638762
---   20261031170000_rebuild_inbox_metadata  0f64264b7fbdb9108ffd77fd4dff7b8a233d6c227ec6a57652b9f88c8f63f870
---   20261031170000_rebuild_search_trigrams  2a5c27ac493fedbed7174ebb1c2bab19d0f33f220a341cb23b271f42e5cf572e
---   20261031180000_rebuild_ads_ad_creation  1769fa24129e6d74119e84d0677a2baf0c935cb73a4e722ae0a443b7fbc7120f
---   20261101100000_rebuild_writing_agents  e70e49f442d3fadde389b6f6990898ab60e157d1617da55080a06dee3c18525e
---   20261101100100_rebuild_post_exports  e5f8825c4bbe5e153da3a56bd18fd3d6668d0ea2765930f9a20afd396d9ce53c
---   20261102120000_rebuild_inbox_note_mentions  59d5aed5183c5bb7a59832abf7692d85a1259b9d14ee0c891fb02a8c441fe817
+-- MS Social Pilot v1.0.0 — Consolidated Initial Database Schema
+-- Generated for PostgreSQL 15+
 
 -- CreateEnum
 CREATE TYPE "WorkspaceRole" AS ENUM ('owner', 'admin', 'editor', 'contributor');
@@ -1797,31 +1649,7 @@ CREATE UNIQUE INDEX "error_events_fingerprint_key" ON "error_events"("fingerprin
 CREATE INDEX "error_events_lastSeenAt_idx" ON "error_events"("lastSeenAt");
 
 
--- CreateTable
-CREATE TABLE "workspace_exports" (
-    "id" TEXT NOT NULL,
-    "workspaceId" TEXT NOT NULL,
-    "requestedById" TEXT,
-    "status" TEXT NOT NULL DEFAULT 'queued',
-    "storageKey" TEXT,
-    "bytes" INTEGER,
-    "skippedMedia" INTEGER NOT NULL DEFAULT 0,
-    "error" TEXT,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "finishedAt" TIMESTAMP(3),
-    "expiresAt" TIMESTAMP(3),
-
-    CONSTRAINT "workspace_exports_pkey" PRIMARY KEY ("id")
-);
-
--- CreateIndex
-CREATE INDEX "workspace_exports_workspaceId_createdAt_idx" ON "workspace_exports"("workspaceId", "createdAt");
-
--- CreateIndex
-CREATE INDEX "workspace_exports_status_idx" ON "workspace_exports"("status");
-
--- AddForeignKey
-ALTER TABLE "workspace_exports" ADD CONSTRAINT "workspace_exports_workspaceId_fkey" FOREIGN KEY ("workspaceId") REFERENCES "workspaces"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+-- (legacy workspace_exports replaced by durable workspace_exports table below)
 
 
 -- AlterTable
@@ -2750,7 +2578,7 @@ ALTER TABLE "workspace_data_purges" ADD CONSTRAINT "workspace_data_purges_worksp
 -- Every directly workspace-owned legacy table gets the same write gate. Locking
 -- the parent first orders a concurrent write against the purge's FOR UPDATE
 -- lock; checking only the job row in a BEFORE trigger would leave a race.
-CREATE FUNCTION rebuild_reject_purging_workspace_write() RETURNS trigger LANGUAGE plpgsql AS $$
+CREATE FUNCTION reject_purging_workspace_write() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
   PERFORM 1 FROM workspaces WHERE id = NEW."workspaceId" FOR SHARE;
   IF EXISTS (
@@ -2775,7 +2603,7 @@ BEGIN
       AND ns.nspname = 'public' AND child.relkind = 'r'
       AND child.relname NOT IN ('memberships', 'workspace_data_purges')
   LOOP
-    EXECUTE format('CREATE TRIGGER rebuild_workspace_purge_write_gate BEFORE INSERT OR UPDATE ON public.%I FOR EACH ROW EXECUTE FUNCTION rebuild_reject_purging_workspace_write()', item.table_name);
+    EXECUTE format('CREATE TRIGGER workspace_purge_write_gate BEFORE INSERT OR UPDATE ON public.%I FOR EACH ROW EXECUTE FUNCTION reject_purging_workspace_write()', item.table_name);
   END LOOP;
 END $$;
 
@@ -2813,17 +2641,17 @@ CREATE INDEX "mcp_api_keys_workspaceId_createdAt_idx" ON "mcp_api_keys"("workspa
 CREATE INDEX "mcp_api_keys_expiresAt_idx" ON "mcp_api_keys"("expiresAt");
 
 -- Distributed lease and append-only outcome history for the replacement worker.
-CREATE TABLE "rebuild_job_leases" (
+CREATE TABLE "job_leases" (
   "name" TEXT NOT NULL,
   "owner" TEXT NOT NULL,
   "token" TEXT NOT NULL,
   "leaseExpiresAt" TIMESTAMP(3) NOT NULL,
   "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  CONSTRAINT "rebuild_job_leases_pkey" PRIMARY KEY ("name")
+  CONSTRAINT "job_leases_pkey" PRIMARY KEY ("name")
 );
-CREATE INDEX "rebuild_job_leases_leaseExpiresAt_idx" ON "rebuild_job_leases"("leaseExpiresAt");
+CREATE INDEX "job_leases_leaseExpiresAt_idx" ON "job_leases"("leaseExpiresAt");
 
-CREATE TABLE "rebuild_sync_runs" (
+CREATE TABLE "sync_runs" (
   "id" TEXT NOT NULL,
   "job" TEXT NOT NULL,
   "owner" TEXT NOT NULL,
@@ -2833,13 +2661,13 @@ CREATE TABLE "rebuild_sync_runs" (
   "attempts" INTEGER NOT NULL DEFAULT 0,
   "summary" TEXT,
   "error" TEXT,
-  CONSTRAINT "rebuild_sync_runs_pkey" PRIMARY KEY ("id")
+  CONSTRAINT "sync_runs_pkey" PRIMARY KEY ("id")
 );
-CREATE INDEX "rebuild_sync_runs_job_startedAt_idx" ON "rebuild_sync_runs"("job", "startedAt");
-CREATE INDEX "rebuild_sync_runs_finishedAt_idx" ON "rebuild_sync_runs"("finishedAt");
+CREATE INDEX "sync_runs_job_startedAt_idx" ON "sync_runs"("job", "startedAt");
+CREATE INDEX "sync_runs_finishedAt_idx" ON "sync_runs"("finishedAt");
 
 -- Durable, content-free recovery journal for Inbox remote deletions.
-CREATE TABLE "rebuild_inbox_deletions" (
+CREATE TABLE "inbox_deletions" (
   "id" TEXT NOT NULL,
   "workspaceId" TEXT NOT NULL,
   "targetId" TEXT NOT NULL,
@@ -2855,14 +2683,14 @@ CREATE TABLE "rebuild_inbox_deletions" (
   "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
   "remoteConfirmedAt" TIMESTAMP(3),
   "completedAt" TIMESTAMP(3),
-  CONSTRAINT "rebuild_inbox_deletions_pkey" PRIMARY KEY ("id"),
-  CONSTRAINT "rebuild_inbox_deletions_workspaceId_fkey"
+  CONSTRAINT "inbox_deletions_pkey" PRIMARY KEY ("id"),
+  CONSTRAINT "inbox_deletions_workspaceId_fkey"
     FOREIGN KEY ("workspaceId") REFERENCES "workspaces"("id") ON DELETE CASCADE ON UPDATE CASCADE,
-  CONSTRAINT "rebuild_inbox_deletions_state_check"
+  CONSTRAINT "inbox_deletions_state_check"
     CHECK ("state" IN ('started', 'uncertain', 'remote_confirmed', 'completed', 'rejected')),
-  CONSTRAINT "rebuild_inbox_deletions_reason_check"
+  CONSTRAINT "inbox_deletions_reason_check"
     CHECK ("reason" IS NULL OR "reason" IN ('transport_unconfirmed', 'provider_rejected', 'local_pending')),
-  CONSTRAINT "rebuild_inbox_deletions_timestamps_check"
+  CONSTRAINT "inbox_deletions_timestamps_check"
     CHECK (
       ("state" <> 'completed' OR ("remoteConfirmedAt" IS NOT NULL AND "completedAt" IS NOT NULL))
       AND ("state" <> 'remote_confirmed' OR "remoteConfirmedAt" IS NOT NULL)
@@ -2870,13 +2698,13 @@ CREATE TABLE "rebuild_inbox_deletions" (
     )
 );
 
-CREATE UNIQUE INDEX "rebuild_inbox_deletions_workspaceId_provider_targetId_remoteId_key"
-  ON "rebuild_inbox_deletions"("workspaceId", "provider", "targetId", "remoteId");
-CREATE INDEX "rebuild_inbox_deletions_workspaceId_targetId_updatedAt_idx"
-  ON "rebuild_inbox_deletions"("workspaceId", "targetId", "updatedAt");
+CREATE UNIQUE INDEX "inbox_deletions_workspaceId_provider_targetId_remoteId_key"
+  ON "inbox_deletions"("workspaceId", "provider", "targetId", "remoteId");
+CREATE INDEX "inbox_deletions_workspaceId_targetId_updatedAt_idx"
+  ON "inbox_deletions"("workspaceId", "targetId", "updatedAt");
 
 -- Durable, content-free recovery journal and tombstones for remote post deletion.
-CREATE TABLE "rebuild_post_deletions" (
+CREATE TABLE "post_deletions" (
   "id" TEXT NOT NULL,
   "workspaceId" TEXT NOT NULL,
   "targetId" TEXT NOT NULL,
@@ -2891,14 +2719,14 @@ CREATE TABLE "rebuild_post_deletions" (
   "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
   "remoteConfirmedAt" TIMESTAMP(3),
   "completedAt" TIMESTAMP(3),
-  CONSTRAINT "rebuild_post_deletions_pkey" PRIMARY KEY ("id"),
-  CONSTRAINT "rebuild_post_deletions_workspaceId_fkey"
+  CONSTRAINT "post_deletions_pkey" PRIMARY KEY ("id"),
+  CONSTRAINT "post_deletions_workspaceId_fkey"
     FOREIGN KEY ("workspaceId") REFERENCES "workspaces"("id") ON DELETE CASCADE ON UPDATE CASCADE,
-  CONSTRAINT "rebuild_post_deletions_state_check"
+  CONSTRAINT "post_deletions_state_check"
     CHECK ("state" IN ('started', 'uncertain', 'remote_confirmed', 'completed', 'rejected')),
-  CONSTRAINT "rebuild_post_deletions_reason_check"
+  CONSTRAINT "post_deletions_reason_check"
     CHECK ("reason" IS NULL OR "reason" IN ('transport_unconfirmed', 'provider_rejected', 'external_not_deleted', 'local_pending')),
-  CONSTRAINT "rebuild_post_deletions_timestamps_check"
+  CONSTRAINT "post_deletions_timestamps_check"
     CHECK ((
       ("state" = 'started' AND "reason" IS NULL AND "remoteConfirmedAt" IS NULL AND "completedAt" IS NULL)
       OR ("state" = 'uncertain' AND "reason" = 'transport_unconfirmed' AND "remoteConfirmedAt" IS NULL AND "completedAt" IS NULL)
@@ -2908,17 +2736,17 @@ CREATE TABLE "rebuild_post_deletions" (
     ) IS TRUE)
 );
 
-CREATE UNIQUE INDEX "rebuild_post_deletions_active_remote_identity_key"
-  ON "rebuild_post_deletions"("workspaceId", "provider", "targetId", "remoteId")
+CREATE UNIQUE INDEX "post_deletions_active_remote_identity_key"
+  ON "post_deletions"("workspaceId", "provider", "targetId", "remoteId")
   WHERE "state" <> 'rejected';
-CREATE INDEX "rebuild_post_deletions_workspaceId_targetId_updatedAt_idx"
-  ON "rebuild_post_deletions"("workspaceId", "targetId", "updatedAt");
-CREATE INDEX "rebuild_post_deletions_localPostIds_gin_idx"
-  ON "rebuild_post_deletions" USING GIN ("localPostIds");
+CREATE INDEX "post_deletions_workspaceId_targetId_updatedAt_idx"
+  ON "post_deletions"("workspaceId", "targetId", "updatedAt");
+CREATE INDEX "post_deletions_localPostIds_gin_idx"
+  ON "post_deletions" USING GIN ("localPostIds");
 
 -- Durable, content-free publication intent, receipt, and resolution journal.
 -- Identifier bounds are fixed integrity caps (2048 characters) independent of runtime configuration.
-CREATE TABLE "rebuild_publication_attempts" (
+CREATE TABLE "publication_attempts" (
   "id" TEXT NOT NULL,
   "workspaceId" TEXT NOT NULL,
   "postId" TEXT NOT NULL,
@@ -2936,14 +2764,14 @@ CREATE TABLE "rebuild_publication_attempts" (
   "attestedBy" TEXT,
   "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
   "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  CONSTRAINT "rebuild_publication_attempts_pkey" PRIMARY KEY ("id"),
-  CONSTRAINT "rebuild_publication_attempts_workspaceId_fkey"
+  CONSTRAINT "publication_attempts_pkey" PRIMARY KEY ("id"),
+  CONSTRAINT "publication_attempts_workspaceId_fkey"
     FOREIGN KEY ("workspaceId") REFERENCES "workspaces"("id") ON DELETE CASCADE ON UPDATE CASCADE,
-  CONSTRAINT "rebuild_publication_attempts_state_check"
+  CONSTRAINT "publication_attempts_state_check"
     CHECK ("state" IN ('started', 'uncertain', 'receipt_recorded', 'projected', 'rejected', 'attested_absent')),
-  CONSTRAINT "rebuild_publication_attempts_reason_check"
+  CONSTRAINT "publication_attempts_reason_check"
     CHECK ("reason" IS NULL OR "reason" IN ('provider_rejected', 'outcome_unknown', 'provider_receipt', 'external_human_attestation')),
-  CONSTRAINT "rebuild_publication_attempts_bounds_check"
+  CONSTRAINT "publication_attempts_bounds_check"
     CHECK ((
       length("id") BETWEEN 1 AND 2048 AND
       length("workspaceId") BETWEEN 1 AND 2048 AND
@@ -2956,7 +2784,7 @@ CREATE TABLE "rebuild_publication_attempts" (
       ("remotePostId" IS NULL OR length("remotePostId") BETWEEN 1 AND 2048) AND
       ("remoteUrl" IS NULL OR length("remoteUrl") BETWEEN 1 AND 2048)
     ) IS TRUE),
-  CONSTRAINT "rebuild_publication_attempts_state_timestamps_check"
+  CONSTRAINT "publication_attempts_state_timestamps_check"
     CHECK ((
       ("state" = 'started' AND "reason" IS NULL AND "remotePostId" IS NULL AND "remoteUrl" IS NULL AND "receiptAt" IS NULL AND "projectedAt" IS NULL AND "attestedAt" IS NULL AND "attestedBy" IS NULL)
       OR ("state" = 'uncertain' AND "reason" = 'outcome_unknown' AND "remotePostId" IS NULL AND "remoteUrl" IS NULL AND "receiptAt" IS NULL AND "projectedAt" IS NULL AND "attestedAt" IS NULL AND "attestedBy" IS NULL)
@@ -2967,17 +2795,17 @@ CREATE TABLE "rebuild_publication_attempts" (
     ) IS TRUE)
 );
 
-CREATE UNIQUE INDEX "rebuild_publication_attempts_active_postTarget_key"
-  ON "rebuild_publication_attempts"("workspaceId", "postTargetId")
+CREATE UNIQUE INDEX "publication_attempts_active_postTarget_key"
+  ON "publication_attempts"("workspaceId", "postTargetId")
   WHERE "state" NOT IN ('rejected', 'attested_absent');
-CREATE INDEX "rebuild_publication_attempts_workspaceId_targetId_updatedAt_idx"
-  ON "rebuild_publication_attempts"("workspaceId", "targetId", "updatedAt");
-CREATE INDEX "rebuild_publication_attempts_workspaceId_postId_postTargetId_idx"
-  ON "rebuild_publication_attempts"("workspaceId", "postId", "postTargetId");
+CREATE INDEX "publication_attempts_workspaceId_targetId_updatedAt_idx"
+  ON "publication_attempts"("workspaceId", "targetId", "updatedAt");
+CREATE INDEX "publication_attempts_workspaceId_postId_postTargetId_idx"
+  ON "publication_attempts"("workspaceId", "postId", "postTargetId");
 
 -- Content-free intent and receipt journal for Facebook's unpublished photo uploads.
 -- Provider objects remain recoverable across a process crash without retaining media bytes or URLs.
-CREATE TABLE "rebuild_facebook_media_steps" (
+CREATE TABLE "facebook_media_steps" (
   "id" TEXT NOT NULL,
   "workspaceId" TEXT NOT NULL,
   "operationId" TEXT NOT NULL,
@@ -2994,14 +2822,14 @@ CREATE TABLE "rebuild_facebook_media_steps" (
   "rejectedAt" TIMESTAMP(3),
   "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
   "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  CONSTRAINT "rebuild_facebook_media_steps_pkey" PRIMARY KEY ("id"),
-  CONSTRAINT "rebuild_facebook_media_steps_workspaceId_fkey"
+  CONSTRAINT "facebook_media_steps_pkey" PRIMARY KEY ("id"),
+  CONSTRAINT "facebook_media_steps_workspaceId_fkey"
     FOREIGN KEY ("workspaceId") REFERENCES "workspaces"("id") ON DELETE CASCADE ON UPDATE CASCADE,
-  CONSTRAINT "rebuild_facebook_media_steps_phase_ordinal_check"
+  CONSTRAINT "facebook_media_steps_phase_ordinal_check"
     CHECK ((("phase" = 'photo' AND "ordinal" BETWEEN 1 AND 20) OR ("phase" = 'feed' AND "ordinal" = 0)) IS TRUE),
-  CONSTRAINT "rebuild_facebook_media_steps_state_check"
+  CONSTRAINT "facebook_media_steps_state_check"
     CHECK ("state" IN ('started', 'recorded', 'rejected', 'uncertain')),
-  CONSTRAINT "rebuild_facebook_media_steps_bounds_check"
+  CONSTRAINT "facebook_media_steps_bounds_check"
     CHECK (
       length("id") BETWEEN 1 AND 2048 AND
       length("workspaceId") BETWEEN 1 AND 2048 AND
@@ -3013,28 +2841,28 @@ CREATE TABLE "rebuild_facebook_media_steps" (
       length("remoteTargetId") BETWEEN 1 AND 2048 AND
       ("remoteId" IS NULL OR length("remoteId") BETWEEN 1 AND 2048)
     ),
-  CONSTRAINT "rebuild_facebook_media_steps_state_timestamps_check"
+  CONSTRAINT "facebook_media_steps_state_timestamps_check"
     CHECK ((
       ("state" = 'started' AND "remoteId" IS NULL AND "receiptAt" IS NULL AND "rejectedAt" IS NULL) OR
       ("state" = 'recorded' AND "remoteId" IS NOT NULL AND "receiptAt" IS NOT NULL AND "rejectedAt" IS NULL) OR
       ("state" = 'rejected' AND "remoteId" IS NULL AND "receiptAt" IS NULL AND "rejectedAt" IS NOT NULL) OR
       ("state" = 'uncertain' AND "remoteId" IS NULL AND "receiptAt" IS NULL AND "rejectedAt" IS NULL)
     ) IS TRUE),
-  CONSTRAINT "rebuild_facebook_media_steps_time_order_check"
+  CONSTRAINT "facebook_media_steps_time_order_check"
     CHECK (("createdAt" <= "updatedAt" AND ("receiptAt" IS NULL OR "receiptAt" <= "updatedAt") AND ("rejectedAt" IS NULL OR "rejectedAt" <= "updatedAt")) IS TRUE)
 );
 
-CREATE UNIQUE INDEX "rebuild_facebook_media_steps_operation_phase_ordinal_key"
-  ON "rebuild_facebook_media_steps"("operationId", "phase", "ordinal");
-CREATE INDEX "rebuild_facebook_media_steps_workspace_operation_idx"
-  ON "rebuild_facebook_media_steps"("workspaceId", "operationId", "phase", "ordinal");
-CREATE INDEX "rebuild_facebook_media_steps_workspace_target_updated_idx"
-  ON "rebuild_facebook_media_steps"("workspaceId", "targetId", "updatedAt");
-CREATE UNIQUE INDEX "rebuild_facebook_media_steps_known_remote_id_key"
-  ON "rebuild_facebook_media_steps"("workspaceId", "targetId", "phase", "remoteId")
+CREATE UNIQUE INDEX "facebook_media_steps_operation_phase_ordinal_key"
+  ON "facebook_media_steps"("operationId", "phase", "ordinal");
+CREATE INDEX "facebook_media_steps_workspace_operation_idx"
+  ON "facebook_media_steps"("workspaceId", "operationId", "phase", "ordinal");
+CREATE INDEX "facebook_media_steps_workspace_target_updated_idx"
+  ON "facebook_media_steps"("workspaceId", "targetId", "updatedAt");
+CREATE UNIQUE INDEX "facebook_media_steps_known_remote_id_key"
+  ON "facebook_media_steps"("workspaceId", "targetId", "phase", "remoteId")
   WHERE "remoteId" IS NOT NULL;
 
-CREATE TABLE rebuild_facebook_media_deletions (
+CREATE TABLE facebook_media_deletions (
   id text PRIMARY KEY,
   "workspaceId" text NOT NULL,
   "mediaStepId" text NOT NULL,
@@ -3049,11 +2877,11 @@ CREATE TABLE rebuild_facebook_media_deletions (
   "receiptAt" timestamptz,
   "createdAt" timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
   "updatedAt" timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  CONSTRAINT rebuild_facebook_media_deletions_workspace_fk
+  CONSTRAINT facebook_media_deletions_workspace_fk
     FOREIGN KEY ("workspaceId") REFERENCES workspaces(id) ON DELETE CASCADE,
-  CONSTRAINT rebuild_facebook_media_deletions_id_length_check
+  CONSTRAINT facebook_media_deletions_id_length_check
     CHECK (char_length(id) BETWEEN 1 AND 2048),
-  CONSTRAINT rebuild_facebook_media_deletions_binding_length_check
+  CONSTRAINT facebook_media_deletions_binding_length_check
     CHECK (
       char_length("workspaceId") BETWEEN 1 AND 2048 AND
       char_length("mediaStepId") BETWEEN 1 AND 2048 AND
@@ -3065,7 +2893,7 @@ CREATE TABLE rebuild_facebook_media_deletions (
       char_length("remotePhotoId") BETWEEN 1 AND 2048 AND
       char_length("actorId") BETWEEN 1 AND 2048
     ),
-  CONSTRAINT rebuild_facebook_media_deletions_no_control_chars_check
+  CONSTRAINT facebook_media_deletions_no_control_chars_check
     CHECK (
       id !~ '[[:cntrl:]]' AND "workspaceId" !~ '[[:cntrl:]]' AND
       "mediaStepId" !~ '[[:cntrl:]]' AND "operationId" !~ '[[:cntrl:]]' AND
@@ -3073,30 +2901,30 @@ CREATE TABLE rebuild_facebook_media_deletions (
       "targetId" !~ '[[:cntrl:]]' AND "remoteTargetId" !~ '[[:cntrl:]]' AND
       "remotePhotoId" !~ '[[:cntrl:]]' AND "actorId" !~ '[[:cntrl:]]'
     ),
-  CONSTRAINT rebuild_facebook_media_deletions_state_check
+  CONSTRAINT facebook_media_deletions_state_check
     CHECK ((state IN ('started', 'uncertain', 'confirmed', 'rejected')) IS TRUE),
-  CONSTRAINT rebuild_facebook_media_deletions_receipt_check
+  CONSTRAINT facebook_media_deletions_receipt_check
     CHECK ((
       (state IN ('started', 'uncertain') AND "receiptAt" IS NULL) OR
       (state IN ('confirmed', 'rejected') AND "receiptAt" IS NOT NULL)
     ) IS TRUE),
-  CONSTRAINT rebuild_facebook_media_deletions_updated_check
+  CONSTRAINT facebook_media_deletions_updated_check
     CHECK (("updatedAt" >= "createdAt" AND ("receiptAt" IS NULL OR "receiptAt" <= "updatedAt")) IS TRUE)
 );
 
 -- Rejected requests can be explicitly tried again. Started, uncertain and confirmed rows
 -- reserve the exact known photo identity, preventing concurrent or duplicate cleanup.
-CREATE UNIQUE INDEX rebuild_facebook_media_deletions_active_photo_unique
-  ON rebuild_facebook_media_deletions ("workspaceId", "mediaStepId")
+CREATE UNIQUE INDEX facebook_media_deletions_active_photo_unique
+  ON facebook_media_deletions ("workspaceId", "mediaStepId")
   WHERE state <> 'rejected';
 
-CREATE INDEX rebuild_facebook_media_deletions_workspace_updated_idx
-  ON rebuild_facebook_media_deletions ("workspaceId", "updatedAt" DESC, id DESC);
+CREATE INDEX facebook_media_deletions_workspace_updated_idx
+  ON facebook_media_deletions ("workspaceId", "updatedAt" DESC, id DESC);
 
-CREATE INDEX rebuild_facebook_media_deletions_step_history_idx
-  ON rebuild_facebook_media_deletions ("workspaceId", "mediaStepId", "createdAt" DESC, id DESC);
+CREATE INDEX facebook_media_deletions_step_history_idx
+  ON facebook_media_deletions ("workspaceId", "mediaStepId", "createdAt" DESC, id DESC);
 
-CREATE FUNCTION rebuild_facebook_media_deletions_binding_immutable() RETURNS trigger
+CREATE FUNCTION facebook_media_deletions_binding_immutable() RETURNS trigger
 LANGUAGE plpgsql AS $$
 BEGIN
   IF ROW(NEW.id, NEW."workspaceId", NEW."mediaStepId", NEW."operationId", NEW."postId",
@@ -3110,23 +2938,23 @@ BEGIN
 END;
 $$;
 
-CREATE TRIGGER rebuild_facebook_media_deletions_binding_immutable_trigger
-  BEFORE UPDATE ON rebuild_facebook_media_deletions
-  FOR EACH ROW EXECUTE FUNCTION rebuild_facebook_media_deletions_binding_immutable();
+CREATE TRIGGER facebook_media_deletions_binding_immutable_trigger
+  BEFORE UPDATE ON facebook_media_deletions
+  FOR EACH ROW EXECUTE FUNCTION facebook_media_deletions_binding_immutable();
 
 -- Immutable operator attestations and delayed provider-result evidence for
 -- Facebook's content-free multi-photo and staged-photo deletion journals.
-ALTER TABLE rebuild_facebook_media_steps
+ALTER TABLE facebook_media_steps
   ADD COLUMN "attestedAt" TIMESTAMP(3),
   ADD COLUMN "attestedBy" TEXT;
 
-ALTER TABLE rebuild_facebook_media_steps
-  DROP CONSTRAINT rebuild_facebook_media_steps_state_check,
-  DROP CONSTRAINT rebuild_facebook_media_steps_state_timestamps_check,
-  DROP CONSTRAINT rebuild_facebook_media_steps_time_order_check,
-  ADD CONSTRAINT rebuild_facebook_media_steps_state_check
+ALTER TABLE facebook_media_steps
+  DROP CONSTRAINT facebook_media_steps_state_check,
+  DROP CONSTRAINT facebook_media_steps_state_timestamps_check,
+  DROP CONSTRAINT facebook_media_steps_time_order_check,
+  ADD CONSTRAINT facebook_media_steps_state_check
     CHECK ("state" IN ('started', 'recorded', 'rejected', 'uncertain', 'attested_present', 'attested_absent', 'conflict')),
-  ADD CONSTRAINT rebuild_facebook_media_steps_state_timestamps_check
+  ADD CONSTRAINT facebook_media_steps_state_timestamps_check
     CHECK ((
       ("state" = 'started' AND "remoteId" IS NULL AND "receiptAt" IS NULL AND "rejectedAt" IS NULL AND "attestedAt" IS NULL AND "attestedBy" IS NULL) OR
       ("state" = 'recorded' AND "remoteId" IS NOT NULL AND "receiptAt" IS NOT NULL AND "rejectedAt" IS NULL AND "attestedAt" IS NULL AND "attestedBy" IS NULL) OR
@@ -3136,39 +2964,39 @@ ALTER TABLE rebuild_facebook_media_steps
       ("state" = 'attested_absent' AND "remoteId" IS NULL AND "receiptAt" IS NULL AND "rejectedAt" IS NULL AND "attestedAt" IS NOT NULL AND "attestedBy" IS NOT NULL) OR
       ("state" = 'conflict' AND ("remoteId" IS NULL OR "receiptAt" IS NOT NULL) AND "rejectedAt" IS NULL AND (("attestedAt" IS NULL AND "attestedBy" IS NULL) OR ("attestedAt" IS NOT NULL AND "attestedBy" IS NOT NULL)))
     ) IS TRUE),
-  ADD CONSTRAINT rebuild_facebook_media_steps_time_order_check
+  ADD CONSTRAINT facebook_media_steps_time_order_check
     CHECK (("createdAt" <= "updatedAt" AND ("receiptAt" IS NULL OR "receiptAt" <= "updatedAt") AND ("rejectedAt" IS NULL OR "rejectedAt" <= "updatedAt") AND ("attestedAt" IS NULL OR "attestedAt" <= "updatedAt")) IS TRUE),
-  ADD CONSTRAINT rebuild_facebook_media_steps_attestor_bound_check
+  ADD CONSTRAINT facebook_media_steps_attestor_bound_check
     CHECK ("attestedBy" IS NULL OR (length("attestedBy") BETWEEN 1 AND 2048 AND "attestedBy" !~ '[[:cntrl:]]'));
 
-ALTER TABLE rebuild_facebook_media_deletions
+ALTER TABLE facebook_media_deletions
   ADD COLUMN "attestedAt" timestamptz,
   ADD COLUMN "attestedBy" text;
 
-ALTER TABLE rebuild_facebook_media_deletions
-  DROP CONSTRAINT rebuild_facebook_media_deletions_state_check,
-  DROP CONSTRAINT rebuild_facebook_media_deletions_receipt_check,
-  DROP CONSTRAINT rebuild_facebook_media_deletions_updated_check,
-  ADD CONSTRAINT rebuild_facebook_media_deletions_state_check
+ALTER TABLE facebook_media_deletions
+  DROP CONSTRAINT facebook_media_deletions_state_check,
+  DROP CONSTRAINT facebook_media_deletions_receipt_check,
+  DROP CONSTRAINT facebook_media_deletions_updated_check,
+  ADD CONSTRAINT facebook_media_deletions_state_check
     CHECK ((state IN ('started', 'uncertain', 'confirmed', 'rejected', 'attested_deleted', 'attested_present', 'conflict')) IS TRUE),
-  ADD CONSTRAINT rebuild_facebook_media_deletions_receipt_check
+  ADD CONSTRAINT facebook_media_deletions_receipt_check
     CHECK ((
       (state IN ('started', 'uncertain') AND "receiptAt" IS NULL AND "attestedAt" IS NULL AND "attestedBy" IS NULL) OR
       (state IN ('confirmed', 'rejected') AND "receiptAt" IS NOT NULL AND "attestedAt" IS NULL AND "attestedBy" IS NULL) OR
       (state IN ('attested_deleted', 'attested_present') AND "receiptAt" IS NULL AND "attestedAt" IS NOT NULL AND "attestedBy" IS NOT NULL) OR
       (state = 'conflict' AND ("receiptAt" IS NULL OR "receiptAt" <= "updatedAt") AND (("attestedAt" IS NULL AND "attestedBy" IS NULL) OR ("attestedAt" IS NOT NULL AND "attestedBy" IS NOT NULL)))
     ) IS TRUE),
-  ADD CONSTRAINT rebuild_facebook_media_deletions_updated_check
+  ADD CONSTRAINT facebook_media_deletions_updated_check
     CHECK (("updatedAt" >= "createdAt" AND ("receiptAt" IS NULL OR "receiptAt" <= "updatedAt") AND ("attestedAt" IS NULL OR "attestedAt" <= "updatedAt")) IS TRUE),
-  ADD CONSTRAINT rebuild_facebook_media_deletions_attestor_bound_check
+  ADD CONSTRAINT facebook_media_deletions_attestor_bound_check
     CHECK ("attestedBy" IS NULL OR (char_length("attestedBy") BETWEEN 1 AND 2048 AND "attestedBy" !~ '[[:cntrl:]]'));
 
-DROP INDEX rebuild_facebook_media_deletions_active_photo_unique;
-CREATE UNIQUE INDEX rebuild_facebook_media_deletions_active_photo_unique
-  ON rebuild_facebook_media_deletions ("workspaceId", "mediaStepId")
+DROP INDEX facebook_media_deletions_active_photo_unique;
+CREATE UNIQUE INDEX facebook_media_deletions_active_photo_unique
+  ON facebook_media_deletions ("workspaceId", "mediaStepId")
   WHERE state NOT IN ('rejected', 'attested_present');
 
-CREATE TABLE rebuild_facebook_media_resolutions (
+CREATE TABLE facebook_media_resolutions (
   id text PRIMARY KEY,
   "workspaceId" text NOT NULL,
   "operationId" text NOT NULL,
@@ -3186,17 +3014,17 @@ CREATE TABLE rebuild_facebook_media_resolutions (
   outcome text NOT NULL,
   "remoteId" text,
   "createdAt" timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  CONSTRAINT rebuild_facebook_media_resolutions_workspace_fk
+  CONSTRAINT facebook_media_resolutions_workspace_fk
     FOREIGN KEY ("workspaceId") REFERENCES workspaces(id) ON DELETE CASCADE,
-  CONSTRAINT rebuild_facebook_media_resolutions_phase_check
+  CONSTRAINT facebook_media_resolutions_phase_check
     CHECK (((phase = 'photo' AND ordinal BETWEEN 1 AND 20 AND "deletionId" IS NULL) OR
             (phase = 'feed' AND ordinal = 0 AND "deletionId" IS NULL) OR
             (phase = 'delete' AND ordinal BETWEEN 1 AND 20 AND "deletionId" IS NOT NULL)) IS TRUE),
-  CONSTRAINT rebuild_facebook_media_resolutions_source_check
+  CONSTRAINT facebook_media_resolutions_source_check
     CHECK (source IN ('operator', 'provider')),
-  CONSTRAINT rebuild_facebook_media_resolutions_outcome_check
+  CONSTRAINT facebook_media_resolutions_outcome_check
     CHECK (outcome IN ('photo_present', 'photo_absent', 'feed_present', 'feed_absent', 'delete_deleted', 'delete_present', 'late_provider_receipt', 'late_provider_rejection', 'late_provider_uncertain')),
-  CONSTRAINT rebuild_facebook_media_resolutions_binding_length_check
+  CONSTRAINT facebook_media_resolutions_binding_length_check
     CHECK (
       char_length(id) BETWEEN 1 AND 2048 AND
       char_length("workspaceId") BETWEEN 1 AND 2048 AND
@@ -3211,7 +3039,7 @@ CREATE TABLE rebuild_facebook_media_resolutions (
       ("eventActorId" IS NULL OR char_length("eventActorId") BETWEEN 1 AND 2048) AND
       ("remoteId" IS NULL OR char_length("remoteId") BETWEEN 1 AND 2048)
     ),
-  CONSTRAINT rebuild_facebook_media_resolutions_control_chars_check
+  CONSTRAINT facebook_media_resolutions_control_chars_check
     CHECK (
       id !~ '[[:cntrl:]]' AND "workspaceId" !~ '[[:cntrl:]]' AND "operationId" !~ '[[:cntrl:]]' AND
       "mediaStepId" !~ '[[:cntrl:]]' AND ("deletionId" IS NULL OR "deletionId" !~ '[[:cntrl:]]') AND
@@ -3219,35 +3047,35 @@ CREATE TABLE rebuild_facebook_media_resolutions (
       "remoteTargetId" !~ '[[:cntrl:]]' AND "publicationActorId" !~ '[[:cntrl:]]' AND
       ("eventActorId" IS NULL OR "eventActorId" !~ '[[:cntrl:]]') AND ("remoteId" IS NULL OR "remoteId" !~ '[[:cntrl:]]')
     ),
-  CONSTRAINT rebuild_facebook_media_resolutions_actor_check
+  CONSTRAINT facebook_media_resolutions_actor_check
     CHECK (((source = 'operator' AND "eventActorId" IS NOT NULL AND outcome IN ('photo_present', 'photo_absent', 'feed_present', 'feed_absent', 'delete_deleted', 'delete_present')) OR
             (source = 'provider' AND "eventActorId" IS NULL AND outcome IN ('late_provider_receipt', 'late_provider_rejection', 'late_provider_uncertain'))) IS TRUE),
-  CONSTRAINT rebuild_facebook_media_resolutions_remote_id_check
+  CONSTRAINT facebook_media_resolutions_remote_id_check
     CHECK (((outcome IN ('photo_present', 'feed_present', 'late_provider_receipt') AND "remoteId" IS NOT NULL) OR
             (outcome NOT IN ('photo_present', 'feed_present', 'late_provider_receipt') AND "remoteId" IS NULL)) IS TRUE)
 );
 
-CREATE INDEX rebuild_facebook_media_resolutions_operation_history_idx
-  ON rebuild_facebook_media_resolutions ("workspaceId", "operationId", "createdAt" DESC, id DESC);
-CREATE INDEX rebuild_facebook_media_resolutions_step_history_idx
-  ON rebuild_facebook_media_resolutions ("workspaceId", "mediaStepId", "createdAt" DESC, id DESC);
-CREATE INDEX rebuild_facebook_media_resolutions_deletion_history_idx
-  ON rebuild_facebook_media_resolutions ("workspaceId", "deletionId", "createdAt" DESC, id DESC)
+CREATE INDEX facebook_media_resolutions_operation_history_idx
+  ON facebook_media_resolutions ("workspaceId", "operationId", "createdAt" DESC, id DESC);
+CREATE INDEX facebook_media_resolutions_step_history_idx
+  ON facebook_media_resolutions ("workspaceId", "mediaStepId", "createdAt" DESC, id DESC);
+CREATE INDEX facebook_media_resolutions_deletion_history_idx
+  ON facebook_media_resolutions ("workspaceId", "deletionId", "createdAt" DESC, id DESC)
   WHERE "deletionId" IS NOT NULL;
 
-CREATE FUNCTION rebuild_facebook_media_resolutions_immutable() RETURNS trigger
+CREATE FUNCTION facebook_media_resolutions_immutable() RETURNS trigger
 LANGUAGE plpgsql AS $$
 BEGIN
   RAISE EXCEPTION 'Facebook media resolution history is immutable';
 END;
 $$;
 
-CREATE TRIGGER rebuild_facebook_media_resolutions_immutable_trigger
+CREATE TRIGGER facebook_media_resolutions_immutable_trigger
   -- Workspace erasure owns deletion of scoped rows; normal module code has no delete path.
-  BEFORE UPDATE ON rebuild_facebook_media_resolutions
-  FOR EACH ROW EXECUTE FUNCTION rebuild_facebook_media_resolutions_immutable();
+  BEFORE UPDATE ON facebook_media_resolutions
+  FOR EACH ROW EXECUTE FUNCTION facebook_media_resolutions_immutable();
 
-CREATE TABLE rebuild_notifications (
+CREATE TABLE notifications (
   id TEXT PRIMARY KEY CHECK (length(id) BETWEEN 1 AND 2048),
   "eventId" TEXT NOT NULL CHECK (length("eventId") BETWEEN 1 AND 2048),
   "workspaceId" TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
@@ -3268,27 +3096,27 @@ CREATE TABLE rebuild_notifications (
   "claimToken" TEXT,
   "claimUntil" TIMESTAMPTZ,
   "safeReason" TEXT CHECK ("safeReason" IS NULL OR "safeReason" IN ('recipient_unavailable', 'preflight_unavailable', 'mail_unavailable', 'mail_failed', 'mail_uncertain', 'claim_expired', 'authorization_changed', 'resource_unavailable')),
-  CONSTRAINT rebuild_notifications_claim_shape CHECK (("emailState" = 'sending') = ("claimToken" IS NOT NULL AND "claimUntil" IS NOT NULL)),
-  CONSTRAINT rebuild_notifications_sent_shape CHECK (("emailState" = 'sent') = ("emailSentAt" IS NOT NULL)),
-  CONSTRAINT rebuild_notifications_attempt_shape CHECK ((attempt = 0) = ("lastAttemptAt" IS NULL)),
-  CONSTRAINT rebuild_notifications_context_shape CHECK (
+  CONSTRAINT notifications_claim_shape CHECK (("emailState" = 'sending') = ("claimToken" IS NOT NULL AND "claimUntil" IS NOT NULL)),
+  CONSTRAINT notifications_sent_shape CHECK (("emailState" = 'sent') = ("emailSentAt" IS NOT NULL)),
+  CONSTRAINT notifications_attempt_shape CHECK ((attempt = 0) = ("lastAttemptAt" IS NULL)),
+  CONSTRAINT notifications_context_shape CHECK (
     (kind = 'note_mention' AND "postId" IS NOT NULL AND "noteId" IS NOT NULL)
     OR (kind = 'mix_dry' AND "targetId" IS NOT NULL)
   ),
-  CONSTRAINT rebuild_notifications_id_workspace_cap CHECK (
+  CONSTRAINT notifications_id_workspace_cap CHECK (
     length("eventId") <= 2048 AND length("workspaceId") <= 2048 AND length("userId") <= 2048
   )
 );
 
-CREATE UNIQUE INDEX rebuild_notifications_event_recipient_uq
-  ON rebuild_notifications ("workspaceId", "eventId", "userId");
-CREATE INDEX rebuild_notifications_recipient_page_idx
-  ON rebuild_notifications ("workspaceId", "userId", "createdAt" DESC, id DESC);
-CREATE INDEX rebuild_notifications_delivery_due_idx
-  ON rebuild_notifications ("nextAt", "createdAt", id)
+CREATE UNIQUE INDEX notifications_event_recipient_uq
+  ON notifications ("workspaceId", "eventId", "userId");
+CREATE INDEX notifications_recipient_page_idx
+  ON notifications ("workspaceId", "userId", "createdAt" DESC, id DESC);
+CREATE INDEX notifications_delivery_due_idx
+  ON notifications ("nextAt", "createdAt", id)
   WHERE "emailState" = 'pending';
-CREATE INDEX rebuild_notifications_delivery_lease_idx
-  ON rebuild_notifications ("claimUntil", id)
+CREATE INDEX notifications_delivery_lease_idx
+  ON notifications ("claimUntil", id)
   WHERE "emailState" = 'sending';
 
 CREATE TABLE ads_management_operations (
@@ -3341,7 +3169,7 @@ BEGIN
   END IF;
 END $$;
 
-CREATE OR REPLACE FUNCTION public.rebuild_reject_purging_workspace_write()
+CREATE OR REPLACE FUNCTION public.reject_purging_workspace_write()
 RETURNS trigger LANGUAGE plpgsql SET search_path = pg_catalog, public AS $$
 BEGIN
   -- Erasure takes FOR UPDATE on this same parent. A concurrent child write
@@ -3370,15 +3198,15 @@ BEGIN
       AND child.relname NOT IN ('memberships', 'workspace_data_purges')
   LOOP
     SELECT tgfoid, tgenabled INTO installed FROM pg_trigger
-      WHERE tgrelid = item.oid AND tgname = 'rebuild_workspace_purge_write_gate'
+      WHERE tgrelid = item.oid AND tgname = 'workspace_purge_write_gate'
         AND NOT tgisinternal;
     IF FOUND THEN
-      IF installed.tgfoid <> 'public.rebuild_reject_purging_workspace_write()'::regprocedure
+      IF installed.tgfoid <> 'public.reject_purging_workspace_write()'::regprocedure
          OR installed.tgenabled NOT IN ('O', 'A') THEN
         RAISE EXCEPTION 'Unexpected or disabled workspace purge gate on %', item.table_name;
       END IF;
     ELSE
-      EXECUTE format('CREATE TRIGGER rebuild_workspace_purge_write_gate BEFORE INSERT OR UPDATE ON public.%I FOR EACH ROW EXECUTE FUNCTION public.rebuild_reject_purging_workspace_write()', item.table_name);
+      EXECUTE format('CREATE TRIGGER workspace_purge_write_gate BEFORE INSERT OR UPDATE ON public.%I FOR EACH ROW EXECUTE FUNCTION public.reject_purging_workspace_write()', item.table_name);
     END IF;
   END LOOP;
 END $$;
@@ -3426,8 +3254,8 @@ ALTER TABLE "task_comments" ADD CONSTRAINT "task_comments_authorId_fkey"
 -- The earlier workspace_data_purges migration installed this write gate on every
 -- workspace-owned table that existed then. New tables must join it, otherwise a
 -- comment could be written while the workspace is being erased.
-CREATE TRIGGER rebuild_workspace_purge_write_gate BEFORE INSERT OR UPDATE ON "task_comments"
-  FOR EACH ROW EXECUTE FUNCTION rebuild_reject_purging_workspace_write();
+CREATE TRIGGER workspace_purge_write_gate BEFORE INSERT OR UPDATE ON "task_comments"
+  FOR EACH ROW EXECUTE FUNCTION reject_purging_workspace_write();
 
 -- Legacy links without an expiry remain stored but are not publicly served by the rebuild.
 -- Owners can rotate/recreate them with an explicit bounded lifetime.
@@ -3485,29 +3313,29 @@ CREATE INDEX report_runs_output_expiry ON report_runs ("outputExpiresAt", id) WH
 -- erasure guard without rewriting the already-applied report history migration.
 DO $$
 BEGIN
-  IF to_regprocedure('public.rebuild_reject_purging_workspace_write()') IS NULL THEN
+  IF to_regprocedure('public.reject_purging_workspace_write()') IS NULL THEN
     RAISE EXCEPTION 'Shared workspace purge write gate prerequisite is missing';
   END IF;
 END $$;
-CREATE TRIGGER rebuild_workspace_purge_write_gate BEFORE INSERT OR UPDATE ON report_runs
-  FOR EACH ROW EXECUTE FUNCTION rebuild_reject_purging_workspace_write();
+CREATE TRIGGER workspace_purge_write_gate BEFORE INSERT OR UPDATE ON report_runs
+  FOR EACH ROW EXECUTE FUNCTION reject_purging_workspace_write();
 
 -- Additive neutral per-destination intent. NULL retains an existing legacy
 -- destination's post-level format; newly authored destinations store an ID.
 ALTER TABLE post_targets ADD COLUMN "formatId" text;
-ALTER TABLE post_targets ADD CONSTRAINT rebuild_destination_format_identity
+ALTER TABLE post_targets ADD CONSTRAINT destination_format_identity
   CHECK ("formatId" IS NULL OR (char_length("formatId") BETWEEN 1 AND 128 AND "formatId" = btrim("formatId")));
 -- Versions retain the exact target -> format map that was reviewed or edited.
 ALTER TABLE post_versions ADD COLUMN "destinationFormats" jsonb NOT NULL DEFAULT '{}'::jsonb;
-ALTER TABLE post_versions ADD CONSTRAINT rebuild_version_destination_formats_object
+ALTER TABLE post_versions ADD CONSTRAINT version_destination_formats_object
   CHECK (jsonb_typeof("destinationFormats") = 'object');
 
 -- Facebook native publishing receipts are a child of the neutral publication
 -- claim. This journal stores bounded, content-free protocol evidence only.
-CREATE UNIQUE INDEX "rebuild_publication_attempts_workspaceId_id_key"
-  ON "rebuild_publication_attempts"("workspaceId", "id");
+CREATE UNIQUE INDEX "publication_attempts_workspaceId_id_key"
+  ON "publication_attempts"("workspaceId", "id");
 
-CREATE TABLE "rebuild_facebook_native_journal" (
+CREATE TABLE "facebook_native_journal" (
   "operationId" TEXT NOT NULL,
   "workspaceId" TEXT NOT NULL,
   "postId" TEXT NOT NULL,
@@ -3527,12 +3355,12 @@ CREATE TABLE "rebuild_facebook_native_journal" (
   "conflicted" BOOLEAN NOT NULL DEFAULT FALSE,
   "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
   "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  CONSTRAINT "rebuild_facebook_native_journal_pkey" PRIMARY KEY ("operationId"),
-  CONSTRAINT "rebuild_facebook_native_journal_workspaceId_fkey"
+  CONSTRAINT "facebook_native_journal_pkey" PRIMARY KEY ("operationId"),
+  CONSTRAINT "facebook_native_journal_workspaceId_fkey"
     FOREIGN KEY ("workspaceId") REFERENCES "workspaces"("id") ON DELETE CASCADE ON UPDATE CASCADE,
-  CONSTRAINT "rebuild_facebook_native_journal_parent_fkey"
-    FOREIGN KEY ("workspaceId", "operationId") REFERENCES "rebuild_publication_attempts"("workspaceId", "id") ON DELETE CASCADE ON UPDATE CASCADE,
-  CONSTRAINT "rebuild_facebook_native_journal_binding_check" CHECK ((
+  CONSTRAINT "facebook_native_journal_parent_fkey"
+    FOREIGN KEY ("workspaceId", "operationId") REFERENCES "publication_attempts"("workspaceId", "id") ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT "facebook_native_journal_binding_check" CHECK ((
     length("operationId") BETWEEN 1 AND 2048 AND
     length("workspaceId") BETWEEN 1 AND 2048 AND
     length("postId") BETWEEN 1 AND 2048 AND
@@ -3554,9 +3382,9 @@ CREATE TABLE "rebuild_facebook_native_journal" (
     ("remoteId" IS NULL OR (length("remoteId") BETWEEN 1 AND 2048 AND "remoteId" = btrim("remoteId") AND "remoteId" !~ '[[:cntrl:]]')) AND
     "createdAt" <= "updatedAt"
   ) IS TRUE),
-  CONSTRAINT "rebuild_facebook_native_journal_state_check"
+  CONSTRAINT "facebook_native_journal_state_check"
     CHECK ("state" IN ('started', 'published', 'rejected', 'uncertain', 'confirmed', 'deleted')),
-  CONSTRAINT "rebuild_facebook_native_journal_json_check" CHECK ((
+  CONSTRAINT "facebook_native_journal_json_check" CHECK ((
     jsonb_typeof("knownIds") = 'array' AND jsonb_typeof("steps") = 'array' AND
     ("state" <> 'started' OR "remoteId" IS NULL) AND
     ("remoteId" IS NULL OR "knownIds" @> jsonb_build_array("remoteId")) AND
@@ -3564,13 +3392,13 @@ CREATE TABLE "rebuild_facebook_native_journal" (
   ) IS TRUE)
 );
 
-CREATE INDEX "rebuild_facebook_native_journal_workspace_target_updated_idx"
-  ON "rebuild_facebook_native_journal"("workspaceId", "targetId", "updatedAt");
+CREATE INDEX "facebook_native_journal_workspace_target_updated_idx"
+  ON "facebook_native_journal"("workspaceId", "targetId", "updatedAt");
 
-CREATE FUNCTION "rebuild_facebook_native_journal_guard"() RETURNS trigger
+CREATE FUNCTION "facebook_native_journal_guard"() RETURNS trigger
 LANGUAGE plpgsql AS $$
 DECLARE
-  parent_row "rebuild_publication_attempts"%ROWTYPE;
+  parent_row "publication_attempts"%ROWTYPE;
   expected text[];
   step jsonb;
   i integer;
@@ -3581,7 +3409,7 @@ BEGIN
        NEW."knownIds" <> '[]'::jsonb OR NEW."steps" <> '[]'::jsonb OR NEW."conflicted" THEN
       RAISE EXCEPTION 'native journal must begin empty and started';
     END IF;
-    SELECT * INTO parent_row FROM "rebuild_publication_attempts"
+    SELECT * INTO parent_row FROM "publication_attempts"
       WHERE "id" = NEW."operationId" AND "workspaceId" = NEW."workspaceId" FOR UPDATE;
     IF NOT FOUND OR parent_row."provider" <> 'facebook' OR parent_row."state" <> 'started' OR
        parent_row."postId" <> NEW."postId" OR parent_row."postTargetId" <> NEW."postTargetId" OR
@@ -3609,7 +3437,7 @@ BEGIN
      (OLD."operationId", OLD."workspaceId", OLD."postId", OLD."postTargetId", OLD."targetId", OLD."actorId", OLD."remoteTargetId", OLD."format", OLD."sourceFormatId", OLD."payloadHash", OLD."ownerToken", OLD."createdAt") THEN
     RAISE EXCEPTION 'native journal binding is immutable';
   END IF;
-  SELECT * INTO parent_row FROM "rebuild_publication_attempts"
+  SELECT * INTO parent_row FROM "publication_attempts"
     WHERE "id" = NEW."operationId" AND "workspaceId" = NEW."workspaceId" FOR UPDATE;
   IF NOT FOUND OR parent_row."provider" IS DISTINCT FROM 'facebook' OR
      parent_row."postId" IS DISTINCT FROM NEW."postId" OR parent_row."postTargetId" IS DISTINCT FROM NEW."postTargetId" OR
@@ -3695,41 +3523,41 @@ BEGIN
 END;
 $$;
 
-CREATE TRIGGER "rebuild_facebook_native_journal_guard_trigger"
-  BEFORE INSERT OR UPDATE ON "rebuild_facebook_native_journal"
-  FOR EACH ROW EXECUTE FUNCTION "rebuild_facebook_native_journal_guard"();
+CREATE TRIGGER "facebook_native_journal_guard_trigger"
+  BEFORE INSERT OR UPDATE ON "facebook_native_journal"
+  FOR EACH ROW EXECUTE FUNCTION "facebook_native_journal_guard"();
 
-CREATE FUNCTION "rebuild_publication_attempts_native_binding_guard"() RETURNS trigger
+CREATE FUNCTION "publication_attempts_native_binding_guard"() RETURNS trigger
 LANGUAGE plpgsql AS $$
 BEGIN
   IF (NEW."id", NEW."provider", NEW."workspaceId", NEW."postId", NEW."postTargetId", NEW."targetId", NEW."actorId")
      IS DISTINCT FROM
      (OLD."id", OLD."provider", OLD."workspaceId", OLD."postId", OLD."postTargetId", OLD."targetId", OLD."actorId") AND
-     EXISTS (SELECT 1 FROM "rebuild_facebook_native_journal" j WHERE j."operationId" = OLD."id" AND j."workspaceId" = OLD."workspaceId") THEN
+     EXISTS (SELECT 1 FROM "facebook_native_journal" j WHERE j."operationId" = OLD."id" AND j."workspaceId" = OLD."workspaceId") THEN
     RAISE EXCEPTION 'publication claim binding cannot change after native journal creation';
   END IF;
   RETURN NEW;
 END;
 $$;
 
-CREATE TRIGGER "rebuild_publication_attempts_native_binding_guard_trigger"
-  BEFORE UPDATE ON "rebuild_publication_attempts"
-  FOR EACH ROW EXECUTE FUNCTION "rebuild_publication_attempts_native_binding_guard"();
+CREATE TRIGGER "publication_attempts_native_binding_guard_trigger"
+  BEFORE UPDATE ON "publication_attempts"
+  FOR EACH ROW EXECUTE FUNCTION "publication_attempts_native_binding_guard"();
 
 DO $$
 BEGIN
-  IF to_regprocedure('public.rebuild_reject_purging_workspace_write()') IS NULL THEN
+  IF to_regprocedure('public.reject_purging_workspace_write()') IS NULL THEN
     RAISE EXCEPTION 'Shared workspace purge write gate prerequisite is missing';
   END IF;
 END $$;
 
-CREATE TRIGGER rebuild_workspace_purge_write_gate
-  BEFORE INSERT OR UPDATE ON "rebuild_facebook_native_journal"
-  FOR EACH ROW EXECUTE FUNCTION public.rebuild_reject_purging_workspace_write();
+CREATE TRIGGER workspace_purge_write_gate
+  BEFORE INSERT OR UPDATE ON "facebook_native_journal"
+  FOR EACH ROW EXECUTE FUNCTION public.reject_purging_workspace_write();
 
 -- Provider-owned observations of native publication status. This ledger is a
 -- child of the existing publication claim and grants no dispatch authority.
-CREATE TABLE "rebuild_facebook_native_status_proofs" (
+CREATE TABLE "facebook_native_status_proofs" (
   "id" TEXT NOT NULL,
   "workspaceId" TEXT NOT NULL,
   "operationId" TEXT NOT NULL,
@@ -3745,14 +3573,14 @@ CREATE TABLE "rebuild_facebook_native_status_proofs" (
   "observedAt" TIMESTAMP(3) NOT NULL,
   "accepted" BOOLEAN NOT NULL,
   "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  CONSTRAINT "rebuild_facebook_native_status_proofs_pkey" PRIMARY KEY ("id"),
-  CONSTRAINT "rebuild_facebook_native_status_proofs_workspaceId_fkey"
+  CONSTRAINT "facebook_native_status_proofs_pkey" PRIMARY KEY ("id"),
+  CONSTRAINT "facebook_native_status_proofs_workspaceId_fkey"
     FOREIGN KEY ("workspaceId") REFERENCES "workspaces"("id") ON DELETE CASCADE ON UPDATE CASCADE,
-  CONSTRAINT "rebuild_facebook_native_status_proofs_parent_fkey"
-    FOREIGN KEY ("workspaceId", "operationId") REFERENCES "rebuild_publication_attempts"("workspaceId", "id") ON DELETE CASCADE ON UPDATE CASCADE,
-  CONSTRAINT "rebuild_facebook_native_status_proofs_operation_fkey"
-    FOREIGN KEY ("operationId") REFERENCES "rebuild_facebook_native_journal"("operationId") ON DELETE CASCADE ON UPDATE CASCADE,
-  CONSTRAINT "rebuild_facebook_native_status_proofs_shape_check" CHECK ((
+  CONSTRAINT "facebook_native_status_proofs_parent_fkey"
+    FOREIGN KEY ("workspaceId", "operationId") REFERENCES "publication_attempts"("workspaceId", "id") ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT "facebook_native_status_proofs_operation_fkey"
+    FOREIGN KEY ("operationId") REFERENCES "facebook_native_journal"("operationId") ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT "facebook_native_status_proofs_shape_check" CHECK ((
     "id" ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$' AND
     length("workspaceId") BETWEEN 1 AND 2048 AND "workspaceId" = btrim("workspaceId") AND "workspaceId" !~ '[[:cntrl:]]' AND
     length("operationId") BETWEEN 1 AND 2048 AND "operationId" = btrim("operationId") AND "operationId" !~ '[[:cntrl:]]' AND
@@ -3769,17 +3597,17 @@ CREATE TABLE "rebuild_facebook_native_status_proofs" (
   ) IS TRUE)
 );
 
-CREATE INDEX "rebuild_fb_native_proofs_workspace_operation_time_idx"
-  ON "rebuild_facebook_native_status_proofs"("workspaceId", "operationId", "observedAt");
-CREATE UNIQUE INDEX "rebuild_fb_native_proofs_accepted_revision_key"
-  ON "rebuild_facebook_native_status_proofs"("operationId", "observedRevision")
+CREATE INDEX "fb_native_proofs_workspace_operation_time_idx"
+  ON "facebook_native_status_proofs"("workspaceId", "operationId", "observedAt");
+CREATE UNIQUE INDEX "fb_native_proofs_accepted_revision_key"
+  ON "facebook_native_status_proofs"("operationId", "observedRevision")
   WHERE "accepted";
 
-CREATE FUNCTION "rebuild_facebook_native_status_proofs_guard"() RETURNS trigger
+CREATE FUNCTION "facebook_native_status_proofs_guard"() RETURNS trigger
 LANGUAGE plpgsql AS $$
 DECLARE
-  parent_row "rebuild_publication_attempts"%ROWTYPE;
-  child_row "rebuild_facebook_native_journal"%ROWTYPE;
+  parent_row "publication_attempts"%ROWTYPE;
+  child_row "facebook_native_journal"%ROWTYPE;
   expected text[];
 BEGIN
   IF TG_OP = 'UPDATE' THEN
@@ -3787,13 +3615,13 @@ BEGIN
   END IF;
 
   -- Preserve the shared claim's lock order: parent first, then provider child.
-  SELECT * INTO parent_row FROM "rebuild_publication_attempts"
+  SELECT * INTO parent_row FROM "publication_attempts"
     WHERE "id" = NEW."operationId" AND "workspaceId" = NEW."workspaceId" FOR UPDATE;
   IF NOT FOUND OR parent_row."provider" IS DISTINCT FROM 'facebook' THEN
     RAISE EXCEPTION 'native status proof requires its Facebook publication claim';
   END IF;
 
-  SELECT * INTO child_row FROM "rebuild_facebook_native_journal"
+  SELECT * INTO child_row FROM "facebook_native_journal"
     WHERE "operationId" = NEW."operationId" AND "workspaceId" = NEW."workspaceId" FOR UPDATE;
   IF NOT FOUND OR child_row."workspaceId" IS DISTINCT FROM NEW."workspaceId" OR
      child_row."format" IS DISTINCT FROM NEW."format" OR
@@ -3835,36 +3663,36 @@ BEGIN
 END;
 $$;
 
-CREATE TRIGGER "rebuild_facebook_native_status_proofs_guard_trigger"
-  BEFORE INSERT OR UPDATE ON "rebuild_facebook_native_status_proofs"
-  FOR EACH ROW EXECUTE FUNCTION "rebuild_facebook_native_status_proofs_guard"();
+CREATE TRIGGER "facebook_native_status_proofs_guard_trigger"
+  BEFORE INSERT OR UPDATE ON "facebook_native_status_proofs"
+  FOR EACH ROW EXECUTE FUNCTION "facebook_native_status_proofs_guard"();
 
 DO $$
 BEGIN
-  IF to_regprocedure('public.rebuild_reject_purging_workspace_write()') IS NULL THEN
+  IF to_regprocedure('public.reject_purging_workspace_write()') IS NULL THEN
     RAISE EXCEPTION 'Shared workspace purge write gate prerequisite is missing';
   END IF;
 END $$;
 
-CREATE TRIGGER rebuild_workspace_purge_write_gate
-  BEFORE INSERT OR UPDATE ON "rebuild_facebook_native_status_proofs"
-  FOR EACH ROW EXECUTE FUNCTION public.rebuild_reject_purging_workspace_write();
+CREATE TRIGGER workspace_purge_write_gate
+  BEFORE INSERT OR UPDATE ON "facebook_native_status_proofs"
+  FOR EACH ROW EXECUTE FUNCTION public.reject_purging_workspace_write();
 
 -- Provider submission is a durable receipt state that precedes local projection.
 -- Preserve the prior state/timestamp branches verbatim and extend them additively.
-ALTER TABLE "rebuild_publication_attempts"
-  DROP CONSTRAINT "rebuild_publication_attempts_state_check",
-  ADD CONSTRAINT "rebuild_publication_attempts_state_check"
+ALTER TABLE "publication_attempts"
+  DROP CONSTRAINT "publication_attempts_state_check",
+  ADD CONSTRAINT "publication_attempts_state_check"
     CHECK ("state" IN ('started', 'uncertain', 'receipt_recorded', 'projected', 'rejected', 'attested_absent', 'submitted'));
 
-ALTER TABLE "rebuild_publication_attempts"
-  DROP CONSTRAINT "rebuild_publication_attempts_reason_check",
-  ADD CONSTRAINT "rebuild_publication_attempts_reason_check"
+ALTER TABLE "publication_attempts"
+  DROP CONSTRAINT "publication_attempts_reason_check",
+  ADD CONSTRAINT "publication_attempts_reason_check"
     CHECK ("reason" IS NULL OR "reason" IN ('provider_rejected', 'outcome_unknown', 'provider_receipt', 'external_human_attestation', 'provider_submission'));
 
-ALTER TABLE "rebuild_publication_attempts"
-  DROP CONSTRAINT "rebuild_publication_attempts_state_timestamps_check",
-  ADD CONSTRAINT "rebuild_publication_attempts_state_timestamps_check"
+ALTER TABLE "publication_attempts"
+  DROP CONSTRAINT "publication_attempts_state_timestamps_check",
+  ADD CONSTRAINT "publication_attempts_state_timestamps_check"
     CHECK ((
       ("state" = 'started' AND "reason" IS NULL AND "remotePostId" IS NULL AND "remoteUrl" IS NULL AND "receiptAt" IS NULL AND "projectedAt" IS NULL AND "attestedAt" IS NULL AND "attestedBy" IS NULL)
       OR ("state" = 'uncertain' AND "reason" = 'outcome_unknown' AND "remotePostId" IS NULL AND "remoteUrl" IS NULL AND "receiptAt" IS NULL AND "projectedAt" IS NULL AND "attestedAt" IS NULL AND "attestedBy" IS NULL)
@@ -3926,7 +3754,7 @@ CREATE INDEX "mcp_oauth_codes_clientId_idx" ON "mcp_oauth_codes"("clientId");
 CREATE INDEX "mcp_oauth_codes_expiresAt_idx" ON "mcp_oauth_codes"("expiresAt");
 CREATE INDEX "mcp_oauth_clients_createdAt_idx" ON "mcp_oauth_clients"("createdAt");
 
-CREATE TABLE public.rebuild_workspace_exports (
+CREATE TABLE public.workspace_exports (
   id TEXT PRIMARY KEY,
   "workspaceId" TEXT NOT NULL REFERENCES public.workspaces(id) ON DELETE CASCADE,
   "requestedById" TEXT NOT NULL,
@@ -3940,35 +3768,35 @@ CREATE TABLE public.rebuild_workspace_exports (
   error TEXT,
   bytes INTEGER
 );
-CREATE INDEX rebuild_workspace_exports_due ON public.rebuild_workspace_exports(status, "createdAt");
-CREATE INDEX rebuild_workspace_exports_workspace ON public.rebuild_workspace_exports("workspaceId", "createdAt");
-CREATE UNIQUE INDEX rebuild_workspace_exports_pending ON public.rebuild_workspace_exports("workspaceId") WHERE status IN ('requested','running');
-CREATE TRIGGER rebuild_workspace_purge_write_gate BEFORE INSERT OR UPDATE ON public.rebuild_workspace_exports
- FOR EACH ROW EXECUTE FUNCTION public.rebuild_reject_purging_workspace_write();
+CREATE INDEX workspace_exports_due ON public.workspace_exports(status, "createdAt");
+CREATE INDEX workspace_exports_workspace ON public.workspace_exports("workspaceId", "createdAt");
+CREATE UNIQUE INDEX workspace_exports_pending ON public.workspace_exports("workspaceId") WHERE status IN ('requested','running');
+CREATE TRIGGER workspace_purge_write_gate BEFORE INSERT OR UPDATE ON public.workspace_exports
+ FOR EACH ROW EXECUTE FUNCTION public.reject_purging_workspace_write();
 
 -- A deletion outbox deliberately survives its source job/workspace. Erasure first
 -- deletes database rows, then removes files, possibly after a process restart.
-CREATE TABLE public.rebuild_export_file_cleanups (
+CREATE TABLE public.export_file_cleanups (
   id TEXT PRIMARY KEY,
   "workspaceId" TEXT NOT NULL,
   "mediaRoot" TEXT NOT NULL,
   "nextAttemptAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
-CREATE INDEX rebuild_export_file_cleanups_workspace ON public.rebuild_export_file_cleanups("workspaceId");
-CREATE FUNCTION public.rebuild_queue_export_file_cleanup() RETURNS trigger LANGUAGE plpgsql AS $$
+CREATE INDEX export_file_cleanups_workspace ON public.export_file_cleanups("workspaceId");
+CREATE FUNCTION public.queue_export_file_cleanup() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
-  INSERT INTO public.rebuild_export_file_cleanups (id, "workspaceId", "mediaRoot")
+  INSERT INTO public.export_file_cleanups (id, "workspaceId", "mediaRoot")
     VALUES (OLD.id, OLD."workspaceId", OLD."mediaRoot") ON CONFLICT (id) DO NOTHING;
   RETURN OLD;
 END $$;
-CREATE TRIGGER rebuild_export_file_cleanup AFTER DELETE ON public.rebuild_workspace_exports
-  FOR EACH ROW EXECUTE FUNCTION public.rebuild_queue_export_file_cleanup();
+CREATE TRIGGER export_file_cleanup AFTER DELETE ON public.workspace_exports
+  FOR EACH ROW EXECUTE FUNCTION public.queue_export_file_cleanup();
 
-ALTER TABLE rebuild_notifications ADD COLUMN "accountId" TEXT REFERENCES social_accounts(id) ON DELETE CASCADE;
-ALTER TABLE rebuild_notifications DROP CONSTRAINT rebuild_notifications_kind_check;
-ALTER TABLE rebuild_notifications ADD CONSTRAINT rebuild_notifications_kind_check CHECK (kind IN ('note_mention','mix_dry','publish_failure','connection_expired','token_expiring','approval_request','approval_decision','inbox_digest','queue_empty','draft_updated','moderation_alert','negative_spike'));
-ALTER TABLE rebuild_notifications DROP CONSTRAINT rebuild_notifications_context_shape;
-ALTER TABLE rebuild_notifications ADD CONSTRAINT rebuild_notifications_context_shape CHECK (
+ALTER TABLE notifications ADD COLUMN "accountId" TEXT REFERENCES social_accounts(id) ON DELETE CASCADE;
+ALTER TABLE notifications DROP CONSTRAINT notifications_kind_check;
+ALTER TABLE notifications ADD CONSTRAINT notifications_kind_check CHECK (kind IN ('note_mention','mix_dry','publish_failure','connection_expired','token_expiring','approval_request','approval_decision','inbox_digest','queue_empty','draft_updated','moderation_alert','negative_spike'));
+ALTER TABLE notifications DROP CONSTRAINT notifications_context_shape;
+ALTER TABLE notifications ADD CONSTRAINT notifications_context_shape CHECK (
  (kind = 'note_mention' AND "postId" IS NOT NULL AND "noteId" IS NOT NULL)
  OR (kind IN ('mix_dry','inbox_digest','queue_empty','moderation_alert','negative_spike') AND "targetId" IS NOT NULL)
  OR (kind IN ('publish_failure','approval_request','approval_decision','draft_updated') AND "postId" IS NOT NULL)
@@ -3976,7 +3804,7 @@ ALTER TABLE rebuild_notifications ADD CONSTRAINT rebuild_notifications_context_s
 );
 
 -- Channel labels are customer metadata, independent of provider categories and post labels.
-CREATE TABLE rebuild_channel_profiles (
+CREATE TABLE channel_profiles (
   "targetId" TEXT PRIMARY KEY REFERENCES targets(id) ON DELETE CASCADE,
   labels TEXT[] NOT NULL DEFAULT '{}'
 );
@@ -3986,11 +3814,11 @@ CREATE TABLE rebuild_channel_profiles (
 -- A Story keeps two journal identities (the staged photo/video and the final
 -- Story post), so its accepted proof requires exactly those two, one of which is
 -- the final identity, instead of the sole-identity rule used by Video and Reel.
-ALTER TABLE "rebuild_facebook_native_status_proofs"
-  DROP CONSTRAINT "rebuild_facebook_native_status_proofs_shape_check";
+ALTER TABLE "facebook_native_status_proofs"
+  DROP CONSTRAINT "facebook_native_status_proofs_shape_check";
 
-ALTER TABLE "rebuild_facebook_native_status_proofs"
-  ADD CONSTRAINT "rebuild_facebook_native_status_proofs_shape_check" CHECK ((
+ALTER TABLE "facebook_native_status_proofs"
+  ADD CONSTRAINT "facebook_native_status_proofs_shape_check" CHECK ((
     "id" ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$' AND
     length("workspaceId") BETWEEN 1 AND 2048 AND "workspaceId" = btrim("workspaceId") AND "workspaceId" !~ '[[:cntrl:]]' AND
     length("operationId") BETWEEN 1 AND 2048 AND "operationId" = btrim("operationId") AND "operationId" !~ '[[:cntrl:]]' AND
@@ -4006,11 +3834,11 @@ ALTER TABLE "rebuild_facebook_native_status_proofs"
      (NOT "accepted" AND "appliedRevision" IS NULL))
   ) IS TRUE);
 
-CREATE OR REPLACE FUNCTION "rebuild_facebook_native_status_proofs_guard"() RETURNS trigger
+CREATE OR REPLACE FUNCTION "facebook_native_status_proofs_guard"() RETURNS trigger
 LANGUAGE plpgsql AS $$
 DECLARE
-  parent_row "rebuild_publication_attempts"%ROWTYPE;
-  child_row "rebuild_facebook_native_journal"%ROWTYPE;
+  parent_row "publication_attempts"%ROWTYPE;
+  child_row "facebook_native_journal"%ROWTYPE;
   expected text[];
 BEGIN
   IF TG_OP = 'UPDATE' THEN
@@ -4018,13 +3846,13 @@ BEGIN
   END IF;
 
   -- Preserve the shared claim's lock order: parent first, then provider child.
-  SELECT * INTO parent_row FROM "rebuild_publication_attempts"
+  SELECT * INTO parent_row FROM "publication_attempts"
     WHERE "id" = NEW."operationId" AND "workspaceId" = NEW."workspaceId" FOR UPDATE;
   IF NOT FOUND OR parent_row."provider" IS DISTINCT FROM 'facebook' THEN
     RAISE EXCEPTION 'native status proof requires its Facebook publication claim';
   END IF;
 
-  SELECT * INTO child_row FROM "rebuild_facebook_native_journal"
+  SELECT * INTO child_row FROM "facebook_native_journal"
     WHERE "operationId" = NEW."operationId" AND "workspaceId" = NEW."workspaceId" FOR UPDATE;
   IF NOT FOUND OR child_row."workspaceId" IS DISTINCT FROM NEW."workspaceId" OR
      child_row."format" IS DISTINCT FROM NEW."format" OR
@@ -4097,16 +3925,16 @@ CREATE INDEX ads_creation_receipt_lookup ON root_activities ((detail->>'workspac
   WHERE action = 'ads.creation_receipt';
 
 -- Workspace branding only. Originals and legacy per-channel watermark JSON are untouched.
-CREATE TABLE rebuild_workspace_watermarks (
+CREATE TABLE workspace_watermarks (
   "workspaceId" text PRIMARY KEY REFERENCES workspaces(id) ON DELETE CASCADE,
   logo bytea NOT NULL,
   position text NOT NULL CHECK (position IN ('northwest', 'northeast', 'center', 'southwest', 'southeast')),
   opacity double precision NOT NULL CHECK (opacity >= 0 AND opacity <= 1),
   scale double precision NOT NULL CHECK (scale >= 0.01 AND scale <= 1)
 );
-CREATE TRIGGER rebuild_workspace_watermarks_purge_gate
-BEFORE INSERT OR UPDATE ON rebuild_workspace_watermarks
-FOR EACH ROW EXECUTE FUNCTION public.rebuild_reject_purging_workspace_write();
+CREATE TRIGGER workspace_watermarks_purge_gate
+BEFORE INSERT OR UPDATE ON workspace_watermarks
+FOR EACH ROW EXECUTE FUNCTION public.reject_purging_workspace_write();
 
 -- Additive; existing legacy labels remain untrusted until classified with provenance.
 ALTER TABLE post_comments
@@ -4114,7 +3942,7 @@ ALTER TABLE post_comments
   ADD COLUMN "sentimentProvenance" JSONB;
 
 -- A provider edit invalidates the old classification atomically, including legacy writes.
-CREATE FUNCTION rebuild_invalidate_comment_sentiment() RETURNS trigger AS $$
+CREATE FUNCTION invalidate_comment_sentiment() RETURNS trigger AS $$
 BEGIN
   IF NEW.message IS DISTINCT FROM OLD.message THEN
     NEW.sentiment := NULL;
@@ -4124,9 +3952,9 @@ BEGIN
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
-CREATE TRIGGER rebuild_comment_sentiment_invalidation
+CREATE TRIGGER comment_sentiment_invalidation
   BEFORE UPDATE ON post_comments FOR EACH ROW
-  EXECUTE FUNCTION rebuild_invalidate_comment_sentiment();
+  EXECUTE FUNCTION invalidate_comment_sentiment();
 CREATE INDEX post_comments_sentiment_pending_idx ON post_comments ("sentimentAttemptedAt", "createdTime") WHERE sentiment IS NULL;
 
 -- Separate person-only credentials: no workspace or write grants can be stored.
@@ -4148,10 +3976,10 @@ CREATE INDEX person_mcp_keys_user_active ON person_mcp_keys ("userId", "expiresA
 -- published native Video) are child intents of the native journal. One row per
 -- change, bound to the journal row, its workspace and the immutable remote id.
 -- Content-free protocol evidence only. A repeat can never dispatch a second write.
-CREATE UNIQUE INDEX "rebuild_facebook_native_journal_workspaceId_operationId_key"
-  ON "rebuild_facebook_native_journal"("workspaceId", "operationId");
+CREATE UNIQUE INDEX "facebook_native_journal_workspaceId_operationId_key"
+  ON "facebook_native_journal"("workspaceId", "operationId");
 
-CREATE TABLE "rebuild_facebook_native_schedule_changes" (
+CREATE TABLE "facebook_native_schedule_changes" (
   "changeId" TEXT NOT NULL,
   "workspaceId" TEXT NOT NULL,
   "publishOperationId" TEXT NOT NULL,
@@ -4164,34 +3992,34 @@ CREATE TABLE "rebuild_facebook_native_schedule_changes" (
   "state" TEXT NOT NULL DEFAULT 'started',
   "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
   "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  CONSTRAINT "rebuild_facebook_native_schedule_changes_pkey" PRIMARY KEY ("changeId"),
-  CONSTRAINT "rebuild_facebook_native_schedule_changes_workspaceId_fkey"
+  CONSTRAINT "facebook_native_schedule_changes_pkey" PRIMARY KEY ("changeId"),
+  CONSTRAINT "facebook_native_schedule_changes_workspaceId_fkey"
     FOREIGN KEY ("workspaceId") REFERENCES "workspaces"("id") ON DELETE CASCADE ON UPDATE CASCADE,
-  CONSTRAINT "rebuild_facebook_native_schedule_changes_journal_fkey"
-    FOREIGN KEY ("workspaceId", "publishOperationId") REFERENCES "rebuild_facebook_native_journal"("workspaceId", "operationId") ON DELETE CASCADE ON UPDATE CASCADE,
-  CONSTRAINT "rebuild_facebook_native_schedule_changes_kind_check" CHECK ((
+  CONSTRAINT "facebook_native_schedule_changes_journal_fkey"
+    FOREIGN KEY ("workspaceId", "publishOperationId") REFERENCES "facebook_native_journal"("workspaceId", "operationId") ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT "facebook_native_schedule_changes_kind_check" CHECK ((
     ("kind" = 'cancel' AND "scheduledUnix" IS NULL AND "changeId" = "publishOperationId" || ':cancel') OR
     ("kind" = 'reschedule' AND "scheduledUnix" > 0 AND "changeId" = "publishOperationId" || ':reschedule:' || "scheduledUnix"::text)
   ) IS TRUE),
-  CONSTRAINT "rebuild_facebook_native_schedule_changes_bounds_check" CHECK ((
+  CONSTRAINT "facebook_native_schedule_changes_bounds_check" CHECK ((
     length("changeId") BETWEEN 1 AND 4200 AND "changeId" !~ '[[:cntrl:]]' AND
     length("remoteId") BETWEEN 1 AND 128 AND "remoteId" = btrim("remoteId") AND "remoteId" !~ '[[:cntrl:]]' AND
     length("remoteTargetId") BETWEEN 1 AND 2048 AND "remoteTargetId" = btrim("remoteTargetId") AND "remoteTargetId" !~ '[[:cntrl:]]' AND
     "revision" >= 0 AND "createdAt" <= "updatedAt"
   ) IS TRUE),
-  CONSTRAINT "rebuild_facebook_native_schedule_changes_state_check"
+  CONSTRAINT "facebook_native_schedule_changes_state_check"
     CHECK ("state" IN ('started', 'published', 'rejected', 'uncertain', 'deleted'))
 );
 
-CREATE INDEX "rebuild_facebook_native_schedule_changes_publish_idx"
-  ON "rebuild_facebook_native_schedule_changes"("workspaceId", "publishOperationId", "createdAt");
+CREATE INDEX "facebook_native_schedule_changes_publish_idx"
+  ON "facebook_native_schedule_changes"("workspaceId", "publishOperationId", "createdAt");
 
-CREATE FUNCTION "rebuild_facebook_native_schedule_changes_guard"() RETURNS trigger
+CREATE FUNCTION "facebook_native_schedule_changes_guard"() RETURNS trigger
 LANGUAGE plpgsql AS $$
 DECLARE
-  journal_row "rebuild_facebook_native_journal"%ROWTYPE;
+  journal_row "facebook_native_journal"%ROWTYPE;
 BEGIN
-  SELECT * INTO journal_row FROM "rebuild_facebook_native_journal"
+  SELECT * INTO journal_row FROM "facebook_native_journal"
     WHERE "operationId" = NEW."publishOperationId" AND "workspaceId" = NEW."workspaceId" FOR UPDATE;
   IF NOT FOUND OR journal_row."format" <> 'video' OR journal_row."remoteId" IS DISTINCT FROM NEW."remoteId" OR
      journal_row."remoteTargetId" <> NEW."remoteTargetId" THEN
@@ -4223,20 +4051,20 @@ BEGIN
 END;
 $$;
 
-CREATE TRIGGER "rebuild_facebook_native_schedule_changes_guard_trigger"
-  BEFORE INSERT OR UPDATE ON "rebuild_facebook_native_schedule_changes"
-  FOR EACH ROW EXECUTE FUNCTION "rebuild_facebook_native_schedule_changes_guard"();
+CREATE TRIGGER "facebook_native_schedule_changes_guard_trigger"
+  BEFORE INSERT OR UPDATE ON "facebook_native_schedule_changes"
+  FOR EACH ROW EXECUTE FUNCTION "facebook_native_schedule_changes_guard"();
 
 DO $$
 BEGIN
-  IF to_regprocedure('public.rebuild_reject_purging_workspace_write()') IS NULL THEN
+  IF to_regprocedure('public.reject_purging_workspace_write()') IS NULL THEN
     RAISE EXCEPTION 'Shared workspace purge write gate prerequisite is missing';
   END IF;
 END $$;
 
-CREATE TRIGGER rebuild_workspace_purge_write_gate
-  BEFORE INSERT OR UPDATE ON "rebuild_facebook_native_schedule_changes"
-  FOR EACH ROW EXECUTE FUNCTION public.rebuild_reject_purging_workspace_write();
+CREATE TRIGGER workspace_purge_write_gate
+  BEFORE INSERT OR UPDATE ON "facebook_native_schedule_changes"
+  FOR EACH ROW EXECUTE FUNCTION public.reject_purging_workspace_write();
 
 -- Scheduling place per destination (post target): 'application' (our worker publishes at the time)
 -- or 'remote' (the destination's platform holds the post). Additive and nullable: NULL means the
@@ -4248,7 +4076,7 @@ ALTER TABLE "post_targets" ADD CONSTRAINT "post_targets_scheduleMode_check"
 BEGIN;
 -- Provider job state belongs outside the Root configuration registry.
 -- Direct workspace FK participates in the catalog-driven export and erasure.
-CREATE TABLE "rebuild_facebook_sync_cursors" (
+CREATE TABLE "facebook_sync_cursors" (
   "workspaceId" TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE ON UPDATE CASCADE,
   "targetId" TEXT NOT NULL REFERENCES targets(id) ON DELETE CASCADE ON UPDATE CASCADE,
   "providerId" TEXT NOT NULL,
@@ -4258,27 +4086,27 @@ CREATE TABLE "rebuild_facebook_sync_cursors" (
   PRIMARY KEY ("workspaceId", "targetId", kind)
 );
 
-CREATE FUNCTION rebuild_facebook_sync_cursor_binding() RETURNS trigger LANGUAGE plpgsql AS $$
+CREATE FUNCTION facebook_sync_cursor_binding() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM targets WHERE id = NEW."targetId" AND "workspaceId" = NEW."workspaceId" AND "providerId" = NEW."providerId") THEN
     RAISE EXCEPTION 'Facebook cursor target binding mismatch';
   END IF;
   RETURN NEW;
 END $$;
-CREATE TRIGGER rebuild_facebook_sync_cursor_binding BEFORE INSERT OR UPDATE ON rebuild_facebook_sync_cursors
-  FOR EACH ROW EXECUTE FUNCTION rebuild_facebook_sync_cursor_binding();
-CREATE TRIGGER rebuild_workspace_purge_write_gate BEFORE INSERT OR UPDATE ON rebuild_facebook_sync_cursors
-  FOR EACH ROW EXECUTE FUNCTION rebuild_reject_purging_workspace_write();
+CREATE TRIGGER facebook_sync_cursor_binding BEFORE INSERT OR UPDATE ON facebook_sync_cursors
+  FOR EACH ROW EXECUTE FUNCTION facebook_sync_cursor_binding();
+CREATE TRIGGER workspace_purge_write_gate BEFORE INSERT OR UPDATE ON facebook_sync_cursors
+  FOR EACH ROW EXECUTE FUNCTION reject_purging_workspace_write();
 
 -- Exact joined keys avoid parsing IDs using dots. Only current target bindings
 -- are reusable; stale/deleted target progress is disposable job state.
-INSERT INTO rebuild_facebook_sync_cursors ("workspaceId", "targetId", "providerId", kind, cursor, "updatedAt")
+INSERT INTO facebook_sync_cursors ("workspaceId", "targetId", "providerId", kind, cursor, "updatedAt")
 SELECT t."workspaceId", t.id, t."providerId", 'post_history', s.value, s."updatedAt"
 FROM app_settings s JOIN targets t ON s.key = 'facebook.history.' || t."workspaceId" || '.' || t.id || '.' || t."providerId"
 WHERE NOT s.encrypted AND jsonb_typeof(s.value) = 'object';
 DELETE FROM app_settings WHERE key LIKE 'facebook.history.%';
 
-CREATE INDEX rebuild_facebook_sync_cursors_target_idx ON rebuild_facebook_sync_cursors ("targetId");
+CREATE INDEX facebook_sync_cursors_target_idx ON facebook_sync_cursors ("targetId");
 COMMIT;
 
 BEGIN;
@@ -4325,7 +4153,7 @@ CREATE UNIQUE INDEX "wordpress_recipe_plans_slot_key" ON "wordpress_recipe_plans
 CREATE INDEX "wordpress_recipe_plans_recipe_idx" ON "wordpress_recipe_plans" ("sourceId", "wpPostId");
 CREATE INDEX "wordpress_recipe_plans_workspace_slot_idx" ON "wordpress_recipe_plans" ("workspaceId", "slotAt");
 
-CREATE FUNCTION rebuild_wordpress_recipe_plan_binding() RETURNS trigger LANGUAGE plpgsql AS $$
+CREATE FUNCTION wordpress_recipe_plan_binding() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM targets WHERE id = NEW."targetId" AND "workspaceId" = NEW."workspaceId")
      OR NOT EXISTS (SELECT 1 FROM "wordpress_recipe_sources" WHERE id = NEW."sourceId" AND "workspaceId" = NEW."workspaceId") THEN
@@ -4333,22 +4161,22 @@ BEGIN
   END IF;
   RETURN NEW;
 END $$;
-CREATE TRIGGER rebuild_wordpress_recipe_plan_binding BEFORE INSERT OR UPDATE ON "wordpress_recipe_plans"
-  FOR EACH ROW EXECUTE FUNCTION rebuild_wordpress_recipe_plan_binding();
-CREATE TRIGGER rebuild_workspace_purge_write_gate BEFORE INSERT OR UPDATE ON "wordpress_recipe_plans"
-  FOR EACH ROW EXECUTE FUNCTION rebuild_reject_purging_workspace_write();
-CREATE TRIGGER rebuild_workspace_purge_write_gate BEFORE INSERT OR UPDATE ON "wordpress_recipe_sources"
-  FOR EACH ROW EXECUTE FUNCTION rebuild_reject_purging_workspace_write();
+CREATE TRIGGER wordpress_recipe_plan_binding BEFORE INSERT OR UPDATE ON "wordpress_recipe_plans"
+  FOR EACH ROW EXECUTE FUNCTION wordpress_recipe_plan_binding();
+CREATE TRIGGER workspace_purge_write_gate BEFORE INSERT OR UPDATE ON "wordpress_recipe_plans"
+  FOR EACH ROW EXECUTE FUNCTION reject_purging_workspace_write();
+CREATE TRIGGER workspace_purge_write_gate BEFORE INSERT OR UPDATE ON "wordpress_recipe_sources"
+  FOR EACH ROW EXECUTE FUNCTION reject_purging_workspace_write();
 COMMIT;
 
 -- Persistence idempotency for sampled minutes; daily totals remain legacy-compatible.
-CREATE TABLE rebuild_uptime_samples (
+CREATE TABLE uptime_samples (
   minute TIMESTAMP(3) NOT NULL,
   component TEXT NOT NULL CHECK (component IN ('app', 'worker')),
   PRIMARY KEY (minute, component)
 );
 
-CREATE TABLE rebuild_monitoring_deliveries (
+CREATE TABLE monitoring_deliveries (
   id TEXT PRIMARY KEY,
   key TEXT NOT NULL,
   state TEXT NOT NULL CHECK (state IN ('open', 'resolved')),
@@ -4357,13 +4185,13 @@ CREATE TABLE rebuild_monitoring_deliveries (
   "claimedAt" TIMESTAMP(3),
   "finishedAt" TIMESTAMP(3)
 );
-CREATE INDEX rebuild_monitoring_deliveries_status_created ON rebuild_monitoring_deliveries(status, "createdAt");
+CREATE INDEX monitoring_deliveries_status_created ON monitoring_deliveries(status, "createdAt");
 
 -- Content-free transactional outbox. Transport claims commit before external I/O;
 -- a lost claim becomes uncertain, never pending again.
 CREATE UNIQUE INDEX chat_channels_id_workspace_id ON chat_channels(id, "workspaceId");
 
-CREATE TABLE rebuild_chat_deliveries (
+CREATE TABLE chat_deliveries (
   id TEXT PRIMARY KEY,
   "workspaceId" TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
   "channelId" TEXT NOT NULL,
@@ -4379,16 +4207,16 @@ CREATE TABLE rebuild_chat_deliveries (
   FOREIGN KEY ("channelId", "workspaceId") REFERENCES chat_channels(id, "workspaceId") ON DELETE CASCADE,
   UNIQUE ("workspaceId", "channelId", "eventId", event)
 );
-CREATE INDEX rebuild_chat_deliveries_pending ON rebuild_chat_deliveries(status, "createdAt");
+CREATE INDEX chat_deliveries_pending ON chat_deliveries(status, "createdAt");
 
-CREATE TRIGGER rebuild_workspace_purge_write_gate
-  BEFORE INSERT OR UPDATE ON public.rebuild_chat_deliveries
-  FOR EACH ROW EXECUTE FUNCTION public.rebuild_reject_purging_workspace_write();
+CREATE TRIGGER workspace_purge_write_gate
+  BEFORE INSERT OR UPDATE ON public.chat_deliveries
+  FOR EACH ROW EXECUTE FUNCTION public.reject_purging_workspace_write();
 
 -- OAuthCode is a legacy compatibility table without a workspace FK. Use the
 -- same parent lock/check as directly owned tables. Do not add FKs over unaudited
 -- historical orphan records. Deletes remain allowed for erasure/account cleanup.
-CREATE FUNCTION public.rebuild_reject_purging_legacy_oauth_write()
+CREATE FUNCTION public.reject_purging_legacy_oauth_write()
 RETURNS trigger LANGUAGE plpgsql SET search_path = pg_catalog, public AS $$
 BEGIN
   PERFORM 1 FROM public.workspaces WHERE id = NEW."workspaceId" FOR SHARE;
@@ -4405,14 +4233,14 @@ BEGIN
   RETURN NEW;
 END $$;
 
-CREATE TRIGGER rebuild_workspace_purge_write_gate
+CREATE TRIGGER workspace_purge_write_gate
   BEFORE INSERT OR UPDATE ON public."OAuthCode"
-  FOR EACH ROW EXECUTE FUNCTION public.rebuild_reject_purging_legacy_oauth_write();
+  FOR EACH ROW EXECUTE FUNCTION public.reject_purging_legacy_oauth_write();
 
 -- Profiles inherit ownership from targets. Parent-first locking matches erasure:
 -- resolve the tenant, lock its workspace, then recheck/lock the target. Locking
 -- the target first would deadlock against a purge that already owns the workspace.
-CREATE FUNCTION public.rebuild_reject_purging_channel_profile_write()
+CREATE FUNCTION public.reject_purging_channel_profile_write()
 RETURNS trigger LANGUAGE plpgsql SET search_path = pg_catalog, public AS $$
 DECLARE owner_workspace TEXT;
 BEGIN
@@ -4438,26 +4266,26 @@ BEGIN
   RETURN NEW;
 END $$;
 
-CREATE TRIGGER rebuild_workspace_purge_write_gate
-  BEFORE INSERT OR UPDATE ON public.rebuild_channel_profiles
-  FOR EACH ROW EXECUTE FUNCTION public.rebuild_reject_purging_channel_profile_write();
+CREATE TRIGGER workspace_purge_write_gate
+  BEFORE INSERT OR UPDATE ON public.channel_profiles
+  FOR EACH ROW EXECUTE FUNCTION public.reject_purging_channel_profile_write();
 
 -- Posts: workspace equality followed by the complete, deterministic list ordering.
 -- The same btree supports ascending Home/queue and descending Posts scans.
-CREATE INDEX IF NOT EXISTS rebuild_posts_workspace_schedule_order
+CREATE INDEX IF NOT EXISTS posts_workspace_schedule_order
   ON posts ("workspaceId", "scheduledAt", "createdAt", id);
 
 -- Status-filtered lists (including Home's upcoming scheduled posts).
-CREATE INDEX IF NOT EXISTS rebuild_posts_workspace_status_schedule_order
+CREATE INDEX IF NOT EXISTS posts_workspace_status_schedule_order
   ON posts ("workspaceId", status, "scheduledAt", "createdAt", id);
 
 -- Oldest-created lists cannot use a schedule-leading index for their ordering.
-CREATE INDEX IF NOT EXISTS rebuild_posts_workspace_created_order
+CREATE INDEX IF NOT EXISTS posts_workspace_created_order
   ON posts ("workspaceId", "createdAt", id);
 
 -- Analytics range reads constrain target and endTime without constraining metric.
 -- The existing (targetId, metric, endTime) index cannot narrow that date range.
-CREATE INDEX IF NOT EXISTS rebuild_page_insights_target_time_metric
+CREATE INDEX IF NOT EXISTS page_insights_target_time_metric
   ON page_insights ("targetId", "endTime", metric);
 
 -- Optional neutral provider observations; existing rows retain unknown metadata.
@@ -4514,24 +4342,24 @@ ALTER TABLE ads_management_operations ADD CONSTRAINT ads_operations_operation_ki
   "operationType" IN ('status.set','budget.set','rename','creative.assign','delete','campaign.create','adset.create','creative.create','ad.create')
 );
 
-CREATE TABLE rebuild_writing_agents (
+CREATE TABLE writing_agents (
  id text PRIMARY KEY, "workspaceId" text NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
  name text NOT NULL, instructions text NOT NULL, voice text NOT NULL,
  UNIQUE (id, "workspaceId"),
  "createdById" text NOT NULL REFERENCES users(id), "updatedAt" timestamptz NOT NULL DEFAULT now()
 );
-CREATE INDEX ON rebuild_writing_agents ("workspaceId", id);
-CREATE TABLE rebuild_writing_agent_runs (
+CREATE INDEX ON writing_agents ("workspaceId", id);
+CREATE TABLE writing_agent_runs (
  id text PRIMARY KEY, "workspaceId" text NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
  "agentId" text,
- FOREIGN KEY ("agentId", "workspaceId") REFERENCES rebuild_writing_agents(id, "workspaceId") ON DELETE SET NULL ("agentId"),
+ FOREIGN KEY ("agentId", "workspaceId") REFERENCES writing_agents(id, "workspaceId") ON DELETE SET NULL ("agentId"),
  "createdById" text NOT NULL REFERENCES users(id), kind text NOT NULL CHECK (kind IN ('post', 'reply')),
  status text NOT NULL CHECK (status IN ('pending', 'completed', 'failed')), "errorCode" text,
  "createdAt" timestamptz NOT NULL DEFAULT now(), "completedAt" timestamptz
 );
-CREATE INDEX ON rebuild_writing_agent_runs ("workspaceId", "createdAt" DESC, id);
+CREATE INDEX ON writing_agent_runs ("workspaceId", "createdAt" DESC, id);
 
-CREATE TABLE rebuild_post_exports (
+CREATE TABLE post_exports (
  id text PRIMARY KEY, "workspaceId" text NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
  "userId" text NOT NULL REFERENCES users(id) ON DELETE CASCADE,
  filters jsonb NOT NULL, ceiling jsonb NOT NULL, scope text NOT NULL,
@@ -4541,17 +4369,17 @@ CREATE TABLE rebuild_post_exports (
  "lastError" text, "completedAt" timestamptz,
  "createdAt" timestamptz NOT NULL DEFAULT now(), UNIQUE (id, "workspaceId", "userId")
 );
-CREATE INDEX ON rebuild_post_exports (status, "nextAttemptAt", "createdAt");
-CREATE TABLE rebuild_post_export_runs (
- id text PRIMARY KEY, "exportId" text NOT NULL REFERENCES rebuild_post_exports(id) ON DELETE CASCADE,
+CREATE INDEX ON post_exports (status, "nextAttemptAt", "createdAt");
+CREATE TABLE post_export_runs (
+ id text PRIMARY KEY, "exportId" text NOT NULL REFERENCES post_exports(id) ON DELETE CASCADE,
  "workspaceId" text NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
  "userId" text NOT NULL REFERENCES users(id) ON DELETE CASCADE,
  attempt integer NOT NULL, outcome text NOT NULL CHECK (outcome IN ('running','succeeded','retry','failed','expired')),
  "errorCode" text, "startedAt" timestamptz NOT NULL DEFAULT now(), "finishedAt" timestamptz,
  "postCount" integer, "byteLength" integer, UNIQUE ("exportId", attempt),
- FOREIGN KEY ("exportId", "workspaceId", "userId") REFERENCES rebuild_post_exports(id, "workspaceId", "userId") ON DELETE CASCADE
+ FOREIGN KEY ("exportId", "workspaceId", "userId") REFERENCES post_exports(id, "workspaceId", "userId") ON DELETE CASCADE
 );
-CREATE INDEX ON rebuild_post_export_runs ("workspaceId", "exportId", attempt);
+CREATE INDEX ON post_export_runs ("workspaceId", "exportId", attempt);
 
 -- Inbox private-note @mentions: store the resolved member ids on the note so delivery can re-verify them.
 ALTER TABLE inbox_notes ADD COLUMN IF NOT EXISTS "mentionIds" TEXT[] NOT NULL DEFAULT '{}';
@@ -4594,8 +4422,8 @@ ALTER TABLE "task_checklist_items" ADD CONSTRAINT "task_checklist_items_createdB
 
 -- New tables must join the workspace purge write gate, otherwise an item could
 -- be written while the workspace is being erased.
-CREATE TRIGGER rebuild_workspace_purge_write_gate BEFORE INSERT OR UPDATE ON "task_checklist_items"
-  FOR EACH ROW EXECUTE FUNCTION rebuild_reject_purging_workspace_write();
+CREATE TRIGGER workspace_purge_write_gate BEFORE INSERT OR UPDATE ON "task_checklist_items"
+  FOR EACH ROW EXECUTE FUNCTION reject_purging_workspace_write();
 -- Optional-area activation for Tasks (design v2 B7 leftover, lane 56; 01 section 4):
 -- a workspace owner can show the Tasks area in Settings › Workspace before the
 -- workspace has any task. Additive nullable-safe column: existing rows read as
@@ -4670,10 +4498,10 @@ CREATE INDEX "link_preview_cache_expiresAt_idx" ON "link_preview_cache"("expires
 -- New tables must join the workspace purge write gate, otherwise a row could
 -- be written while the workspace is being erased. The shared cache table has no
 -- workspace column, so it stays outside the gate like other shared storage.
-CREATE TRIGGER rebuild_workspace_purge_write_gate BEFORE INSERT OR UPDATE ON "autopilot_policies"
-  FOR EACH ROW EXECUTE FUNCTION rebuild_reject_purging_workspace_write();
-CREATE TRIGGER rebuild_workspace_purge_write_gate BEFORE INSERT OR UPDATE ON "post_language_variants"
-  FOR EACH ROW EXECUTE FUNCTION rebuild_reject_purging_workspace_write();
+CREATE TRIGGER workspace_purge_write_gate BEFORE INSERT OR UPDATE ON "autopilot_policies"
+  FOR EACH ROW EXECUTE FUNCTION reject_purging_workspace_write();
+CREATE TRIGGER workspace_purge_write_gate BEFORE INSERT OR UPDATE ON "post_language_variants"
+  FOR EACH ROW EXECUTE FUNCTION reject_purging_workspace_write();
 -- Engagement batch: metric alert rules with worker-evaluated firings, new
 -- notification email switches, and full-text search indexes over stored
 -- inbox messages and comments. Additive only: two new tables, three new
@@ -4742,10 +4570,10 @@ ALTER TABLE "metric_alert_firings" ADD CONSTRAINT "metric_alert_firings_workspac
 ALTER TABLE "metric_alert_firings" ADD CONSTRAINT "metric_alert_firings_ruleId_fkey"
   FOREIGN KEY ("ruleId") REFERENCES "metric_alert_rules"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
-CREATE TRIGGER rebuild_workspace_purge_write_gate BEFORE INSERT OR UPDATE ON "metric_alert_rules"
-  FOR EACH ROW EXECUTE FUNCTION rebuild_reject_purging_workspace_write();
-CREATE TRIGGER rebuild_workspace_purge_write_gate BEFORE INSERT OR UPDATE ON "metric_alert_firings"
-  FOR EACH ROW EXECUTE FUNCTION rebuild_reject_purging_workspace_write();
+CREATE TRIGGER workspace_purge_write_gate BEFORE INSERT OR UPDATE ON "metric_alert_rules"
+  FOR EACH ROW EXECUTE FUNCTION reject_purging_workspace_write();
+CREATE TRIGGER workspace_purge_write_gate BEFORE INSERT OR UPDATE ON "metric_alert_firings"
+  FOR EACH ROW EXECUTE FUNCTION reject_purging_workspace_write();
 
 ALTER TABLE "notification_settings"
   ADD COLUMN "onMetricAlert" BOOLEAN NOT NULL DEFAULT true,
@@ -4765,7 +4593,7 @@ CREATE INDEX "post_comments_fts_idx" ON "post_comments"
 --
 -- Workspace boundary:
 --   * meta_webhook_deliveries is installation operational history (like
---     rebuild_sync_runs): content-free delivery receipts (ids, kinds,
+--     sync_runs): content-free delivery receipts (ids, kinds,
 --     verbs, counts — never message text), retained under the Root
 --     meta.webhookDeliveryRetentionDays bound. No workspace FK on purpose:
 --     one event fans out to every workspace holding the Page, and unmatched
@@ -4873,9 +4701,9 @@ ALTER TABLE "analytics_rollup_weekly" ADD CONSTRAINT "analytics_rollup_weekly_ta
 ALTER TABLE "analytics_rollup_runs" ADD CONSTRAINT "analytics_rollup_runs_workspaceId_fkey"
   FOREIGN KEY ("workspaceId") REFERENCES "workspaces"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
-CREATE TRIGGER rebuild_workspace_purge_write_gate BEFORE INSERT OR UPDATE ON "analytics_rollup_daily"
-  FOR EACH ROW EXECUTE FUNCTION rebuild_reject_purging_workspace_write();
-CREATE TRIGGER rebuild_workspace_purge_write_gate BEFORE INSERT OR UPDATE ON "analytics_rollup_weekly"
-  FOR EACH ROW EXECUTE FUNCTION rebuild_reject_purging_workspace_write();
-CREATE TRIGGER rebuild_workspace_purge_write_gate BEFORE INSERT OR UPDATE ON "analytics_rollup_runs"
-  FOR EACH ROW EXECUTE FUNCTION rebuild_reject_purging_workspace_write();
+CREATE TRIGGER workspace_purge_write_gate BEFORE INSERT OR UPDATE ON "analytics_rollup_daily"
+  FOR EACH ROW EXECUTE FUNCTION reject_purging_workspace_write();
+CREATE TRIGGER workspace_purge_write_gate BEFORE INSERT OR UPDATE ON "analytics_rollup_weekly"
+  FOR EACH ROW EXECUTE FUNCTION reject_purging_workspace_write();
+CREATE TRIGGER workspace_purge_write_gate BEFORE INSERT OR UPDATE ON "analytics_rollup_runs"
+  FOR EACH ROW EXECUTE FUNCTION reject_purging_workspace_write();

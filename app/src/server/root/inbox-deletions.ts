@@ -48,7 +48,7 @@ export async function listRootInboxDeletions(userId: string, cap?: number) {
     SELECT d.id, d."workspaceId", d."targetId", d."localItemId", d.provider, d."remoteId", d.state,
       d."createdAt", d."updatedAt", d."remoteConfirmedAt", d."completedAt",
       w.name AS "workspaceName", t.name AS "targetName"
-    FROM rebuild_inbox_deletions d
+    FROM inbox_deletions d
     JOIN workspaces w ON w.id = d."workspaceId"
     LEFT JOIN targets t ON t.id = d."targetId" AND t."workspaceId" = d."workspaceId"
     ORDER BY d."updatedAt" DESC, d.id DESC
@@ -71,7 +71,7 @@ export async function confirmRootInboxDeletion(userId: string, input: unknown) {
   }
 
   const found = await prisma.$queryRaw<Array<Pick<DeletionRow, 'id' | 'workspaceId' | 'targetId' | 'state'>>>`
-    SELECT id, "workspaceId", "targetId", state FROM rebuild_inbox_deletions WHERE id = ${parsed.data.operationId}
+    SELECT id, "workspaceId", "targetId", state FROM inbox_deletions WHERE id = ${parsed.data.operationId}
   `;
   const initial = found[0];
   if (!initial) throw new OperationError('not_found', 'This deletion operation is unavailable.');
@@ -88,13 +88,13 @@ export async function confirmRootInboxDeletion(userId: string, input: unknown) {
       `;
       if (!actors[0]?.isInstanceOwner || actors[0].disabledAt) throw forbidden();
       const rows = await tx.$queryRaw<Array<Pick<DeletionRow, 'id' | 'workspaceId' | 'targetId' | 'localItemId' | 'state'>>>`
-        SELECT id, "workspaceId", "targetId", "localItemId", state FROM rebuild_inbox_deletions
+        SELECT id, "workspaceId", "targetId", "localItemId", state FROM inbox_deletions
         WHERE id = ${parsed.data.operationId} AND "workspaceId" = ${initial.workspaceId} FOR UPDATE
       `;
       const current = rows[0];
       if (!current || current.targetId !== initial.targetId) throw new OperationError('not_found', 'This deletion operation is unavailable.');
       if (current.state !== 'started' && current.state !== 'uncertain') throw new OperationError('conflict', 'This deletion changed state. Reload recovery history before continuing.');
-      await tx.$executeRaw`UPDATE rebuild_inbox_deletions SET state = 'remote_confirmed', reason = 'local_pending', "remoteConfirmedAt" = CURRENT_TIMESTAMP, "updatedAt" = CURRENT_TIMESTAMP
+      await tx.$executeRaw`UPDATE inbox_deletions SET state = 'remote_confirmed', reason = 'local_pending', "remoteConfirmedAt" = CURRENT_TIMESTAMP, "updatedAt" = CURRENT_TIMESTAMP
         WHERE id = ${current.id} AND "workspaceId" = ${initial.workspaceId} AND state IN ('started', 'uncertain')`;
       await tx.$executeRaw`INSERT INTO root_activities (id, "actorId", action, detail, "createdAt")
         VALUES (${randomUUID()}, ${userId}, 'inbox.comment_deletion_verified', ${JSON.stringify({ workspaceId: current.workspaceId, targetId: current.targetId, itemId: current.localItemId, operationId: current.id })}::jsonb, NOW())`;

@@ -48,9 +48,8 @@ export async function repairPlannedRecipeCaption(actor: FeedActor, input: unknow
   if (plans.length !== 1) throw await bad();
   const plan = plans[0]!;
   const config = resolveConfig(settings.defaults, source.config, patchLimits(settings));
-  const url = await runtimeSecret('feeds.wordpress.databaseUrl');
-  if (typeof url !== 'string' || !url) throw await bad();
-  const raw = await readWordpressCaption({ url, tablePrefix: settings.tablePrefix, ...settings.db }, config.mapping, plan.wpPostId);
+  const apiToken = await runtimeSecret('feeds.wordpress.databaseUrl').catch(() => null);
+  const raw = await readWordpressCaption({ siteUrl: source.siteUrl || settings.siteUrl, apiToken, uploadsPath: settings.uploadsPath, ...settings.db }, config.mapping, plan.wpPostId);
   if (raw === null) throw await bad();
   const max = await runtimeConfig('publishing.maxMessageCharacters');
   const desired = normalizeWordpressCaption(raw);
@@ -89,7 +88,7 @@ export async function repairPlannedRecipeCaption(actor: FeedActor, input: unknow
       || target.remotePostId || target.remoteUrl || target.publishedAt || target.nativeScheduledFor
       || (target.messageOverride !== null && target.messageOverride !== post.message)) throw await bad();
     const attempts = await tx.$queryRaw<Array<{ id: string }>>`
-      SELECT id FROM rebuild_publication_attempts WHERE "workspaceId" = ${actor.workspaceId} AND "postId" = ${post.id}`;
+      SELECT id FROM publication_attempts WHERE "workspaceId" = ${actor.workspaceId} AND "postId" = ${post.id}`;
     if (attempts.length) throw await bad();
     const proposal = captionRepairProposal(post.message, raw);
     if (!proposal) return { dryRun: data.dryRun, changed: false, reason: post.message === desired ? 'unchanged' : 'source_mismatch' } as const;

@@ -28,10 +28,10 @@ export async function requestPostExport(actor: PublishingActor, raw: unknown, co
   const current = await publishingPostReadQuery(actor, filters);
   if (fingerprint(current.scope) !== fingerprint(query.scope)) throw await missing();
   await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`post-export:${actor.workspaceId}:${actor.userId}`}))::text`;
-  const count = await tx.$queryRaw<Array<{ count: bigint }>>`SELECT count(*)::bigint AS count FROM rebuild_post_exports WHERE "workspaceId" = ${actor.workspaceId} AND "userId" = ${actor.userId} AND status IN ('queued','processing') AND "expiresAt" > now()`;
+  const count = await tx.$queryRaw<Array<{ count: bigint }>>`SELECT count(*)::bigint AS count FROM post_exports WHERE "workspaceId" = ${actor.workspaceId} AND "userId" = ${actor.userId} AND status IN ('queued','processing') AND "expiresAt" > now()`;
   if (Number(count[0].count) >= p.maxPendingPerUser) throw new OperationError('conflict', (await postExportCopy()).busy);
   const id = randomUUID(); const expiresAt = new Date(Date.now() + p.expiryMs);
-  await tx.$executeRaw`INSERT INTO rebuild_post_exports (id, "workspaceId", "userId", filters, ceiling, scope, status, "expiresAt") VALUES (${id}, ${actor.workspaceId}, ${actor.userId}, ${JSON.stringify(filters)}::jsonb, ${JSON.stringify(actor.allowedTargetIds ?? null)}::jsonb, ${fingerprint(query.scope)}, 'queued', ${expiresAt})`;
+  await tx.$executeRaw`INSERT INTO post_exports (id, "workspaceId", "userId", filters, ceiling, scope, status, "expiresAt") VALUES (${id}, ${actor.workspaceId}, ${actor.userId}, ${JSON.stringify(filters)}::jsonb, ${JSON.stringify(actor.allowedTargetIds ?? null)}::jsonb, ${fingerprint(query.scope)}, 'queued', ${expiresAt})`;
   await tx.$executeRaw`INSERT INTO activity_logs (id, "workspaceId", "actorId", action, detail, "createdAt") VALUES (${randomUUID()}, ${actor.workspaceId}, ${actor.userId}, 'publishing.export_requested', ${JSON.stringify({ id })}::jsonb, now())`;
   return { id, status: 'queued', expiresAt: expiresAt.toISOString() };
  });
@@ -40,13 +40,13 @@ export async function requestPostExport(actor: PublishingActor, raw: unknown, co
 export async function readPostExport(actor: PublishingActor, id: string, download = false) {
  // Authorize before lookup, including on missing ids.
  await publishingPostReadQuery(actor, {});
- const rows = await prisma.$queryRaw<Job[]>`SELECT * FROM rebuild_post_exports WHERE id = ${id} AND "workspaceId" = ${actor.workspaceId} AND "userId" = ${actor.userId} AND "expiresAt" > now()`;
+ const rows = await prisma.$queryRaw<Job[]>`SELECT * FROM post_exports WHERE id = ${id} AND "workspaceId" = ${actor.workspaceId} AND "userId" = ${actor.userId} AND "expiresAt" > now()`;
  const job = rows[0]; if (!job) throw await missing();
  const query = await publishingPostReadQuery(actor, job.filters);
  if (fingerprint(query.scope) !== job.scope) throw await missing();
  if (download && (job.status !== 'ready' || job.csv === null)) throw await missing();
  const p = await policy();
- const runs = await prisma.$queryRaw<Array<{ attempt: number; outcome: string; startedAt: Date; finishedAt: Date | null }>>`SELECT attempt, outcome, "startedAt", "finishedAt" FROM rebuild_post_export_runs WHERE "exportId" = ${id} AND "workspaceId" = ${actor.workspaceId} AND "userId" = ${actor.userId} ORDER BY attempt DESC LIMIT ${p.historyLimit}`;
+ const runs = await prisma.$queryRaw<Array<{ attempt: number; outcome: string; startedAt: Date; finishedAt: Date | null }>>`SELECT attempt, outcome, "startedAt", "finishedAt" FROM post_export_runs WHERE "exportId" = ${id} AND "workspaceId" = ${actor.workspaceId} AND "userId" = ${actor.userId} ORDER BY attempt DESC LIMIT ${p.historyLimit}`;
  if (download) await prisma.$executeRaw`INSERT INTO activity_logs (id, "workspaceId", "actorId", action, detail, "createdAt") VALUES (${randomUUID()}, ${actor.workspaceId}, ${actor.userId}, 'publishing.export_downloaded', ${JSON.stringify({ id })}::jsonb, now())`;
  return { id: job.id, status: job.status, expiresAt: job.expiresAt.toISOString(), runs, ...(download ? { csv: job.csv, fileName: 'posts.csv' } : {}) };
 }
@@ -57,10 +57,10 @@ export async function runPostExportJob() {
  if (p.leaseMs <= Number(timeout) + Number(maxWait)) throw new OperationError('unavailable', (await postExportCopy()).lease);
  const token = randomUUID(); const leaseUntil = new Date(Date.now() + p.leaseMs);
  const job = await prisma.$transaction(async tx => {
-  const rows = await tx.$queryRaw<Job[]>`UPDATE rebuild_post_exports SET status = 'processing', token = ${token}, "leaseUntil" = ${leaseUntil}, attempts = attempts + 1 WHERE id = (SELECT id FROM rebuild_post_exports WHERE "expiresAt" > now() AND attempts < ${p.maxAttempts} AND "nextAttemptAt" <= now() AND (status = 'queued' OR (status = 'processing' AND "leaseUntil" < now())) ORDER BY "createdAt", id FOR UPDATE SKIP LOCKED LIMIT 1) RETURNING *`;
+  const rows = await tx.$queryRaw<Job[]>`UPDATE post_exports SET status = 'processing', token = ${token}, "leaseUntil" = ${leaseUntil}, attempts = attempts + 1 WHERE id = (SELECT id FROM post_exports WHERE "expiresAt" > now() AND attempts < ${p.maxAttempts} AND "nextAttemptAt" <= now() AND (status = 'queued' OR (status = 'processing' AND "leaseUntil" < now())) ORDER BY "createdAt", id FOR UPDATE SKIP LOCKED LIMIT 1) RETURNING *`;
   const claimed = rows[0]; if (!claimed) return null;
-  await tx.$executeRaw`UPDATE rebuild_post_export_runs SET outcome = 'expired', "finishedAt" = now(), "errorCode" = 'lease_expired' WHERE "exportId" = ${claimed.id} AND outcome = 'running'`;
-  await tx.$executeRaw`INSERT INTO rebuild_post_export_runs (id, "exportId", "workspaceId", "userId", attempt, outcome) VALUES (${token}, ${claimed.id}, ${claimed.workspaceId}, ${claimed.userId}, ${claimed.attempts}, 'running')`;
+  await tx.$executeRaw`UPDATE post_export_runs SET outcome = 'expired', "finishedAt" = now(), "errorCode" = 'lease_expired' WHERE "exportId" = ${claimed.id} AND outcome = 'running'`;
+  await tx.$executeRaw`INSERT INTO post_export_runs (id, "exportId", "workspaceId", "userId", attempt, outcome) VALUES (${token}, ${claimed.id}, ${claimed.workspaceId}, ${claimed.userId}, ${claimed.attempts}, 'running')`;
   return claimed;
  });
  if (!job) return false;
@@ -72,9 +72,9 @@ export async function runPostExportJob() {
   const after = await publishingPostReadQuery(actor, job.filters);
   if (fingerprint(after.scope) !== job.scope) throw await missing();
   await prisma.$transaction(async tx => {
-   const updated = await tx.$executeRaw`UPDATE rebuild_post_exports SET status = 'ready', csv = ${result.csv}, token = NULL, "leaseUntil" = NULL, "completedAt" = now(), "lastError" = NULL WHERE id = ${job.id} AND token = ${token} AND "expiresAt" > now() AND "leaseUntil" > now()`;
+   const updated = await tx.$executeRaw`UPDATE post_exports SET status = 'ready', csv = ${result.csv}, token = NULL, "leaseUntil" = NULL, "completedAt" = now(), "lastError" = NULL WHERE id = ${job.id} AND token = ${token} AND "expiresAt" > now() AND "leaseUntil" > now()`;
    if (!updated) return;
-   await tx.$executeRaw`UPDATE rebuild_post_export_runs SET outcome = 'succeeded', "finishedAt" = now(), "postCount" = ${result.postCount}, "byteLength" = ${result.byteLength} WHERE id = ${token} AND outcome = 'running'`;
+   await tx.$executeRaw`UPDATE post_export_runs SET outcome = 'succeeded', "finishedAt" = now(), "postCount" = ${result.postCount}, "byteLength" = ${result.byteLength} WHERE id = ${token} AND outcome = 'running'`;
    await tx.$executeRaw`INSERT INTO activity_logs (id, "workspaceId", "actorId", action, detail, "createdAt") VALUES (${randomUUID()}, ${job.workspaceId}, ${job.userId}, 'publishing.export_completed', ${JSON.stringify({ id: job.id, postCount: result.postCount, byteLength: result.byteLength })}::jsonb, now())`;
   });
  } catch (error) {
@@ -82,9 +82,9 @@ export async function runPostExportJob() {
   const retry = job.attempts < p.maxAttempts && ['upstream_failure','unavailable'].includes(code);
   const nextAttemptAt = new Date(Date.now() + p.retryDelayMs);
   await prisma.$transaction(async tx => {
-   const updated = await tx.$executeRaw`UPDATE rebuild_post_exports SET status = ${retry ? 'queued' : 'failed'}, csv = NULL, token = NULL, "leaseUntil" = NULL, "lastError" = ${code}, "nextAttemptAt" = ${nextAttemptAt}, "completedAt" = ${retry ? null : new Date()} WHERE id = ${job.id} AND token = ${token} AND "leaseUntil" > now() AND "expiresAt" > now()`;
+   const updated = await tx.$executeRaw`UPDATE post_exports SET status = ${retry ? 'queued' : 'failed'}, csv = NULL, token = NULL, "leaseUntil" = NULL, "lastError" = ${code}, "nextAttemptAt" = ${nextAttemptAt}, "completedAt" = ${retry ? null : new Date()} WHERE id = ${job.id} AND token = ${token} AND "leaseUntil" > now() AND "expiresAt" > now()`;
    if (!updated) return;
-   await tx.$executeRaw`UPDATE rebuild_post_export_runs SET outcome = ${retry ? 'retry' : 'failed'}, "errorCode" = ${code}, "finishedAt" = now() WHERE id = ${token} AND outcome = 'running'`;
+   await tx.$executeRaw`UPDATE post_export_runs SET outcome = ${retry ? 'retry' : 'failed'}, "errorCode" = ${code}, "finishedAt" = now() WHERE id = ${token} AND outcome = 'running'`;
    await tx.$executeRaw`INSERT INTO activity_logs (id, "workspaceId", "actorId", action, detail, "createdAt") VALUES (${randomUUID()}, ${job.workspaceId}, ${job.userId}, 'publishing.export_attempt_failed', ${JSON.stringify({ id: job.id, code, retry })}::jsonb, now())`;
   });
  }
@@ -94,9 +94,9 @@ export async function expirePostExports() {
  const p = await policy();
  return prisma.$transaction(async tx => {
   // Exhausted crashed attempts become terminal rather than remaining stuck in processing.
-  await tx.$executeRaw`UPDATE rebuild_post_export_runs SET outcome = 'expired', "finishedAt" = now(), "errorCode" = 'lease_expired' WHERE outcome = 'running' AND "exportId" IN (SELECT id FROM rebuild_post_exports WHERE status = 'processing' AND "leaseUntil" <= now())`;
-  await tx.$executeRaw`UPDATE rebuild_post_exports SET status = 'failed', csv = NULL, token = NULL, "leaseUntil" = NULL, "lastError" = 'lease_expired', "completedAt" = now() WHERE status = 'processing' AND "leaseUntil" <= now() AND attempts >= ${p.maxAttempts}`;
-  return tx.$executeRaw`DELETE FROM rebuild_post_exports WHERE "expiresAt" <= now()`;
+  await tx.$executeRaw`UPDATE post_export_runs SET outcome = 'expired', "finishedAt" = now(), "errorCode" = 'lease_expired' WHERE outcome = 'running' AND "exportId" IN (SELECT id FROM post_exports WHERE status = 'processing' AND "leaseUntil" <= now())`;
+  await tx.$executeRaw`UPDATE post_exports SET status = 'failed', csv = NULL, token = NULL, "leaseUntil" = NULL, "lastError" = 'lease_expired', "completedAt" = now() WHERE status = 'processing' AND "leaseUntil" <= now() AND attempts >= ${p.maxAttempts}`;
+  return tx.$executeRaw`DELETE FROM post_exports WHERE "expiresAt" <= now()`;
  });
 }
 

@@ -18,7 +18,7 @@ export async function assertNoPendingPostDeletionForAliases(
   const uniquePostTargetIds = [...new Set(postTargetIds)];
   if (!uniquePostIds.length && !uniquePostTargetIds.length) return;
   const rows = await tx.$queryRaw<Array<{ id: string }>>`
-    SELECT id FROM rebuild_post_deletions
+    SELECT id FROM post_deletions
     WHERE "workspaceId" = ${workspaceId}
       AND state = ANY(${ACTIVE_DELETION_STATES}::text[])
       AND (
@@ -36,7 +36,7 @@ export async function loadPostDeletionTargetIds(
   postId: string,
 ): Promise<string[]> {
   const rows = await tx.$queryRaw<Array<{ targetId: string }>>`
-    SELECT DISTINCT "targetId" FROM rebuild_post_deletions
+    SELECT DISTINCT "targetId" FROM post_deletions
     WHERE "workspaceId" = ${workspaceId}
       AND "localPostIds" @> ARRAY[${postId}]::text[]`;
   return [...new Set(rows.map(row => row.targetId))];
@@ -52,11 +52,11 @@ export async function assertPostDeletionTargetsSettled(
   if (targetIds?.length === 0) return;
   const rows = targetIds === undefined
     ? await tx.$queryRaw<Array<{ id: string }>>`
-      SELECT id FROM rebuild_post_deletions
+      SELECT id FROM post_deletions
       WHERE "workspaceId" = ${workspaceId} AND state = ANY(${ACTIVE_DELETION_STATES}::text[])
       LIMIT 1`
     : await tx.$queryRaw<Array<{ id: string }>>`
-      SELECT id FROM rebuild_post_deletions
+      SELECT id FROM post_deletions
       WHERE "workspaceId" = ${workspaceId} AND state = ANY(${ACTIVE_DELETION_STATES}::text[])
         AND "targetId" = ANY(${[...new Set(targetIds)]}::text[])
       LIMIT 1`;
@@ -72,7 +72,7 @@ export async function assertNoPostDeletionForRemoteIdentity(
 ): Promise<void> {
   const errorText = await loadPublishingErrorText();
   const rows = await tx.$queryRaw<Array<{ id: string }>>`
-    SELECT id FROM rebuild_post_deletions
+    SELECT id FROM post_deletions
     WHERE "workspaceId" = ${workspaceId} AND "targetId" = ${targetId} AND "remoteId" = ${remoteId}
       AND state <> 'rejected'
     LIMIT 1`;

@@ -12,7 +12,7 @@ export const instagramPublicationRecovery: PlatformPublicationRecovery = {
   async assertSettled(tx, workspaceId, targetIds) {
     if (targetIds?.length === 0) return;
     const rows = await tx.$queryRaw<Array<{ id: string }>>`
-      SELECT a.id FROM rebuild_publication_attempts a
+      SELECT a.id FROM publication_attempts a
       WHERE a.provider='instagram' AND a."workspaceId"=${workspaceId}
         AND (${targetIds === undefined} OR a."targetId"=ANY(${[...(targetIds ?? [])]}::text[]))
         AND EXISTS (SELECT 1 FROM root_activities r WHERE r.action='instagram.publication_step'
@@ -25,7 +25,7 @@ export const instagramPublicationRecovery: PlatformPublicationRecovery = {
     const rows = await tx.$queryRaw<Step[]>`
       SELECT r.id, r.detail->>'operationId' AS "operationId", r.detail->>'phase' AS phase,
         r.detail->>'state' AS state, r.detail->>'remoteId' AS "remoteId", r."createdAt"
-      FROM root_activities r JOIN rebuild_publication_attempts a ON a.id=r.detail->>'operationId'
+      FROM root_activities r JOIN publication_attempts a ON a.id=r.detail->>'operationId'
       WHERE r.action='instagram.publication_step' AND a.provider='instagram'
         AND a."workspaceId"=${workspaceId} AND a.id=${operationId} AND r.detail->>'phase'='publish'
       FOR UPDATE OF r`;
@@ -41,7 +41,7 @@ export const instagramPublicationRecovery: PlatformPublicationRecovery = {
     const rows = await prisma.$queryRaw<Step[]>`
       SELECT r.id, r.detail->>'operationId' AS "operationId", r.detail->>'phase' AS phase,
         r.detail->>'state' AS state, r.detail->>'remoteId' AS "remoteId", r."createdAt"
-      FROM root_activities r JOIN rebuild_publication_attempts a ON a.id=r.detail->>'operationId'
+      FROM root_activities r JOIN publication_attempts a ON a.id=r.detail->>'operationId'
       WHERE r.action='instagram.publication_step' AND a.provider='instagram'
         AND (${operationId === undefined} OR a.id=${operationId ?? null})
       ORDER BY r."createdAt" DESC, r.id DESC LIMIT ${cap + 1}`;

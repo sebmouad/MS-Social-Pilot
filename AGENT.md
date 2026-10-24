@@ -1,45 +1,109 @@
-# AGENT.md — MS Social Pilot (`v1.0.0`)
+# AGENT.md — AI Agent Engineering Playbook
 
-Compact, high-signal guide for AI coding agents. Read this file first to understand the entire codebase with minimal context usage.
+Read this file first before modifying the codebase. It is designed to give any AI model complete architectural context in minimal tokens.
+
+---
 
 ## 1. Repository Layout
 
-All application code lives in `app/` (`ms-social-pilot@1.0.0`, Next.js 15 App Router, React 19, TypeScript, Prisma, PostgreSQL):
+Only 3 markdown files exist at the root (`README.md`, `AGENT.md`, `PLAN.md`). All application code lives inside `app/`:
 
-- `app/src/app/` — Next.js pages and thin HTTP route handlers (`/api/**`).
-- `app/src/components/` — Shared design system (`AppShell`, `CommandPalette`, `DataTable`, `Select`, `Tabs`, `Drawer`, `Dialog`, ECharts wrappers).
-- `app/src/styles/` — CSS token system (`tokens.css`, `shell.css`, `components.css`, `responsive.css`) with 8 light/dark palettes (`vivid`, `meta`, `warm`, `clean`).
-- `app/src/modules/<module>/` — Domain modules (`home`, `publishing`, `inbox`, `analytics`, `ads`, `studio`, `media`, `feeds`, `tasks`, `agency`, `sharing`, `integrations`, `notifications`, `settings`, `root`, `shell`):
-  - `manifest.ts` — Routes, navigation hub placement, feature IDs, and background job schedules.
-  - `config.ts` — Typed Root settings and bilingual (`en`/`fr`) UI copy catalogs.
-  - `mcp.ts` — MCP tool definitions and confirmation requirements.
-  - `server/` — Shared domain services called by UI, REST, and MCP.
-  - `ui/` — Module React components.
-- `app/src/platforms/<provider>/` — Isolated social network adapters (`facebook`, `instagram`, `youtube`, `tiktok`, `linkedin`, `x`, `threads`, `pinterest`, `bluesky`, `mastodon`, `telegram`).
-- `app/src/server/` — Auth, RBAC, job leases, mail outbox, audit logging, and GDPR export/erasure (`data-control/`).
-- `app/prisma/` — `schema.prisma` and the single initial SQL schema migration (`prisma/migrations/0001_init/migration.sql`).
-- `app/scripts/` — Only 2 files:
-  - `deploy.sh` — Parameterized install, update, and admin recovery script (`--host`, `--user`, `--key`, `--pass`, `--local`, `--set-root`, `--reset-2fa`).
-  - `worker.ts` — Background job worker (`npm run worker`).
-
-## 2. Core Rules & Conventions
-
-1. **Shared Service Boundary**: UI actions, REST routes (`/api/**`), and MCP tools must call the same domain service in `src/modules/<module>/server/`, enforcing workspace scope, RBAC, and audit logging.
-2. **Platform Neutrality**: Product modules (`src/modules/*`) never branch on specific social networks; provider logic stays inside `src/platforms/<provider>/`.
-3. **Design Tokens & Bilingual Copy**: Use CSS variables from `src/styles/tokens.css` (never hardcode hex colors in components) and keep user-facing copy in module `config.ts` (`en`/`fr`).
-4. **Additive Migrations**: Add new schema changes as new numbered SQL folders in `app/prisma/migrations/` (e.g. `0002_<name>/migration.sql`).
-
-## 3. Verification & Deployment Commands
-
-Run from `app/`:
-
-```bash
-npm run typecheck                  # TypeScript strict check (tsc --noEmit)
-npm run build                      # Production Next.js build
+```text
+app/
+├── prisma/
+│   ├── schema.prisma                        # Authoritative Prisma schema (clean table names, no rebuild_ prefix)
+│   └── migrations/
+│       ├── 0001_init/migration.sql          # Consolidated initial PostgreSQL schema
+│       └── 0002_remove_rebuild_prefix/      # Idempotent migration renaming any legacy rebuild_* objects
+├── scripts/
+│   ├── deploy.sh                            # Unified fresh-install, update & admin CLI (--host, --key/--pass, --local)
+│   └── worker.ts                            # Background worker process (polls job_leases, runs sync/publish/CMS jobs)
+└── src/
+    ├── app/                                 # Next.js 15 App Router
+    │   ├── (auth)/                          # /login, /register, /forgot-password, /reset-password, /invite, /share
+    │   ├── (workspace)/                     # Authenticated workspace shell & feature routes
+    │   ├── root/                            # Instance owner (/root) administration console
+    │   └── api/                             # REST & MCP route handlers (/api/*)
+    ├── components/                          # Shared UI primitives & AppShell (Topbar, Rail, CommandPalette, Dialog)
+    ├── core/                                # Shared guards, session, crypto, pagination, rate-limit utilities
+    ├── lib/                                 # Pure utilities (calendar-dates, i18n, config entry definitions)
+    ├── modules/                             # Domain feature modules (`ui/` client components + `server/` services)
+    ├── platforms/                           # Social network connectors & capability matrix (`PLATFORM_CAPABILITY_MATRIX`)
+    ├── server/                              # Prisma singleton, runtime config store, worker loop, root health
+    └── styles/                              # Global CSS design system (tokens.css, shell.css, components.css)
 ```
 
-Deploy to any Debian/Ubuntu server (see [`README.md`](README.md)):
+---
+
+## 2. Domain Modules Map (`app/src/modules/`)
+
+Every domain module separates browser UI (`ui/`) from server logic (`server/`):
+
+| Module | Path | Responsibility |
+| :--- | :--- | :--- |
+| **Publishing** | `src/modules/publishing/` | Post lifecycle, Composer (`ComposerWorkspace.tsx`), Calendar (`CalendarWorkspace.tsx`), Queue, Templates, Bulk CSV, Approvals |
+| **Feeds & CMS** | `src/modules/feeds/` | Standard WordPress REST connector (`wordpress/db.ts`, `recipe.ts`, `server/wordpress-planner.ts`) & RSS/Atom feeds (`server/feeds.ts`) |
+| **Inbox** | `src/modules/inbox/` | Unified comments, DMs, reviews, saved replies, sentiment, moderation rules (`InboxWorkspace.tsx`) |
+| **Analytics & Insights** | `src/modules/analytics/`, `insights/`, `reports/` | Cross-channel metrics, daily/weekly rollups, Top Posts, metric alerts, scheduled reports |
+| **Ads** | `src/modules/ads/` | Meta Ads overview, Campaign/AdSet/Ad management (`AdsManageWorkspace.tsx`), creative creation, analysis |
+| **AI Studio** | `src/modules/studio/`, `writing-agents/`, `ai-video/` | AI caption generator, custom writing personas, A/B caption tests, short-form video assembly |
+| **Channels & Connections** | `src/modules/channels/`, `connections/` | OAuth connection flow, channel discovery, channel groups, goals, health diagnostics |
+| **Agency & Sharing** | `src/modules/agency/`, `sharing/`, `bio/` | Multi-workspace agency rollup, external share links, Link-in-Bio pages |
+| **Tasks & Notifications** | `src/modules/tasks/`, `notifications/` | Team tasks with checklists/comments, in-app/email notifications, Slack/Discord/Telegram chat webhooks |
+| **Settings & Root** | `src/modules/settings/`, `root/`, `security/` | Workspace settings, watermarks, MCP API keys, ZIP exports, 2FA/Passkeys, Root admin operations |
+
+---
+
+## 3. Architectural Contracts (Do Not Break)
+
+### 3.1 Workspace & Role Isolation
+- Every workspace API route and server action must authenticate through `src/core/http/guard.ts` (`withGuard`) or module access guards (`authorizeFeeds`, `withPublishingOperation`, etc.).
+- **Never** query workspace tables without scoping by `workspaceId` (`WHERE "workspaceId" = ${actor.workspaceId}`).
+- Respect channel-scoped members (`actor.allowedTargetIds`): if `allowedTargetIds !== undefined`, filter targets/posts/plans to that set.
+
+### 3.2 Standard WordPress REST CMS Connector (`src/modules/feeds/wordpress/`)
+- **No MariaDB / MySQL dependency**: The WordPress connector (`src/modules/feeds/wordpress/db.ts`) communicates exclusively over HTTP/HTTPS with the standard WordPress REST API (`/wp-json/wp/v2/`).
+- **Authentication**: Public WordPress sites require only `siteUrl` (`https://...`). Private or custom endpoints can optionally set `feeds.wordpress.databaseUrl` in `/root/config` to a WordPress Application Password (`username:xxxx xxxx`) or Bearer token.
+- **Recipe & Content Extraction (`extractRecipeJson` in `wordpress/db.ts`)**:
+  1. Checks custom REST post meta (`mapping.recipeMetaKey`, default `_msrwa_recipe`).
+  2. Extracts Schema.org `@type: "Recipe"` JSON-LD from Yoast/RankMath REST metadata (`yoast_head_json.schema`) or embedded `<script type="application/ld+json">`.
+  3. Extracts HTML lists/paragraphs (including WP Recipe Maker `.wprm-recipe-*` markup) as a fallback so any WordPress recipe or article can be planned into slots.
+- **Planned Slot Workflow (`server/wordpress-planner.ts`)**:
+  - Claims slots atomically in `wordpress_recipe_plans` (`UNIQUE ("sourceId", "targetId", "slotAt")`).
+  - Downloads and normalizes the recipe image via `prepareRecipeImage` (`wordpress/image.ts`), schedules the post via Publishing's `createPost`, and formats the delayed first comment using `renderComment` (`wordpress/recipe.ts`).
+
+### 3.3 Social Platform Connectors (`src/platforms/`)
+- All 11 connectors are registered in `src/platforms/index.ts` alongside `PLATFORM_CAPABILITY_MATRIX`:
+  - **Primary (Enabled by default)**: `facebook`, `instagram`.
+  - **Secondary (Toggled by Root Admin via `platforms.<id>.enabled` in `/root/platforms` or `/root/config`)**: `youtube`, `tiktok`, `pinterest`, `linkedin`, `x`, `threads`, `bluesky`, `mastodon`, `telegram`.
+- Every connector implements `PlatformModule` (`src/platforms/module.ts`) and `PlatformAdapter` (`src/platforms/types.ts`).
+
+### 3.4 Database & Migrations (`app/prisma/`)
+- All database tables use clean, unprefixed names (`job_leases`, `sync_runs`, `notifications`, `publication_attempts`, `workspace_exports`, `export_file_cleanups`, `channel_profiles`, `chat_deliveries`, `writing_agents`, etc.). Never introduce `rebuild_` prefixes.
+- When adding a schema change:
+  1. Update `app/prisma/schema.prisma`.
+  2. Create a new timestamped or numbered SQL migration under `app/prisma/migrations/`.
+  3. Run `npx prisma generate` and `npm run typecheck`.
+
+### 3.5 Styling, Theme & Bilingual (EN/FR) Parity
+- **Tokens**: Always use semantic CSS custom properties from `src/styles/tokens.css` (`--bg`, `--surface`, `--surface-raised`, `--text`, `--text-muted`, `--line`, `--brand`, `--success`, `--warning`, `--danger`). Never hardcode hex colors in components.
+- **Numeric Alignment**: Use `font-variant-numeric: tabular-nums` on all counters, KPI cards, tables, and timers.
+- **i18n**: Keep English (`en`) and French (`fr`) dictionaries in sync (`src/lib/i18n.ts` and module `copy.ts` files).
+
+---
+
+## 4. Development & Verification Workflow for Agents
+
+Before committing or deploying any change, always run from `app/`:
 
 ```bash
-bash app/scripts/deploy.sh --host <ip> --user <user> --key <ssh_key_path>
+cd app
+npx prisma generate
+npm run typecheck
+npm run build
+```
+
+To deploy to a remote server when requested by the user:
+```bash
+bash app/scripts/deploy.sh --host <SERVER_IP> --user root --key <SSH_KEY_PATH>
 ```

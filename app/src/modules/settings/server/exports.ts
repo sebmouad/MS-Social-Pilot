@@ -66,7 +66,7 @@ export async function listWorkspaceExports(actor: DataControlActor) {
   return withWorkspaceOperation(actor.workspaceId, async () => {
     await authorize(actor);
     const max = await limit('data.exportMaxJobs');
-    const jobs = await prisma.$queryRaw<Job[]>`SELECT * FROM rebuild_workspace_exports WHERE "workspaceId" = ${actor.workspaceId} ORDER BY "createdAt" DESC, id DESC LIMIT ${max}`;
+    const jobs = await prisma.$queryRaw<Job[]>`SELECT * FROM workspace_exports WHERE "workspaceId" = ${actor.workspaceId} ORDER BY "createdAt" DESC, id DESC LIMIT ${max}`;
     return jobs.map(publicJob);
   });
 }
@@ -80,14 +80,14 @@ export async function requestWorkspaceExport(actor: DataControlActor, confirmati
     // Serialize requests separately from the workspace SHARE gate; never upgrade that gate.
     return prisma.$transaction(async tx => {
       await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`workspace-export:${actor.workspaceId}`}, 0))::text`;
-      const pending = await tx.$queryRaw<Job[]>`SELECT * FROM rebuild_workspace_exports WHERE "workspaceId" = ${actor.workspaceId} AND status IN ('requested','running') LIMIT 1`;
+      const pending = await tx.$queryRaw<Job[]>`SELECT * FROM workspace_exports WHERE "workspaceId" = ${actor.workspaceId} AND status IN ('requested','running') LIMIT 1`;
       if (pending[0]) return publicJob(pending[0]);
-      await tx.$executeRaw`DELETE FROM rebuild_workspace_exports WHERE "workspaceId" = ${actor.workspaceId} AND status IN ('expired','failed')`;
-      const counts = await tx.$queryRaw<Array<{ count: bigint }>>`SELECT COUNT(*) AS count FROM rebuild_workspace_exports WHERE "workspaceId" = ${actor.workspaceId}`;
+      await tx.$executeRaw`DELETE FROM workspace_exports WHERE "workspaceId" = ${actor.workspaceId} AND status IN ('expired','failed')`;
+      const counts = await tx.$queryRaw<Array<{ count: bigint }>>`SELECT COUNT(*) AS count FROM workspace_exports WHERE "workspaceId" = ${actor.workspaceId}`;
       if (Number(counts[0]!.count) >= max) throw new OperationError('conflict', 'Wait for an existing export to expire before requesting another.');
       const id = randomUUID();
       const expiresAt = new Date(Date.now() + hours * 3600000);
-      const rows = await tx.$queryRaw<Job[]>`INSERT INTO rebuild_workspace_exports (id, "workspaceId", "requestedById", "apiKeyId", "mediaRoot", "expiresAt") VALUES (${id}, ${actor.workspaceId}, ${actor.userId}, ${actor.apiKeyId ?? null}, ${mediaRoot}, ${expiresAt}) RETURNING *`;
+      const rows = await tx.$queryRaw<Job[]>`INSERT INTO workspace_exports (id, "workspaceId", "requestedById", "apiKeyId", "mediaRoot", "expiresAt") VALUES (${id}, ${actor.workspaceId}, ${actor.userId}, ${actor.apiKeyId ?? null}, ${mediaRoot}, ${expiresAt}) RETURNING *`;
       await tx.$executeRaw`INSERT INTO root_activities (id, "actorId", action, detail, "createdAt") VALUES (${randomUUID()}, ${actor.userId}, 'workspace.export_requested', ${JSON.stringify({ workspaceId: actor.workspaceId, exportId: id, apiKeyId: actor.apiKeyId })}::jsonb, NOW())`;
       return publicJob(rows[0]!);
     });
@@ -97,7 +97,7 @@ export async function requestWorkspaceExport(actor: DataControlActor, confirmati
 export async function downloadWorkspaceExport(actor: DataControlActor, id: string) {
   return withWorkspaceOperation(actor.workspaceId, async () => {
     await authorize(actor);
-    const rows = await prisma.$queryRaw<Job[]>`SELECT * FROM rebuild_workspace_exports WHERE id = ${id} AND "workspaceId" = ${actor.workspaceId}`;
+    const rows = await prisma.$queryRaw<Job[]>`SELECT * FROM workspace_exports WHERE id = ${id} AND "workspaceId" = ${actor.workspaceId}`;
     const job = rows[0];
     if (!job || job.status !== 'ready' || job.expiresAt <= new Date()) throw missing();
     const handle = await open(await archivePath(job), constants.O_RDONLY | constants.O_NOFOLLOW);
@@ -120,16 +120,16 @@ export async function runWorkspaceExports(): Promise<string> {
   const batch = await limit('data.exportWorkerBatch');
   const leaseSeconds = await limit('data.exportLeaseSeconds');
   const timeout = await runtimeConfig('data.workspaceOperationTimeoutMs') as number;
-  const deleted = await prisma.$queryRaw<Array<{ id: string; workspaceId: string; mediaRoot: string }>>`SELECT * FROM rebuild_export_file_cleanups WHERE "nextAttemptAt" <= NOW() ORDER BY "nextAttemptAt", id LIMIT ${batch}`;
+  const deleted = await prisma.$queryRaw<Array<{ id: string; workspaceId: string; mediaRoot: string }>>`SELECT * FROM export_file_cleanups WHERE "nextAttemptAt" <= NOW() ORDER BY "nextAttemptAt", id LIMIT ${batch}`;
   for (const item of deleted) {
     try {
       await removeArchive(item);
-      await prisma.$executeRaw`DELETE FROM rebuild_export_file_cleanups WHERE id = ${item.id}`;
+      await prisma.$executeRaw`DELETE FROM export_file_cleanups WHERE id = ${item.id}`;
     } catch {
-      await prisma.$executeRaw`UPDATE rebuild_export_file_cleanups SET "nextAttemptAt" = ${new Date(Date.now() + leaseSeconds * 1000)} WHERE id = ${item.id}`;
+      await prisma.$executeRaw`UPDATE export_file_cleanups SET "nextAttemptAt" = ${new Date(Date.now() + leaseSeconds * 1000)} WHERE id = ${item.id}`;
     }
   }
-  const due = await prisma.$queryRaw<Job[]>`SELECT * FROM rebuild_workspace_exports WHERE "expiresAt" <= NOW() AND status <> 'expired' AND ("leaseUntil" IS NULL OR "leaseUntil" < NOW()) ORDER BY "expiresAt" LIMIT ${batch}`;
+  const due = await prisma.$queryRaw<Job[]>`SELECT * FROM workspace_exports WHERE "expiresAt" <= NOW() AND status <> 'expired' AND ("leaseUntil" IS NULL OR "leaseUntil" < NOW()) ORDER BY "expiresAt" LIMIT ${batch}`;
   for (const job of due) {
     try {
       await prisma.$transaction(async tx => {
@@ -138,28 +138,28 @@ export async function runWorkspaceExports(): Promise<string> {
         await tx.$queryRaw`SELECT id FROM workspaces WHERE id = ${job.workspaceId} FOR SHARE`;
         const purge = await tx.workspaceDataPurge.findUnique({ where: { workspaceId: job.workspaceId }, select: { status: true } });
         if (purge && purge.status !== 'completed') return;
-        const locked = await tx.$queryRaw<Job[]>`SELECT * FROM rebuild_workspace_exports WHERE id = ${job.id} AND status <> 'expired' AND "expiresAt" <= NOW() FOR UPDATE SKIP LOCKED`;
+        const locked = await tx.$queryRaw<Job[]>`SELECT * FROM workspace_exports WHERE id = ${job.id} AND status <> 'expired' AND "expiresAt" <= NOW() FOR UPDATE SKIP LOCKED`;
         if (!locked.length) return;
         await removeArchive(locked[0]!);
-        await tx.$executeRaw`UPDATE rebuild_workspace_exports SET status = 'expired', bytes = NULL, "leaseToken" = NULL, "leaseUntil" = NULL WHERE id = ${job.id}`;
+        await tx.$executeRaw`UPDATE workspace_exports SET status = 'expired', bytes = NULL, "leaseToken" = NULL, "leaseUntil" = NULL WHERE id = ${job.id}`;
       }, { timeout });
     } catch {
       // Back off unreadable storage so it does not monopolize the cleanup batch.
-      await prisma.$executeRaw`UPDATE rebuild_workspace_exports SET "leaseUntil" = ${new Date(Date.now() + leaseSeconds * 1000)} WHERE id = ${job.id} AND status <> 'expired'`.catch(() => undefined);
+      await prisma.$executeRaw`UPDATE workspace_exports SET "leaseUntil" = ${new Date(Date.now() + leaseSeconds * 1000)} WHERE id = ${job.id} AND status <> 'expired'`.catch(() => undefined);
     }
   }
-  const candidates = await prisma.$queryRaw<Job[]>`SELECT * FROM rebuild_workspace_exports WHERE "expiresAt" > NOW() AND ((status = 'requested' AND ("leaseUntil" IS NULL OR "leaseUntil" < NOW())) OR (status = 'running' AND "leaseUntil" < NOW())) ORDER BY "createdAt" LIMIT ${batch}`;
+  const candidates = await prisma.$queryRaw<Job[]>`SELECT * FROM workspace_exports WHERE "expiresAt" > NOW() AND ((status = 'requested' AND ("leaseUntil" IS NULL OR "leaseUntil" < NOW())) OR (status = 'running' AND "leaseUntil" < NOW())) ORDER BY "createdAt" LIMIT ${batch}`;
   let built = 0;
   for (const candidate of candidates) {
     await withWorkspaceOperation(candidate.workspaceId, async () => {
       const token = randomUUID();
       // Skip a row locked by a live builder, even if its lease clock has elapsed.
-      const claimed = await prisma.$queryRaw<Job[]>`UPDATE rebuild_workspace_exports SET status = 'running', "leaseToken" = ${token}, "leaseUntil" = ${new Date(Date.now() + leaseSeconds * 1000)} WHERE id IN (SELECT id FROM rebuild_workspace_exports WHERE id = ${candidate.id} AND "expiresAt" > NOW() AND ((status = 'requested' AND ("leaseUntil" IS NULL OR "leaseUntil" < NOW())) OR (status = 'running' AND "leaseUntil" < NOW())) FOR UPDATE SKIP LOCKED) RETURNING *`;
+      const claimed = await prisma.$queryRaw<Job[]>`UPDATE workspace_exports SET status = 'running', "leaseToken" = ${token}, "leaseUntil" = ${new Date(Date.now() + leaseSeconds * 1000)} WHERE id IN (SELECT id FROM workspace_exports WHERE id = ${candidate.id} AND "expiresAt" > NOW() AND ((status = 'requested' AND ("leaseUntil" IS NULL OR "leaseUntil" < NOW())) OR (status = 'running' AND "leaseUntil" < NOW())) FOR UPDATE SKIP LOCKED) RETURNING *`;
       const job = claimed[0];
       if (!job) return;
       try {
         await prisma.$transaction(async tx => {
-          const locked = await tx.$queryRaw<Job[]>`SELECT * FROM rebuild_workspace_exports WHERE id = ${job.id} AND "leaseToken" = ${token} AND status = 'running' FOR UPDATE`;
+          const locked = await tx.$queryRaw<Job[]>`SELECT * FROM workspace_exports WHERE id = ${job.id} AND "leaseToken" = ${token} AND status = 'running' FOR UPDATE`;
           if (!locked.length) return;
           const actor = { userId: job.requestedById, workspaceId: job.workspaceId, ...(job.apiKeyId ? { apiKeyId: job.apiKeyId } : {}) };
           await authorize(actor);
@@ -172,7 +172,7 @@ export async function runWorkspaceExports(): Promise<string> {
           if (job.expiresAt <= new Date()) throw new Error('Export expired while building.');
           const file = await open(await archivePath(job, true), constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW, 0o600);
           try { await file.writeFile(content); } finally { await file.close(); }
-          await tx.$executeRaw`UPDATE rebuild_workspace_exports SET status = 'ready', bytes = ${content.length}, "leaseUntil" = NULL WHERE id = ${job.id} AND "leaseToken" = ${token}`;
+          await tx.$executeRaw`UPDATE workspace_exports SET status = 'ready', bytes = ${content.length}, "leaseUntil" = NULL WHERE id = ${job.id} AND "leaseToken" = ${token}`;
           await audit(actor, job.id, 'workspace.export_ready', tx);
           built++;
         }, { timeout });
@@ -180,15 +180,15 @@ export async function runWorkspaceExports(): Promise<string> {
         // Reacquire the row and prove this token still owns it before touching
         // disk. A successor may have claimed the job after transaction rollback.
         await prisma.$transaction(async tx => {
-          const owned = await tx.$queryRaw<Job[]>`SELECT * FROM rebuild_workspace_exports WHERE id = ${job.id} AND "leaseToken" = ${token} AND status = 'running' FOR UPDATE SKIP LOCKED`;
+          const owned = await tx.$queryRaw<Job[]>`SELECT * FROM workspace_exports WHERE id = ${job.id} AND "leaseToken" = ${token} AND status = 'running' FOR UPDATE SKIP LOCKED`;
           if (!owned.length) return;
           await removeArchive(job);
-          await tx.$executeRaw`UPDATE rebuild_workspace_exports SET status = 'failed', error = 'The export could not be built. Request another export.', "leaseToken" = NULL, "leaseUntil" = NULL WHERE id = ${job.id} AND "leaseToken" = ${token}`;
+          await tx.$executeRaw`UPDATE workspace_exports SET status = 'failed', error = 'The export could not be built. Request another export.', "leaseToken" = NULL, "leaseUntil" = NULL WHERE id = ${job.id} AND "leaseToken" = ${token}`;
         }, { timeout });
       }
     }).catch(async () => {
       // Suspended/deleting workspaces must not block other tenants' requests.
-      await prisma.$executeRaw`UPDATE rebuild_workspace_exports SET "leaseUntil" = ${new Date(Date.now() + leaseSeconds * 1000)} WHERE id = ${candidate.id} AND status IN ('requested','running')`.catch(() => undefined);
+      await prisma.$executeRaw`UPDATE workspace_exports SET "leaseUntil" = ${new Date(Date.now() + leaseSeconds * 1000)} WHERE id = ${candidate.id} AND status IN ('requested','running')`.catch(() => undefined);
     });
   }
   return `built=${built} cleanupExamined=${due.length}`;

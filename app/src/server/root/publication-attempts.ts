@@ -26,7 +26,7 @@ export async function listRootPublicationAttempts(userId: string, cap?: number) 
   const rows = await prisma.$queryRaw<Attempt[]>`
     SELECT a.id, a."workspaceId", a."postId", a."postTargetId", a."targetId", a.provider, a.state, a.reason,
       a."remotePostId", a."remoteUrl", a."createdAt", a."updatedAt", w.name AS "workspaceName", t.name AS "targetName"
-    FROM rebuild_publication_attempts a
+    FROM publication_attempts a
     LEFT JOIN workspaces w ON w.id = a."workspaceId"
     LEFT JOIN targets t ON t.id = a."targetId" AND t."workspaceId" = a."workspaceId"
     ORDER BY a."updatedAt" DESC, a.id DESC LIMIT ${Math.min(limit, cap ?? limit)}
@@ -37,7 +37,7 @@ export async function listRootPublicationAttempts(userId: string, cap?: number) 
     JOIN social_accounts sa ON sa.id=t."socialAccountId"
     LEFT JOIN workspaces w ON w.id=p."workspaceId"
     WHERE pt.status='processing' AND pt."remotePostId" IS NULL
-      AND NOT EXISTS (SELECT 1 FROM rebuild_publication_attempts a WHERE a."workspaceId"=p."workspaceId" AND a."postTargetId"=pt.id AND a.state NOT IN ('rejected','attested_absent'))
+      AND NOT EXISTS (SELECT 1 FROM publication_attempts a WHERE a."workspaceId"=p."workspaceId" AND a."postTargetId"=pt.id AND a.state NOT IN ('rejected','attested_absent'))
     ORDER BY pt."updatedAt" DESC, pt.id DESC LIMIT ${Math.min(limit, cap ?? limit) + 1}
   `;
   return { timeZone, limits: await recoveryLimits(), items: rows.map(row => ({ operationId: row.id, workspaceId: row.workspaceId, workspaceName: row.workspaceName ?? row.workspaceId, postId: row.postId, postTargetId: row.postTargetId, targetId: row.targetId, targetName: row.targetName, provider: row.provider, state: row.state, reason: row.reason, remotePostId: row.remotePostId, remoteUrl: row.remoteUrl, createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString() })), legacyProcessing: legacyProcessing.slice(0, Math.min(limit, cap ?? limit)).map(row => ({ ...row, workspaceName: row.workspaceName ?? row.workspaceId })), legacyTruncated: legacyProcessing.length > Math.min(limit, cap ?? limit) };
@@ -54,7 +54,7 @@ export async function recordRootPublicationOutcome(userId: string, input: unknow
     try { url = new URL(parsed.data.remoteUrl); } catch { throw new OperationError('invalid_request', 'Enter a valid public post link.'); }
     if (url.protocol !== 'https:' || url.username || url.password) throw new OperationError('invalid_request', 'Enter a valid public post link.');
   }
-  const found = await prisma.$queryRaw<Array<{ id: string; workspaceId: string; postId: string; targetId: string; state: string }>>`SELECT id, "workspaceId", "postId", "targetId", state FROM rebuild_publication_attempts WHERE id = ${parsed.data.operationId}`;
+  const found = await prisma.$queryRaw<Array<{ id: string; workspaceId: string; postId: string; targetId: string; state: string }>>`SELECT id, "workspaceId", "postId", "targetId", state FROM publication_attempts WHERE id = ${parsed.data.operationId}`;
   const initial = found[0];
   if (!initial) throw new OperationError('not_found', 'This publication operation is unavailable.');
   if (!['started', 'uncertain', 'submitted'].includes(initial.state)) throw new OperationError('conflict', 'This publication can no longer be manually attested.');
@@ -69,7 +69,7 @@ export async function finishRootPublicationProjection(userId: string, input: unk
   await requireActiveRoot(userId);
   const parsed = z.object(rootRecoveryFields(await recoveryLimits())).strict().safeParse(input);
   if (!parsed.success || parsed.data.confirmation !== `ROOT FINISH PUBLICATION ${parsed.data.operationId}`) throw new OperationError('invalid_request', 'Confirm the exact publication to finish its local update.');
-  const rows = await prisma.$queryRaw<Array<{ workspaceId: string; postId: string; targetId: string }>>`SELECT "workspaceId", "postId", "targetId" FROM rebuild_publication_attempts WHERE id=${parsed.data.operationId}`;
+  const rows = await prisma.$queryRaw<Array<{ workspaceId: string; postId: string; targetId: string }>>`SELECT "workspaceId", "postId", "targetId" FROM publication_attempts WHERE id=${parsed.data.operationId}`;
   const row = rows[0];
   if (!row) throw new OperationError('not_found', 'This publication operation is unavailable.');
   return rootWorkspaceOperation(userId, row.workspaceId, row.postId, row.targetId, tx => projectPublicationInTransaction(tx, { userId, workspaceId: row.workspaceId }, parsed.data.operationId).then(ok => ({ ok, operationId: parsed.data.operationId, state: ok ? 'projected' : 'receipt_recorded' })));

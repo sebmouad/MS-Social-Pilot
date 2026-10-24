@@ -57,7 +57,7 @@ async function status(actor: PublishingActor, postId: string): Promise<Publicati
   const post = await selectedPost(actor, postId);
   const limit = await runtimeConfig('publishing.publicationHistoryLimit');
   const rows = await prisma.$queryRaw<PublicationRow[]>`SELECT id, "workspaceId", "postId", "postTargetId", "targetId", provider, "actorId", state, reason, "remotePostId", "remoteUrl", "receiptAt", "attestedAt", "createdAt", "updatedAt"
-    FROM rebuild_publication_attempts WHERE "workspaceId" = ${actor.workspaceId} AND "postId" = ${postId}
+    FROM publication_attempts WHERE "workspaceId" = ${actor.workspaceId} AND "postId" = ${postId}
     ORDER BY CASE WHEN state IN ('started','uncertain','submitted','receipt_recorded') THEN 0 ELSE 1 END, "createdAt" DESC, id DESC LIMIT ${limit + 1}`;
   // All attempt identities must still be in current scope, even if local destination references were changed.
   const access = await authorizePublishing(actor, 'publishing/posts', 'read');
@@ -65,7 +65,7 @@ async function status(actor: PublishingActor, postId: string): Promise<Publicati
   if (rows.some(row => !ids.includes(row.targetId))) throw missing(errorText);
   const legacy = await prisma.$queryRaw<Array<{ count: bigint }>>`SELECT count(*) AS count FROM post_targets p JOIN posts s ON s.id=p."postId"
     WHERE s."workspaceId"=${actor.workspaceId} AND p."postId"=${postId} AND p.status='processing' AND p."remotePostId" IS NULL
-    AND NOT EXISTS (SELECT 1 FROM rebuild_publication_attempts a WHERE a."workspaceId"=s."workspaceId" AND a."postTargetId"=p.id AND a.state NOT IN ('rejected','attested_absent'))`;
+    AND NOT EXISTS (SELECT 1 FROM publication_attempts a WHERE a."workspaceId"=s."workspaceId" AND a."postTargetId"=p.id AND a.state NOT IN ('rejected','attested_absent'))`;
   return { postId, truncated: rows.length > limit, legacyProcessingCount: Number(legacy[0]?.count ?? 0), operations: rows.slice(0, limit).map(row => ({ id: row.id, postTargetId: row.postTargetId, targetId: row.targetId, targetName: post.targets.find(target => target.targetId === row.targetId)?.target.name ?? null, state: row.state, reason: row.reason, remotePostId: row.remotePostId, remoteUrl: row.remoteUrl, createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString() })) };
 }
 export async function getPublicationStatus(actor: PublishingActor, input: { postId: string }): Promise<PublicationStatus> {
@@ -88,7 +88,7 @@ export async function recordPublicationOutcomeInTransaction(tx: Prisma.Transacti
   if (!['PUBLISHED', 'ABSENT'].includes(input.outcome)) throw new PublishingOperationError('invalid_request', 'chooseAPublicationOutcome', {}, errorText);
   const confirmed = input.outcome === 'PUBLISHED' ? await receipt(input) : null;
   if (input.outcome === 'ABSENT' && (input.remotePostId || input.remoteUrl)) throw new PublishingOperationError('invalid_request', 'absentPublicationsCannotIncludeARemoteReceipt', {}, errorText);
-  const rows = await tx.$queryRaw<PublicationRow[]>`SELECT * FROM rebuild_publication_attempts WHERE id=${input.operationId} AND "workspaceId"=${input.workspaceId} FOR UPDATE`;
+  const rows = await tx.$queryRaw<PublicationRow[]>`SELECT * FROM publication_attempts WHERE id=${input.operationId} AND "workspaceId"=${input.workspaceId} FOR UPDATE`;
   const row = rows[0];
   if (!row) throw missing(errorText);
   if (!['started', 'uncertain', 'submitted'].includes(row.state)) throw new PublishingOperationError('conflict', 'thisPublicationAlreadyHasARecordedOutcome', {}, errorText);
@@ -98,9 +98,9 @@ export async function recordPublicationOutcomeInTransaction(tx: Prisma.Transacti
   await assertPlatformPublicationOutcome(tx, row.provider, row.workspaceId, row.id, input.outcome, confirmed?.remotePostId);
   if (confirmed) {
     await assertReceiptIdentity(tx, row, confirmed.remotePostId);
-    await tx.$executeRaw`UPDATE rebuild_publication_attempts SET state='receipt_recorded', reason='external_human_attestation', "remotePostId"=${confirmed.remotePostId}, "remoteUrl"=${row.state === 'submitted' ? row.remoteUrl ?? confirmed.remoteUrl : confirmed.remoteUrl}, "receiptAt"=${row.state === 'submitted' ? row.receiptAt : new Date()}, "attestedAt"=CURRENT_TIMESTAMP, "attestedBy"=${actorId}, "updatedAt"=CURRENT_TIMESTAMP WHERE id=${row.id} AND "workspaceId"=${input.workspaceId}`;
+    await tx.$executeRaw`UPDATE publication_attempts SET state='receipt_recorded', reason='external_human_attestation', "remotePostId"=${confirmed.remotePostId}, "remoteUrl"=${row.state === 'submitted' ? row.remoteUrl ?? confirmed.remoteUrl : confirmed.remoteUrl}, "receiptAt"=${row.state === 'submitted' ? row.receiptAt : new Date()}, "attestedAt"=CURRENT_TIMESTAMP, "attestedBy"=${actorId}, "updatedAt"=CURRENT_TIMESTAMP WHERE id=${row.id} AND "workspaceId"=${input.workspaceId}`;
   } else {
-    await tx.$executeRaw`UPDATE rebuild_publication_attempts SET state='attested_absent', reason='external_human_attestation', "attestedAt"=CURRENT_TIMESTAMP, "attestedBy"=${actorId}, "updatedAt"=CURRENT_TIMESTAMP WHERE id=${row.id} AND "workspaceId"=${input.workspaceId}`;
+    await tx.$executeRaw`UPDATE publication_attempts SET state='attested_absent', reason='external_human_attestation', "attestedAt"=CURRENT_TIMESTAMP, "attestedBy"=${actorId}, "updatedAt"=CURRENT_TIMESTAMP WHERE id=${row.id} AND "workspaceId"=${input.workspaceId}`;
     await tx.postTarget.updateMany({ where: { id: row.postTargetId, postId: row.postId, targetId: row.targetId, post: { workspaceId: input.workspaceId }, status: 'processing', remotePostId: null }, data: { status: 'failed' } });
     await aggregatePublicationPostInTransaction(tx, input.workspaceId, row.postId);
     await emitWorkspaceAlert(tx, { workspaceId: input.workspaceId, eventId: `publication_${row.id}`, kind: 'publish_failure', postId: row.postId, targetId: row.targetId });
@@ -123,7 +123,7 @@ export async function projectPublicationInOperation(actor: PublishingActor, oper
 /** Trusted local-only projection for Root and the guarded product service. */
 export async function projectPublicationInTransaction(tx: Prisma.TransactionClient, actor: { userId: string | null; workspaceId: string }, operationId: string, observedPublishedAt?: Date): Promise<boolean> {
   const errorText = await loadPublishingErrorText();
-    const rows = await tx.$queryRaw<PublicationRow[]>`SELECT * FROM rebuild_publication_attempts WHERE id=${operationId} AND "workspaceId"=${actor.workspaceId} FOR UPDATE`;
+    const rows = await tx.$queryRaw<PublicationRow[]>`SELECT * FROM publication_attempts WHERE id=${operationId} AND "workspaceId"=${actor.workspaceId} FOR UPDATE`;
     const row = rows[0];
     if (!row) throw missing(errorText);
     if (row.state === 'projected') return true;
@@ -138,7 +138,7 @@ export async function projectPublicationInTransaction(tx: Prisma.TransactionClie
       ? { status: 'scheduled_remote', remotePostId: row.remotePostId, remoteUrl: row.remoteUrl, publishedAt: null }
       : { status: 'published', remotePostId: row.remotePostId, remoteUrl: row.remoteUrl, publishedAt: observedPublishedAt ?? row.attestedAt ?? row.receiptAt } });
     if (changed.count !== 1) throw new PublishingOperationError('conflict', 'thisDestinationChangedReviewItsPublicationBeforeContinuing', {}, errorText);
-    await tx.$executeRaw`UPDATE rebuild_publication_attempts SET state='projected', "projectedAt"=CURRENT_TIMESTAMP, "updatedAt"=CURRENT_TIMESTAMP WHERE id=${row.id}`;
+    await tx.$executeRaw`UPDATE publication_attempts SET state='projected', "projectedAt"=CURRENT_TIMESTAMP, "updatedAt"=CURRENT_TIMESTAMP WHERE id=${row.id}`;
     await aggregatePublicationPostInTransaction(tx, actor.workspaceId, row.postId);
     await audit(tx, actor.userId, actor.workspaceId, heldUntil ? 'publishing.target_held_remotely' : 'publishing.target_published', { postId: row.postId, postTargetId: row.postTargetId, operationId, ...(heldUntil ? { heldUntil: heldUntil.toISOString() } : {}) });
     return true;
@@ -150,7 +150,7 @@ export async function recordPublicationOutcome(actor: PublishingActor, input: { 
   return withPublishingOperation(actor, { postId: input.postId, allowPublicationRecovery: true }, async context => {
     if (!managers.has(context.role)) throw new PublishingOperationError('forbidden', 'onlyWorkspaceManagersCanRecordExternalPublicationOutcomes', {}, errorText);
     await selectedPost(context.actor, input.postId);
-    const rows = await prisma.$queryRaw<Array<{ id: string }>>`SELECT id FROM rebuild_publication_attempts WHERE id=${input.operationId} AND "workspaceId"=${actor.workspaceId} AND "postId"=${input.postId}`;
+    const rows = await prisma.$queryRaw<Array<{ id: string }>>`SELECT id FROM publication_attempts WHERE id=${input.operationId} AND "workspaceId"=${actor.workspaceId} AND "postId"=${input.postId}`;
     if (!rows.length) throw missing(errorText);
     await withPublishingTransaction(context.signal, tx => recordPublicationOutcomeInTransaction(tx, actor.userId, { ...input, workspaceId: actor.workspaceId }));
     return status(context.actor, input.postId);
@@ -163,7 +163,7 @@ export async function finishPublicationProjection(actor: PublishingActor, input:
   return withPublishingOperation(actor, { postId: input.postId, allowPublicationRecovery: true }, async context => {
     if (!managers.has(context.role)) throw new PublishingOperationError('forbidden', 'onlyWorkspaceManagersCanFinishPublicationRecovery', {}, errorText);
     await selectedPost(context.actor, input.postId);
-    const rows = await prisma.$queryRaw<Array<{ id: string }>>`SELECT id FROM rebuild_publication_attempts WHERE id=${input.operationId} AND "workspaceId"=${actor.workspaceId} AND "postId"=${input.postId}`;
+    const rows = await prisma.$queryRaw<Array<{ id: string }>>`SELECT id FROM publication_attempts WHERE id=${input.operationId} AND "workspaceId"=${actor.workspaceId} AND "postId"=${input.postId}`;
     if (!rows.length) throw missing(errorText);
     await projectPublicationInOperation(context.actor, input.operationId, context.signal);
     return status(context.actor, input.postId);
@@ -189,10 +189,10 @@ export async function adoptLegacyPublicationInTransaction(tx: Prisma.Transaction
   const errorText = await loadPublishingErrorText();
   const row = await tx.postTarget.findFirst({ where: { id: input.postTargetId, postId: input.postId, targetId: input.targetId, post: { workspaceId: actor.workspaceId }, target: { workspaceId: actor.workspaceId }, status: 'processing', remotePostId: null }, select: { id: true } });
   if (!row) throw new PublishingOperationError('conflict', 'thisDestinationDoesNotNeedLegacyPublicationRecovery', {}, errorText);
-  const existing = await tx.$queryRaw<Array<{ id: string }>>`SELECT id FROM rebuild_publication_attempts WHERE "workspaceId"=${actor.workspaceId} AND "postTargetId"=${row.id} AND state NOT IN ('rejected','attested_absent')`;
+  const existing = await tx.$queryRaw<Array<{ id: string }>>`SELECT id FROM publication_attempts WHERE "workspaceId"=${actor.workspaceId} AND "postTargetId"=${row.id} AND state NOT IN ('rejected','attested_absent')`;
   if (existing.length) throw new PublishingOperationError('conflict', 'thisDestinationAlreadyHasARecoveryRecordRefreshIts', {}, errorText);
   const id = randomUUID();
-  await tx.$executeRaw`INSERT INTO rebuild_publication_attempts (id,"workspaceId","postId","postTargetId","targetId",provider,"actorId",state,reason) VALUES (${id},${actor.workspaceId},${input.postId},${row.id},${input.targetId},${input.provider},${actor.userId},'uncertain','outcome_unknown')`;
+  await tx.$executeRaw`INSERT INTO publication_attempts (id,"workspaceId","postId","postTargetId","targetId",provider,"actorId",state,reason) VALUES (${id},${actor.workspaceId},${input.postId},${row.id},${input.targetId},${input.provider},${actor.userId},'uncertain','outcome_unknown')`;
   await audit(tx, actor.userId, actor.workspaceId, 'publishing.publication_legacy_adopted', { postId: input.postId, postTargetId: row.id, operationId: id });
   return { ok: true as const, operationId: id, state: 'uncertain' as const };
 }
@@ -201,7 +201,7 @@ export async function adoptLegacyPublicationInTransaction(tx: Prisma.Transaction
 export async function publishDestinationInOperation(context: { actor: PublishingActor; signal: AbortSignal }, input: { postId: string; postTargetId: string; targetId: string; provider: string; expectedStatus: 'pending' | 'failed'; /** Set when the destination asks its provider to hold the post until this instant. */ nativeScheduledFor?: Date; dispatch(operationId: string): Promise<PublishResult>; classifyFailure(error: unknown): 'rejected' | 'uncertain' }): Promise<'published' | 'failed' | 'needs_review'> {
   const { actor, signal } = context;
   const operation = await withPublishingTransaction(signal, async tx => {
-    const existing = await tx.$queryRaw<PublicationRow[]>`SELECT * FROM rebuild_publication_attempts WHERE "workspaceId"=${actor.workspaceId} AND "postTargetId"=${input.postTargetId} AND state NOT IN ('rejected','attested_absent') FOR UPDATE`;
+    const existing = await tx.$queryRaw<PublicationRow[]>`SELECT * FROM publication_attempts WHERE "workspaceId"=${actor.workspaceId} AND "postTargetId"=${input.postTargetId} AND state NOT IN ('rejected','attested_absent') FOR UPDATE`;
     if (existing.length) return existing[0];
     await assertPlatformPublicationsSettled(tx, actor.workspaceId, [input.targetId]);
     const claim = await tx.postTarget.updateMany({ where: { id: input.postTargetId, postId: input.postId, targetId: input.targetId, post: { workspaceId: actor.workspaceId }, status: input.expectedStatus, remotePostId: null }, data: { status: 'processing' } });
@@ -209,7 +209,7 @@ export async function publishDestinationInOperation(context: { actor: Publishing
     // Recorded with the claim so a later recovery projects the same intent; cleared again whenever the destination is released.
     await tx.$executeRaw`UPDATE post_targets SET "nativeScheduledFor"=${input.nativeScheduledFor ?? null} WHERE id=${input.postTargetId} AND "postId"=${input.postId}`;
     const id = randomUUID();
-    const created = await tx.$queryRaw<PublicationRow[]>`INSERT INTO rebuild_publication_attempts (id,"workspaceId","postId","postTargetId","targetId",provider,"actorId",state) VALUES (${id},${actor.workspaceId},${input.postId},${input.postTargetId},${input.targetId},${input.provider},${actor.userId},'started') RETURNING *`;
+    const created = await tx.$queryRaw<PublicationRow[]>`INSERT INTO publication_attempts (id,"workspaceId","postId","postTargetId","targetId",provider,"actorId",state) VALUES (${id},${actor.workspaceId},${input.postId},${input.postTargetId},${input.targetId},${input.provider},${actor.userId},'started') RETURNING *`;
     await audit(tx, actor.userId, actor.workspaceId, 'publishing.publication_started', { postId: input.postId, postTargetId: input.postTargetId, operationId: id });
     return created[0] ? { ...created[0], dispatchOwned: true } : null;
   });
@@ -232,7 +232,7 @@ export async function reconcileSubmittedPublicationInTransaction(
   status: RemoteStatus,
 ): Promise<boolean> {
   if (status.state !== 'published' || status.remoteId !== input.remoteId || status.targetId !== input.remoteTargetId) return false;
-  const rows = await tx.$queryRaw<PublicationRow[]>`SELECT * FROM rebuild_publication_attempts
+  const rows = await tx.$queryRaw<PublicationRow[]>`SELECT * FROM publication_attempts
     WHERE id=${input.operationId} AND "workspaceId"=${observer.workspaceId} FOR UPDATE`;
   const row = rows[0];
   if (!row || row.state !== 'submitted' || row.provider !== input.provider || row.postId !== input.postId ||
@@ -244,7 +244,7 @@ export async function reconcileSubmittedPublicationInTransaction(
   if (!destination) return false;
   await assertPlatformPublicationOutcome(tx, row.provider, row.workspaceId, row.id, 'PUBLISHED', row.remotePostId!);
   await assertReceiptIdentity(tx, row, row.remotePostId!);
-  const changed = await tx.$executeRaw`UPDATE rebuild_publication_attempts SET state='receipt_recorded',reason='provider_receipt',"updatedAt"=CURRENT_TIMESTAMP
+  const changed = await tx.$executeRaw`UPDATE publication_attempts SET state='receipt_recorded',reason='provider_receipt',"updatedAt"=CURRENT_TIMESTAMP
     WHERE id=${row.id} AND "workspaceId"=${row.workspaceId} AND state='submitted' AND "remotePostId"=${input.remoteId}`;
   if (changed !== 1) return false;
   const observedAt = new Date();
@@ -275,7 +275,7 @@ async function dispatchAndRecord(actor: PublishingActor, signal: AbortSignal, op
     let rejected = false;
     try { rejected = input.classifyFailure(error) === 'rejected'; } catch { /* An unreliable classifier cannot release a claim. */ }
     try { await receiptTransaction(async tx => {
-      const changed = await tx.$executeRaw`UPDATE rebuild_publication_attempts SET state=${rejected ? 'rejected' : 'uncertain'}, reason=${rejected ? 'provider_rejected' : 'outcome_unknown'}, "updatedAt"=CURRENT_TIMESTAMP WHERE id=${operation.id} AND "workspaceId"=${actor.workspaceId} AND state='started'`;
+      const changed = await tx.$executeRaw`UPDATE publication_attempts SET state=${rejected ? 'rejected' : 'uncertain'}, reason=${rejected ? 'provider_rejected' : 'outcome_unknown'}, "updatedAt"=CURRENT_TIMESTAMP WHERE id=${operation.id} AND "workspaceId"=${actor.workspaceId} AND state='started'`;
       if (changed !== 1) throw new PublishingOperationError('conflict', 'thePublicationOutcomeChanged', {}, errorText);
       if (rejected) await tx.postTarget.updateMany({ where: { id: operation.postTargetId, postId: operation.postId, post: { workspaceId: actor.workspaceId }, status: 'processing', remotePostId: null }, data: { status: 'failed' } });
       if (rejected) await emitWorkspaceAlert(tx, { workspaceId: actor.workspaceId, eventId: `publication_${operation.id}`, kind: 'publish_failure', postId: operation.postId, targetId: operation.targetId });
@@ -306,7 +306,7 @@ async function dispatchAndRecord(actor: PublishingActor, signal: AbortSignal, op
         // overriding another post/deletion. Resolution remains a separate action.
         identityConflict = true; submitted = true;
       }
-      const changed = await tx.$executeRaw`UPDATE rebuild_publication_attempts SET state=${submitted ? 'submitted' : 'receipt_recorded'}, reason=${submitted ? 'provider_submission' : 'provider_receipt'}, "remotePostId"=${confirmed.remotePostId}, "remoteUrl"=${confirmed.remoteUrl}, "receiptAt"=CURRENT_TIMESTAMP, "updatedAt"=CURRENT_TIMESTAMP WHERE id=${operation.id} AND "workspaceId"=${actor.workspaceId} AND state='started'`;
+      const changed = await tx.$executeRaw`UPDATE publication_attempts SET state=${submitted ? 'submitted' : 'receipt_recorded'}, reason=${submitted ? 'provider_submission' : 'provider_receipt'}, "remotePostId"=${confirmed.remotePostId}, "remoteUrl"=${confirmed.remoteUrl}, "receiptAt"=CURRENT_TIMESTAMP, "updatedAt"=CURRENT_TIMESTAMP WHERE id=${operation.id} AND "workspaceId"=${actor.workspaceId} AND state='started'`;
       if (changed !== 1) throw new PublishingOperationError('conflict', 'thePublicationOutcomeChanged', {}, errorText);
       await audit(tx, actor.userId, actor.workspaceId, submitted ? 'publishing.publication_submitted' : 'publishing.publication_receipt_recorded', { operationId: operation.id, postId: operation.postId, identityConflict });
     });

@@ -1,13 +1,13 @@
 import { recordError } from '../src/server/errors/recorder';
 import { hostname } from 'node:os';
-import { REBUILD_WORKER_PREFIX } from '../src/server/jobs/identity';
+import { WORKER_PREFIX } from '../src/server/jobs/identity';
 import { prisma } from '../src/server/data';
 import { runtimeConfig } from '../src/server/config/store';
 import { createWorker } from '../src/server/jobs/worker';
 import { createWorkerDependencies } from '../src/server/jobs/runtime';
 import { runWorkerLoop } from '../src/server/jobs/run-loop';
 
-const owner = `${REBUILD_WORKER_PREFIX}${hostname()}-${process.pid}`;
+const owner = `${WORKER_PREFIX}${hostname()}-${process.pid}`;
 const log = (message: string, detail?: unknown) => console.log(`${new Date().toISOString()} [${owner}] ${message}`, detail ?? '');
 
 async function main() {

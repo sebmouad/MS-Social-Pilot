@@ -54,7 +54,7 @@ async function candidates(take: number): Promise<Candidate[]> {
     SELECT a.id, a."workspaceId", a."postId", a."postTargetId", a."targetId", a.provider,
       a."remotePostId" AS "remoteId", t."providerId" AS "remoteTargetId", a."updatedAt", p.media,
       COALESCE(pt."formatId",p.format) AS "formatId"
-    FROM rebuild_publication_attempts a
+    FROM publication_attempts a
     JOIN posts p ON p.id=a."postId" AND p."workspaceId"=a."workspaceId"
     JOIN post_targets pt ON pt.id=a."postTargetId" AND pt."postId"=p.id AND pt."targetId"=a."targetId"
     JOIN targets t ON t.id=a."targetId" AND t."workspaceId"=a."workspaceId"
@@ -95,7 +95,7 @@ export async function syncFacebookSubmittedPosts(now = new Date(), retryLimit = 
           const binding = await prisma.$queryRaw<Array<{ remotePostId: string; targetWorkspaceId: string; providerId: string; enabled: boolean; targetToken: string | null; accountId: string; accountWorkspaceId: string; accountToken: string; scopes: string; tokenExpiresAt: Date | null; invalidatedAt: Date | null; formatId: string | null; media: unknown }>>`
             SELECT a."remotePostId",t."workspaceId" AS "targetWorkspaceId",t."providerId",t.enabled,t."accessToken" AS "targetToken",
               sa.id AS "accountId",sa."workspaceId" AS "accountWorkspaceId",sa."accessToken" AS "accountToken",sa.scopes,sa."tokenExpiresAt",sa."invalidatedAt",COALESCE(pt."formatId",p.format) AS "formatId",p.media
-            FROM rebuild_publication_attempts a JOIN post_targets pt ON pt.id=a."postTargetId" AND pt."postId"=a."postId" AND pt."targetId"=a."targetId"
+            FROM publication_attempts a JOIN post_targets pt ON pt.id=a."postTargetId" AND pt."postId"=a."postId" AND pt."targetId"=a."targetId"
             JOIN posts p ON p.id=a."postId" AND p."workspaceId"=a."workspaceId"
             JOIN targets t ON t.id=a."targetId" AND t."workspaceId"=a."workspaceId"
             JOIN social_accounts sa ON sa.id=t."socialAccountId" AND sa."workspaceId"=a."workspaceId"

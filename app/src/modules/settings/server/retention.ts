@@ -76,7 +76,7 @@ export async function pruneWorkspaceHistory(workspaceId: string, p: RetentionPol
 export async function pruneInstallationHistory(p: RetentionPolicy, now = new Date()): Promise<RetentionCounts> {
   const counts: RetentionCounts = { ...ZERO };
   counts.errors = await prisma.$executeRaw`DELETE FROM error_events WHERE "lastSeenAt" < ${cutoff(now, p.errorDays)}`;
-  counts.syncRuns = await prisma.$executeRaw`DELETE FROM rebuild_sync_runs WHERE "startedAt" < ${cutoff(now, p.syncLogDays)}`;
+  counts.syncRuns = await prisma.$executeRaw`DELETE FROM sync_runs WHERE "startedAt" < ${cutoff(now, p.syncLogDays)}`;
   counts.emails = await prisma.$executeRaw`DELETE FROM email_logs WHERE "workspaceId" IS NULL AND "createdAt" < ${cutoff(now, p.emailDays)}`;
   return counts;
 }
@@ -118,7 +118,7 @@ export async function getRetentionStatus(actor: RetentionActor, now = new Date()
     prisma.$queryRaw<Array<{ count: bigint }>>`SELECT COUNT(*)::bigint AS count FROM link_clicks WHERE "shortLinkId" IN (SELECT id FROM short_links WHERE "workspaceId" = ${actor.workspaceId}) AND "createdAt" < ${cutoff(now, p.clickDays)}`.then(rows => Number(rows[0]?.count ?? 0)),
     prisma.$queryRaw<Array<{ count: bigint }>>`SELECT COUNT(*)::bigint AS count FROM ai_generations WHERE "workspaceId" = ${actor.workspaceId} AND "createdAt" < ${cutoff(now, p.aiDays)}`.then(rows => Number(rows[0]?.count ?? 0)),
     prisma.$queryRaw<Array<{ count: bigint }>>`SELECT COUNT(*)::bigint AS count FROM report_runs WHERE "workspaceId" = ${actor.workspaceId} AND "finishedAt" IS NOT NULL AND "startedAt" < ${cutoff(now, p.analyticsDays)}`.then(rows => Number(rows[0]?.count ?? 0)),
-    prisma.$queryRaw<Array<{ startedAt: Date; summary: string | null; outcome: string }>>`SELECT "startedAt", summary, outcome FROM rebuild_sync_runs WHERE job = 'retention' ORDER BY "startedAt" DESC LIMIT 1`.then(rows => rows[0] ?? null),
+    prisma.$queryRaw<Array<{ startedAt: Date; summary: string | null; outcome: string }>>`SELECT "startedAt", summary, outcome FROM sync_runs WHERE job = 'retention' ORDER BY "startedAt" DESC LIMIT 1`.then(rows => rows[0] ?? null),
   ]);
   return { policy: p, pending: { activity, emails, clicks, ai, errors: 0, syncRuns: 0, reports }, lastRun: last ? { startedAt: last.startedAt.toISOString(), summary: last.summary, outcome: last.outcome } : null };
 }

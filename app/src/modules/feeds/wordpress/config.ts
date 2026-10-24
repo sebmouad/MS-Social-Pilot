@@ -6,7 +6,7 @@ import { entry } from '@/lib/config/entry';
  * keeps scheduled posts filled). Per-workspace sources start from these defaults and may override them.
  */
 export const WORDPRESS_DEFAULTS = {
-  enabled: false, tablePrefix: 'wp_', siteUrl: '', uploadsPath: '/wp-content/uploads', permalinkTemplate: '{siteUrl}/{slug}/',
+  enabled: true, tablePrefix: 'wp_', siteUrl: '', uploadsPath: '/wp-content/uploads', permalinkTemplate: '{siteUrl}/{slug}/',
   dbConnectTimeoutMs: 5000, dbQueryTimeoutMs: 15000, dbPoolSize: 2, candidateBatchSize: 200, candidateMaxScan: 5000,
   postType: 'post', postStatus: 'publish', captionMetaKey: '_msrwa_facebook_caption', imageMetaKey: '_msrwa_facebook_generated',
   recipeMetaKey: '_msrwa_recipe', skipMetaKey: 'fb_shared_at', attachedFileMetaKey: '_wp_attached_file', skipShared: true, order: 'newest', maxAgeDays: 0,
@@ -51,8 +51,8 @@ const metaKey = z.string().regex(META_KEY);
 const P = 'feeds.wordpress.';
 
 export const WORDPRESS_CONFIG = [
-  entry({ key: `${P}databaseUrl`, group: G, label: 'WordPress database address', kind: 'secret', description: 'mysql://user:password@host:3306/database for a read-only account (SELECT on the posts and post-meta tables only). Encrypted at rest; never returned. The application never writes to WordPress.', defaultValue: '', schema: z.string().max(2048).refine(v => v === '' || /^mysql:\/\//.test(v), 'Use a mysql:// address.'), consumption: 'active' }),
-  flag(`${P}enabled`, 'Plan recipes from WordPress', 'Master switch. When on, the background worker keeps enabled recipe sources filled with scheduled posts. Each workspace source also has its own switch.', WORDPRESS_DEFAULTS.enabled),
+  entry({ key: `${P}databaseUrl`, group: G, label: 'WordPress REST API credential (optional)', kind: 'secret', description: 'Optional WordPress Application Password (username:xxxx xxxx) or Bearer token for authenticated /wp-json/wp/v2/ requests. Leave empty for public WordPress REST API sites.', defaultValue: '', schema: z.string().max(2048), consumption: 'active' }),
+  flag(`${P}enabled`, 'Plan recipes from WordPress', 'Master switch. When on, the background worker keeps enabled recipe sources filled with scheduled posts via the WordPress REST API.', WORDPRESS_DEFAULTS.enabled),
   text(`${P}tablePrefix`, 'WordPress table prefix', 'Prefix of the WordPress tables (letters, digits and underscore).', WORDPRESS_DEFAULTS.tablePrefix, z.string().regex(/^[A-Za-z0-9_]{0,32}$/)),
   text(`${P}siteUrl`, 'WordPress site address', 'Default site address (https) for new recipe sources; permalinks and image addresses are built from it.', WORDPRESS_DEFAULTS.siteUrl, sitePattern),
   text(`${P}uploadsPath`, 'WordPress uploads path', 'Path under the site address where attachments are served.', WORDPRESS_DEFAULTS.uploadsPath, z.string().regex(/^\/[A-Za-z0-9_./-]{0,200}$/)),

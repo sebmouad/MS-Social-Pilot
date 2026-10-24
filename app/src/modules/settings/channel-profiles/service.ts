@@ -43,7 +43,7 @@ export async function readChannelProfiles(actor: ProfileActor, feature: ProfileF
     if (groups.length > limits.maxGroups) throw new OperationError('unavailable', 'The group directory exceeds its configured limit.');
     const ids = available.map(channel => channel.id);
     const members = ids.length ? await prisma.$queryRaw<Array<{ groupId: string; targetId: string }>>`SELECT p."groupId", p."targetId" FROM page_group_targets p JOIN page_groups g ON g.id = p."groupId" WHERE g."workspaceId" = ${actor.workspaceId} AND p."targetId" = ANY(${ids}::text[])` : [];
-    const labels = ids.length ? await prisma.$queryRaw<Array<{ targetId: string; labels: string[] }>>`SELECT p."targetId", p.labels FROM rebuild_channel_profiles p JOIN targets t ON t.id = p."targetId" WHERE t."workspaceId" = ${actor.workspaceId} AND p."targetId" = ANY(${ids}::text[])` : [];
+    const labels = ids.length ? await prisma.$queryRaw<Array<{ targetId: string; labels: string[] }>>`SELECT p."targetId", p.labels FROM channel_profiles p JOIN targets t ON t.id = p."targetId" WHERE t."workspaceId" = ${actor.workspaceId} AND p."targetId" = ANY(${ids}::text[])` : [];
     return { channels: available.map(channel => ({ ...channel, labels: labels.find(row => row.targetId === channel.id)?.labels ?? [] })), groups: scopedGroups(groups.map(group => ({ ...group, channelIds: members.filter(row => row.groupId === group.id).map(row => row.targetId) })), ids) };
   });
 }
@@ -79,7 +79,7 @@ export async function changeChannelProfiles(actor: ProfileActor, input: unknown)
       if (value.action === 'setLabels') {
         if (!ids.includes(value.channelId)) throw denied();
         const labels = [...new Set(value.labels)];
-        await tx.$executeRaw`INSERT INTO rebuild_channel_profiles ("targetId", labels) VALUES (${value.channelId}, ${labels}::text[]) ON CONFLICT ("targetId") DO UPDATE SET labels = EXCLUDED.labels`;
+        await tx.$executeRaw`INSERT INTO channel_profiles ("targetId", labels) VALUES (${value.channelId}, ${labels}::text[]) ON CONFLICT ("targetId") DO UPDATE SET labels = EXCLUDED.labels`;
       } else {
         if (previous.some(row => !ids.includes(row.targetId))) throw new OperationError('conflict', 'This group includes unavailable channels. Restore channel selection before editing or deleting it.');
         if (value.action === 'deleteGroup') {

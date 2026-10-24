@@ -234,10 +234,21 @@ const emptySummary = (reason?: RecipePlanSummary['reason']): RecipePlanSummary =
 const totals = (summary: RecipePlanSummary, o: SourceOutcome) => { summary.outcomes.push(o); summary.planned += o.planned; summary.failed += o.failed; summary.uncertain += o.uncertain; summary.unfilled += o.unfilled; };
 export const recipeSummaryRecord = (o: SourceOutcome, at: Date): Record<string, unknown> => ({ at: at.toISOString(), planned: o.planned, failed: o.failed, uncertain: o.uncertain, unfilled: o.unfilled, slots: o.slots, pages: o.pages, excludedPages: o.excludedPages, scanned: o.scanned, ...(o.reason ? { reason: o.reason } : {}) });
 
-export async function openDatabase(ports: PlannerPorts, settings: WordpressSettings): Promise<WpDb | null> {
-  const url = await ports.databaseUrl().catch(() => null);
-  if (!url) return null;
-  try { return await ports.openDb({ url, tablePrefix: settings.tablePrefix, connectTimeoutMs: settings.db.connectTimeoutMs, queryTimeoutMs: settings.db.queryTimeoutMs, poolSize: settings.db.poolSize }); } catch { return null; }
+export async function openDatabase(ports: PlannerPorts, settings: WordpressSettings, siteUrlOverride?: string): Promise<WpDb | null> {
+  const siteUrl = (siteUrlOverride || settings.siteUrl || '').trim();
+  if (!siteUrl) return null;
+  const apiToken = await ports.databaseUrl().catch(() => null);
+  try {
+    return await ports.openDb({
+      siteUrl,
+      apiToken,
+      uploadsPath: settings.uploadsPath,
+      connectTimeoutMs: settings.db.connectTimeoutMs,
+      queryTimeoutMs: settings.db.queryTimeoutMs,
+    });
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -253,31 +264,31 @@ export async function runRecipePlanning(overrides: Partial<PlannerPorts> = {}, l
   const sources = await ports.store.enabledSources(settings.maxSourcesPerRun);
   const summary = emptySummary(); summary.sources = sources.length;
   if (!sources.length) return summary;
-  const db = await openDatabase(ports, settings);
   const now = ports.now();
-  if (!db) {
-    for (const source of sources) await ports.store.recordRun(source.workspaceId, source.id, { at: now, error: 'The recipe library could not be reached.', summary: { at: now.toISOString(), reason: 'database_unavailable' } }).catch(() => undefined);
-    return { ...summary, reason: 'database_unavailable' };
-  }
   const budget = { left: settings.runBudget };
-  try {
-    for (const source of sources) {
-      if (budget.left <= 0) break;
-      try {
-        const auth = await ports.qualify(source.workspaceId);
-        if (!auth) {
-          await ports.store.recordRun(source.workspaceId, source.id, { at: now, error: 'No active owner is allowed to plan posts for this workspace.', summary: { at: now.toISOString(), reason: 'no_qualifying_owner' } });
-          totals(summary, { sourceId: source.id, planned: 0, failed: 0, uncertain: 0, unfilled: 0, slots: 0, pages: 0, excludedPages: 0, scanned: 0, reason: 'no_qualifying_owner' });
-          continue;
-        }
-        const outcome = await planSource({ settings, ports, db, budget, now }, source, auth);
-        totals(summary, outcome);
-        await ports.store.recordRun(source.workspaceId, source.id, { at: now, error: outcome.reason && !['complete', 'budget'].includes(outcome.reason) ? `Planning stopped: ${outcome.reason}` : null, summary: recipeSummaryRecord(outcome, now) });
-      } catch {
-        totals(summary, { sourceId: source.id, planned: 0, failed: 1, uncertain: 0, unfilled: 0, slots: 0, pages: 0, excludedPages: 0, scanned: 0, reason: 'error' });
-        await ports.store.recordRun(source.workspaceId, source.id, { at: now, error: 'Planning could not be completed.', summary: { at: now.toISOString(), reason: 'error' } }).catch(() => undefined);
-      }
+  for (const source of sources) {
+    if (budget.left <= 0) break;
+    const db = await openDatabase(ports, settings, source.siteUrl);
+    if (!db) {
+      await ports.store.recordRun(source.workspaceId, source.id, { at: now, error: 'The recipe library could not be reached.', summary: { at: now.toISOString(), reason: 'database_unavailable' } }).catch(() => undefined);
+      continue;
     }
-  } finally { await db.close(); }
+    try {
+      const auth = await ports.qualify(source.workspaceId);
+      if (!auth) {
+        await ports.store.recordRun(source.workspaceId, source.id, { at: now, error: 'No active owner is allowed to plan posts for this workspace.', summary: { at: now.toISOString(), reason: 'no_qualifying_owner' } });
+        totals(summary, { sourceId: source.id, planned: 0, failed: 0, uncertain: 0, unfilled: 0, slots: 0, pages: 0, excludedPages: 0, scanned: 0, reason: 'no_qualifying_owner' });
+        continue;
+      }
+      const outcome = await planSource({ settings, ports, db, budget, now }, source, auth);
+      totals(summary, outcome);
+      await ports.store.recordRun(source.workspaceId, source.id, { at: now, error: outcome.reason && !['complete', 'budget'].includes(outcome.reason) ? `Planning stopped: ${outcome.reason}` : null, summary: recipeSummaryRecord(outcome, now) });
+    } catch {
+      totals(summary, { sourceId: source.id, planned: 0, failed: 1, uncertain: 0, unfilled: 0, slots: 0, pages: 0, excludedPages: 0, scanned: 0, reason: 'error' });
+      await ports.store.recordRun(source.workspaceId, source.id, { at: now, error: 'Planning could not be completed.', summary: { at: now.toISOString(), reason: 'error' } }).catch(() => undefined);
+    } finally {
+      await db.close();
+    }
+  }
   return summary;
 }

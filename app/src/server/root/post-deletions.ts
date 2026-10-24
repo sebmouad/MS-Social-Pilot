@@ -41,7 +41,7 @@ export async function listRootPostDeletions(userId: string, cap?: number) {
     SELECT d.id, d."workspaceId", d."targetId", d.provider, d."remoteId",
       d."localPostIds", d."localPostTargetIds", d.state, d."createdAt", d."updatedAt",
       d."remoteConfirmedAt", d."completedAt", w.name AS "workspaceName", t.name AS "targetName"
-    FROM rebuild_post_deletions d
+    FROM post_deletions d
     LEFT JOIN workspaces w ON w.id = d."workspaceId"
     LEFT JOIN targets t ON t.id = d."targetId" AND t."workspaceId" = d."workspaceId"
     ORDER BY d."updatedAt" DESC, d.id DESC LIMIT ${Math.min(limit, cap ?? limit)}
@@ -66,7 +66,7 @@ export async function recordRootPostDeletionOutcome(userId: string, input: unkno
     throw new OperationError('invalid_request', 'Verify the current platform result and enter its exact confirmation.');
   }
   const found = await prisma.$queryRaw<Array<{ id: string; workspaceId: string; targetId: string; state: string }>>`
-    SELECT id, "workspaceId", "targetId", state FROM rebuild_post_deletions WHERE id = ${parsed.data.operationId}
+    SELECT id, "workspaceId", "targetId", state FROM post_deletions WHERE id = ${parsed.data.operationId}
   `;
   const initial = found[0];
   if (!initial) throw new OperationError('not_found', 'This deletion operation is unavailable.');

@@ -90,7 +90,7 @@ const INDIRECT_WORKSPACE_TABLES = [
   { table: 'notification_mutes', where: ownedBy('targetId', 'targets') },
   { table: 'page_group_targets', where: `(${ownedBy('groupId', 'page_groups')} OR ${ownedBy('targetId', 'targets')})` },
   { table: 'page_reviews', where: ownedBy('targetId', 'targets') },
-  { table: 'rebuild_channel_profiles', where: ownedBy('targetId', 'targets') },
+  { table: 'channel_profiles', where: ownedBy('targetId', 'targets') },
   { table: 'page_videos', where: ownedBy('targetId', 'targets') },
   { table: 'post_field_values', where: `(${ownedBy('postId', 'posts')} OR ${ownedBy('fieldId', 'custom_fields')})` },
   { table: 'post_labels', where: `(${ownedBy('postId', 'posts')} OR ${ownedBy('labelId', 'labels')})` },

@@ -15,7 +15,6 @@
     "@simplewebauthn/server": "^13.3.3",
     "@tabler/icons-react": "3.49.0",
     "echarts": "6.1.0",
-    "mysql2": "3.24.5",
     "next": "15.5.23",
     "nodemailer": "^6.10.1",
     "react": "19.0.0",

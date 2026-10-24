@@ -38,7 +38,7 @@ async function candidate(database: Pick<Prisma.TransactionClient, '$queryRaw'>, 
     a.provider AS "parentProvider", a.state AS "parentState",
     a."remotePostId" AS "parentRemoteId", a."postId" AS "parentPostId", a."postTargetId" AS "parentPostTargetId",
     a."targetId" AS "parentTargetId", a."actorId" AS "parentActorId"
-    FROM rebuild_facebook_native_journal j JOIN rebuild_publication_attempts a
+    FROM facebook_native_journal j JOIN publication_attempts a
       ON a.id=j."operationId" AND a."workspaceId"=j."workspaceId"
     WHERE j."operationId"=${operationId} LIMIT 1`;
   if (!rows[0]) throw failure('not_found', 'This native Facebook publication is unavailable.');
@@ -54,10 +54,10 @@ function bindingValid(row: Candidate) {
 }
 
 async function lockCandidate(tx: Prisma.TransactionClient, original: Candidate) {
-  const parents = await tx.$queryRaw<Array<{ id: string }>>`SELECT id FROM rebuild_publication_attempts
+  const parents = await tx.$queryRaw<Array<{ id: string }>>`SELECT id FROM publication_attempts
     WHERE id=${original.operationId} AND "workspaceId"=${original.workspaceId} FOR UPDATE`;
   if (parents.length !== 1) throw changed();
-  await tx.$queryRaw`SELECT "operationId" FROM rebuild_facebook_native_journal
+  await tx.$queryRaw`SELECT "operationId" FROM facebook_native_journal
     WHERE "operationId"=${original.operationId} AND "workspaceId"=${original.workspaceId} FOR UPDATE`;
   const row = await candidate(tx, original.operationId);
   for (const key of ['workspaceId','operationId','postId','postTargetId','targetId','actorId','remoteTargetId','sourceFormatId','format','payloadHash','remoteId'] as const) {
@@ -99,12 +99,12 @@ export async function refreshFacebookNativeStatus(userId: string, input: Platfor
       bindingValid(row);
       if (!facebookNativeStatusEligible(row) || row.revision !== initial.revision) throw changed();
       if (row.parentState === 'started') {
-        const count = await tx.$executeRaw`UPDATE rebuild_publication_attempts SET state='uncertain',reason='outcome_unknown',"updatedAt"=clock_timestamp()
+        const count = await tx.$executeRaw`UPDATE publication_attempts SET state='uncertain',reason='outcome_unknown',"updatedAt"=clock_timestamp()
           WHERE id=${row.operationId} AND "workspaceId"=${row.workspaceId} AND state='started'`;
         if (count !== 1) throw changed();
       }
       // Invalidate the creator revision before reading. This never grants a new phase.
-      const count = await tx.$executeRaw`UPDATE rebuild_facebook_native_journal SET state='uncertain',revision=revision+1,"updatedAt"=clock_timestamp()
+      const count = await tx.$executeRaw`UPDATE facebook_native_journal SET state='uncertain',revision=revision+1,"updatedAt"=clock_timestamp()
         WHERE "operationId"=${row.operationId} AND "workspaceId"=${row.workspaceId} AND revision=${row.revision}`;
       if (count !== 1) throw changed();
       await tx.$executeRaw`INSERT INTO root_activities (id,"actorId",action,detail,"createdAt") VALUES
@@ -133,7 +133,7 @@ export async function refreshFacebookNativeStatus(userId: string, input: Platfor
       const accept = currentAuthority && !signal.aborted && parentValid && row.revision === frozen.revision &&
         facebookNativeStatusEligible(row) && proof.outcome === 'published';
       if (accept) {
-        const count = await tx.$executeRaw`UPDATE rebuild_facebook_native_journal SET state='confirmed',revision=revision+1,"updatedAt"=clock_timestamp()
+        const count = await tx.$executeRaw`UPDATE facebook_native_journal SET state='confirmed',revision=revision+1,"updatedAt"=clock_timestamp()
           WHERE "operationId"=${row.operationId} AND "workspaceId"=${row.workspaceId} AND revision=${frozen.revision} AND NOT conflicted`;
         if (count !== 1) throw changed();
       }
@@ -150,7 +150,7 @@ export async function refreshFacebookNativeStatus(userId: string, input: Platfor
 }
 
 async function appendProof(tx: Prisma.TransactionClient, actorId: string, row: Candidate, proof: FacebookNativeReadProof, id: string, accepted: boolean) {
-  await tx.$executeRaw`INSERT INTO rebuild_facebook_native_status_proofs
+  await tx.$executeRaw`INSERT INTO facebook_native_status_proofs
     (id,"workspaceId","operationId","observedRevision","appliedRevision","payloadHash",format,"remoteTargetId","remoteId","actorId",outcome,detail,"observedAt",accepted)
     VALUES (${id},${row.workspaceId},${row.operationId},${row.revision},${accepted ? row.revision + 1 : null},${row.payloadHash},${row.format},
       ${row.remoteTargetId},${row.remoteId},${actorId},${proof.outcome},${proof.detail},${proof.observedAt},${accepted})`;

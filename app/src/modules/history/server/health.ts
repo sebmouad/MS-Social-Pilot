@@ -1,6 +1,6 @@
 import { prisma } from '@/server/data';
 import { runtimeConfigBatch } from '@/server/config/store';
-import { REBUILD_WORKER_PREFIX } from '@/server/jobs/identity';
+import { WORKER_PREFIX } from '@/server/jobs/identity';
 import { CONFIG_BY_KEY } from '@/lib/config/registry';
 
 export type WorkerState = 'ok' | 'stale' | 'never' | 'unknown';
@@ -29,7 +29,7 @@ export async function readSystemHealth(now = Date.now()): Promise<SystemHealth> 
   clearTimeout(timer);
   if (!database) return { database, worker: { status: 'unknown', lastBeatSeconds: null } };
   try {
-    const rows = await prisma.$queryRaw<Array<{ seenAt: Date }>>`SELECT "seenAt" FROM worker_heartbeats WHERE LEFT("workerId", ${REBUILD_WORKER_PREFIX.length}::int) = ${REBUILD_WORKER_PREFIX} ORDER BY "seenAt" DESC LIMIT 1`;
+    const rows = await prisma.$queryRaw<Array<{ seenAt: Date }>>`SELECT "seenAt" FROM worker_heartbeats WHERE LEFT("workerId", ${WORKER_PREFIX.length}::int) = ${WORKER_PREFIX} ORDER BY "seenAt" DESC LIMIT 1`;
     const seen = rows[0]?.seenAt;
     if (!seen) return { database, worker: { status: 'never', lastBeatSeconds: null } };
     const seconds = Math.max(0, Math.round((now - seen.getTime()) / 1000));
