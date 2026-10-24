@@ -92,6 +92,14 @@ typechecked (`npm run typecheck` 0 errors), and verified across Vitest suites
     country, and locale codes; sortable column headers (`aria-sort`) on
     `PostsTable`; formatted `00:00`…`24:00` hour `<Select>` controls for
     Workspace working hours and full-width `.cards` alignment.
+  - **Ads › Campaigns, Reports & Media Library** (`CampaignAccountSwitcher.tsx`,
+    `CampaignsScreen.tsx`, `ReportsManager.tsx`, `AlertsManager.tsx`,
+    `MediaLibrary.tsx`, `media.module.css`): added a `role="tablist"` account
+    switcher for multi-account campaign results; consolidated `/insights/reports`
+    page-1 empty states into one onboarding panel + one Metric alerts panel with
+    disclaimers tucked into `InfoTip` (`ⓘ`); removed inline grid-tile `Delete`
+    in Media Library (keeping `Delete` in the `Details` side panel) and upgraded
+    the Library pager to button-styled `Previous` / `Page N` / `Next` controls.
 - **Next**: rerun `scripts/dev/ui-audit.mjs` against the preview server and
   deploy when in an authorized live lane.
 

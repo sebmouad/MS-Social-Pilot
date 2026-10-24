@@ -89,7 +89,7 @@ export function AlertsManager({ rules, firings, canManage, channels, locale = 'e
     <section className={reportStyles.panel} aria-labelledby="alert-h">
       <div className={reportStyles.panelHeading}>
         <div><h2 id="alert-h"><IconBellRinging aria-hidden="true" /> {t.title}</h2><p>{t.description}</p></div>
-        {canManage && <Button variant="primary" disabled={!channels.length} onClick={() => channels.length && openRule()}>{t.newRule}</Button>}
+        {canManage && <Button variant="secondary" disabled={!channels.length} onClick={() => channels.length && openRule()}>{t.newRule}</Button>}
       </div>
       {rules.length ? <DataTable caption={t.title} rows={rules} rowKey={row => row.id} columns={[
         { key: 'rule', label: t.rule, render: row => <><strong>{row.name}</strong><span className={reportStyles.secondaryLine}>{row.channelName ?? row.channelId}{row.channelAvailable ? '' : ' · ⚠'}</span></> },
@@ -99,14 +99,14 @@ export function AlertsManager({ rules, firings, canManage, channels, locale = 'e
       ]} /> : <div className={reportStyles.emptyState}><h3>{t.noRulesTitle}</h3><p>{canManage ? t.noRulesBody : t.noRulesReadOnly}</p></div>}
     </section>
 
-    <section className={reportStyles.panel} aria-labelledby="alert-firings-h">
+    {(rules.length > 0 || firings.length > 0) && <section className={reportStyles.panel} aria-labelledby="alert-firings-h">
       <div className={reportStyles.panelHeading}><div><h2 id="alert-firings-h">{t.firingsTitle}</h2></div></div>
       {firings.length ? <DataTable caption={t.firingsTitle} rows={firings} rowKey={row => row.id} columns={[
         { key: 'rule', label: t.rule, render: row => <><strong>{row.ruleName}</strong><span className={reportStyles.secondaryLine}>{row.channelName ?? ''}</span></> },
         { key: 'condition', label: t.condition, render: row => <>{metricLabel(row.metric)} {row.operator === 'above' ? t.above : t.below} {row.threshold.toLocaleString(locale)}<span className={reportStyles.secondaryLine}>{t.actual}: {row.actual.toLocaleString(locale)}</span></> },
         { key: 'state', label: t.state, render: row => <><Badge tone={row.resolvedAt ? 'neutral' : 'warning'}>{row.resolvedAt ? t.resolved : t.firing}</Badge><span className={reportStyles.secondaryLine}>{row.firedLabel}</span></> },
       ]} /> : <div className={reportStyles.emptyState}><h3>{t.firingsTitle}</h3><p>{t.firingsEmpty}</p></div>}
-    </section>
+    </section>}
 
     <Dialog closeLabel={t.cancel} open={form === 'rule'} title={editing ? t.edit : t.newRule} description={t.description} busy={busy} onClose={() => !busy && setForm(null)} actions={<><Button data-dialog-cancel variant="secondary" disabled={busy} onClick={() => setForm(null)}>{t.cancel}</Button><Button type="submit" form="alert-form" variant="primary" disabled={busy}>{busy ? t.saving : t.save}</Button></>}>
       {dialogError && <RouteNotice error className="ui-error" focusKey={`alert-error:${dialogError}`}>{dialogError}</RouteNotice>}

@@ -10,6 +10,7 @@ import { IconAd, IconSpeakerphone } from '@tabler/icons-react';
 import { adsHeaderFor } from '../AdsTabsFor';
 import { AdsReportPager } from '../AdsReportPager';
 import { AdsReportExport } from '../AdsReportExport';
+import { CampaignAccountSwitcher } from './CampaignAccountSwitcher';
 import { CampaignCharts } from './CampaignCharts';
 import { HierarchyTable } from './HierarchyTable';
 import { headers } from 'next/headers';
@@ -96,15 +97,22 @@ async function CampaignsPage({ searchParams }: { searchParams: Promise<AdsSearch
   return <PageFrame module="ads"><div className="insights">
     {header}
     {!accounts.length ? <section className="panel"><EmptyState icon={<IconAd />} title={t('text003')} action={<a className="text-link" href="/settings/channels">{t('text004')}</a>}>{t('text043')}</EmptyState></section> : <>
-    {objectPage.resultCount ? [...byAccount].map(([accountId, rows]) => {
+    {objectPage.resultCount ? <CampaignAccountSwitcher label={t('text009')} items={[...byAccount].map(([accountId, rows]) => {
       const account = accounts.find(item => item.id === accountId);
+      const accountLabel = rows[0]?.accountName ?? account?.name ?? t('text044');
+      const accountMeta = [account?.actId, account?.currency].filter(Boolean).join(' · ');
       const levels = [
         { value: 'campaign', label: t('text057') }, { value: 'adset', label: t('text058') }, { value: 'ad', label: t('text059') },
       ];
-      return <section className="panel ads-results-panel" key={accountId}>
-        <div className="analytics-panel-title"><div><div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}><h2>{rows[0]?.accountName ?? account?.name ?? t('text044')}</h2><InfoTip name={rows[0]?.accountName ?? account?.name ?? t('text044')} blocks={[{ text: t('hierarchyNote') }, { text: t('text054') }]} /></div><p className="small-note">{account?.actId}{account?.currency ? ` · ${account.currency}` : ''}</p></div><span className="badge">{rows.length} {t('text045')}</span></div>
-        <CampaignCharts accountName={rows[0]?.accountName ?? account?.name ?? t('text044')} rows={rows} locale={locale} />
-        {reconnectAccounts.has(accountId) ? <p className="small-note" role="note">{t('needsReconnectAccount', { account: rows[0]?.accountName ?? account?.name ?? t('text044') })} <a href="/settings/channels">{t('needsReconnectAction')}</a></p> : null}
+      return {
+        id: accountId,
+        name: accountLabel,
+        meta: accountMeta || undefined,
+        badge: `${rows.length} ${t('text045')}`,
+        content: <section className="panel ads-results-panel" key={accountId}>
+        <div className="analytics-panel-title"><div><div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}><h2>{accountLabel}</h2><InfoTip name={accountLabel} blocks={[{ text: t('hierarchyNote') }, { text: t('text054') }]} /></div><p className="small-note">{accountMeta}</p></div><span className="badge">{rows.length} {t('text045')}</span></div>
+        <CampaignCharts accountName={accountLabel} rows={rows} locale={locale} />
+        {reconnectAccounts.has(accountId) ? <p className="small-note" role="note">{t('needsReconnectAccount', { account: accountLabel })} <a href="/settings/channels">{t('needsReconnectAction')}</a></p> : null}
         {levels.map(level => {
           const resolveParent = parentResolvers.get(accountId);
           const known = summaries.filter(row => row.accountId === accountId);
@@ -136,8 +144,9 @@ async function CampaignsPage({ searchParams }: { searchParams: Promise<AdsSearch
         {adCreateAvailability.get(accountId) && rows.some(row => row.level === 'adset') ? <div className="ads-result-level"><h3>{t('adCreateAction')}</h3><p className="small-note">{t('adCreateDescription')}</p>
           {rows.filter(row => row.level === 'adset').map(row => <AdCreateForm key={row.id} adAccountId={accountId} adSetId={row.id} adSetName={row.name} nameMaxCharacters={nameMaxByAccount.get(accountId) ?? 100} />)}
         </div> : null}
-      </section>;
-    }) : <section className="panel"><EmptyState icon={<IconSpeakerphone />} title={t('text049')} action={<a className="text-link" href="/ads">{t('text050')}</a>}>{t('text051')}</EmptyState></section>}
+      </section>,
+      };
+    })} /> : <section className="panel"><EmptyState icon={<IconSpeakerphone />} title={t('text049')} action={<a className="text-link" href="/ads">{t('text050')}</a>}>{t('text051')}</EmptyState></section>}
     {accounts.filter(account => !filters.accountId || account.id === filters.accountId).some(account => createAvailability.get(account.id) && adsUi.get(account.id)?.campaign) ? <section className="panel"><h2>{t('text052')}</h2><p className="small-note">{t('text053')}</p>
       {accounts.filter(account => !filters.accountId || account.id === filters.accountId).filter(account => createAvailability.get(account.id) && adsUi.get(account.id)?.campaign).map(account => <CampaignCreateForm key={account.id} adAccountId={account.id} accountName={account.name} config={adsUi.get(account.id)!.campaign!} ownerScope={{ userId: viewer.user.id, workspaceId }} />)}
     </section> : null}

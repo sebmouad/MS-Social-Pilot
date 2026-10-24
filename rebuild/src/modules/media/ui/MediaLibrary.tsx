@@ -142,11 +142,15 @@ export function MediaLibrary({ items, usage, page, hasMore, filters, canWrite, w
         </div>
         <div className={styles.tileActions}>
           <Button size="sm" variant="secondary" onClick={() => setDetailId(a.id)}>{t('details')}</Button>
-          {canWrite && workspaceWide && <><Button size="sm" disabled={busy} onClick={() => { setNotice(null); setConfirmation(''); setRenameName(a.name); setRenaming(a); }}>{t('rename')}</Button><Button size="sm" variant="danger" disabled={busy} aria-label={`${t('delete')} ${a.name}`} onClick={() => { setNotice(null); setConfirmation(''); setForce(false); setRemoving(a); }}>{t('delete')}</Button></>}
+          {canWrite && workspaceWide && <Button size="sm" disabled={busy} onClick={() => { setNotice(null); setConfirmation(''); setRenameName(a.name); setRenaming(a); }}>{t('rename')}</Button>}
         </div>
       </li>)}
     </ul> : <p className={styles.empty}>{filtered ? t('noMatch') : t('empty')}</p>}
-    <nav className={styles.pagination} aria-label={t('pages')}>{page > 1 && <a href={query(page - 1)}>{t('previous')}</a>}<span>{t('page', { page })}</span>{hasMore && <a href={query(page + 1)}>{t('next')}</a>}</nav>
+    <nav className={styles.pagination} aria-label={t('pages')}>
+      {page > 1 ? <a className="ui-button ui-button--secondary ui-button--sm" rel="prev" href={query(page - 1)}>{t('previous')}</a> : <span className="ui-button ui-button--secondary ui-button--sm" aria-disabled="true">{t('previous')}</span>}
+      <span aria-current="page">{t('page', { page })}</span>
+      {hasMore ? <a className="ui-button ui-button--secondary ui-button--sm" rel="next" href={query(page + 1)}>{t('next')}</a> : <span className="ui-button ui-button--secondary ui-button--sm" aria-disabled="true">{t('next')}</span>}
+    </nav>
     {canWrite && !workspaceWide && <p className={styles.help}>{t('deleteNeedsAll')}</p>}
 
     {detail ? <SidePanel open title={detail.name} closeLabel={t('close')} onClose={() => setDetailId(null)}

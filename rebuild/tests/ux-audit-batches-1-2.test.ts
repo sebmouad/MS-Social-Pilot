@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { AppShell } from '../src/components/AppShell';
 import { ChannelScopeList } from '../src/components/ChannelScopeList';
 import { CsvExportButton } from '../src/components/CsvExportButton';
+import { CampaignAccountSwitcher } from '../src/modules/ads/ui/campaigns/CampaignAccountSwitcher';
 import { formatAudienceLabel } from '../src/modules/analytics/ui/demographics/AudienceCharts';
 import { PostsTable } from '../src/modules/analytics/ui/posts/PostsTable';
 import { uiCopy } from '../src/modules/agency/ui/copy';
@@ -167,5 +168,29 @@ describe('UX Audit 2026-10-24 — Batch 1 & Batch 2 regressions', () => {
       }),
     );
     expect(html).toContain('aria-sort="descending"');
+  });
+
+  it('renders a tablist account switcher in CampaignAccountSwitcher when multiple accounts are present', () => {
+    const singleHtml = renderToStaticMarkup(
+      createElement(CampaignAccountSwitcher, {
+        label: 'Ad account',
+        items: [{ id: 'a1', name: 'Europe', badge: '2 objects', content: createElement('div', null, 'Europe panel') }],
+      }),
+    );
+    expect(singleHtml).not.toContain('role="tablist"');
+    expect(singleHtml).toContain('Europe panel');
+
+    const multiHtml = renderToStaticMarkup(
+      createElement(CampaignAccountSwitcher, {
+        label: 'Ad account',
+        items: [
+          { id: 'a1', name: 'Europe', meta: 'act_1 · EUR', badge: '2 objects', content: createElement('div', null, 'Europe panel') },
+          { id: 'a2', name: 'North America', meta: 'act_2 · USD', badge: '3 objects', content: createElement('div', null, 'NA panel') },
+        ],
+      }),
+    );
+    expect(multiHtml).toContain('role="tablist"');
+    expect(multiHtml).toContain('Europe panel');
+    expect(multiHtml).not.toContain('NA panel');
   });
 });

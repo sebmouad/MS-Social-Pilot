@@ -13,8 +13,8 @@
 .preview { display: -webkit-box; max-width: 28rem; overflow: hidden; white-space: pre-wrap; overflow-wrap: anywhere; -webkit-box-orient: vertical; -webkit-line-clamp: 3; }
 .actions { display: flex; gap: .4rem; flex-wrap: wrap; }
 .empty, .help, .privacy { color: var(--ink-soft); font-size: .9rem; }
-.pagination { display: flex; justify-content: space-between; align-items: center; gap: .75rem; }
-.pagination a { color: var(--accent); text-decoration: underline; text-underline-offset: .18em; }
+.pagination { display: flex; justify-content: space-between; align-items: center; gap: .75rem; padding-top: var(--space-3); border-top: 1px solid var(--line); }
+.pagination [aria-disabled="true"] { opacity: .55; pointer-events: none; }
 .form { display: grid; gap: .85rem; }
 .form label { display: grid; gap: .35rem; font-size: .85rem; font-weight: 650; }
 .form label span { color: var(--ink-soft); font-weight: 400; }
