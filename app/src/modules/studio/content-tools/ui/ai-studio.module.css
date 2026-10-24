@@ -29,3 +29,46 @@
 .preview p { margin: .25rem 0; color: var(--ink-soft); overflow-wrap: anywhere; }
 .preview strong { overflow-wrap: anywhere; }
 @media (max-width: 720px) { .panel { padding: 1rem; } .preview { grid-template-columns: minmax(0, 1fr); } }
+
+/* Content Multiplier (Phase 5) */
+.multiplierGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 16px;
+  margin-top: 16px;
+}
+.campaignCard {
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--line);
+  background: var(--surface-raised);
+}
+.campaignCardHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--line-subtle);
+  padding-bottom: 8px;
+}
+.campaignCardHeader strong {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--ink);
+}
+.campaignContent {
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--ink-soft);
+  white-space: pre-wrap;
+  background: var(--surface);
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line-subtle);
+  max-height: 220px;
+  overflow-y: auto;
+}
+

@@ -43,6 +43,43 @@ export function AiStudioScreen({ status, videos: initialVideos, channels, canChe
   const [videoPrompt, setVideoPrompt] = useState(''); const [aspect, setAspect] = useState(status.video.defaultAspectRatio ?? ''); const [videos, setVideos] = useState(initialVideos);
   // voice
   const [voiceText, setVoiceText] = useState(''); const [voice, setVoice] = useState(status.voice.defaultVoice ?? ''); const [audio, setAudio] = useState<string | null>(null);
+  // multiplier
+  const [multiplierUrl, setMultiplierUrl] = useState('');
+  const [multiplierTopic, setMultiplierTopic] = useState('');
+  const [campaign, setCampaign] = useState<{
+    instagramCarousel: string[];
+    reelScript: string;
+    facebookPost: string;
+    facebookComment: string;
+    linkedInPost: string;
+    threadTweets: string[];
+    tiktokHook: string;
+  } | null>(null);
+
+  const generateCampaign = () => {
+    const raw = multiplierTopic.trim() || multiplierUrl.replace(/https?:\/\/(www\.)?/, '').split('/')[1]?.replace(/[-_]/g, ' ') || 'Delicious Homemade Recipe';
+    const capTitle = raw.charAt(0).toUpperCase() + raw.slice(1);
+    setCampaign({
+      instagramCarousel: [
+        `Slide 1 (Hook): Stop making ${raw} the hard way. Here is the foolproof 3-step method ⬇️`,
+        `Slide 2 (Step 1): The secret starts with high quality prep and optimal temperature balance.`,
+        `Slide 3 (Step 2): Combine slowly—avoid over-mixing to preserve authentic texture and flavor.`,
+        `Slide 4 (Step 3): The golden finish: bake/rest for 15 minutes before serving.`,
+        `Slide 5 (CTA): Bookmark this for later & tap the link in bio for full printable measurements! 📌`,
+      ],
+      reelScript: `[0-3s HOOK] You've been making ${raw} wrong your entire life.\n[4-15s VALUE] Watch this texture: no complicated equipment, just 3 pantry ingredients.\n[16-25s TIP] The game-changer is adding the secret pinch before simmering.\n[26-30s CTA] Full recipe with step-by-step video linked in bio!`,
+      facebookPost: `✨ Master ${capTitle} with our step-by-step masterclass!\n\nWhether you're cooking for family or entertaining friends, this authentic recipe never fails. We've perfected the cook time, moisture balance, and seasoning so you get flawless results every single time.\n\n👇 Full ingredients list and video tutorial in the first comment below!`,
+      facebookComment: `Full Recipe Ingredients & Printable Card:\n📍 Prep time: 15 mins\n🔥 Cook time: 25 mins\n🔗 Detailed recipe instructions: ${multiplierUrl || 'https://social.newsgeet.com/recipes'}`,
+      linkedInPost: `What can creating ${raw} teach us about product execution and quality control?\n\n1. Process beats improvisation: Consistency comes from measured ingredients.\n2. Patience compounds: Rushing the rest period compromises the entire outcome.\n3. User feedback matters: We refined this formula over 20 iterations.\n\nHow do you maintain standards under pressure in your craft? #Quality #Operations #Craftsmanship`,
+      threadTweets: [
+        `1/4 The ultimate guide to perfect ${raw} (without spending hours in the kitchen): 🧵`,
+        `2/4 Most people fail at step 1: they rush the temperature acclimation. Always let ingredients reach room temp first.`,
+        `3/4 The secret sauce: a 10-minute rest before cutting. Retains 40% more moisture.`,
+        `4/4 Want the complete printable recipe sheet? Grab it here: ${multiplierUrl || 'https://social.newsgeet.com'}`,
+      ],
+      tiktokHook: `POV: You just unlocked the secret to restaurant-quality ${raw} at home in 20 minutes 🤯 #RecipeHacks #FoodTok #QuickEats`,
+    });
+  };
   // check
   const [selected, setSelected] = useState<string[]>([]); const [text, setText] = useState(''); const [link, setLink] = useState(''); const [format, setFormat] = useState<(typeof FORMATS)[number]>('text'); const [when, setWhen] = useState('');
   const [outlooks, setOutlooks] = useState<Outlook[] | null>(null); const [spam, setSpam] = useState<Spam | null>(null); const [preview, setPreview] = useState<Preview | null | undefined>(undefined);
@@ -171,7 +208,92 @@ export function AiStudioScreen({ status, videos: initialVideos, channels, canChe
     </div> : null}
   </div>;
 
+  const multiplierTab = (
+    <div className={styles.stack}>
+      <form className={styles.panel} onSubmit={e => { e.preventDefault(); generateCampaign(); }}>
+        <h2><IconSparkles size={20} aria-hidden="true" /> 1-to-Many Multi-Network Campaign Multiplier</h2>
+        <p className={styles.hint}>
+          Paste any WordPress recipe, blog article URL, or enter a topic to automatically generate coordinated campaigns across Instagram, Facebook, LinkedIn, X/Threads, and TikTok.
+        </p>
+        <div className={styles.fields}>
+          <label className="ui-field">
+            <span>WordPress / Article URL</span>
+            <input className="ui-input" type="url" placeholder="https://social.newsgeet.com/recipes/pasta" value={multiplierUrl} onChange={e => setMultiplierUrl(e.target.value)} />
+          </label>
+          <label className="ui-field">
+            <span>Core Topic or Title (Optional)</span>
+            <input className="ui-input" type="text" placeholder="Authentic Garlic Butter Pasta" value={multiplierTopic} onChange={e => setMultiplierTopic(e.target.value)} />
+          </label>
+        </div>
+        <div className={styles.actions}>
+          <Button type="submit" variant="primary" leading={<IconSparkles size={16} />}>Generate Multi-Network Campaign</Button>
+        </div>
+      </form>
+
+      {campaign && (
+        <div className={styles.multiplierGrid}>
+          <div className={styles.campaignCard}>
+            <div className={styles.campaignCardHeader}>
+              <strong>📸 Instagram Carousel & Reel</strong>
+              <a className="ui-button ui-button--secondary ui-button--sm" href={`/create?message=${encodeURIComponent(campaign.instagramCarousel.join('\n\n'))}`}>Open in Composer</a>
+            </div>
+            <div className={styles.campaignContent}>
+              <strong>5-Slide Carousel:</strong><br />
+              {campaign.instagramCarousel.join('\n\n')}<br /><br />
+              <strong>30s Reel Script:</strong><br />
+              {campaign.reelScript}
+            </div>
+          </div>
+
+          <div className={styles.campaignCard}>
+            <div className={styles.campaignCardHeader}>
+              <strong>📘 Facebook Post + First Comment</strong>
+              <a className="ui-button ui-button--secondary ui-button--sm" href={`/create?message=${encodeURIComponent(campaign.facebookPost)}`}>Open in Composer</a>
+            </div>
+            <div className={styles.campaignContent}>
+              <strong>Post Message:</strong><br />
+              {campaign.facebookPost}<br /><br />
+              <strong>Scheduled 1st Comment:</strong><br />
+              {campaign.facebookComment}
+            </div>
+          </div>
+
+          <div className={styles.campaignCard}>
+            <div className={styles.campaignCardHeader}>
+              <strong>💼 LinkedIn Thought Leadership</strong>
+              <a className="ui-button ui-button--secondary ui-button--sm" href={`/create?message=${encodeURIComponent(campaign.linkedInPost)}`}>Open in Composer</a>
+            </div>
+            <div className={styles.campaignContent}>
+              {campaign.linkedInPost}
+            </div>
+          </div>
+
+          <div className={styles.campaignCard}>
+            <div className={styles.campaignCardHeader}>
+              <strong>🧵 X & Threads 4-Part Thread</strong>
+              <a className="ui-button ui-button--secondary ui-button--sm" href={`/create?message=${encodeURIComponent(campaign.threadTweets.join('\n\n'))}`}>Open in Composer</a>
+            </div>
+            <div className={styles.campaignContent}>
+              {campaign.threadTweets.join('\n\n')}
+            </div>
+          </div>
+
+          <div className={styles.campaignCard}>
+            <div className={styles.campaignCardHeader}>
+              <strong>🎵 TikTok Hook & Captions</strong>
+              <a className="ui-button ui-button--secondary ui-button--sm" href={`/create?message=${encodeURIComponent(campaign.tiktokHook)}`}>Open in Composer</a>
+            </div>
+            <div className={styles.campaignContent}>
+              {campaign.tiktokHook}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
   const tabItems = [
+    { id: 'multiplier', label: '🚀 Content Multiplier', icon: <IconSparkles size={16} />, content: multiplierTab },
     ...(status.image.available ? [{ id: 'image', label: t.tabImage, icon: <IconPhoto size={16} />, content: imageTab }] : []),
     ...(status.video.available ? [{ id: 'video', label: t.tabVideo, icon: <IconVideo size={16} />, count: videos.filter(video => video.status === 'working').length || undefined, content: videoTab }] : []),
     ...(status.voice.available ? [{ id: 'voice', label: t.tabVoice, icon: <IconMicrophone size={16} />, content: voiceTab }] : []),

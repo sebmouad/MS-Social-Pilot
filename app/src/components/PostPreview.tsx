@@ -198,6 +198,16 @@ export function PostPreview({ post, authorName, authorAvatarUrl, timeZone, varia
           <p>{post.firstComment}</p>
         </section>
       ) : commentEmptySlot ? <p className={styles.emptyCommentSlot} aria-hidden="true">{rendering!.copy.emptyComment}</p> : null}
+      {post.status === 'published' && (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px', paddingTop: '8px', borderTop: '1px solid var(--line-subtle)' }}>
+          <span style={{ background: '#fef3c7', color: '#b45309', border: '1px solid #f59e0b', fontSize: '11px', fontWeight: 700, padding: '2px 8px', borderRadius: '999px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+            ⚡ 90th %ile Outperformer
+          </span>
+          <a className="ui-button ui-button--secondary ui-button--sm" style={{ height: '26px', fontSize: '11px', padding: '0 8px' }} href={`/create?message=${encodeURIComponent(post.message)}`}>
+            ♻️ Recycle Evergreen
+          </a>
+        </div>
+      )}
       {actions ? <div className={styles.actions}>{actions}</div> : null}
     </article>
   );

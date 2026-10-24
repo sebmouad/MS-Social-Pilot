@@ -1,5 +1,5 @@
 'use client';
-import { IconAlertTriangle, IconCalendarEvent, IconCheck, IconChevronDown, IconInfoCircle, IconPlus, IconTemplate, IconX } from '@tabler/icons-react';
+import { IconAlertTriangle, IconCalendarEvent, IconCheck, IconChevronDown, IconInfoCircle, IconPlus, IconSparkles, IconTemplate, IconX } from '@tabler/icons-react';
 import { BestTimeSuggestions } from './BestTimeSuggestions';
 import { LinkPreviewCard } from './LinkPreviewCard';
 import { PostVariantsEditor } from './PostVariantsEditor';
@@ -168,6 +168,39 @@ function PostComposerContent({ copyCatalog = composerCatalogDefaults, profiles, 
   const [templateChooserOpen, setTemplateChooserOpen] = useState(false);
   const [templateSearch, setTemplateSearch] = useState('');
   const [templateToApply, setTemplateToApply] = useState<ComposerTemplate | null>(null);
+  const [hookScorerOpen, setHookScorerOpen] = useState(false);
+  const [hookAnalysis, setHookAnalysis] = useState<{ score: number; curiosity: number; clarity: number; fit: number; alternatives: string[] } | null>(null);
+
+  const analyzeHook = () => {
+    const firstLine = message.split('\n')[0]?.trim() || message.slice(0, 100);
+    const words = firstLine.split(/\s+/).length;
+    const hasQuestion = firstLine.includes('?');
+    const hasNumber = /\d+/.test(firstLine);
+    const curiosity = Math.min(96, Math.max(65, (hasQuestion ? 30 : 20) + (hasNumber ? 25 : 15) + (words < 12 ? 35 : 20)));
+    const clarity = Math.min(94, Math.max(70, words >= 4 && words <= 16 ? 90 : 72));
+    const fit = Math.min(98, Math.max(75, firstLine.length < 80 ? 92 : 78));
+    const score = Math.round((curiosity * 0.4) + (clarity * 0.3) + (fit * 0.3));
+
+    const baseText = firstLine.replace(/^[#\s]+/, '').replace(/[.!?]+$/, '') || 'your core message';
+    setHookAnalysis({
+      score,
+      curiosity,
+      clarity,
+      fit,
+      alternatives: [
+        `Most people do this completely backwards: "${baseText}"`,
+        `The exact 3-step formula we use to master ${baseText}:`,
+        `Stop scrolling if you care about ${baseText} 👇`,
+      ],
+    });
+    setHookScorerOpen(true);
+  };
+
+  const applyHookAlternative = (alt: string) => {
+    const lines = message.split('\n');
+    lines[0] = alt;
+    setMessage(lines.join('\n'));
+  };
   const [uploading, setUploading] = useState(false);
   const submitGuard = useRef<'ready' | 'uploading' | 'submitting'>('ready');
   const feedbackRef = useRef<HTMLParagraphElement>(null);
@@ -486,8 +519,36 @@ function PostComposerContent({ copyCatalog = composerCatalogDefaults, profiles, 
         <AutoTextarea id="composer-message" name="message" disabled={saved} value={message} onChange={event => setMessage(event.currentTarget.value)} maxLength={imageRules.maxMessageCharacters} rows={6} placeholder={cc.createTextPlaceholder} aria-labelledby={`${titleId}-text`} aria-describedby="composer-message-count" />
         <div className={styles.textTools}>
           <AiAssist status={aiStatus} locale={aiLocale} text={message} disabled={pending || saved} onUse={(suggestion, kind) => setMessage(current => (kind === 'hashtags' ? `${current.trimEnd()}${current.trim() ? '\n\n' : ''}${suggestion}` : suggestion).slice(0, imageRules.maxMessageCharacters))} />
+          <button type="button" className={styles.addRow} style={{ minHeight: '32px', fontSize: '12px' }} onClick={analyzeHook}>
+            <IconSparkles size={14} aria-hidden="true" />
+            <span>⚡ Hook Scorer</span>
+          </button>
           <span className={styles.counter} id="composer-message-count">{fillContent(cc.createCounter, { used: message.length.toLocaleString(aiLocale), max: imageRules.maxMessageCharacters.toLocaleString(aiLocale) })}</span>
         </div>
+        {hookAnalysis && hookScorerOpen && (
+          <div style={{ background: 'var(--surface-raised)', border: '1px solid var(--line)', borderRadius: 'var(--radius-sm)', padding: '12px', marginTop: '10px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+              <strong style={{ fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                Virality Score: <span style={{ color: 'var(--accent)', fontWeight: 800 }}>{hookAnalysis.score} / 100</span>
+              </strong>
+              <button type="button" className={styles.addRow} style={{ minHeight: 'auto', padding: '2px 6px', fontSize: '11px' }} onClick={() => setHookScorerOpen(false)}>Dismiss</button>
+            </div>
+            <div style={{ display: 'flex', gap: '12px', fontSize: '11px', color: 'var(--ink-soft)', marginBottom: '10px' }}>
+              <span>Curiosity: <strong>{hookAnalysis.curiosity}%</strong></span>
+              <span>Clarity: <strong>{hookAnalysis.clarity}%</strong></span>
+              <span>Network Fit: <strong>{hookAnalysis.fit}%</strong></span>
+            </div>
+            <div style={{ display: 'grid', gap: '6px' }}>
+              <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--ink)' }}>3 Punchier Alternatives:</span>
+              {hookAnalysis.alternatives.map((alt, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', padding: '6px 8px', background: 'var(--surface)', border: '1px solid var(--line-subtle)', borderRadius: '4px', fontSize: '12px' }}>
+                  <span style={{ flex: 1, minWidth: 0, textOverflow: 'ellipsis', overflow: 'hidden' }}>{alt}</span>
+                  <button type="button" className="ui-button ui-button--secondary ui-button--sm" style={{ padding: '2px 8px', fontSize: '11px', height: '26px' }} onClick={() => applyHookAlternative(alt)}>Apply</button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </section>
       <section className={styles.section} aria-labelledby={`${titleId}-media`}>
         <div className={styles.sectionHead}><h2 id={`${titleId}-media`}>{cc.createMedia}</h2></div>
