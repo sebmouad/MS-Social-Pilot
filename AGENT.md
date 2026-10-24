@@ -18,7 +18,7 @@ All application code lives in `app/` (`ms-social-pilot@1.0.0`, Next.js 15 App Ro
 - `app/src/platforms/<provider>/` — Isolated social network adapters (`facebook`, `instagram`, `youtube`, `tiktok`, `linkedin`, `x`, `threads`, `pinterest`, `bluesky`, `mastodon`, `telegram`).
 - `app/src/server/` — Auth, RBAC, job leases, mail outbox, audit logging, and GDPR export/erasure (`data-control/`).
 - `app/prisma/` — `schema.prisma` and additive SQL migrations (`20261103000000_baseline` .. `20261103050000_platform_moat`).
-- `app/scripts/` — Only 4 operational files:
+- `app/scripts/` — Operational scripts:
   - `deploy.sh` — Single unified script for fresh server installation and production updates.
   - `worker.ts` — Background job worker (`npm run worker`).
   - `admin/set-root.ts` & `admin/reset-two-step.ts` — CLI Root bootstrap and 2FA recovery.
@@ -36,8 +36,6 @@ Run from `app/`:
 
 ```bash
 npm run typecheck                  # TypeScript strict check (tsc --noEmit)
-npx vitest run tests/<file>.test.ts # Focused unit test run
-npm test                           # Full Vitest suite
 npm run build                      # Production Next.js build
 ```
 

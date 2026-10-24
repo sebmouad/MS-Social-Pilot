@@ -14,7 +14,6 @@ cd app
 npm ci
 npx prisma generate
 npm run typecheck
-npm test
 npm run dev
 ```
 
