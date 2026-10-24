@@ -88,6 +88,28 @@ describe('replacement worker scheduling', () => {
     expect(state.runs).toHaveLength(1);
   });
 
+  it('lets later ticks spend launch budget on jobs still due this minute', async () => {
+    // Regression: the worker ticks several times per minute, and jobs launched
+    // on the first tick used to burn the whole concurrency budget again as
+    // no-ops on every later tick, permanently starving jobs ordered past the
+    // cap (analyticsAlerts, sharingDeadlines and captionTests never ran).
+    const launched = new Set<string>();
+    const state = dependencies({
+      readConfig: async key => key === 'jobs.order' ? ['posts', 'analytics'] : key === 'jobs.enabled' ? true : key === 'sync.maxConcurrentJobs' ? 1 : key === 'sync.retryLimit' ? 0 : key === 'sync.retryBaseDelayMs' ? 1000 : key === 'sync.retryMaxDelayMs' ? 60000 : key === 'sync.workerPollSeconds' ? 5 : key === 'sync.workerLeaseMinutes' ? 5 : key === 'sync.workerHeartbeatSeconds' ? 30 : '* * * * *',
+      execute: async job => { launched.add(job); state.started.push(job); return 'done'; },
+      alreadyRanThisMinute: async job => launched.has(job as string),
+    });
+    const worker = createWorker(state.deps, 'test-worker', { jobs: ['posts', 'analytics'], heartbeat: false });
+    const now = new Date(2026, 0, 1, 12, 5);
+    await worker.tick(now);
+    await drain(worker);
+    await worker.tick(new Date(now.getTime() + 5000));
+    await drain(worker);
+    expect(state.started).toEqual(['posts', 'analytics']);
+    expect(state.runs).toHaveLength(2);
+    await worker.shutdown(100, 1);
+  });
+
   it('does not run when its distributed lease is held elsewhere', async () => {
     const state = dependencies({ tryLease: vi.fn(async () => false) });
     const worker = createWorker(state.deps, 'test-worker');

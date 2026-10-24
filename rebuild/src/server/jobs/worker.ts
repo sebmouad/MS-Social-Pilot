@@ -154,12 +154,18 @@ export function createWorker(deps: WorkerDependencies, owner: string, options: {
     const retryBackoff = { baseDelayMs: Math.max(1, Math.trunc(retryBaseDelayMs)), maxDelayMs: Math.max(1, Math.trunc(retryMaxDelayMs)) };
     const leaseMs = Math.max(1, Math.trunc(leaseMinutes)) * MINUTE_MS;
     if (enabled && !stopping) {
+      const minuteStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), now.getHours(), now.getMinutes());
+      const minuteEnd = new Date(minuteStart.getTime() + MINUTE_MS);
       let available = Math.max(0, Math.trunc(maxConcurrent) - running.size);
       for (const job of orderedJobs) {
         if (!available) break;
         const expression = await deps.readConfig(job.configKey) as string;
         if (!cronMatches(expression, now)) continue;
         if (running.has(job.name)) continue;
+        // Jobs already launched this minute must not consume launch budget: the
+        // worker ticks several times per minute, and early no-ops would otherwise
+        // starve every job ordered past the concurrency cap at crowded minutes.
+        if (await deps.alreadyRanThisMinute(job.name, minuteStart, minuteEnd)) continue;
         void launch(job, now, Math.max(0, Math.trunc(retryLimit)), retryBackoff, leaseMs, renewalDivisor, errorLimit, summaryLimit).catch(error => log(`could not start ${job.name}`, error));
         // Lease acquisition is async; reserve a local slot before its result.
         available--;
