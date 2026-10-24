@@ -1709,6 +1709,19 @@ Llama: wired as 4th provider (`llamaPort`, OpenAI-compatible) and covered
 by `ai-provider-ports` tests, but production has no Llama key
 (`ai.provider=openai`, keys present only for anthropic/gemini/openai).
 Live check BLOCKED on the owner provisioning a Meta API key.
-Instagram live checklist, dry-run rehearsal, webhook proof: still open.
+Instagram live checklist, dry-run rehearsal: still open.
 retention natural slot: tomorrow 01:17 UTC. Rollups natural slot: today
 23:30 UTC (post-fix).
+
+## Webhook proof (2026-10-24 ~01:55 UTC)
+Receiver proven end-to-end against production config: live route returns
+403 on wrong verify token, 401 on unsigned POST, 404 on unknown platform;
+a server-side drill signed a synthetic page-comment payload with the real
+`meta.appSecret` and `ingestMetaWebhookDelivery` verified, parsed and
+stored it (received=1/unmatched=1, receipt row confirmed then deleted).
+0 historical receipts fully explained: no `meta.webhookVerifyToken` is set
+(empty refuses every handshake by design) AND Meta reports
+`subscribed_apps: []` for the sampled Page. Remaining owner steps: set a
+verify token in Root settings, add the app subscription in the Meta
+dashboard (callback `https://social.newsgeet.com/api/platforms/facebook/webhooks`).
+Deliberately did not rewire the Meta app subscription unattended.
