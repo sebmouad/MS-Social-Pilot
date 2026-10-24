@@ -4,6 +4,16 @@ Updated 2026-10-24: batch 18 (`dc82625b`) deployed live (`DEPLOY OK
 dc82625b`), schema **142**. Full goal remains active. Historical records
 below retain their dates; current source reconciliation wins.
 
+## UI/UX audit — 2026-10-24 (findings only, next action)
+
+[UX_AUDIT_2026-10-24.md](UX_AUDIT_2026-10-24.md) lists the screenshot audit of
+37 routes at 1440/390 on the synthetic preview. Owner-approved next work:
+batch 1 (quick fixes) and batch 2 (consistency), in that file. Root causes are
+already confirmed for the sidebar ellipsis, Approvals overflow, Tasks/Agency
+tabs and AI studio stubs. **Nothing is implemented yet**; production is
+unchanged at `dc82625b`. Rerun the audit with `scripts/dev/ui-audit.mjs`
+against the preview (synthetic data only) after each batch.
+
 ## Batch 18 — 2026-10-24 (deployed, browser-verified)
 
 User request: "improve UI with graphs". Audit found the overview,
