@@ -104,13 +104,13 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
       id: post.id, text: postContentSummary(post.message, post.media, post.link, copy).slice(0, 240), status: post.status, whenIso: when.toISOString(), channels: channelsOfPost, movable,
       authorName: post.authorId === viewer.user.id ? viewer.user.name : copy.approvalsMember,
       origin: origins.get(post.id),
-      clockLabel: formatPostPreviewTime(when, timeZone),
+      clockLabel: formatPostPreviewTime(when, timeZone, locale),
       wallTime,
       moveOptions: movable ? moveCandidates(when.toISOString(), timeZone, now.getTime(), movePolicy) : undefined,
       preview: {
         id: post.id, authorId: post.authorId, message: post.message, firstComment: post.firstComment, link: post.link, media: post.media,
         status: post.status, scheduledAt: post.scheduledAt, publishedAt: post.publishedAt, createdAt: post.createdAt,
-        displayTime: formatPostPreviewTime(post.publishedAt ?? post.scheduledAt ?? post.createdAt, timeZone),
+        displayTime: formatPostPreviewTime(post.publishedAt ?? post.scheduledAt ?? post.createdAt, timeZone, locale),
         targets: post.targets.map(({ id, status, remotePostId, remoteUrl, firstCommentId, firstCommentAt, firstCommentError, target }) => ({ id, status, remotePostId, remoteUrl, firstCommentId, firstCommentAt, firstCommentError, target })),
       },
     }]);

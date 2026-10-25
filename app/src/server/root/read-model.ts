@@ -31,6 +31,10 @@ export function sanitizeRootActivity(row: ActivityRow) {
     if (typeof value === 'number' && Number.isFinite(value)) return [`${value} ${config.label}`];
     return [];
   });
+  // Name the setting a config change touched (never its value, which may be a secret).
+  if (row.action === 'config.changed' && typeof detail.key === 'string' && /^[A-Za-z0-9_.:-]{1,200}$/.test(detail.key)) {
+    metadata.unshift(`setting: ${detail.key}${typeof detail.change === 'string' && /^[a-z_]{1,40}$/.test(detail.change) ? ` (${detail.change})` : ''}`);
+  }
   return {
     id: row.id,
     action: row.action,

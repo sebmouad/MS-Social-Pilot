@@ -75,7 +75,7 @@ export default async function ApprovalsPage({ searchParams }: { searchParams: Pr
       authorName: post.authorId === viewer.user.id ? viewer.user.name : copy.approvalsMember,
       // A scheduled card answers "when does it go out", not when it was written.
       whenLabel: formatDate(stage === "scheduled" && post.scheduledAt ? post.scheduledAt : post.createdAt, timeZone, true, locale, copy),
-      displayTime: formatPostPreviewTime(post.publishedAt ?? post.scheduledAt ?? post.createdAt, timeZone),
+      displayTime: formatPostPreviewTime(post.publishedAt ?? post.scheduledAt ?? post.createdAt, timeZone, locale),
       canSubmit: stage === "draft" && canWriteNotes && canManage(post.authorId) && post.targets.length > 0,
       ...(stage === "approved" && approval?.reviewedByName ? { stageNote: fillContent(content.copy.approvalsApprovedBy, { name: approval.reviewedByName }) } : {}),
       notes: notes?.notes.map(note => ({ id: note.id, body: note.body, authorId: note.authorId, authorName: note.authorName, createdAt: note.createdAt.toISOString(), createdLabel: zoned(note.createdAt) })) ?? [],

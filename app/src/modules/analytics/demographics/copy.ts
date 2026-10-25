@@ -87,6 +87,10 @@ export const demographicsCopyDefaults = {
     "en": "As of",
     "fr": "Au"
   },
+  "Snapshot history": {
+    "en": "Snapshot history by channel and date",
+    "fr": "Historique des relevés par canal et date"
+  },
   "Fetched at": {
     "en": "Fetched at",
     "fr": "Collecté le"

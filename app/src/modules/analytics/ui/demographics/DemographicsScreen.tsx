@@ -90,6 +90,8 @@ export default async function DemographicsPage({ searchParams }: { searchParams:
       <p>{t("Channels with stored snapshots")} : {metric.historyCoverage.covered} / {metric.historyCoverage.selected} · {when(metric.historyCoverage.oldestAsOf)} — {when(metric.historyCoverage.newestAsOf)}</p>
       <AudienceChart copy={copy} locale={fr ? 'fr' : 'en'} label={`${metric.label} · ${t("latest stored figures")}`} rows={metric.rows} />
       {!metric.history.length && <p>{unknown}</p>}
+      {/* One collapsed block: listing every snapshot made each chart thousands of pixels long. */}
+      {metric.history.length > 0 && <details className={styles.history}><summary>{t("Snapshot history")} ({number.format(metric.history.length)})</summary>
       {metric.history.map(item => <details key={`${item.resourceId}:${item.asOf.toISOString()}`}><summary>{item.resourceLabel} · {t("As of")} {when(item.asOf)}</summary>
         <p>{t("Fetched at")} {when(item.fetchedAt)}</p>
         <BarChart locale={fr ? 'fr' : 'en'} label={`${metric.label} · ${item.resourceLabel} · ${when(item.asOf)}`} orientation="horizontal"
@@ -97,6 +99,7 @@ export default async function DemographicsPage({ searchParams }: { searchParams:
         <div className={styles.tableWrap}><table><caption>{metric.label} · {item.resourceLabel} · {when(item.asOf)}</caption><thead><tr><th scope="col">{t("Category")}</th><th scope="col">{t("Value")}</th><th scope="col">{t("Share of snapshot")}</th></tr></thead><tbody>
           {item.rows.map(row => <tr key={row.label}><th scope="row">{row.label}</th><td>{row.value === null ? unknown : number.format(row.value)}</td><td>{row.share === null ? unknown : `${number.format(row.share)}%`}</td></tr>)}
         </tbody></table></div></details>)}
+      </details>}
     </section>)}
   </div></PageFrame>;
 }

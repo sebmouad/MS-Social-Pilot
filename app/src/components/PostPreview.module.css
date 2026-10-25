@@ -287,3 +287,7 @@
 }
 
 .reuse { display: flex; justify-content: flex-end; padding-top: 8px; border-top: 1px solid var(--line-subtle); }
+
+.commentClamp { display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
+.firstComment:has(.commentMore[open]) .commentClamp { display: none; }
+.commentMore summary { margin-top: 6px; color: var(--accent); font-size: 12px; font-weight: 600; cursor: pointer; }

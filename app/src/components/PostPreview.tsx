@@ -11,6 +11,8 @@ export type PostPreviewPost = {
   authorId: string;
   message: string;
   firstComment: string | null;
+  /** Minutes the first comment waits after the post; absent or 0 means right after. */
+  firstCommentDelayMinutes?: number | null;
   link: string | null;
   media: unknown;
   status: string;
@@ -167,7 +169,7 @@ export function PostPreview({ post, authorName, authorAvatarUrl, timeZone, varia
         {authorPicture ? <img className={styles.channelAvatar} src={authorPicture} alt="" loading="lazy" /> : <span className={styles.authorAvatar} aria-hidden="true">{initials(authorName)}</span>}
         <div className={styles.headerText}>
           <strong>{authorName}</strong>
-          {post.unsaved ? null : <time dateTime={time.toISOString()}>{timeLabel} {post.displayTime ?? formatPostPreviewTime(time, timeZone)}</time>}
+          {post.unsaved ? null : <time dateTime={time.toISOString()}>{timeLabel} {post.displayTime ?? formatPostPreviewTime(time, timeZone, locale)}</time>}
         </div>
         <StatusChip status={post.status} locale={locale} />
       </header>
@@ -284,9 +286,12 @@ export function PostPreview({ post, authorName, authorAvatarUrl, timeZone, varia
         <section className={styles.firstComment} aria-label={t.previewFirstComment}>
           <div className={styles.firstCommentHeader}>
             <strong>{t.previewFirstComment}</strong>
-            <span className={styles.delayBadge}>+15m delay</span>
+            {post.firstCommentDelayMinutes ? <span className={styles.delayBadge}>{t.previewCommentDelay.replace('{n}', String(post.firstCommentDelayMinutes))}</span> : null}
           </div>
-          <p>{post.firstComment}</p>
+          {/* Long comments (a full recipe) are clamped so lists of previews stay scannable. */}
+          {(post.firstComment?.length ?? 0) > 280
+            ? <><p className={styles.commentClamp}>{post.firstComment}</p><details className={styles.commentMore}><summary>{t.previewCommentShowAll}</summary><p>{post.firstComment}</p></details></>
+            : <p>{post.firstComment}</p>}
         </section>
       ) : commentEmptySlot ? <p className={styles.emptyCommentSlot} aria-hidden="true">{rendering!.copy.emptyComment}</p> : null}
       {post.status === 'published' && (
