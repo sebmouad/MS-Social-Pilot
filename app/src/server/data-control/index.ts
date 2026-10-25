@@ -339,7 +339,7 @@ export async function purgeWorkspaceData(actor: DataControlActor, authorize: (tx
     await assertPublishingTargetsSettled(tx, actor.workspaceId);
     await assertInboxDeletionsSettled(tx, actor.workspaceId);
     const configuredRoot = await runtimeConfig('storage.mediaRoot');
-    if (!configuredRoot) throw new Error('Set the media storage root in Root before deleting workspace data. No data was deleted.');
+    if (!configuredRoot) throw new OperationError('unavailable', 'Set the media storage root in Root before deleting workspace data. No data was deleted.');
     const mediaRoot = await canonicalMediaRoot(configuredRoot);
     const values = { status: 'requested', requestedById: actor.userId, apiKeyId: actor.apiKeyId ?? null, mediaRoot, counts: undefined, error: null, requestedAt: new Date(), dbDeletedAt: null, completedAt: null };
     if (existing) await tx.workspaceDataPurge.update({ where: { workspaceId: actor.workspaceId }, data: values });

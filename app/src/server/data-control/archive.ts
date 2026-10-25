@@ -1,3 +1,4 @@
+import { OperationError } from '@/lib/operation-error';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -14,7 +15,7 @@ const json = (value: unknown) => `${JSON.stringify(value, null, 2)}\n`;
 export async function exportWorkspaceArchive(actor: DataControlActor): Promise<Buffer> {
   validateWorkspaceId(actor.workspaceId);
   const mediaRoot = await runtimeConfig('storage.mediaRoot');
-  if (!mediaRoot) throw new Error('Set the media storage root in Root before exporting workspace media.');
+  if (!mediaRoot) throw new OperationError('unavailable', 'Set the media storage root in Root before exporting workspace media.');
   const [archiveLimit, headroom] = await Promise.all([runtimeConfig('data.maxArchiveBytes'), runtimeConfig('data.zipSafetyHeadroomBytes')]);
   const maxBytes = Math.min(archiveLimit as number, ZIP32_MAX_BYTES - (headroom as number));
 
