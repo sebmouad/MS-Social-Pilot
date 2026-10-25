@@ -27,7 +27,7 @@
 .alert p { margin: 0; font-size: 13px; line-height: 1.45; }
 .alert a { color: inherit; font-size: 12px; font-weight: 650; text-decoration: underline; }
 
-.split { display: grid; grid-template-columns: minmax(280px, 380px) minmax(0, 1fr); align-items: stretch; gap: 16px; min-width: 0; height: max(480px, calc(100dvh - var(--inbox-top-offset, 220px))); }
+.split { display: grid; grid-template-columns: minmax(320px, 440px) minmax(0, 1fr); align-items: stretch; gap: 16px; min-width: 0; height: max(480px, calc(100dvh - var(--inbox-top-offset, 220px))); }
 .listPane, .threadPane { min-width: 0; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface); }
 .listPane { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
 .listPane > .list { flex: 1 1 auto; min-height: 0; }
@@ -204,7 +204,7 @@
 .item[data-group="comment"] { border-left: 3px dashed var(--line-strong); }
 .item[data-group="review"] { border-left: 3px dotted var(--line-strong); }
 .item[data-group][aria-current="true"] { border-left-color: var(--mod, var(--accent)); }
-.kindTabs { display: flex; flex: 0 0 auto; gap: 8px; padding: 10px 12px; overflow-x: auto; border-bottom: 1px solid var(--line-subtle, var(--line)); scrollbar-width: thin; }
+.kindTabs { display: flex; flex: 0 0 auto; flex-wrap: wrap; gap: 8px; padding: 10px 12px; overflow-x: auto; border-bottom: 1px solid var(--line-subtle, var(--line)); scrollbar-width: thin; }
 .kindTab { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 4px 12px 4px 10px; border: 1px solid var(--line-strong); border-inline-start-width: 4px; border-radius: var(--radius-sm); background: var(--surface); color: var(--ink); font-size: 13px; font-weight: 600; text-decoration: none; white-space: nowrap; }
 .kindTab[data-kind="message"] { border-inline-start-style: solid; }
 .kindTab[data-kind="comment"] { border-inline-start-style: dashed; }

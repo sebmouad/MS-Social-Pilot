@@ -1,6 +1,5 @@
 'use client';
 import { usePublishingActionText } from '../WorkflowSubmitButtons';
-import { PostPreview } from '@/components/PostPreview';
 import { PostNotesThread } from '../collaboration/PostPanel';
 import { useContent } from '../ContentProvider';
 import { fillContent } from '../content-copy';
@@ -39,13 +38,19 @@ function Thread({ row, timeZone, viewerId, canWriteNotes, canModerateNotes }: { 
 function PipelineCard({ row, locale, timeZone, viewerId, canWriteNotes, canModerateNotes }: { row: PipelineRow; locale: KitLocale; timeZone: string; viewerId: string; canWriteNotes: boolean; canModerateNotes: boolean }) {
   const t = usePublishingActionText(locale);
   const { copy: content } = useContent();
+  const first = Array.isArray(row.media) ? row.media[0] as { kind?: unknown; url?: unknown } | undefined : undefined;
+  const cover = first?.kind === 'image' && typeof first.url === 'string' ? first.url : null;
   return <article className={styles.card} aria-label={fillContent(content.approvalsSubmittedBy, { name: row.authorName })}>
     <header className={styles.cardHead}>
       <div><strong>{row.authorName}</strong><span className={styles.when}>{row.whenLabel}</span></div>
       <ChannelsCell post={row} locale={locale} />
     </header>
     {row.stageNote ? <p className={styles.help}>{row.stageNote}</p> : null}
-    <div className={styles.cardPreview}><PostPreview post={row} authorName={row.authorName} timeZone={timeZone} locale={locale} variant="card" /></div>
+    {/* Outside review, a compact summary: the full preview (with first comment) made one column thousands of pixels tall. */}
+    <div className={styles.compact}>
+      {cover ? <img src={/^\/api\/media\//.test(cover) ? `${cover}?w=160` : cover} alt="" loading="lazy" /> : null}
+      <p>{row.message}</p>
+    </div>
     <div className={styles.actions}>
       {row.canSubmit ? <form noValidate action={submitForApprovalAction}><input type="hidden" name="postId" value={row.id} /><button className="ui-button ui-button--primary ui-button--sm" type="submit">{t('submitForApproval')}</button></form> : null}
       <a className="ui-button ui-button--secondary ui-button--sm" href={`/content/post/${encodeURIComponent(row.id)}`}>{content.approvalsOpenPost}</a>

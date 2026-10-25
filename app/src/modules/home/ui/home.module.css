@@ -1,5 +1,5 @@
 .root { display: grid; gap: var(--space-4); min-width: 0; }
-.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: var(--space-4); align-items: stretch; min-width: 0; }
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: var(--space-4); align-items: stretch; min-width: 0; }
 .grid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: var(--space-4); align-items: start; }
 .span4 { grid-column: span 4; }
 .span6 { grid-column: span 6; }

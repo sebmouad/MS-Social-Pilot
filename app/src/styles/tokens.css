@@ -905,7 +905,8 @@ select.ui-input { appearance: none; padding-right: 36px; background-image: linea
 .ui-state--error { border-style: solid; border-color: color-mix(in srgb, var(--danger) 35%, var(--line)); background: var(--danger-soft); color: var(--danger); }
 .ui-state--error > :is(h2, h3) { color: var(--danger); }
 .ui-table--compact td { height: 44px; padding-block: 6px; }
-.ui-table-wrap { max-width: 100%; overscroll-behavior-x: contain; }
+/* Positioned so absolutely placed cell content (hidden checkboxes, tooltips) is clipped here instead of stretching the page. */
+.ui-table-wrap { position: relative; max-width: 100%; overscroll-behavior-x: contain; }
 
 /* Larger touch targets on coarse pointers; mouse layouts stay compact. */
 @media (pointer: coarse) {

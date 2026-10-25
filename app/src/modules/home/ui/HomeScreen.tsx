@@ -202,7 +202,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
         ? <Card module="inbox" icon={<IconInbox size={20} />} title={t.inbox} t={t} span="span4" id="home-inbox" count={overview.inbox.data.open > 0 ? <Badge tone="brand">{number.format(overview.inbox.data.open)}</Badge> : undefined}>
           {overview.inbox.data.recent.length > 0
             ? <div className={styles.list}>{overview.inbox.data.recent.map(row => <ListRow key={row.key}
-              href={`/inbox?thread=${encodeURIComponent(row.key)}`} title={row.preview || row.author}
+              href={`/inbox?thread=${encodeURIComponent(row.key)}`} title={row.preview || t.inboxNoText}
               meta={<><span>{row.author}</span> · <span>{row.channel}</span> · <time dateTime={row.time}>{Number.isNaN(new Date(row.time).getTime()) ? row.time : timeFormat.format(new Date(row.time))}</time>{row.unread > 0 ? <> · <Badge tone="brand">{number.format(row.unread)}</Badge></> : null}</>} />)}</div>
             : <p className={styles.note}>{overview.inbox.data.open > 0 ? `${number.format(overview.inbox.data.open)} ${t.inboxOpen}` : t.inboxZero}</p>}
         </Card>

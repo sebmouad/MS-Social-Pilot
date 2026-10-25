@@ -257,10 +257,9 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
 
   // Applied filters stay visible in the content header; each chip links to the same view without that one filter.
   const without = (...keys: Array<keyof InboxLocation>) => inboxHref({ ...Object.fromEntries(Object.entries(baseLocation).filter(([key]) => !keys.includes(key as keyof InboxLocation))), ...(requestedThread ? { thread: requestedThread } : {}) });
-  const typeLabel = kindLabel(activeKind);
   const chips: UrlFilterChip[] = [
     ...(filters.channelId ? [{ key: 'channel', label: copy.channel, value: visibleChannels.find(item => item.id === filters.channelId)?.name ?? filters.channelId, removeHref: without('channel', 'cursor') }] : []),
-    ...(filters.kind !== 'all' && filters.kind !== 'message' ? [{ key: 'type', label: copy.type, value: typeLabel, removeHref: without('type', 'cursor') }] : []),
+    // The kind tabs above the list already show and switch the type, so it is not a removable filter chip.
     ...(filters.state !== 'open' ? [{ key: 'status', label: copy.status, value: filters.state === 'resolved' ? copy.resolved : copy.all, removeHref: without('status', 'cursor') }] : []),
     ...(filters.hidden !== 'visible' ? [{ key: 'hidden', label: copy.hiddenComments, value: copy.showThem, removeHref: without('hidden', 'cursor') }] : []),
     ...(filters.q ? [{ key: 'q', label: copy.searchChip, value: filters.q, removeHref: without('q', 'cursor') }] : []),

@@ -73,7 +73,8 @@ export default async function ApprovalsPage({ searchParams }: { searchParams: Pr
     return {
       ...post, media: post.media as Array<{ kind: string; url: string; altText?: string }>,
       authorName: post.authorId === viewer.user.id ? viewer.user.name : copy.approvalsMember,
-      whenLabel: formatDate(post.createdAt, timeZone, true, locale, copy),
+      // A scheduled card answers "when does it go out", not when it was written.
+      whenLabel: formatDate(stage === "scheduled" && post.scheduledAt ? post.scheduledAt : post.createdAt, timeZone, true, locale, copy),
       displayTime: formatPostPreviewTime(post.publishedAt ?? post.scheduledAt ?? post.createdAt, timeZone),
       canSubmit: stage === "draft" && canWriteNotes && canManage(post.authorId) && post.targets.length > 0,
       ...(stage === "approved" && approval?.reviewedByName ? { stageNote: fillContent(content.copy.approvalsApprovedBy, { name: approval.reviewedByName }) } : {}),
