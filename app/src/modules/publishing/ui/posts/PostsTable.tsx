@@ -92,7 +92,7 @@ export function PostsTable({ rows, caption, locale = 'en', timeZone = 'UTC', sel
               title={label(row)}
               meta={<>
                 <AvatarStack channels={channels} max={3} locale={locale} />
-                <StatusChip status={row.status} compact />
+                <StatusChip status={row.status} compact locale={locale} />
                 {failed ? <AttentionHint locale={locale} /> : null}
                 {reachNum !== null && (row.reach?.measured ?? 0) > 0 ? (
                   <span className={styles.phoneMetrics}>
@@ -158,7 +158,7 @@ export function PostsTable({ rows, caption, locale = 'en', timeZone = 'UTC', sel
                     {destMetric.reach > 0 ? <span><IconEye size={11} aria-hidden="true" /> {destMetric.reach}</span> : null}
                   </div>
                 ) : null}
-                <StatusChip status={status} compact />
+                <StatusChip status={status} compact locale={locale} />
                 {remoteUrl || destMetric?.remoteUrl ? <a href={remoteUrl || destMetric?.remoteUrl || '#'} target="_blank" rel="noopener noreferrer" aria-label={`${copy.openDetails}: ${target.name}`}><IconExternalLink size={15} aria-hidden="true" /></a> : null}
               </li>;
             })}</ul> : <p>{content.postsPanelNoDestinations}</p>}

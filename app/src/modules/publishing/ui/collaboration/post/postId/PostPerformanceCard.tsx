@@ -147,7 +147,7 @@ export function PostPerformanceCard({ postId, initialMetrics, locale = 'en', tim
                         <div className={styles.destAvatarFallback}>{dest.targetName.slice(0, 2).toUpperCase()}</div>
                       )}
                       <span className={styles.destName}>{dest.targetName}</span>
-                      <StatusChip status={dest.status} compact />
+                      <StatusChip status={dest.status} compact locale={locale.startsWith('fr') ? 'fr' : 'en'} />
                     </div>
                     {directUrl ? (
                       <a

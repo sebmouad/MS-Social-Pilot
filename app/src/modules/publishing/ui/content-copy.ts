@@ -61,6 +61,7 @@ export const contentCopyDefaults = {
   createHookScore: m('Score the opening line', 'Évaluer l’accroche'),
   createGridPreview: m('Grid preview', 'Aperçu en grille'),
   calendarBestTimes: m('Best times', 'Meilleurs créneaux'),
+  calendarFilterPlaceholder: m('Filter posts on the board…', 'Filtrer les publications du tableau…'),
   calendarBestTimesNote: m('Shades hours where your past posts did better than usual, from stored post results.', 'Colore les heures où vos publications passées ont mieux marché que d’habitude, d’après les résultats enregistrés.'),
   calendarBestTimesPeak: m('Strong', 'Fort'),
   createHookLength: m('Opening line: {n} characters (visible before "See more" up to about {max})', 'Première ligne : {n} caractères (visible avant « Voir plus » jusqu’à environ {max})'),

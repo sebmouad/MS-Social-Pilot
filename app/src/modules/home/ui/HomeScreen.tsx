@@ -121,7 +121,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', margin: '-4px 0 8px' }}>
       <a className="ui-button ui-button--primary ui-button--sm" href="/create">
         <IconPlus size={15} stroke={2.2} />
-        <span>Create Post</span>
+        <span>{t.upcomingEmptyAction}</span>
         <kbd className="ui-kbd" style={{ background: 'rgba(255,255,255,0.2)', color: 'inherit', border: 'none', marginLeft: '4px', fontSize: '10px', height: '17px', minWidth: '17px' }}>C</kbd>
       </a>
       <a className="ui-button ui-button--secondary ui-button--sm" href="/content/calendar">

@@ -143,7 +143,7 @@ export function MediaLibrary({ items, usage, page, hasMore, filters, canWrite, w
           {a.holders && a.holders.length > 0 && <ul className={styles.holders}>{a.holders.map(h => <li key={h.postId}>{h.excerpt || t('untitled')} ({h.status.replace(/_/g, ' ')})</li>)}</ul>}
         </div>
         <div className={styles.tileActions}>
-          <a className="ui-button ui-button--primary ui-button--sm" href={`/create?media=${encodeURIComponent(`media:${a.id}`)}`}>Create Post</a>
+          <a className="ui-button ui-button--primary ui-button--sm" href={`/create?media=${encodeURIComponent(`media:${a.id}`)}`}>{t('createPost')}</a>
           <Button size="sm" variant="secondary" onClick={() => setDetailId(a.id)}>{t('details')}</Button>
           {canWrite && workspaceWide && <Button size="sm" disabled={busy} onClick={() => { setNotice(null); setConfirmation(''); setRenameName(a.name); setRenaming(a); }}>{t('rename')}</Button>}
         </div>

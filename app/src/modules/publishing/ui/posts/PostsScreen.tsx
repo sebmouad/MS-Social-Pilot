@@ -139,7 +139,7 @@ export default async function PostsPage({ searchParams }: { searchParams: Promis
   const manageProps = { targets: targetChoices, canPublish, canOrganize, canQueue, imageRules, timeZone, undoSendSeconds };
   const canBulk = canWritePosts && canAuthorDrafts;
   const chips: FilterChip[] = [
-    ...(selectedStatus ? [{ key: 'status', label: copy.status, value: statusLabel(selectedStatus), removeHref: hrefWith(null, 'status') }] : []),
+    ...(selectedStatus ? [{ key: 'status', label: copy.status, value: statusLabel(selectedStatus, locale), removeHref: hrefWith(null, 'status') }] : []),
     ...(q?.trim() ? [{ key: 'q', label: copy.search, value: q.trim(), removeHref: hrefWith(null, 'q') }] : []),
     ...(originKind ? [{ key: 'origin', label: originCopy[locale].createdBy, value: originOptions.find(option => option.kind === originKind)?.label ?? originKind, removeHref: hrefWith(null, 'origin') }] : []),
   ];

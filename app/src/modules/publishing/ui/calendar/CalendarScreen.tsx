@@ -147,7 +147,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
   const extraCalendars = await calendarExtrasLinks(locale, ['dates', 'seasons', 'trends', 'feeds']).catch(() => []);
   const without = (omit: "status" | "origin") => `/content/calendar?view=${view}&date=${anchor}${params.channel ? `&channel=${encodeURIComponent(params.channel)}` : ""}${status && omit !== "status" ? `&status=${status}` : ""}${originKind && omit !== "origin" ? `&origin=${encodeURIComponent(originKind)}` : ""}`;
   const chips = [
-    ...(status ? [{ key: "status", label: copy.status, value: statusLabel(status), removeHref: without("status") }] : []),
+    ...(status ? [{ key: "status", label: copy.status, value: statusLabel(status, locale), removeHref: without("status") }] : []),
     ...(originKind ? [{ key: "origin", label: originCopy[locale].createdBy, value: originOptions.find(option => option.kind === originKind)?.label ?? originKind, removeHref: without("origin") }] : []),
   ];
   const previous = weekLike ? addDaysToKey(gridStart, -7) : `${adjacentCalendarMonth(selected.year, selected.month, -1)}-01`;

@@ -103,7 +103,7 @@ export function CalendarBoard({ view, days, timeZone, nowIso, canCreate, filterQ
         ...(!isMatch ? { opacity: 0.18, filter: 'grayscale(1)', pointerEvents: 'none' as const } : {}),
       }}
       draggable={post.movable} onDragStart={event => { dragged.current = post; event.dataTransfer.effectAllowed = "move"; event.dataTransfer.setData("text/plain", post.id); }} onDragEnd={() => { dragged.current = null; setOver(null); }}>
-      <div className={styles.postMeta}><time dateTime={post.whenIso}>{timeOf(post)}</time><StatusChip status={post.status} compact /></div>
+      <div className={styles.postMeta}><time dateTime={post.whenIso}>{timeOf(post)}</time><StatusChip status={post.status} compact locale={locale} /></div>
       <div className={styles.postBody}>
         {post.preview && postThumbnail(post.preview.media) ? <PostThumb thumb={postThumbnail(post.preview.media)} size="sm" /> : null}
         <p className={styles.postText} title={post.text}>{post.text || copy.calendarNoText}</p>
@@ -177,7 +177,8 @@ export function CalendarBoard({ view, days, timeZone, nowIso, canCreate, filterQ
       <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
         <input
           type="search"
-          placeholder="Filter posts on board..."
+          placeholder={content.calendarFilterPlaceholder}
+          aria-label={content.calendarFilterPlaceholder}
           value={boardSearch}
           onChange={e => setBoardSearch(e.target.value)}
           style={{

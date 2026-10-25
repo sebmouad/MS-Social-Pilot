@@ -169,7 +169,7 @@ export function PostPreview({ post, authorName, authorAvatarUrl, timeZone, varia
           <strong>{authorName}</strong>
           {post.unsaved ? null : <time dateTime={time.toISOString()}>{timeLabel} {post.displayTime ?? formatPostPreviewTime(time, timeZone)}</time>}
         </div>
-        <StatusChip status={post.status} />
+        <StatusChip status={post.status} locale={locale} />
       </header>
 
       {post.targets.length > 0 ? <ul className={styles.destinations} aria-label={t.previewDestinations}>
@@ -181,7 +181,7 @@ export function PostPreview({ post, authorName, authorAvatarUrl, timeZone, varia
           return <li className={styles.destination} key={target.id}>
             {picture ? <img className={styles.channelAvatar} src={picture} alt="" loading="lazy" /> : <span className={styles.channelFallback} aria-hidden="true">{initials(target.name)}</span>}
             <span className={styles.channelName}>{target.name}</span>
-            <StatusChip status={status} compact />
+            <StatusChip status={status} compact locale={locale} />
             {status === 'scheduled_remote' ? <ScheduleBadge mode="remote" locale={locale} platformName={target.platformName ?? undefined} />
               : post.scheduledAt && post.status === 'scheduled' && status === 'pending' ? <ScheduleBadge mode="application" locale={locale} /> : null}
             {commentState !== 'not_requested' ? <span className={styles.noDestinations}>{commentLabels[commentState]}</span> : null}

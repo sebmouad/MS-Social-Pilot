@@ -22,13 +22,19 @@ const STATUSES: Record<string, { label: string; tone: Tone; icon: ReactNode }> =
   cancelled: { label: "Cancelled", tone: "neutral", icon: <><circle cx="8" cy="8" r="5.5" {...shape} /><path d="m4.1 11.9 7.8-7.8" {...shape} /></> },
 };
 
-export function statusLabel(status: string) {
+const FRENCH: Record<string, string> = {
+  active: "Actif", disabled: "Désactivé", draft: "Brouillon", pending_approval: "En attente d’approbation", rejected: "Refusé",
+  scheduled: "Programmé", publishing: "Publication en cours", published: "Publié", partially_failed: "Échec partiel", failed: "Échec", cancelled: "Annulé",
+};
+
+export function statusLabel(status: string, locale: "en" | "fr" = "en") {
+  if (locale === "fr" && FRENCH[status]) return FRENCH[status];
   return STATUSES[status]?.label ?? status.replaceAll("_", " ").replace(/^./, letter => letter.toUpperCase());
 }
 
-export function StatusChip({ status, compact = false, group }: { status: string; compact?: boolean; group?: PostGroup }) {
+export function StatusChip({ status, compact = false, group, locale = "en" }: { status: string; compact?: boolean; group?: PostGroup; locale?: "en" | "fr" }) {
   const known = STATUSES[status];
-  const label = statusLabel(status);
+  const label = statusLabel(status, locale);
   // Post-level statuses carry their planned/outcome group (dashed = outcome) unless the caller overrides it; other marks stay ungrouped.
   const resolved = group ?? ((PLANNED_STATUSES as readonly string[]).includes(status) ? 'planned' : (OUTCOME_STATUSES as readonly string[]).includes(status) ? 'outcome' : undefined);
   return <span className={`ui-chip ui-chip--${known?.tone ?? "neutral"}${compact ? " ui-chip--compact" : ""}`} data-status={status} {...(resolved ? { 'data-group': resolved } : {})}>

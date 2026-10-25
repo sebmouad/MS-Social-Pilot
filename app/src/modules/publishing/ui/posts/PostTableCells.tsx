@@ -120,7 +120,7 @@ export function StatusCell({ post, locale = 'en' }: { post: Row; locale?: KitLoc
   const failed = post.targets.filter(row => row.status === 'failed').length;
   const done = post.targets.filter(row => row.status === 'published').length;
   return <div className={styles.statusCell}>
-    <StatusChip status={post.status} />
+    <StatusChip status={post.status} locale={locale} />
     {scheduled ? <ScheduleBadge mode={remote ? 'remote' : 'application'} locale={locale} platformName={remote ? remotePlatformName(post) : undefined} /> : null}
     {post.targets.length > 1 && (failed || done) ? <span className={styles.sub}>{done}/{post.targets.length}</span> : null}
     {failed ? <AttentionHint locale={locale} /> : null}

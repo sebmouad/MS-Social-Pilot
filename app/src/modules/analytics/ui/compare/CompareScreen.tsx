@@ -92,7 +92,7 @@ export default async function ComparePage({ searchParams }: { searchParams: Prom
         {(['a', 'b'] as const).map(s => <div className={styles.tile} key={s}><span>{s === 'a' ? 'A' : 'B'}</span><strong>{formatValue(data.audience[s].total, 'count')}</strong><small>{data.audience[s].covered}{" "}{t("of")}{" "}{data.audience[s].selected}{" "}{t("channels reported")}</small></div>)}
         <div className={styles.tile}><span>{t("Difference (A minus B)")}</span><strong>{data.audience.delta === null ? t('Unknown') : formatValue(data.audience.delta, 'count')}</strong><small>{data.audience.delta === null ? t('Shown only when every selected channel reported on both sides.') : t('Both sides fully covered.')}</small></div></div><p>{data.audience.note}</p></section>
       <section className={styles.panel}><h2>{t("Metrics")}</h2>
-        {data.metrics.filter(m => m.status === 'comparable').map(m => <BarChart key={m.key} label={`${m.label} · A / B`} categories={['A', 'B']}
+        {data.metrics.filter(m => m.status === 'comparable').map(m => <BarChart key={m.key} locale={locale} label={`${m.label} · A / B`} categories={['A', 'B']}
           format={m.unit === 'percent' ? { style: 'percent' } : undefined}
           series={[{ id: m.key, name: m.label, values: [m.a?.total, m.b?.total].map(value => value == null ? null : m.unit === 'percent' ? value / 100 : value) }]} />)}
         {data.truncated && <p className={styles.alert} role="status">{t("Showing")}{" "}{data.metrics.length}{" "}{t("of")}{" "}{data.totalMetrics}{" "}{t("metrics.")}</p>}
