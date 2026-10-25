@@ -640,6 +640,35 @@ function PostComposerContent({ recentPosts = [], copyCatalog = composerCatalogDe
         <input type="hidden" name="draftPostId" value={draftPostId} />
       </section>
 
+      <fieldset className={styles.group} disabled={busy}>
+        <legend className="ui-visually-hidden">{text.scheduling}</legend>
+        {mode === 'schedule' && remoteScheduling?.offered && holdable.length > 0 && <div className={styles.holdChoice}>
+          <strong id="composer-hold-legend">{text.whoSends}</strong>
+          <RadioCards legend={holdCopy.legend} name="scheduleMode" value={scheduleMode} onChange={value => setScheduleMode(value === 'remote' ? 'remote' : 'application')} options={[
+            { value: 'application', label: text.holdApp, description: text.holdAppHint },
+            { value: 'remote', label: text.holdPlatform(holdablePlatforms || text.platformFallback), description: `${text.holdPlatformHint(holdablePlatforms || text.platformFallback)} ${holdCopy.window.replace('{min}', holdWindow.min).replace('{max}', holdWindow.max)}` },
+          ]} />
+        </div>}
+        <input type="hidden" name="destinationScheduleModesJson" value={destinationScheduleModesJson} />
+        {mode === 'schedule' && remoteScheduling?.offered && holdable.length > 0 && <ul className={styles.destinationModes} aria-label={text.whoSends}>
+          {selected.map(target => {
+            const canHold = remoteScheduling?.offered && holdable.some(item => item.id === target.id);
+            const effective = canHold ? destinationModes[target.id] ?? scheduleMode : 'application';
+            const platform = target.platformName || text.platformFallback;
+            return <li key={target.id}>
+              <div className={styles.modeRow}>
+                <span className={styles.chosenName}>{target.name}</span>
+                {canHold && selected.length > 1 ? <Select aria-label={`${text.perDestination}: ${target.name}`} value={destinationModes[target.id] ?? ''}
+                  onChange={value => setDestinationModes(current => { const next = { ...current }; if (value === 'application' || value === 'remote') next[target.id] = value; else delete next[target.id]; return next; })}
+                  options={[{ value: '', label: text.sameAsAbove }, { value: 'application', label: text.holdApp }, { value: 'remote', label: text.holdPlatform(platform) }]} /> : null}
+              </div>
+              <small>{effective === 'remote' ? text.destinationPlatform(platform) : canHold || !remoteScheduling?.offered ? text.destinationApp : text.destinationAppOnly}</small>
+            </li>;
+          })}
+        </ul>}
+        {mode === 'schedule' && remoteScheduling?.offered && scheduleMode === 'remote' && appOnly.length > 0 && <small role="status">{holdCopy.appOnly.replace('{names}', appOnly.map(target => target.name).join(', '))}</small>}
+      </fieldset>
+
       <details className={styles.advanced}>
         <summary><IconChevronDown size={16} aria-hidden="true" />{cc.createAdvanced}</summary>
         <div className={styles.advancedBody}>
@@ -654,34 +683,6 @@ function PostComposerContent({ recentPosts = [], copyCatalog = composerCatalogDe
           <legend>{cc.createAdvancedFormats}</legend>
           <DestinationFormats copyCatalog={copyCatalog} locale={aiLocale} targets={targets} selectedIds={selected.map(target => target.id)} values={formatChoices} formId={FORM_ID} disabled={busy} onChange={(id, value) => setFormatChoices(current => ({ ...current, [id]: value }))} />
         </fieldset>}
-        <fieldset className={styles.group} disabled={busy}>
-          <legend className="ui-visually-hidden">{text.scheduling}</legend>
-          {remoteScheduling?.offered && holdable.length > 0 && <div className={styles.holdChoice}>
-            <strong id="composer-hold-legend">{text.whoSends}</strong>
-            <RadioCards legend={holdCopy.legend} name="scheduleMode" value={scheduleMode} onChange={value => setScheduleMode(value === 'remote' ? 'remote' : 'application')} options={[
-              { value: 'application', label: text.holdApp, description: text.holdAppHint },
-              { value: 'remote', label: text.holdPlatform(holdablePlatforms || text.platformFallback), description: `${text.holdPlatformHint(holdablePlatforms || text.platformFallback)} ${holdCopy.window.replace('{min}', holdWindow.min).replace('{max}', holdWindow.max)}` },
-            ]} />
-          </div>}
-          <input type="hidden" name="destinationScheduleModesJson" value={destinationScheduleModesJson} />
-          {selected.length > 0 && <ul className={styles.destinationModes} aria-label={text.whoSends}>
-            {selected.map(target => {
-              const canHold = remoteScheduling?.offered && holdable.some(item => item.id === target.id);
-              const effective = canHold ? destinationModes[target.id] ?? scheduleMode : 'application';
-              const platform = target.platformName || text.platformFallback;
-              return <li key={target.id}>
-                <div className={styles.modeRow}>
-                  <span className={styles.chosenName}>{target.name}</span>
-                  {canHold && selected.length > 1 ? <Select aria-label={`${text.perDestination}: ${target.name}`} value={destinationModes[target.id] ?? ''}
-                    onChange={value => setDestinationModes(current => { const next = { ...current }; if (value === 'application' || value === 'remote') next[target.id] = value; else delete next[target.id]; return next; })}
-                    options={[{ value: '', label: text.sameAsAbove }, { value: 'application', label: text.holdApp }, { value: 'remote', label: text.holdPlatform(platform) }]} /> : null}
-                </div>
-                <small>{effective === 'remote' ? text.destinationPlatform(platform) : canHold || !remoteScheduling?.offered ? text.destinationApp : text.destinationAppOnly}</small>
-              </li>;
-            })}
-          </ul>}
-          {remoteScheduling?.offered && scheduleMode === 'remote' && appOnly.length > 0 && <small role="status">{holdCopy.appOnly.replace('{names}', appOnly.map(target => target.name).join(', '))}</small>}
-        </fieldset>
         </div>
       </details>
     </form>
