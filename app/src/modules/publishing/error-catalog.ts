@@ -1073,7 +1073,7 @@ export const publishingErrorCopy = {
 "read_9": {"en":"Choose valid ISO date filters.","fr":"Choisissez des filtres de date ISO valides."},
 "read_10": {"en":"Choose valid post statuses.","fr":"Choisissez des statuts de publication valides."},
 "read_11": {"en":"The end date must follow the start date.","fr":"La date de fin doit suivre la date de début."},
-"read_12": {"en":"This export exceeds the synchronous limit. Narrow your filters and try again.","fr":"Cet export dépasse la limite de traitement immédiat. Affinez les filtres et réessayez."},
+"read_12": {"en":"This export exceeds the synchronous limit. Narrow your filters (status, dates, channel), or start a background export for everything.","fr":"Cet export dépasse la limite de traitement immédiat. Affinez les filtres (statut, dates, canal) ou lancez un export en arrière-plan pour tout exporter."},
 "read_13": {"en":"Choose a valid Publishing export result limit.","fr":"Choisissez une limite de résultats d’export valide."},
 "read_14": {"en":"Choose a valid post origin.","fr":"Choisissez une origine de publication valide."},
   "chooseValidVariantDetailsAndConfirmTheExactAction": {
