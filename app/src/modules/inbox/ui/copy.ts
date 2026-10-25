@@ -3,7 +3,7 @@ export type InboxLocale = 'en' | 'fr';
 
 export const inboxCopy = {
   en: {
-    title: 'Conversations', description: 'Messages, comments and reviews from the channels you can access.', eyebrow: 'Inbox',
+    title: 'Inbox', description: 'Messages, comments and reviews from the channels you can access.', eyebrow: 'Inbox',
     items: (shown: number, total: number) => total === 0 ? '0 stored items' : `${shown} ${shown === 1 ? 'item' : 'items'} shown · ${total} stored matches`,
     filters: 'Filters', filtersLabel: 'Inbox filters and navigation', resetFilters: 'Reset filters', applyFilters: 'Apply filters',
     search: 'Search messages and people', searchChip: 'Search', searchPlaceholder: 'Name or message text', channel: 'Channel', allChannels: 'All channels',
@@ -48,7 +48,7 @@ export const inboxCopy = {
     lastSynced: 'Last synced', notSynced: 'Not synced yet',
   },
   fr: {
-    title: 'Conversations', description: 'Messages, commentaires et avis des canaux auxquels vous avez accès.', eyebrow: 'Boîte de réception',
+    title: 'Boîte de réception', description: 'Messages, commentaires et avis des canaux auxquels vous avez accès.', eyebrow: 'Boîte de réception',
     items: (shown: number, total: number) => total === 0 ? '0 élément enregistré' : `${shown} ${shown === 1 ? 'élément affiché' : 'éléments affichés'} · ${total} résultats enregistrés`,
     filters: 'Filtres', filtersLabel: 'Filtres et navigation de la boîte de réception', resetFilters: 'Réinitialiser les filtres', applyFilters: 'Appliquer les filtres',
     search: 'Rechercher des messages et des personnes', searchChip: 'Recherche', searchPlaceholder: 'Nom ou texte du message', channel: 'Canal', allChannels: 'Tous les canaux',

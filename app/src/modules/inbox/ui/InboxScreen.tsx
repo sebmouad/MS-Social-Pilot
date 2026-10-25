@@ -18,6 +18,7 @@ import { inboxReplyPolicy } from '@/modules/inbox/server/policy';
 import { inboxCapabilities } from '@/modules/inbox/server/providers';
 import { formatInboxTime } from '@/modules/inbox/server/threads';
 import { UrlFilterChips, type UrlFilterChip } from '@/modules/publishing/ui/kit/UrlFilterChips';
+import { aiStatus } from '@/modules/studio/server/ai';
 import { InboxSyncBar, ReplyBox, ThreadToolbar } from './InboxActions';
 import { reviewSummary, reviewText } from '@/modules/inbox/reviews-copy';
 import { ThreadTools } from './ThreadTools';
@@ -129,11 +130,12 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
 
   let threadView = null;
   if (thread) {
-    const [canWrite, canResolve, capabilities, rule] = await Promise.all([
+    const [canWrite, canResolve, capabilities, rule, aiAvailable] = await Promise.all([
       canManageInbox(actor, thread.target.id),
       canManageInboxWorkflow(actor, thread.target.id),
-      thread.target.provider ? inboxCapabilities(thread.target.provider) : Promise.resolve({ reply: false, hide: false, remove: false, reviews: false, replyToReviews: false }),
+      thread.target.provider ? inboxCapabilities(thread.target.provider) : Promise.resolve({ reply: false, hide: false, remove: false, reviews: false, replyToReviews: false, privateReply: false }),
       thread.kind === 'review' ? Promise.resolve({ allowed: false, headline: '', detail: undefined }) : inboxReplyPolicy(thread.target.provider, { kind: thread.kind, channelRemoteId: thread.target.providerId, lastInbound: thread.lastInbound, timeZone }),
+      aiStatus(actor).then(status => status.available, () => false),
     ]);
     // Stored facts only; if they cannot be read the panel says so and the conversation itself stays usable.
     const details: InboxContactDetails | null = await readInboxContactDetails(actor, { key: `${thread.kind}:${thread.id}` }, constraints).catch(() => null);
@@ -195,7 +197,7 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
       <div className={styles.replyDock}>
         {thread.kind === 'review'
           ? (canWrite && capabilities.replyToReviews ? <ReplyBox key={thread.id} id={thread.id} kind="review" locale={locale} allowed headline="" /> : <p>{reviewLabel(locale, 'replyUnavailable')}</p>)
-          : <ThreadTools kind={thread.kind} id={thread.id} canWrite={canWrite} canReply={capabilities.reply} allowed={rule.allowed} headline={rule.headline} detail={rule.detail} locale={locale} />}
+          : <ThreadTools kind={thread.kind} id={thread.id} canWrite={canWrite} canReply={capabilities.reply} allowed={rule.allowed} headline={rule.headline} detail={rule.detail} locale={locale} source={[...thread.entries].reverse().find(entry => !entry.fromChannel)?.text} aiAvailable={aiAvailable} />}
       </div>
     </>;
     threadView = <section className={styles.threadPane} aria-label={thread.kind === 'message' ? copy.openConversation : thread.kind === 'review' ? reviewLabel(locale, 'openReview') : copy.openComment}>

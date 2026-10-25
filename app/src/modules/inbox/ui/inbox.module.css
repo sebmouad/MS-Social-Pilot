@@ -225,6 +225,7 @@
 }
 
 /* AI Tone Chips & Parent Post Context (Phase 4) */
+.aiToneLabel { font-size: 11px; color: var(--ink-faint); font-weight: 600; }
 .aiToneRow {
   display: flex;
   align-items: center;

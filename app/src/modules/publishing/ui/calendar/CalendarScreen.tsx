@@ -1,3 +1,4 @@
+import { readBestTimeHeatmap } from '@/modules/home/server/best-times';
 import { configOrDefault } from '@/server/config/config-or-default';
 import { reschedulePolicySchema } from '@/lib/config/reschedule-policy';
 import { InfoTip, PageHeader } from '@/components';
@@ -53,6 +54,8 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
   const movePolicy = { ...reschedulePolicy, locale: locale === "fr" ? "fr-FR" as const : "en-US" as const };
   const defaultScheduleTime = await runtimeConfig('publishing.defaultScheduleTime') as string;
   const timeZone = viewer.membership.workspace.timezone;
+  // Best-times overlay from stored post history; absent when Analytics is unavailable to this viewer.
+  const heatmap = await readBestTimeHeatmap({ userId: viewer.user.id, workspaceId: viewer.workspaceId, ...(viewer.permissions.pageScope.all ? {} : { allowedChannelIds: viewer.permissions.pageScope.ids }) }, timeZone);
   const params = await searchParams;
   const now = new Date();
   const today = workspaceDateKey(now, timeZone);
@@ -175,6 +178,6 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
     <CalendarToolbar navigation={{ previous: href(view, previous), today: href(view, today), next: href(view, next), unit }} rangeLabel={rangeLabel} view={view} counts={{ planned: posts.filter(post => postGroup(post.status) === 'planned').length, published: posts.filter(post => post.status === 'published').length }}
       viewHrefs={{ month: href("month", anchor), week: href("week", anchor), list: href("list", anchor) }} statuses={STATUSES.map(value => ({ value, label: value === "pending_approval" || value === "partially_failed" ? copy[`calendarStatus_${value}`] : copy[`status_${value}`] }))}
       origins={originOptions} chips={chips} resetHref={`/content/calendar?view=${view}&date=${anchor}${params.channel ? `&channel=${encodeURIComponent(params.channel)}` : ""}`} />
-    <CalendarBoard view={view} days={days} timeZone={timeZone} nowIso={now.toISOString()} canCreate={canCreate} filterQuery={filterQuery} defaultScheduleTime={defaultScheduleTime} guardrails={guardrails} />
+    <CalendarBoard heatmap={heatmap?.cells ?? null} view={view} days={days} timeZone={timeZone} nowIso={now.toISOString()} canCreate={canCreate} filterQuery={filterQuery} defaultScheduleTime={defaultScheduleTime} guardrails={guardrails} />
   </PublishingCopyProvider></ContentProvider>;
 }

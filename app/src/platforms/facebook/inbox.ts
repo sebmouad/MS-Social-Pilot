@@ -189,6 +189,25 @@ export async function replyToFacebookInbox(actor: InboxActor, input: { kind: 'me
   });
 }
 
+/** Sends one private Messenger reply to the author of a top-level comment; the conversation appears in the Inbox on the next sync. */
+export async function privateReplyToFacebookComment(actor: InboxActor, input: { id: string; text: string }) {
+  const text = input.text.trim();
+  if (!text || text.length > 2000) throw new OperationError('invalid_request', 'Write a message of 1 to 2,000 characters.');
+  if (!/^[A-Za-z0-9_-]{1,200}$/.test(input.id)) throw new OperationError('invalid_request', 'Invalid inbox item.');
+  const row = await prisma.postComment.findFirst({ where: { id: input.id, parentRemoteId: null, postTarget: { post: { workspaceId: actor.workspaceId }, target: { workspaceId: actor.workspaceId } } }, select: { id: true, remoteId: true, parentRemoteId: true, postTarget: { select: { targetId: true } } } });
+  if (!row) throw new OperationError('not_found', 'This comment is unavailable in the current workspace.');
+  const targetId = row.postTarget.targetId;
+  return withInboxChannelOperation(actor.workspaceId, targetId, async signal => {
+    if (await prisma.$transaction(tx => inboxCommentSuppressed(tx, actor.workspaceId, targetId, row.remoteId, row.parentRemoteId))) throw new OperationError('conflict', 'This comment has a pending or confirmed deletion.');
+    const channel = await page(actor, targetId, true);
+    signal.throwIfAborted();
+    const engine = await configuredFacebookEngine({ signal });
+    const remoteId = await engine.privateReplyToComment(channel.token, channel.providerId, row.remoteId, text);
+    await audit(actor, 'inbox.comment_private_replied', { targetId, commentId: row.id, remoteId });
+    return { ok: true };
+  });
+}
+
 export async function moderateFacebookComment(actor: InboxActor, input: { id: string; hidden: boolean }) {
   if (!/^[A-Za-z0-9_-]{1,200}$/.test(input.id)) throw new OperationError('invalid_request', 'Invalid inbox item.');
   const row = await prisma.postComment.findFirst({ where: { id: input.id, postTarget: { post: { workspaceId: actor.workspaceId }, target: { workspaceId: actor.workspaceId } } }, select: { id: true, remoteId: true, postTarget: { select: { targetId: true } } } });

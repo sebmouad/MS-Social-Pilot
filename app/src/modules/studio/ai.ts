@@ -4,16 +4,20 @@ import { AI_BOUNDS, AI_DEFAULTS } from './config';
 export const TONES = ['friendly', 'professional', 'playful', 'urgent', 'informative'] as const;
 export type Tone = (typeof TONES)[number];
 export const AI_KINDS = ['caption', 'improve', 'translate', 'hashtags'] as const;
-export type AiKind = (typeof AI_KINDS)[number];
+/** Networks the AI Studio multiplier writes for; `repurpose` is requested there only, never offered in composer assist. */
+export const REPURPOSE_NETWORKS = ['facebook', 'instagram', 'threads', 'linkedin', 'tiktok'] as const;
+export type AiKind = (typeof AI_KINDS)[number] | 'repurpose' | 'reply';
 const CONTROL = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/;
 const noControl = (v: string) => !CONTROL.test(v);
 
 export const aiRequestSchema = (maxInput: number, maxLanguage: number) => z.object({
-  kind: z.enum(AI_KINDS),
+  kind: z.enum([...AI_KINDS, 'repurpose', 'reply']),
   text: z.string().trim().min(1).max(maxInput).refine(noControl, 'Control characters are not allowed.'),
   tone: z.enum(TONES).optional(),
   language: z.string().trim().min(2).max(maxLanguage).regex(/^[A-Za-z][A-Za-z -]*$/).optional(),
-}).strict().refine(v => v.kind !== 'translate' || v.language !== undefined, { message: 'Choose a language.' });
+  network: z.enum(REPURPOSE_NETWORKS).optional(),
+}).strict().refine(v => v.kind !== 'translate' || v.language !== undefined, { message: 'Choose a language.' })
+  .refine(v => (v.kind === 'repurpose') === (v.network !== undefined), { message: 'Choose a network.' });
 export const AI_REQUEST_SCHEMA = aiRequestSchema(AI_BOUNDS.maxInputCharacters.max, AI_BOUNDS.languageMaxCharacters.max);
 export type AiRequest = z.infer<typeof AI_REQUEST_SCHEMA>;
 
@@ -48,6 +52,14 @@ export type AiContext = { brandVoice?: string | null; avoidWords?: string | null
 const strip = (value: string) => value.replace(/<\/?(material|voice|avoid)>/gi, '').replace(new RegExp(CONTROL, 'g'), ' ').trim();
 
 /** The model sees the member's text only as quoted material to transform, never as instructions. */
+const REPURPOSE_TASK: Record<(typeof REPURPOSE_NETWORKS)[number], string> = {
+  facebook: 'Write one Facebook post: a strong first line, a short description, and a question that invites comments',
+  instagram: 'Write one Instagram caption: a hook in the first line, short paragraphs, and up to 5 relevant hashtags at the end',
+  threads: 'Write a Threads thread of 3 or 4 short posts, each under 500 characters, separated by a line containing only ---',
+  linkedin: 'Write one LinkedIn post in short paragraphs',
+  tiktok: 'Write a 20 to 30 second short-video script: a 3-second hook, then the key steps, then a call to action',
+};
+
 export function buildPrompt(request: AiRequest, maxHashtags: number, context: AiContext = {}): { system: string; prompt: string } {
   const voice = context.brandVoice ? strip(context.brandVoice) : '';
   const avoid = context.avoidWords ? strip(context.avoidWords) : '';
@@ -65,6 +77,8 @@ export function buildPrompt(request: AiRequest, maxHashtags: number, context: Ai
     improve: `Rewrite the material${tone}: clearer and more engaging, same meaning and language.`,
     translate: `Translate the material into ${request.language}${tone}, keeping hashtags and links unchanged.`,
     hashtags: `Suggest up to ${maxHashtags} relevant hashtags for the material, separated by spaces, each starting with #.`,
+    reply: `Write one short reply${tone} from the brand to the message in the material. Answer only what is asked, in the same language as the message.`,
+    repurpose: `${REPURPOSE_TASK[request.network ?? 'facebook']}${tone} from the material. Write in the same language as the material.`,
   }[request.kind];
   return { system, prompt: `${task}\n\n${material}` };
 }

@@ -19,6 +19,16 @@ type Outlook = { outlook: 'above' | 'around' | 'below' | 'unknown'; basis: numbe
 type Spam = { risk: { pages: number; network: string; ownPages: number; otherPosts: number; gapMinutes: number } | null; gapMinutes: number };
 const FORMATS = ['photo', 'video', 'link', 'text', 'other'] as const;
 const VIDEO_POLL_MS = 15_000;
+const NETWORKS = ['facebook', 'instagram', 'threads', 'linkedin', 'tiktok'] as const;
+type Network = (typeof NETWORKS)[number];
+const MULTIPLIER_COPY = {
+  en: { tab: 'Repurpose', title: 'Repurpose an article', hint: 'Paste a recipe or article address, add notes if you like, and get a draft for each network written by AI from the page title and description. Review every draft before posting.',
+    url: 'Article address', topic: 'Notes (optional)', generate: 'Write drafts', working: 'Writing…', open: 'Open in composer', needInput: 'Enter an address or some notes.', noPage: 'That page could not be read; only your notes were used.', failed: 'This draft could not be written. Try again.',
+    networks: { facebook: 'Facebook', instagram: 'Instagram', threads: 'Threads', linkedin: 'LinkedIn', tiktok: 'TikTok script' } },
+  fr: { tab: 'Recycler', title: 'Recycler un article', hint: 'Collez l’adresse d’une recette ou d’un article, ajoutez des notes si besoin : l’IA écrit un brouillon par réseau à partir du titre et de la description de la page. Relisez chaque brouillon avant de publier.',
+    url: 'Adresse de l’article', topic: 'Notes (facultatif)', generate: 'Écrire les brouillons', working: 'Rédaction…', open: 'Ouvrir dans l’éditeur', needInput: 'Saisissez une adresse ou des notes.', noPage: 'Cette page n’a pas pu être lue ; seules vos notes ont été utilisées.', failed: 'Ce brouillon n’a pas pu être écrit. Réessayez.',
+    networks: { facebook: 'Facebook', instagram: 'Instagram', threads: 'Threads', linkedin: 'LinkedIn', tiktok: 'Script TikTok' } },
+} as const;
 
 async function call<T>(url: string, body: unknown, fallback: string): Promise<{ data?: T; response?: Response; error?: string }> {
   try {
@@ -43,42 +53,23 @@ export function AiStudioScreen({ status, videos: initialVideos, channels, canChe
   const [videoPrompt, setVideoPrompt] = useState(''); const [aspect, setAspect] = useState(status.video.defaultAspectRatio ?? ''); const [videos, setVideos] = useState(initialVideos);
   // voice
   const [voiceText, setVoiceText] = useState(''); const [voice, setVoice] = useState(status.voice.defaultVoice ?? ''); const [audio, setAudio] = useState<string | null>(null);
-  // multiplier
+  // multiplier: one AI request per network, from the page's real title and description plus the person's notes.
   const [multiplierUrl, setMultiplierUrl] = useState('');
   const [multiplierTopic, setMultiplierTopic] = useState('');
-  const [campaign, setCampaign] = useState<{
-    instagramCarousel: string[];
-    reelScript: string;
-    facebookPost: string;
-    facebookComment: string;
-    linkedInPost: string;
-    threadTweets: string[];
-    tiktokHook: string;
-  } | null>(null);
-
-  const generateCampaign = () => {
-    const raw = multiplierTopic.trim() || multiplierUrl.replace(/https?:\/\/(www\.)?/, '').split('/')[1]?.replace(/[-_]/g, ' ') || 'Delicious Homemade Recipe';
-    const capTitle = raw.charAt(0).toUpperCase() + raw.slice(1);
-    setCampaign({
-      instagramCarousel: [
-        `Slide 1 (Hook): Stop making ${raw} the hard way. Here is the foolproof 3-step method ⬇️`,
-        `Slide 2 (Step 1): The secret starts with high quality prep and optimal temperature balance.`,
-        `Slide 3 (Step 2): Combine slowly—avoid over-mixing to preserve authentic texture and flavor.`,
-        `Slide 4 (Step 3): The golden finish: bake/rest for 15 minutes before serving.`,
-        `Slide 5 (CTA): Bookmark this for later & tap the link in bio for full printable measurements! 📌`,
-      ],
-      reelScript: `[0-3s HOOK] You've been making ${raw} wrong your entire life.\n[4-15s VALUE] Watch this texture: no complicated equipment, just 3 pantry ingredients.\n[16-25s TIP] The game-changer is adding the secret pinch before simmering.\n[26-30s CTA] Full recipe with step-by-step video linked in bio!`,
-      facebookPost: `✨ Master ${capTitle} with our step-by-step masterclass!\n\nWhether you're cooking for family or entertaining friends, this authentic recipe never fails. We've perfected the cook time, moisture balance, and seasoning so you get flawless results every single time.\n\n👇 Full ingredients list and video tutorial in the first comment below!`,
-      facebookComment: `Full Recipe Ingredients & Printable Card:\n📍 Prep time: 15 mins\n🔥 Cook time: 25 mins\n🔗 Detailed recipe instructions: ${multiplierUrl || 'https://social.newsgeet.com/recipes'}`,
-      linkedInPost: `What can creating ${raw} teach us about product execution and quality control?\n\n1. Process beats improvisation: Consistency comes from measured ingredients.\n2. Patience compounds: Rushing the rest period compromises the entire outcome.\n3. User feedback matters: We refined this formula over 20 iterations.\n\nHow do you maintain standards under pressure in your craft? #Quality #Operations #Craftsmanship`,
-      threadTweets: [
-        `1/4 The ultimate guide to perfect ${raw} (without spending hours in the kitchen): 🧵`,
-        `2/4 Most people fail at step 1: they rush the temperature acclimation. Always let ingredients reach room temp first.`,
-        `3/4 The secret sauce: a 10-minute rest before cutting. Retains 40% more moisture.`,
-        `4/4 Want the complete printable recipe sheet? Grab it here: ${multiplierUrl || 'https://social.newsgeet.com'}`,
-      ],
-      tiktokHook: `POV: You just unlocked the secret to restaurant-quality ${raw} at home in 20 minutes 🤯 #RecipeHacks #FoodTok #QuickEats`,
-    });
+  const [campaign, setCampaign] = useState<Array<{ network: Network; text: string | null; error: string | null }> | null>(null);
+  const [multiplying, setMultiplying] = useState(false);
+  const m = MULTIPLIER_COPY[locale];
+  const generateCampaign = async () => {
+    setMultiplying(true); setCampaign(null); setError('');
+    const url = multiplierUrl.trim();
+    const page = url ? (await call<{ preview: Preview | null }>('/api/publishing/link-preview', { url }, m.noPage)).data?.preview ?? null : null;
+    const material = [page?.title, page?.description, multiplierTopic.trim(), url].filter(Boolean).join('\n');
+    if (!material) { setMultiplying(false); setError(m.needInput); return; }
+    const results = await Promise.all(NETWORKS.map(async network => {
+      const outcome = await call<{ text: string }>('/api/ai', { kind: 'repurpose', network, text: material }, m.failed);
+      return { network, text: outcome.data?.text ?? null, error: outcome.error ?? null };
+    }));
+    setCampaign(results); setMultiplying(false);
   };
   // check
   const [selected, setSelected] = useState<string[]>([]); const [text, setText] = useState(''); const [link, setLink] = useState(''); const [format, setFormat] = useState<(typeof FORMATS)[number]>('text'); const [when, setWhen] = useState('');
@@ -210,90 +201,33 @@ export function AiStudioScreen({ status, videos: initialVideos, channels, canChe
 
   const multiplierTab = (
     <div className={styles.stack}>
-      <form className={styles.panel} onSubmit={e => { e.preventDefault(); generateCampaign(); }}>
-        <h2><IconSparkles size={20} aria-hidden="true" /> 1-to-Many Multi-Network Campaign Multiplier</h2>
-        <p className={styles.hint}>
-          Paste any WordPress recipe, blog article URL, or enter a topic to automatically generate coordinated campaigns across Instagram, Facebook, LinkedIn, X/Threads, and TikTok.
-        </p>
+      <form className={styles.panel} onSubmit={e => { e.preventDefault(); void generateCampaign(); }}>
+        <h2><IconSparkles size={20} aria-hidden="true" /> {m.title}</h2>
+        <p className={styles.hint}>{m.hint}</p>
         <div className={styles.fields}>
-          <label className="ui-field">
-            <span>WordPress / Article URL</span>
-            <input className="ui-input" type="url" placeholder="https://social.newsgeet.com/recipes/pasta" value={multiplierUrl} onChange={e => setMultiplierUrl(e.target.value)} />
-          </label>
-          <label className="ui-field">
-            <span>Core Topic or Title (Optional)</span>
-            <input className="ui-input" type="text" placeholder="Authentic Garlic Butter Pasta" value={multiplierTopic} onChange={e => setMultiplierTopic(e.target.value)} />
-          </label>
+          <label className="ui-field"><span>{m.url}</span>
+            <input className="ui-input" type="url" placeholder="https://" value={multiplierUrl} onChange={e => setMultiplierUrl(e.target.value)} /></label>
+          <label className="ui-field"><span>{m.topic}</span>
+            <input className="ui-input" type="text" value={multiplierTopic} onChange={e => setMultiplierTopic(e.target.value)} /></label>
         </div>
         <div className={styles.actions}>
-          <Button type="submit" variant="primary" leading={<IconSparkles size={16} />}>Generate Multi-Network Campaign</Button>
+          <Button type="submit" variant="primary" busy={multiplying} disabled={multiplying} leading={<IconSparkles size={16} />}>{multiplying ? m.working : m.generate}</Button>
         </div>
       </form>
-
-      {campaign && (
-        <div className={styles.multiplierGrid}>
-          <div className={styles.campaignCard}>
-            <div className={styles.campaignCardHeader}>
-              <strong>📸 Instagram Carousel & Reel</strong>
-              <a className="ui-button ui-button--secondary ui-button--sm" href={`/create?message=${encodeURIComponent(campaign.instagramCarousel.join('\n\n'))}`}>Open in Composer</a>
-            </div>
-            <div className={styles.campaignContent}>
-              <strong>5-Slide Carousel:</strong><br />
-              {campaign.instagramCarousel.join('\n\n')}<br /><br />
-              <strong>30s Reel Script:</strong><br />
-              {campaign.reelScript}
-            </div>
+      {campaign && <div className={styles.multiplierGrid}>
+        {campaign.map(item => <div key={item.network} className={styles.campaignCard}>
+          <div className={styles.campaignCardHeader}>
+            <strong>{m.networks[item.network]}</strong>
+            {item.text ? <a className="ui-button ui-button--secondary ui-button--sm" href={`/create?message=${encodeURIComponent(item.text)}`}>{m.open}</a> : null}
           </div>
-
-          <div className={styles.campaignCard}>
-            <div className={styles.campaignCardHeader}>
-              <strong>📘 Facebook Post + First Comment</strong>
-              <a className="ui-button ui-button--secondary ui-button--sm" href={`/create?message=${encodeURIComponent(campaign.facebookPost)}`}>Open in Composer</a>
-            </div>
-            <div className={styles.campaignContent}>
-              <strong>Post Message:</strong><br />
-              {campaign.facebookPost}<br /><br />
-              <strong>Scheduled 1st Comment:</strong><br />
-              {campaign.facebookComment}
-            </div>
-          </div>
-
-          <div className={styles.campaignCard}>
-            <div className={styles.campaignCardHeader}>
-              <strong>💼 LinkedIn Thought Leadership</strong>
-              <a className="ui-button ui-button--secondary ui-button--sm" href={`/create?message=${encodeURIComponent(campaign.linkedInPost)}`}>Open in Composer</a>
-            </div>
-            <div className={styles.campaignContent}>
-              {campaign.linkedInPost}
-            </div>
-          </div>
-
-          <div className={styles.campaignCard}>
-            <div className={styles.campaignCardHeader}>
-              <strong>🧵 X & Threads 4-Part Thread</strong>
-              <a className="ui-button ui-button--secondary ui-button--sm" href={`/create?message=${encodeURIComponent(campaign.threadTweets.join('\n\n'))}`}>Open in Composer</a>
-            </div>
-            <div className={styles.campaignContent}>
-              {campaign.threadTweets.join('\n\n')}
-            </div>
-          </div>
-
-          <div className={styles.campaignCard}>
-            <div className={styles.campaignCardHeader}>
-              <strong>🎵 TikTok Hook & Captions</strong>
-              <a className="ui-button ui-button--secondary ui-button--sm" href={`/create?message=${encodeURIComponent(campaign.tiktokHook)}`}>Open in Composer</a>
-            </div>
-            <div className={styles.campaignContent}>
-              {campaign.tiktokHook}
-            </div>
-          </div>
-        </div>
-      )}
+          <div className={styles.campaignContent}>{item.text ?? <span role="alert">{item.error}</span>}</div>
+        </div>)}
+      </div>}
     </div>
   );
 
   const tabItems = [
-    { id: 'multiplier', label: '🚀 Content Multiplier', icon: <IconSparkles size={16} />, content: multiplierTab },
+    { id: 'multiplier', label: MULTIPLIER_COPY[locale].tab, icon: <IconSparkles size={16} />, content: multiplierTab },
     ...(status.image.available ? [{ id: 'image', label: t.tabImage, icon: <IconPhoto size={16} />, content: imageTab }] : []),
     ...(status.video.available ? [{ id: 'video', label: t.tabVideo, icon: <IconVideo size={16} />, count: videos.filter(video => video.status === 'working').length || undefined, content: videoTab }] : []),
     ...(status.voice.available ? [{ id: 'voice', label: t.tabVoice, icon: <IconMicrophone size={16} />, content: voiceTab }] : []),

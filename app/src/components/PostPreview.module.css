@@ -286,3 +286,4 @@
   font-weight: 600;
 }
 
+.reuse { display: flex; justify-content: flex-end; padding-top: 8px; border-top: 1px solid var(--line-subtle); }

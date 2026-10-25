@@ -58,6 +58,12 @@ async function send(payload: Record<string, unknown>, locale: InboxLocale = 'en'
   }
 }
 
+const REPLY_TONES = ['friendly', 'professional', 'informative'] as const;
+const REPLY_AI_COPY = {
+  en: { label: 'Draft with AI', failed: 'No draft this time. Try again.', tones: { friendly: 'Friendly', professional: 'Professional', informative: 'Informative' } },
+  fr: { label: 'Brouillon IA', failed: 'Pas de brouillon cette fois. Réessayez.', tones: { friendly: 'Chaleureux', professional: 'Professionnel', informative: 'Informatif' } },
+} as const;
+
 /** Freshness of the stored Inbox read behind the sync bar: never synced, stale, or fresh. A sync that just completed in this browser session is current by definition. */
 export function inboxFreshnessState({ lastSynced, stale = false, syncedNow = null }: { lastSynced: string | null; stale?: boolean; syncedNow?: string | null }): 'never' | 'stale' | 'fresh' {
   if (syncedNow) return 'fresh';
@@ -271,7 +277,7 @@ type SavedReply = { id: string; name: string; body: string };
 const isSavedReply = (value: unknown): value is SavedReply => typeof value === 'object' && value !== null && typeof (value as SavedReply).id === 'string' && typeof (value as SavedReply).name === 'string' && typeof (value as SavedReply).body === 'string';
 
 /** Reply composer with a character count and the platform's reply rule in plain words. */
-export function ReplyBox({ id, kind, allowed, headline, detail, maxLength = 2000, value, onChange, onInsertSavedReply, locale = 'en' }: { locale?: 'en' | 'fr'; id: string; kind: Kind; allowed: boolean; headline: string; detail?: string; maxLength?: number; value?: string; onChange?: (value: string) => void; onInsertSavedReply?: (body: string) => void }) {
+export function ReplyBox({ id, kind, allowed, headline, detail, maxLength = 2000, value, onChange, onInsertSavedReply, source, aiAvailable = false, locale = 'en' }: { source?: string; aiAvailable?: boolean; locale?: 'en' | 'fr'; id: string; kind: Kind; allowed: boolean; headline: string; detail?: string; maxLength?: number; value?: string; onChange?: (value: string) => void; onInsertSavedReply?: (body: string) => void }) {
   const validation = useFormValidation();
   const copy = useInboxCatalog('REPLY_COPY')[locale];
   const inFlight = useRef(false);
@@ -281,6 +287,20 @@ export function ReplyBox({ id, kind, allowed, headline, detail, maxLength = 2000
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [sent, setSent] = useState('');
+  // AI drafts answer the visitor's actual message; nothing is sent until the person presses Send.
+  const ai = REPLY_AI_COPY[locale];
+  const [drafting, setDrafting] = useState<(typeof REPLY_TONES)[number] | null>(null);
+  const [draftError, setDraftError] = useState('');
+  async function draftReply(tone: (typeof REPLY_TONES)[number]) {
+    if (!source) return;
+    setDrafting(tone); setDraftError('');
+    try {
+      const response = await fetch('/api/ai', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ kind: 'reply', tone, text: source.slice(0, 4000) }) });
+      const body = await response.json().catch(() => null) as { text?: string; error?: string } | null;
+      if (response.ok && body?.text) updateText(body.text.slice(0, maxLength)); else setDraftError(body?.error || ai.failed);
+    } catch { setDraftError(ai.failed); }
+    finally { setDrafting(null); }
+  }
   // Saved replies only fill the draft through the caller's insert handler; inserting never sends anything.
   const [savedReplies, setSavedReplies] = useState<SavedReply[] | 'error' | null>(null);
   // The fetch depends only on whether a handler exists, so typing in the draft never refetches the list.
@@ -328,14 +348,11 @@ export function ReplyBox({ id, kind, allowed, headline, detail, maxLength = 2000
   return <form method="post" noValidate className={styles.reply} onSubmit={event => void submit(event)}>
     <p id={ruleId} className={allowed ? styles.ruleOpen : styles.ruleClosed}><span aria-hidden="true">{allowed ? '●' : '■'}</span> <strong>{headline}</strong>{detail ? <span className={styles.ruleDetail}> {detail}</span> : null}</p>
     <p className={styles.replyAudience} data-kind={kind}>{kind === 'message' ? copy.privateNote : copy.publicNote}</p>
-    <div className={styles.aiToneRow} role="group" aria-label="AI Reply Suggestions">
-      <span style={{ fontSize: '11px', color: 'var(--ink-faint)', fontWeight: 600 }}>AI Draft:</span>
-      <button type="button" className={styles.aiToneChip} onClick={() => updateText("Thank you so much for reaching out! We're glad to have you in our community. Let us know if you have any questions! 😊")}>✨ Friendly</button>
-      <button type="button" className={styles.aiToneChip} onClick={() => updateText("Hi there, thank you for letting us know! We're on it and happy to assist you right away.")}>🤝 Supportive</button>
-      <button type="button" className={styles.aiToneChip} onClick={() => updateText("Thanks for asking! You can find the full guide and details linked directly in our bio.")}>❓ FAQ / Link</button>
-      <button type="button" className={styles.aiToneChip} onClick={() => updateText("Bonjour et merci de votre message ! N'hésitez pas si vous avez la moindre question.")}>🇫🇷 French</button>
-      <button type="button" className={styles.aiToneChip} onClick={() => updateText("We truly appreciate your feedback and apologize for any inconvenience. We'd love to make this right—please send us a DM so we can assist directly.")}>🛡️ De-escalate</button>
-    </div>
+    {aiAvailable && source ? <div className={styles.aiToneRow} role="group" aria-label={ai.label}>
+      <span className={styles.aiToneLabel}>{ai.label}</span>
+      {REPLY_TONES.map(tone => <button key={tone} type="button" className={styles.aiToneChip} disabled={!allowed || busy || drafting !== null} aria-busy={drafting === tone} onClick={() => void draftReply(tone)}>{ai.tones[tone]}</button>)}
+      {draftError ? <span role="alert" className={styles.error}>{draftError}</span> : null}
+    </div> : null}
     <label htmlFor={fieldId} className="ui-visually-hidden">{copy.reply}</label>
     <AutoTextarea id={fieldId} name="reply" data-inbox-reply rows={3} maxLength={maxLength} value={text} disabled={!allowed || busy} aria-describedby={[ruleId, countId, validation.fieldProps('reply')['aria-describedby']].filter(Boolean).join(' ')} aria-invalid={Boolean(error) || Boolean(validation.errors.reply) || undefined}
       placeholder={allowed ? (kind === 'message' ? copy.privatePlaceholder : copy.publicPlaceholder) : copy.unavailable}

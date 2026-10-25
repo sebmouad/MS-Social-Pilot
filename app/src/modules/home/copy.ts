@@ -11,7 +11,7 @@ const en = {
   startBody: 'Connect a platform, then select the channels and ad accounts to add to this workspace. Only selected sources appear in publishing and reports.', startAction: 'Connect channels',
   continueTitle: 'Continue your work', posts: 'Browse posts', connections: 'View connections', analytics: 'Explore analytics', ads: 'View ad accounts',
   greeting: 'Welcome back', period: 'Last {n} days (UTC; today so far)', openModule: 'Open {name}',
-  moduleNames: { publishing: 'Publishing', inbox: 'Inbox', analytics: 'Analytics', ads: 'Ads' },
+  moduleNames: { publishing: 'Publishing', inbox: 'Inbox', analytics: 'Insights', ads: 'Ads' },
   unavailableTitle: 'Not available right now', unavailableBody: 'This figure could not be loaded. Try again in a moment.',
   audience: 'Audience', audienceOf: '{covered} of {selected} channels have a count', audienceAsOf: 'Most recent count: {date}; other channels may be older',
   audienceNote: 'Added across channels; a person who follows several may be counted more than once.',

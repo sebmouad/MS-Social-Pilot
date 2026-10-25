@@ -9,7 +9,7 @@ import { handleFacebookDataDeletion, handleFacebookDeauthorize } from './data-ca
 import { facebookAdsHost } from './ads';
 import { facebookAdsOps } from './ads-ops';
 import { facebookAnalyticsHost } from './analytics';
-import { facebookReplyPolicy, canManageFacebookInbox, syncFacebookInbox, replyToFacebookInbox, moderateFacebookComment, prepareDeleteFacebookComment, readFacebookCommentPresence, syncFacebookReviews } from './inbox';
+import { facebookReplyPolicy, canManageFacebookInbox, syncFacebookInbox, replyToFacebookInbox, moderateFacebookComment, privateReplyToFacebookComment, prepareDeleteFacebookComment, readFacebookCommentPresence, syncFacebookReviews } from './inbox';
 import { syncAdsAnalytics, syncInbox, syncPageAnalytics, syncScheduledPostStatus } from './jobs';
 import { syncFacebookSubmittedPosts } from './submitted-jobs';
 import { refreshFacebookLinkCard } from './link-preview';
@@ -37,7 +37,7 @@ export const facebookHost = {
   },
   linkPreview: { refresh: refreshFacebookLinkCard },
   apiUsage: { read: readFacebookGraphUsage },
-  inbox: { replyPolicy: facebookReplyPolicy, canManage: canManageFacebookInbox, sync: syncFacebookInbox, reply: replyToFacebookInbox, moderate: moderateFacebookComment, prepareDeleteComment: prepareDeleteFacebookComment, readCommentPresence: readFacebookCommentPresence, reviews: { sync: syncFacebookReviews } },
+  inbox: { replyPolicy: facebookReplyPolicy, canManage: canManageFacebookInbox, sync: syncFacebookInbox, reply: replyToFacebookInbox, moderate: moderateFacebookComment, privateReply: privateReplyToFacebookComment, prepareDeleteComment: prepareDeleteFacebookComment, readCommentPresence: readFacebookCommentPresence, reviews: { sync: syncFacebookReviews } },
   dataCallbacks: { deauthorize: handleFacebookDeauthorize, dataDeletion: handleFacebookDataDeletion },
   connection: {
     isReady: () => configuredFacebookOAuth().then(() => true, () => false),

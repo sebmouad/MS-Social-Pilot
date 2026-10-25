@@ -145,37 +145,6 @@
   border-radius: var(--radius-md);
   padding: 16px;
 }
-.gridProfileHeader {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding-bottom: 14px;
-  border-bottom: 1px solid var(--line-subtle);
-}
-.gridProfileAvatar {
-  width: 56px;
-  height: 56px;
-  border-radius: 50%;
-  background: var(--accent-soft);
-  color: var(--accent);
-  display: grid;
-  place-items: center;
-  font-weight: 700;
-  font-size: 18px;
-}
-.gridProfileStats {
-  display: flex;
-  gap: 16px;
-  font-size: 12px;
-}
-.gridProfileStats strong {
-  display: block;
-  font-size: 14px;
-  color: var(--ink);
-}
-.gridProfileStats span {
-  color: var(--ink-faint);
-}
 .nineGridContainer {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -215,43 +184,19 @@
   z-index: 2;
   box-shadow: 0 1px 3px rgba(0,0,0,0.3);
 }
-.gridCellStats {
-  position: absolute;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.45);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  color: #fff;
-  font-size: 11px;
-  font-weight: 600;
-  opacity: 0;
-  transition: opacity var(--ease-fast);
-}
-.gridCell:hover .gridCellStats {
-  opacity: 1;
-}
-.gridHarmony {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding-top: 8px;
-  font-size: 11px;
-  color: var(--ink-soft);
-}
-.colorPalette {
-  display: flex;
-  gap: 4px;
-}
-.colorDot {
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  border: 1px solid rgba(0,0,0,0.1);
-}
 
 
 /* Keyboard hints in the action bar; hidden where there is no keyboard to use them. */
 .shortcutHints { display: inline-flex; align-items: center; gap: 10px; font-size: 11px; color: var(--ink-faint); margin-right: auto; }
 @media (max-width: 720px), (pointer: coarse) { .shortcutHints { display: none; } }
+.gridCellEmpty { color: var(--ink-faint); font-size: 11px; text-align: center; padding: 8px; }
+/* Opening-line checks */
+.hookPanel { background: var(--surface-raised); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 12px; margin-top: 10px; display: grid; gap: 8px; font-size: 12px; }
+.hookHead { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.hookChecks { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; color: var(--ink-soft); }
+.hookChecks li { display: flex; align-items: center; gap: 6px; }
+.hookChecks li svg { color: var(--warning); flex-shrink: 0; }
+.hookChecks li[data-ok] svg { color: var(--success); }
+.hookRewrite { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.hookRewrite span { flex: 1; min-width: 0; color: var(--ink); }
+.hookRewrite p { flex-basis: 100%; margin: 0; color: var(--danger); }

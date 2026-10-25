@@ -88,6 +88,8 @@ export interface FacebookEngine {
   createCampaign(input: AdCampaignCreateRequest): Promise<{ remoteId: string }>;
   replyToConversation(accessToken: string, conversationId: string, text: string): Promise<string>;
   replyToComment(accessToken: string, commentId: string, text: string): Promise<string>;
+  /** Messenger "private reply" to a comment's author (one per comment, within Meta's window). */
+  privateReplyToComment(accessToken: string, pageId: string, commentId: string, text: string): Promise<string>;
   moderateComment(accessToken: string, commentId: string, hidden: boolean): Promise<void>;
   deleteComment(accessToken: string, commentId: string): Promise<void>;
 }
@@ -508,6 +510,11 @@ export function createFacebookEngine(rawConfig: FacebookConfig, fetchImpl: Faceb
       const result = object(await request(`${encodeURIComponent(commentId)}/comments`, { method: 'POST', token, body: { message: text } }));
       if (typeof result.id !== 'string') throw new FacebookApiError('Facebook did not return a reply id.', 200);
       return result.id;
+    },
+    async privateReplyToComment(token, pageId, commentId, text) {
+      const result = object(await request(`${encodeURIComponent(pageId)}/messages`, { method: 'POST', token, body: { recipient: JSON.stringify({ comment_id: commentId }), message: JSON.stringify({ text }) } }));
+      if (typeof result.message_id !== 'string') throw new FacebookApiError('Facebook did not confirm the private reply.', 200);
+      return result.message_id;
     },
     async moderateComment(token, commentId, hidden) {
       await request(encodeURIComponent(commentId), { method: 'POST', token, body: { is_hidden: String(hidden) } });

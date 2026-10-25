@@ -60,7 +60,7 @@ export function ModerationRules({ canWrite, locale = 'en' }: { canWrite: boolean
   }
   async function save() {
     if (!draft) return;
-    const rule = { ...draft, name: draft.name.trim(), keywords: keywords.split(',').map(word => word.trim()).filter(Boolean), replyText: draft.action === 'reply' ? (draft.replyText ?? '').trim() : null };
+    const rule = { ...draft, name: draft.name.trim(), keywords: keywords.split(',').map(word => word.trim()).filter(Boolean), replyText: draft.action === 'reply' || draft.action === 'comment_to_dm' ? (draft.replyText ?? '').trim() : null };
     const problem = moderationRuleProblem(rule);
     if (problem) { setError(t(problem === 'keywords' ? 'needsKeywords' : 'needsReply')); return; }
     const confirmation = editing ? moderationConfirmation.update(editing) : moderationConfirmation.create(rule.name);
@@ -91,7 +91,7 @@ export function ModerationRules({ canWrite, locale = 'en' }: { canWrite: boolean
         <label>{t('when')}<select value={draft.match} onChange={e => setDraft({ ...draft, match: e.target.value as ModerationRuleInput['match'] })}>{MODERATION_MATCHES.map(match => <option key={match} value={match}>{t(`match.${match}`)}</option>)}</select></label>
         {draft.match === 'keywords' && <label>{t('keywords')}<input type="text" value={keywords} onChange={e => setKeywords(e.target.value)} /><span className={styles.hint}>{t('keywordsHint')}</span></label>}
         <label>{t('then')}<select value={draft.action} onChange={e => setDraft({ ...draft, action: e.target.value as ModerationRuleInput['action'] })}>{MODERATION_ACTIONS.map(action => <option key={action} value={action}>{t(`action.${action}`)}</option>)}</select></label>
-        {draft.action === 'reply' && <><label>{t('replyText')}<textarea maxLength={2000} value={draft.replyText ?? ''} onChange={e => setDraft({ ...draft, replyText: e.target.value })} /><span className={styles.hint}>{t('replyHint')}</span></label>
+        {(draft.action === 'reply' || draft.action === 'comment_to_dm') && <><label>{t('replyText')}<textarea maxLength={2000} value={draft.replyText ?? ''} onChange={e => setDraft({ ...draft, replyText: e.target.value })} /><span className={styles.hint}>{t('replyHint')}</span></label>
           <label className={styles.check}><input type="checkbox" checked={draft.oncePerUser} onChange={e => setDraft({ ...draft, oncePerUser: e.target.checked })} />{t('oncePerUser')}</label></>}
         <fieldset className={styles.channels}><legend>{t('channels')}</legend>
           {data.canTargetAllChannels && <label className={styles.check}><input type="checkbox" checked={draft.targetIds.length === 0} onChange={e => setDraft({ ...draft, targetIds: e.target.checked ? [] : data.channels.slice(0, 1).map(channel => channel.id) })} />{t('allChannels')}</label>}
