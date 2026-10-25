@@ -21,6 +21,7 @@ import { AdsHeader } from './AdsHeader';
 import { AdsReportPager } from './AdsReportPager';
 import { AdsReportExport } from './AdsReportExport';
 import { loadAdsInsightsCopy } from './ads-insights-server';
+import { readBoostSuggestion } from '@/modules/ads/server/boost-suggestion';
 import './ads.css';
 
 const PATH = '/ads';
@@ -31,7 +32,7 @@ const PATH = '/ads';
  * REST and MCP; spend is never added across currencies.
  */
 async function AdsPage({ searchParams }: { searchParams: Promise<AdsSearchParams & { page?: string | string[] }> }) {
-  const { workspaceId, permissions, entitlements } = await requireViewer({ feature: 'ads/overview', channelScoped: true });
+  const { workspaceId, permissions, entitlements, user: { id: userId } } = await requireViewer({ feature: 'ads/overview', channelScoped: true });
   const { copy: ui, locale } = await loadAdsInsightsCopy();
   const catalogs = await loadAdsCopy();
   const t = (key: Parameters<typeof customerText>[2], values?: Record<string, string | number>) => customerText(catalogs.customer, locale, key, values);
@@ -62,6 +63,7 @@ async function AdsPage({ searchParams }: { searchParams: Promise<AdsSearchParams
   }));
   const use = (feature: string) => canUseFeature(entitlements, feature) && canAccessFeature(permissions, feature, 'read');
   const exportPolicy = use('ads/campaigns') ? await loadAdsOutputPolicy().catch(() => null) : null;
+  const boost = use('ads/campaigns') && use('analytics/posts') ? await readBoostSuggestion({ userId, workspaceId, ...(allowedTargetIds ? { allowedChannelIds: allowedTargetIds } : {}) }) : null;
 
   return <PageFrame module="ads"><div className="insights">
     <AdsHeader title={t('text001')} copy={ui} locale={locale} policy={policy} filters={filters} accounts={dataset.accounts} count={scoped.length}
@@ -69,23 +71,16 @@ async function AdsPage({ searchParams }: { searchParams: Promise<AdsSearchParams
     {!dataset.accounts.length
       ? <EmptyState title={ui.emptyTitle} icon={<IconAd />} action={<a className="ui-button ui-button--primary ui-button--md" href="/settings/channels">{ui.emptyAction}</a>}>{ui.emptyBody}</EmptyState>
       : <section className="insights-accounts" aria-label={ui.caption}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px', padding: '14px 18px', background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.1) 0%, rgba(245, 158, 11, 0.02) 100%)', border: '1px solid rgba(245, 158, 11, 0.35)', borderRadius: 'var(--radius-md)', marginBottom: '16px' }}>
-          <div style={{ display: 'grid', gap: '4px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ fontSize: '18px' }}>⚡</span>
-              <strong style={{ fontSize: '13.5px', color: 'var(--ink)' }}>Organic-to-Paid Meta Ad Auto-Boost Recommendation</strong>
-              <span style={{ fontSize: '10px', fontWeight: 750, textTransform: 'uppercase', background: '#f59e0b', color: '#fff', padding: '1px 6px', borderRadius: '4px' }}>90th %ile Velocity</span>
-            </div>
-            <p style={{ margin: 0, fontSize: '12px', color: 'var(--ink-soft)', lineHeight: 1.45 }}>
-              Your recent organic post <em>&ldquo;Mastering Garlic Butter Pasta&rdquo;</em> is beating 92% of workspace engagement velocity. Boost this post to Meta Ads with a recommended $25 test budget over 3 days.
-            </p>
+        {boost ? <aside className="ads-boost" aria-label={t('boostTitle')}>
+          <div>
+            <strong>{t('boostTitle')}</strong>
+            <p>{t('boostBody', { text: boost.text.length > 90 ? `${boost.text.slice(0, 89)}…` : boost.text, channel: boost.channelName, value: new Intl.NumberFormat(locale).format(boost.value), label: boost.rankLabel, ratio: new Intl.NumberFormat(locale, { maximumFractionDigits: 1 }).format(boost.ratio) })}</p>
           </div>
-          <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
-            <a className="ui-button ui-button--primary ui-button--sm" style={{ fontWeight: 700 }} href="/ads/manage?action=boost&budget=25">
-              ⚡ Auto-Boost ($25)
-            </a>
+          <div className="ads-boost__actions">
+            {boost.url ? <a className="ui-button ui-button--secondary ui-button--sm" href={boost.url} target="_blank" rel="noreferrer">{t('boostOpenPost')}</a> : null}
+            <a className="ui-button ui-button--primary ui-button--sm" href="/ads/campaigns">{t('boostCreate')}</a>
           </div>
-        </div>
+        </aside> : null}
         <AccountsTrendCharts accounts={trends} locale={locale} />
         <AccountsTable rows={rows} copy={ui} locale={locale} campaignsHref={adsQuery(filters, '/ads/campaigns')} rowLabel={ui.colAccount} />
         <AdsReportPager filters={filters} path={PATH} kind="accounts" page={page} />

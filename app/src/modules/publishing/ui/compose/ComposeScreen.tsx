@@ -17,6 +17,8 @@ import { pageChannelScope } from '@/modules/shell/server/scope';
 import { isDateKey } from '@/lib/calendar-dates';
 import { formatPostPreviewTime } from '@/lib/post-preview-time';
 import { PostComposer } from './PostComposer';
+import { readPublishingPostPage } from '@/modules/publishing/server/read';
+import { postThumbnail } from '@/components/post-thumbnail';
 import { aiStatus } from '@/modules/studio/server/ai';
 import { loadWorkspaceOperations } from '@/modules/settings/server/workspace-operations';
 
@@ -73,13 +75,16 @@ async function ComposePageContent({ searchParams }: { searchParams: Promise<Para
   const scoped = (scope?.ids ?? []).filter(id => postable.includes(id));
   const initialTargetIds = scoped.length ? scoped : postable.length === 1 ? postable : [];
   const authorFallback = copyCatalog.authorFallback[locale];
+  // The grid preview shows real recent posts: the latest published page of posts, filtered to the selected channels in the browser.
+  const recentPosts = await readPublishingPostPage({ userId: viewer.user.id, workspaceId: viewer.workspaceId }, { status: 'published' })
+    .then(page => page.posts.map(post => ({ id: post.id, targetIds: post.targets.map(target => target.target.id), thumbnail: postThumbnail(post.media) })), () => []);
   const initialMessage = first(params.message);
   const initialLink = first(params.link);
   const initialMediaParam = first(params.media);
   const initialMediaUrls = initialMediaParam ? [initialMediaParam] : undefined;
   return <ContentProvider copy={content} policy={policy} locale={locale}>
     {canCreate
-      ? <PostComposer copyCatalog={copyCatalog} autosaveSeconds={Number(autosaveSeconds)} remoteScheduling={remoteScheduling} profiles={profiles ?? undefined} queueAvailable={queueAvailable} aiStatus={aiAssist} aiLocale={locale} targets={choices} initialTargetIds={initialTargetIds} initialMessage={initialMessage} initialLink={initialLink} initialMediaUrls={initialMediaUrls} templates={templates} labels={labels} maxFirstCommentDelayMinutes={Number(maxFirstCommentDelayMinutes)} spacingGapMinutes={spacingGapMinutes} imageRules={{ allowedMimeTypes: allowedMimeTypes as string[], maxUploadBytes: Number(maxUploadBytes), maxAltCharacters: Number(maxAltCharacters), maxMessageCharacters: Number(maxMessageCharacters), maxMedia: Number(maxMedia) }} schedule={schedule} authorName={viewer.user.name || authorFallback} createdAt={createdAt} createdAtDisplay={formatPostPreviewTime(createdAt, schedule.timeZone)} />
+      ? <PostComposer recentPosts={recentPosts} copyCatalog={copyCatalog} autosaveSeconds={Number(autosaveSeconds)} remoteScheduling={remoteScheduling} profiles={profiles ?? undefined} queueAvailable={queueAvailable} aiStatus={aiAssist} aiLocale={locale} targets={choices} initialTargetIds={initialTargetIds} initialMessage={initialMessage} initialLink={initialLink} initialMediaUrls={initialMediaUrls} templates={templates} labels={labels} maxFirstCommentDelayMinutes={Number(maxFirstCommentDelayMinutes)} spacingGapMinutes={spacingGapMinutes} imageRules={{ allowedMimeTypes: allowedMimeTypes as string[], maxUploadBytes: Number(maxUploadBytes), maxAltCharacters: Number(maxAltCharacters), maxMessageCharacters: Number(maxMessageCharacters), maxMedia: Number(maxMedia) }} schedule={schedule} authorName={viewer.user.name || authorFallback} createdAt={createdAt} createdAtDisplay={formatPostPreviewTime(createdAt, schedule.timeZone)} />
       : <section><p>{copyCatalog.noPermission[locale]}</p><a href="/content">{content.postDetailBack}</a></section>}
   </ContentProvider>;
 }

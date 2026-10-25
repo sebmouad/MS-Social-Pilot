@@ -41,10 +41,12 @@ export function McpKeyManager({ features, initialKeys, maxLifetimeDays, defaultL
   };
   const readable = features.filter(feature => feature.canRead).map(feature => feature.id);
   const writable = features.filter(feature => feature.canWrite).map(feature => feature.id);
-  const applyPreset = (kind: 'read' | 'readWrite' | 'none') => {
+  // Role presets read everything and write only their module, so a key holds no more than its job needs.
+  const applyPreset = (kind: 'read' | 'readWrite' | 'publisher' | 'ads' | 'none') => {
     setConsent(false); validation.clear('features');
     setReadFeatures(kind === 'none' ? [] : readable);
-    setWriteFeatures(kind === 'readWrite' ? writable : []);
+    const module = kind === 'publisher' ? 'publishing' : kind === 'ads' ? 'ads' : null;
+    setWriteFeatures(kind === 'readWrite' ? writable : module ? writable.filter(id => features.find(feature => feature.id === id)?.module === module) : []);
   };
   const toggleModule = (module: string, on: boolean) => {
     setConsent(false); validation.clear('features');
@@ -98,6 +100,8 @@ export function McpKeyManager({ features, initialKeys, maxLifetimeDays, defaultL
       <fieldset aria-invalid={validation.errors.features ? true : undefined}><legend>{t.allowedFeatures}</legend>
         <div className={styles['mcp-key-presets']} role="group" aria-label={t.presets}>
           <Button type="button" disabled={busy} onClick={() => applyPreset('read')}>{t.presetRead}</Button>
+          <Button type="button" disabled={busy} onClick={() => applyPreset('publisher')}>{t.presetPublisher}</Button>
+          <Button type="button" disabled={busy} onClick={() => applyPreset('ads')}>{t.presetAds}</Button>
           <Button type="button" disabled={busy} onClick={() => applyPreset('readWrite')}>{t.presetReadWrite}</Button>
           <Button type="button" disabled={busy || !readFeatures.length} onClick={() => applyPreset('none')}>{t.presetClear}</Button>
           <span className={styles['mcp-key-summary']} role="status">{fill(t.summary, { read: readFeatures.length, write: writeFeatures.length })}</span>

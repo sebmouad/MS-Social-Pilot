@@ -1,3 +1,4 @@
+import { readPageBenchmark } from '@/modules/analytics/compare/page-benchmark';
 import { workspaceText, workspaceCopyDefaults, type WorkspaceCopy } from '../../workspace-copy';
 import { analyticsCopy } from '../../server/copy';
 import { headers } from 'next/headers';
@@ -32,6 +33,17 @@ function defaultComparePeriods(now = new Date()) {
   return { aStart, aEnd, bStart, bEnd, start: aStart, end: aEnd };
 }
 
+const BENCHMARK_COPY = {
+  en: { title: 'Page benchmark', channel: 'Channel', followers: 'Followers', postsPerWeek: 'Posts / week',
+    average: (label: string | null) => `Average per post${label ? ` (${label})` : ''}`, measured: (n: number) => `${n} measured posts`,
+    note: (days: number, label: string | null) => `Your selected channels over the last ${days} days, best average first${label ? `, ranked by ${label}` : ''}. Stored data only; unknown values are not zero.`,
+    truncated: 'Some posts were left out because the period holds more posts than one read allows.' },
+  fr: { title: 'Comparatif des pages', channel: 'Canal', followers: 'Abonnés', postsPerWeek: 'Publications / semaine',
+    average: (label: string | null) => `Moyenne par publication${label ? ` (${label})` : ''}`, measured: (n: number) => `${n} publications mesurées`,
+    note: (days: number, label: string | null) => `Vos canaux sélectionnés sur les ${days} derniers jours, meilleure moyenne en premier${label ? `, classés par ${label}` : ''}. Données enregistrées uniquement ; une valeur inconnue n’est pas zéro.`,
+    truncated: 'Certaines publications ont été omises : la période en contient plus qu’une lecture ne le permet.' },
+} as const;
+
 export default async function ComparePage({ searchParams }: { searchParams: Promise<Search> }) {
   const viewer = await requireViewer({ feature: 'analytics/compare', channelScoped: true });
   const { workspace: copy } = await analyticsCopy();
@@ -58,6 +70,10 @@ export default async function ComparePage({ searchParams }: { searchParams: Prom
   let channels: Array<{ id: string; name: string }> = data?.options.channels ?? [];
   if (!channels.length) { try { channels = (await (await import('@/modules/analytics/server/read')).readAnalyticsSnapshot(actor, {}, { feature: 'analytics/compare' })).options.channels; } catch { channels = []; } }
   const kindSwitch = await compareKindSwitch('channels', viewer);
+  // Your own channels side by side over the last weeks, from stored data (competitor Pages need Meta's public content access).
+  const benchmark = await readPageBenchmark({ ...actor, ...(viewer.permissions.pageScope.all ? {} : { allowedChannelIds: viewer.permissions.pageScope.ids }) });
+  const integer = new Intl.NumberFormat(locale), decimal = new Intl.NumberFormat(locale, { maximumFractionDigits: 1 });
+  const bench = BENCHMARK_COPY[locale];
   const mode = first(params.mode) === 'channels' ? 'channels' : 'period';
   const form = <ComparisonFilters copy={copy} locale={locale} mode={mode} channels={channels} initial={{
     aStart: first(params.aStart), aEnd: first(params.aEnd), bStart: first(params.bStart), bEnd: first(params.bEnd),
@@ -86,52 +102,19 @@ export default async function ComparePage({ searchParams }: { searchParams: Prom
             <td className={styles.num}>{m.b ? formatValue(m.b.total, m.unit, m.b.displayTotal) : t('Unknown')}<br /><small>{m.b ? `${m.b.coverage}/${m.b.available} ${m.resourceKind === 'ad-account' ? t('ad accounts') : t('channels')}` : t('no data')}</small></td>
             <td className={styles.num}>{m.delta === null ? '–' : `${m.delta > 0 ? '+' : ''}${formatValue(m.delta, m.unit)}${m.percent === null ? '' : ` (${m.percent > 0 ? '+' : ''}${m.percent.toFixed(1)}%)`}`}</td>
             <td><strong>{t(LABEL[m.status] as keyof WorkspaceCopy)}</strong><br /><small>{m.reason}</small></td></tr>)}</tbody></table></div> : <p className={styles.empty}>{t("No stored metrics exist for either side.")}</p>}</section></>}
-    <section className={styles.panel} aria-label="Competitor Watchlist">
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
-        <h2>🎯 Competitor Benchmark Watchlist</h2>
-        <span style={{ fontSize: '11px', color: 'var(--ink-soft)' }}>Tracking 4 of 10 allowed competitor pages</span>
-      </div>
-      <p className={styles.note} style={{ margin: '0 0 14px' }}>
-        Benchmark your workspace’s public follower growth, weekly posting velocity, and engagement rates against top competitor channels.
-      </p>
-      <div className={styles.tableWrap}>
-        <table>
-          <thead>
-            <tr>
-              <th scope="col">Page / Handle</th>
-              <th scope="col">Platform</th>
-              <th scope="col" className={styles.num}>Followers</th>
-              <th scope="col" className={styles.num}>Posts / Week</th>
-              <th scope="col" className={styles.num}>Avg. Engagement</th>
-              <th scope="col">Trend</th>
-            </tr>
-          </thead>
-          <tbody>
-            {[
-              { name: 'Your Brand (Workspace)', platform: 'Instagram & Facebook', followers: '48,600', posts: '12', eng: '4.8%', trendVal: 0.6, history: [4.1, 4.3, 4.2, 4.6, 4.5, 4.8], own: true },
-              { name: 'Competitor Brand Alpha', platform: 'Instagram', followers: '62,400', posts: '18', eng: '3.2%', trendVal: -0.3, history: [3.8, 3.6, 3.5, 3.4, 3.3, 3.2], own: false },
-              { name: 'Culinary Pulse Daily', platform: 'Facebook & YouTube', followers: '114,000', posts: '24', eng: '2.9%', trendVal: 0.1, history: [2.7, 2.8, 2.7, 2.9, 2.8, 2.9], own: false },
-              { name: 'Tastecraft Studio', platform: 'TikTok & Instagram', followers: '34,200', posts: '8', eng: '5.4%', trendVal: 1.2, history: [4.2, 4.4, 4.7, 4.9, 5.1, 5.4], own: false },
-            ].map(row => (
-              <tr key={row.name} style={row.own ? { background: 'var(--accent-soft)', fontWeight: 600 } : undefined}>
-                <th scope="row">
-                  {row.name} {row.own && <span style={{ fontSize: '10px', background: 'var(--accent)', color: '#fff', padding: '1px 6px', borderRadius: '4px', marginLeft: '6px' }}>YOU</span>}
-                </th>
-                <td>{row.platform}</td>
-                <td className={styles.num}>{row.followers}</td>
-                <td className={styles.num}>{row.posts}</td>
-                <td className={styles.num}>{row.eng}</td>
-                <td>
-                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
-                    <Sparkline data={row.history} width={46} height={18} color={row.own ? 'var(--accent)' : 'var(--ink-soft)'} />
-                    <DeltaBadge value={row.trendVal} precision={1} />
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </section>
+    {benchmark && benchmark.rows.length > 1 ? <section className={styles.panel} aria-labelledby="page-benchmark">
+      <h2 id="page-benchmark">{bench.title}</h2>
+      <p className={styles.note}>{bench.note(benchmark.days, benchmark.rankLabel)}</p>
+      <div className={styles.tableWrap}><table>
+        <thead><tr><th scope="col">{bench.channel}</th><th scope="col" className={styles.num}>{bench.followers}</th><th scope="col" className={styles.num}>{bench.postsPerWeek}</th><th scope="col" className={styles.num}>{bench.average(benchmark.rankLabel)}</th></tr></thead>
+        <tbody>{benchmark.rows.map(row => <tr key={row.id}>
+          <th scope="row">{row.name}</th>
+          <td className={styles.num}>{row.followers === null ? t('Unknown') : integer.format(row.followers)}</td>
+          <td className={styles.num}>{decimal.format(row.postsPerWeek)}</td>
+          <td className={styles.num}>{row.avgRank === null ? t('Unknown') : decimal.format(row.avgRank)}<br /><small>{bench.measured(row.measuredPosts)}</small></td>
+        </tr>)}</tbody>
+      </table></div>
+      {benchmark.truncated ? <p className={styles.note}>{bench.truncated}</p> : null}
+    </section> : null}
   </div></PageFrame>;
 }

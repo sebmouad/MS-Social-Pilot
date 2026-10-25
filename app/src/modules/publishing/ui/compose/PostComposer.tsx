@@ -31,6 +31,7 @@ import { autosaveDraftAction, previewQueueAction, saveQueueComposerAction, type 
 import { fill } from './queue-copy';
 import { holdsRemotely, leadLabel } from './remote-copy';
 import styles from './PostComposer.module.css';
+import type { RecentGridPost } from './ChannelPreviewTabs';
 import { ComposerCopyProvider } from './CopyProvider';
 
 type LocalImageUpload = { maxBytes: number; mimeTypes: readonly string[] };
@@ -131,7 +132,11 @@ function selectedMediaIssue(targets: TargetChoice[], formats: Record<string, str
   return localUploadIssue(targets, items, ui);
 }
 
-function PostComposerContent({ copyCatalog = composerCatalogDefaults, profiles, targets, templates = [], labels = [], imageRules, schedule, authorName, createdAt, createdAtDisplay, maxFirstCommentDelayMinutes, spacingGapMinutes = 0, aiStatus, aiLocale = 'en', queueAvailable = false, remoteScheduling, autosaveSeconds = 0, initialTargetIds = [], initialMessage, initialMediaUrls, initialLink, closeHref = '/content' }: { initialTargetIds?: string[]; initialMessage?: string; initialMediaUrls?: string[]; initialLink?: string; closeHref?: string; copyCatalog?: ComposerCatalog; autosaveSeconds?: number; remoteScheduling?: { offered: boolean; defaultMode: 'application' | 'remote' }; profiles?: ProfileDirectory; queueAvailable?: boolean; aiStatus?: AiStatus; aiLocale?: 'en' | 'fr'; targets: TargetChoice[]; templates?: ComposerTemplate[]; labels?: Array<{ id: string; name: string }>; imageRules: ImageRules; schedule: Schedule; authorName: string; createdAt: Date; createdAtDisplay: string; maxFirstCommentDelayMinutes: number; spacingGapMinutes?: number }) {
+/** Facebook folds long text behind "See more" after roughly this many characters on mobile. */
+const HOOK_VISIBLE_CHARACTERS = 125;
+const HOOK_MAX_HASHTAGS = 5;
+
+function PostComposerContent({ recentPosts = [], copyCatalog = composerCatalogDefaults, profiles, targets, templates = [], labels = [], imageRules, schedule, authorName, createdAt, createdAtDisplay, maxFirstCommentDelayMinutes, spacingGapMinutes = 0, aiStatus, aiLocale = 'en', queueAvailable = false, remoteScheduling, autosaveSeconds = 0, initialTargetIds = [], initialMessage, initialMediaUrls, initialLink, closeHref = '/content' }: { recentPosts?: RecentGridPost[]; initialTargetIds?: string[]; initialMessage?: string; initialMediaUrls?: string[]; initialLink?: string; closeHref?: string; copyCatalog?: ComposerCatalog; autosaveSeconds?: number; remoteScheduling?: { offered: boolean; defaultMode: 'application' | 'remote' }; profiles?: ProfileDirectory; queueAvailable?: boolean; aiStatus?: AiStatus; aiLocale?: 'en' | 'fr'; targets: TargetChoice[]; templates?: ComposerTemplate[]; labels?: Array<{ id: string; name: string }>; imageRules: ImageRules; schedule: Schedule; authorName: string; createdAt: Date; createdAtDisplay: string; maxFirstCommentDelayMinutes: number; spacingGapMinutes?: number }) {
   const router = useRouter();
   const navigated = useRef<ComposerActionState | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
@@ -169,31 +174,34 @@ function PostComposerContent({ copyCatalog = composerCatalogDefaults, profiles, 
   const [templateSearch, setTemplateSearch] = useState('');
   const [templateToApply, setTemplateToApply] = useState<ComposerTemplate | null>(null);
   const [hookScorerOpen, setHookScorerOpen] = useState(false);
-  const [hookAnalysis, setHookAnalysis] = useState<{ score: number; curiosity: number; clarity: number; fit: number; alternatives: string[] } | null>(null);
+  const [hookAnalysis, setHookAnalysis] = useState<{ firstLine: string; checks: Array<{ ok: boolean; text: string }>; rewrite: string | null; rewriting: boolean; error: string } | null>(null);
 
+  /** Plain checks on the opening line (no invented score) plus an optional AI rewrite of that line. */
   const analyzeHook = () => {
-    const firstLine = message.split('\n')[0]?.trim() || message.slice(0, 100);
-    const words = firstLine.split(/\s+/).length;
-    const hasQuestion = firstLine.includes('?');
-    const hasNumber = /\d+/.test(firstLine);
-    const curiosity = Math.min(96, Math.max(65, (hasQuestion ? 30 : 20) + (hasNumber ? 25 : 15) + (words < 12 ? 35 : 20)));
-    const clarity = Math.min(94, Math.max(70, words >= 4 && words <= 16 ? 90 : 72));
-    const fit = Math.min(98, Math.max(75, firstLine.length < 80 ? 92 : 78));
-    const score = Math.round((curiosity * 0.4) + (clarity * 0.3) + (fit * 0.3));
-
-    const baseText = firstLine.replace(/^[#\s]+/, '').replace(/[.!?]+$/, '') || 'your core message';
+    const firstLine = message.split('\n')[0]?.trim() ?? '';
+    const hashtags = (message.match(/(^|\s)#[\p{L}\p{N}_]+/gu) ?? []).length;
     setHookAnalysis({
-      score,
-      curiosity,
-      clarity,
-      fit,
-      alternatives: [
-        `Most people do this completely backwards: "${baseText}"`,
-        `The exact 3-step formula we use to master ${baseText}:`,
-        `Stop scrolling if you care about ${baseText} 👇`,
+      firstLine,
+      checks: [
+        { ok: firstLine.length > 0 && firstLine.length <= HOOK_VISIBLE_CHARACTERS, text: fillComposerCopy(cc.createHookLength, { n: firstLine.length, max: HOOK_VISIBLE_CHARACTERS }) },
+        { ok: message.includes('?'), text: cc.createHookQuestion },
+        { ok: hashtags <= HOOK_MAX_HASHTAGS, text: fillComposerCopy(cc.createHookHashtags, { n: hashtags, max: HOOK_MAX_HASHTAGS }) },
       ],
+      rewrite: null, rewriting: false, error: '',
     });
     setHookScorerOpen(true);
+  };
+  const rewriteHook = async () => {
+    if (!hookAnalysis?.firstLine) return;
+    setHookAnalysis(current => current && { ...current, rewriting: true, error: '' });
+    try {
+      const response = await fetch('/api/ai', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ kind: 'improve', text: hookAnalysis.firstLine }) });
+      const body = await response.json().catch(() => null) as { text?: string; error?: string } | null;
+      const text = response.ok && body?.text ? body.text.split('\n')[0]!.trim() : '';
+      setHookAnalysis(current => current && { ...current, rewriting: false, rewrite: text || null, error: text ? '' : body?.error || cc.createHookRewriteFailed });
+    } catch {
+      setHookAnalysis(current => current && { ...current, rewriting: false, error: cc.createHookRewriteFailed });
+    }
   };
 
   const applyHookAlternative = (alt: string) => {
@@ -349,9 +357,9 @@ function PostComposerContent({ copyCatalog = composerCatalogDefaults, profiles, 
     id: 'composer-preview', authorId: 'preview', message, firstComment: firstComment || null,
     link: link || null,
     media: attachments.media,
-    status: 'draft', scheduledAt: null, publishedAt: null, createdAt, displayTime: createdAtDisplay,
+    status: 'draft', scheduledAt: null, publishedAt: null, createdAt, displayTime: createdAtDisplay, unsaved: !draftPostId,
     targets: selected.map(target => ({ status: 'pending', remotePostId: null, remoteUrl: null, target: { id: target.id, type: target.type, name: target.name, pictureUrl: target.pictureUrl ?? null } })),
-  }), [message, firstComment, link, attachments.media, createdAt, createdAtDisplay, selected]);
+  }), [message, firstComment, link, attachments.media, createdAt, createdAtDisplay, selected, draftPostId]);
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     const form = event.currentTarget;
@@ -392,7 +400,8 @@ function PostComposerContent({ copyCatalog = composerCatalogDefaults, profiles, 
       try { const parsed = new URL(link); valid = parsed.protocol === 'https:' && !parsed.username && !parsed.password; } catch { /* shown as a field error */ }
       if (!valid) { event.preventDefault(); setLocalError(ui.invalidLink); document.getElementById('composer-link')?.focus(); return; }
     }
-    if (intent === 'schedule' && (!scheduleDate || !scheduleTime || !selected.length)) {
+    // "Publish now" needs no wall time: the server computes the instant.
+    if (intent === 'schedule' && (!selected.length || (!publishNowFlag && (!scheduleDate || !scheduleTime)))) {
       event.preventDefault(); setLocalError(!selected.length ? ui.needDestination : ui.needTime); return;
     }
     if (intent === 'queue' && (!selected.length || !queuePreview || typeof queuePreview !== 'object' || queuePreview.status !== 'ready' || previewSelection !== selectedKey)) { event.preventDefault(); setLocalError(!selected.length ? copy.needDestination : copy.unavailable); return; }
@@ -541,7 +550,7 @@ function PostComposerContent({ copyCatalog = composerCatalogDefaults, profiles, 
           <AiAssist status={aiStatus} locale={aiLocale} text={message} disabled={pending || saved} onUse={(suggestion, kind) => setMessage(current => (kind === 'hashtags' ? `${current.trimEnd()}${current.trim() ? '\n\n' : ''}${suggestion}` : suggestion).slice(0, imageRules.maxMessageCharacters))} />
           <button type="button" className={styles.addRow} style={{ minHeight: '32px', fontSize: '12px' }} onClick={analyzeHook}>
             <IconSparkles size={14} aria-hidden="true" />
-            <span>⚡ Hook Scorer</span>
+            <span>{cc.createHookScore}</span>
           </button>
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
             {imageRules.maxMessageCharacters > 0 && (() => {
@@ -581,27 +590,17 @@ function PostComposerContent({ copyCatalog = composerCatalogDefaults, profiles, 
           );
         })()}
         {hookAnalysis && hookScorerOpen && (
-          <div style={{ background: 'var(--surface-raised)', border: '1px solid var(--line)', borderRadius: 'var(--radius-sm)', padding: '12px', marginTop: '10px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-              <strong style={{ fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                Virality Score: <span style={{ color: 'var(--accent)', fontWeight: 800 }}>{hookAnalysis.score} / 100</span>
-              </strong>
-              <button type="button" className={styles.addRow} style={{ minHeight: 'auto', padding: '2px 6px', fontSize: '11px' }} onClick={() => setHookScorerOpen(false)}>Dismiss</button>
+          <div className={styles.hookPanel}>
+            <div className={styles.hookHead}>
+              <strong>{cc.createHookScore}</strong>
+              <button type="button" className={styles.addRow} onClick={() => setHookScorerOpen(false)}>{cc.createHookDismiss}</button>
             </div>
-            <div style={{ display: 'flex', gap: '12px', fontSize: '11px', color: 'var(--ink-soft)', marginBottom: '10px' }}>
-              <span>Curiosity: <strong>{hookAnalysis.curiosity}%</strong></span>
-              <span>Clarity: <strong>{hookAnalysis.clarity}%</strong></span>
-              <span>Network Fit: <strong>{hookAnalysis.fit}%</strong></span>
-            </div>
-            <div style={{ display: 'grid', gap: '6px' }}>
-              <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--ink)' }}>3 Punchier Alternatives:</span>
-              {hookAnalysis.alternatives.map((alt, i) => (
-                <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', padding: '6px 8px', background: 'var(--surface)', border: '1px solid var(--line-subtle)', borderRadius: '4px', fontSize: '12px' }}>
-                  <span style={{ flex: 1, minWidth: 0, textOverflow: 'ellipsis', overflow: 'hidden' }}>{alt}</span>
-                  <button type="button" className="ui-button ui-button--secondary ui-button--sm" style={{ padding: '2px 8px', fontSize: '11px', height: '26px' }} onClick={() => applyHookAlternative(alt)}>Apply</button>
-                </div>
-              ))}
-            </div>
+            <ul className={styles.hookChecks}>{hookAnalysis.checks.map(check => <li key={check.text} data-ok={check.ok || undefined}>{check.ok ? <IconCheck size={14} aria-label={cc.createHookPass} /> : <IconAlertTriangle size={14} aria-label={cc.createHookFail} />} {check.text}</li>)}</ul>
+            {aiStatus?.available && hookAnalysis.firstLine ? <div className={styles.hookRewrite}>
+              {hookAnalysis.rewrite ? <><span>{hookAnalysis.rewrite}</span><Button type="button" variant="secondary" size="sm" onClick={() => applyHookAlternative(hookAnalysis.rewrite!)}>{cc.createHookApply}</Button></>
+                : <Button type="button" variant="secondary" size="sm" busy={hookAnalysis.rewriting} disabled={hookAnalysis.rewriting} onClick={() => void rewriteHook()}>{cc.createHookRewrite}</Button>}
+              {hookAnalysis.error ? <p role="alert">{hookAnalysis.error}</p> : null}
+            </div> : null}
           </div>
         )}
       </section>
@@ -688,15 +687,15 @@ function PostComposerContent({ copyCatalog = composerCatalogDefaults, profiles, 
 
     <aside className={styles.preview} aria-labelledby={`${titleId}-preview`}>
       <div className={styles.sectionHead}><h2 id={`${titleId}-preview`}>{cc.createPreviewTitle}</h2><InfoTip name={cc.createPreviewTitle}>{cc.createPreviewInfo}</InfoTip><span className={styles.sectionMeta}>{saved ? ui.savedPreview : ui.unsavedPreview}</span></div>
-      <ChannelPreviewTabs channels={selected.map(target => ({ ...target, displayName: channelName(target) }))} formats={formatChoices} previewPost={previewPost} attachments={attachments} timeZone={schedule.timeZone} locale={aiLocale} authorFallback={authorName || ui.yourTeam} value={previewChannelId || 'all'} onChange={id => setPreviewChannelId(id === 'all' ? '' : id)} />
+      <ChannelPreviewTabs recentPosts={recentPosts.filter(post => post.targetIds.some(id => selectedTargets.includes(id))).slice(0, 8)} channels={selected.map(target => ({ ...target, displayName: channelName(target) }))} formats={formatChoices} previewPost={previewPost} attachments={attachments} timeZone={schedule.timeZone} locale={aiLocale} authorFallback={authorName || ui.yourTeam} value={previewChannelId || 'all'} onChange={id => setPreviewChannelId(id === 'all' ? '' : id)} />
       {mode === 'schedule' && hasTime && <p className={styles.timeNote}><IconCalendarEvent size={15} aria-hidden="true" />{fillComposerCopy(ui.schedulePreview, { date: scheduleDate, time: scheduleTime, zone: schedule.timeZone.replaceAll('_', ' ') })}</p>}
       {mode === 'queue' && queueReady && typeof queuePreview === 'object' && queuePreview?.status === 'ready' && <p className={styles.timeNote}><IconCalendarEvent size={15} aria-hidden="true" />{fill(copy.next, { time: queuePreview.scheduledLabel })} <small>{copy.estimate}</small></p>}
     </aside>
     </div>
 
     <ActionBar label={cc.createActionBar} status={status}>
-      <div style={{ display: 'inline-flex', alignItems: 'center', gap: '10px', fontSize: '11px', color: 'var(--ink-faint)', marginRight: 'auto' }}>
-        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}><kbd className="ui-kbd">⌘</kbd><kbd className="ui-kbd">↵</kbd> {hasTime ? cc.createSchedule : cc.createSaveDraft}</span>
+      <div className={styles.shortcutHints}>
+        {hasTime && <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}><kbd className="ui-kbd">⌘</kbd><kbd className="ui-kbd">↵</kbd> {cc.createSchedule}</span>}
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}><kbd className="ui-kbd">⌘</kbd><kbd className="ui-kbd">S</kbd> {cc.createSaveDraft}</span>
       </div>
       <Button type="button" variant="secondary" disabled={busy} onClick={() => submitWith('draft')}>{cc.createSaveDraft}</Button>

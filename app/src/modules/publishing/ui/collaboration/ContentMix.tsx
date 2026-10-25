@@ -90,7 +90,7 @@ export function ContentMix({ targets, groups, labels, rules, status, windowDays,
       {scope ? <>
         {rows.length ? <ul className={styles.form}>{rows.map((r, index) => <li key={r.labelId} className={styles.slotRow}><span>{name(r.labelId)}</span>
           <label><span className="sr-only">{fillComposerCopy(c.postsPerWeek, { label: name(r.labelId) })}</span><input type="number" min={1} max={maxPerWeek} step={1} value={r.perWeek} disabled={!canEdit || action.busy} aria-invalid={r.perWeek === '' || invalidRows.includes(r)} aria-describedby={r.perWeek === '' || invalidRows.includes(r) ? `mix-rule-error-${index}` : undefined} onChange={e => setRows(rows.map(x => x.labelId === r.labelId ? { ...x, perWeek: e.target.value === '' ? '' : Number(e.target.value) } : x))} />{c.perWeek}</label>
-          {canEdit && <Button size="sm" variant="danger" disabled={action.busy} onClick={() => setRows(rows.filter(x => x.labelId !== r.labelId))}>{c.remove}</Button>}
+          {canEdit && <Button size="sm" variant="quiet" disabled={action.busy} onClick={() => setRows(rows.filter(x => x.labelId !== r.labelId))}>{c.remove}</Button>}
           {(r.perWeek === '' || invalidRows.includes(r)) && <p id={`mix-rule-error-${index}`} className="ui-field-error" role="alert">{fillComposerCopy(c.wholeTarget, { max: maxPerWeek })}</p>}
         </li>)}</ul>
           : <p className={styles.empty}>{c.no_rules_here_yet}</p>}

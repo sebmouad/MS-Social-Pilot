@@ -134,13 +134,21 @@ export function AppShell({ children, activeModule, enabledModules, enabledFeatur
     document.title = brand && brand !== documentTitle ? `${documentTitle} · ${brand}` : documentTitle;
   }, [documentTitle, pathname]);
   // Phone tab strips scroll; bring the current tab into view instead of leaving it clipped past the edge.
+  // A strip with more tabs past its right edge is marked so CSS can fade that edge as a scroll cue.
   useEffect(() => {
-    for (const strip of document.querySelectorAll<HTMLElement>(".shell-tabs .ui-tabs__list, .shell-settings__list")) {
+    const strips = [...document.querySelectorAll<HTMLElement>(".shell-tabs .ui-tabs__list, .shell-settings__list")];
+    const mark = (strip: HTMLElement) => { strip.dataset.more = strip.scrollLeft + strip.clientWidth < strip.scrollWidth - 4 ? "end" : ""; };
+    const onScroll = (event: Event) => mark(event.currentTarget as HTMLElement);
+    for (const strip of strips) {
       const current = strip.querySelector<HTMLElement>('[aria-current="page"]');
-      if (!current || strip.scrollWidth <= strip.clientWidth) continue;
-      const box = strip.getBoundingClientRect(), tab = current.getBoundingClientRect();
-      if (tab.right > box.right - 32 || tab.left < box.left) strip.scrollLeft += tab.left - box.left - 16;
+      if (current && strip.scrollWidth > strip.clientWidth) {
+        const box = strip.getBoundingClientRect(), tab = current.getBoundingClientRect();
+        if (tab.right > box.right - 32 || tab.left < box.left) strip.scrollLeft += tab.left - box.left - 16;
+      }
+      mark(strip);
+      strip.addEventListener("scroll", onScroll, { passive: true });
     }
+    return () => { for (const strip of strips) strip.removeEventListener("scroll", onScroll); };
   }, [pathname]);
   const activeHubPages = activeHub ? hubPages(activeHub, enabledFeatures, effectiveOptionalAreas) : [];
   const tabs = activeHubPages.map(page => ({ id: page.id, href: page.href, label: pageLabel(page), ...(tabCounts[page.id] ? { count: tabCounts[page.id] } : {}) }));

@@ -82,7 +82,7 @@ export type ModerationRequest = z.infer<typeof moderationActionSchema>;
 /** A rule needs keywords to look for, or words to reply with. */
 export function moderationRuleProblem(rule: Pick<ModerationRuleInput, 'match' | 'keywords' | 'action' | 'replyText'>): 'keywords' | 'reply' | null {
   if (rule.match === 'keywords' && rule.keywords.length === 0) return 'keywords';
-  if (rule.action === 'reply' && !rule.replyText?.trim()) return 'reply';
+  if ((rule.action === 'reply' || rule.action === 'comment_to_dm') && !rule.replyText?.trim()) return 'reply';
   return null;
 }
 
@@ -99,8 +99,8 @@ export const moderationCopy = {
     name: 'Rule name', namePlaceholder: 'For example: Hide spam links',
     when: 'When a comment contains', then: 'Then',
     'match.links': 'a link', 'match.phones': 'a phone number', 'match.keywords': 'one of these words',
-    'action.hide': 'Hide it', 'action.alert': 'Record it for the team', 'action.reply': 'Reply as the channel', 'action.comment_to_dm': 'Send DM + Reply (Comment-to-DM)',
-    'done.hide': 'Hidden', 'done.alert': 'Recorded', 'done.reply': 'Replied', 'done.comment_to_dm': 'Sent DM & Replied',
+    'action.hide': 'Hide it', 'action.alert': 'Record it for the team', 'action.reply': 'Reply as the channel', 'action.comment_to_dm': 'Send a private message',
+    'done.hide': 'Hidden', 'done.alert': 'Recorded', 'done.reply': 'Replied', 'done.comment_to_dm': 'Private message sent',
     keywords: 'Words to look for', keywordsHint: 'Separate them with commas. Capitals and accents are ignored.',
     replyText: 'Reply', replyHint: 'Use {first_name} for the commenter’s first name and {page} for the channel name.',
     oncePerUser: 'Reply to each person only once',
@@ -128,8 +128,8 @@ export const moderationCopy = {
     name: 'Nom de la règle', namePlaceholder: 'Par exemple : Masquer les liens indésirables',
     when: 'Quand un commentaire contient', then: 'Alors',
     'match.links': 'un lien', 'match.phones': 'un numéro de téléphone', 'match.keywords': 'l’un de ces mots',
-    'action.hide': 'Le masquer', 'action.alert': 'L’enregistrer pour l’équipe', 'action.reply': 'Répondre au nom du canal', 'action.comment_to_dm': 'Envoyer un MP + Répondre (Comment-to-DM)',
-    'done.hide': 'Masqué', 'done.alert': 'Enregistré', 'done.reply': 'Répondu', 'done.comment_to_dm': 'MP envoyé & Répondu',
+    'action.hide': 'Le masquer', 'action.alert': 'L’enregistrer pour l’équipe', 'action.reply': 'Répondre au nom du canal', 'action.comment_to_dm': 'Envoyer un message privé',
+    'done.hide': 'Masqué', 'done.alert': 'Enregistré', 'done.reply': 'Répondu', 'done.comment_to_dm': 'Message privé envoyé',
     keywords: 'Mots à rechercher', keywordsHint: 'Séparez-les par des virgules. Majuscules et accents sont ignorés.',
     replyText: 'Réponse', replyHint: 'Utilisez {first_name} pour le prénom de la personne et {page} pour le nom du canal.',
     oncePerUser: 'Ne répondre qu’une fois à chaque personne',

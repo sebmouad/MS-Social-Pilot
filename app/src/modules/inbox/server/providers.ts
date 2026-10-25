@@ -7,10 +7,10 @@ export async function inboxChannelKinds(providers?: readonly string[]): Promise<
   return [...new Set((providers ?? await inboxPlatformIds()).flatMap(id => platformModule(id)?.channelKinds.map(item => item.kind as TargetType) ?? []))];
 }
 /** reviews: the module reads public reviews; replyToReviews: it can also answer one. Both are absent unless the module declares them. */
-export type InboxCapabilities = { reply: boolean; hide: boolean; remove: boolean; reviews: boolean; replyToReviews: boolean };
+export type InboxCapabilities = { reply: boolean; hide: boolean; remove: boolean; reviews: boolean; replyToReviews: boolean; privateReply: boolean };
 export async function inboxCapabilities(provider: string): Promise<InboxCapabilities> {
   const [adapter, host] = await Promise.all([platformFor(provider, 'inbox'), platformInbox(provider)]);
-  return { reply: Boolean(adapter?.replyToInbox), hide: Boolean(adapter?.hideInboxItem), remove: Boolean(adapter?.deleteInboxItem), reviews: Boolean(host?.reviews), replyToReviews: Boolean(host?.reviews?.reply) };
+  return { reply: Boolean(adapter?.replyToInbox), hide: Boolean(adapter?.hideInboxItem), remove: Boolean(adapter?.deleteInboxItem), reviews: Boolean(host?.reviews), replyToReviews: Boolean(host?.reviews?.reply), privateReply: Boolean(host?.privateReply) };
 }
 
 /** UI and MCP read the same selected, authorized and module-supported channels. */

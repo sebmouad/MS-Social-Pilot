@@ -41,6 +41,8 @@ function isoInstant(value: unknown, key: string): Date {
 }
 
 /** MCP tool groups this module installs. The host merges installed groups; edit only here. */
+const LIST_POSTS_DEFAULT_LIMIT = 25;
+
 export const PUBLISHING_MCP: readonly McpToolGroup[] = [
   {
     id: 'publishing-best-times',
@@ -300,7 +302,8 @@ export const PUBLISHING_MCP: readonly McpToolGroup[] = [
     execute: async (viewer, name, args, cap) => {
       switch (name) {
       case 'list_posts': {
-        return listPostsWithFirstComment({ userId: viewer.userId, workspaceId: viewer.workspaceId, ...(pageIdsFor(viewer) === undefined ? {} : { allowedTargetIds: pageIdsFor(viewer) }) }, args, cap);
+        // A small default page keeps results readable for AI clients; pass limit for more.
+        return listPostsWithFirstComment({ userId: viewer.userId, workspaceId: viewer.workspaceId, ...(pageIdsFor(viewer) === undefined ? {} : { allowedTargetIds: pageIdsFor(viewer) }) }, { limit: LIST_POSTS_DEFAULT_LIMIT, ...args }, cap);
       }
       case 'export_posts': {
         return exportPublishingPosts({ userId: viewer.userId, workspaceId: viewer.workspaceId, ...(pageIdsFor(viewer) === undefined ? {} : { allowedTargetIds: pageIdsFor(viewer) }) }, args, {

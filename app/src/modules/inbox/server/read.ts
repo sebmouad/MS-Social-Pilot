@@ -38,6 +38,9 @@ function pageKeys(rows: Key[], take: number, cursor: InboxCursor | null, fingerp
 }
 const literalSearch = (value: string) => `%${value.replace(/[\\%_]/g, character => `\\${character}`)}%`;
 
+/** A top-level comment the channel itself wrote (e.g. a first comment) is not an Inbox item: alias pc / t. */
+export const NOT_OWN_COMMENT = Prisma.sql`AND pc."sentById" IS NULL AND pc."fromId" IS DISTINCT FROM t."providerId"`;
+
 type QuickBranch = 'message' | 'comment' | 'review';
 /**
  * SQL for the quick filters, per branch of the merged activity (aliases c / pc+t / r as in readInboxList).
@@ -96,7 +99,7 @@ export async function readInboxList(actor: InboxReadActor, input: unknown = {}, 
     UNION ALL
     SELECT pc.id, 'comment'::text AS kind, pc."createdTime" AS time FROM post_comments pc
       JOIN post_targets pt ON pt.id = pc."postTargetId" JOIN targets t ON t.id = pt."targetId" JOIN posts p ON p.id = pt."postId"
-    WHERE ${gate === 'all' || gate === 'comment'} AND pc."parentRemoteId" IS NULL AND t."workspaceId" = ${actor.workspaceId} AND p."workspaceId" = ${actor.workspaceId} AND t.id IN (${Prisma.join(channelIds)}) ${status('pc')} ${narrow('comment')}
+    WHERE ${gate === 'all' || gate === 'comment'} AND pc."parentRemoteId" IS NULL ${NOT_OWN_COMMENT} AND t."workspaceId" = ${actor.workspaceId} AND p."workspaceId" = ${actor.workspaceId} AND t.id IN (${Prisma.join(channelIds)}) ${status('pc')} ${narrow('comment')}
       ${hidden === 'visible' ? Prisma.sql`AND pc."isHidden" = false` : Prisma.empty}
       ${q ? Prisma.sql`AND (pc.message ILIKE ${pattern} ESCAPE ${'\\'} OR pc."fromName" ILIKE ${pattern} ESCAPE ${'\\'})` : Prisma.empty}
     UNION ALL

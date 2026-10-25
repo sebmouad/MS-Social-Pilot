@@ -167,6 +167,8 @@ export interface PlatformInboxHost {
   sync(actor: InboxActor, targetId?: string): Promise<{ targetCount: number; failedCount: number; conversationCount: number; messageCount: number; commentCount: number; syncedAt: string; /** Channels whose discovery hit paging bounds; absent means the host does not report it. */ incompleteCount?: number }>;
   reply(actor: InboxActor, input: { kind: 'message' | 'comment'; id: string; text: string }): Promise<{ ok: boolean }>;
   moderate(actor: InboxActor, input: { id: string; hidden: boolean }): Promise<{ ok: boolean }>;
+  /** Optional: one private message to the author of a top-level comment, where the provider allows it. */
+  privateReply?(actor: InboxActor, input: { id: string; text: string }): Promise<{ ok: boolean }>;
   prepareDeleteComment(actor: InboxActor, input: { targetId: string; remoteId: string }): Promise<(signal: AbortSignal) => Promise<void>>;
   /** Optional read-only worker check for an uncertain deletion. `absent` is positive evidence the module's own rules accept; `present` and `unknown` keep the deletion held. Never writes remotely. */
   readCommentPresence?(input: { workspaceId: string; targetId: string; remoteId: string; postRemoteId: string }, signal: AbortSignal): Promise<'present' | 'absent' | 'unknown'>;

@@ -19,6 +19,8 @@ export type PostPreviewPost = {
   createdAt: Date;
   /** Server-formatted workspace time for previews rendered inside client components. */
   displayTime?: string;
+  /** A composer preview of a post that is not saved yet: no creation time to show. */
+  unsaved?: boolean;
   targets: Array<{
     id?: string;
     status: string;
@@ -162,7 +164,7 @@ export function PostPreview({ post, authorName, authorAvatarUrl, timeZone, varia
         {authorPicture ? <img className={styles.channelAvatar} src={authorPicture} alt="" loading="lazy" /> : <span className={styles.authorAvatar} aria-hidden="true">{initials(authorName)}</span>}
         <div className={styles.headerText}>
           <strong>{authorName}</strong>
-          <time dateTime={time.toISOString()}>{timeLabel} {post.displayTime ?? formatPostPreviewTime(time, timeZone)}</time>
+          {post.unsaved ? null : <time dateTime={time.toISOString()}>{timeLabel} {post.displayTime ?? formatPostPreviewTime(time, timeZone)}</time>}
         </div>
         <StatusChip status={post.status} />
       </header>
@@ -285,13 +287,8 @@ export function PostPreview({ post, authorName, authorAvatarUrl, timeZone, varia
         </section>
       ) : commentEmptySlot ? <p className={styles.emptyCommentSlot} aria-hidden="true">{rendering!.copy.emptyComment}</p> : null}
       {post.status === 'published' && (
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px', paddingTop: '8px', borderTop: '1px solid var(--line-subtle)' }}>
-          <span style={{ background: '#fef3c7', color: '#b45309', border: '1px solid #f59e0b', fontSize: '11px', fontWeight: 700, padding: '2px 8px', borderRadius: '999px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-            ⚡ 90th %ile Outperformer
-          </span>
-          <a className="ui-button ui-button--secondary ui-button--sm" style={{ height: '26px', fontSize: '11px', padding: '0 8px' }} href={`/create?message=${encodeURIComponent(post.message)}`}>
-            ♻️ Recycle Evergreen
-          </a>
+        <div className={styles.reuse}>
+          <a className="ui-button ui-button--secondary ui-button--sm" href={`/create?message=${encodeURIComponent(post.message)}`}>{t.previewReuse}</a>
         </div>
       )}
       {actions ? <div className={styles.actions}>{actions}</div> : null}

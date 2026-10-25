@@ -26,8 +26,8 @@ export function CalendarTools(props: Pick<WorkspaceProps, 'area' | 'copy' | 'fro
  return <div className={styles.tools}>
   <nav aria-label={c.dates}>{AREAS.map(a => { const Icon = icons[a]; return <a key={a} href={paths[a]} aria-current={a === area ? 'page' : undefined}><Icon size={18} aria-hidden="true" />{c[a]}</a>; })}</nav>
   <form className={styles.tools} action={paths[area]}>
-   <label className="ui-field"><span>{c.from}</span><input className="ui-input" type="text" inputMode="numeric" name="from" defaultValue={props.from} autoComplete="off" /></label>
-   <label className="ui-field"><span>{c.to}</span><input className="ui-input" type="text" inputMode="numeric" name="to" defaultValue={props.to} autoComplete="off" /></label>
+   <label className="ui-field"><span>{c.from}</span><input className="ui-input" type="date" name="from" defaultValue={props.from} autoComplete="off" /></label>
+   <label className="ui-field"><span>{c.to}</span><input className="ui-input" type="date" name="to" defaultValue={props.to} autoComplete="off" /></label>
    <label className="ui-field"><span>{c.channels}</span><select className="ui-input" name="targetId" defaultValue={props.targetId}><option value="">{c.allChannels}</option>{props.targetId && !props.channels.some(ch => ch.id === props.targetId) && <option value={props.targetId}>{c.unknown}</option>}{props.channels.map(ch => <option key={ch.id} value={ch.id}>{ch.name}</option>)}</select></label>
    {area === 'trends' && <label className={styles.choice}><input type="checkbox" name="showAll" value="true" defaultChecked={props.showAll} />{c.showAll}</label>}
    <Button type="submit">{c.apply}</Button>

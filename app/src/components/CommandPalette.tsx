@@ -55,7 +55,7 @@ export function CommandPalette({ copy: t }: { copy: CommandCopy }) {
     const match = (text: string) => !q || text.toLowerCase().includes(q);
 
     const quickActions: PaletteRow[] = [
-      { kind: 'action', key: 'qa-post', title: 'Create New Post', sub: 'Publishing', href: '/content/post' },
+      { kind: 'action', key: 'qa-post', title: 'Create New Post', sub: 'Publishing', href: '/create' },
       { kind: 'action', key: 'qa-cal', title: 'Open Content Calendar', sub: 'Publishing', href: '/content/calendar' },
       { kind: 'action', key: 'qa-inbox', title: 'Triage Social Inbox', sub: 'Community', href: '/inbox' },
       { kind: 'action', key: 'qa-ai', title: 'Open Content Multiplier & AI Studio', sub: 'Studio', href: '/content/ai-studio' },

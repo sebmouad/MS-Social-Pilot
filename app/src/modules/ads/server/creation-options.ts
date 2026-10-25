@@ -5,6 +5,7 @@ import { prisma } from '@/server/data';
 import { platformAds } from '@/server/platforms/registry';
 import { getAdsAccountWhere } from './queries';
 import { canManageWorkspaceAds } from './actions';
+import { describeAdsManagement } from '@/modules/ads/management/server';
 import { authorizeAdsRead, type AdsReadActor } from './access';
 export async function readAdsCreationOptions(actor: AdsReadActor, input: Record<string, unknown>) {
   return withAdsCopySnapshot(async () => {
@@ -15,11 +16,15 @@ export async function readAdsCreationOptions(actor: AdsReadActor, input: Record<
   const where = await getAdsAccountWhere(actor.workspaceId, access.allowedTargetIds, access.allowedProviders, access.allowedAdAccountIds);
   const account = await prisma.adAccount.findFirst({
     where: { AND: [where, { id: adAccountId }] },
-    select: { id: true, currency: true, socialAccount: { select: { provider: true } } },
+    select: { id: true, name: true, currency: true, socialAccount: { select: { provider: true } } },
   });
   const provider = account?.socialAccount?.provider;
   const host = provider ? await platformAds(provider) : null;
   const manageable = account && await canManageWorkspaceAds(access.actor, adAccountId);
+  // Say why when the only problem is a connection missing advertising permissions.
+  if (account && provider && host && !manageable && (await describeAdsManagement(access.actor, adAccountId)).needsReconnect) {
+    throw new OperationError('reconnect_required', `${await adsServiceText('needsReconnectAccount', { account: account.name })} ${await adsServiceText('needsReconnectAction')}: /settings/channels`);
+  }
   if (!account || !provider || !host || !manageable) throw new OperationError('unavailable', await adsServiceText('service003'));
   const creationUi = host.creationUi ? await host.creationUi() : host.ui;
   return {

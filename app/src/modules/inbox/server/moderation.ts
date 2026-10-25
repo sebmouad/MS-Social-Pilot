@@ -10,7 +10,7 @@ import { withWorkspaceOperation } from '@/server/data-control/guard';
 import { isStagingDryRun, suppressStagingBatch } from '@/server/jobs/staging';
 import { loadPermissions } from '@/server/permissions/loader';
 import { inboxCapabilities } from '@/modules/inbox/server/providers';
-import { moderateInboxComment, replyToInbox } from '@/modules/inbox/server/actions';
+import { moderateInboxComment, privateReplyToInboxComment, replyToInbox } from '@/modules/inbox/server/actions';
 import { authorizeInbox } from './access';
 import type { InboxReadActor } from './types';
 import {
@@ -82,7 +82,7 @@ async function validateRule(rule: ModerationRuleInput, channelIds: readonly stri
   const targetIds = [...new Set(rule.targetIds)];
   if (targetIds.length === 0 && !every) throw new OperationError('forbidden', await inboxServiceText('service27'));
   if (targetIds.some(id => !channelIds.includes(id))) throw new OperationError('not_found', await inboxServiceText('service28'));
-  return { ...rule, targetIds, keywords: [...new Set(rule.keywords)], replyText: rule.action === 'reply' ? rule.replyText : rule.replyText || null };
+  return { ...rule, targetIds, keywords: [...new Set(rule.keywords)], replyText: rule.action === 'reply' || rule.action === 'comment_to_dm' ? rule.replyText : rule.replyText || null };
 }
 
 export async function performInboxModerationAction(actor: InboxReadActor, input: unknown) {
@@ -164,15 +164,16 @@ export async function runInboxModerationRules(actor: InboxReadActor, channelId: 
     for (const rule of rules) {
       if (rule.targetIds.length && !rule.targetIds.includes(comment.targetId)) continue;
       if (!matchesModerationRule(rule, comment.message ?? '')) continue;
-      if ((rule.action === 'hide' && !supports.hide) || (rule.action === 'reply' && (!supports.reply || comment.parentRemoteId !== null))) { result.skipped++; continue; }
+      if ((rule.action === 'hide' && !supports.hide) || (rule.action === 'reply' && (!supports.reply || comment.parentRemoteId !== null)) || (rule.action === 'comment_to_dm' && (!supports.privateReply || comment.parentRemoteId !== null))) { result.skipped++; continue; }
       const today = await prisma.$queryRaw<Array<{ count: number }>>`SELECT COUNT(*)::int AS count FROM moderation_actions WHERE "ruleId" = ${rule.id} AND "createdAt" >= ${new Date(now.getTime() - DAY_MS)} AND error IS NULL`;
       if (Number(today[0]?.count ?? 0) >= rule.dailyCap) { result.skipped++; continue; }
-      if (rule.action === 'reply' && rule.oncePerUser && comment.fromId) {
-        const answered = await prisma.$queryRaw<Array<{ count: number }>>`SELECT COUNT(*)::int AS count FROM moderation_actions WHERE "ruleId" = ${rule.id} AND "authorId" = ${comment.fromId} AND action = 'reply' AND error IS NULL`;
+      const writes = rule.action === 'reply' || rule.action === 'comment_to_dm';
+      if (writes && rule.oncePerUser && comment.fromId) {
+        const answered = await prisma.$queryRaw<Array<{ count: number }>>`SELECT COUNT(*)::int AS count FROM moderation_actions WHERE "ruleId" = ${rule.id} AND "authorId" = ${comment.fromId} AND action = ${rule.action} AND error IS NULL`;
         if (Number(answered[0]?.count ?? 0) > 0) { result.skipped++; continue; }
       }
-      const text = rule.action === 'reply' ? fillModerationReply(rule.replyText ?? '', { name: comment.fromName, channel: comment.targetName }) : '';
-      if (rule.action === 'reply' && !text) { result.skipped++; continue; }
+      const text = writes ? fillModerationReply(rule.replyText ?? '', { name: comment.fromName, channel: comment.targetName }) : '';
+      if (writes && !text) { result.skipped++; continue; }
       // Claimed before acting: another run finds the row and leaves the comment alone.
       const claimId = randomUUID();
       const claimed = await prisma.$transaction(async tx => {
@@ -184,6 +185,7 @@ export async function runInboxModerationRules(actor: InboxReadActor, channelId: 
       try {
         if (rule.action === 'hide') await withWorkspaceOperation(actor.workspaceId, () => moderateInboxComment(actor, { id: comment.id, hidden: true }));
         else if (rule.action === 'reply') await withWorkspaceOperation(actor.workspaceId, () => replyToInbox(actor, { kind: 'comment', id: comment.id, text }));
+        else if (rule.action === 'comment_to_dm') await withWorkspaceOperation(actor.workspaceId, () => privateReplyToInboxComment(actor, { id: comment.id, text }));
         result.acted++;
         await audit(actor, 'inbox.moderation_rule_applied', { ruleId: rule.id, actionId: claimId, targetId: comment.targetId, commentId: comment.id, action: rule.action });
       } catch (error) {

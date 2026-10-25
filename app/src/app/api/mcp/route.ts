@@ -121,8 +121,10 @@ async function handlePost(request: Request) {
   if (!viewer) return unauthenticated();
   const requestsPerMinute = await runtimeConfig(viewer.scope === 'person' || viewer.apiKeyId ? 'mcp.keys.requestsPerMinute' : 'mcp.requestsPerMinute') as number;
   const rateKey = viewer.scope === 'person' ? `mcp:person-key:${viewer.personKeyId}` : viewer.apiKeyId ? `mcp:key:${viewer.apiKeyId}` : viewer.scope === 'installation' ? `mcp:installation:${viewer.userId}` : `mcp:${viewer.workspaceId}:${viewer.userId}`;
-  if (!hit(rateKey, { limit: requestsPerMinute, windowMs: 60_000 }).allowed) {
-    return json({ jsonrpc: '2.0', id: null, error: { code: -32004, message: 'MCP request limit reached.' } }, { status: 429 });
+  const limited = hit(rateKey, { limit: requestsPerMinute, windowMs: 60_000 });
+  if (!limited.allowed) {
+    const retryAfter = Math.max(1, Math.ceil((limited.resetAt - Date.now()) / 1000));
+    return json({ jsonrpc: '2.0', id: null, error: { code: -32004, message: `MCP request limit reached (${requestsPerMinute} per minute). Retry in ${retryAfter} seconds.`, data: { retryAfterSeconds: retryAfter } } }, { status: 429, headers: { 'retry-after': String(retryAfter) } });
   }
   let message: Record<string, unknown>;
   try {
@@ -136,7 +138,9 @@ async function handlePost(request: Request) {
     }
     return json({ jsonrpc: '2.0', id: null, error: { code: -32700, message: 'Parse error.' } }, { status: 400 });
   }
-  return handleMcpMessage(viewer, message);
+  // `?toolsets=publishing,inbox` lists only those feature areas; omitted keeps every tool.
+  const toolsets = new URL(request.url).searchParams.get('toolsets')?.split(',').map(item => item.trim()).filter(Boolean);
+  return handleMcpMessage(viewer, message, toolsets?.length ? { toolsets } : {});
 }
 
 export async function GET(request: Request) {

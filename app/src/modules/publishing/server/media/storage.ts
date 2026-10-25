@@ -1,3 +1,4 @@
+import { OperationError } from '@/lib/operation-error';
 import { loadMediaPresentationPolicy } from './policy';
 import type { MediaPresentationPolicy } from './config';
 import { loadPublishingErrorText } from '../error-copy';
@@ -228,7 +229,7 @@ export async function listWorkspaceImages(workspaceId: string, options: { limit:
 
 export async function getWorkspaceImageMetadata(workspaceId: string, id: string, holderVisibility: HolderVisibility = null): Promise<WorkspaceImageListing> {
   const file = await safeImageFile(workspaceId, id);
-  if (!file) throw new Error('Image not found.');
+  if (!file) throw new OperationError('not_found', 'Image not found.');
   const policy = await loadMediaPresentationPolicy();
   const [image, refs, info] = await Promise.all([readWorkspaceImage(workspaceId, id), referenceMap(workspaceId, policy), lstat(file.path)]);
   const visible = await visibleHolderIds(refs, [id], holderVisibility);
@@ -236,7 +237,7 @@ export async function getWorkspaceImageMetadata(workspaceId: string, id: string,
 }
 
 async function safeImageFile(workspaceId: string, id: string): Promise<{ path: string; size: number } | null> {
-  if (!IMAGE_ID.test(id)) throw new Error('Invalid media ID.');
+  if (!IMAGE_ID.test(id)) throw new OperationError('invalid_request', 'Invalid media ID.');
   const dir = await workspaceImageDirectory(workspaceId, false);
   const filePath = path.join(dir, id);
   let info;

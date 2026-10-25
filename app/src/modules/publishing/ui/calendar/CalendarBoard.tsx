@@ -1,4 +1,5 @@
 "use client";
+import { weekdayOfKey } from "@/lib/calendar-dates";
 import { synchronousPolicy } from '@/lib/config/synchronous-policy';
 
 import { usePublishingCopy, usePublishingLocale } from '../kit/CopyProvider';
@@ -28,7 +29,7 @@ type Notice = { kind: "ok" | "error"; text: string } | null;
 const hourLabel = (hour: number, locale: string = "en-US") => new Intl.DateTimeFormat(locale, { hour: "numeric", timeZone: "UTC" }).format(new Date(Date.UTC(2000, 0, 1, hour)));
 const pad = (n: number) => String(n).padStart(2, "0");
 
-export function CalendarBoard({ view, days, timeZone, nowIso, canCreate, filterQuery, defaultScheduleTime, guardrails }: { view: "month" | "week" | "list"; days: BoardDay[]; timeZone: string; nowIso: string; canCreate: boolean; filterQuery: string; defaultScheduleTime: string; guardrails?: CalendarGuardrails }) {
+export function CalendarBoard({ view, days, timeZone, nowIso, canCreate, filterQuery, defaultScheduleTime, guardrails, heatmap }: { heatmap?: ReadonlyArray<{ day: number; hour: number; value: number }> | null; view: "month" | "week" | "list"; days: BoardDay[]; timeZone: string; nowIso: string; canCreate: boolean; filterQuery: string; defaultScheduleTime: string; guardrails?: CalendarGuardrails }) {
   const copy = usePublishingCopy();
   const locale = usePublishingLocale();
   const { copy: content, policy } = useContent();
@@ -53,15 +54,13 @@ export function CalendarBoard({ view, days, timeZone, nowIso, canCreate, filterQ
   const quietHour = (hour: number) => guardrails ? isAutopilotQuietHourOfDay(guardrails, hour) : false;
   const showQuiet = Boolean(guardrails && guardrails.quietStartHour !== guardrails.quietEndHour);
 
+  // Levels come from your own stored post history (lift over each channel's typical post); hours without data show nothing.
+  const heatByCell = new Map((heatmap ?? []).map(cell => [`${cell.day}:${cell.hour}`, cell.value]));
   const getHeatLevel = (hour: number, dayKey: string) => {
     if (!heatmapActive) return undefined;
-    const dayOfWeek = new Date(`${dayKey}T12:00:00Z`).getUTCDay();
-    const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
-    if (!isWeekend && (hour === 14 || hour === 10)) return "peak";
-    if (!isWeekend && (hour >= 9 && hour <= 16)) return "high";
-    if (isWeekend && (hour >= 12 && hour <= 16)) return "high";
-    if (hour >= 8 && hour <= 20) return "medium";
-    return undefined;
+    const lift = heatByCell.get(`${weekdayOfKey(dayKey)}:${hour}`);
+    if (lift === undefined) return undefined;
+    return lift >= 1.5 ? "peak" : lift >= 1.15 ? "high" : lift >= 0.85 ? "medium" : undefined;
   };
 
   const undoLastMove = async () => {
@@ -234,9 +233,9 @@ export function CalendarBoard({ view, days, timeZone, nowIso, canCreate, filterQ
           <button type="button" aria-pressed={weekLayout === "timeline"} onClick={() => setWeekLayout("timeline")}>{content.calendarWeekTimeline}</button>
           <button type="button" aria-pressed={weekLayout === "lanes"} onClick={() => setWeekLayout("lanes")}>{content.calendarWeekLanes}</button>
         </div>
-        <button type="button" className={styles.heatmapToggle} data-active={heatmapActive} onClick={() => setHeatmapActive(!heatmapActive)}>
-          🔥 Best-Time Heatmap
-        </button>
+        {heatmap?.length ? <button type="button" className={styles.heatmapToggle} aria-pressed={heatmapActive} data-active={heatmapActive} title={content.calendarBestTimesNote} onClick={() => setHeatmapActive(!heatmapActive)}>
+          {content.calendarBestTimes}
+        </button> : null}
       </div>
       {weekLayout === "lanes" ? <div className={styles.lanesWrap}><div className={styles.lanes} style={{ gridTemplateColumns: `200px repeat(${days.length}, minmax(160px, 1fr))` }}>
         <span className={styles.laneCorner} aria-hidden="true" />
@@ -264,7 +263,7 @@ export function CalendarBoard({ view, days, timeZone, nowIso, canCreate, filterQ
           const dropKey = `s:${day.key}:${hour}`;
           const heatLevel = getHeatLevel(hour, day.key);
           return <div key={dropKey} role="group" aria-label={`${day.longLabel}, ${hourLabel(hour, locale)}`} className={styles.slot} data-past={slotEnded || undefined} data-quiet={(showQuiet && quietHour(hour) && !slotEnded) || undefined} data-heat={heatLevel} data-over={over === dropKey || undefined} {...dropProps(dropKey, day.key, time, day.isPast || slotEnded)}>
-            {heatLevel === 'peak' && <span className={styles.heatTag}>★ Peak</span>}
+            {heatLevel === 'peak' && <span className={styles.heatTag}>{content.calendarBestTimesPeak}</span>}
             {slotPosts.map(postCard)}
             {canCreate && !slotEnded && day.freeSlots?.filter(free => Number(free.slice(0, 2)) === hour).map(free => freePill(day, free))}
             {canCreate && !slotEnded && <a className={styles.slotAdd} href={newPostHref(day.key, time)} aria-label={fillCopy(copy.newPostLabel, {day:day.longLabel,time:hourLabel(hour, locale)})}><span aria-hidden="true">+</span></a>}

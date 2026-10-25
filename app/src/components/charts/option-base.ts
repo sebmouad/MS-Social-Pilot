@@ -40,7 +40,7 @@ export function axisStyle({ theme }: ChartEnv, kind: "category" | "value") {
   return {
     axisLine: { show: kind === "category", lineStyle: { color: css(theme.line) } },
     axisTick: { show: false },
-    axisLabel: { color: css(theme.text), fontSize: 11, margin: 10 },
+    axisLabel: { color: css(theme.text), fontSize: 11, margin: 10, hideOverlap: kind === "category" },
     splitLine: { show: kind === "value", lineStyle: { color: css(theme.grid), type: "dashed" } },
   };
 }

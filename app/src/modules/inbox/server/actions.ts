@@ -97,6 +97,14 @@ export async function replyToInbox(actor: InboxActor, input: { kind: InboxItemKi
   }
   return (await host(item.provider)).reply(actor, { ...input, kind: input.kind });
 }
+/** One private message to a comment's author, where the channel's module supports it. */
+export async function privateReplyToInboxComment(actor: InboxActor, input: { id: string; text: string }, constraints: InboxReadConstraints = {}) {
+  const item = await providerForItem('comment', input.id, actor.workspaceId);
+  await requireVisibleChannel(actor, item.targetId, 'write', constraints);
+  const privateReply = (await host(item.provider)).privateReply;
+  if (!privateReply) throw new OperationError('unavailable', await inboxServiceText('service9'));
+  return privateReply(actor, input);
+}
 export async function setInboxResolved(actor: InboxActor, input: { kind: InboxItemKind; id: string; resolved: boolean; action?: 'resolve' }, constraints: InboxReadConstraints = {}) {
   return setInboxWorkflowResolved(actor, { kind: input.kind, id: input.id, resolved: input.resolved }, constraints);
 }

@@ -54,52 +54,7 @@ export function RecipeSource({ initial, locale, canWrite, copy = recipeCopy }: {
   const [cancelPosts, setCancelPosts] = useState(false);
   const [preview, setPreview] = useState<Preview | null>(null);
   const [busy, setBusy] = useState(false);
-  const [inspectResult, setInspectResult] = useState<{
-    status: 'ok' | 'error';
-    siteName: string;
-    wpVersion: string;
-    postTypes: string[];
-    schemaTypes: string[];
-    customMeta: string[];
-  } | null>(null);
   const [notice, setNotice] = useState<{ error: boolean; text: string; key: number } | null>(null);
-
-  const testConnection = async () => {
-    try {
-      const url = draft.siteUrl.trim();
-      const endpoint = `${url.replace(/\/+$/, '')}/wp-json/`;
-      const res = await fetch(endpoint).catch(() => null);
-      if (res && res.ok) {
-        const data = await res.json().catch(() => ({}));
-        setInspectResult({
-          status: 'ok',
-          siteName: data.name || 'WordPress Site',
-          wpVersion: '6.4+ (REST API v2)',
-          postTypes: ['post', 'recipe', 'wprm_recipe', 'page'],
-          schemaTypes: ['Recipe (Schema.org)', 'Article (Schema.org)', 'WebPage'],
-          customMeta: ['_thumbnail_id', 'wprm_rating', 'recipe_servings', 'prep_time', 'cook_time'],
-        });
-      } else {
-        setInspectResult({
-          status: 'ok',
-          siteName: draft.name || 'Connected CMS Site',
-          wpVersion: 'WordPress 6.x (Active)',
-          postTypes: ['post', 'recipe', 'wprm_recipe'],
-          schemaTypes: ['Recipe (Schema.org / JSON-LD)', 'Article'],
-          customMeta: ['_wp_attached_file', 'recipe_ingredients', 'recipe_instructions'],
-        });
-      }
-    } catch {
-      setInspectResult({
-        status: 'error',
-        siteName: 'Unknown',
-        wpVersion: 'Connection timeout',
-        postTypes: [],
-        schemaTypes: [],
-        customMeta: [],
-      });
-    }
-  };
   const inFlight = useRef(false);
   const source = view.source;
   const say = (text: string, error = false) => setNotice(v => ({ error, text, key: (v?.key ?? 0) + 1 }));
@@ -204,25 +159,6 @@ export function RecipeSource({ initial, locale, canWrite, copy = recipeCopy }: {
       <h3 className={styles.sectionTitle}>{t('sourceHeading')}</h3>
       <label>{t('name')}<input disabled={busy} required maxLength={view.limits.maxNameCharacters} value={draft.name} onChange={e => setDraft(d => ({ ...d, name: e.target.value }))} /></label>
       <label>{t('siteUrl')}<input disabled={busy} required inputMode="url" placeholder="https://" value={draft.siteUrl} onChange={e => setDraft(d => ({ ...d, siteUrl: e.target.value }))} /><span>{t('siteUrlHint')}</span></label>
-      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-        <Button type="button" size="sm" variant="secondary" onClick={() => void testConnection()}>
-          🔍 Test Connection & Inspect Fields
-        </Button>
-      </div>
-      {inspectResult && (
-        <div style={{ background: 'var(--surface-raised)', border: '1px solid var(--line)', borderRadius: 'var(--radius-sm)', padding: '12px', fontSize: '12px', display: 'grid', gap: '6px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <strong style={{ color: inspectResult.status === 'ok' ? 'var(--ui-good, #10b981)' : 'var(--danger)' }}>
-              {inspectResult.status === 'ok' ? '🟢 REST Connection Verified' : '🔴 Connection Failed'}
-            </strong>
-            <button type="button" className="ui-button ui-button--secondary ui-button--sm" style={{ height: '24px', padding: '0 6px', fontSize: '11px' }} onClick={() => setInspectResult(null)}>Close</button>
-          </div>
-          <div><strong>Site:</strong> {inspectResult.siteName} ({inspectResult.wpVersion})</div>
-          <div><strong>Detected Post Types:</strong> {inspectResult.postTypes.join(', ')}</div>
-          <div><strong>Schema.org Formats:</strong> {inspectResult.schemaTypes.join(', ')}</div>
-          <div><strong>Mapped Custom Meta:</strong> {inspectResult.customMeta.join(', ')}</div>
-        </div>
-      )}
       <fieldset className={styles.checks} disabled={busy}><legend>{t('channels')}</legend>
         <label><input type="radio" name="recipe-scope" checked={draft.allTargets} onChange={() => setDraft(d => ({ ...d, allTargets: true }))} />{t('allChannels')}</label>
         <label><input type="radio" name="recipe-scope" checked={!draft.allTargets} onChange={() => setDraft(d => ({ ...d, allTargets: false }))} />{t('chooseChannels')}</label>

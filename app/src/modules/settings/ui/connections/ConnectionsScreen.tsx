@@ -82,7 +82,7 @@ export default async function ConnectionsPage({ searchParams }: { searchParams: 
     {!canManage && <p className={styles['settings-note']}>{t.managersOnly}</p>}
     <SettingsPanel title={c.adTitle} detail={c.adDetail}>
       <DataTable caption={c.adTitle} rows={adRows} rowKey={ad => ad.id} emptyMessage={t.noAds} emptyIcon={<IconPlugConnected />} columns={[
-        { key: 'account', label: t.adAccount, render: ad => <><strong>{ad.name}</strong><span className={styles['settings-table__secondary']}>{ad.provider ? providerName(ad.provider) : t.platformMissing}</span></> },
+        { key: 'account', label: t.adAccount, render: ad => <><strong>{ad.name}</strong><span className={styles['settings-table__secondary']}>{ad.provider ? providerName(ad.provider) : t.platformMissing} · {ad.actId}</span></> },
         { key: 'profile', label: c.adLinked, render: ad => ad.owner ?? t.noLinkedProfile },
         { key: 'status', label: t.status, render: ad => <Status tone={ad.enabled && ad.state === 'connected' ? 'good' : 'warning'}>{!ad.enabled ? c.inUseOff : ad.state && ad.state !== 'connected' ? statusLabels[ad.state] : c.inUseOn}</Status> },
         ...(canManage ? [{ key: 'actions', label: t.actions, render: (ad: (typeof adRows)[number]) => ad.socialAccountId && socialById.has(ad.socialAccountId) ? <a href={`/settings/channels?source=${encodeURIComponent(ad.socialAccountId)}&action=manage`}>{c.adManage}</a> : t.reconnectFirst }] : []),

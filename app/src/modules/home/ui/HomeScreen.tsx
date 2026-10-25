@@ -8,7 +8,6 @@ import { EmptyState } from '@/components/EmptyState';
 import { MetricCard, type MetricDelta } from '@/components/MetricCard';
 import { PageHeader } from '@/components/PageHeader';
 import { PostThumb } from '@/components/PostThumb';
-import type { PostThumbnail } from '@/components/post-thumbnail';
 import { HeatmapChart } from '@/components/charts';
 import { PageFrame } from '@/server/PageFrame';
 import { requireViewer } from '@/server/context';
@@ -187,7 +186,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
           {upcoming => <>
             <div className={styles.list}>{upcoming.items.map(item => <ListRow key={item.id}
               href={`/content?post=${encodeURIComponent(item.id)}`}
-              leading={<PostThumb thumb={(item as typeof item & { thumbnail?: PostThumbnail | null }).thumbnail ?? null} size="md" />}
+              leading={<PostThumb thumb={item.thumbnail} size="md" />}
               title={item.text || '—'}
               meta={<><time dateTime={item.scheduledAt}>{Number.isNaN(new Date(item.scheduledAt).getTime()) ? item.scheduledAt : timeFormat.format(new Date(item.scheduledAt))}</time> · {item.channels.join(', ')}</>}
               trailing={<InfoTip name={t.upcoming}><p>{t[MODE_COPY[item.mode]]}</p><p>{overview.timeZone}</p></InfoTip>} />)}</div>

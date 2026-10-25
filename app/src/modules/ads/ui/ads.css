@@ -162,3 +162,7 @@
 .ads-account-tab:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
 .ads-account-tab__meta { color: var(--ink-faint); font-size: var(--text-xs); font-weight: 500; }
 @media (pointer: coarse) { .ads-account-tab { min-height: 44px; } }
+/* Boost suggestion computed from stored post measures; absent when no post stands out. */
+.ads-boost { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 16px; padding: 14px 18px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface); margin-bottom: 16px; }
+.ads-boost p { margin: 4px 0 0; font-size: 13px; color: var(--ink-soft); line-height: 1.45; max-width: 70ch; }
+.ads-boost__actions { display: flex; flex-wrap: wrap; gap: 8px; }
