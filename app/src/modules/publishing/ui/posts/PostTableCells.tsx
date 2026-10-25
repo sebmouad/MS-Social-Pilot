@@ -27,7 +27,7 @@ function mediaList(value: unknown): Media[] {
 
 function thumbUrl(item: Media | undefined) {
   if (!item || item.kind !== 'image') return null;
-  if (item.url.startsWith('media:')) { const id = item.url.slice(6); return MEDIA_ID.test(id) ? `/api/media/${encodeURIComponent(id)}` : null; }
+  if (item.url.startsWith('media:')) { const id = item.url.slice(6); return MEDIA_ID.test(id) ? `/api/media/${encodeURIComponent(id)}?w=320` : null; }
   return isSafeImageUrl(item.url) ? item.url : null;
 }
 
@@ -35,7 +35,8 @@ function thumbUrl(item: Media | undefined) {
 export function postThumbUrl(media: unknown) { return thumbUrl(mediaList(media)[0]); }
 
 /** Thumbnail, text summary and attachment count for one post row. */
-export function PostCell({ post, locale = 'en' }: { post: Row; locale?: KitLocale }) {
+/** `showOrigin={false}` when the cell sits inside a button: the origin badge holds a link, which must not be nested there. */
+export function PostCell({ post, locale = 'en', showOrigin = true }: { post: Row; locale?: KitLocale; showOrigin?: boolean }) {
   const media = mediaList(post.media);
   const first = media[0];
   const copy = usePublishingCopy(locale);
@@ -44,7 +45,7 @@ export function PostCell({ post, locale = 'en' }: { post: Row; locale?: KitLocal
     <div className={styles.cellText}>
       <span className={styles.message}>{postContentSummary(post.message, post.media, post.link, copy) || copy.noText}</span>
       {media.length ? <span className={styles.sub}>{media.length} {copy.mediaCount}</span> : null}
-      {post.origin ? <OriginBadge origin={post.origin} /> : null}
+      {showOrigin && post.origin ? <OriginBadge origin={post.origin} /> : null}
     </div>
   </div>;
 }

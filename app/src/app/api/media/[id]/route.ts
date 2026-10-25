@@ -1,3 +1,4 @@
+import { thumbnailWebp } from '@/modules/media/server/thumbnail';
 import { requestOrigin } from '@/server/request-origin';
 import { NextResponse } from 'next/server';
 import { requireViewer } from '@/server/context';
@@ -37,6 +38,10 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   }
   try {
     const image = await readWorkspaceImage(viewer.workspaceId, id);
+    // `?w=` asks for a small WebP for list and grid views; the original is served when it cannot be made.
+    const width = Number(query.get('w'));
+    const thumbnail = width ? await thumbnailWebp(image.bytes, image.mimeType, width) : null;
+    if (thumbnail) return new NextResponse(new Uint8Array(thumbnail), { headers: { 'content-type': 'image/webp', 'content-length': String(thumbnail.length), 'content-disposition': 'inline', 'x-content-type-options': 'nosniff', 'cache-control': 'private, max-age=31536000, immutable' } });
     // Stored images are written once under a new id and never rewritten, so the viewer's browser may keep them.
     return new NextResponse(new Uint8Array(image.bytes), { headers: { 'content-type': image.mimeType, 'content-length': String(image.bytes.length), 'content-disposition': 'inline', 'x-content-type-options': 'nosniff', 'cache-control': 'private, max-age=31536000, immutable' } });
   } catch {

@@ -96,7 +96,7 @@ export default async function ComparePage({ searchParams }: { searchParams: Prom
           format={m.unit === 'percent' ? { style: 'percent' } : undefined}
           series={[{ id: m.key, name: m.label, values: [m.a?.total, m.b?.total].map(value => value == null ? null : m.unit === 'percent' ? value / 100 : value) }]} />)}
         {data.truncated && <p className={styles.alert} role="status">{t("Showing")}{" "}{data.metrics.length}{" "}{t("of")}{" "}{data.totalMetrics}{" "}{t("metrics.")}</p>}
-        {data.metrics.length ? <div className={styles.tableWrap}><table><caption>{t("A is")}{" "}{data.mode === 'period' ? `${data.periods.a.start} to ${data.periods.a.end}` : t('group A')}{t("; B is")}{" "}{data.mode === 'period' ? `${data.periods.b.start} to ${data.periods.b.end}` : t('group B')}</caption><thead><tr><th scope="col">{t("Metric")}</th><th scope="col" className={styles.num}>{t("A")}</th><th scope="col" className={styles.num}>{t("B")}</th><th scope="col" className={styles.num}>{t("Difference")}</th><th scope="col">{t("Basis")}</th></tr></thead>
+        {data.metrics.length ? <div className={styles.tableWrap} tabIndex={0} role="region" aria-label={t("Metrics")}><table><caption>{t("A is")}{" "}{data.mode === 'period' ? `${data.periods.a.start} to ${data.periods.a.end}` : t('group A')}{t("; B is")}{" "}{data.mode === 'period' ? `${data.periods.b.start} to ${data.periods.b.end}` : t('group B')}</caption><thead><tr><th scope="col">{t("Metric")}</th><th scope="col" className={styles.num}>{t("A")}</th><th scope="col" className={styles.num}>{t("B")}</th><th scope="col" className={styles.num}>{t("Difference")}</th><th scope="col">{t("Basis")}</th></tr></thead>
           <tbody>{data.metrics.map(m => <tr key={m.key}><th scope="row">{m.label}<br /><small>{m.sourceLabel}</small></th>
             <td className={styles.num}>{m.a ? formatValue(m.a.total, m.unit, m.a.displayTotal) : t('Unknown')}<br /><small>{m.a ? `${m.a.coverage}/${m.a.available} ${m.resourceKind === 'ad-account' ? t('ad accounts') : t('channels')}` : t('no data')}</small></td>
             <td className={styles.num}>{m.b ? formatValue(m.b.total, m.unit, m.b.displayTotal) : t('Unknown')}<br /><small>{m.b ? `${m.b.coverage}/${m.b.available} ${m.resourceKind === 'ad-account' ? t('ad accounts') : t('channels')}` : t('no data')}</small></td>
@@ -105,7 +105,7 @@ export default async function ComparePage({ searchParams }: { searchParams: Prom
     {benchmark && benchmark.rows.length > 1 ? <section className={styles.panel} aria-labelledby="page-benchmark">
       <h2 id="page-benchmark">{bench.title}</h2>
       <p className={styles.note}>{bench.note(benchmark.days, benchmark.rankLabel)}</p>
-      <div className={styles.tableWrap}><table>
+      <div className={styles.tableWrap} tabIndex={0} role="region" aria-labelledby="page-benchmark"><table>
         <thead><tr><th scope="col">{bench.channel}</th><th scope="col" className={styles.num}>{bench.followers}</th><th scope="col" className={styles.num}>{bench.postsPerWeek}</th><th scope="col" className={styles.num}>{bench.average(benchmark.rankLabel)}</th></tr></thead>
         <tbody>{benchmark.rows.map(row => <tr key={row.id}>
           <th scope="row">{row.name}</th>

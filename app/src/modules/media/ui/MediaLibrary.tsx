@@ -135,7 +135,7 @@ export function MediaLibrary({ items, usage, page, hasMore, filters, canWrite, w
     {usageMayBeIncomplete && <p className={styles.help}>{t('usageIncomplete')}</p>}
     {visibleAssets.length ? <ul className={styles.grid} aria-label={t('tableCaption')}>
       {visibleAssets.map(a => <li key={a.id} className={styles.tile}>
-        <div className={styles.preview}>{a.kind === 'image' && a.source === 'stored-image' ? <img className={styles.tileImage} src={`/api/media/${encodeURIComponent(a.id)}`} alt="" loading="lazy" /> : <span className={styles.tileKind}>{a.kind === 'video' ? t('video') : t('image')}</span>}
+        <div className={styles.preview}>{a.kind === 'image' && a.source === 'stored-image' ? <img className={styles.tileImage} src={`/api/media/${encodeURIComponent(a.id)}?w=640`} alt="" loading="lazy" /> : <span className={styles.tileKind}>{a.kind === 'video' ? t('video') : t('image')}</span>}
           <span className={`${styles.badge}${a.inUse ? ` ${styles.badgeUsed}` : ''}`}>{a.inUse ? usedLabel(a.holderCount) : t('unused')}</span></div>
         <div className={styles.tileBody}>
           <span className={styles.name}>{a.name}</span>

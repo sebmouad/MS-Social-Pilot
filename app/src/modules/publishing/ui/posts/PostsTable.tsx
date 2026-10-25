@@ -13,6 +13,7 @@ import { type KitLocale } from '../kit/copy';
 import { useContent } from '../ContentProvider';
 import { fillContent } from '../content-copy';
 import { BulkPostActions } from './BulkPostActions';
+import { OriginBadge } from '../origins/OriginBadge';
 import { PostRowActions } from './PostActions';
 import type { PostOriginView } from '../origins/post-origin';
 import { ChannelsCell, PostCell, ReachCell, StatusCell, postThumbUrl } from './PostTableCells';
@@ -58,7 +59,7 @@ export function PostsTable({ rows, caption, locale = 'en', timeZone = 'UTC', sel
   }, []);
 
   const columns: TableColumn<PostsTableRow>[] = [
-    { key: 'post', label: copy.columnPost, render: row => <button type="button" className={styles.rowOpen} aria-haspopup="true" aria-expanded={openId === row.id} aria-label={fillContent(content.postsOpenRow, { text: label(row).slice(0, 80) })} onClick={event => { event.stopPropagation(); show(openId === row.id ? null : row.id); }}><PostCell post={row} locale={locale} /></button> },
+    { key: 'post', label: copy.columnPost, render: row => <><button type="button" className={styles.rowOpen} aria-haspopup="true" aria-expanded={openId === row.id} aria-label={fillContent(content.postsOpenRow, { text: label(row).slice(0, 80) })} onClick={event => { event.stopPropagation(); show(openId === row.id ? null : row.id); }}><PostCell post={row} locale={locale} showOrigin={false} /></button>{row.origin ? <span className={styles.rowOrigin}><OriginBadge origin={row.origin} /></span> : null}</> },
     { key: 'channels', label: copy.columnChannels, render: row => <ChannelsCell post={row} locale={locale} /> },
     { key: 'status', label: copy.columnStatus, render: row => <StatusCell post={row} locale={locale} /> },
     { key: 'reach', label: copy.columnReach, align: 'end', render: row => <ReachCell reach={row.reach} locale={locale} /> },

@@ -23,11 +23,11 @@ export function safeWebUrl(value: unknown): string | null {
   }
 }
 
-/** Library references resolve through the authorized media route; anything else must be a web URL. */
+/** Library references resolve through the authorized media route (as a small thumbnail); anything else must be a web URL. */
 export function imageSource(value: unknown): string | null {
   if (typeof value === 'string' && value.startsWith('media:')) {
     const id = value.slice('media:'.length);
-    return MEDIA_ID.test(id) ? `/api/media/${encodeURIComponent(id)}` : null;
+    return MEDIA_ID.test(id) ? `/api/media/${encodeURIComponent(id)}?w=320` : null;
   }
   return safeWebUrl(value);
 }

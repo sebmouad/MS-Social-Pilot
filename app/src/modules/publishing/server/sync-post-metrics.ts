@@ -175,7 +175,7 @@ export async function syncPostMetrics(workspaceId: string, postId: string): Prom
         });
       } else if (provider === 'instagram') {
         // Instagram Graph API post metrics
-        const insUrl = `https://graph.facebook.com/${graphVersion}/${encodeURIComponent(pt.remotePostId)}?fields=like_count,comments_count,permalink,insights.metric(reach,impressions,saved)&access_token=${encodeURIComponent(token)}`;
+        const insUrl = `https://graph.facebook.com/${graphVersion}/${encodeURIComponent(pt.remotePostId)}?fields=like_count,comments_count,permalink,insights.metric(reach,views,saved)&access_token=${encodeURIComponent(token)}`;
         const insRes = await fetch(insUrl, { signal: AbortSignal.timeout(10000) });
         const data = await insRes.json().catch(() => ({}));
         if (!data.error) {
@@ -188,7 +188,7 @@ export async function syncPostMetrics(workspaceId: string, postId: string): Prom
             for (const item of data.insights.data) {
               const val = item.values?.[0]?.value;
               if (item.name === 'reach' && typeof val === 'number') reach = val;
-              if (item.name === 'impressions' && typeof val === 'number') views = val;
+              if (item.name === 'views' && typeof val === 'number') views = val; // Meta replaced media impressions with views (v22)
             }
           }
           const insightsMap = { likes, likeCount: likes, comments, commentsCount: comments, reach, views, impressions: views };

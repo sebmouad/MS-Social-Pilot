@@ -48,7 +48,7 @@ export function LibraryPicker({ open, onClose, onAdd, maxSelect }: { open: boole
           return <li key={item.id}>
             <button type="button" className={`${styles.tile}${on ? ` ${styles.on}` : ''}`} aria-pressed={on} aria-label={fillContent(copy.createLibraryImage, { name: String(index + 1) })} onClick={() => toggle(item.id)}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={`/api/media/${encodeURIComponent(item.id)}`} alt="" loading="lazy" />
+              <img src={`/api/media/${encodeURIComponent(item.id)}?w=320`} alt="" loading="lazy" />
             </button>
           </li>;
         })}</ul>
