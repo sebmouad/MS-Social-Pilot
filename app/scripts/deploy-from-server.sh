@@ -33,6 +33,9 @@ if [ "$EUID" -ne 0 ]; then
   exit 1
 fi
 
+# Switch working directory to /tmp to avoid sudo -u postgres /root cwd permission warnings
+cd /tmp
+
 REPO_URL="https://github.com/sebmouad/MS-Social-Pilot.git"
 REPO_DIR="/srv/ms-social-pilot-repo"
 LIVE_DIR="/srv/ms-social-pilot"
@@ -417,4 +420,3 @@ ln -sf /usr/local/bin/socialpilot-deploy /usr/local/bin/deploy 2>/dev/null || tr
 printf "\n${GREEN}${BOLD}====================================================${RESET}\n"
 printf "${GREEN}${BOLD}✓ DEPLOY SUCCESSFUL: Commit %s active on server${RESET}\n" "$SHORT_COMMIT"
 printf "${GREEN}${BOLD}====================================================${RESET}\n\n"
-EOF
