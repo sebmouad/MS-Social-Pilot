@@ -6,6 +6,7 @@ import { runtimeConfig } from '@/server/config/store';
 import { OperationError } from '@/lib/operation-error';
 import { authorizeInbox as readAccess } from './access';
 import type { InboxReadActor, InboxReadConstraints } from './types';
+import { NOT_OWN_COMMENT } from './read';
 
 const idSchema = z.string().regex(/^[A-Za-z0-9_-]{1,200}$/);
 const invalid = async () => new OperationError('invalid_request', await inboxServiceText('service3'));
@@ -54,7 +55,7 @@ export async function searchInbox(actor: InboxReadActor, input: unknown = {}, co
         COALESCE(pc."fromName", '') AS author, ts_headline('simple', pc.message, plainto_tsquery('simple', ${q}), 'MaxWords=25, MinWords=8') AS excerpt,
         pc."createdTime" AS time, ts_rank(to_tsvector('simple', COALESCE(pc.message, '') || ' ' || COALESCE(pc."fromName", '')), plainto_tsquery('simple', ${q})) AS rank
       FROM post_comments pc JOIN post_targets pt ON pt.id = pc."postTargetId" JOIN targets t ON t.id = pt."targetId" JOIN posts p ON p.id = pt."postId"
-      WHERE ${gate('comment')} AND pc."parentRemoteId" IS NULL AND t."workspaceId" = ${actor.workspaceId} AND p."workspaceId" = ${actor.workspaceId} AND t.id IN (${Prisma.join(channelIds)})
+      WHERE ${gate('comment')} AND pc."parentRemoteId" IS NULL ${NOT_OWN_COMMENT} AND t."workspaceId" = ${actor.workspaceId} AND p."workspaceId" = ${actor.workspaceId} AND t.id IN (${Prisma.join(channelIds)})
         AND to_tsvector('simple', COALESCE(pc.message, '') || ' ' || COALESCE(pc."fromName", '')) @@ plainto_tsquery('simple', ${q})
     ), totals AS (SELECT COUNT(*) AS count FROM hits)
     SELECT hits.*, totals.count AS total FROM totals LEFT JOIN hits ON true

@@ -6,6 +6,7 @@ import { deletionRequestStatus } from '@/server/platforms/deletion-status';
 import { fillText, parseBlocks, parseInline, resolveDataDeletionResults, resolveLegalValues, siteLocale, type SiteLocale, type SitePageContent } from '../public/content';
 import { listPublicPlans, loadOperator, loadPublicChangelog, loadPublicHealth, loadSiteContent, siteIsPublic } from '../server/site';
 import { runtimeConfig } from '@/server/config/store';
+import { registrationAvailable } from '@/modules/settings/server/registration';
 import styles from './public.module.css';
 
 type Page = 'help' | 'pricing' | 'privacy' | 'terms' | 'status' | 'changelog' | 'dataDeletion';
@@ -39,16 +40,18 @@ export function RichBody({ body }: { body: string }) {
     : <p key={index}><Inline text={block.text} /></p>)}</>;
 }
 
-function SiteFrame({ content, operator, locale, current, children }: { content: SitePageContent; operator: { productName: string }; locale: SiteLocale; current: Page | null; children: ReactNode }) {
+async function SiteFrame({ content, operator, locale, current, children }: { content: SitePageContent; operator: { productName: string }; locale: SiteLocale; current: Page | null; children: ReactNode }) {
   const nav = content.nav;
+  // Never link to pages that would answer "not found": gated pages follow the public-site switch, sign-up follows registration.
+  const [sitePublic, signUpOpen] = await Promise.all([siteIsPublic(), registrationAvailable()]);
   const link = (page: Page, label: string) => <a key={page} href={PATHS[page]} aria-current={current === page ? 'page' : undefined}>{label}</a>;
   return <div className={styles.shell} lang={locale}>
     <header className={styles.header}><div className={styles.bar}>
       <a className={styles.brand} href="/"><span className={styles.mark} aria-hidden="true">{Array.from(operator.productName)[0] ?? 'S'}</span>{operator.productName}</a>
       <nav className={styles.nav} aria-label={nav.label}>
-        {link('help', nav.help)}{link('pricing', nav.pricing)}{link('changelog', nav.changelog)}{link('status', nav.status)}
+        {sitePublic && <>{link('help', nav.help)}{link('pricing', nav.pricing)}{link('changelog', nav.changelog)}{link('status', nav.status)}</>}
         <a href="/sign-in">{nav.signIn}</a>
-        <a className={styles.cta} href="/sign-up">{nav.signUp}</a>
+        {signUpOpen && <a className={styles.cta} href="/sign-up">{nav.signUp}</a>}
       </nav>
     </div></header>
     <main className={styles.main}>{children}</main>

@@ -72,6 +72,7 @@ export function InboxSyncBar({ targetId, lastSynced, stale = false, incomplete =
   const [syncedNow, setSyncedNow] = useState<string | null>(null);
   const [partialNow, setPartialNow] = useState(false);
   const router = useRouter();
+  const toast = useToast();
   const copy = useInboxCatalog('actionCopy')[locale];
 
   async function sync() {
@@ -91,7 +92,9 @@ export function InboxSyncBar({ targetId, lastSynced, stale = false, incomplete =
     // Optional so older providers keep validating; a bounds-hit sync still warns.
     const incompleteCount = outcome.body.incompleteCount;
     setPartialNow(typeof incompleteCount === 'number' && Number.isSafeInteger(incompleteCount) && incompleteCount > 0);
-    setResult({ kind: failedCount ? 'error' : 'ok', text: copy.synced({ targets: Number(targetCount), conversations: Number(conversationCount), messages: Number(messageCount), comments: Number(commentCount), reviews, failed: failedCount }) });
+    const text = copy.synced({ targets: Number(targetCount), conversations: Number(conversationCount), messages: Number(messageCount), comments: Number(commentCount), reviews, failed: failedCount });
+    // Success is shown as a toast (which also announces it); failures stay as an inline alert next to the button.
+    if (failedCount) setResult({ kind: 'error', text }); else toast.notify({ tone: 'success', title: text });
     if (typeof outcome.body.syncedLabel === 'string') setSyncedNow(outcome.body.syncedLabel);
     router.refresh();
   }
@@ -104,8 +107,8 @@ export function InboxSyncBar({ targetId, lastSynced, stale = false, incomplete =
     <Button variant="secondary" disabled={disabled || busy} aria-busy={busy} onClick={() => void sync()}>{busy ? copy.syncing : copy.syncNow}</Button>
     {showStale ? <Badge tone="warning">{copy.staleNote}</Badge> : null}
     {showPartial ? <Badge tone="warning">{copy.partialNote}</Badge> : null}
+    <span className={styles.syncedAt}>{shown ? <>{copy.lastSynced} {shown}</> : copy.notSynced}</span>
     <InfoTip name={copy.lastSynced}>{shown ? <>{copy.lastSynced} <strong>{shown}</strong>{showStale ? <> · {copy.staleNote}</> : null}{showPartial ? <> · {copy.partialNote}</> : null}</> : copy.notSynced}</InfoTip>
-    <div role="status" aria-live="polite" className="ui-visually-hidden">{result?.kind === 'ok' ? <span>{result.text}</span> : null}</div>
     {result?.kind === 'error' ? <p role="alert" className={styles.error}>{result.text}</p> : null}
   </div>;
 }

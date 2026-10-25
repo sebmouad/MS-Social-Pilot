@@ -392,7 +392,8 @@ function PostComposerContent({ copyCatalog = composerCatalogDefaults, profiles, 
       try { const parsed = new URL(link); valid = parsed.protocol === 'https:' && !parsed.username && !parsed.password; } catch { /* shown as a field error */ }
       if (!valid) { event.preventDefault(); setLocalError(ui.invalidLink); document.getElementById('composer-link')?.focus(); return; }
     }
-    if (intent === 'schedule' && (!scheduleDate || !scheduleTime || !selected.length)) {
+    // "Publish now" needs no wall time: the server computes the instant.
+    if (intent === 'schedule' && (!selected.length || (!publishNowFlag && (!scheduleDate || !scheduleTime)))) {
       event.preventDefault(); setLocalError(!selected.length ? ui.needDestination : ui.needTime); return;
     }
     if (intent === 'queue' && (!selected.length || !queuePreview || typeof queuePreview !== 'object' || queuePreview.status !== 'ready' || previewSelection !== selectedKey)) { event.preventDefault(); setLocalError(!selected.length ? copy.needDestination : copy.unavailable); return; }

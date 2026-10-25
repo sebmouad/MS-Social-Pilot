@@ -2,7 +2,7 @@ import { Prisma } from '../../../../generated/client';
 import { prisma } from '@/server/data';
 import { runtimeConfig } from '@/server/config/store';
 import { authorizeInbox } from './access';
-import { quickConditions } from './read';
+import { NOT_OWN_COMMENT, quickConditions } from './read';
 
 /**
  * Open conversations and visible top-level comments mentioning the page, for the
@@ -22,7 +22,7 @@ export async function openMentionCount(actor: { userId: string; workspaceId: str
         UNION ALL
         SELECT pc.id FROM post_comments pc
           JOIN post_targets pt ON pt.id = pc."postTargetId" JOIN targets t ON t.id = pt."targetId" JOIN posts p ON p.id = pt."postId"
-        WHERE pc."parentRemoteId" IS NULL AND t."workspaceId" = ${actor.workspaceId} AND p."workspaceId" = ${actor.workspaceId}
+        WHERE pc."parentRemoteId" IS NULL ${NOT_OWN_COMMENT} AND t."workspaceId" = ${actor.workspaceId} AND p."workspaceId" = ${actor.workspaceId}
           AND t.id IN (${Prisma.join(access.channelIds)}) AND pc."resolvedAt" IS NULL AND pc."isHidden" = false ${quickConditions(['mentions'], prefix, 'comment')}
         LIMIT ${cap + 1}
       ) AS mentions`);

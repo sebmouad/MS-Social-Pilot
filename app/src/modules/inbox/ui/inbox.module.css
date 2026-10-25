@@ -5,6 +5,7 @@
 
 .sync { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 4px 8px; max-width: 26rem; }
 .sync > [role=alert] { flex-basis: 100%; text-align: right; }
+.syncedAt { font-size: var(--text-xs); color: var(--ink-soft); }
 .syncTime { margin: 0; color: var(--ink-soft); font-size: 12.5px; }
 .syncTime strong { color: var(--ink); font-weight: 650; }
 .syncResult { color: var(--ink-soft); font-size: 12.5px; line-height: 1.45; text-align: right; }

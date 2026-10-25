@@ -7,6 +7,8 @@ import { canAccessFeature } from '@/server/permissions';
 import { loadPermissions } from '@/server/permissions/loader';
 import { platformAnalytics } from '@/server/platforms/registry';
 import { readAnalyticsSnapshot } from '@/modules/analytics/server/read';
+import { pickMetric } from '@/modules/analytics/ui/insights/overview-model';
+import type { InsightsPolicy } from '@/modules/analytics/ui/insights/insights-config';
 import { readChannelMeasures, readChannelPostHistory } from '@/modules/analytics/server/stored-reads';
 import { readInboxList } from '@/modules/inbox/server/read';
 import { readAdsDailyRows } from '@/modules/ads/server/report-read';
@@ -53,7 +55,7 @@ export type HomeActor = { userId: string; workspaceId: string };
 
 const KEYS = ['home.lookbackDays', 'home.maxChannels', 'home.topChannelsLimit', 'home.upcomingLimit', 'home.snippetCharacters', 'home.interactionMeasureKeys',
   'home.heatmapLookbackDays', 'home.heatmapMaxPostsPerChannel', 'home.heatmapMinPosts', 'home.adsMaxPages',
-  'home.linkClickMeasureWords', 'home.recentInboxLimit', 'home.recentInboxPreviewCharacters', 'home.attentionReconnectLimit'] as const;
+  'home.linkClickMeasureWords', 'analytics.insightsPolicy', 'home.recentInboxLimit', 'home.recentInboxPreviewCharacters', 'home.attentionReconnectLimit'] as const;
 const DAY = 86_400_000;
 /** Calendar day key (YYYY-MM-DD) from a day string, ISO timestamp or Date. */
 const dayKey = (value: unknown): string => { if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}/.test(value)) return value.slice(0, 10); const date = value instanceof Date ? value : new Date(String(value)); return Number.isNaN(date.getTime()) ? '' : date.toISOString().slice(0, 10); }; // Fixed UTC calendar duration, not an operational setting.
@@ -72,6 +74,7 @@ export async function readHomeOverview(actor: HomeActor, now = new Date(), optio
   if (!entitlements || !permissions) throw new OperationError('forbidden', (await homeErrorCopy()).homeUnavailable);
   const allowed = (feature: string) => canUseFeature(entitlements, feature) && canAccessFeature(permissions, feature, 'read');
   const config = await runtimeConfigBatch(KEYS) as Record<(typeof KEYS)[number], unknown>;
+  const insightsPolicy = config['analytics.insightsPolicy'] as InsightsPolicy;
   const lookbackDays = Number(config['home.lookbackDays']), maxChannels = Number(config['home.maxChannels']);
   const memberScope = permissions.pageScope.all ? undefined : [...permissions.pageScope.ids];
   const requested = options.channelIds?.filter(id => typeof id === 'string' && id.length > 0);
@@ -135,19 +138,25 @@ export async function readHomeOverview(actor: HomeActor, now = new Date(), optio
       const row = byId.get(channel.id);
       return { channel, current: row?.current ?? null, previous: row?.previous ?? null, mix: row?.mix.filter(measure => interactionKeys.includes(measure.key)) ?? [] };
     });
-    const views = periodTotals(rows.map(row => ({ current: row.current?.views ?? null, previous: row.previous?.views ?? null })));
-    const engagements = periodTotals(rows.map(row => ({ current: row.current?.engagements ?? null, previous: row.previous?.engagements ?? null })));
-    // Link clicks come from the same snapshot as the Insights tile: the first stored channel metric whose label
-    // matches a Root word, with its snapshot comparison. No match, or no stored total, means no tile, not zero.
-    const clickWords = (config['home.linkClickMeasureWords'] as string[]).map(word => word.toLowerCase());
-    const clickMetric = snapshot.allMetrics.find(metric => metric.resourceKind === 'channel' && metric.kind !== 'breakdown' && metric.total !== null && typeof metric.label === 'string' && clickWords.some(word => metric.label.toLowerCase().includes(word)));
-    const clickComparison = clickMetric ? snapshot.comparisons[clickMetric.key] : undefined;
-    const clickPrevious = clickMetric && clickComparison?.status === 'comparable' ? clickComparison.previous : null;
-    const linkClicks = clickMetric ? {
-      current: clickMetric.total, previous: clickPrevious,
-      change: clickMetric.total !== null && clickPrevious !== null && clickPrevious > 0 ? (clickMetric.total - clickPrevious) / clickPrevious : null,
-      covered: clickMetric.coverage, comparable: clickComparison?.status === 'comparable' ? clickMetric.coverage : 0,
-    } : null;
+    // Views, engagements and link clicks come from the same snapshot as the Insights tiles: the first stored channel
+    // metric whose label matches the words, with its snapshot comparison (no change unless both periods are comparable).
+    // No match, or no stored total, means no tile, not zero.
+    const fromSnapshot = (words: readonly string[]) => {
+      const metric = pickMetric(snapshot.allMetrics, words);
+      if (!metric) return null;
+      const comparison = snapshot.comparisons[metric.key];
+      const previous = comparison?.status === 'comparable' ? comparison.previous : null;
+      return {
+        current: metric.total, previous,
+        change: metric.total !== null && previous !== null && previous > 0 ? (metric.total - previous) / previous : null,
+        covered: metric.coverage, comparable: comparison?.status === 'comparable' ? metric.coverage : 0,
+      };
+    };
+    const tileWords = (id: string) => insightsPolicy.tiles.find(tile => tile.id === id)?.words ?? [];
+    const empty = { current: null, previous: null, change: null, covered: 0, comparable: 0 };
+    const views = fromSnapshot(tileWords('views')) ?? empty;
+    const engagements = fromSnapshot(tileWords('engagements')) ?? empty;
+    const linkClicks = fromSnapshot(config['home.linkClickMeasureWords'] as string[]);
     if (views.current === null && engagements.current === null && (linkClicks === null || linkClicks.current === null)) return { state: 'empty' };
     const topLimit = Number(config['home.topChannelsLimit']);
     const topChannels = rows.flatMap(row => row.current?.engagements != null && Number.isFinite(row.current.engagements) ? [{ id: row.channel.id, name: row.channel.name, engagements: row.current.engagements }] : [])

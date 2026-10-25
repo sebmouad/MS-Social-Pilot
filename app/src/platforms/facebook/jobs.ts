@@ -8,6 +8,7 @@ import { prisma } from '@/server/data';
 import { decryptSecret } from '@/server/secret-crypto';
 import { configuredFacebookEngine } from '@/platforms/facebook/runtime';
 import { runtimeConfig } from '@/server/config/store';
+import { recordError } from '@/server/errors/recorder';
 import { Prisma } from '../../../generated/client';
 import { withRetries } from '@/server/jobs/retry';
 import type { RetryBackoff } from '@/server/jobs/retry';
@@ -209,6 +210,7 @@ async function fetchPageAnalytics(target: PageTarget, now: Date, today: Date, re
       return engine.getPageInsightObservations(binding.token, target.providerId, since, now);
     }, retryLimit, retryBackoff);
     let failedMetrics = observations.failedMetrics?.length ? 1 : 0;
+    if (observations.failedMetrics?.length) await logItemFailure('pageInsights', target.id, observations.failedMetrics.map(item => `${item.metric}: ${item.message}`).join('; '));
     const historyBinding = await currentPageBinding(target, now);
     if (!historyBinding) throw new OperationError('forbidden', 'History access unavailable.');
     const startCursor = await readHistoryCursor(prisma, target);
@@ -224,7 +226,10 @@ async function fetchPageAnalytics(target: PageTarget, now: Date, today: Date, re
       failedMetrics++;
       await logItemFailure('postHistory', target.id, historyError);
     }
-    if (history?.failures.length) failedMetrics++;
+    if (history?.failures.length) {
+      failedMetrics++;
+      await logItemFailure('postHistory', target.id, history.failures.join('; '));
+    }
     return { observations, history, startCursor, failedMetrics };
   });
 }
@@ -377,7 +382,10 @@ export async function syncAdsAnalytics(now = new Date(), retryLimit = 0, retryBa
 async function logItemFailure(job: string, targetId: string, error: unknown) {
   const max = await runtimeConfig('logging.errorDetailMaxCharacters').catch(() => null) as number | null;
   const reason = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
-  console.warn(`[${job}] target=${targetId} failed: ${redact(reason, max ?? Number(CONFIG_BY_KEY.get('logging.errorDetailMaxCharacters')?.defaultValue))}`);
+  const detail = redact(reason, max ?? Number(CONFIG_BY_KEY.get('logging.errorDetailMaxCharacters')?.defaultValue));
+  console.warn(`[${job}] target=${targetId} failed: ${detail}`);
+  // Also visible in Root › Errors, grouped by job and message, so a failed=N summary has a cause.
+  await recordError({ source: 'worker', error: new Error(detail ?? reason), location: `facebook.${job}` });
 }
 
 type InboxFetch = {

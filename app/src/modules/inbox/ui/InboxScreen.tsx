@@ -80,11 +80,17 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
   const constraints = scope.constraints;
   const { channel: _scopeParam, ...listParams } = params;
 
-  // The screen shows one explicit list at a time; an absent or legacy mixed `type` opens Messages. The service still accepts `all` for API/MCP callers.
+  // The screen shows one explicit list at a time; an absent or legacy mixed `type` opens the first non-empty list
+  // (Messages when all are empty). The service still accepts `all` for API/MCP callers.
   const listInput = inboxListInput(listParams);
-  if (listInput.kind === undefined || listInput.kind === 'all') listInput.kind = 'message';
+  const kindChosen = listInput.kind !== undefined && listInput.kind !== 'all';
+  if (!kindChosen) listInput.kind = 'message';
   const listOutcome = await (async () => {
-    try { return { page: await readInboxList(actor, listInput, constraints), error: null }; }
+    try {
+      const first = await readInboxList(actor, listInput, constraints);
+      const fallback = kindChosen || first.total > 0 ? undefined : KIND_TABS.find(kind => (first.totals?.[kind] ?? 0) > 0);
+      return { page: fallback ? await readInboxList(actor, { ...listInput, kind: fallback }, constraints) : first, error: null };
+    }
     catch (error) { return { page: null, error: operationFailure(error, copy.listError) }; }
   })();
   const listPage = listOutcome.page;
@@ -274,7 +280,7 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
   </div>;
 
   return <InboxCopyProvider catalog={catalog}><PageFrame module="inbox" scopedAccess><div className={styles.page}>
-    <InboxHeader title={copy.title} count={listPage && filters.state === 'open' ? listPage.total : undefined} info={<InfoTip name={copy.title}>{copy.description}</InfoTip>} tabs={tabs} filters={filterRow}
+    <InboxHeader title={copy.title} count={listPage && filters.state === 'open' ? (listPage.totals ? KIND_TABS.reduce((sum, kind) => sum + (listPage.totals?.[kind] ?? 0), 0) : listPage.total) : undefined} info={<InfoTip name={copy.title}>{copy.description}</InfoTip>} tabs={tabs} filters={filterRow}
       actions={<>
         {visibleChannels.length > 0 ? <InboxSyncBar targetId={syncTarget} lastSynced={lastSynced ? formatInboxTime(lastSynced, timeZone, true, locale) : null} stale={inboxSyncStale(lastSynced, staleAfterMinutes)} incomplete={listPage?.syncIncomplete ?? false} timeZone={timeZone} locale={locale} /> : null}
         {visibleChannels.length > 0 ? <SavedRepliesManager locale={locale} canWrite={canWriteReplies} /> : null}
