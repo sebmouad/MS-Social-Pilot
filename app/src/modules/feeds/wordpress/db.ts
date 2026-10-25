@@ -27,13 +27,15 @@ export type CandidateQuery = {
   order: 'newest' | 'oldest';
   skipShared: boolean;
   maxAgeDays: number;
-  afterId: string | null;
-  afterDate?: Date | null;
+  /** Posts already read in this scan; WordPress pages by offset, so posts sharing a publish second are never skipped. */
+  offset: number;
   limit: number;
   now: Date;
 };
+/** `fetched` counts posts WordPress returned before local filtering; fewer than `requested` means the library ended. */
+export type CandidatePage = { rows: WpCandidateRow[]; fetched: number; requested: number };
 export type WpDb = {
-  candidates(query: CandidateQuery): Promise<WpCandidateRow[]>;
+  candidates(query: CandidateQuery): Promise<CandidatePage>;
   /** attachment ID -> relative file path under the uploads folder */
   attachments(ids: readonly string[], attachedFileMetaKey: string): Promise<Map<string, string>>;
   ping(): Promise<void>;
@@ -260,17 +262,17 @@ export async function openWordpressDb(settings: DbSettings): Promise<WpDb> {
   return {
     async candidates(q) {
       const endpoint = restEndpointForType(q.mapping.postType || 'post');
+      // The REST API returns at most 100 posts per request.
+      const requested = Math.min(100, Math.max(1, q.limit));
       const params = new URLSearchParams({
-        per_page: String(Math.min(100, Math.max(1, q.limit))),
+        per_page: String(requested),
+        offset: String(Math.max(0, q.offset)),
         orderby: 'date',
         order: q.order === 'newest' ? 'desc' : 'asc',
         _embed: 'wp:featuredmedia',
       });
       if (q.mapping.postStatus && q.mapping.postStatus !== 'publish' && settings.apiToken) {
         params.set('status', q.mapping.postStatus);
-      }
-      if (q.afterDate) {
-        params.set(q.order === 'newest' ? 'before' : 'after', q.afterDate.toISOString());
       }
       if (q.maxAgeDays > 0) {
         const minDate = new Date(q.now.getTime() - q.maxAgeDays * 86_400_000);
@@ -281,14 +283,14 @@ export async function openWordpressDb(settings: DbSettings): Promise<WpDb> {
       }
 
       const raw = await fetchJson(`${base}/wp-json/wp/v2/${endpoint}?${params.toString()}`, settings);
-      if (!Array.isArray(raw)) return [];
+      if (!Array.isArray(raw)) return { rows: [], fetched: 0, requested };
 
       const rows: WpCandidateRow[] = [];
       for (const entry of raw) {
         if (!entry || typeof entry !== 'object') continue;
         const item = entry as Record<string, unknown>;
         const id = String(item['id'] ?? '').trim();
-        if (!id || (q.afterId !== null && id === q.afterId)) continue;
+        if (!id) continue;
 
         if (q.skipShared && q.mapping.skipMetaKey && metaValue(item, q.mapping.skipMetaKey)) {
           continue;
@@ -339,7 +341,7 @@ export async function openWordpressDb(settings: DbSettings): Promise<WpDb> {
         const recipe = q.mapping.recipeMetaKey ? metaValue(item, q.mapping.recipeMetaKey) : extractRecipeJson(item, '', title);
         rows.push({ id, title, slug, publishedAt, caption, imageId, recipe });
       }
-      return rows;
+      return { rows, fetched: raw.length, requested };
     },
 
     async attachments(ids, attachedFileMetaKey) {

@@ -72,14 +72,17 @@ export type Scan = { candidates: Candidate[]; scanned: number; exhausted: boolea
  */
 export async function scanCandidates(db: WpDb, settings: WordpressSettings, source: Pick<SourceRow, 'siteUrl'>, config: PlanConfig, now: Date, enough: (candidates: Candidate[]) => boolean): Promise<Scan> {
   const candidates: Candidate[] = [];
-  let afterId: string | null = null; let afterDate: Date | null = null; let scanned = 0; let exhausted = false;
+  let scanned = 0; let exhausted = false;
   while (scanned < settings.candidateMaxScan) {
     const limit = Math.min(settings.candidateBatchSize, settings.candidateMaxScan - scanned);
-    const rows = await db.candidates({ mapping: config.mapping, order: config.order, skipShared: config.skipShared, maxAgeDays: config.maxAgeDays, afterId, afterDate, limit, now });
-    if (!rows.length) { exhausted = true; break; }
-    scanned += rows.length; afterId = rows[rows.length - 1]!.id; afterDate = rows[rows.length - 1]!.publishedAt;
+    const { rows, fetched, requested } = await db.candidates({ mapping: config.mapping, order: config.order, skipShared: config.skipShared, maxAgeDays: config.maxAgeDays, offset: scanned, limit, now });
+    // Only WordPress returning a short page ends the library; posts filtered out locally (already shared) do not.
+    if (!fetched) { exhausted = true; break; }
+    scanned += fetched;
     const files = await db.attachments(rows.map(r => r.imageId), config.mapping.attachedFileMetaKey);
     for (const row of rows) {
+      // New posts published during a scan shift offsets; never list one recipe twice.
+      if (candidates.some(candidate => candidate.wpPostId === row.id)) continue;
       const file = files.get(row.imageId);
       const imageUrl = file ? buildImageUrl(source.siteUrl, settings.uploadsPath, file) : null;
       const permalink = buildPermalink(settings.permalinkTemplate, source.siteUrl, row.slug);
@@ -88,7 +91,7 @@ export async function scanCandidates(db: WpDb, settings: WordpressSettings, sour
       candidates.push({ wpPostId: row.id, title: (recipe.title || row.title).slice(0, settings.titleMax), slug: row.slug, caption: row.caption, imageUrl, permalink, recipe, publishedAt: row.publishedAt });
     }
     if (enough(candidates)) break;
-    if (rows.length < limit) { exhausted = true; break; }
+    if (fetched < requested) { exhausted = true; break; }
   }
   return { candidates, scanned, exhausted };
 }
