@@ -624,7 +624,16 @@ export async function publishPost(actor: PublishingActor, postId: string, expect
       const adapter = provider ? await platformFor(provider, 'publishing') : null;
       const credential = adapter ? readPublishingCredential(item.target, adapter, 'publishing') : null;
       const eligible = Boolean(credential && provider && hasPlatformCapability(entitlements, provider) && adapter?.publish && (!post.firstComment?.trim() || adapter.publishFirstComment) && adapter.supportsTargetKind?.(item.target.type, 'publishing') && item.target.enabled && item.target.canPublish && item.target.accessToken && !item.target.socialAccount?.invalidatedAt);
-      if (!eligible) { failed++; await markTarget(actor, post.id, item.id, 'failed', signal); continue; }
+      if (!eligible) {
+        // Say why, so a failed destination is actionable instead of a bare "Failed".
+        const reason = !provider || !adapter?.publish ? 'This channel type cannot publish.'
+          : item.target.socialAccount?.invalidatedAt || !item.target.accessToken || !credential ? 'The channel connection expired. Reconnect it in Settings › Channels.'
+          : !hasPlatformCapability(entitlements, provider) ? 'Your plan does not include publishing to this network.'
+          : !item.target.enabled || !item.target.canPublish ? 'This channel is turned off or lacks permission to publish.'
+          : post.firstComment?.trim() && !adapter.publishFirstComment ? 'This network does not support first comments.'
+          : 'This channel cannot receive this post.';
+        failed++; await markTarget(actor, post.id, item.id, 'failed', signal, reason); continue;
+      }
       linkSettings ??= await loadWorkspaceOperations(actor.workspaceId);
       const resolved = resolveVariantMessage(post.message, selection.variants, selection.locales.get(item.target.id) ?? selection.workspaceLocale);
       if (resolved.message !== post.message) validatePostContent(resolved.message, maxMessageChars, attachments, errorText);
@@ -736,11 +745,11 @@ export function parsePublishingCsv(source: string, errorText: PublishingErrorTex
   return rows;
 }
 
-async function markTarget(actor: PublishingActor, postId: string, id: string, status: 'failed', signal: AbortSignal) {
+async function markTarget(actor: PublishingActor, postId: string, id: string, status: 'failed', signal: AbortSignal, reason?: string) {
   await publishingTransaction(signal, async tx => {
     await tx.postTarget.updateMany({ where: { id, post: { workspaceId: actor.workspaceId }, status: { in: ['pending', 'failed', 'processing'] }, remotePostId: null }, data: { status } });
     await emitWorkspaceAlert(tx, { workspaceId: actor.workspaceId, eventId: randomUUID(), kind: 'publish_failure', postId });
-    await audit(tx, actor, 'publishing.target_failed', { postTargetId: id });
+    await audit(tx, actor, 'publishing.target_failed', { postTargetId: id, ...(reason ? { reason } : {}) });
   });
 }
 
