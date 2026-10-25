@@ -511,7 +511,7 @@ function PostComposerContent({ recentPosts = [], copyCatalog = composerCatalogDe
     : queueErrored ? cc.createQueueRetry
     : typeof queuePreview === 'object' && queuePreview.status === 'ready' ? fillContent(cc.createQueueAt, { when: queuePreview.scheduledLabel }) : cc.createQueueFull;
 
-  return <div className={styles.sheet} role="dialog" aria-modal="true" aria-labelledby={titleId} onKeyDown={onSheetKey}>
+  return <><div className={styles.backdrop} aria-hidden="true" /><div className={styles.sheet} role="dialog" aria-modal="true" aria-labelledby={titleId} onKeyDown={onSheetKey}>
     <header className={styles.top}>
       <h1 id={titleId}>{cc.createTitle}</h1>
       <div className={styles.topEnd}>
@@ -741,7 +741,7 @@ function PostComposerContent({ recentPosts = [], copyCatalog = composerCatalogDe
     <Dialog open={Boolean(templateToApply)} title={ui.replaceTitle} description={ui.replaceDescription} onClose={() => setTemplateToApply(null)} actions={<><Button data-dialog-cancel onClick={() => setTemplateToApply(null)}>{ui.keepDraft}</Button><Button variant="primary" onClick={() => templateToApply && applyTemplate(templateToApply)}>{ui.replaceText}</Button></>}>
       <p><strong>{templateToApply?.name}</strong></p><p>{templateToApply?.body}</p>{templateToApply?.hashtags && <p>{templateToApply.hashtags}</p>}
     </Dialog>
-  </div>;
+  </div></>;
 }
 
 export function PostComposer(props: Parameters<typeof PostComposerContent>[0]) {

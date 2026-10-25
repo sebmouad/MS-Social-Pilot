@@ -35,8 +35,8 @@ export function AccountsTable({ rows, copy, locale, campaignsHref, rowLabel }: {
     { key: 'cpc', label: copy.colCpc, align: 'end', render: row => <span className="insights-num">{row.summary ? money(row.summary.cpc, row.currency) : '—'}</span> },
     { key: 'synced', label: copy.colSynced, render: row => when(row.lastSyncedAt) },
   ];
-  return <>
-    <DataTable columns={columns} rows={rows} rowKey={row => row.id} caption={copy.caption} density="compact" onRowClick={row => setOpenId(row.id)} />
+  return <div className="insights-accounts-split" data-open={open !== null}>
+    <div className="insights-accounts-split__list"><DataTable columns={columns} rows={rows} rowKey={row => row.id} caption={copy.caption} density="compact" onRowClick={row => setOpenId(row.id)} /></div>
     <SidePanel open={open !== null} title={open?.name ?? rowLabel} onClose={() => setOpenId(null)} closeLabel={copy.detailsClose}
       actions={open ? <a className="ui-button ui-button--secondary ui-button--md" href={campaignsHref}>{copy.detailsCampaigns}</a> : undefined}>
       {open && <div className="insights-detail">
@@ -53,5 +53,5 @@ export function AccountsTable({ rows, copy, locale, campaignsHref, rowLabel }: {
           : <p className="small-note">{copy.noResults}</p>}
       </div>}
     </SidePanel>
-  </>;
+  </div>;
 }

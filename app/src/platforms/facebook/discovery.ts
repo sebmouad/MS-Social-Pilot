@@ -62,15 +62,15 @@ export async function persistFacebookDiscovery(actor: ConnectionMutationActor, i
       const existing = await tx.target.findUnique({ where: { workspaceId_providerId: { workspaceId: actor.workspaceId, providerId: page.id } }, select: { id: true, socialAccountId: true } });
       const pageData = {
         socialAccountId: account.id, type: 'page' as const, name: page.name,
-        // Stable address that redirects to the current picture; CDN picture URLs are signed and expire.
-        pictureUrl: `https://graph.facebook.com/${encodeURIComponent(page.id)}/picture?type=square`,
         accessToken: encryptSecret(page.accessToken), canPublish: true,
       };
       if (!existing) {
-        await tx.target.create({ data: { id: randomUUID(), workspaceId: actor.workspaceId, providerId: page.id, ...pageData, enabled: false, createdAt: now } });
+        const id = randomUUID();
+        // Served with the Page's own token (app/api/channels/[id]/picture); CDN picture URLs are signed and expire.
+        await tx.target.create({ data: { id, workspaceId: actor.workspaceId, providerId: page.id, ...pageData, pictureUrl: `/api/channels/${id}/picture`, enabled: false, createdAt: now } });
         savedPages++;
       } else if (existing.socialAccountId === null || existing.socialAccountId === account.id) {
-        await tx.target.update({ where: { id: existing.id }, data: { ...pageData, ...(existing.socialAccountId === null ? { enabled: false } : {}) } });
+        await tx.target.update({ where: { id: existing.id }, data: { ...pageData, pictureUrl: `/api/channels/${existing.id}/picture`, ...(existing.socialAccountId === null ? { enabled: false } : {}) } });
         savedPages++;
       } else {
         skippedPages++;

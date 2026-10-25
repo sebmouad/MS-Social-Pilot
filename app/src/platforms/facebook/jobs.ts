@@ -348,7 +348,9 @@ export async function syncAdsAnalytics(now = new Date(), retryLimit = 0, retryBa
             const date = validDate(row.date_start);
             if (!date) continue;
             const level = row.report_level === 'campaign' || row.report_level === 'adset' || row.report_level === 'ad' ? row.report_level : 'account';
-            const objectId = typeof row[`${level}_id`] === 'string' ? row[`${level}_id`] as string : account.actId;
+            // Account rows always key on the stored act_ id: Graph's account_id has no prefix, and keying on it
+            // stored the same day twice when the requested fields changed.
+            const objectId = level === 'account' ? account.actId : typeof row[`${level}_id`] === 'string' ? row[`${level}_id`] as string : account.actId;
             if (level !== 'account' && objectId === account.actId) throw new Error('Ads hierarchy identity missing.');
             const objectName = typeof row[`${level}_name`] === 'string' ? row[`${level}_name`] as string : account.name;
             const spend = finite(row.spend) ?? 0;
