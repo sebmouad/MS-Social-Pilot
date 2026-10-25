@@ -9,7 +9,7 @@ import { InfoTip } from '@/components';
 import type React from 'react';
 import { readAdObjects } from './service';
 import { ObjectsTrendCharts } from './TrendCharts';
-import { storedFieldRows } from '@/modules/ads/ui/stored-fields';
+import { storedFieldRows } from '@/modules/ads/stored-fields';
 import { adsTranslator } from '@/modules/ads/copy';
 import type { AdObject } from './aggregate';
 import styles from '@/modules/analytics/ui/reports/workflows.module.css';
