@@ -25,13 +25,14 @@ export function CalendarTools(props: Pick<WorkspaceProps, 'area' | 'copy' | 'fro
  const { area, copy: c } = props;
  return <div className={styles.tools}>
   <nav aria-label={c.dates}>{AREAS.map(a => { const Icon = icons[a]; return <a key={a} href={paths[a]} aria-current={a === area ? 'page' : undefined}><Icon size={18} aria-hidden="true" />{c[a]}</a>; })}</nav>
-  <form className={styles.tools} action={paths[area]}>
+  {/* Subscriptions are personal links, not dated entries: a period or channel filter would change nothing. */}
+  {area !== 'feeds' && <form className={styles.tools} action={paths[area]}>
    <label className="ui-field"><span>{c.from}</span><input className="ui-input" type="date" name="from" defaultValue={props.from} autoComplete="off" /></label>
    <label className="ui-field"><span>{c.to}</span><input className="ui-input" type="date" name="to" defaultValue={props.to} autoComplete="off" /></label>
    <label className="ui-field"><span>{c.channels}</span><select className="ui-input" name="targetId" defaultValue={props.targetId}><option value="">{c.allChannels}</option>{props.targetId && !props.channels.some(ch => ch.id === props.targetId) && <option value={props.targetId}>{c.unknown}</option>}{props.channels.map(ch => <option key={ch.id} value={ch.id}>{ch.name}</option>)}</select></label>
    {area === 'trends' && <label className={styles.choice}><input type="checkbox" name="showAll" value="true" defaultChecked={props.showAll} />{c.showAll}</label>}
    <Button type="submit">{c.apply}</Button>
-  </form>
+  </form>}
  </div>;
 }
 export function CalendarWorkspace(props: WorkspaceProps) {
@@ -66,7 +67,7 @@ export function CalendarWorkspace(props: WorkspaceProps) {
   {area === 'seasons' && <p className={styles.notice}>{c.seasonNotice}</p>}
   {props.children}
   {area !== 'trends' && <section className={styles.panel} aria-label={c[area]}>
-   {rows.length === 0 ? <p className={styles.meta}>{c.noMatches}</p> : <ul className={styles.agenda}>{rows.map(row => {
+   {rows.length === 0 ? <p className={styles.meta}>{area === 'feeds' ? c.empty : c.noMatches}</p> : <ul className={styles.agenda}>{rows.map(row => {
     const date = 'date' in row ? row.date : 'startsOn' in row ? row.startsOn : 'day' in row ? row.day : null;
     const title = 'title' in row ? row.title : 'label' in row ? row.label : row.name;
     const ids = 'targetIds' in row ? row.targetIds : 'targetId' in row ? row.targetId ? [row.targetId] : [] : row.pageIds;

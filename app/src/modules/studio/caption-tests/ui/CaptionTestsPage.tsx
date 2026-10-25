@@ -6,15 +6,13 @@ import { requireViewer } from '@/server/context';
 import { captionCopy, learnCaptionTest, listCaptionTests, listTestablePosts, startCaptionTestInput, type Locale } from '../server/service';
 import type { InstantFormatter } from '@/server/instant-labels';
 import { CaptionTestsScreen, type CaptionAction, type CaptionActionResult } from './CaptionTestsScreen';
-import { toolsCopy } from '../../content-tools/server/copy-loader';
-import { StudioLinks } from '../../ui/StudioLinks';
 
 export default async function CaptionTestsPage() {
   const viewer = await requireViewer({ module: 'studio', feature: 'studio/tests', channelScoped: true });
   const locale: Locale = await requestLocale();
   const actor = { userId: viewer.user.id, workspaceId: viewer.workspaceId };
   const instants = await workspaceInstantFormatter(viewer.workspaceId, locale);
-  const [data, copy, links] = await Promise.all([listCaptionTests(actor, { locale }), captionCopy(locale), toolsCopy(locale)]);
+  const [data, copy] = await Promise.all([listCaptionTests(actor, { locale }), captionCopy(locale)]);
   const channels = data.canStart ? (await publishingDestinationChoices(viewer)).filter(channel => channel.canPublish).map(channel => ({ id: channel.id, name: channel.name })) : [];
   const testable = data.canStart ? await listTestablePosts(actor, { locale }).catch(() => []) : [];
 
@@ -32,10 +30,8 @@ export default async function CaptionTestsPage() {
     } catch (error) { return { error: error instanceof OperationError ? error.message : copy.errUpstream }; }
   }
 
-  return <>
-    <CaptionTestsScreen tests={label(data.tests, instants)} channels={channels} posts={testable} canLearn={data.canLearn} canStart={data.canStart} limits={data.limits} copy={copy} locale={locale} execute={execute} />
-    <StudioLinks copy={links} />
-  </>;
+  // Caption tests live under Insights; the AI planning shortcuts belong to the Create area only.
+  return <CaptionTestsScreen tests={label(data.tests, instants)} channels={channels} posts={testable} canLearn={data.canLearn} canStart={data.canStart} limits={data.limits} copy={copy} locale={locale} execute={execute} />;
 }
 
 function label<T extends { createdAt: string; dueAt: string | null }>(tests: T[], instants: InstantFormatter) {

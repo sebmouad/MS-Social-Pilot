@@ -84,6 +84,8 @@ export interface PlatformPublicationRecovery {
 /** One published post on one channel, with module-normalized stored measures. Missing measures are null, never zero. */
 export type PostPerformance = {
   postId: string; text: string; publishedAt: Date | null; url: string | null;
+  /** Representative picture: the app post's first attachment, else the provider's stored picture. */
+  thumbnail?: import('@/components/post-thumbnail').PostThumbnail | null;
   measures: Array<{ key: string; label: string; labelFr?: string; value: number | null }>;
   /** The module's ranking measure for this post (null when unknown) and its customer label. */
   rankValue: number | null; rankLabel: string;

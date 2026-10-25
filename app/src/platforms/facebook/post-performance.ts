@@ -2,6 +2,7 @@ import { runtimeConfig } from '@/server/config/store';
 import { Prisma } from '../../../generated/client';
 import { prisma } from '@/server/data';
 import type { PostPerformance, PostPerformanceRequest } from '@/server/platforms/host';
+import { postThumbnail } from '@/components/post-thumbnail';
 
 /**
  * Facebook per-post measures from the insights snapshot the legacy sync stores on each published post target.
@@ -12,7 +13,7 @@ const MEASURES: Array<[key: string, label: string]> = [
   ['impressions', 'Impressions'], ['reach', 'Reach'], ['reactions', 'Reactions'], ['comments', 'Comments'], ['shares', 'Shares'], ['clicks', 'Clicks'],
 ];
 
-type Row = { postId: string; message: string; publishedAt: Date | null; remoteUrl: string | null; insights: unknown; insightsSyncedAt: Date | null };
+type Row = { postId: string; message: string; publishedAt: Date | null; remoteUrl: string | null; insights: unknown; insightsSyncedAt: Date | null; media?: unknown; pictureUrl?: string | null };
 
 const num = (value: unknown): number | null => typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : null;
 
@@ -24,7 +25,7 @@ export function facebookPostPerformance(row: Row): PostPerformance {
   const parts = ['reactions', 'comments', 'shares'].map(key => num(insights[key]));
   const rankValue = parts.every(part => part === null) ? null : parts.reduce<number>((sum, part) => sum + (part ?? 0), 0);
   const url = typeof row.remoteUrl === 'string' && /^https:\/\//.test(row.remoteUrl) ? row.remoteUrl : null;
-  return { postId: row.postId, text: row.message, publishedAt: row.publishedAt, url, measures, rankValue, rankLabel: 'Engagement', measuredAt: row.insightsSyncedAt };
+  return { postId: row.postId, text: row.message, publishedAt: row.publishedAt, url, measures, rankValue, rankLabel: 'Engagement', measuredAt: row.insightsSyncedAt, thumbnail: postThumbnail(row.media ?? [], row.pictureUrl ?? null) };
 }
 
 export async function readFacebookPostPerformance(request: PostPerformanceRequest): Promise<PostPerformance[]> {
@@ -35,14 +36,14 @@ export async function readFacebookPostPerformance(request: PostPerformanceReques
     SELECT * FROM (
       SELECT p.id AS "postId", p.message, pt."publishedAt", COALESCE(pt."remoteUrl", ep.permalink) AS "remoteUrl",
         CASE WHEN pt."insightsSyncedAt" IS NULL AND ep."insightsSyncedAt" IS NOT NULL THEN ep.insights ELSE pt.insights END AS insights,
-        COALESCE(pt."insightsSyncedAt", ep."insightsSyncedAt") AS "insightsSyncedAt"
+        COALESCE(pt."insightsSyncedAt", ep."insightsSyncedAt") AS "insightsSyncedAt", p.media, ep."pictureUrl"
       FROM post_targets pt JOIN posts p ON p.id = pt."postId" JOIN targets t ON t.id = pt."targetId"
       -- Post history stores current insights on the synced remote copy of an app-published post.
       LEFT JOIN external_posts ep ON ep."targetId" = pt."targetId" AND ep."remoteId" = pt."remotePostId"
       WHERE t.id = ${request.targetId} AND t."workspaceId" = ${request.workspaceId} AND p."workspaceId" = ${request.workspaceId}
         AND pt.status = 'published' AND pt."publishedAt" >= ${request.from} AND pt."publishedAt" < ${request.to}
       UNION ALL
-      SELECT ep.id AS "postId", COALESCE(ep.message, '') AS message, ep."createdTime" AS "publishedAt", ep.permalink AS "remoteUrl", ep.insights, ep."insightsSyncedAt"
+      SELECT ep.id AS "postId", COALESCE(ep.message, '') AS message, ep."createdTime" AS "publishedAt", ep.permalink AS "remoteUrl", ep.insights, ep."insightsSyncedAt", '[]'::jsonb AS media, ep."pictureUrl"
       FROM external_posts ep JOIN targets t ON t.id = ep."targetId"
       WHERE t.id = ${request.targetId} AND t."workspaceId" = ${request.workspaceId}
         AND ep."createdTime" >= ${request.from} AND ep."createdTime" < ${request.to}
