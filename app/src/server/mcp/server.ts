@@ -26,7 +26,7 @@ function sizedResult(value: unknown) {
   const result = textResult(value);
   const size = result.content[0]!.text.length;
   if (size <= MAX_RESULT_CHARACTERS) return result;
-  return { ...textResult({ error: `This result is about ${Math.ceil(size / 1000)} KB, above the ${MAX_RESULT_CHARACTERS / 1000} KB limit. Narrow it with the tool's filters (limit, dates, channel, key or group) and try again.`, code: 'result_too_large' }), isError: true };
+  return { ...textResult({ error: `This result is about ${Math.ceil(size / 1000)} KB, above the ${MAX_RESULT_CHARACTERS / 1000} KB limit. Narrow it with the tool's own filters (for example limit, dates or channel), or use the matching background export.`, code: 'result_too_large' }), isError: true };
 }
 
 /** Tool hints for clients that auto-approve reads and confirm destructive or external actions (MCP tool annotations). */

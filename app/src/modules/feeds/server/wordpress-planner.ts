@@ -96,6 +96,9 @@ export async function scanCandidates(db: WpDb, settings: WordpressSettings, sour
     }
     if (enough(candidates)) break;
     if (fetched < requested) { exhausted = true; break; }
+    // A whole first page without the caption field means WordPress is not exposing it (credentials or REST
+    // registration), not that these recipes lack captions: scanning thousands more posts would find the same.
+    if (!candidates.length && rows.length > 0 && rejected.captionFieldMissing === scanned - rejected.shared) break;
   }
   return { candidates, scanned, exhausted, rejected };
 }

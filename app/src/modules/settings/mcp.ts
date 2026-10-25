@@ -10,6 +10,8 @@ import { AGENCY_SESSION_MCP } from '@/modules/agency/mcp';
 import { CHANNEL_PROFILES_MCP } from './channel-profiles/mcp';
 import { WATERMARK_MCP } from './watermark/mcp';
 import { OperationError } from '@/lib/operation-error';
+/** Inline export results must fit the MCP result cap (server/mcp/server.ts, 200 KB). */
+const INLINE_EXPORT_CHARACTERS = 200_000;
 import { prisma } from '@/server/data';
 import { canUseFeature, entitledPlatformIds, requireFeature } from '@/server/entitlements';
 import { canAccessFeature } from '@/server/permissions';
@@ -183,10 +185,15 @@ export const SETTINGS_MCP: readonly McpToolGroup[] = [
         return previewWorkspaceDataDeletion({ userId: viewer.userId, workspaceId: viewer.workspaceId });
       case 'export_workspace_archive': {
         const content = await exportWorkspaceArchive({ userId: viewer.userId, workspaceId: viewer.workspaceId });
+        // Base64 inflates by a third; past the MCP result cap, point to the background export instead of failing late.
+        if (Math.ceil(content.length / 3) * 4 > INLINE_EXPORT_CHARACTERS) throw new OperationError('invalid_request', `This workspace archive is ${Math.ceil(content.length / 1_000_000)} MB, too large to return inline. Use request_workspace_export, then download_workspace_export when it is ready.`);
         return { mimeType: 'application/zip', byteLength: content.length, contentBase64: content.toString('base64') };
       }
-      case 'export_workspace_data':
-        return exportWorkspaceData({ userId: viewer.userId, workspaceId: viewer.workspaceId });
+      case 'export_workspace_data': {
+        const data = await exportWorkspaceData({ userId: viewer.userId, workspaceId: viewer.workspaceId });
+        if (JSON.stringify(data).length > INLINE_EXPORT_CHARACTERS) throw new OperationError('invalid_request', 'This workspace snapshot is too large to return inline. Use request_workspace_export, then download_workspace_export when it is ready.');
+        return data;
+      }
       case 'delete_workspace_data': {
         requireConfirmation(args, `DELETE WORKSPACE DATA ${viewer.workspaceId}`);
         const counts = await deleteWorkspaceData({ userId: viewer.userId, workspaceId: viewer.workspaceId, ...(viewer.apiKeyId ? { apiKeyId: viewer.apiKeyId } : {}) }, 'DELETE');

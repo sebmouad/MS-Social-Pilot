@@ -55,7 +55,7 @@ export async function readAdObjects(actor: Actor, raw: unknown = {}) {
   if (input.accountId && !accounts.some(account => account.id === input.accountId)) throw forbidden();
   const selected = accounts.filter(account => !input.accountId || account.id === input.accountId);
   const dataset = await getAdsDataset(actor.workspaceId, { period: 'custom', since: period.range.from, until: new Date(period.range.to.getTime() + 1), accountId: input.accountId ?? null }, targetIds, providers, { levels: ['campaign', 'adset', 'ad'], allowedAdAccountIds: actor.allowedAdAccountIds });
-  if (dataset.insights.length > maxRows) throw bad();
+  if (dataset.insights.length > maxRows) throw new OperationError('invalid_request', `This period holds ${dataset.insights.length} stored rows, above the ${maxRows}-row limit. Choose an ad account (accountId) or a shorter period.`);
   // Fail closed if selection or connection state changed between catalog and data reads.
   if (selected.some(account => !account.socialAccount)) throw forbidden();
   const providerByAccount = new Map(selected.map(account => [account.id, account.socialAccount!.provider]));
