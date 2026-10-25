@@ -1,4 +1,5 @@
-import type { ReactNode } from "react";
+"use client";
+import { useState, type ReactNode } from "react";
 
 /** Stable 1..8 slot (matches --chart-1..8) for a name, so the same person always gets the same color. */
 export function avatarSlot(seed: string): number {
@@ -27,10 +28,12 @@ type AvatarProps = {
 
 /** Round image with an initials fallback colored by a stable hash of the name. */
 export function Avatar({ name, src, size = "md", decorative = false, className = "" }: AvatarProps) {
+  // A stored picture URL can expire (signed CDN links); a failed image falls back to the initials.
+  const [failed, setFailed] = useState<string | null>(null);
   return <span className={`ui-avatar ui-avatar--${size} ${className}`.trim()} data-slot={avatarSlot(name)} role={decorative ? undefined : "img"} aria-label={decorative ? undefined : name} aria-hidden={decorative || undefined}>
-    {src
+    {src && failed !== src
       // eslint-disable-next-line @next/next/no-img-element -- avatar sources are arbitrary authorized URLs
-      ? <img src={src} alt="" loading="lazy" decoding="async" />
+      ? <img src={src} alt="" loading="lazy" decoding="async" onError={() => setFailed(src)} />
       : <span aria-hidden="true">{avatarInitials(name)}</span>}
   </span>;
 }

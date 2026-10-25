@@ -24,6 +24,8 @@ export interface SyncedPostMetricResult {
  * and external_posts so all views across the application reflect the latest real data.
  */
 export async function syncPostMetrics(workspaceId: string, postId: string): Promise<SyncedPostMetricResult[]> {
+  // Same Graph version as the rest of the Meta integration; a pinned old version stops working when Meta retires it.
+  const graphVersion = String(await runtimeConfig('meta.graphVersion'));
   const post = await prisma.post.findFirst({
     where: { id: postId, workspaceId },
     select: {
@@ -81,7 +83,7 @@ export async function syncPostMetrics(workspaceId: string, postId: string): Prom
         const proofParam = proof ? `&appsecret_proof=${proof}` : '';
 
         // 1. Fetch basic post fields (reactions, comments, shares, permalink)
-        const basicUrl = `https://graph.facebook.com/v21.0/${encodeURIComponent(pt.remotePostId)}?fields=shares,comments.summary(true),reactions.summary(true),permalink_url&access_token=${encodeURIComponent(token)}${proofParam}`;
+        const basicUrl = `https://graph.facebook.com/${graphVersion}/${encodeURIComponent(pt.remotePostId)}?fields=shares,comments.summary(true),reactions.summary(true),permalink_url&access_token=${encodeURIComponent(token)}${proofParam}`;
         const basicRes = await fetch(basicUrl, { signal: AbortSignal.timeout(10000) });
         const basicData = await basicRes.json().catch(() => ({}));
 
@@ -107,7 +109,7 @@ export async function syncPostMetrics(workspaceId: string, postId: string): Prom
           clicks: 0,
         };
 
-        const insUrl = `https://graph.facebook.com/v21.0/${encodeURIComponent(pt.remotePostId)}/insights?metric=post_media_view,post_total_media_view_unique,post_clicks,post_reactions_by_type_total&period=lifetime&access_token=${encodeURIComponent(token)}${proofParam}`;
+        const insUrl = `https://graph.facebook.com/${graphVersion}/${encodeURIComponent(pt.remotePostId)}/insights?metric=post_media_view,post_total_media_view_unique,post_clicks,post_reactions_by_type_total&period=lifetime&access_token=${encodeURIComponent(token)}${proofParam}`;
         try {
           const insRes = await fetch(insUrl, { signal: AbortSignal.timeout(10000) });
           const insData = await insRes.json();
@@ -173,7 +175,7 @@ export async function syncPostMetrics(workspaceId: string, postId: string): Prom
         });
       } else if (provider === 'instagram') {
         // Instagram Graph API post metrics
-        const insUrl = `https://graph.facebook.com/v21.0/${encodeURIComponent(pt.remotePostId)}?fields=like_count,comments_count,permalink,insights.metric(reach,impressions,saved)&access_token=${encodeURIComponent(token)}`;
+        const insUrl = `https://graph.facebook.com/${graphVersion}/${encodeURIComponent(pt.remotePostId)}?fields=like_count,comments_count,permalink,insights.metric(reach,impressions,saved)&access_token=${encodeURIComponent(token)}`;
         const insRes = await fetch(insUrl, { signal: AbortSignal.timeout(10000) });
         const data = await insRes.json().catch(() => ({}));
         if (!data.error) {

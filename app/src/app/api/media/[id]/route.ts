@@ -37,7 +37,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   }
   try {
     const image = await readWorkspaceImage(viewer.workspaceId, id);
-    return new NextResponse(new Uint8Array(image.bytes), { headers: { 'content-type': image.mimeType, 'content-length': String(image.bytes.length), 'content-disposition': 'inline', 'x-content-type-options': 'nosniff', 'cache-control': 'private, no-store' } });
+    // Stored images are written once under a new id and never rewritten, so the viewer's browser may keep them.
+    return new NextResponse(new Uint8Array(image.bytes), { headers: { 'content-type': image.mimeType, 'content-length': String(image.bytes.length), 'content-disposition': 'inline', 'x-content-type-options': 'nosniff', 'cache-control': 'private, max-age=31536000, immutable' } });
   } catch {
     return NextResponse.json({ error: 'Image not found.' }, { status: 404, headers: { 'cache-control': 'no-store' } });
   }

@@ -31,7 +31,7 @@ import { autosaveDraftAction, previewQueueAction, saveQueueComposerAction, type 
 import { fill } from './queue-copy';
 import { holdsRemotely, leadLabel } from './remote-copy';
 import styles from './PostComposer.module.css';
-import type { RecentGridPost } from './ChannelPreviewTabs';
+import { GRID_PREVIEW_TAB, type RecentGridPost } from './ChannelPreviewTabs';
 import { ComposerCopyProvider } from './CopyProvider';
 
 type LocalImageUpload = { maxBytes: number; mimeTypes: readonly string[] };
@@ -447,7 +447,8 @@ function PostComposerContent({ recentPosts = [], copyCatalog = composerCatalogDe
   const dateLabel = (date: string, time: string) => new Intl.DateTimeFormat(aiLocale, { timeZone: 'UTC', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(new Date(`${date}T${time}:00Z`));
   const toggleTarget = (id: string) => setSelectedTargets(current => current.includes(id) ? current.filter(item => item !== id) : [...current, id]);
   // A deselected channel cannot stay the preview tab.
-  useEffect(() => { if (previewChannelId && !selectedTargets.includes(previewChannelId)) setPreviewChannelId(''); }, [previewChannelId, selectedTargets]);
+  // The grid preview is a tab of its own, not a channel.
+  useEffect(() => { if (previewChannelId && previewChannelId !== GRID_PREVIEW_TAB && !selectedTargets.includes(previewChannelId)) setPreviewChannelId(''); }, [previewChannelId, selectedTargets]);
 
   /** Pick the intent, then submit through the form so validation, uploads and the server action are the same for every button. */
   function submitWith(next: 'draft' | 'schedule' | 'queue', when?: { date: string; time: string }, now = false) {

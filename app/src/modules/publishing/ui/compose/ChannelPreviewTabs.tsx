@@ -8,6 +8,7 @@ import { useContent } from '../ContentProvider';
 import styles from './PostComposer.module.css';
 import type { PostThumbnail } from '@/components/post-thumbnail';
 
+export const GRID_PREVIEW_TAB = 'grid_planner';
 export type RecentGridPost = { id: string; targetIds: string[]; thumbnail: PostThumbnail | null };
 export type ChannelPreviewTarget = DestinationFormatTarget & { pictureUrl?: string | null; platformName?: string | null; displayName: string };
 
@@ -59,7 +60,7 @@ export function ChannelPreviewTabs({ recentPosts, channels, formats, previewPost
       </>,
     };
   }), {
-    id: 'grid_planner',
+    id: GRID_PREVIEW_TAB,
     label: cc.createGridPreview,
     content: (
       <div className={styles.gridPlanner}>

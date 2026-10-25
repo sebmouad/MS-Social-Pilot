@@ -180,7 +180,7 @@ export const ANALYTICS_MCP: readonly McpToolGroup[] = [
     execute: async (viewer, name, args, cap) => {
       switch (name) {
       case 'get_analytics_overview': {
-        const { offset, audienceOffset, targetOffset, limit: pageLimit } = analyticsPageArgs(args, cap, Math.min(cap, 50));
+        const { offset, audienceOffset, targetOffset, limit: pageLimit } = analyticsPageArgs(args, cap, Math.min(cap, 10)); // ~10 KB per metric: a small default page keeps the result readable
         const snapshot = await readMcpAnalyticsSnapshot(viewer, args);
         const filteredMetrics = snapshot.allMetrics;
         const metrics = filteredMetrics.slice(offset, offset + pageLimit);

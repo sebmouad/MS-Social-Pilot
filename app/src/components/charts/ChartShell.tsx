@@ -75,13 +75,15 @@ function ChartCanvas({ option, signature, label, height, focusCount }: CanvasPro
     let disposed = false;
     let observer: ResizeObserver | undefined;
     let visibility: IntersectionObserver | undefined;
+    let frame = 0;
     const start = () => {
       import("./echarts-setup").then(({ init }) => {
         if (disposed || !host.current) return;
         const instance = init(host.current, undefined, { renderer: "canvas" }) as unknown as ChartInstance;
         chart.current = instance;
         if (typeof ResizeObserver !== "undefined") {
-          observer = new ResizeObserver(() => instance.resize());
+          // Resize on the next frame: resizing inside the callback triggers "ResizeObserver loop" errors.
+          observer = new ResizeObserver(() => { cancelAnimationFrame(frame); frame = requestAnimationFrame(() => instance.resize()); });
           observer.observe(host.current);
         }
         apply();
@@ -100,6 +102,7 @@ function ChartCanvas({ option, signature, label, height, focusCount }: CanvasPro
       disposed = true;
       visibility?.disconnect();
       observer?.disconnect();
+      cancelAnimationFrame(frame);
       chart.current?.dispose();
       chart.current = null;
       applied.current = "";

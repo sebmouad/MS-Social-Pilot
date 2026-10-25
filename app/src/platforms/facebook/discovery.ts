@@ -61,7 +61,9 @@ export async function persistFacebookDiscovery(actor: ConnectionMutationActor, i
     for (const page of input.pages) {
       const existing = await tx.target.findUnique({ where: { workspaceId_providerId: { workspaceId: actor.workspaceId, providerId: page.id } }, select: { id: true, socialAccountId: true } });
       const pageData = {
-        socialAccountId: account.id, type: 'page' as const, name: page.name, pictureUrl: null,
+        socialAccountId: account.id, type: 'page' as const, name: page.name,
+        // Stable address that redirects to the current picture; CDN picture URLs are signed and expire.
+        pictureUrl: `https://graph.facebook.com/${encodeURIComponent(page.id)}/picture?type=square`,
         accessToken: encryptSecret(page.accessToken), canPublish: true,
       };
       if (!existing) {
