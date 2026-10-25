@@ -106,6 +106,9 @@ function mediaItems(value: unknown): MediaItem[] {
   });
 }
 
+/** Stored images display as a 640px thumbnail; the link still opens the original. */
+const displaySrc = (url: string) => url.startsWith('/api/media/') && !url.includes('?') ? `${url}?w=640` : url;
+
 function mediaUrl(item: MediaItem): string | null {
   if (item.kind === 'image' && item.url.startsWith('media:')) {
     const id = item.url.slice('media:'.length);
@@ -205,7 +208,7 @@ export function PostPreview({ post, authorName, authorAvatarUrl, timeZone, varia
 
       {mediaOverride !== undefined ? mediaOverride : media.length ? <div className={styles.media} data-aspect={rendering?.mediaAspect ?? undefined}>
         {media.map((item, index) => item.kind === 'image'
-          ? <PostImage key={`${item.url}-${index}`} src={item.url} href={item.url} alt={item.altText?.trim() || t.previewImage} locale={locale} linkClassName={styles.imageLink} />
+          ? <PostImage key={`${item.url}-${index}`} src={displaySrc(item.url)} href={item.url} alt={item.altText?.trim() || t.previewImage} locale={locale} linkClassName={styles.imageLink} />
           : item.kind === 'video'
             ? <video className={styles.video} controls preload="metadata" aria-label={t.previewVideo} key={`${item.url}-${index}`}>
                 <source src={item.url} />
