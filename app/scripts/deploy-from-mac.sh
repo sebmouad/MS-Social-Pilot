@@ -347,4 +347,3 @@ REMOTE
 printf "\n${GREEN}${BOLD}====================================================${RESET}\n"
 printf "${GREEN}${BOLD}✓ DEPLOY SUCCESSFUL: Commit %s active on %s${RESET}\n" "$SHORT_COMMIT" "$DEPLOY_HOST"
 printf "${GREEN}${BOLD}====================================================${RESET}\n"
-EOF
