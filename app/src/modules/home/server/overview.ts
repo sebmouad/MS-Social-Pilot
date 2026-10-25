@@ -214,7 +214,7 @@ export async function readHomeOverview(actor: HomeActor, now = new Date(), optio
       allowed('publishing/posts') ? readPublishingPostPage(publishingActor, { status: 'failed' }).then(page => page.total, () => null) : null,
       allowed('publishing/posts') ? readPublishingPostPage(publishingActor, { status: 'partially_failed' }).then(page => page.total, () => null) : null,
       allowed('publishing/approvals') ? pendingApprovalCount({ userId: actor.userId, workspaceId: actor.workspaceId }) : null,
-      allowed('inbox/conversations') ? readInboxList(inboxActor, { state: 'open', limit: 1 }).then(page => page.total, () => null) : null,
+      allowed('inbox/conversations') ? readInboxList(inboxActor, { state: 'open', quick: ['unanswered'], limit: 1 }).then(page => page.total, () => null) : null,
       allowed('settings/connections')
         ? shellChannels(actor.workspaceId, channelScope ? [...channelScope] : undefined, maxChannels, now)
           .then(rows => rows.filter(row => row.health !== 'connected').slice(0, reconnectLimit).map(row => ({ id: row.id, name: row.name, platform: row.platformName })), () => null)

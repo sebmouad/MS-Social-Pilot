@@ -97,7 +97,7 @@ export const contentCopyDefaults = {
   createClearTime: m('Clear time', 'Effacer l’heure'),
   createNeedTime: m('Choose a date and a time to schedule.', 'Choisissez une date et une heure pour programmer.'),
   createPublishTitle: m('Publish now?', 'Publier maintenant ?'),
-  createPublishBody: m('This post goes to {count} channel(s) within about a minute. You can still cancel it from Content while it waits.', 'Cette publication part vers {count} canal(aux) dans environ une minute. Vous pouvez encore l’annuler depuis Contenu tant qu’elle attend.'),
+  createPublishBody: m('This post goes to {count} channel(s) within a few minutes (the next delivery run). You can still cancel it from Content while it waits.', 'Cette publication part vers {count} canal(aux) d’ici quelques minutes (au prochain envoi). Vous pouvez encore l’annuler depuis Contenu en attendant.'),
   createPublishGo: m('Publish now', 'Publier maintenant'),
   createPublishCancel: m('Cancel', 'Annuler'),
   createPublishNeedChannel: m('Choose at least one channel to publish.', 'Choisissez au moins un canal pour publier.'),

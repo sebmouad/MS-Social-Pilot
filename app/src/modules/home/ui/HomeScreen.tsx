@@ -112,7 +112,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
     ...(attention.reconnect?.length ? [{ key: 'reconnect', icon: <IconPlugConnected size={18} aria-hidden="true" />,
       title: attention.reconnect.length === 1 ? fill(t.attentionReconnect, { name: attention.reconnect[0]!.name }) : fill(t.attentionReconnectMany, { n: number.format(attention.reconnect.length) }),
       href: '/settings/channels' }] : []),
-    ...(attention.waitingConversations ? [{ key: 'inbox', icon: <IconInbox size={18} aria-hidden="true" />, title: fill(t.attentionConversations, { n: number.format(attention.waitingConversations) }), href: '/inbox' }] : []),
+    ...(attention.waitingConversations ? [{ key: 'inbox', icon: <IconInbox size={18} aria-hidden="true" />, title: fill(t.attentionConversations, { n: number.format(attention.waitingConversations) }), href: '/inbox?quick=unanswered' }] : []),
   ] : [];
 
   return <PageFrame module="home"><div className={styles.root}>
