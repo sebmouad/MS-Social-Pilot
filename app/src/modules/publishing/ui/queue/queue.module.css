@@ -11,7 +11,7 @@
 .more { margin: 0; color: var(--ink-faint); font-size: var(--text-sm); }
 .emptyActions { display: inline-flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
 /* Design v2 S4: the queue on the left, the weekly queue times on the right. */
-.layout { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: var(--space-6); align-items: start; }
+.layout { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: var(--space-6); align-items: start; }
 .main { display: grid; gap: var(--space-4); min-width: 0; }
 .main > h2, .sidePanel > h2 { margin: 0; font-size: var(--text-lg); overflow-wrap: anywhere; }
 .side { display: grid; gap: var(--space-4); position: sticky; top: calc(var(--topbar-h) + 16px); min-width: 0; }
@@ -29,5 +29,6 @@
 /* The queue-times editor sits flat inside the side panel: dividers instead of cards within a card. */
 .sidePanel section { padding: 0; border: 0; border-radius: 0; background: none; box-shadow: none; }
 .sidePanel section + section, .sidePanel section + div + section { padding-top: var(--space-3); border-top: 1px solid var(--line-subtle); }
-.sidePanel section h2 { font-size: var(--text-sm); }
+.sidePanel section h2 { font-size: var(--text-sm); overflow-wrap: normal; word-break: normal; white-space: normal; }
 .sidePanel section p { font-size: var(--text-xs); line-height: 1.5; }
+.sidePanel table { min-width: 100% !important; }

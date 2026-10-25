@@ -27,10 +27,12 @@ export function AppearancePicker({ initialTheme, initialMode, copy: t, canWrite 
   }
   retry.current = () => void save();
   return <>
-    <RadioCards legend={t.group} value={selected} onChange={value => { select(value); previewAppearance({ theme: value as ThemeId }); }} options={THEMES.map(option => ({
-      value: option.id, label: t[option.id], description: t[`${option.id}Description`], disabled: busy || appearanceBusy || !canWrite,
-      icon: <span className={styles.preview} style={{ background: option.swatches[0] }}><span className={styles.swatches}>{option.swatches.map(color => <i key={color} style={{ background: color }} />)}</span></span>,
-    }))} />
+    <div className={styles.appearanceCards}>
+      <RadioCards legend={t.group} value={selected} onChange={value => { select(value); previewAppearance({ theme: value as ThemeId }); }} options={THEMES.map(option => ({
+        value: option.id, label: t[option.id], description: t[`${option.id}Description`], disabled: busy || appearanceBusy || !canWrite,
+        icon: <span className={styles.preview} style={{ background: option.swatches[0] }}><span className={styles.swatches}>{option.swatches.map(color => <i key={color} style={{ background: color }} />)}</span></span>,
+      }))} />
+    </div>
     <SegmentedControl legend={t.mode} value={mode} onChange={value => { selectMode(value); previewAppearance({ mode: value as ModeId }); }} options={MODES.map(option => ({ value: option.id, label: t[option.id], disabled: busy || appearanceBusy || !canWrite }))} />
     <Button type="button" variant="primary" busy={busy} disabled={busy || appearanceBusy || !canWrite} onClick={() => void save()}>{busy ? t.saving : t.save}</Button>
   </>;
