@@ -206,7 +206,10 @@ export type Allocation<C> = { targetId: string; slotAt: Date; candidate: C };
  * Give each slot (in the order supplied) the first candidate that its page has not had within the cooldown,
  * that no other page received in the horizon (when distinct), and that the slot has not already failed with.
  */
-export function allocateRecipes<C extends { wpPostId: string }>(input: {
+/** Same dish under another WordPress post (the site publishes near-identical variants): compared by recipe title. */
+export const recipeTitleKey = (title: string) => `title:${title.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()}`;
+
+export function allocateRecipes<C extends { wpPostId: string; title?: string }>(input: {
   needs: readonly SlotNeed[]; candidates: readonly C[]; blocked: ReadonlyMap<string, ReadonlySet<string>>; taken: ReadonlySet<string>; distinct: boolean; allowReuse?: boolean; reused?: ReadonlyMap<string, ReadonlyMap<string, number>>;
 }): { assignments: Array<Allocation<C>>; unfilled: number } {
   const used = new Set(input.taken);
@@ -220,9 +223,13 @@ export function allocateRecipes<C extends { wpPostId: string }>(input: {
     const dates = input.reused?.get(need.targetId);
     const candidates = ranked.get(need.targetId) ?? (dates?.size ? [...input.candidates].sort((a, b) => (dates.get(a.wpPostId) ?? -Infinity) - (dates.get(b.wpPostId) ?? -Infinity)) : input.candidates);
     ranked.set(need.targetId, candidates);
-    const pick = candidates.find(c => !(input.allowReuse === false && dates?.has(c.wpPostId)) && !page.has(c.wpPostId) && !(input.distinct && used.has(c.wpPostId)) && !need.avoid?.has(c.wpPostId));
+    const titleKey = (c: C) => c.title ? recipeTitleKey(c.title) : null;
+    const pick = candidates.find(c => { const key = titleKey(c);
+      return !(input.allowReuse === false && dates?.has(c.wpPostId)) && !page.has(c.wpPostId) && !(key && page.has(key)) && !(input.distinct && (used.has(c.wpPostId) || (key && used.has(key)))) && !need.avoid?.has(c.wpPostId); });
     if (!pick) { unfilled += 1; continue; }
+    const pickedTitle = titleKey(pick);
     page.add(pick.wpPostId); used.add(pick.wpPostId);
+    if (pickedTitle) { page.add(pickedTitle); used.add(pickedTitle); }
     assignments.push({ targetId: need.targetId, slotAt: need.slotAt, candidate: pick });
   }
   return { assignments, unfilled };

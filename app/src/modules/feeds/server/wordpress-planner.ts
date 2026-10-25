@@ -2,7 +2,7 @@ import { OperationError } from '@/lib/operation-error';
 import { prisma } from '@/server/data';
 import { runtimeSecret } from '@/server/config/store';
 import { defaultFetchDeps, type FetchDeps } from '@/modules/publishing/server/media/network/net-guard';
-import { allocateRecipes, buildImageUrl, buildPermalink, parseRecipe, renderComment, resolveConfig, slotInstants, type PlanConfig, type Recipe, type SlotNeed } from '../wordpress/recipe';
+import { allocateRecipes, recipeTitleKey, buildImageUrl, buildPermalink, parseRecipe, renderComment, resolveConfig, slotInstants, type PlanConfig, type Recipe, type SlotNeed } from '../wordpress/recipe';
 import { openWordpressDb, type DbSettings, type WpDb } from '../wordpress/db';
 import { defaultImagePorts, prepareRecipeImage, RecipeImageError, type ImagePorts } from '../wordpress/image';
 import { qualifyingOwner, type FeedActor, type FeedAuthorization } from './access';
@@ -118,8 +118,8 @@ export function ledgerView(rows: readonly LedgerRow[], now: Date, reuse?: { enab
     if (reusable) {
       const dates = reused.get(row.targetId) ?? new Map<string, number>();
       dates.set(row.wpPostId, Math.max(dates.get(row.wpPostId) ?? -Infinity, published)); reused.set(row.targetId, dates);
-    } else add(row.targetId, row.wpPostId);
-    if (row.slotAt.getTime() >= now.getTime()) taken.add(row.wpPostId);
+    } else { add(row.targetId, row.wpPostId); if (row.title) add(row.targetId, recipeTitleKey(row.title)); }
+    if (row.slotAt.getTime() >= now.getTime()) { taken.add(row.wpPostId); if (row.title) taken.add(recipeTitleKey(row.title)); }
   }
   return { blocked, taken, byKey, reused };
 }
