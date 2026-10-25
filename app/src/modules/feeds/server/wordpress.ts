@@ -4,6 +4,7 @@ import { OperationError } from '@/lib/operation-error';
 import { withWorkspaceOperation } from '@/server/data-control/guard';
 import { prisma } from '@/server/data';
 import { checkUrlShape } from '@/modules/publishing/server/media/network/net-guard';
+import { encryptSecret } from '@/server/secret-crypto';
 import { WORDPRESS_BOUNDS } from '../wordpress/config';
 import { pauseAndCancelRecipeSourceConfirmation, pauseRecipeSourceConfirmation, planConfigPatchSchema, resumeRecipeSourceConfirmation, retryRecipeSlotsConfirmation, runRecipePlannerConfirmation, saveRecipeSourceConfirmation, type PlanConfig } from '../wordpress/recipe';
 import { authorizeFeedWrite, authorizeFeeds, type FeedActor, type FeedAuthorization } from './access';
@@ -27,6 +28,8 @@ const saveSchema = (s: WordpressSettings) => z.object({
   name: z.string().trim().min(1).max(s.sourceNameMax), siteUrl: z.string().trim().max(2048), enabled: z.boolean().optional(),
   allTargets: z.boolean(), targetIds: z.array(z.string().regex(ID).max(s.identifierMax)).max(s.maxTargets),
   config: planConfigPatchSchema(patchLimits(s)).optional(), confirmation: z.string(),
+  /** Omitted keeps the saved credential; an empty string removes it. */
+  credential: z.string().trim().max(2048).optional(),
 }).strict();
 const stateSchema = z.object({ enabled: z.boolean(), cancelScheduled: z.boolean().optional(), confirmation: z.string() }).strict();
 const confirmSchema = z.object({ confirmation: z.string() }).strict();
@@ -46,11 +49,11 @@ async function transact<T>(workspaceId: string, s: WordpressSettings, fn: (tx: T
 }
 
 export type SourceView = {
-  id: string; name: string; siteUrl: string; enabled: boolean; allTargets: boolean; targetIds: string[]; config: PlanConfig;
+  id: string; name: string; siteUrl: string; hasCredential: boolean; enabled: boolean; allTargets: boolean; targetIds: string[]; config: PlanConfig;
   lastRunAt: string | null; lastError: string | null; lastSummary: unknown;
 };
 const viewOf = (s: WordpressSettings, row: SourceRow): SourceView => ({
-  id: row.id, name: row.name, siteUrl: row.siteUrl, enabled: row.enabled, allTargets: row.allTargets, targetIds: row.targetIds, config: configOf(s, row),
+  id: row.id, name: row.name, siteUrl: row.siteUrl, hasCredential: Boolean(row.apiCredential), enabled: row.enabled, allTargets: row.allTargets, targetIds: row.targetIds, config: configOf(s, row),
   lastRunAt: row.lastRunAt?.toISOString() ?? null, lastError: row.lastError, lastSummary: row.lastSummary,
 });
 export type PlanView = { id: string; targetId: string; targetName: string; wpPostId: string; slotAt: string; state: LedgerRow['state']; postId: string | null; title: string; permalink: string | null; reason: string | null };
@@ -69,7 +72,7 @@ async function readPool(s: WordpressSettings, source: SourceRow, ports: PlannerP
   try {
     const now = ports.now();
     const health = await cachedPoolHealth(`${source.id}|${JSON.stringify([source.workspaceId, source.config, source.targetIds, source.allTargets, s, auth.actor])}`, s.poolCacheSeconds, now, async () => {
-      const db = await openDatabase(ports, s, source.siteUrl);
+      const db = await openDatabase(ports, s, source);
       if (!db) throw new Error('library_unavailable');
       try { return await computePoolHealth({ settings: s, ports, db, source, now }); } finally { await db.close(); }
     });
@@ -89,7 +92,7 @@ export async function readRecipeSource(actor: FeedActor, input: unknown = {}, de
     const source = row && visible(auth, row) ? row : null;
     const page = query.page ?? 1;
     const ports = { ...defaultPlannerPorts(), ...deps };
-    const configured = Boolean(source?.siteUrl || s.siteUrl || await ports.databaseUrl().catch(() => null));
+    const configured = Boolean(source?.siteUrl || s.siteUrl);
     const poolReady = Boolean(source) && s.enabled && configured;
     const [pages, plans, counts, pool] = await Promise.all([
       selectablePages(actor.workspaceId, s, auth),
@@ -131,6 +134,8 @@ export async function saveRecipeSource(actor: FeedActor, input: unknown, deps: R
     for (const id of data.targetIds) await ports.validateTarget(auth.actor, id);
   }
   const targetIds = data.allTargets ? [] : data.targetIds;
+  if (data.credential && (/^[a-z][a-z0-9+.-]*:\/\//i.test(data.credential) || !/^(Bearer\s+\S+|[^:\s][^:]*:.+)$/i.test(data.credential))) throw await bad('Enter the WordPress credential as username:application-password.');
+  const credential = data.credential === undefined ? undefined : data.credential ? encryptSecret(data.credential) : null;
   const config = data.config ?? {};
   return protect(transact(actor.workspaceId, s, async tx => {
     await lockActor(tx, actor, true);
@@ -139,12 +144,12 @@ export async function saveRecipeSource(actor: FeedActor, input: unknown, deps: R
     const enabled = data.enabled ?? existing?.enabled ?? false;
     const id = existing?.id ?? `wrs_${randomUUID()}`;
     if (existing) {
-      await tx.$executeRaw`UPDATE wordpress_recipe_sources SET name = ${data.name}, "siteUrl" = ${normalized}, enabled = ${enabled}, "allTargets" = ${data.allTargets}, "targetIds" = ${JSON.stringify(targetIds)}::jsonb, config = ${JSON.stringify(config)}::jsonb, "lastError" = NULL, "updatedAt" = NOW() WHERE id = ${id} AND "workspaceId" = ${actor.workspaceId}`;
+      await tx.$executeRaw`UPDATE wordpress_recipe_sources SET name = ${data.name}, "siteUrl" = ${normalized}, enabled = ${enabled}, "allTargets" = ${data.allTargets}, "targetIds" = ${JSON.stringify(targetIds)}::jsonb, config = ${JSON.stringify(config)}::jsonb, "apiCredential" = CASE WHEN ${credential === undefined} THEN "apiCredential" ELSE ${credential ?? null} END, "lastError" = NULL, "updatedAt" = NOW() WHERE id = ${id} AND "workspaceId" = ${actor.workspaceId}`;
     } else {
-      await tx.$executeRaw`INSERT INTO wordpress_recipe_sources (id, "workspaceId", name, "siteUrl", enabled, "allTargets", "targetIds", config, "createdAt", "updatedAt") VALUES (${id}, ${actor.workspaceId}, ${data.name}, ${normalized}, ${enabled}, ${data.allTargets}, ${JSON.stringify(targetIds)}::jsonb, ${JSON.stringify(config)}::jsonb, NOW(), NOW())`;
+      await tx.$executeRaw`INSERT INTO wordpress_recipe_sources (id, "workspaceId", name, "siteUrl", "apiCredential", enabled, "allTargets", "targetIds", config, "createdAt", "updatedAt") VALUES (${id}, ${actor.workspaceId}, ${data.name}, ${normalized}, ${credential ?? null}, ${enabled}, ${data.allTargets}, ${JSON.stringify(targetIds)}::jsonb, ${JSON.stringify(config)}::jsonb, NOW(), NOW())`;
     }
     forgetPoolHealth(id);
-    await audit(tx, actor.workspaceId, actor, existing ? 'feeds.recipe_source_updated' : 'feeds.recipe_source_created', { sourceId: id, host: new URL(normalized).hostname, allTargets: data.allTargets, targetCount: targetIds.length, enabled });
+    await audit(tx, actor.workspaceId, actor, existing ? 'feeds.recipe_source_updated' : 'feeds.recipe_source_created', { sourceId: id, host: new URL(normalized).hostname, allTargets: data.allTargets, targetCount: targetIds.length, enabled, ...(credential === undefined ? {} : { credential: credential ? 'saved' : 'removed' }) });
     await lockActor(tx, actor, true);
     const saved = await tx.$queryRawUnsafe<Array<Record<string, unknown>>>(`SELECT id FROM wordpress_recipe_sources WHERE id = $1 AND "workspaceId" = $2`, id, actor.workspaceId);
     if (!saved[0]) throw await unavailable();
@@ -201,7 +206,7 @@ export async function retryRecipeSlotsNow(actor: FeedActor, input: unknown, deps
   if (!s.enabled) throw new OperationError('unavailable', 'Recipe planning is not available right now.');
   if (!source.enabled) throw new OperationError('conflict', 'This recipe source is paused. Resume it to plan posts.');
   const ports = { ...defaultPlannerPorts(), ...deps };
-  const db = await openDatabase(ports, s, source.siteUrl);
+  const db = await openDatabase(ports, s, source);
   if (!db) throw new OperationError('unavailable', 'The recipe library could not be reached. Try again later.');
   try {
     const outcome = await retryRecipeSlots({ settings: s, ports, db, now: ports.now() }, source, auth);
@@ -230,7 +235,7 @@ export async function previewRecipeSource(actor: FeedActor, input: unknown = {},
   await parse(z.object({}).strict(), input);
   const { source } = await authorizedSource(actor);
   const ports = { ...defaultPlannerPorts(), ...deps };
-  const db = await openDatabase(ports, s, source.siteUrl);
+  const db = await openDatabase(ports, s, source);
   if (!db) throw await feedsError('unavailable', 'The recipe library could not be reached. Try again later.');
   try {
     const config = configOf(s, source);
@@ -261,7 +266,7 @@ export async function runRecipePlannerNow(actor: FeedActor, input: unknown, deps
   if (!s.enabled) throw await feedsError('unavailable', 'Recipe planning is not available right now.');
   if (!source.enabled) throw await feedsError('conflict', 'This recipe source is paused. Resume it to plan posts.');
   const ports = { ...defaultPlannerPorts(), ...deps };
-  const db = await openDatabase(ports, s, source.siteUrl);
+  const db = await openDatabase(ports, s, source);
   if (!db) throw await feedsError('unavailable', 'The recipe library could not be reached. Try again later.');
   const now = ports.now();
   try {

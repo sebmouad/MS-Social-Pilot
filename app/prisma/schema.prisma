@@ -692,6 +692,7 @@ model WordpressRecipeSource {
   workspaceId String   @unique
   name        String
   siteUrl     String
+  apiCredential String?
   enabled     Boolean  @default(false)
   allTargets  Boolean  @default(true)
   targetIds   Json     @default("[]")

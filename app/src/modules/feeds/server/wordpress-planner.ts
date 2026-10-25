@@ -1,6 +1,6 @@
 import { OperationError } from '@/lib/operation-error';
 import { prisma } from '@/server/data';
-import { runtimeSecret } from '@/server/config/store';
+import { decryptSecret } from '@/server/secret-crypto';
 import { defaultFetchDeps, type FetchDeps } from '@/modules/publishing/server/media/network/net-guard';
 import { allocateRecipes, recipeTitleKey, buildImageUrl, buildPermalink, parseRecipe, renderComment, resolveConfig, slotInstants, type PlanConfig, type Recipe, type SlotNeed } from '../wordpress/recipe';
 import { openWordpressDb, type DbSettings, type WpDb } from '../wordpress/db';
@@ -9,11 +9,9 @@ import { qualifyingOwner, type FeedActor, type FeedAuthorization } from './acces
 import { loadWordpressSettings, patchLimits, type WordpressSettings } from './wordpress-settings';
 import { prismaRecipeStore, type LedgerRow, type RecipeStore, type SourceRow } from './wordpress-store';
 
-const DATABASE_SECRET = 'feeds.wordpress.databaseUrl';
 const MS_DAY = 86_400_000;
 
 export type PlannerPorts = {
-  databaseUrl(): Promise<string | null>;
   openDb(settings: DbSettings): Promise<WpDb>;
   validateTarget(actor: FeedActor, targetId: string): Promise<void>;
   createPost(actor: FeedActor, input: PlannedPostInput): Promise<{ id: string }>;
@@ -30,7 +28,6 @@ export type PlannedPostInput = { message: string; firstComment: string; targetId
 
 export function defaultPlannerPorts(net: FetchDeps = defaultFetchDeps()): PlannerPorts {
   return {
-    databaseUrl: () => runtimeSecret(DATABASE_SECRET),
     openDb: settings => openWordpressDb(settings),
     async validateTarget(actor, targetId) {
       const { validateTargets } = await import('@/modules/publishing/server/lifecycle');
@@ -251,17 +248,23 @@ export const recipeSummaryRecord = (o: SourceOutcome, at: Date): Record<string, 
 export function captionFieldMessage(scanned: number, field: string, credential: string | null): string {
   const token = credential?.trim() ?? '';
   const cause = !token
-    ? 'No WordPress credential is saved, so private fields are not returned. Save "username:application-password" in Root › Config › WordPress.'
+    ? 'No WordPress credential is saved for this blog, so private fields are not returned. Save "username:application-password" in the recipe source settings.'
     : /^[a-z][a-z0-9+.-]*:\/\//i.test(token)
       ? 'The saved WordPress credential is a database address from the former direct connection, so it is not sent. Replace it with "username:application-password" (WordPress › Users › Profile › Application passwords).'
       : 'Check that the saved application password is still valid and that the field is exposed to the REST API.';
   return `WordPress returned none of the ${scanned} recipes with the field "${field}". ${cause}`;
 }
 
-export async function openDatabase(ports: PlannerPorts, settings: WordpressSettings, siteUrlOverride?: string): Promise<WpDb | null> {
-  const siteUrl = (siteUrlOverride || settings.siteUrl || '').trim();
+/** The blog's own saved credential in clear, or null when none is saved or it cannot be decrypted. */
+export function sourceCredential(source: Pick<SourceRow, 'apiCredential'>): string | null {
+  if (!source.apiCredential) return null;
+  try { return decryptSecret(source.apiCredential); } catch { return null; }
+}
+
+export async function openDatabase(ports: PlannerPorts, settings: WordpressSettings, source: Pick<SourceRow, 'siteUrl' | 'apiCredential'>): Promise<WpDb | null> {
+  const siteUrl = (source.siteUrl || settings.siteUrl || '').trim();
   if (!siteUrl) return null;
-  const apiToken = await ports.databaseUrl().catch(() => null);
+  const apiToken = sourceCredential(source);
   try {
     return await ports.openDb({
       siteUrl,
@@ -292,7 +295,7 @@ export async function runRecipePlanning(overrides: Partial<PlannerPorts> = {}, l
   const budget = { left: settings.runBudget };
   for (const source of sources) {
     if (budget.left <= 0) break;
-    const db = await openDatabase(ports, settings, source.siteUrl);
+    const db = await openDatabase(ports, settings, source);
     if (!db) {
       await ports.store.recordRun(source.workspaceId, source.id, { at: now, error: 'The recipe library could not be reached.', summary: { at: now.toISOString(), reason: 'database_unavailable' } }).catch(() => undefined);
       continue;
@@ -306,7 +309,7 @@ export async function runRecipePlanning(overrides: Partial<PlannerPorts> = {}, l
       }
       const outcome = await planSource({ settings, ports, db, budget, now }, source, auth);
       totals(summary, outcome);
-      await ports.store.recordRun(source.workspaceId, source.id, { at: now, error: outcome.reason === 'caption_field_missing' ? captionFieldMessage(outcome.scanned, configOf(settings, source).mapping.captionMetaKey, await ports.databaseUrl().catch(() => null)) : outcome.reason && !['complete', 'budget'].includes(outcome.reason) ? `Planning stopped: ${outcome.reason}` : null, summary: recipeSummaryRecord(outcome, now) });
+      await ports.store.recordRun(source.workspaceId, source.id, { at: now, error: outcome.reason === 'caption_field_missing' ? captionFieldMessage(outcome.scanned, configOf(settings, source).mapping.captionMetaKey, sourceCredential(source)) : outcome.reason && !['complete', 'budget'].includes(outcome.reason) ? `Planning stopped: ${outcome.reason}` : null, summary: recipeSummaryRecord(outcome, now) });
     } catch {
       totals(summary, { sourceId: source.id, planned: 0, failed: 1, uncertain: 0, unfilled: 0, slots: 0, pages: 0, excludedPages: 0, scanned: 0, reason: 'error' });
       await ports.store.recordRun(source.workspaceId, source.id, { at: now, error: 'Planning could not be completed.', summary: { at: now.toISOString(), reason: 'error' } }).catch(() => undefined);

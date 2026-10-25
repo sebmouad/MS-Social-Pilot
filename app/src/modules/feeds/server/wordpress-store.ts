@@ -4,7 +4,7 @@ import { prisma } from '@/server/data';
 /** Persistence of recipe sources and the plan ledger. Every statement is scoped by workspace. */
 export type PlanState = 'claimed' | 'planned' | 'uncertain' | 'failed';
 export type SourceRow = {
-  id: string; workspaceId: string; name: string; siteUrl: string; enabled: boolean; allTargets: boolean; targetIds: string[]; config: unknown;
+  id: string; workspaceId: string; name: string; siteUrl: string; /** Encrypted "username:application-password" or Bearer token for this blog; null when none is saved. */ apiCredential: string | null; enabled: boolean; allTargets: boolean; targetIds: string[]; config: unknown;
   lastRunAt: Date | null; lastError: string | null; lastSummary: unknown; createdAt: Date; updatedAt: Date;
 };
 export type LedgerRow = {
@@ -34,7 +34,7 @@ export interface RecipeStore {
   settleIf(workspaceId: string, id: string, expected: PlanState, settlement: Settlement & { expectedPostId?: string | null }): Promise<boolean>;
 }
 
-const SOURCE_COLUMNS = `id, "workspaceId", name, "siteUrl", enabled, "allTargets", "targetIds", config, "lastRunAt", "lastError", "lastSummary", "createdAt", "updatedAt"`;
+const SOURCE_COLUMNS = `id, "workspaceId", name, "siteUrl", "apiCredential", enabled, "allTargets", "targetIds", config, "lastRunAt", "lastError", "lastSummary", "createdAt", "updatedAt"`;
 const LEDGER_COLUMNS = `id, "sourceId", "targetId", "wpPostId", "slotAt", state, "postId", title, permalink, reason, skipped, "claimedAt"`;
 const strings = (value: unknown): string[] => Array.isArray(value) ? value.filter((v): v is string => typeof v === 'string') : [];
 type RawSource = Omit<SourceRow, 'targetIds'> & { targetIds: unknown };

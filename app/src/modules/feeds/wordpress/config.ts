@@ -51,7 +51,6 @@ const metaKey = z.string().regex(META_KEY);
 const P = 'feeds.wordpress.';
 
 export const WORDPRESS_CONFIG = [
-  entry({ key: `${P}databaseUrl`, group: G, label: 'WordPress REST API credential', kind: 'secret', description: 'WordPress Application Password as username:xxxx xxxx xxxx xxxx (or a Bearer token). Required when the caption, image or recipe fields are private (names starting with _), as in the default mapping: without it WordPress omits them and no recipe can be planned. A database address from the former direct connection is not a valid value.', defaultValue: '', schema: z.string().max(2048), consumption: 'active' }),
   flag(`${P}enabled`, 'Plan recipes from WordPress', 'Master switch. When on, the background worker keeps enabled recipe sources filled with scheduled posts via the WordPress REST API.', WORDPRESS_DEFAULTS.enabled),
   text(`${P}tablePrefix`, 'WordPress table prefix', 'Prefix of the WordPress tables (letters, digits and underscore).', WORDPRESS_DEFAULTS.tablePrefix, z.string().regex(/^[A-Za-z0-9_]{0,32}$/)),
   text(`${P}siteUrl`, 'WordPress site address', 'Default site address (https) for new recipe sources; permalinks and image addresses are built from it.', WORDPRESS_DEFAULTS.siteUrl, sitePattern),

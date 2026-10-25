@@ -1,7 +1,8 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { prisma } from '@/server/data';
-import { runtimeConfig, runtimeSecret } from '@/server/config/store';
+import { runtimeConfig } from '@/server/config/store';
+import { sourceCredential } from '../server/wordpress-planner';
 import { withPublishingOperation, withPublishingTransaction } from '@/modules/publishing/server/guard';
 import { audit, bad, lockActor } from '../server/core';
 import { authorizeFeedWrite, type FeedActor } from '../server/access';
@@ -48,7 +49,7 @@ export async function repairPlannedRecipeCaption(actor: FeedActor, input: unknow
   if (plans.length !== 1) throw await bad();
   const plan = plans[0]!;
   const config = resolveConfig(settings.defaults, source.config, patchLimits(settings));
-  const apiToken = await runtimeSecret('feeds.wordpress.databaseUrl').catch(() => null);
+  const apiToken = sourceCredential(source);
   const raw = await readWordpressCaption({ siteUrl: source.siteUrl || settings.siteUrl, apiToken, uploadsPath: settings.uploadsPath, ...settings.db }, config.mapping, plan.wpPostId);
   if (raw === null) throw await bad();
   const max = await runtimeConfig('publishing.maxMessageCharacters');

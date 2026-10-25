@@ -15,7 +15,7 @@ export type RecipeConfig = {
   distinctAcrossPages: boolean; cooldownDays: number; firstCommentTemplate: string; firstCommentDelayMinutes: number;
 };
 export type RecipeSourceData = {
-  id: string; name: string; siteUrl: string; enabled: boolean; allTargets: boolean; targetIds: string[]; config: RecipeConfig;
+  id: string; name: string; siteUrl: string; hasCredential: boolean; enabled: boolean; allTargets: boolean; targetIds: string[]; config: RecipeConfig;
   lastRunAt: string | null; lastError: string | null; lastSummary: { planned?: number; failed?: number; unfilled?: number; scanned?: number; candidates?: number; rejected?: { shared: number; caption: number; image: number; link: number; recipe: number } } | null;
 };
 export type RecipePlan = { id: string; targetId: string; targetName: string; wpPostId: string; slotAt: string; state: 'claimed' | 'planned' | 'uncertain' | 'failed'; postId: string | null; title: string; permalink: string | null; reason: string | null };
@@ -37,13 +37,13 @@ const REVIEW_COPY: Record<Review, { title: RecipeCopyKey; text: RecipeCopyKey; a
   resume: { title: 'resumeTitle', text: 'resumeDescription', action: 'confirmResume' }, run: { title: 'runTitle', text: 'runDescription', action: 'confirmRun' },
   retry: { title: 'retryTitle', text: 'retryDescription', action: 'confirmRetry' },
 };
-type Draft = { name: string; siteUrl: string; allTargets: boolean; targetIds: string[]; config: RecipeConfig };
+type Draft = { name: string; siteUrl: string; credential: string; allTargets: boolean; targetIds: string[]; config: RecipeConfig };
 
 const SLOT = /^([01]\d|2[0-3]):[0-5]\d$/;
 const defaultConfig = (defaults: RecipeView['defaults']): RecipeConfig => { const { siteUrl: _siteUrl, ...config } = defaults; return structuredClone(config); };
 const initialDraft = (view: RecipeView): Draft => view.source
-  ? { name: view.source.name, siteUrl: view.source.siteUrl, allTargets: view.source.allTargets, targetIds: view.source.targetIds, config: structuredClone(view.source.config) }
-  : { name: '', siteUrl: view.defaults.siteUrl, allTargets: true, targetIds: [], config: defaultConfig(view.defaults) };
+  ? { name: view.source.name, siteUrl: view.source.siteUrl, credential: '', allTargets: view.source.allTargets, targetIds: view.source.targetIds, config: structuredClone(view.source.config) }
+  : { name: '', siteUrl: view.defaults.siteUrl, credential: '', allTargets: true, targetIds: [], config: defaultConfig(view.defaults) };
 
 export function RecipeSource({ initial, locale, canWrite, copy = recipeCopy }: { initial: RecipeView; locale: RecipeLocale; canWrite: boolean; copy?: RecipeCopyCatalog }) {
   const t = (key: RecipeCopyKey, values: Record<string, string | number> = {}) => recipeText(locale, key, values, copy);
@@ -89,7 +89,7 @@ export function RecipeSource({ initial, locale, canWrite, copy = recipeCopy }: {
   };
   const perform = () => run(async () => {
     if (review === 'save') {
-      await call('/api/feeds/wordpress', 'PUT', { name: draft.name.trim(), siteUrl: draft.siteUrl.trim(), allTargets: draft.allTargets, targetIds: draft.allTargets ? [] : draft.targetIds, config: configPatch(draft.config, view.defaults), confirmation: phrase });
+      await call('/api/feeds/wordpress', 'PUT', { name: draft.name.trim(), siteUrl: draft.siteUrl.trim(), ...(draft.credential.trim() ? { credential: draft.credential.trim() } : {}), allTargets: draft.allTargets, targetIds: draft.allTargets ? [] : draft.targetIds, config: configPatch(draft.config, view.defaults), confirmation: phrase });
       await reload(); say(t('savedNotice'));
     } else if (review === 'pause' || review === 'resume') {
       const body = await call('/api/feeds/wordpress/state', 'POST', { enabled: review === 'resume', ...(review === 'pause' && cancelPosts ? { cancelScheduled: true } : {}), confirmation: phrase }) as { cancellation?: { cancelled: number; notCancelled: number; remaining: boolean; incomplete: boolean } };
@@ -164,6 +164,7 @@ export function RecipeSource({ initial, locale, canWrite, copy = recipeCopy }: {
       <h3 className={styles.sectionTitle}>{t('sourceHeading')}</h3>
       <label>{t('name')}<input disabled={busy} required maxLength={view.limits.maxNameCharacters} value={draft.name} onChange={e => setDraft(d => ({ ...d, name: e.target.value }))} /></label>
       <label>{t('siteUrl')}<input disabled={busy} required inputMode="url" placeholder="https://" value={draft.siteUrl} onChange={e => setDraft(d => ({ ...d, siteUrl: e.target.value }))} /><span>{t('siteUrlHint')}</span></label>
+      <label>{t('credential')}<input disabled={busy} type="password" autoComplete="off" placeholder={view.source?.hasCredential ? t('credentialSaved') : 'username:xxxx xxxx xxxx xxxx'} value={draft.credential} onChange={e => setDraft(d => ({ ...d, credential: e.target.value }))} /><span>{t('credentialHint')}</span></label>
       <fieldset className={styles.checks} disabled={busy}><legend>{t('channels')}</legend>
         <label><input type="radio" name="recipe-scope" checked={draft.allTargets} onChange={() => setDraft(d => ({ ...d, allTargets: true }))} />{t('allChannels')}</label>
         <label><input type="radio" name="recipe-scope" checked={!draft.allTargets} onChange={() => setDraft(d => ({ ...d, allTargets: false }))} />{t('chooseChannels')}</label>
