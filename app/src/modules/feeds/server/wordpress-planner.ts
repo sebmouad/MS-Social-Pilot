@@ -247,11 +247,12 @@ export const recipeSummaryRecord = (o: SourceOutcome, at: Date): Record<string, 
 /** Explains a run where WordPress returned no caption field at all; the usual cause is the saved credential, so say which case applies. */
 export function captionFieldMessage(scanned: number, field: string, credential: string | null): string {
   const token = credential?.trim() ?? '';
+  // WordPress returns only meta registered for the REST API (show_in_rest), whatever the credential.
   const cause = !token
-    ? 'No WordPress credential is saved for this blog, so private fields are not returned. Save "username:application-password" in the recipe source settings.'
+    ? `The field is probably not registered for the REST API: register "${field}" with show_in_rest on the WordPress site (register_post_meta). If it is protected, also save "username:application-password" in the recipe source settings.`
     : /^[a-z][a-z0-9+.-]*:\/\//i.test(token)
       ? 'The saved WordPress credential is a database address from the former direct connection, so it is not sent. Replace it with "username:application-password" (WordPress › Users › Profile › Application passwords).'
-      : 'Check that the saved application password is still valid and that the field is exposed to the REST API.';
+      : `Check that "${field}" is registered with show_in_rest on the WordPress site and that the saved application password is still valid.`;
   return `WordPress returned none of the ${scanned} recipes with the field "${field}". ${cause}`;
 }
 
