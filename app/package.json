@@ -7,7 +7,10 @@
     "build": "prisma generate && next build",
     "start": "next start -p 3200",
     "typecheck": "tsc --noEmit",
-    "worker": "node --env-file-if-exists=.env --import tsx scripts/worker.ts"
+    "worker": "node --env-file-if-exists=.env --import tsx scripts/worker.ts",
+    "deploy": "bash scripts/deploy-from-mac.sh",
+    "deploy:mac": "bash scripts/deploy-from-mac.sh",
+    "deploy:server": "bash scripts/deploy-from-server.sh"
   },
   "dependencies": {
     "@prisma/client": "6.19.3",

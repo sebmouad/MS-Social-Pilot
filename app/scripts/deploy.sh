@@ -65,46 +65,7 @@ while [ $# -gt 0 ]; do
 done
 
 if [ "$MODE" = "local" ]; then
-  [ "$EUID" -eq 0 ] || { echo "Run with sudo: sudo bash app/scripts/deploy.sh --local" >&2; exit 1; }
-  APP_DIR="$(pwd)"
-  APP_USER="${APP_USER:-socialpilot}"
-  DB_NAME="${DB_NAME:-social_pilot}"
-  DB_USER="${DB_USER:-socialpilot}"
-
-  if ! command -v node >/dev/null 2>&1 || [ "$(node -p 'process.versions.node.split(".")[0]')" -lt 22 ]; then
-    export DEBIAN_FRONTEND=noninteractive
-    apt-get update -qq && apt-get install -y -qq ca-certificates curl gnupg git openssl build-essential postgresql postgresql-contrib rsync
-    install -d -m 0755 /etc/apt/keyrings
-    curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg
-    chmod a+r /etc/apt/keyrings/nodesource.gpg
-    echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_22.x nodistro main" > /etc/apt/sources.list.d/nodesource.list
-    apt-get update -qq && apt-get install -y -qq nodejs
-  fi
-
-  id -u "$APP_USER" >/dev/null 2>&1 || useradd --system --create-home --shell /bin/bash "$APP_USER"
-  systemctl enable --now postgresql
-
-  if [ ! -f "$APP_DIR/.env.production.local" ]; then
-    DB_PASS="$(openssl rand -hex 24)"
-    sudo -u postgres psql -tAc "SELECT 1 FROM pg_roles WHERE rolname='$DB_USER'" | grep -q 1 \
-      || sudo -u postgres psql -q -c "CREATE ROLE $DB_USER LOGIN PASSWORD '$DB_PASS'"
-    sudo -u postgres psql -tAc "SELECT 1 FROM pg_database WHERE datname='$DB_NAME'" | grep -q 1 \
-      || sudo -u postgres createdb -O "$DB_USER" "$DB_NAME"
-    sudo -u postgres psql -q -c "ALTER DATABASE $DB_NAME SET timezone TO 'UTC'"
-    umask 077
-    cat > "$APP_DIR/.env.production.local" <<ENV
-DATABASE_URL="postgresql://${DB_USER}:${DB_PASS}@127.0.0.1:5432/${DB_NAME}?schema=public"
-ENCRYPTION_KEY="$(openssl rand -hex 32)"
-SESSION_SECRET="$(openssl rand -hex 32)"
-NODE_ENV="production"
-PORT="${APP_PORT}"
-ENV
-    chown "$APP_USER:$APP_USER" "$APP_DIR/.env.production.local"
-  fi
-
-  chown -R "$APP_USER:$APP_USER" "$APP_DIR"
-  sudo -u "$APP_USER" bash -c "cd '$APP_DIR' && npm ci --no-audit --no-fund && npx prisma generate && npm run build"
-  exit 0
+  exec "$(dirname "$0")/deploy-from-server.sh" "$@"
 fi
 
 [ -n "$DEPLOY_HOST" ] || { echo "Error: --host <ip_or_domain> (or DEPLOY_HOST) is required." >&2; usage >&2; exit 2; }
