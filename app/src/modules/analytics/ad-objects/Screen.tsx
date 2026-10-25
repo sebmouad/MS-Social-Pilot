@@ -58,8 +58,8 @@ export default async function AdObjectsScreen({ searchParams }: { searchParams: 
   ]} />;
   const field = (label: string, control: React.ReactNode) => <label className={local.field}><span>{label}</span>{control}</label>;
   const sidebar = <form action="/ads/analysis" className={local.filters} aria-label={t("Ad-object analysis")}>
-    {field(t("Start (UTC, inclusive)"), <input className="ui-input" type="text" name="start" size={10} placeholder={t("YYYY-MM-DD")} defaultValue={data?.period.start ?? value('start')} />)}
-    {field(t("End (UTC, inclusive)"), <input className="ui-input" type="text" name="end" size={10} placeholder={t("YYYY-MM-DD")} defaultValue={data?.period.end ?? value('end')} />)}
+    {field(t("Start (UTC, inclusive)"), <input className="ui-input" type="date" name="start" size={10} placeholder={t("YYYY-MM-DD")} defaultValue={data?.period.start ?? value('start')} />)}
+    {field(t("End (UTC, inclusive)"), <input className="ui-input" type="date" name="end" size={10} placeholder={t("YYYY-MM-DD")} defaultValue={data?.period.end ?? value('end')} />)}
     {field(t("Ad account"), <select className="ui-input" name="accountId" defaultValue={selectedAccount}>
       <option value="">{t("All accessible accounts")}</option>
       {selectedAccount && !options.some(a => a.id === selectedAccount) && <option value={selectedAccount}>{selectedAccount} · {missing}</option>}
