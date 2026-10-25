@@ -34,23 +34,21 @@ import styles from "./queue.module.css";
 export default async function QueuePage({ searchParams }: { searchParams: Promise<{ page?: string; channel?: string }> }) {
   const viewer = await requireViewer({ feature: "publishing/queue", channelScoped: true });
   const timeZone = viewer.membership.workspace.timezone;
-  const locale = await pageLocale();
-  const { catalog, copy: localizedCopy } = await loadPublishingCopy();
-  const actionCatalog = await loadPublishingActionCopy();
-  const copy = localizedCopy[locale];
   const params = await searchParams;
   const { page: pageParam } = params;
   const requestedPage = pageParam && /^[1-9]\d*$/.test(pageParam) && Number.isSafeInteger(Number(pageParam)) ? Number(pageParam) : 1;
-  const content = await loadContent();
-  const composerCatalog = await loadComposerCopy();
-  const scope = await pageChannelScope(viewer, params).catch(() => null);
+  // Independent reads run together; the page waits for the slowest instead of their sum.
+  const [locale, { catalog, copy: localizedCopy }, actionCatalog, content, composerCatalog, scope] = await Promise.all([
+    pageLocale(), loadPublishingCopy(), loadPublishingActionCopy(), loadContent(), loadComposerCopy(), pageChannelScope(viewer, params).catch(() => null),
+  ]);
+  const copy = localizedCopy[locale];
   const channelId = scope?.ids.length ? scope.ids.join(",") : undefined;
-  const [listing, slotsPerChannel] = await Promise.all([
+  // Published/failed context for the header and the Sent block, in the same channel scope. A failed count falls back to the scheduled-only total, which never mixes states.
+  const [listing, slotsPerChannel, counts] = await Promise.all([
     readPublishingPostPage({ userId: viewer.user.id, workspaceId: viewer.workspaceId }, { page: requestedPage, status: "scheduled", order: "scheduled_asc", channelId }, "publishing/queue"),
     runtimeConfig('publishing.queueTimelineSlotsPerChannel'),
+    readPublishingStatusCounts({ userId: viewer.user.id, workspaceId: viewer.workspaceId }, { ...(channelId === undefined ? {} : { channelId }) }, "publishing/queue").catch(() => null),
   ]);
-  // Published/failed context for the header and the Sent block, in the same channel scope. A failed count falls back to the scheduled-only total, which never mixes states.
-  const counts = await readPublishingStatusCounts({ userId: viewer.user.id, workspaceId: viewer.workspaceId }, { ...(channelId === undefined ? {} : { channelId }) }, "publishing/queue").catch(() => null);
   const origins = await loadPostOrigins(viewer.workspaceId, listing.posts.map(post => post.id), locale);
   const now = new Date();
   const slotFormat = new Intl.DateTimeFormat(locale, { timeZone, weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });

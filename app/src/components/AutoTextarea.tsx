@@ -32,12 +32,14 @@ export const AutoTextarea = forwardRef<HTMLTextAreaElement, TextareaHTMLAttribut
     const element = field.current;
     if (!element || typeof ResizeObserver === 'undefined') return;
     let width = element.getBoundingClientRect().width;
+    let frame = 0;
+    // Resize on the next frame: changing height inside the callback triggers "ResizeObserver loop" errors.
     const observer = new ResizeObserver(() => {
       const nextWidth = element.getBoundingClientRect().width;
-      if (nextWidth !== width) { width = nextWidth; resize(); }
+      if (nextWidth !== width) { width = nextWidth; cancelAnimationFrame(frame); frame = requestAnimationFrame(resize); }
     });
     observer.observe(element);
-    return () => observer.disconnect();
+    return () => { cancelAnimationFrame(frame); observer.disconnect(); };
   }, [resize]);
   return <textarea {...props} value={value} ref={attach} style={{ ...style, resize: 'none', overflowY: 'hidden' }} onChange={event => { resize(); onChange?.(event); }} />;
 });

@@ -251,3 +251,7 @@
   border: 1px solid rgba(0,0,0,0.1);
 }
 
+
+/* Keyboard hints in the action bar; hidden where there is no keyboard to use them. */
+.shortcutHints { display: inline-flex; align-items: center; gap: 10px; font-size: 11px; color: var(--ink-faint); margin-right: auto; }
+@media (max-width: 720px), (pointer: coarse) { .shortcutHints { display: none; } }

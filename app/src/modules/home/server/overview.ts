@@ -7,6 +7,7 @@ import { canAccessFeature } from '@/server/permissions';
 import { loadPermissions } from '@/server/permissions/loader';
 import { platformAnalytics } from '@/server/platforms/registry';
 import { readAnalyticsSnapshot } from '@/modules/analytics/server/read';
+import { postThumbnail, type PostThumbnail } from '@/components/post-thumbnail';
 import { pickMetric } from '@/modules/analytics/ui/insights/overview-model';
 import type { InsightsPolicy } from '@/modules/analytics/ui/insights/insights-config';
 import { readChannelMeasures, readChannelPostHistory } from '@/modules/analytics/server/stored-reads';
@@ -42,7 +43,7 @@ export type HomeOverview = {
     interactions: Array<{ key: string; label: string; value: number }>;
   }> | null;
   bestTimes: Section<{ cells: HeatmapCell[]; measuredPosts: number }> | null;
-  upcoming: Section<{ total: number; items: Array<{ id: string; text: string; scheduledAt: string; channels: string[]; mode: ScheduleMode }> }> | null;
+  upcoming: Section<{ total: number; items: Array<{ id: string; text: string; scheduledAt: string; channels: string[]; mode: ScheduleMode; thumbnail: PostThumbnail | null }> }> | null;
   inbox: Section<{ open: number; recent: Array<{ key: string; author: string; preview: string; time: string; channel: string; unread: number }> }> | null;
   ads: Section<{ start: string; end: string; spend: Array<{ currency: string | null; total: number; firstDay: string; lastDay: string; recordedDays: number; daily: TrendPoint[] }> }> | null;
   attention: Section<HomeAttention> | null;
@@ -186,7 +187,7 @@ export async function readHomeOverview(actor: HomeActor, now = new Date(), optio
     const text = Number(config['home.snippetCharacters']);
     const items = page.posts.filter(post => post.scheduledAt).slice(0, Number(config['home.upcomingLimit'])).map(post => ({
       id: post.id, text: snippet(post.message, text), scheduledAt: post.scheduledAt!.toISOString(), channels: post.targets.map(target => target.target.name),
-      mode: scheduleMode(post.targets.map(target => target.status)),
+      mode: scheduleMode(post.targets.map(target => target.status)), thumbnail: postThumbnail(post.media),
     }));
     return { state: 'ready', data: { total: page.total, items } };
   });

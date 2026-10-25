@@ -19,6 +19,8 @@ export type PostPreviewPost = {
   createdAt: Date;
   /** Server-formatted workspace time for previews rendered inside client components. */
   displayTime?: string;
+  /** A composer preview of a post that is not saved yet: no creation time to show. */
+  unsaved?: boolean;
   targets: Array<{
     id?: string;
     status: string;
@@ -162,7 +164,7 @@ export function PostPreview({ post, authorName, authorAvatarUrl, timeZone, varia
         {authorPicture ? <img className={styles.channelAvatar} src={authorPicture} alt="" loading="lazy" /> : <span className={styles.authorAvatar} aria-hidden="true">{initials(authorName)}</span>}
         <div className={styles.headerText}>
           <strong>{authorName}</strong>
-          <time dateTime={time.toISOString()}>{timeLabel} {post.displayTime ?? formatPostPreviewTime(time, timeZone)}</time>
+          {post.unsaved ? null : <time dateTime={time.toISOString()}>{timeLabel} {post.displayTime ?? formatPostPreviewTime(time, timeZone)}</time>}
         </div>
         <StatusChip status={post.status} />
       </header>

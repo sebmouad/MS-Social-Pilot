@@ -58,6 +58,8 @@ export const contentCopyDefaults = {
   createActionBar: m('Post actions', 'Actions de la publication'),
   createSaveDraft: m('Save draft', 'Enregistrer le brouillon'),
   createSchedule: m('Schedule', 'Programmer'),
+  createHookScore: m('Score the opening line', 'Évaluer l’accroche'),
+  createGridPreview: m('Grid preview', 'Aperçu en grille'),
   createScheduleFor: m('Schedule for {when}', 'Programmer pour le {when}'),
   createScheduleEllipsis: m('Schedule…', 'Programmer…'),
   createPublishNow: m('Publish now', 'Publier maintenant'),

@@ -44,12 +44,10 @@ export default async function PostsPage({ searchParams }: { searchParams: Promis
   const params = await searchParams;
   const { notice, recovery, page: pageParam, status, q, origin: originParam, post: postParam } = params;
   const originKind = parseOriginFilter(originParam);
-  const locale = await pageLocale();
-  const { catalog, copy: localizedCopy } = await loadPublishingCopy();
-  const noticeCatalog = await loadPublishingNoticeCopy();
-  const actionCatalog = await loadPublishingActionCopy();
-  const composerCatalog = await loadComposerCopy();
-  const content = await loadContent();
+  // Independent reads run together; the page waits for the slowest instead of their sum.
+  const [locale, { catalog, copy: localizedCopy }, noticeCatalog, actionCatalog, composerCatalog, content] = await Promise.all([
+    pageLocale(), loadPublishingCopy(), loadPublishingNoticeCopy(), loadPublishingActionCopy(), loadComposerCopy(), loadContent(),
+  ]);
   const copy = localizedCopy[locale];
   const [allowedMimeTypes, maxUploadBytes, maxAltCharacters, maxMedia, maxFirstCommentDelayMinutes, searchMaxCharacters, exportMaxPosts, exportMaxBytes] = await Promise.all([
     runtimeConfig('publishing.allowedImageMimeTypes'), runtimeConfig('publishing.maxImageUploadBytes'), runtimeConfig('publishing.maxImageAltCharacters'), runtimeConfig('publishing.maxRemoteMediaPerPost'), runtimeConfig('publishing.maxFirstCommentDelayMinutes'),
@@ -77,9 +75,15 @@ export default async function PostsPage({ searchParams }: { searchParams: Promis
   // A shared `?post=` link to a post that is not on this page opens the post's own page instead.
   if (postParam && POST_ID.test(postParam) && !listing.posts.some(post => post.id === postParam)) redirect(`/content/post/${encodeURIComponent(postParam)}`);
   // Header counts use the same channel/search/origin scope as the list but ignore the status filter, so they always split planned vs published. A failed count hides instead of showing a bare total.
-  const counts = await readPublishingStatusCounts({ userId: viewer.user.id, workspaceId: viewer.workspaceId }, { ...(selectedChannel === undefined ? {} : { channelId: selectedChannel }), ...(q === undefined ? {} : { q }), ...(originKind === undefined ? {} : { origin: originKind }) }).catch(() => null);
-  const targetChoices = await publishingDestinationChoices(viewer);
-  const undoSendSeconds = await loadWorkspaceOperations(viewer.workspaceId).then(value => value.undoSendSeconds, () => 0);
+  const postIds = listing.posts.map(post => post.id);
+  const [counts, targetChoices, undoSendSeconds, origins, originOptions, reach] = await Promise.all([
+    readPublishingStatusCounts({ userId: viewer.user.id, workspaceId: viewer.workspaceId }, { ...(selectedChannel === undefined ? {} : { channelId: selectedChannel }), ...(q === undefined ? {} : { q }), ...(originKind === undefined ? {} : { origin: originKind }) }).catch(() => null),
+    publishingDestinationChoices(viewer),
+    loadWorkspaceOperations(viewer.workspaceId).then(value => value.undoSendSeconds, () => 0),
+    loadPostOrigins(viewer.workspaceId, postIds, locale),
+    originFilterOptions(viewer.workspaceId, locale).catch(() => []),
+    loadPostReach(viewer.workspaceId, postIds),
+  ]);
   const timeZone = viewer.membership.workspace.timezone;
   const canManageDrafts = ["owner", "admin", "editor"].includes(viewer.membership.role);
   const canAuthorDrafts = canManageDrafts || viewer.membership.role === "contributor";
@@ -96,9 +100,6 @@ export default async function PostsPage({ searchParams }: { searchParams: Promis
       && !post.targets.some(target => target.status === 'processing' || target.status === 'scheduled_remote');
     return { canEdit, canDuplicate };
   };
-  const origins = await loadPostOrigins(viewer.workspaceId, listing.posts.map(post => post.id), locale);
-  const originOptions = await originFilterOptions(viewer.workspaceId, locale).catch(() => []);
-  const reach = await loadPostReach(viewer.workspaceId, listing.posts.map(post => post.id));
   const rows: PostsTableRow[] = listing.posts.map(post => ({
     ...post,
     origin: origins.get(post.id) ?? null,

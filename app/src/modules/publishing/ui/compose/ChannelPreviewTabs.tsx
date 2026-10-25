@@ -57,7 +57,7 @@ export function ChannelPreviewTabs({ channels, formats, previewPost, attachments
     };
   }), {
     id: 'grid_planner',
-    label: '📸 9-Grid Planner',
+    label: cc.createGridPreview,
     content: (
       <div className={styles.gridPlanner}>
         <div className={styles.gridProfileHeader}>

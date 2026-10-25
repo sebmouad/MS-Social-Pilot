@@ -349,9 +349,9 @@ function PostComposerContent({ copyCatalog = composerCatalogDefaults, profiles, 
     id: 'composer-preview', authorId: 'preview', message, firstComment: firstComment || null,
     link: link || null,
     media: attachments.media,
-    status: 'draft', scheduledAt: null, publishedAt: null, createdAt, displayTime: createdAtDisplay,
+    status: 'draft', scheduledAt: null, publishedAt: null, createdAt, displayTime: createdAtDisplay, unsaved: !draftPostId,
     targets: selected.map(target => ({ status: 'pending', remotePostId: null, remoteUrl: null, target: { id: target.id, type: target.type, name: target.name, pictureUrl: target.pictureUrl ?? null } })),
-  }), [message, firstComment, link, attachments.media, createdAt, createdAtDisplay, selected]);
+  }), [message, firstComment, link, attachments.media, createdAt, createdAtDisplay, selected, draftPostId]);
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     const form = event.currentTarget;
@@ -542,7 +542,7 @@ function PostComposerContent({ copyCatalog = composerCatalogDefaults, profiles, 
           <AiAssist status={aiStatus} locale={aiLocale} text={message} disabled={pending || saved} onUse={(suggestion, kind) => setMessage(current => (kind === 'hashtags' ? `${current.trimEnd()}${current.trim() ? '\n\n' : ''}${suggestion}` : suggestion).slice(0, imageRules.maxMessageCharacters))} />
           <button type="button" className={styles.addRow} style={{ minHeight: '32px', fontSize: '12px' }} onClick={analyzeHook}>
             <IconSparkles size={14} aria-hidden="true" />
-            <span>⚡ Hook Scorer</span>
+            <span>{cc.createHookScore}</span>
           </button>
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
             {imageRules.maxMessageCharacters > 0 && (() => {
@@ -696,8 +696,8 @@ function PostComposerContent({ copyCatalog = composerCatalogDefaults, profiles, 
     </div>
 
     <ActionBar label={cc.createActionBar} status={status}>
-      <div style={{ display: 'inline-flex', alignItems: 'center', gap: '10px', fontSize: '11px', color: 'var(--ink-faint)', marginRight: 'auto' }}>
-        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}><kbd className="ui-kbd">⌘</kbd><kbd className="ui-kbd">↵</kbd> {hasTime ? cc.createSchedule : cc.createSaveDraft}</span>
+      <div className={styles.shortcutHints}>
+        {hasTime && <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}><kbd className="ui-kbd">⌘</kbd><kbd className="ui-kbd">↵</kbd> {cc.createSchedule}</span>}
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}><kbd className="ui-kbd">⌘</kbd><kbd className="ui-kbd">S</kbd> {cc.createSaveDraft}</span>
       </div>
       <Button type="button" variant="secondary" disabled={busy} onClick={() => submitWith('draft')}>{cc.createSaveDraft}</Button>
