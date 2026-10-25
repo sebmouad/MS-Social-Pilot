@@ -14,6 +14,8 @@ export type DbSettings = {
   uploadsPath?: string;
 };
 export type WpCandidateRow = {
+  /** False when WordPress returned the post without the configured caption field at all (not merely empty). */
+  captionFieldPresent?: boolean;
   id: string;
   title: string;
   slug: string;
@@ -69,6 +71,11 @@ const stripHtml = (html: string): string =>
     .replace(/\n{3,}/g, '\n\n')
     .trim();
 
+/** Whether the REST response carries the field at all; private meta is omitted when credentials fail or the field is not exposed. */
+const hasMetaKey = (item: Record<string, unknown>, key: string): boolean => {
+  const meta = item['meta'];
+  return Boolean(meta && typeof meta === 'object' && !Array.isArray(meta) && key in (meta as Record<string, unknown>)) || key in item;
+};
 const metaValue = (item: Record<string, unknown>, key: string): string => {
   if (!key) return '';
   const meta = item['meta'];
@@ -339,7 +346,8 @@ export async function openWordpressDb(settings: DbSettings): Promise<WpDb> {
         }
 
         const recipe = q.mapping.recipeMetaKey ? metaValue(item, q.mapping.recipeMetaKey) : extractRecipeJson(item, '', title);
-        rows.push({ id, title, slug, publishedAt, caption, imageId, recipe });
+        const captionFieldPresent = !q.mapping.captionMetaKey || hasMetaKey(item, q.mapping.captionMetaKey);
+        rows.push({ id, title, slug, publishedAt, caption, imageId, recipe, captionFieldPresent });
       }
       return { rows, fetched: raw.length, requested };
     },

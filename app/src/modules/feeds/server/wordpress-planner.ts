@@ -65,7 +65,7 @@ export function defaultPlannerPorts(net: FetchDeps = defaultFetchDeps()): Planne
 
 export type Candidate = { wpPostId: string; title: string; slug: string; caption: string; imageUrl: string; permalink: string; recipe: Recipe; publishedAt: Date | null };
 /** Why scanned posts were not candidates; shown with an empty run so the cause is visible. */
-export type ScanRejections = { shared: number; caption: number; image: number; link: number; recipe: number };
+export type ScanRejections = { shared: number; caption: number; image: number; link: number; recipe: number; captionFieldMissing?: number };
 export type Scan = { candidates: Candidate[]; scanned: number; exhausted: boolean; rejected: ScanRejections };
 
 /**
@@ -75,7 +75,7 @@ export type Scan = { candidates: Candidate[]; scanned: number; exhausted: boolea
 export async function scanCandidates(db: WpDb, settings: WordpressSettings, source: Pick<SourceRow, 'siteUrl'>, config: PlanConfig, now: Date, enough: (candidates: Candidate[]) => boolean): Promise<Scan> {
   const candidates: Candidate[] = [];
   let scanned = 0; let exhausted = false;
-  const rejected: ScanRejections = { shared: 0, caption: 0, image: 0, link: 0, recipe: 0 };
+  const rejected: ScanRejections = { shared: 0, caption: 0, image: 0, link: 0, recipe: 0, captionFieldMissing: 0 };
   while (scanned < settings.candidateMaxScan) {
     const limit = Math.min(settings.candidateBatchSize, settings.candidateMaxScan - scanned);
     const { rows, fetched, requested } = await db.candidates({ mapping: config.mapping, order: config.order, skipShared: config.skipShared, maxAgeDays: config.maxAgeDays, offset: scanned, limit, now });
@@ -91,7 +91,7 @@ export async function scanCandidates(db: WpDb, settings: WordpressSettings, sour
       const imageUrl = file ? buildImageUrl(source.siteUrl, settings.uploadsPath, file) : null;
       const permalink = buildPermalink(settings.permalinkTemplate, source.siteUrl, row.slug);
       const recipe = parseRecipe(row.recipe, row.title, settings.minutesSuffix);
-      if (!row.caption) { rejected.caption++; continue; }
+      if (!row.caption) { rejected.caption++; if (row.captionFieldPresent === false) rejected.captionFieldMissing = (rejected.captionFieldMissing ?? 0) + 1; continue; }
       if (!imageUrl) { rejected.image++; continue; }
       if (!permalink) { rejected.link++; continue; }
       if (!recipe) { rejected.recipe++; continue; }
@@ -199,6 +199,9 @@ export async function planSource(ctx: Ctx, source: SourceRow, auth: FeedAuthoriz
 
   const scan = await scanCandidates(ctx.db, settings, source, config, now, found => !settings.reuse.enabled && allocateRecipes({ needs: todo, candidates: found, blocked: view.blocked, taken: view.taken, reused: view.reused, distinct: config.distinctAcrossPages }).unfilled === 0);
   out.scanned = scan.scanned; out.candidates = scan.candidates.length; out.rejected = scan.rejected;
+  // Every post came back without the caption field itself: credentials or the REST exposure of that field failed, not the content.
+  const readable = scan.scanned - scan.rejected.shared;
+  if (readable > 0 && scan.rejected.captionFieldMissing === readable) out.reason = 'caption_field_missing';
   const { assignments, unfilled } = allocateRecipes({ needs: todo, candidates: scan.candidates, allowReuse: scan.exhausted, blocked: view.blocked, taken: view.taken, reused: view.reused, distinct: config.distinctAcrossPages });
   out.unfilled = unfilled + (needs.length - todo.length);
 
@@ -243,6 +246,17 @@ export type RecipePlanSummary = { reason?: 'disabled' | 'misconfigured' | 'datab
 const emptySummary = (reason?: RecipePlanSummary['reason']): RecipePlanSummary => ({ ...(reason ? { reason } : {}), sources: 0, planned: 0, failed: 0, uncertain: 0, unfilled: 0, outcomes: [] });
 const totals = (summary: RecipePlanSummary, o: SourceOutcome) => { summary.outcomes.push(o); summary.planned += o.planned; summary.failed += o.failed; summary.uncertain += o.uncertain; summary.unfilled += o.unfilled; };
 export const recipeSummaryRecord = (o: SourceOutcome, at: Date): Record<string, unknown> => ({ at: at.toISOString(), planned: o.planned, failed: o.failed, uncertain: o.uncertain, unfilled: o.unfilled, slots: o.slots, pages: o.pages, excludedPages: o.excludedPages, scanned: o.scanned, ...(o.candidates !== undefined ? { candidates: o.candidates } : {}), ...(o.rejected ? { rejected: o.rejected } : {}), ...(o.reason ? { reason: o.reason } : {}) });
+
+/** Explains a run where WordPress returned no caption field at all; the usual cause is the saved credential, so say which case applies. */
+export function captionFieldMessage(scanned: number, field: string, credential: string | null): string {
+  const token = credential?.trim() ?? '';
+  const cause = !token
+    ? 'No WordPress credential is saved, so private fields are not returned. Save "username:application-password" in Root › Config › WordPress.'
+    : /^[a-z][a-z0-9+.-]*:\/\//i.test(token)
+      ? 'The saved WordPress credential is a database address from the former direct connection, so it is not sent. Replace it with "username:application-password" (WordPress › Users › Profile › Application passwords).'
+      : 'Check that the saved application password is still valid and that the field is exposed to the REST API.';
+  return `WordPress returned none of the ${scanned} recipes with the field "${field}". ${cause}`;
+}
 
 export async function openDatabase(ports: PlannerPorts, settings: WordpressSettings, siteUrlOverride?: string): Promise<WpDb | null> {
   const siteUrl = (siteUrlOverride || settings.siteUrl || '').trim();
@@ -292,7 +306,7 @@ export async function runRecipePlanning(overrides: Partial<PlannerPorts> = {}, l
       }
       const outcome = await planSource({ settings, ports, db, budget, now }, source, auth);
       totals(summary, outcome);
-      await ports.store.recordRun(source.workspaceId, source.id, { at: now, error: outcome.reason && !['complete', 'budget'].includes(outcome.reason) ? `Planning stopped: ${outcome.reason}` : null, summary: recipeSummaryRecord(outcome, now) });
+      await ports.store.recordRun(source.workspaceId, source.id, { at: now, error: outcome.reason === 'caption_field_missing' ? captionFieldMessage(outcome.scanned, configOf(settings, source).mapping.captionMetaKey, await ports.databaseUrl().catch(() => null)) : outcome.reason && !['complete', 'budget'].includes(outcome.reason) ? `Planning stopped: ${outcome.reason}` : null, summary: recipeSummaryRecord(outcome, now) });
     } catch {
       totals(summary, { sourceId: source.id, planned: 0, failed: 1, uncertain: 0, unfilled: 0, slots: 0, pages: 0, excludedPages: 0, scanned: 0, reason: 'error' });
       await ports.store.recordRun(source.workspaceId, source.id, { at: now, error: 'Planning could not be completed.', summary: { at: now.toISOString(), reason: 'error' } }).catch(() => undefined);
