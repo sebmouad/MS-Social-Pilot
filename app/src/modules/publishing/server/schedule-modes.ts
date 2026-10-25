@@ -4,6 +4,7 @@ import { loadPublishingErrorText } from '@/modules/publishing/server/error-copy'
 import type { Prisma } from '../../../../generated/client';
 import { OperationError } from '@/lib/operation-error';
 import { runtimeConfig } from '@/server/config/store';
+import { prisma } from '@/server/data';
 import { parseScheduleMode, SCHEDULE_MODES, type ScheduleMode } from '@/modules/publishing/remote-scheduling';
 
 /** Where each destination's schedule waits, keyed by destination (target) id. */
@@ -33,23 +34,31 @@ export function parseDestinationScheduleModesJson(raw: unknown, errorText: Publi
   return parsed && Object.keys(parsed).length ? parsed : undefined;
 }
 
-/** Requested mode, falling back to the Root default; platform holding is refused outright when Root withdrew the choice. */
-export async function effectiveScheduleMode(requested: ScheduleMode | undefined): Promise<ScheduleMode> {
+/** The workspace's own default scheduling place; null when it never chose, so the Root default applies. */
+export async function workspaceScheduleMode(workspaceId: string): Promise<ScheduleMode | null> {
+  const rows = await prisma.$queryRaw<Array<{ scheduleMode: string | null }>>`SELECT "scheduleMode" FROM workspaces WHERE id = ${workspaceId}`;
+  return parseScheduleMode(rows[0]?.scheduleMode ?? undefined) ?? null;
+}
+
+/** Requested mode, else the workspace default, else the Root default; platform holding is refused outright when Root withdrew the choice. */
+export async function effectiveScheduleMode(requested: ScheduleMode | undefined, workspaceId?: string): Promise<ScheduleMode> {
   const errorText = await loadPublishingErrorText();
   parseScheduleMode(requested);
   const offered = await runtimeConfig('publishing.remoteScheduling.offered') === true;
   if (requested === 'remote' && !offered) throw new PublishingOperationError('invalid_request', 'platformheldSchedulingIsNotAvailableChooseApplicationScheduling', {}, errorText);
   if (requested) return requested;
-  return offered && await runtimeConfig('publishing.remoteScheduling.defaultMode') === 'remote' ? 'remote' : 'application';
+  if (!offered) return 'application';
+  const own = workspaceId ? await workspaceScheduleMode(workspaceId) : null;
+  return (own ?? await runtimeConfig('publishing.remoteScheduling.defaultMode')) === 'remote' ? 'remote' : 'application';
 }
 
 /**
  * Resolve every destination's mode: its own override, else the post-level choice, else the Root default. Overrides naming a
  * destination that is not on the post are refused, and a platform-held override is refused when Root withdrew the choice.
  */
-export async function resolveScheduleModes(targetIds: readonly string[], postLevel: ScheduleMode | undefined, overrides?: DestinationScheduleModes): Promise<ResolvedScheduleModes> {
+export async function resolveScheduleModes(targetIds: readonly string[], postLevel: ScheduleMode | undefined, overrides?: DestinationScheduleModes, workspaceId?: string): Promise<ResolvedScheduleModes> {
   const errorText = await loadPublishingErrorText();
-  const postMode = await effectiveScheduleMode(postLevel);
+  const postMode = await effectiveScheduleMode(postLevel, workspaceId);
   const known = new Set(targetIds);
   for (const [targetId, mode] of Object.entries(overrides ?? {})) {
     if (!known.has(targetId)) throw new PublishingOperationError('invalid_request', 'aSchedulingChoiceNamesADestinationThatIsNot', {}, errorText);
@@ -59,9 +68,9 @@ export async function resolveScheduleModes(targetIds: readonly string[], postLev
 }
 
 /** Modes for a post a system job schedules: never throws; if the choice cannot be honoured every destination stays with the application. */
-export async function systemScheduleModes(targetIds: readonly string[], preferred?: DestinationScheduleModes): Promise<Map<string, ScheduleMode>> {
+export async function systemScheduleModes(targetIds: readonly string[], preferred?: DestinationScheduleModes, workspaceId?: string): Promise<Map<string, ScheduleMode>> {
   const scoped = preferred ? Object.fromEntries(Object.entries(preferred).filter(([id]) => targetIds.includes(id))) : undefined;
-  try { return (await resolveScheduleModes(targetIds, undefined, scoped)).byTarget; }
+  try { return (await resolveScheduleModes(targetIds, undefined, scoped, workspaceId)).byTarget; }
   catch { return new Map(targetIds.map(id => [id, 'application' as const])); }
 }
 

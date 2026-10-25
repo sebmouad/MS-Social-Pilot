@@ -32,9 +32,11 @@ export async function readWorkspacePolicy(actor: WorkspacePolicyActor) {
   try {
     await authorizeWorkspaceManager(actor, false);
     await assertWorkspaceNotPurging(actor.workspaceId);
-    const rows = await prisma.$queryRaw<Array<{ timezone: string; requiresApproval: boolean }>>`SELECT timezone, "requiresApproval" FROM workspaces WHERE id = ${actor.workspaceId}`;
+    const rows = await prisma.$queryRaw<Array<{ timezone: string; requiresApproval: boolean; scheduleMode: string | null }>>`SELECT timezone, "requiresApproval", "scheduleMode" FROM workspaces WHERE id = ${actor.workspaceId}`;
     if (!rows[0] || !validTimeZone(rows[0].timezone) || typeof rows[0].requiresApproval !== 'boolean') throw unavailable();
-    return { ok: true as const, timezone: rows[0].timezone, requiresApproval: rows[0].requiresApproval, maxTimezoneCharacters: await maxZoneLength() };
+    const [offered, rootMode] = await Promise.all([runtimeConfig('publishing.remoteScheduling.offered'), runtimeConfig('publishing.remoteScheduling.defaultMode')]);
+    const scheduleMode: 'application' | 'remote' = (rows[0].scheduleMode ?? rootMode) === 'remote' ? 'remote' : 'application';
+    return { ok: true as const, timezone: rows[0].timezone, requiresApproval: rows[0].requiresApproval, scheduleMode, remoteSchedulingOffered: offered === true, maxTimezoneCharacters: await maxZoneLength() };
   } catch (error) { if (error instanceof OperationError) throw error; throw unavailable(); }
 }
 
@@ -73,9 +75,9 @@ export async function updateWorkspacePolicy(actor: WorkspacePolicyActor, input: 
         const releasedCounts = released[0];
         if (Number(releasedCounts?.total ?? 0) > 0) await tx.$executeRaw`INSERT INTO activity_logs (id, "workspaceId", "actorId", action, detail, "createdAt") VALUES (${randomUUID()}, ${actor.workspaceId}, ${actor.userId}, 'approvals.disabled', ${JSON.stringify({ released: Number(releasedCounts?.total ?? 0), scheduled: Number(releasedCounts?.scheduled ?? 0), drafts: Number(releasedCounts?.drafts ?? 0) })}::jsonb, NOW())`;
       }
-      await tx.$executeRaw`UPDATE workspaces SET timezone = ${value.data.timezone}, "requiresApproval" = ${value.data.requiresApproval}, "updatedAt" = NOW() WHERE id = ${actor.workspaceId}`;
-      await tx.$executeRaw`INSERT INTO activity_logs (id, "workspaceId", "actorId", action, detail, "createdAt") VALUES (${randomUUID()}, ${actor.workspaceId}, ${actor.userId}, 'workspace.policy_updated', ${JSON.stringify({ timezone: value.data.timezone, requiresApproval: value.data.requiresApproval })}::jsonb, NOW())`;
-      return { ok: true as const, timezone: value.data.timezone, requiresApproval: value.data.requiresApproval };
+      await tx.$executeRaw`UPDATE workspaces SET timezone = ${value.data.timezone}, "requiresApproval" = ${value.data.requiresApproval}, "scheduleMode" = COALESCE(${value.data.scheduleMode ?? null}, "scheduleMode"), "updatedAt" = NOW() WHERE id = ${actor.workspaceId}`;
+      await tx.$executeRaw`INSERT INTO activity_logs (id, "workspaceId", "actorId", action, detail, "createdAt") VALUES (${randomUUID()}, ${actor.workspaceId}, ${actor.userId}, 'workspace.policy_updated', ${JSON.stringify({ timezone: value.data.timezone, requiresApproval: value.data.requiresApproval, ...(value.data.scheduleMode ? { scheduleMode: value.data.scheduleMode } : {}) })}::jsonb, NOW())`;
+      return { ok: true as const, timezone: value.data.timezone, requiresApproval: value.data.requiresApproval, ...(value.data.scheduleMode ? { scheduleMode: value.data.scheduleMode } : {}) };
     }, { timeout, maxWait });
   } catch (error) { if (error instanceof OperationError) throw error; throw unavailable(); }
 }

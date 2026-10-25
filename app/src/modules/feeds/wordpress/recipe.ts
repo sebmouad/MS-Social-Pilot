@@ -157,6 +157,14 @@ export function buildPermalink(template: string, siteUrl: string, slug: string):
   const link = template.replace('{siteUrl}', trimSite(siteUrl)).replace('{slug}', encodeSegment(clean));
   try { const parsed = new URL(link); return parsed.protocol === 'https:' && !parsed.username && !parsed.password ? parsed.toString() : null; } catch { return null; }
 }
+/** The permalink WordPress reported for the post, kept only when it is https on the blog's own host. */
+export function reportedPermalink(siteUrl: string, link: string | undefined): string | null {
+  if (!link) return null;
+  try {
+    const parsed = new URL(link), site = new URL(trimSite(siteUrl));
+    return parsed.protocol === 'https:' && !parsed.username && !parsed.password && parsed.hostname === site.hostname ? parsed.toString() : null;
+  } catch { return null; }
+}
 export function buildImageUrl(siteUrl: string, uploadsPath: string, file: string): string | null {
   const path = file.trim();
   if (!path || path.startsWith('/') || path.includes('..') || /^[A-Za-z][A-Za-z0-9+.-]*:/.test(path) || path.includes('\\')) return null;

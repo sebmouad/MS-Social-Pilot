@@ -131,8 +131,8 @@ export const publishingAutomationLifecycle: AutomationLifecycle = {
     if (changed.count !== 1) throw unavailable();
     const metadata = await tx.$executeRaw`UPDATE posts SET timezone=${policy.timezone} WHERE id=${post.id} AND "workspaceId"=${input.workspaceId}`;
     if (metadata !== 1) throw unavailable();
-    // The Root default decides where each destination waits; platform-held ones are handed over after this run (handOffRemoteSchedules).
-    const modes = await systemScheduleModes(post.targets.map(t => t.targetId));
+    // The workspace default (else Root's) decides where each destination waits; platform-held ones are handed over after this run (handOffRemoteSchedules).
+    const modes = await systemScheduleModes(post.targets.map(t => t.targetId), undefined, input.workspaceId);
     await storeScheduleModes(tx, input.workspaceId, post.id, modes);
     await recordPostVersion(tx, post.id, null, ready.retention);
     await systemAudit(tx, input.workspaceId, 'publishing.post_scheduled_by_mix', { postId: post.id, authorId: post.authorId, scheduledAt: input.scheduledAt.toISOString(), scheduleMode: summaryMode(modes) });
@@ -154,9 +154,9 @@ export const publishingAutomationLifecycle: AutomationLifecycle = {
       targets: { create: post.targets.map(target => ({ id: randomUUID(), targetId: target.targetId, formatId: ready.destinationFormats[target.targetId], status: 'pending' as const })) } } });
     const metadata = await tx.$executeRaw`UPDATE posts SET timezone=${policy.timezone}, "originPostId"=${post.id}, "approvalStatus"=${hold ? 'pending' : reviewed ? 'approved' : 'not_required'}::"ApprovalStatus", "submittedById"=${hold ? post.authorId : null}, "submittedAt"=${hold ? new Date() : null} WHERE id=${input.copyId} AND "workspaceId"=${input.workspaceId}`;
     if (metadata !== 1) throw unavailable();
-    // Repeat the author's own per-destination choices from the original; destinations without one follow the Root default.
+    // Repeat the author's own per-destination choices from the original; destinations without one follow the workspace default.
     const earlier = await tx.$queryRaw<Array<{ targetId: string; scheduleMode: string | null }>>`SELECT "targetId", "scheduleMode" FROM post_targets WHERE "postId"=${post.id} AND "scheduleMode" IS NOT NULL`;
-    const modes = await systemScheduleModes(post.targets.map(t => t.targetId), Object.fromEntries(earlier.map(row => [row.targetId, row.scheduleMode as ScheduleMode])));
+    const modes = await systemScheduleModes(post.targets.map(t => t.targetId), Object.fromEntries(earlier.map(row => [row.targetId, row.scheduleMode as ScheduleMode])), input.workspaceId);
     await storeScheduleModes(tx, input.workspaceId, input.copyId, modes);
     const badLabels = await tx.$queryRaw<Array<{ labelId: string }>>`SELECT pl."labelId" FROM post_labels pl LEFT JOIN labels l ON l.id=pl."labelId" WHERE pl."postId"=${post.id} AND (l.id IS NULL OR l."workspaceId"<>${input.workspaceId}) LIMIT 1`;
     if (badLabels.length) throw unavailable();

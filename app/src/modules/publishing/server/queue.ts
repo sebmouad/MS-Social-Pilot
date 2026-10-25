@@ -77,7 +77,7 @@ async function queuePostInOperation(actor: PublishingActor, postId: string, opti
     if (!Array.isArray(post.media)) throw new PublishingOperationError('invalid_request', 'storedPostAttachmentsNeedReviewBeforeQueueing', {}, errorText);
 
     const targetIds = post.targets.map(t => t.targetId);
-    const modes = await resolveScheduleModes(targetIds, options.scheduleMode, options.destinationScheduleModes);
+    const modes = await resolveScheduleModes(targetIds, options.scheduleMode, options.destinationScheduleModes, actor.workspaceId);
     await context.lockTargets(targetIds);
     const publishingLimits = await limits();
     const firstComment = validFirstComment(post.firstComment ?? '', publishingLimits.maxText, errorText);

@@ -308,7 +308,7 @@ export async function schedulePost(actor: PublishingActor, postId: string, sched
     return publishingTransaction(signal, async tx => {
       const post = await tx.post.findFirst({ where: { id: postId, workspaceId: actor.workspaceId }, select: { id: true, authorId: true, status: true, message: true, firstComment: true, format: true, link: true, media: true, targets: { select: { targetId: true, status: true, formatId: true, target: { select: { socialAccount: { select: { provider: true } } } } } } } });
       if (!post || !canManage(role.role, post.authorId, actor.userId) || !['draft', 'rejected'].includes(post.status) || !post.targets.length || post.targets.some(target => target.status !== 'pending')) throw new PublishingOperationError('conflict', 'thisPostCannotBeScheduled', {}, errorText);
-      const resolved = await resolveScheduleModes(post.targets.map(target => target.targetId), options.scheduleMode, options.destinationScheduleModes);
+      const resolved = await resolveScheduleModes(post.targets.map(target => target.targetId), options.scheduleMode, options.destinationScheduleModes, actor.workspaceId);
       await assertStoredPostMediaCompatible(actor.workspaceId, post);
       await recordPostVersion(tx, post.id, actor.userId, retention);
       await tx.post.update({ where: { id: post.id }, data: { status: holdForApproval ? 'pending_approval' : 'scheduled', scheduledAt, updatedAt: new Date() } });
@@ -418,7 +418,7 @@ async function preparePostCreation(actor: PublishingActor, input: CreatePostInpu
   const targets = await validateTargets(actor, input.targetIds, config.maxTargets, uploadMedia, Boolean(firstComment), attachments.link);
   if (input.scheduledAt && (!Number.isFinite(input.scheduledAt.getTime()) || input.scheduledAt.getTime() <= Date.now() || !targets.length)) throw new PublishingOperationError('invalid_request', 'chooseAFuturePublishingTimeAndAtLeastOne', {}, errorText);
   const destinationFormats = await resolveAuthorizedDestinationFormats(targets, input.destinationFormats, config.maxTargets, { media: uploadMedia, link: attachments.link, firstComment, scheduled: Boolean(input.scheduledAt) });
-  const modes = input.scheduledAt ? await resolveScheduleModes(targets.map(target => target.id), input.scheduleMode, input.destinationScheduleModes) : null;
+  const modes = input.scheduledAt ? await resolveScheduleModes(targets.map(target => target.id), input.scheduleMode, input.destinationScheduleModes, actor.workspaceId) : null;
   const retention = await loadVersionRetention();
   const now = new Date();
   const id = randomUUID();

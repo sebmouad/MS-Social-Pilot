@@ -1,4 +1,5 @@
 import { PublishingCopyProvider } from '@/modules/publishing/ui/kit/CopyProvider';
+import { workspaceScheduleMode } from '@/modules/publishing/server/schedule-modes';
 import { loadPublishingCopy } from '@/modules/publishing/server/customer-copy';
 import { PublishingActionCopyProvider } from '@/modules/publishing/ui/WorkflowSubmitButtons';
 import { loadPublishingActionCopy } from '@/modules/publishing/server/action-copy';
@@ -60,7 +61,7 @@ async function ComposePageContent({ searchParams }: { searchParams: Promise<Para
   // Suggestion-only writing help; the status is empty (and the control hidden) when unavailable.
   const aiAssist = canCreate ? await aiStatus({ userId: viewer.user.id, workspaceId: viewer.workspaceId }).catch(() => undefined) : undefined;
   const profiles = await readChannelProfiles({ userId: viewer.user.id, workspaceId: viewer.workspaceId }, 'publishing/posts').catch(() => null);
-  const remoteScheduling = { offered: await runtimeConfig('publishing.remoteScheduling.offered') === true, defaultMode: (await runtimeConfig('publishing.remoteScheduling.defaultMode') === 'remote' ? 'remote' : 'application') as 'application' | 'remote' };
+  const remoteScheduling = { offered: await runtimeConfig('publishing.remoteScheduling.offered') === true, defaultMode: (((await workspaceScheduleMode(viewer.workspaceId).catch(() => null)) ?? await runtimeConfig('publishing.remoteScheduling.defaultMode')) === 'remote' ? 'remote' : 'application') as 'application' | 'remote' };
   const createdAt = new Date();
   const date = first(params.date);
   const time = first(params.time);

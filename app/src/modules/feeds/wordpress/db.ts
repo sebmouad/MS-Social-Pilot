@@ -19,6 +19,8 @@ export type WpCandidateRow = {
   id: string;
   title: string;
   slug: string;
+  /** The post's own permalink as WordPress reports it; empty when absent. */
+  link?: string;
   publishedAt: Date | null;
   caption: string;
   imageId: string;
@@ -304,6 +306,7 @@ export async function openWordpressDb(settings: DbSettings): Promise<WpDb> {
         }
 
         const slug = String(item['slug'] ?? '').trim();
+        const link = typeof item['link'] === 'string' ? item['link'].trim() : '';
         const title = stripHtml(renderedOf(item['title']));
         const dateGmt = typeof item['date_gmt'] === 'string' && item['date_gmt']
           ? new Date(`${item['date_gmt'].replace(/Z$/i, '')}Z`)
@@ -347,7 +350,7 @@ export async function openWordpressDb(settings: DbSettings): Promise<WpDb> {
 
         const recipe = q.mapping.recipeMetaKey ? metaValue(item, q.mapping.recipeMetaKey) : extractRecipeJson(item, '', title);
         const captionFieldPresent = !q.mapping.captionMetaKey || hasMetaKey(item, q.mapping.captionMetaKey);
-        rows.push({ id, title, slug, publishedAt, caption, imageId, recipe, captionFieldPresent });
+        rows.push({ id, title, slug, link, publishedAt, caption, imageId, recipe, captionFieldPresent });
       }
       return { rows, fetched: raw.length, requested };
     },

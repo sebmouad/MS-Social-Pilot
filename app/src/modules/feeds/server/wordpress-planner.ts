@@ -2,7 +2,7 @@ import { OperationError } from '@/lib/operation-error';
 import { prisma } from '@/server/data';
 import { decryptSecret } from '@/server/secret-crypto';
 import { defaultFetchDeps, type FetchDeps } from '@/modules/publishing/server/media/network/net-guard';
-import { allocateRecipes, recipeTitleKey, buildImageUrl, buildPermalink, parseRecipe, renderComment, resolveConfig, slotInstants, type PlanConfig, type Recipe, type SlotNeed } from '../wordpress/recipe';
+import { allocateRecipes, recipeTitleKey, buildImageUrl, buildPermalink, reportedPermalink, parseRecipe, renderComment, resolveConfig, slotInstants, type PlanConfig, type Recipe, type SlotNeed } from '../wordpress/recipe';
 import { openWordpressDb, type DbSettings, type WpDb } from '../wordpress/db';
 import { defaultImagePorts, prepareRecipeImage, RecipeImageError, type ImagePorts } from '../wordpress/image';
 import { qualifyingOwner, type FeedActor, type FeedAuthorization } from './access';
@@ -86,7 +86,7 @@ export async function scanCandidates(db: WpDb, settings: WordpressSettings, sour
       if (candidates.some(candidate => candidate.wpPostId === row.id)) continue;
       const file = files.get(row.imageId);
       const imageUrl = file ? buildImageUrl(source.siteUrl, settings.uploadsPath, file) : null;
-      const permalink = buildPermalink(settings.permalinkTemplate, source.siteUrl, row.slug);
+      const permalink = reportedPermalink(source.siteUrl, row.link) ?? buildPermalink(settings.permalinkTemplate, source.siteUrl, row.slug);
       const recipe = parseRecipe(row.recipe, row.title, settings.minutesSuffix);
       if (!row.caption) { rejected.caption++; if (row.captionFieldPresent === false) rejected.captionFieldMissing = (rejected.captionFieldMissing ?? 0) + 1; continue; }
       if (!imageUrl) { rejected.image++; continue; }

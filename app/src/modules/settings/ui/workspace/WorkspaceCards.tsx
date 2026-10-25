@@ -39,7 +39,7 @@ function Card({ id, title, detail, canSave, dirty, invalid, copy, onSave, childr
 
 export type WorkspaceCardsProps = {
   locale: Locale; copy: SectionsCopy; workspaceId: string; workspaceName: string; canManage: boolean;
-  policy: { timezone: string; requiresApproval: boolean; maxTimezoneCharacters: number };
+  policy: { timezone: string; requiresApproval: boolean; scheduleMode: 'application' | 'remote'; remoteSchedulingOffered: boolean; maxTimezoneCharacters: number };
   operations: WorkspaceOperations; timezones: string[]; bestTime?: ReactNode;
 };
 
@@ -49,6 +49,7 @@ export function WorkspaceCards({ locale, copy, workspaceId, workspaceName, canMa
   const [savedPolicy, setSavedPolicy] = useState(policy);
   const [zone, setZone] = useState(policy.timezone);
   const [approval, setApproval] = useState(policy.requiresApproval);
+  const [scheduleMode, setScheduleMode] = useState(policy.scheduleMode);
   const [savedOps, setSavedOps] = useState(operations);
   const [draft, setDraft] = useState<Record<string, unknown>>({});
   const value = <K extends keyof WorkspaceOperations>(key: K): WorkspaceOperations[K] => (key in draft ? draft[key] : savedOps[key]) as WorkspaceOperations[K];
@@ -56,7 +57,7 @@ export function WorkspaceCards({ locale, copy, workspaceId, workspaceName, canMa
   const set = (key: keyof WorkspaceOperations, next: unknown) => setDraft(current => ({ ...current, [key]: next }));
   const dirtyOf = (keys: Array<keyof WorkspaceOperations>) => keys.some(key => key in draft && JSON.stringify(draft[key]) !== JSON.stringify(savedOps[key] ?? ''));
 
-  async function savePolicy(next: { timezone: string; requiresApproval: boolean }): Promise<string | null> {
+  async function savePolicy(next: { timezone: string; requiresApproval: boolean; scheduleMode?: 'application' | 'remote' }): Promise<string | null> {
     const response = await fetch('/api/settings/workspace/policy', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ ...next, confirmation: `UPDATE WORKSPACE POLICY ${workspaceId}` }) });
     const result = await response.json().catch(() => ({}));
     if (!response.ok || result.ok !== true) return typeof result.error === 'string' ? result.error : policyCopy.unconfirmed;
@@ -103,6 +104,9 @@ export function WorkspaceCards({ locale, copy, workspaceId, workspaceName, canMa
     <Card id="ws-approvals" copy={copy} title={copy.approvals.title} detail={copy.approvals.detail} canSave={canManage} dirty={approval !== savedPolicy.requiresApproval} onSave={() => savePolicy({ timezone: savedPolicy.timezone, requiresApproval: approval })}>
       <Switch checked={approval} onChange={setApproval} label={copy.approvals.switchLabel} />
     </Card>
+    {savedPolicy.remoteSchedulingOffered && <Card id="ws-scheduling" copy={copy} title={copy.scheduling.title} detail={copy.scheduling.detail} canSave={canManage} dirty={scheduleMode !== savedPolicy.scheduleMode} onSave={() => savePolicy({ timezone: savedPolicy.timezone, requiresApproval: savedPolicy.requiresApproval, scheduleMode })}>
+      <div className={styles.field}><span>{copy.scheduling.label}</span><Select aria-label={copy.scheduling.label} value={scheduleMode} onChange={next => setScheduleMode(next === 'remote' ? 'remote' : 'application')} options={[{ value: 'application', label: copy.scheduling.application }, { value: 'remote', label: copy.scheduling.remote }]} /><small>{copy.scheduling.hint}</small></div>
+    </Card>}
     <Card id="ws-hours" copy={copy} title={copy.hours.title} detail={copy.hours.detail} canSave={canManage} dirty={dirtyOf(hoursKeys)} invalid={hoursInvalid} onSave={() => saveOps(hoursKeys)}>
       <div className={styles.field}><span>{ops.weekStartsOn}</span><Select aria-label={ops.weekStartsOn} value={String(value('weekStartsOn'))} onChange={next => set('weekStartsOn', Number(next))} options={ops.dayNames.map((name, index) => ({ value: String(index), label: name }))} /></div>
       <div className={styles.field}><span>{copy.hours.days}</span><div className={styles.days}>{ops.days.map((name, index) => <label key={name} className={styles.day} data-on={value('businessDays').includes(index)}><input type="checkbox" checked={value('businessDays').includes(index)} onChange={() => toggleDay(index)} /><span>{name}</span></label>)}</div></div>

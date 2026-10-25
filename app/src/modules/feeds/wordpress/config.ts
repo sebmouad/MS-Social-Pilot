@@ -55,7 +55,7 @@ export const WORDPRESS_CONFIG = [
   text(`${P}tablePrefix`, 'WordPress table prefix', 'Prefix of the WordPress tables (letters, digits and underscore).', WORDPRESS_DEFAULTS.tablePrefix, z.string().regex(/^[A-Za-z0-9_]{0,32}$/)),
   text(`${P}siteUrl`, 'WordPress site address', 'Default site address (https) for new recipe sources; permalinks and image addresses are built from it.', WORDPRESS_DEFAULTS.siteUrl, sitePattern),
   text(`${P}uploadsPath`, 'WordPress uploads path', 'Path under the site address where attachments are served.', WORDPRESS_DEFAULTS.uploadsPath, z.string().regex(/^\/[A-Za-z0-9_./-]{0,200}$/)),
-  text(`${P}permalinkTemplate`, 'Recipe link template', 'Link given to the first comment. {siteUrl} and {slug} are replaced.', WORDPRESS_DEFAULTS.permalinkTemplate, z.string().min(1).max(500).refine(v => v.includes('{slug}'), 'Include {slug}.')),
+  text(`${P}permalinkTemplate`, 'Recipe link template', 'Fallback link for the first comment, used only when WordPress does not report the post\'s own link. {siteUrl} and {slug} are replaced.', WORDPRESS_DEFAULTS.permalinkTemplate, z.string().min(1).max(500).refine(v => v.includes('{slug}'), 'Include {slug}.')),
   num(`${P}dbConnectTimeoutMs`, 'WordPress connect timeout (ms)', 'Time allowed to open the read-only database connection.', WORDPRESS_DEFAULTS.dbConnectTimeoutMs, WORDPRESS_BOUNDS.dbConnectTimeoutMs),
   num(`${P}dbQueryTimeoutMs`, 'WordPress query timeout (ms)', 'Time allowed for one read-only query.', WORDPRESS_DEFAULTS.dbQueryTimeoutMs, WORDPRESS_BOUNDS.dbQueryTimeoutMs),
   num(`${P}dbPoolSize`, 'WordPress connection pool size', 'Most database connections held open at once.', WORDPRESS_DEFAULTS.dbPoolSize, WORDPRESS_BOUNDS.dbPoolSize),
