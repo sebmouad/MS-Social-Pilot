@@ -64,7 +64,9 @@ export function defaultPlannerPorts(net: FetchDeps = defaultFetchDeps()): Planne
 /* ----- candidates ----- */
 
 export type Candidate = { wpPostId: string; title: string; slug: string; caption: string; imageUrl: string; permalink: string; recipe: Recipe; publishedAt: Date | null };
-export type Scan = { candidates: Candidate[]; scanned: number; exhausted: boolean };
+/** Why scanned posts were not candidates; shown with an empty run so the cause is visible. */
+export type ScanRejections = { shared: number; caption: number; image: number; link: number; recipe: number };
+export type Scan = { candidates: Candidate[]; scanned: number; exhausted: boolean; rejected: ScanRejections };
 
 /**
  * Read recipes from WordPress newest (or oldest) first until `enough` says the candidates found so far suffice
@@ -73,12 +75,14 @@ export type Scan = { candidates: Candidate[]; scanned: number; exhausted: boolea
 export async function scanCandidates(db: WpDb, settings: WordpressSettings, source: Pick<SourceRow, 'siteUrl'>, config: PlanConfig, now: Date, enough: (candidates: Candidate[]) => boolean): Promise<Scan> {
   const candidates: Candidate[] = [];
   let scanned = 0; let exhausted = false;
+  const rejected: ScanRejections = { shared: 0, caption: 0, image: 0, link: 0, recipe: 0 };
   while (scanned < settings.candidateMaxScan) {
     const limit = Math.min(settings.candidateBatchSize, settings.candidateMaxScan - scanned);
     const { rows, fetched, requested } = await db.candidates({ mapping: config.mapping, order: config.order, skipShared: config.skipShared, maxAgeDays: config.maxAgeDays, offset: scanned, limit, now });
     // Only WordPress returning a short page ends the library; posts filtered out locally (already shared) do not.
     if (!fetched) { exhausted = true; break; }
     scanned += fetched;
+    rejected.shared += fetched - rows.length;
     const files = await db.attachments(rows.map(r => r.imageId), config.mapping.attachedFileMetaKey);
     for (const row of rows) {
       // New posts published during a scan shift offsets; never list one recipe twice.
@@ -87,13 +91,16 @@ export async function scanCandidates(db: WpDb, settings: WordpressSettings, sour
       const imageUrl = file ? buildImageUrl(source.siteUrl, settings.uploadsPath, file) : null;
       const permalink = buildPermalink(settings.permalinkTemplate, source.siteUrl, row.slug);
       const recipe = parseRecipe(row.recipe, row.title, settings.minutesSuffix);
-      if (!row.caption || !imageUrl || !permalink || !recipe) continue;
+      if (!row.caption) { rejected.caption++; continue; }
+      if (!imageUrl) { rejected.image++; continue; }
+      if (!permalink) { rejected.link++; continue; }
+      if (!recipe) { rejected.recipe++; continue; }
       candidates.push({ wpPostId: row.id, title: (recipe.title || row.title).slice(0, settings.titleMax), slug: row.slug, caption: row.caption, imageUrl, permalink, recipe, publishedAt: row.publishedAt });
     }
     if (enough(candidates)) break;
     if (fetched < requested) { exhausted = true; break; }
   }
-  return { candidates, scanned, exhausted };
+  return { candidates, scanned, exhausted, rejected };
 }
 
 export const commentFor = (settings: WordpressSettings, config: PlanConfig, c: Pick<Candidate, 'recipe' | 'permalink'>) =>
@@ -143,7 +150,7 @@ export async function supplyLedgerView(settings: WordpressSettings, ports: Plann
 
 /* ----- one source ----- */
 
-export type SourceOutcome = { sourceId: string; planned: number; failed: number; uncertain: number; unfilled: number; slots: number; pages: number; excludedPages: number; scanned: number; reason?: string };
+export type SourceOutcome = { sourceId: string; planned: number; failed: number; uncertain: number; unfilled: number; slots: number; pages: number; excludedPages: number; scanned: number; reason?: string; candidates?: number; rejected?: ScanRejections };
 export type Ctx = {
   settings: WordpressSettings; ports: PlannerPorts; db: WpDb; budget: { left: number }; now: Date;
   /** Manual retry: only these slots (see slotKey) are planned, and a failed slot is revived even past its attempt cap. */
@@ -191,7 +198,7 @@ export async function planSource(ctx: Ctx, source: SourceRow, auth: FeedAuthoriz
   if (!todo.length) return { ...out, reason: needs.length ? 'budget' : 'complete' };
 
   const scan = await scanCandidates(ctx.db, settings, source, config, now, found => !settings.reuse.enabled && allocateRecipes({ needs: todo, candidates: found, blocked: view.blocked, taken: view.taken, reused: view.reused, distinct: config.distinctAcrossPages }).unfilled === 0);
-  out.scanned = scan.scanned;
+  out.scanned = scan.scanned; out.candidates = scan.candidates.length; out.rejected = scan.rejected;
   const { assignments, unfilled } = allocateRecipes({ needs: todo, candidates: scan.candidates, allowReuse: scan.exhausted, blocked: view.blocked, taken: view.taken, reused: view.reused, distinct: config.distinctAcrossPages });
   out.unfilled = unfilled + (needs.length - todo.length);
 
@@ -235,7 +242,7 @@ export async function planSource(ctx: Ctx, source: SourceRow, auth: FeedAuthoriz
 export type RecipePlanSummary = { reason?: 'disabled' | 'misconfigured' | 'database_unavailable'; sources: number; planned: number; failed: number; uncertain: number; unfilled: number; outcomes: SourceOutcome[] };
 const emptySummary = (reason?: RecipePlanSummary['reason']): RecipePlanSummary => ({ ...(reason ? { reason } : {}), sources: 0, planned: 0, failed: 0, uncertain: 0, unfilled: 0, outcomes: [] });
 const totals = (summary: RecipePlanSummary, o: SourceOutcome) => { summary.outcomes.push(o); summary.planned += o.planned; summary.failed += o.failed; summary.uncertain += o.uncertain; summary.unfilled += o.unfilled; };
-export const recipeSummaryRecord = (o: SourceOutcome, at: Date): Record<string, unknown> => ({ at: at.toISOString(), planned: o.planned, failed: o.failed, uncertain: o.uncertain, unfilled: o.unfilled, slots: o.slots, pages: o.pages, excludedPages: o.excludedPages, scanned: o.scanned, ...(o.reason ? { reason: o.reason } : {}) });
+export const recipeSummaryRecord = (o: SourceOutcome, at: Date): Record<string, unknown> => ({ at: at.toISOString(), planned: o.planned, failed: o.failed, uncertain: o.uncertain, unfilled: o.unfilled, slots: o.slots, pages: o.pages, excludedPages: o.excludedPages, scanned: o.scanned, ...(o.candidates !== undefined ? { candidates: o.candidates } : {}), ...(o.rejected ? { rejected: o.rejected } : {}), ...(o.reason ? { reason: o.reason } : {}) });
 
 export async function openDatabase(ports: PlannerPorts, settings: WordpressSettings, siteUrlOverride?: string): Promise<WpDb | null> {
   const siteUrl = (siteUrlOverride || settings.siteUrl || '').trim();

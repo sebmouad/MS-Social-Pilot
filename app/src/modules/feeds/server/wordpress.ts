@@ -245,7 +245,7 @@ export async function previewRecipeSource(actor: FeedActor, input: unknown = {},
     const items: PreviewItem[] = fresh(scan.candidates, scan.exhausted).slice(0, s.previewCount).map(c => ({
       wpPostId: c.wpPostId, title: c.title, permalink: c.permalink, imageUrl: c.imageUrl, caption: c.caption, firstComment: commentFor(s, config, c), publishedAt: c.publishedAt?.toISOString() ?? null,
     }));
-    return { items, scanned: scan.scanned, exhausted: scan.exhausted };
+    return { items, scanned: scan.scanned, exhausted: scan.exhausted, rejected: scan.rejected };
   } catch (error) {
     if (error instanceof OperationError) throw error;
     throw await feedsError('upstream_failure', 'The recipe library could not be read. Try again later.');

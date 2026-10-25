@@ -16,7 +16,7 @@ export type RecipeConfig = {
 };
 export type RecipeSourceData = {
   id: string; name: string; siteUrl: string; enabled: boolean; allTargets: boolean; targetIds: string[]; config: RecipeConfig;
-  lastRunAt: string | null; lastError: string | null; lastSummary: { planned?: number; failed?: number; unfilled?: number } | null;
+  lastRunAt: string | null; lastError: string | null; lastSummary: { planned?: number; failed?: number; unfilled?: number; scanned?: number; candidates?: number; rejected?: { shared: number; caption: number; image: number; link: number; recipe: number } } | null;
 };
 export type RecipePlan = { id: string; targetId: string; targetName: string; wpPostId: string; slotAt: string; state: 'claimed' | 'planned' | 'uncertain' | 'failed'; postId: string | null; title: string; permalink: string | null; reason: string | null };
 export type RecipeView = {
@@ -116,6 +116,10 @@ export function RecipeSource({ initial, locale, canWrite, copy = recipeCopy }: {
   const unresolved = (view.counts['failed'] ?? 0) + (view.counts['uncertain'] ?? 0);
   const openReview = (next: Review) => { setConfirmation(''); setCancelPosts(false); setReview(next); };
   const lastRun = source?.lastRunAt ? t('lastRun', { when: view.labels?.lastRun ?? '', planned: source.lastSummary?.planned ?? 0, failed: source.lastSummary?.failed ?? 0, unfilled: source.lastSummary?.unfilled ?? 0 }) : t('neverRun');
+  // When slots stay empty, say why: which recipes were read and why the others could not be used.
+  const summary = source?.lastSummary;
+  const unfilledWhy = summary?.unfilled && summary.rejected && summary.candidates !== undefined
+    ? t('unfilledWhy', { scanned: summary.scanned ?? 0, candidates: summary.candidates, shared: summary.rejected.shared, caption: summary.rejected.caption, image: summary.rejected.image + summary.rejected.link, recipe: summary.rejected.recipe }) : null;
   const statusKey: RecipeCopyKey = !source ? 'statusNew' : source.enabled ? 'statusActive' : 'statusPaused';
 
   return <section className={styles.root} aria-labelledby="recipe-heading">
@@ -124,6 +128,7 @@ export function RecipeSource({ initial, locale, canWrite, copy = recipeCopy }: {
     {!view.available && <p className={styles.help} role="status">{t('unavailable')}</p>}
     {notice && !review && <RouteNotice error={notice.error} focusKey={`recipe-notice:${notice.key}`}>{notice.text}</RouteNotice>}
     <p className={styles.help}><span className={styles.badge}>{t(statusKey)}</span> {lastRun}{source?.lastError && <span className={styles.meta}>{source.lastError}</span>}</p>
+    {unfilledWhy ? <p className={styles.help}>{unfilledWhy}</p> : null}
     {canWrite && source && <div className={styles.actions}>
       <Button disabled={busy} onClick={() => void loadPreview()}>{busy ? t('previewing') : t('preview')}</Button>
       <Button disabled={busy || !source.enabled || !view.available} onClick={() => openReview('run')}>{t('run')}</Button>
