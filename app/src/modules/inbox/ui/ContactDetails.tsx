@@ -59,7 +59,7 @@ export function ContactDetails({ details, locale, timeZone, catalog }: { details
       <h4>{copy.relatedPosts}</h4>
       {details.relatedPosts.length ? <ul className={styles.posts}>
         {details.relatedPosts.map(post => <li key={post.id}>
-          <p>{post.text ? (post.text.length > 90 ? `${post.text.slice(0, 90)}…` : post.text) : copy.unknown}</p>
+          <p><a href={`/content/post/${encodeURIComponent(post.id)}`}>{post.text ? (post.text.length > 90 ? `${post.text.slice(0, 90)}…` : post.text) : copy.unknown}</a></p>
           <span>{copy.commentsOn(post.comments)} · <time dateTime={post.lastCommentAt.toISOString()}>{formatter.format(post.lastCommentAt)}</time></span>
         </li>)}
         {details.relatedPostsMore ? <li className={styles.detailsNote}>{copy.morePosts}</li> : null}

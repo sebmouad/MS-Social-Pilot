@@ -35,7 +35,7 @@ export const round3Copy = {
       },
     },
     details: {
-      region: 'Conversation details', title: 'Details', person: 'Person', channel: 'Channel', firstSeen: 'First seen', messagesWritten: 'Messages and comments', labels: 'Labels', relatedPosts: 'Related posts', sentimentTrend: 'Sentiment trend',
+      region: 'Conversation details', title: 'Details', person: 'Person', channel: 'Channel', firstSeen: 'First seen', messagesWritten: 'Messages and comments', labels: 'Labels', relatedPosts: 'Posts they commented on', sentimentTrend: 'Sentiment trend',
       unknown: 'Unknown', partial: 'This item has no platform identity, so only this conversation is described.',
       noPosts: 'They have not commented on any of your posts yet.', morePosts: 'More posts are not shown.', commentsOn: (n: number) => n === 1 ? '1 comment' : `${n} comments`,
       noSentiment: 'No classified comments yet', noSentimentBody: 'The trend appears once this person’s comments are classified.',
@@ -94,7 +94,7 @@ export const round3Copy = {
       },
     },
     details: {
-      region: 'Détails de la conversation', title: 'Détails', person: 'Personne', channel: 'Canal', firstSeen: 'Première apparition', messagesWritten: 'Messages et commentaires', labels: 'Étiquettes', relatedPosts: 'Publications liées', sentimentTrend: 'Tendance du sentiment',
+      region: 'Détails de la conversation', title: 'Détails', person: 'Personne', channel: 'Canal', firstSeen: 'Première apparition', messagesWritten: 'Messages et commentaires', labels: 'Étiquettes', relatedPosts: 'Publications commentées', sentimentTrend: 'Tendance du sentiment',
       unknown: 'Inconnue', partial: 'Cet élément n’a pas d’identité sur la plateforme : seule cette conversation est décrite.',
       noPosts: 'Cette personne n’a encore commenté aucune de vos publications.', morePosts: 'D’autres publications ne sont pas affichées.', commentsOn: (n: number) => n === 1 ? '1 commentaire' : `${n} commentaires`,
       noSentiment: 'Aucun commentaire classé pour l’instant', noSentimentBody: 'La tendance apparaît dès que les commentaires de cette personne sont classés.',
