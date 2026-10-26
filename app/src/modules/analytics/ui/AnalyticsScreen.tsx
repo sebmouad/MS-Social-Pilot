@@ -75,7 +75,7 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
   const ranked = posts ? rankPosts(posts.items.map(item => ({ ...item, measures: item.measures.map(measure => ({ ...measure, label: locale === 'fr' ? measure.labelFr ?? measure.label : measure.label })) })), policy.topPostsRankWords, policy.topPostsRows) : null;
   const topPosts: TopPostItem[] = ranked?.posts.map(post => {
     const value = ranked.measureKey ? post.measures.find(measure => measure.key === ranked.measureKey)?.value ?? null : null;
-    return { key: `${post.channelId}:${post.postId}`, text: post.text, channelName: post.channelName, url: post.url, value: value === null ? null : formatMetricValue(value, 'count', locale), measure: value === null ? null : ranked.measureLabel };
+    return { key: `${post.channelId}:${post.postId}`, text: post.text, channelName: post.channelName, url: post.url, value: value === null ? null : formatMetricValue(value, 'count', locale), measure: value === null ? null : ranked.measureLabel, thumbnail: post.thumbnail ?? null };
   }) ?? [];
   const goalBars: GoalBar[] = (goals?.channels ?? []).flatMap(channel => channel.goals.map(goal => ({ key: `${channel.channelId}:${goal.metric}`, label: `${channel.channelName} · ${goal.label}`, percent: goal.percent }))).slice(0, policy.goalsShown);
 

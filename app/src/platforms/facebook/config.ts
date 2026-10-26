@@ -178,6 +178,11 @@ export const FACEBOOK_METRIC_LABEL_DEFAULTS = {
   reactions_haha: { en: 'Haha reactions', fr: 'Réactions Haha' },
   reactions_sad: { en: 'Sad reactions', fr: 'Réactions Triste' },
   reactions_angry: { en: 'Angry reactions', fr: 'Réactions Grrr' },
+  // Older names Meta still returns for the same reactions, plus the post-level views and clicks keys.
+  reactions_anger: { en: 'Angry reactions', fr: 'Réactions Grrr' },
+  reactions_sorry: { en: 'Sad reactions', fr: 'Réactions Triste' },
+  views: { en: 'Views', fr: 'Vues' },
+  post_clicks: { en: 'Post clicks', fr: 'Clics sur la publication' },
   reactions_care: { en: 'Care reactions', fr: 'Réactions Solidaire' },
 } satisfies Record<string, { en: string; fr: string }>;
 

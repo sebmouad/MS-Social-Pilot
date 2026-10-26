@@ -26,6 +26,8 @@ export const contentCopyDefaults = {
   createChannelBlocked: m('{name} needs to be reconnected before it can publish.', '{name} doit être reconnecté avant de pouvoir publier.'),
   createReconnect: m('Reconnect', 'Reconnecter'),
   createChannelsSelected: m('{count} selected', '{count} sélectionné(s)'),
+  createChannelsAll: m('Select all', 'Tout sélectionner'),
+  createChannelsClear: m('Clear', 'Effacer'),
   createText: m('Post text', 'Texte de la publication'),
   createTextPlaceholder: m('What do you want to share?', 'Que voulez-vous partager ?'),
   createCounter: m('{used} / {max}', '{used} / {max}'),

@@ -260,8 +260,11 @@ export async function syncPageAnalytics(now = new Date(), retryLimit = 0, retryB
           // while Facebook was being read means another run already advanced it, so keep that one.
           const history = fetched.history;
           if (history && JSON.stringify(await readHistoryCursor(tx, target) ?? null) === JSON.stringify(fetched.startCursor ?? null)) {
+            // Facebook's comment total includes the comment this app posted under its own post (the recipe); it is not audience engagement.
+            const ownFirstComment = new Set((history.posts.length ? await tx.$queryRaw<Array<{ remotePostId: string }>>`SELECT "remotePostId" FROM post_targets WHERE "targetId" = ${target.id} AND "firstCommentId" IS NOT NULL AND "remotePostId" = ANY(${history.posts.map(post => post.remoteId)}::text[])` : []).map(row => row.remotePostId));
             for (const post of history.posts) {
               signal.throwIfAborted();
+              if (ownFirstComment.has(post.remoteId) && typeof post.insights.comments === 'number' && post.insights.comments > 0) post.insights = { ...post.insights, comments: post.insights.comments - 1 };
               await tx.$executeRaw`INSERT INTO external_posts (id, "targetId", "remoteId", message, permalink, "statusType", "pictureUrl", "createdTime", insights, "insightsSyncedAt", "fetchedAt")
                 VALUES (${`fb_${randomUUID()}`}, ${target.id}, ${post.remoteId}, ${post.message}, ${post.permalink}, ${post.statusType}, ${post.pictureUrl}, ${post.createdTime}, ${JSON.stringify(post.insights)}::jsonb, ${now}, ${now})
                 ON CONFLICT ("targetId", "remoteId") DO UPDATE SET message = EXCLUDED.message, permalink = EXCLUDED.permalink, "statusType" = EXCLUDED."statusType", "pictureUrl" = EXCLUDED."pictureUrl", insights = EXCLUDED.insights, "insightsSyncedAt" = EXCLUDED."insightsSyncedAt", "fetchedAt" = EXCLUDED."fetchedAt"`;

@@ -12,6 +12,8 @@ export function AdsReportPager<T>({ filters, path, kind, page }: { filters: AdsF
     params.set('page', String(pageNumber));
     return `${pathname}?${params.toString()}`;
   };
+  // One page needs no pager: the table already shows every row.
+  if (page.pageCount <= 1) return null;
   return <div className="ads-report-pager">
     <p className="small-note" aria-live="polite">{t('pagerSummary', { from: page.from, to: page.to, total: page.resultCount, kind: t(kind) })}</p>
     <p className="ads-report-pager__current"><span aria-current="page" aria-label={t('text191', { value0: page.page, value1: page.pageCount })}>{t('text191', { value0: page.page, value1: page.pageCount })}</span></p>

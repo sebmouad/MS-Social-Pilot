@@ -22,7 +22,10 @@ export type PostsTableRow = {
 };
 export type PostsTableMeasure = { key: string; label: string };
 
-const DEFAULT_COLUMNS = 2; // Initial metric columns before the viewer chooses; a presentation default, not a data limit.
+const DEFAULT_COLUMNS = 3; // Initial metric columns before the viewer chooses; a presentation default, not a data limit.
+/** Default columns lead with how many people saw a post, then how they reacted; other measures follow in their stored order. */
+const PREFERRED = ['post_media_view', 'reach', 'impressions', 'post_total_media_view_unique', 'reactions', 'comments', 'shares'];
+const preference = (key: string) => { const index = PREFERRED.indexOf(key); return index === -1 ? PREFERRED.length : index; };
 
 /**
  * Post explorer table: channel avatar beside each post, two metric columns the viewer picks from the
@@ -37,9 +40,9 @@ export function PostsTable({ rows, measures: allMeasures, locale, emptyAction, c
   const unavailable = t("Not available");
   // A measure with no stored value on this page is not offered: it would only add a column of dashes.
   const measures = useMemo(() => allMeasures.filter(measure => rows.some(row => typeof row.measures[measure.key] === 'number')), [allMeasures, rows]);
-  // null = the default columns (the first two offered measures); once the viewer chooses, their list wins.
+  // null = the default columns (views first, then reactions); once the viewer chooses, their list wins.
   const [picked, setPicked] = useState<string[] | null>(null);
-  const shownKeys = (picked ?? measures.slice(0, DEFAULT_COLUMNS).map(measure => measure.key)).filter(key => measures.some(measure => measure.key === key));
+  const shownKeys = (picked ?? [...measures].sort((a, b) => preference(a.key) - preference(b.key)).slice(0, DEFAULT_COLUMNS).map(measure => measure.key)).filter(key => measures.some(measure => measure.key === key));
   const toggle = (key: string) => setPicked(() => { const current = new Set(shownKeys); if (current.has(key)) current.delete(key); else current.add(key); return measures.filter(measure => current.has(measure.key)).map(measure => measure.key); });
   const number = useMemo(() => new Intl.NumberFormat(locale), [locale]);
   const when = (value: string | null, label?: string) => value ? <time dateTime={value}>{label ?? ''}</time> : unavailable;

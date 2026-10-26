@@ -1,12 +1,13 @@
 import { IconAlertTriangle, IconCalendarEvent, IconSend } from '@tabler/icons-react';
 import { InfoTip, PostThumb } from '@/components';
+import type { PostThumbnail } from '@/components/post-thumbnail';
 import { EmptyState } from '@/components/EmptyState';
 import type { InsightsCopy } from './insights-config';
 import { fillInsights } from './insights-config';
 import './insights.css';
 
 export type TopPostItem = {
-  key: string; text: string; channelName: string; url: string | null; value: string | null; measure: string | null;
+  key: string; text: string; channelName: string; url: string | null; value: string | null; measure: string | null; thumbnail?: PostThumbnail | null;
 };
 
 /** Top posts card (design v2 S9 row 3): thumbnail slot, text, channel, the ranking measure and a link to the post. */
@@ -18,7 +19,7 @@ export function TopPostsCard({ copy, posts, infoText, allHref, unavailable }: { 
     </div>
     {posts.length
       ? <ol className="insights-posts">{posts.map(post => <li key={post.key} className="insights-post">
-        <PostThumb thumb={null} size="sm" />
+        <PostThumb thumb={post.thumbnail ?? null} size="sm" />
         <div className="insights-post__text">
           <strong title={post.text}>{post.text || copy.topPostsNoText}</strong>
           <small>{post.channelName}{post.url ? <> · <a href={post.url} target="_blank" rel="noreferrer">{copy.postViewOnChannel}</a></> : null}</small>

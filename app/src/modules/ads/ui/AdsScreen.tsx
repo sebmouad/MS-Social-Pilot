@@ -54,9 +54,18 @@ async function AdsPage({ searchParams }: { searchParams: Promise<AdsSearchParams
   const summaries = new Map(summarizeInsights(dataset.insights, 'account').map(row => [row.accountId, row]));
   const scoped = filters.accountId ? dataset.accounts.filter(account => account.id === filters.accountId) : dataset.accounts;
   const page = pageAdsRows(scoped, requestedPage, dataset.pageSize);
-  const trends: AccountTrend[] = scoped.map(account => ({ id: account.id, name: account.name, currency: account.currency,
-    daily: [...(summaries.get(account.id)?.dailyMetrics ?? [])].sort((a, b) => a.date.getTime() - b.date.getTime())
-      .map(day => ({ date: day.date.toISOString().slice(0, 10), spend: day.spend, impressions: day.impressions })) }));
+  // Meta stores no row for a day without delivery: up to the account's last sync such a day is a real zero, so the chart covers
+  // the chosen period instead of ending where the ads stopped. Days after the last sync stay unknown and are not drawn.
+  const trends: AccountTrend[] = scoped.map(account => {
+    const stored = new Map((summaries.get(account.id)?.dailyMetrics ?? []).map(day => [day.date.toISOString().slice(0, 10), day]));
+    const known = account.lastSyncedAt && account.lastSyncedAt < filters.until ? account.lastSyncedAt : filters.until;
+    const daily: AccountTrend['daily'] = [];
+    if (stored.size) for (let day = new Date(Date.UTC(filters.since.getUTCFullYear(), filters.since.getUTCMonth(), filters.since.getUTCDate())); day <= known; day = new Date(day.getTime() + 86_400_000)) {
+      const key = day.toISOString().slice(0, 10); const row = stored.get(key);
+      daily.push({ date: key, spend: row?.spend ?? 0, impressions: row?.impressions ?? 0 });
+    }
+    return { id: account.id, name: account.name, currency: account.currency, daily };
+  });
   const rows: AccountRow[] = page.items.map(account => ({
     id: account.id, name: account.name, actId: account.actId, currency: account.currency, enabled: account.enabled,
     lastSyncedAt: account.lastSyncedAt?.toISOString() ?? null, summary: summaries.get(account.id) ?? null,
