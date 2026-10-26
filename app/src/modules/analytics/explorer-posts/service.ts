@@ -22,7 +22,8 @@ import type { PostPerformance } from '@/server/platforms/host';
 export const inputSchema = z.object({ start: z.string().optional(), end: z.string().optional(), filter: z.literal('1').optional(), channel: z.union([z.string(), z.array(z.string())]).optional(), page: z.coerce.number().int().min(1).max(100000).default(1), sort: z.string().min(1).max(200).regex(/^[^\u0000-\u001F\u007F]+$/).default('publishedAt'), direction: z.enum(['asc', 'desc']).default('desc') }).strict();
 export type PostRow = PostPerformance & { channelId: string; channelName: string };
 export function comparePosts(sort: string, direction: 'asc' | 'desc') {
-  const value = (p: PostRow) => sort === 'publishedAt' ? p.publishedAt?.getTime() ?? null : p.measures.find(m => m.key === sort)?.value ?? null;
+  // 'engagement' is each post's ranking measure (rankValue); per-channel reads sort by it, so the merge must too.
+  const value = (p: PostRow) => sort === 'publishedAt' ? p.publishedAt?.getTime() ?? null : sort === 'engagement' ? p.rankValue ?? null : p.measures.find(m => m.key === sort)?.value ?? null;
   return (a: PostRow, b: PostRow) => {
     const av = value(a), bv = value(b);
     return (av === null ? (bv === null ? 0 : 1) : bv === null ? -1 : (av - bv) * (direction === 'asc' ? 1 : -1)) || a.postId.localeCompare(b.postId) || a.channelId.localeCompare(b.channelId);

@@ -53,7 +53,7 @@ const strip = (value: string) => value.replace(/<\/?(material|voice|avoid)>/gi, 
 
 /** The model sees the member's text only as quoted material to transform, never as instructions. */
 const REPURPOSE_TASK: Record<(typeof REPURPOSE_NETWORKS)[number], string> = {
-  facebook: 'Write one Facebook post: a strong first line, a short description, and a question that invites comments',
+  facebook: 'Write one Facebook post: a strong first line under 125 characters, a short description, and a question that invites comments; no links in the text and no engagement bait (never ask people to like, share or tag someone)',
   instagram: 'Write one Instagram caption: a hook in the first line, short paragraphs, and up to 5 relevant hashtags at the end',
   threads: 'Write a Threads thread of 3 or 4 short posts, each under 500 characters, separated by a line containing only ---',
   linkedin: 'Write one LinkedIn post in short paragraphs',
@@ -73,7 +73,7 @@ export function buildPrompt(request: AiRequest, maxHashtags: number, context: Ai
   const tone = toneName ? ` in a ${toneName} tone` : '';
   const material = `<material>\n${request.text.replace(/<\/?material>/gi, '')}\n</material>`;
   const task = {
-    caption: `Write one social media post${tone} about the material.`,
+    caption: `Write one social media post${tone} about the material, in the same language as the material: a first line under 125 characters that makes people stop scrolling, then a short description, then one easy question that invites comments. No links in the text, and no engagement bait (never ask people to like, share or tag someone).`,
     improve: `Rewrite the material${tone}: clearer and more engaging, same meaning and language.`,
     translate: `Translate the material into ${request.language}${tone}, keeping hashtags and links unchanged.`,
     hashtags: `Suggest up to ${maxHashtags} relevant hashtags for the material, separated by spaces, each starting with #.`,

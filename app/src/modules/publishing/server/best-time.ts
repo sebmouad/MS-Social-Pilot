@@ -18,7 +18,9 @@ const inputSchema = z.object({ targetIds: z.array(z.string().trim().min(1).max(2
 export type BestTimeSuggestion = BestTimeSlot & { nextAt: string; date: string; time: string };
 /** Why a channel has slots or honestly has none: insufficient history, no slot above its median, no stored hook, or no access. */
 export type BestTimeChannelReason = 'ok' | 'insufficient_history' | 'no_lift' | 'unsupported' | 'no_access';
-export type BestTimeChannel = { targetId: string; name: string; basis: number; reason: BestTimeChannelReason; slots: BestTimeSuggestion[] };
+/** Observed evidence per local publishing hour (posts and median engagement), returned even when no slot qualifies. */
+export type BestTimeHour = { hour: number; posts: number; medianEngagement: number | null };
+export type BestTimeChannel = { targetId: string; name: string; basis: number; reason: BestTimeChannelReason; slots: BestTimeSuggestion[]; hours?: BestTimeHour[] };
 export type BestTimeSuggestions = { mode: 'suggest' | 'apply'; timeZone: string; windowDays: number; suggestions: BestTimeSuggestion[]; perTarget: BestTimeChannel[] };
 
 function withNextOccurrences(slots: readonly BestTimeSlot[], timeZone: string, now: Date, horizonDays: number): BestTimeSuggestion[] {
@@ -35,6 +37,22 @@ function withNextOccurrences(slots: readonly BestTimeSlot[], timeZone: string, n
     }
   }
   return dated;
+}
+
+function hourEvidence(posts: ReadonlyArray<{ publishedAt: Date | null; rankValue: number | null }>, timeZone: string): BestTimeHour[] {
+  const hourOf = new Intl.DateTimeFormat('en-GB', { timeZone, hour: '2-digit', hourCycle: 'h23' });
+  const byHour = new Map<number, { posts: number; values: number[] }>();
+  for (const post of posts) {
+    if (!post.publishedAt) continue;
+    const hour = Number(hourOf.format(post.publishedAt));
+    const bucket = byHour.get(hour) ?? { posts: 0, values: [] };
+    bucket.posts++; if (typeof post.rankValue === 'number') bucket.values.push(post.rankValue);
+    byHour.set(hour, bucket);
+  }
+  return [...byHour].sort(([a], [b]) => a - b).map(([hour, { posts: count, values }]) => {
+    const sorted = values.sort((a, b) => a - b); const mid = Math.floor(sorted.length / 2);
+    return { hour, posts: count, medianEngagement: sorted.length ? (sorted.length % 2 ? sorted[mid]! : (sorted[mid - 1]! + sorted[mid]!) / 2) : null };
+  });
 }
 
 /** UI, HTTP, MCP and queue all read the same current authority, selected destinations and stored-only measures. */
@@ -87,6 +105,7 @@ export async function getBestTimeSuggestions(actor: PublishingActor, input: unkn
       targetId: target.id, name: channelName(target.id), basis: channel.measured,
       reason: channel.slots.length ? 'ok' : channel.measured < ranking.minHistory ? 'insufficient_history' : 'no_lift',
       slots: withNextOccurrences(channel.slots, workspace.timezone, now, Number(horizonDays)),
+      hours: hourEvidence(history, workspace.timezone),
     });
   }
   // Combined suggestions still need every selected destination behind the same cell.

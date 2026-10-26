@@ -35,7 +35,13 @@ export async function executeContentTool(viewer: McpViewer, name: string, args: 
     case 'list_ai_videos': return listVideos(actor);
     case 'get_link_preview': return linkPreview(actor, args);
     case 'get_engagement_outlook': return engagementOutlook(actor, args);
-    case 'check_post_spam_risk': return spamCheck(actor, args);
+    case 'check_post_spam_risk': {
+      // A verdict and next step for agents; the numbers alone did not say whether to change the plan.
+      const result = await spamCheck(actor, args);
+      return { ...result, verdict: result.risk ? 'risky' : 'ok', advice: result.risk
+        ? `The same content would reach ${result.risk.pages} ${result.risk.network} channels within ${result.risk.gapMinutes} minutes. Write a distinct caption per channel or space the posts more than ${result.risk.gapMinutes} minutes apart.`
+        : 'No spam pattern found for these channels and time.' };
+    }
     default: throw new OperationError('invalid_request', 'Choose a supported AI action.');
   }
 }
