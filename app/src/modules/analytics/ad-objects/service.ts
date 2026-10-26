@@ -101,10 +101,13 @@ export async function readAdObjects(actor: Actor, raw: unknown = {}) {
   const coverage = { selectedAccounts: selected.length, coveredAccounts: new Set(matching.map(item => item.accountId)).size, requestedDays,
     unknownParentObjects: input.level === 'campaign' ? 0 : atLevel.filter(item => !item.parentId || !item.parentConsistent).length };
   const itemCount = items.reduce((total, item) => total + 1 + item.daily.length, 0) + options.length;
-  if ((input.format === 'csv' && itemCount > maxRows) || (actor.maxResultItems !== undefined && itemCount > actor.maxResultItems)) throw bad();
+  // Each object counts once plus one per stored day, so a long period multiplies quickly: say so instead of a generic refusal.
+  const tooLarge = (limit: number) => new OperationError('invalid_request', `This selection holds ${itemCount} items (objects and their daily rows), above the ${limit}-item limit. Choose an ad account (accountId), a level, a later page or a shorter period.`);
+  if (input.format === 'csv' && itemCount > maxRows) throw tooLarge(maxRows);
+  if (actor.maxResultItems !== undefined && itemCount > actor.maxResultItems) throw tooLarge(actor.maxResultItems);
   const csv = input.format === 'csv' ? adObjectsCsv(items, period.start, period.end, input.locale, await recordsCopy()) : null;
   const result = { input, period, options, items, accountDaily, coverage, total: matching.length, page, pageSize: size, nextPage: input.format === 'json' && page * size < matching.length ? page + 1 : null, csv };
-  if (Buffer.byteLength(JSON.stringify(result), 'utf8') > maxBytes) throw bad();
+  if (Buffer.byteLength(JSON.stringify(result), 'utf8') > maxBytes) throw new OperationError('invalid_request', `This result is above the ${Math.round(maxBytes / 1000)} KB limit. Choose an ad account (accountId), a level or a shorter period.`);
   return result;
 
   } catch (error) { throw await localizeAnalyticsError(error); }
