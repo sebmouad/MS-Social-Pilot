@@ -387,7 +387,8 @@ async function logItemFailure(job: string, targetId: string, error: unknown) {
   const detail = redact(reason, max ?? Number(CONFIG_BY_KEY.get('logging.errorDetailMaxCharacters')?.defaultValue));
   console.warn(`[${job}] target=${targetId} failed: ${detail}`);
   // Also visible in Root › Errors, grouped by job and message, so a failed=N summary has a cause.
-  await recordError({ source: 'worker', error: new Error(detail ?? reason), location: `facebook.${job}` });
+  // The target id makes a per-Page problem (one expired or under-permissioned Page) findable.
+  await recordError({ source: 'worker', error: new Error(`${detail ?? reason} [target ${targetId}]`), location: `facebook.${job}` });
 }
 
 type InboxFetch = {

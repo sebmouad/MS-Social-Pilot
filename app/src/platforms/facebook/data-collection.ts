@@ -6,6 +6,7 @@ import type { FacebookPageInsightObservations } from './publishing';
 
 const object = (value: unknown): Record<string, unknown> => value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
 const numeric = (value: unknown): number | null => typeof value === 'number' && Number.isFinite(value) ? value : typeof value === 'string' && value.trim() && Number.isFinite(Number(value)) ? Number(value) : null;
+const DAY_ONLY_PAGE_METRICS = new Set(['page_follows', 'page_fans']);
 type Policy = { periods: z.infer<typeof facebookInsightPeriodsSchema>; content: z.infer<typeof facebookContentInsightsSchema> };
 
 /** Read-only analytics transport. Never follows provider URLs with credentials to another origin. */
@@ -96,6 +97,8 @@ export function createFacebookDataCollector(config: FacebookConfig, policy: Poli
       if (until) range.until = String(Math.floor(until.getTime() / 1000));
       async function collect(id: string, edge: string, metrics: readonly string[], requestedPeriods: readonly string[], prefix = '') {
         for (const metric of new Set(metrics)) for (const period of new Set(requestedPeriods)) {
+          // Follower totals are running counts Facebook only reports per day; week/28-day requests always fail.
+          if (!prefix && period !== 'day' && DAY_ONLY_PAGE_METRICS.has(metric)) continue;
           signal?.throwIfAborted();
           try {
             const data = await rows(`${encodeURIComponent(id)}/${edge}`, token, { ...range, metric, period }, period === 'lifetime');
@@ -133,9 +136,10 @@ export function createFacebookDataCollector(config: FacebookConfig, policy: Poli
                 if (Object.keys(categories).length) result.push({ metric: `${prefix}${metric}:breakdowns`, period: responsePeriod, endTime: until, value: categories, numeric: null });
               }
             }
-          } catch {
+          } catch (error) {
             signal?.throwIfAborted();
-            failures.push({ metric: `${prefix}${metric}::${period}`, message: 'Configured insight collection failed.' });
+            // Keep Graph's reason (trimmed) so Root › Errors explains the failure.
+            failures.push({ metric: `${prefix}${metric}::${period}`, message: error instanceof Error ? `Configured insight collection failed: ${error.message.replace(/\s+/g, ' ').slice(0, 160)}` : 'Configured insight collection failed.' });
           }
         }
       }
