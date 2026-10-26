@@ -5,7 +5,7 @@ import { prisma } from '@/server/data';
 import { runtimeConfig } from '@/server/config/store';
 import { isStagingDryRun, suppressStagingBatch } from '@/server/jobs/staging';
 import { withWorkspaceOperation } from '@/server/data-control/guard';
-import { publicMailOrigin, sendTransactionalMail } from '@/server/mail';
+import { mailReady, publicMailOrigin, sendTransactionalMail } from '@/server/mail';
 import { PAGES } from '@/lib/product';
 import { loadNotificationPolicy, notificationRecipientEligible, recipientAllowsNotification, txLocale, localizedNotificationCopy, type NotificationEvent } from './server';
 import type { NotificationEnqueueInput } from './contracts';
@@ -130,6 +130,12 @@ async function deliverUnderGuards(claimed: Claim, now: Date, policy: Awaited<Ret
     }
     if (!eligible) {
       const changed = await tx.$executeRaw`UPDATE notifications SET "emailState" = 'cancelled', "claimToken" = NULL, "claimUntil" = NULL, "nextAt" = NULL, "safeReason" = 'authorization_changed', "updatedAt" = NOW() WHERE id = ${candidate.id} AND "claimToken" = ${token}`;
+      if (changed === 1) await auditDelivery(tx, candidate, 'cancelled');
+      return { state: changed === 1 ? 'cancelled' : 'uncertain' as const };
+    }
+    // No mail transport configured: the notification stays in the app; its email is cancelled, not retried into a failure.
+    if (!await mailReady()) {
+      const changed = await tx.$executeRaw`UPDATE notifications SET "emailState" = 'cancelled', "claimToken" = NULL, "claimUntil" = NULL, "nextAt" = NULL, "safeReason" = 'mail_unavailable', "updatedAt" = NOW() WHERE id = ${candidate.id} AND "claimToken" = ${token}`;
       if (changed === 1) await auditDelivery(tx, candidate, 'cancelled');
       return { state: changed === 1 ? 'cancelled' : 'uncertain' as const };
     }
