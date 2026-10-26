@@ -4,7 +4,6 @@
 /* List rows with a selection box beside the row link. */
 .row { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: start; border-bottom: 1px solid var(--line-subtle); }
 .row > a { border-bottom: 0; min-width: 0; }
-.row > .postOpen { grid-column: 2; margin-top: 0; }
 .rowSelect { display: grid; place-items: start center; padding: 16px 0 0 14px; }
 .selectBox { width: 18px; height: 18px; margin: 0; accent-color: var(--accent); cursor: pointer; }
 @media (pointer: coarse) { .rowSelect { padding-top: 12px; } .selectBox { width: 24px; height: 24px; } }
@@ -29,6 +28,11 @@
 /* Thread layout with the details panel. */
 .threadGrid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; min-width: 0; min-height: 0; flex: 1 1 auto; }
 .threadMain { display: flex; flex-direction: column; gap: 16px; min-width: 0; min-height: 0; }
+/* Desktop: the conversation keeps at least 240px; when the reply area does not fit beside it, the panel scrolls as a whole. */
+@media (min-width: 1024px) {
+  .threadMain { overflow-y: auto; overscroll-behavior: contain; }
+  .threadMain > [data-thread-scroll] { flex: 1 0 240px; }
+}
 /* Design v2 S8: from 1280 px the 320 px details pane sits beside the thread and can collapse; below that it is a drawer. */
 .detailsSlot { min-width: 0; }
 @media (min-width: 1280px) {

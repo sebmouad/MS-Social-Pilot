@@ -66,7 +66,7 @@ export function InboxList({ rows: initialRows, olderCursor: initialCursor, total
   }, [canAppend, failed, busy, load]);
 
   return <>
-    <div className={styles.listHead}><h2>{title}</h2><span role="status" aria-live="polite">{copy.items(rows.length, total)}</span></div>
+    <div className={styles.listHead}><h2>{title}</h2><span role="status" aria-live="polite">{rows.length >= total ? copy.itemsAll(total) : copy.items(rows.length, total)}</span></div>
     <InboxSelectionProvider pageItems={pageItems}>
       <div className={styles.listContent}>
         {pageItems.length ? <BulkBar locale={locale} maxItems={maxItems} /> : null}

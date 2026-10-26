@@ -6,6 +6,7 @@ import { ThreadProductivity } from '@/modules/inbox/components/ThreadProductivit
 import { ReplyBox } from './InboxActions';
 import { useConfirm } from '@/components/useConfirm';
 import type { InboxLocale } from './copy';
+import styles from './inbox.module.css';
 
 
 
@@ -17,6 +18,7 @@ export function ThreadTools(props: ThreadToolsProps) {
 
 function ThreadToolsState({ kind, id, canWrite, canReply, allowed, headline, detail, locale = 'en', source, aiAvailable }: ThreadToolsProps) {
   const copy = useInboxCatalog('threadToolsCopy')[locale];
+  const teamCopy = useInboxCatalog('productivityCopy')[locale];
   const [draft, setDraft] = useState('');
   const [confirm, confirmDialog] = useConfirm({ title: copy.replaceTitle, cancel: copy.keep, confirm: copy.replace, danger: false });
   async function useSavedReply(body: string) {
@@ -25,9 +27,13 @@ function ThreadToolsState({ kind, id, canWrite, canReply, allowed, headline, det
   }
   return <>
     {confirmDialog}
-    <ThreadProductivity kind={kind} id={id} canWrite={canWrite} locale={locale} onUseSavedReply={canWrite && canReply ? useSavedReply : undefined} />
     {canWrite && canReply
       ? <ReplyBox key={id} id={id} kind={kind} allowed={allowed} headline={headline} detail={detail} value={draft} onChange={setDraft} onInsertSavedReply={useSavedReply} source={source} aiAvailable={aiAvailable} locale={locale} />
       : <p>{copy.readOnly}</p>}
+    {/* Team-only tools follow the reply, folded, so the conversation and the reply box stay together on a phone. */}
+    <details className={styles.teamTools}>
+      <summary>{teamCopy.teamSection}</summary>
+      <ThreadProductivity kind={kind} id={id} canWrite={canWrite} locale={locale} />
+    </details>
   </>;
 }

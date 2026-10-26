@@ -18,6 +18,6 @@ export function ThreadScroll({ label, resetKey, children }: { label: string; res
     }
     previousKey.current = resetKey;
   }, [resetKey, children]);
-  return <div ref={ref} className={styles.threadScroll} role="region" aria-label={label} tabIndex={0}
+  return <div ref={ref} className={styles.threadScroll} role="region" aria-label={label} tabIndex={0} data-thread-scroll
     onScroll={event => { const node = event.currentTarget; followEnd.current = node.scrollTop + node.clientHeight >= node.scrollHeight; }}>{children}</div>;
 }

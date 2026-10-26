@@ -38,7 +38,7 @@ function collect(en: unknown, fr: unknown, path: string, result: InboxCustomerCo
 type TemplateSpec = { parameters: string[]; plural?: number; boolean?: boolean; zeroAt?: number };
 const templates: Record<string, TemplateSpec> = {
   'inboxCopy.items': { parameters: ['shown', 'total'], plural: 0, zeroAt: 1 },
-  'inboxCopy.nUnread': { parameters: ['n'], plural: 0 },
+  'inboxCopy.nUnread': { parameters: ['n'], plural: 0 }, 'inboxCopy.itemsAll': { parameters: ['n'], plural: 0 }, 'inboxCopy.openOriginal': { parameters: ['platform'] },
   'inboxCopy.conversationWith': { parameters: ['name'] }, 'inboxCopy.commentBy': { parameters: ['name'] },
   'inboxCopy.audiencePrivate': { parameters: ['name'] },
   'inboxCopy.historyShown': { parameters: ['shown', 'total', 'noun'] }, 'inboxCopy.sentBy': { parameters: ['name'] }, 'inboxCopy.repliesTo': { parameters: ['name'] },

@@ -1,6 +1,6 @@
 export const productivityCopy = {
   en: {
-    region: 'Inbox productivity', assignment: 'Assignment', assignTo: 'Assign to', unassigned: 'Unassigned', teammate: 'Teammate', assignedTo: (name: string) => `Assigned to ${name}`,
+    teamSection: 'Assignment and private notes', region: 'Inbox productivity', assignment: 'Assignment', assignTo: 'Assign to', unassigned: 'Unassigned', teammate: 'Teammate', assignedTo: (name: string) => `Assigned to ${name}`,
     notes: 'Private notes', note: 'Private note', notePlaceholder: 'Add a note for your team', addNote: 'Add note', notesHelp: 'Only your workspace team can see these notes.', deleteNote: 'Delete note',
     mentionHint: 'Type @ to mention a teammate — they get a note.', mentionList: 'Teammates you can mention', mentionEmpty: 'Nobody matches.', mentionNotified: (name: string) => `Notified ${name}`,
     savedReplies: 'Saved replies', noReplies: 'No saved replies yet', noRepliesBody: 'Save the answers you give often and insert them into a reply with one click.',
@@ -11,7 +11,7 @@ export const productivityCopy = {
     done: { assign: 'Assignment updated.', noteAdded: 'Note added.', noteDeleted: 'Note deleted.', replyCreated: 'Saved reply created.', replyUpdated: 'Saved reply updated.', replyDeleted: 'Saved reply deleted.' },
   },
   fr: {
-    region: 'Outils de la boîte de réception', assignment: 'Attribution', assignTo: 'Attribuer à', unassigned: 'Non attribuée', teammate: 'Collègue', assignedTo: (name: string) => `Attribuée à ${name}`,
+    teamSection: 'Attribution et notes privées', region: 'Outils de la boîte de réception', assignment: 'Attribution', assignTo: 'Attribuer à', unassigned: 'Non attribuée', teammate: 'Collègue', assignedTo: (name: string) => `Attribuée à ${name}`,
     notes: 'Notes privées', note: 'Note privée', notePlaceholder: 'Ajoutez une note pour votre équipe', addNote: 'Ajouter la note', notesHelp: 'Seule l’équipe de votre espace de travail voit ces notes.', deleteNote: 'Supprimer la note',
     mentionHint: 'Tapez @ pour mentionner un collègue — il reçoit une note.', mentionList: 'Collègues que vous pouvez mentionner', mentionEmpty: 'Aucun résultat.', mentionNotified: (name: string) => `${name} prévenu`,
     savedReplies: 'Réponses enregistrées', noReplies: 'Aucune réponse enregistrée', noRepliesBody: 'Enregistrez les réponses que vous donnez souvent et insérez-les en un clic.',

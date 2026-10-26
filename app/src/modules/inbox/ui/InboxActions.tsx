@@ -254,7 +254,8 @@ export function ThreadToolbar({ id, kind, resolved, hidden, canResolve, canHide,
       {kind === 'comment' && canHide && <Button size="sm" variant="secondary" disabled={busy !== null} onClick={() => void run('hide', { action: 'moderate', id, hidden: !hidden }, hidden ? copy.visibleDone(cap) : copy.hiddenDone(cap), { action: 'moderate', id, hidden }, hidden ? copy.hiddenDone(cap) : copy.visibleDone(cap))}>{hidden ? copy.unhide(noun) : copy.hide(noun)}</Button>}
       {kind === 'comment' && canDelete && <Button size="sm" variant="quiet" disabled={busy !== null} onClick={() => void openDeleteDialog()}>{copy.delete(noun)}</Button>}
     </div>
-    {kind === 'comment' && canHide ? <p className={styles.toolbarNote}>{copy.hideNote}</p> : null}
+    {/* Said once, beside the opening comment's buttons; reply toolbars would repeat it under every reply. */}
+    {kind === 'comment' && canHide && !reply ? <p className={styles.toolbarNote}>{copy.hideNote}</p> : null}
     <div role="status" aria-live="polite" className={styles.toolbarStatus}>{done}</div>
     {error && !confirming && <p role="alert" className={styles.error}>{error}</p>}
     <Dialog open={confirming} busy={deleteBusy} title={canStartDelete ? copy.deleteTitle(noun) : copy.statusTitle} description={canStartDelete ? copy.deleteBody(noun, platformName) : copy.statusBody} onClose={() => { if (!deleteBusy) { setConfirming(false); } }}

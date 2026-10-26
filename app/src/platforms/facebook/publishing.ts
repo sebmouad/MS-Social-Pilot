@@ -5,7 +5,7 @@ import { validateFacebookConfig } from './config';
 import { PlatformApiError } from '../errors';
 import { facebookAppSecretProof, graphObjectUrl, isFacebookDefiniteRejection, isFacebookRetryable } from './protocol';
 import { FACEBOOK_RATINGS_FIELDS, mapFacebookReview, ratingsReadVersion } from './reviews';
-import type { RemoteRescheduleRequest, AdCampaignCreateRequest,AdMutationRequest, AdObjectReadRequest, AdObjectSnapshot, FirstCommentRequest, InboxReview, OAuthExchangeRequest, OAuthStartRequest, PlatformAdapter, PublishRequest, PublishResult, PublishingFormatPreview, PublishingMediaSupport, RemoteStatus } from '../types';
+import type { InboxMetadata, RemoteRescheduleRequest, AdCampaignCreateRequest,AdMutationRequest, AdObjectReadRequest, AdObjectSnapshot, FirstCommentRequest, InboxReview, OAuthExchangeRequest, OAuthStartRequest, PlatformAdapter, PublishRequest, PublishResult, PublishingFormatPreview, PublishingMediaSupport, RemoteStatus } from '../types';
 import type { FacebookMediaJournal, FacebookMediaJournalFactory } from './media-journal-port';
 
 export type FacebookFetch = typeof fetch;
@@ -46,19 +46,26 @@ export interface FacebookPageInsightObservation { metric: string; period: string
 export type FacebookPageInsightObservations = FacebookPageInsightObservation[] & { failedMetrics?: Array<{ metric: string; message: string }> };
 export interface FacebookInboxMessage { id: string; text: string | null; createdAt: Date; fromName: string | null; fromId: string | null }
 export interface FacebookConversation { id: string; snippet: string | null; updatedAt: Date; unreadCount: number; messageCount: number; messages: FacebookInboxMessage[] }
-export interface FacebookComment { id: string; message: string; fromName: string | null; fromId: string | null; createdAt: Date; parentId: string | null; likeCount: number; replyCount: number; isHidden: boolean }
+export interface FacebookComment { id: string; message: string; fromName: string | null; fromId: string | null; createdAt: Date; parentId: string | null; likeCount: number; replyCount: number; isHidden: boolean; metadata?: InboxMetadata }
 /** Root-owned read bounds for Inbox discovery; absent values keep the strict single-listing behaviour. */
 export interface FacebookInboxBounds { conversationPages?: number; messagePages?: number; replyExpansions?: number }
 /** `incomplete` is set when a bound stopped discovery early or an expansion read failed. */
 export type FacebookDiscovered<T> = T[] & { incomplete?: boolean };
-const COMMENT_FIELDS = 'id,message,from{id,name},created_time,parent{id},like_count,comment_count,is_hidden';
+const COMMENT_FIELDS = 'id,message,from{id,name},created_time,parent{id},like_count,comment_count,is_hidden,attachment,permalink_url';
+/** A photo, sticker, GIF or link in a comment, and the comment's own Facebook link; an explicit empty list means no attachment. */
+function commentMetadata(item: JsonObject): InboxMetadata {
+  const attachment = object(item.attachment); const image = object(object(attachment.media).image);
+  const url = typeof image.src === 'string' ? image.src : typeof attachment.url === 'string' ? attachment.url : null;
+  const type = typeof attachment.type === 'string' ? attachment.type : null;
+  return { attachments: type || url ? [{ type, url }] : [], permalink: typeof item.permalink_url === 'string' ? item.permalink_url : null };
+}
 function mapComments(raw: readonly JsonObject[]): FacebookComment[] {
   return raw.flatMap(item => {
     const from = object(item.from); const parent = object(item.parent); const createdAt = date(item.created_time);
     if (typeof item.id !== 'string' || typeof item.message !== 'string' || !createdAt) return [];
     return [{ id: item.id, message: item.message, fromName: typeof from.name === 'string' ? from.name : null, fromId: typeof from.id === 'string' ? from.id : null,
       createdAt, parentId: typeof parent.id === 'string' ? parent.id : null, likeCount: typeof item.like_count === 'number' ? item.like_count : 0,
-      replyCount: typeof item.comment_count === 'number' ? item.comment_count : 0, isHidden: item.is_hidden === true }];
+      replyCount: typeof item.comment_count === 'number' ? item.comment_count : 0, isHidden: item.is_hidden === true, metadata: commentMetadata(item) }];
   });
 }
 export interface FacebookEngine {

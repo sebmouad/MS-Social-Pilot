@@ -41,6 +41,7 @@ import type { InboxContactDetails } from '@/modules/inbox/details';
 import { inboxLocale } from './locale';
 import { inboxScope } from './scope';
 import { inboxSyncStale } from '@/modules/inbox/server/freshness';
+import { firstAttachment, safePermalink } from './attachments';
 import styles from './inbox.module.css';
 
 const DEFAULT_FILTERS: InboxFilters = { channelId: null, kind: 'message', state: 'open', hidden: 'visible', q: '' };
@@ -145,13 +146,19 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
     const childrenOf = new Map<string, ThreadEntry[]>();
     for (const entry of thread.entries) if (entry.parentId) childrenOf.set(entry.parentId, [...(childrenOf.get(entry.parentId) ?? []), entry]);
     // Replies are actionable through the same shared services as the opening comment; the channel module's declared capabilities decide which actions exist.
+    const attachmentOf = (entry: ThreadEntry) => firstAttachment(entry.metadata);
     const renderEntry = (entry: ThreadEntry): ReactNode => {
       const replies = childrenOf.get(entry.id) ?? [];
       const isReply = entry.parentId !== null;
       return <li key={entry.id} className={styles.entryNode}>
         <div className={styles.entry} data-from={entry.fromChannel ? 'channel' : 'person'} data-reply={isReply || undefined}>
           <div className={styles.entryHead}><strong>{entry.author}</strong>{entry.sentBy ? <span>{copy.sentBy(entry.sentBy)}</span> : null}{entry.hidden ? <InboxTag icon="hidden">{copy.hidden}</InboxTag> : null}<time dateTime={entry.time.toISOString()}>{formatInboxTime(entry.time, timeZone, true, locale)}</time></div>
-          <p>{entry.text || copy.noText}</p>
+          {entry.text || !attachmentOf(entry) ? <p>{entry.text || (thread.kind === 'comment' ? copy.commentNoText : copy.noText)}</p> : null}
+          {(() => { const attachment = attachmentOf(entry); if (!attachment) return null; const label = copy.attachment[attachment.kind];
+            return attachment.url && attachment.kind !== 'link' && attachment.kind !== 'other'
+              ? <img className={styles.entryImage} src={attachment.url} alt={label} loading="lazy" referrerPolicy="no-referrer" />
+              : attachment.url ? <a href={attachment.url} target="_blank" rel="noopener noreferrer">{label}</a> : <p className={styles.contextNote}>{label}</p>; })()}
+          {safePermalink(entry.metadata) ? <a className={styles.permalink} href={safePermalink(entry.metadata)!} target="_blank" rel="noopener noreferrer">{copy.openOriginal(badge.platformName)}</a> : null}
           {isReply && canWrite && (capabilities.hide || capabilities.remove) ? <ThreadToolbar reply id={entry.id} kind="comment" resolved={false} hidden={entry.hidden} canResolve={canWrite} canHide={capabilities.hide} canDelete={capabilities.remove} platformName={badge.platformName} listHref={clearThreadHref} locale={locale} /> : null}
           {isReply && !entry.fromChannel ? <NestedReply id={entry.id} author={entry.author} canReply={canWrite && capabilities.reply} allowed={rule.allowed} /> : null}
         </div>
@@ -187,7 +194,7 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
       <div className={styles.historyHead}>
         <h3>{thread.kind === 'comment' ? copy.commentHistory : thread.kind === 'review' ? reviewLabel(locale, 'reviewHistory') : copy.conversationHistory}</h3>
         <span>{copy.historyShown(history.shown, history.total, historyNoun)}</span>
-        {historyNav}
+        {history.olderCursor || history.newerCursor || history.cursor ? historyNav : null}
       </div>
       {history.cursor && history.shown === 0 ? <p className={styles.contextNote}>{copy.noHistory}</p> : null}
       <ol className={styles.entries} aria-label={copy.historyLabel}>
@@ -293,7 +300,7 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
       <section className={styles.listPane} aria-label={listTitle}>
         {kindTabs}
         {quickRow}
-        {!listPage.items.length ? <div className={styles.listHead}><h2>{listTitle}</h2><span>{copy.items(0, listPage.total)}</span></div> : null}
+        {!listPage.items.length ? <div className={styles.listHead}><h2>{listTitle}</h2><span>{copy.itemsAll(0)}</span></div> : null}
         {listPage.items.length ? <InboxList key={listRevision} rows={rows} total={listPage.total} olderCursor={listPage.olderCursor} location={{ ...baseLocation, ...(requestedThread ? { thread: requestedThread } : {}) }}
           locale={locale} title={listTitle}
           maxItems={listPage.limits.bulkMaxItems ?? listPage.limit} pageLimit={progressivePageLimit} loadMoreAction={loadMoreInboxRows} /> : listPage.total > 0 && listPage.cursor
