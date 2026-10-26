@@ -69,7 +69,7 @@ export function ReachCell({ reach, locale = 'en' }: { reach?: PostPerformanceMet
     return <span className={styles.emptyMetric} aria-label={copy.reachUnavailable}>—</span>;
   }
 
-  const titleText = `${reachVal.toLocaleString(locale)} reach · ${likes.toLocaleString(locale)} likes · ${comments.toLocaleString(locale)} comments · ${shares.toLocaleString(locale)} shares${views > 0 ? ` · ${views.toLocaleString(locale)} views` : ''}`;
+  const titleText = [countLabel(reachVal, locale, REACH_WORDS.en, REACH_WORDS.fr), countLabel(likes, locale, LIKE_WORDS.en, LIKE_WORDS.fr), countLabel(comments, locale, COMMENT_WORDS.en, COMMENT_WORDS.fr), countLabel(shares, locale, SHARE_WORDS.en, SHARE_WORDS.fr), ...(views > 0 ? [countLabel(views, locale, ['view', 'views'], ['vue', 'vues'])] : [])].join(' · ');
 
   return (
     <div className={styles.metricsCell} title={titleText}>
@@ -80,19 +80,19 @@ export function ReachCell({ reach, locale = 'en' }: { reach?: PostPerformanceMet
       {(likes > 0 || comments > 0 || shares > 0) && (
         <div className={styles.metricBadges}>
           {likes > 0 && (
-            <span className={styles.metricBadge} title={`${likes.toLocaleString(locale)} likes / reactions`}>
+            <span className={styles.metricBadge} title={countLabel(likes, locale, LIKE_WORDS.en, LIKE_WORDS.fr)}>
               <IconThumbUp size={11} aria-hidden="true" />
               <span>{likes.toLocaleString(locale)}</span>
             </span>
           )}
           {comments > 0 && (
-            <span className={styles.metricBadge} title={`${comments.toLocaleString(locale)} comments`}>
+            <span className={styles.metricBadge} title={countLabel(comments, locale, COMMENT_WORDS.en, COMMENT_WORDS.fr)}>
               <IconMessageCircle size={11} aria-hidden="true" />
               <span>{comments.toLocaleString(locale)}</span>
             </span>
           )}
           {shares > 0 && (
-            <span className={styles.metricBadge} title={`${shares.toLocaleString(locale)} shares`}>
+            <span className={styles.metricBadge} title={countLabel(shares, locale, SHARE_WORDS.en, SHARE_WORDS.fr)}>
               <IconShare size={11} aria-hidden="true" />
               <span>{shares.toLocaleString(locale)}</span>
             </span>
@@ -112,6 +112,16 @@ export function ChannelsCell({ post, locale = 'en' }: { post: Row; locale?: KitL
 /** The platform names holding a post remotely, from the read model; empty when the module metadata is unknown. */
 export { remotePlatformName } from '../remote-platform-name';
 import { remotePlatformName } from '../remote-platform-name';
+
+/** A count with its noun, singular or plural, in the viewer's language. */
+export const countLabel = (n: number, locale: string, en: [string, string], fr: [string, string]) => {
+  const [one, many] = locale.startsWith('fr') ? fr : en;
+  return `${n.toLocaleString(locale)} ${(locale.startsWith('fr') ? n <= 1 : n === 1) ? one : many}`;
+};
+export const REACH_WORDS = { en: ['reach', 'reach'] as [string, string], fr: ['de portée', 'de portée'] as [string, string] };
+export const LIKE_WORDS = { en: ['like', 'likes'] as [string, string], fr: ['j’aime', 'j’aime'] as [string, string] };
+export const COMMENT_WORDS = { en: ['comment', 'comments'] as [string, string], fr: ['commentaire', 'commentaires'] as [string, string] };
+export const SHARE_WORDS = { en: ['share', 'shares'] as [string, string], fr: ['partage', 'partages'] as [string, string] };
 
 /** Overall status plus the per-destination outcome summary and who schedules it. */
 export function StatusCell({ post, locale = 'en' }: { post: Row; locale?: KitLocale }) {

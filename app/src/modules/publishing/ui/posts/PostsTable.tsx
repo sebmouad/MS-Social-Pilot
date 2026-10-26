@@ -16,7 +16,7 @@ import { BulkPostActions } from './BulkPostActions';
 import { OriginBadge } from '../origins/OriginBadge';
 import { PostRowActions } from './PostActions';
 import type { PostOriginView } from '../origins/post-origin';
-import { ChannelsCell, PostCell, ReachCell, StatusCell, postThumbUrl } from './PostTableCells';
+import { COMMENT_WORDS, ChannelsCell, LIKE_WORDS, PostCell, REACH_WORDS, ReachCell, StatusCell, countLabel, postThumbUrl } from './PostTableCells';
 import styles from './posts-table.module.css';
 
 type ManageProps = ComponentProps<typeof PostRowActions>;
@@ -96,9 +96,9 @@ export function PostsTable({ rows, caption, locale = 'en', timeZone = 'UTC', sel
                 {failed ? <AttentionHint locale={locale} /> : null}
                 {reachNum !== null && (row.reach?.measured ?? 0) > 0 ? (
                   <span className={styles.phoneMetrics}>
-                    {reachNum.toLocaleString(locale)} reach
-                    {likes > 0 ? ` · ${likes.toLocaleString(locale)} likes` : ''}
-                    {comments > 0 ? ` · ${comments.toLocaleString(locale)} comments` : ''}
+                    {countLabel(reachNum, locale, REACH_WORDS.en, REACH_WORDS.fr)}
+                    {likes > 0 ? ` · ${countLabel(likes, locale, LIKE_WORDS.en, LIKE_WORDS.fr)}` : ''}
+                    {comments > 0 ? ` · ${countLabel(comments, locale, COMMENT_WORDS.en, COMMENT_WORDS.fr)}` : ''}
                   </span>
                 ) : null}
                 <span>{row.whenLabel}</span>

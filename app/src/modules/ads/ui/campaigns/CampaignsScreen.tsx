@@ -27,8 +27,7 @@ import { DailyMetrics } from '@/modules/ads/ui/DailyMetrics';
 import { canManageWorkspaceAds, canReadWorkspaceAds } from '@/modules/ads/server/actions';
 import { AdsObjectActions } from '@/modules/ads/ui/AdsObjectActions';
 import { CampaignCreateForm } from '@/modules/ads/ui/CampaignCreateForm';
-import { AdSetCreateForm } from '@/modules/ads/ui/AdSetCreateForm';
-import { AdCreateForm } from '@/modules/ads/ui/AdCreateForm';
+import { AdCreatePicker, AdSetCreatePicker } from '@/modules/ads/ui/objects/ManageCreatePickers';
 import { platformAds } from '@/server/platforms/registry';
 import { loadAdsReportPolicy } from '@/modules/ads/server/report-policy';
 import { pageAdsRows, parseAdsResultPage } from '@/modules/ads/report-page';
@@ -139,10 +138,12 @@ async function CampaignsPage({ searchParams }: { searchParams: Promise<AdsSearch
           </div>;
         })}
         {viewer.permissions.pageScope.all && actionAvailability.get(accountId) && adsUi.get(accountId)?.adSet && rows.some(row => row.level === 'campaign') ? <div className="ads-result-level"><h3>{t('text047')}</h3><p className="small-note">{t('text048')}</p>
-          {adsUi.get(accountId)?.adSet ? rows.filter(row => row.level === 'campaign').map(row => <AdSetCreateForm key={row.id} adAccountId={accountId} campaignId={row.id} campaignName={row.name} currency={row.currency} config={adsUi.get(accountId)!.adSet!} ownerScope={{ userId: viewer.user.id, workspaceId }} />) : null}
+          {/* One form with a campaign picker, not one form per campaign. */}
+          {adsUi.get(accountId)?.adSet ? <AdSetCreatePicker adAccountId={accountId} currency={rows.find(row => row.level === 'campaign')?.currency ?? null} campaigns={rows.filter(row => row.level === 'campaign').map(row => ({ id: row.id, name: row.name }))} config={adsUi.get(accountId)!.adSet!} ownerScope={{ userId: viewer.user.id, workspaceId }} /> : null}
         </div> : null}
         {adCreateAvailability.get(accountId) && rows.some(row => row.level === 'adset') ? <div className="ads-result-level"><h3>{t('adCreateAction')}</h3><p className="small-note">{t('adCreateDescription')}</p>
-          {rows.filter(row => row.level === 'adset').map(row => <AdCreateForm key={row.id} adAccountId={accountId} adSetId={row.id} adSetName={row.name} nameMaxCharacters={nameMaxByAccount.get(accountId) ?? 100} />)}
+          {/* One form with an ad set picker, not one form per ad set. */}
+          <AdCreatePicker adAccountId={accountId} adSets={rows.filter(row => row.level === 'adset').map(row => ({ id: row.id, name: row.name }))} nameMaxCharacters={nameMaxByAccount.get(accountId) ?? 100} />
         </div> : null}
       </section>,
       };

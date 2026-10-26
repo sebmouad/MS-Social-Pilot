@@ -95,8 +95,18 @@ export async function readAdObjects(actor: Actor, raw: unknown = {}) {
     byAccount.set(item.accountId, days);
     return byAccount;
   }, new Map<string, { accountId: string; accountName: string; currency: string | null; days: Map<string, { spend: number | null; impressions: number | null }> }>()).values()]
-    .map(account => ({ accountId: account.accountId, accountName: account.accountName, currency: account.currency,
-      daily: [...account.days].sort(([a], [b]) => a.localeCompare(b)).map(([date, day]) => ({ date, spend: day.spend, impressions: day.impressions })) }))
+    .map(account => {
+      // Meta stores no row for a day without delivery; up to the account's last sync that day is a real zero, so the
+      // trend spans the chosen period instead of ending where delivery stopped. Later days stay unknown and are not drawn.
+      const synced = dataset.accounts.find(item => item.id === account.accountId)?.lastSyncedAt ?? null;
+      const end = synced && synced < period.range.to ? synced : period.range.to;
+      for (let day = new Date(Date.UTC(period.range.from.getUTCFullYear(), period.range.from.getUTCMonth(), period.range.from.getUTCDate())); day <= end; day = new Date(day.getTime() + 86_400_000)) {
+        const key = day.toISOString().slice(0, 10);
+        if (!account.days.has(key)) account.days.set(key, { spend: 0, impressions: 0 });
+      }
+      return { accountId: account.accountId, accountName: account.accountName, currency: account.currency,
+        daily: [...account.days].sort(([a], [b]) => a.localeCompare(b)).map(([date, day]) => ({ date, spend: day.spend, impressions: day.impressions })) };
+    })
     .sort((a, b) => a.accountName.localeCompare(b.accountName));
   const coverage = { selectedAccounts: selected.length, coveredAccounts: new Set(matching.map(item => item.accountId)).size, requestedDays,
     unknownParentObjects: input.level === 'campaign' ? 0 : atLevel.filter(item => !item.parentId || !item.parentConsistent).length };
