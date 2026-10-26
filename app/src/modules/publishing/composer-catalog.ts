@@ -587,6 +587,10 @@ export const composerCatalogDefaults = {
     "en": "Loading suggested times…",
     "fr": "Chargement des suggestions…"
   },
+  "bestTime_noLift": {
+    "en": "No time clearly beats your usual post yet. The strongest hours so far are listed per channel.",
+    "fr": "Aucun horaire ne dépasse encore nettement votre publication habituelle. Les meilleures heures jusqu’ici sont indiquées par canal."
+  },
   "bestTime_unknown": {
     "en": "Not available. More measured post history is needed for these destinations.",
     "fr": "Non disponible. Il faut davantage de publications mesurées pour ces destinations."

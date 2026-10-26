@@ -53,7 +53,7 @@ export function BestTimeSuggestions({ targetIds, locale, disabled, onChoose, cop
           {slot.label}
         </Button>
         <small>{why(slot, active.data.perTarget.reduce((sum, channel) => sum + channel.basis, 0), active.data.windowDays)}</small>
-      </li>)}</ul> : <p>{t.unknown}</p>}
+      </li>)}</ul> : <p>{active.data.perTarget.length && active.data.perTarget.every(channel => channel.reason === 'no_lift') ? t.noLift : t.unknown}</p>}
       {active.data.perTarget.length ? <details>
         <summary>{t.channels}</summary>
         <ul>{active.data.perTarget.map(channel => <li key={channel.targetId}>
