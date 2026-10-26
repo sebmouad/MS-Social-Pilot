@@ -117,7 +117,7 @@ export function ReportsManager({ templates, templateOptions, schedules, runs, ca
     if (!valid) return;
     const key = `manual:${manual.channelId}:${manual.start}:${manual.end}:${manual.templateId}`;
     const requestId = requestIds.current.get(key) ?? crypto.randomUUID(); requestIds.current.set(key, requestId);
-    makePending({ url: '/api/analytics/report-workflows/run', body: { channelId: manual.channelId, templateId: manual.templateId || null, start: manual.start, end: manual.end, requestId }, title: t("Prepare this report?"), detail: t("The report will be prepared for download. Nothing will be emailed."), confirmation: `GENERATE CHANNEL REPORT ${manual.channelId}`, confirmLabel: t("Prepare report"), successMessage: t("Report prepared."), requestKey: key, manual: true, acknowledgement: t("I understand this report is prepared for download and will not be emailed.") });
+    makePending({ url: '/api/analytics/report-workflows/run', body: { channelId: manual.channelId, templateId: manual.templateId || null, start: manual.start, end: manual.end, requestId }, title: t("Prepare this report?"), detail: t("The report will be prepared for download. Nothing will be emailed."), confirmation: `GENERATE CHANNEL REPORT ${manual.channelId}`, confirmLabel: t("Prepare report"), successMessage: t("Report prepared."), requestKey: key, manual: true });
   }
 
   async function write(action: PendingAction) {

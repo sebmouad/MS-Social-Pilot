@@ -25,7 +25,7 @@ export async function readPublicationReport(workspaceId: string, channelId: stri
   const to = new Date(`${period.end}T00:00:00.000Z`); to.setUTCDate(to.getUTCDate() + 1);
   const [published, failed, days, distributionRows] = await Promise.all([
     prisma.$queryRaw<PublicationRecord[]>`
-      SELECT p.id AS "postId", left(COALESCE(pt."messageOverride", p.message), ${policy.excerptCharacters}) AS text,
+      SELECT p.id AS "postId", left(COALESCE(pt."messageOverride", p.message), ${policy.excerptCharacters}::int) AS text,
         pt."publishedAt" AS at, pt.attempts
       FROM post_targets pt JOIN posts p ON p.id = pt."postId"
       JOIN targets t ON t.id = pt."targetId" AND t."workspaceId" = p."workspaceId"
@@ -33,7 +33,7 @@ export async function readPublicationReport(workspaceId: string, channelId: stri
         AND pt.status = 'published' AND pt."publishedAt" >= ${from} AND pt."publishedAt" < ${to}
       ORDER BY pt."publishedAt" DESC, p.id ASC LIMIT ${policy.publishedRows + 1}`,
     prisma.$queryRaw<PublicationRecord[]>`
-      SELECT p.id AS "postId", left(COALESCE(pt."messageOverride", p.message), ${policy.excerptCharacters}) AS text,
+      SELECT p.id AS "postId", left(COALESCE(pt."messageOverride", p.message), ${policy.excerptCharacters}::int) AS text,
         pt."updatedAt" AS at, pt.attempts
       FROM post_targets pt JOIN posts p ON p.id = pt."postId"
       JOIN targets t ON t.id = pt."targetId" AND t."workspaceId" = p."workspaceId"

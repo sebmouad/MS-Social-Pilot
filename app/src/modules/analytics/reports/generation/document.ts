@@ -1,4 +1,5 @@
 import { readLinkReport, type LinkReport } from '../server/link-report';
+import { recordError } from '@/server/errors/recorder';
 import { linkDetails } from './link-details';
 import { readTopPostContent, reportUrl, type ReportTopPost } from '../server/top-post-content';
 import { runtimeConfig } from '@/server/config/store';
@@ -386,6 +387,8 @@ export function createReportGenerator(deps: { bounds: () => Promise<ReportBounds
         return { ok: true, output: renderReport(snapshot, { channelName: channel?.name ?? documentText(documentCopy.copy)('Channel'), sections: request.sections, publications, responseTime, topPosts, destination, goals, recap, generatedAt: deps.now?.() ?? new Date() }, bounds, documentCopy.copy, documentCopy.locale, documentCopy.responseCopy) };
       } catch (error) {
         const code = error && typeof error === 'object' && 'code' in error ? String((error as { code: unknown }).code) : '';
+        // Unexpected failures go to Root › Errors; the run itself only records the generic reason.
+        if (code !== 'unauthorized' && code !== 'forbidden') await recordError({ source: 'server', error, location: 'analytics.report_generation' }).catch(() => undefined);
         return { ok: false, reason: code === 'unauthorized' || code === 'forbidden' ? 'access_unavailable' : 'generation_failed' };
       }
     },
