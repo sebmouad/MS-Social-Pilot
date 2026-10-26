@@ -1,4 +1,5 @@
 import type { InboxMetadata } from '@/platforms/types';
+import type { PostThumbnail } from '@/components/post-thumbnail';
 /** allowedChannelIds is an optional credential ceiling; it narrows, never widens, current membership grants. */
 export type InboxReadActor = { userId: string; workspaceId: string; allowedChannelIds?: readonly string[] };
 export type InboxReadConstraints = { allowedChannelIds?: readonly string[]; maxItems?: number };
@@ -10,6 +11,8 @@ export type InboxListItem = {
   target: { id: string; name: string; provider: string | null }; unread: number; needsReply: boolean; resolved: boolean; hidden: boolean; context: string | null;
   /** Local id of the commented post; null for messages, reviews and unlinked threads. */
   postId: string | null;
+  /** Comments only: the commented post's picture and its address on the platform, when known. */
+  postThumbnail?: PostThumbnail | null; postUrl?: string | null;
   /** Stored classification of a comment; null (unknown) for messages, reviews and unclassified comments. Never defaulted to neutral. */
   sentiment: InboxSentiment | null;
   metadata?: InboxMetadata;
@@ -36,6 +39,7 @@ export type OpenThread = {
   resolved: boolean; hidden: boolean; postText: string | null;
   /** Local id of the commented post; null for messages, reviews and unlinked threads. */
   postId: string | null;
+  postThumbnail?: PostThumbnail | null; postUrl?: string | null;
   entries: ThreadEntry[];
   lastInbound: { fromId: string | null; createdTime: Date } | null;
   remoteId?: string;

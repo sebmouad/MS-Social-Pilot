@@ -69,7 +69,8 @@ export function InboxShortcuts({ locale = 'en' }: { locale?: InboxLocale }) {
     [copy.groups.select, [['x', copy.keys.select], ['escape', copy.keys.clear]]],
   ];
   return <>
-    <Button variant="quiet" size="sm" leading={<IconKeyboard size={18} stroke={1.75} aria-hidden="true" />} aria-label={copy.open} title={copy.open} onClick={() => setGuide(true)} />
+    {/* Keyboard shortcuts mean nothing on a touch screen, so the guide button is hidden there. */}
+    <span className={styles.shortcutsTrigger}><Button variant="quiet" size="sm" leading={<IconKeyboard size={18} stroke={1.75} aria-hidden="true" />} aria-label={copy.open} title={copy.open} onClick={() => setGuide(true)} /></span>
     <Dialog open={guide} title={copy.title} description={copy.description} closeLabel={copy.close} onClose={() => setGuide(false)}>
       <div className={styles.keys}>
         {rows.map(([group, entries]) => <section key={group}><h3>{group}</h3><dl>

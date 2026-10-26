@@ -32,3 +32,8 @@ export const inboxKindTone = (kind: string): Tone => (KIND_TONE as Record<string
 export function InboxTag({ icon, tone = "neutral", title, children }: { icon: keyof typeof ICONS; tone?: Tone; title?: string; children: ReactNode }) {
   return <span title={title}><Badge tone={BADGE_TONE[tone]} icon={<svg viewBox="0 0 16 16" width="13" height="13" focusable="false">{ICONS[icon]}</svg>}>{children}</Badge></span>;
 }
+
+/** The Inbox glyph alone, beside a visible label (the kind switch). */
+export function InboxGlyph({ icon }: { icon: keyof typeof ICONS }) {
+  return <svg viewBox="0 0 16 16" width="16" height="16" focusable="false" aria-hidden="true">{ICONS[icon]}</svg>;
+}

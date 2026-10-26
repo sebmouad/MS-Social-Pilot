@@ -60,8 +60,6 @@
 .historyHead span, .contextNote { color: var(--ink-soft); font-size: 12px; }
 .contextNote { margin: 0; padding: 8px 10px; border-radius: var(--radius-sm); background: var(--surface-muted); line-height: 1.45; }
 .threadTags { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
-.postContext { margin: 0; padding: 10px 12px; border-left: 3px solid var(--line-strong); border-radius: 0 var(--radius-sm) var(--radius-sm) 0; background: var(--surface-muted); color: var(--ink-soft); font-size: 13px; line-height: 1.45; overflow-wrap: anywhere; }
-.postContext strong { display: block; margin-bottom: 2px; color: var(--ink-faint); font-size: 12px; }
 .entries { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
 .entryNode { display: grid; gap: 10px; min-width: 0; }
 .replies { display: grid; gap: 10px; margin: 0; padding: 0 0 0 16px; border-inline-start: 2px solid var(--line); list-style: none; }
@@ -199,14 +197,13 @@
 }
 
 /* The list shows one kind at a time (the kind tabs say which), so rows carry no kind edge or chip. */
-.kindTabs { display: flex; flex: 0 0 auto; flex-wrap: wrap; gap: 8px; padding: 10px 12px; overflow-x: auto; border-bottom: 1px solid var(--line-subtle, var(--line)); scrollbar-width: thin; }
-.kindTab { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 4px 12px 4px 10px; border: 1px solid var(--line-strong); border-inline-start-width: 4px; border-radius: var(--radius-sm); background: var(--surface); color: var(--ink); font-size: 13px; font-weight: 600; text-decoration: none; white-space: nowrap; }
-.kindTab[data-kind="message"] { border-inline-start-style: solid; }
-.kindTab[data-kind="comment"] { border-inline-start-style: dashed; }
-.kindTab[data-kind="review"] { border-inline-start-style: dotted; }
-.kindTab:hover { background: var(--surface-muted); }
-.kindTab[aria-current="page"] { border-color: var(--mod, var(--accent)); border-inline-start-color: var(--mod, var(--accent)); background: var(--mod-soft, var(--accent-soft)); }
+.kindTabs { display: grid; flex: 0 0 auto; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; margin: 10px 12px; padding: 3px; border-radius: var(--radius-sm); background: var(--surface-muted); }
+.kindTab { position: relative; display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-width: 0; min-height: 40px; padding: 4px 8px; border: 1px solid transparent; border-radius: calc(var(--radius-sm) - 2px); color: var(--ink-soft); font-size: 13px; font-weight: 650; text-decoration: none; white-space: nowrap; }
+.kindTab > span:not(.kindCount):not(.kindUnread) { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.kindTab:hover { color: var(--ink); }
+.kindTab[aria-current="page"] { border-color: var(--line); background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgb(0 0 0 / .06); }
 .kindTab:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.kindUnread { position: absolute; top: 6px; right: 6px; width: 8px; height: 8px; border-radius: 50%; background: var(--warning, var(--accent)); }
 .kindCount { color: var(--ink-soft); font-size: 12.5px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .audience { margin: 0; padding: 8px 10px; border-radius: var(--radius-sm); background: var(--surface-muted); color: var(--ink-soft); font-size: 12.5px; line-height: 1.45; }
 .audience[data-kind="message"] { border-inline-start: 3px solid var(--line-strong); }
@@ -215,7 +212,7 @@
 .replyAudience { margin: 0; color: var(--ink-soft); font-size: 12.5px; line-height: 1.45; }
 .toolbarNote { margin: 0; color: var(--ink-soft); font-size: 12.5px; line-height: 1.45; }
 @media (forced-colors: active) {
-  .kindTab[data-kind], .audience[data-kind] { border-inline-start-color: CanvasText; border-left-color: CanvasText; }
+  .audience[data-kind] { border-inline-start-color: CanvasText; border-left-color: CanvasText; }
   .kindTab[aria-current="page"] { border-color: Highlight; }
 }
 
@@ -289,3 +286,13 @@
 .previewThumb { display: block; width: 56px; height: 56px; border-radius: var(--radius-sm); object-fit: cover; background: var(--surface-muted); }
 .entryImage { display: block; max-width: min(100%, 240px); max-height: 240px; border-radius: var(--radius-sm); object-fit: contain; background: var(--surface-muted); }
 .permalink { justify-self: start; font-size: 12.5px; }
+
+/* The commented post: one line in the list, a small card above the conversation. */
+.origin { display: flex; align-items: center; gap: 8px; min-width: 0; color: var(--ink-soft); font-size: 12.5px; }
+.origin > span:last-child { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.origin strong { color: var(--ink-faint); font-weight: 650; }
+.originCard { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 12px; align-items: start; padding: 10px 12px; border: 1px solid var(--line-subtle, var(--line)); border-radius: var(--radius-md); background: var(--surface-muted); }
+.originCard strong { display: block; color: var(--ink-faint); font-size: 12px; }
+.originCard p { margin: 2px 0 6px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; color: var(--ink); font-size: 13px; line-height: 1.45; overflow-wrap: anywhere; }
+.originLinks { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12.5px; font-weight: 600; }
+@media (max-width: 480px) { .kindTab > svg { display: none; } .kindTab { padding-inline: 4px; } }

@@ -9,6 +9,7 @@ import { resolveInboxCatalog, type InboxCustomerCopy } from '../customer-copy';
 import { reviewSummary, reviewText } from '../reviews-copy';
 import { PersonAvatar } from './InboxChrome';
 import { firstAttachment } from './attachments';
+import { PostThumb } from '@/components/PostThumb';
 import { InboxTag } from './InboxTags';
 import { SelectBox, type SelectableItem } from './InboxSelection';
 import type { InboxRow } from './InboxList';
@@ -57,9 +58,9 @@ export function inboxListRows(page: InboxListPage, abilities: Awaited<ReturnType
       <div className={styles.itemTop}><span className={styles.author}>{item.unread > 0 || item.needsReply ? <span className={styles.unreadDot} role="img" aria-label={copy.unread} /> : null}{item.author}</span><time dateTime={item.time.toISOString()}>{formatInboxTime(item.time, timeZone, false, locale)}</time></div>
       <p className={styles.preview}>{body}</p>
       {thumbnail ? <img className={styles.previewThumb} src={thumbnail} alt={copy.attachment[attachment!.kind]} loading="lazy" referrerPolicy="no-referrer" /> : null}
-      {item.kind === 'comment' && item.context ? <p className={styles.postContext}><strong>{copy.onYourPost}</strong>{item.context.length > 160 ? `${item.context.slice(0, 160)}…` : item.context}</p> : null}
+      {item.kind === 'comment' && (item.context || item.postThumbnail) ? <span className={styles.origin}><PostThumb thumb={item.postThumbnail ?? null} size="sm" /><span><strong>{copy.onYourPost}</strong> {item.context?.split('\n')[0]}</span></span> : null}
       <div className={styles.itemMeta}>
-        <ChannelBadge name={item.target.name} platformName={badge.platformName} mark={badge.mark} compact />
+        <ChannelBadge name={item.target.name} platformName={badge.platformName} mark={badge.mark} />
         {item.kind === 'review' ? <InboxTag icon="review">{reviewSummary(locale, item, reviews)}</InboxTag> : null}
         {item.sentiment ? <InboxTag icon={item.sentiment} tone={SENTIMENT_TONE[item.sentiment]} title={copy.sentimentHint}>{copy.sentiment[item.sentiment]}</InboxTag> : null}
         {item.unread > 0 ? <InboxTag icon="unread" tone="warn">{copy.nUnread(item.unread)}</InboxTag> : null}

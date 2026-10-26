@@ -133,3 +133,5 @@
 .savedViews form > button:hover:not(:disabled) { background: var(--surface-muted); }
 .savedViews form > button:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
 .savedViews form > button:disabled { opacity: .6; cursor: wait; }
+
+@media (pointer: coarse) { .shortcutsTrigger { display: none; } }

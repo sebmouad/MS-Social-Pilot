@@ -11,7 +11,7 @@ import styles from './inbox-round3.module.css';
 const TONE = { positive: 'ok', neutral: 'neutral', negative: 'danger' } as const;
 
 /**
- * Side panel for the open conversation: who is writing, how long and how much, which posts they talked about,
+ * Side panel for the open conversation: who is writing, how long and how much,
  * the labels the team sees, and how their comments read over time. It renders stored facts only; anything the
  * stored data cannot say is shown as unknown rather than as zero or neutral.
  */
@@ -54,16 +54,6 @@ export function ContactDetails({ details, locale, timeZone, catalog }: { details
         {state.unread > 0 ? <InboxTag icon="unread" tone="warn">{copy.unreadLabel(state.unread)}</InboxTag> : null}
         <InboxTag icon="message">{state.assignee ? copy.assignedTo(state.assignee.name || copy.teammate) : copy.unassigned}</InboxTag>
       </div>
-    </section>
-    <section aria-label={copy.relatedPosts}>
-      <h4>{copy.relatedPosts}</h4>
-      {details.relatedPosts.length ? <ul className={styles.posts}>
-        {details.relatedPosts.map(post => <li key={post.id}>
-          <p><a href={`/content/post/${encodeURIComponent(post.id)}`}>{post.text ? (post.text.length > 90 ? `${post.text.slice(0, 90)}…` : post.text) : copy.unknown}</a></p>
-          <span>{copy.commentsOn(post.comments)} · <time dateTime={post.lastCommentAt.toISOString()}>{formatter.format(post.lastCommentAt)}</time></span>
-        </li>)}
-        {details.relatedPostsMore ? <li className={styles.detailsNote}>{copy.morePosts}</li> : null}
-      </ul> : <p className={styles.detailsNote}>{copy.noPosts}</p>}
     </section>
     <section aria-label={copy.sentimentTrend}>
       <h4>{copy.sentimentTrend}</h4>

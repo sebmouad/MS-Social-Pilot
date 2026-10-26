@@ -23,7 +23,7 @@ import { InboxSyncBar, ReplyBox, ThreadToolbar } from './InboxActions';
 import { reviewSummary, reviewText } from '@/modules/inbox/reviews-copy';
 import { ThreadTools } from './ThreadTools';
 import { NestedReply } from './NestedReply';
-import { InboxTag, inboxKindTone } from './InboxTags';
+import { InboxGlyph, InboxTag, inboxKindTone } from './InboxTags';
 import { InboxHeader, PersonAvatar } from './InboxChrome';
 import { InboxFilterRow } from './InboxFilterRow';
 import { InboxSavedViews } from './InboxSavedViews';
@@ -42,6 +42,7 @@ import { inboxLocale } from './locale';
 import { inboxScope } from './scope';
 import { inboxSyncStale } from '@/modules/inbox/server/freshness';
 import { firstAttachment, safePermalink } from './attachments';
+import { PostThumb } from '@/components/PostThumb';
 import styles from './inbox.module.css';
 
 const DEFAULT_FILTERS: InboxFilters = { channelId: null, kind: 'message', state: 'open', hidden: 'visible', q: '' };
@@ -187,9 +188,21 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
     </header>;
     // Resolve and the moderation buttons sit in the thread header, so they stay in reach on a phone.
     const headActions = canResolve ? <ThreadToolbar id={thread.id} kind={thread.kind} resolved={thread.resolved} hidden={thread.hidden} canResolve={canResolve} canHide={canWrite && capabilities.hide} canDelete={canWrite && capabilities.remove} platformName={badge.platformName} listHref={clearThreadHref} locale={locale} /> : null;
+    // The post a comment answers stays above the conversation, outside its scroll, so it is always in view.
+    const origin = thread.kind === 'comment' && (thread.postText || thread.postThumbnail) ? <section className={styles.originCard} aria-label={copy.onYourPost}>
+      <PostThumb thumb={thread.postThumbnail ?? null} size="md" />
+      <div>
+        <strong>{copy.onYourPost}</strong>
+        {thread.postText ? <p>{thread.postText}</p> : null}
+        <div className={styles.originLinks}>
+          {thread.postId ? <a href={`/content/post/${encodeURIComponent(thread.postId)}`}>{copy.openPost}</a> : null}
+          {thread.postUrl ? <a href={thread.postUrl} target="_blank" rel="noopener noreferrer">{copy.openOriginal(badge.platformName)}</a> : null}
+        </div>
+      </div>
+    </section> : null;
     const main = <>
+      {origin}
       <ThreadScroll label={copy.historyLabel} resetKey={`${thread.kind}:${thread.id}:${requestedHistoryCursor ?? ''}`}>
-      {thread.postText ?<p className={styles.postContext}><strong>{copy.onYourPost}</strong>{thread.postText.length > 280 ? `${thread.postText.slice(0, 280)}…` : thread.postText}{thread.postId ? <> <a href={`/content/post/${encodeURIComponent(thread.postId)}`}>{copy.openPost}</a></> : null}</p> : null}
       <p className={styles.contextNote}>{thread.kind === 'review' ? reviewLabel(locale, 'note') : copy.syncedNote}</p>
       <div className={styles.historyHead}>
         <h3>{thread.kind === 'comment' ? copy.commentHistory : thread.kind === 'review' ? reviewLabel(locale, 'reviewHistory') : copy.conversationHistory}</h3>
@@ -248,9 +261,9 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
     {KIND_TABS.map(kind => {
       const unread = kind === 'message' ? listPage.unread?.message ?? 0 : 0;
       return <a key={kind} href={kindHref(kind)} className={styles.kindTab} data-kind={kind} aria-current={activeKind === kind ? 'page' : undefined}>
-        <InboxTag icon={kind} tone={inboxKindTone(kind)}>{kindLabel(kind)}</InboxTag>
+        <InboxGlyph icon={kind} /><span>{kindLabel(kind)}</span>
         {listPage.totals ? <span className={styles.kindCount}>{listPage.totals[kind]}</span> : null}
-        {unread > 0 ? <InboxTag icon="unread" tone="warn">{copy.nUnread(unread)}</InboxTag> : null}
+        {unread > 0 ? <span className={styles.kindUnread} title={copy.nUnread(unread)}><span className="ui-visually-hidden">{copy.nUnread(unread)}</span></span> : null}
       </a>;
     })}
   </nav> : null;
