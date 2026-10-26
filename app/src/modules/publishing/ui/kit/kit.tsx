@@ -30,9 +30,12 @@ export function isSafeImageUrl(value: string | null | undefined) {
 
 export function Avatar({ name, src, size = 28 }: { name: string; src?: string | null; size?: number }) {
   const style = { width: size, height: size, ['--avatar-hue' as string]: channelHue(name) };
-  return isSafeImageUrl(src)
+  const [failed, setFailed] = useState<string | null>(null);
+  // Channel pictures are served by the app itself (/api/channels/<id>/picture); a Page without a picture answers 404.
+  const usable = (isSafeImageUrl(src) || /^\/api\/[^/]/.test(src ?? '')) && failed !== src;
+  return usable
     // eslint-disable-next-line @next/next/no-img-element
-    ? <img className={styles.avatar} style={style} src={src!} alt="" loading="lazy" />
+    ? <img className={styles.avatar} style={style} src={src!} alt="" loading="lazy" onError={() => setFailed(src ?? null)} />
     : <span className={styles.avatar} data-fallback style={style} aria-hidden="true">{initials(name)}</span>;
 }
 
