@@ -127,7 +127,8 @@ function pageInputs(rows: PageRow[], selected: FacebookTarget[], audienceRows: P
     const numeric = group.flatMap(row => { const value = row.numeric ?? safeNumber(row.value); return value === null ? [] : [{ date: row.endTime, channelId: row.target.id, channelLabel: row.target.name, value }]; });
     const coveredResourceIds = [...new Set(numeric.map(row => row.channelId))].sort();
     const updatedAt = new Date(Math.max(...group.map(row => row.fetchedAt.getTime())));
-    const baseLabel = `${label(first.metric)}${period !== 'day' ? ` · ${period}` : ''}`;
+    const periodName: Record<string, { en: string; fr: string }> = { week: { en: 'last 7 days', fr: '7 derniers jours' }, days_28: { en: 'last 28 days', fr: '28 derniers jours' }, lifetime: { en: 'lifetime', fr: 'depuis la création' } };
+    const baseLabel = `${label(first.metric)}${period !== 'day' ? ` · ${periodName[period]?.[locale] ?? period}` : ''}`;
     // Saved catalogs predate the weekly note and keep working: fall back to the shipped default until Root re-saves.
     const weeklyNote = copy.rollupWeeksNote ?? FACEBOOK_PAGE_ANALYTICS_COPY_DEFAULTS[locale].rollupWeeksNote;
     const seriesNotes = [/unique|reach/.test(first.metric) ? copy.overlap : undefined, period === 'day' && presentation.weeklySeriesNote ? weeklyNote : undefined].filter((note): note is string => Boolean(note));

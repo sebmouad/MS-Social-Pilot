@@ -138,7 +138,8 @@ export function createFacebookPostHistory(config: FacebookConfig, policyInput: z
             // One refused metric poisons the batch; retry individually so surviving metrics still persist.
             for (const metric of eligible) {
               try { await readMetric(metric); }
-              catch { signal?.throwIfAborted(); failures.push(metric); postFailures.push(metric); }
+              // Keep Graph's reason with the metric so Root › Errors says why it was refused, not only which.
+              catch (error) { signal?.throwIfAborted(); failures.push(`${metric} (${error instanceof Error ? error.message.replace(/\s+/g, ' ').slice(0, 160) : 'refused'})`); postFailures.push(metric); }
             }
           }
         }
