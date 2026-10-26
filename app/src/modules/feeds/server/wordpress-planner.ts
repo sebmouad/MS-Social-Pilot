@@ -179,6 +179,8 @@ export async function planSource(ctx: Ctx, source: SourceRow, auth: FeedAuthoriz
     try { await ports.validateTarget(auth.actor, page.id); pages.push(page); } catch { out.excludedPages += 1; }
   }
   out.pages = pages.length;
+  const pageOrder = new Map(pages.map((page, index) => [page.id, index]));
+  const staggered = (slotAt: Date, targetId: string) => new Date(slotAt.getTime() + (pageOrder.get(targetId) ?? 0) * (Number.isFinite(settings.pageStaggerMinutes) ? settings.pageStaggerMinutes : 0) * 60_000);
   if (!pages.length) return { ...out, reason: 'no_pages' };
 
   const slots = slotInstants({ now, slots: config.slots, timezone: config.timezone, horizonDays: config.horizonDays, leadMinutes: settings.minLeadMinutes });
@@ -216,7 +218,8 @@ export async function planSource(ctx: Ctx, source: SourceRow, auth: FeedAuthoriz
     try {
       const image = await prepareRecipeImage(ports.image, { actor: { userId: auth.actor.userId, workspaceId: source.workspaceId }, url: c.imageUrl, fileName: safeName(c.slug), settings: settings.image });
       const post = await ports.createPost(auth.actor, {
-        message: c.caption, firstComment: commentFor(settings, config, c), targetIds: [targetId], scheduledAt: slotAt,
+        // The slot keeps its identity (ledger key); only the publish time is offset per Page, so Pages never post in lockstep.
+        message: c.caption, firstComment: commentFor(settings, config, c), targetIds: [targetId], scheduledAt: staggered(slotAt, targetId),
         media: [{ kind: 'image', url: `media:${image.mediaId}`, altText: c.title.slice(0, settings.altMax) }], firstCommentDelayMinutes: config.firstCommentDelayMinutes,
       });
       postId = post.id;

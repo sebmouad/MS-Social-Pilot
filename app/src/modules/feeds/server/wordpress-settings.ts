@@ -8,7 +8,7 @@ const P = 'feeds.wordpress.';
 const KEYS = [
   'enabled', 'tablePrefix', 'siteUrl', 'uploadsPath', 'permalinkTemplate', 'dbConnectTimeoutMs', 'dbQueryTimeoutMs', 'dbPoolSize', 'candidateBatchSize', 'candidateMaxScan',
   'postType', 'postStatus', 'captionMetaKey', 'imageMetaKey', 'recipeMetaKey', 'skipMetaKey', 'attachedFileMetaKey', 'skipShared', 'order', 'maxAgeDays', 'slots', 'timezone',
-  'horizonDays', 'minLeadMinutes', 'distinctAcrossPages', 'repostCooldownDays', 'targetTypes', 'runBudget', 'maxSourcesPerRun', 'claimLeaseSeconds', 'maxSlotAttempts', 'previewCount', 'ledgerPageSize',
+  'horizonDays', 'minLeadMinutes', 'pageStaggerMinutes', 'distinctAcrossPages', 'repostCooldownDays', 'targetTypes', 'runBudget', 'maxSourcesPerRun', 'claimLeaseSeconds', 'maxSlotAttempts', 'previewCount', 'ledgerPageSize',
   'firstCommentTemplate', 'firstCommentMaxCharacters', 'firstCommentDelayMinutes', 'minutesSuffix', 'truncationMark', 'jpegQuality', 'jpegMinQuality', 'jpegQualityStep',
   'imageMaxBytes', 'imageMaxPixels', 'imageFetchTimeoutMs', 'sourceNameMaxCharacters', 'textMaxCharacters', 'titleMaxCharacters',
   'reuseEnabled', 'reuseCooldownDays', 'poolWarnDays', 'poolCacheSeconds', 'pauseCancelEnabled', 'pauseCancelBatchSize',
@@ -19,7 +19,7 @@ const SHARED = ['feeds.fetchMaxRedirects', 'feeds.allowHttp', 'feeds.hostAllowli
 export type WordpressSettings = {
   enabled: boolean; tablePrefix: string; siteUrl: string; uploadsPath: string; permalinkTemplate: string;
   db: { connectTimeoutMs: number; queryTimeoutMs: number; poolSize: number }; candidateBatchSize: number; candidateMaxScan: number;
-  defaults: PlanConfig; minLeadMinutes: number; targetTypes: string[]; runBudget: number; maxSourcesPerRun: number; claimLeaseSeconds: number; maxSlotAttempts: number; previewCount: number; ledgerPageSize: number;
+  defaults: PlanConfig; minLeadMinutes: number; pageStaggerMinutes: number; targetTypes: string[]; runBudget: number; maxSourcesPerRun: number; claimLeaseSeconds: number; maxSlotAttempts: number; previewCount: number; ledgerPageSize: number;
   commentMax: number; minutesSuffix: string; truncationMark: string; image: ImageSettings; altMax: number;
   reuse: { enabled: boolean; cooldownDays: number };
   poolWarnDays: number; poolCacheSeconds: number; pauseCancel: { enabled: boolean; batchSize: number };
@@ -47,7 +47,7 @@ export async function loadWordpressSettings(): Promise<WordpressSettings> {
       horizonDays: n(w('horizonDays')), distinctAcrossPages: w('distinctAcrossPages') === true, cooldownDays: n(w('repostCooldownDays')),
       firstCommentTemplate: String(w('firstCommentTemplate')), firstCommentDelayMinutes: n(w('firstCommentDelayMinutes')),
     },
-    minLeadMinutes: n(w('minLeadMinutes')), targetTypes: w('targetTypes') as string[], runBudget: n(w('runBudget')), maxSourcesPerRun: n(w('maxSourcesPerRun')), claimLeaseSeconds: n(w('claimLeaseSeconds')), maxSlotAttempts: n(w('maxSlotAttempts')),
+    minLeadMinutes: n(w('minLeadMinutes')), pageStaggerMinutes: n(w('pageStaggerMinutes')), targetTypes: w('targetTypes') as string[], runBudget: n(w('runBudget')), maxSourcesPerRun: n(w('maxSourcesPerRun')), claimLeaseSeconds: n(w('claimLeaseSeconds')), maxSlotAttempts: n(w('maxSlotAttempts')),
     previewCount: n(w('previewCount')), ledgerPageSize: n(w('ledgerPageSize')),
     commentMax: Math.min(n(w('firstCommentMaxCharacters')), publishingMax), minutesSuffix: String(w('minutesSuffix')), truncationMark: String(w('truncationMark')),
     image: {
