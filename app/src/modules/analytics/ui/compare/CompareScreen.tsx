@@ -2,7 +2,6 @@ import { readPageBenchmark } from '@/modules/analytics/compare/page-benchmark';
 import { workspaceText, workspaceCopyDefaults, type WorkspaceCopy } from '../../workspace-copy';
 import { analyticsCopy } from '../../server/copy';
 import { headers } from 'next/headers';
-import { BarChart } from '@/components/charts';
 import { PageHeader } from '@/components/PageHeader';
 import { InfoTip } from '@/components';
 import { Sparkline } from '@/components/Sparkline';
@@ -92,9 +91,7 @@ export default async function ComparePage({ searchParams }: { searchParams: Prom
         {(['a', 'b'] as const).map(s => <div className={styles.tile} key={s}><span>{s === 'a' ? 'A' : 'B'}</span><strong>{formatValue(data.audience[s].total, 'count')}</strong><small>{data.audience[s].covered}{" "}{t("of")}{" "}{data.audience[s].selected}{" "}{t("channels reported")}</small></div>)}
         <div className={styles.tile}><span>{t("Difference (A minus B)")}</span><strong>{data.audience.delta === null ? t('Unknown') : formatValue(data.audience.delta, 'count')}</strong><small>{data.audience.delta === null ? t('Shown only when every selected channel reported on both sides.') : t('Both sides fully covered.')}</small></div></div><p>{data.audience.note}</p></section>
       <section className={styles.panel}><h2>{t("Metrics")}</h2>
-        {data.metrics.filter(m => m.status === 'comparable').map(m => <BarChart key={m.key} locale={locale} label={`${m.label} · A / B`} categories={['A', 'B']}
-          format={m.unit === 'percent' ? { style: 'percent' } : undefined}
-          series={[{ id: m.key, name: m.label, values: [m.a?.total, m.b?.total].map(value => value == null ? null : m.unit === 'percent' ? value / 100 : value) }]} />)}
+        {/* The table below states A, B and the difference for every metric; a two-bar chart per metric only repeated it. */}
         {data.truncated && <p className={styles.alert} role="status">{t("Showing")}{" "}{data.metrics.length}{" "}{t("of")}{" "}{data.totalMetrics}{" "}{t("metrics.")}</p>}
         {data.metrics.length ? <div className={styles.tableWrap} tabIndex={0} role="region" aria-label={t("Metrics")}><table><caption>{t("A is")}{" "}{data.mode === 'period' ? `${data.periods.a.start} to ${data.periods.a.end}` : t('group A')}{t("; B is")}{" "}{data.mode === 'period' ? `${data.periods.b.start} to ${data.periods.b.end}` : t('group B')}</caption><thead><tr><th scope="col">{t("Metric")}</th><th scope="col" className={styles.num}>{t("A")}</th><th scope="col" className={styles.num}>{t("B")}</th><th scope="col" className={styles.num}>{t("Difference")}</th><th scope="col">{t("Basis")}</th></tr></thead>
           <tbody>{data.metrics.map(m => <tr key={m.key}><th scope="row">{m.label}<br /><small>{m.sourceLabel}</small></th>

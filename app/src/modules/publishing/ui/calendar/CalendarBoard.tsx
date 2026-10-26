@@ -282,7 +282,10 @@ export function CalendarBoard({ view, days, timeZone, nowIso, canCreate, filterQ
       {days.filter(day => view === "week" || day.posts.length > 0 || day.milestones?.length).map(day => <div className={styles.agendaDay} key={day.key}>
         <div className={styles.agendaHead}><h3><time dateTime={day.key}>{day.longLabel}</time>{day.isToday && <span className={styles.todayTag}>{copy.today}</span>}</h3>{canCreate && !day.isPast && <a className={styles.agendaAdd} href={newPostHref(day.key, defaultScheduleTime)}>{copy.addPost}<span className="ui-visually-hidden">{copy.onDay}{day.longLabel}</span></a>}</div>
         {milestoneList(day)}
-        {day.posts.length ? <div className={styles.agendaPosts}>{day.posts.map(post => postCard(post))}</div> : <p className={styles.muted}>{copy.nothingPlanned}</p>}
+        {/* The phone agenda uses compact cards; in month view a busy day shows its first posts and links to the rest, like the month grid. */}
+        {day.posts.length ? <div className={styles.agendaPosts}>{(view === "month" ? day.posts.slice(0, policy.monthPostsShown) : day.posts).map(post => postCard(post, true))}
+          {view === "month" && day.posts.length > policy.monthPostsShown && <a className={styles.more} href={`/content/calendar?view=week&date=${day.key}${filterQuery}`}>+{day.posts.length - policy.monthPostsShown}{copy.more}<span className="ui-visually-hidden">{copy.onDay}{day.longLabel}</span></a>}
+        </div> : <p className={styles.muted}>{copy.nothingPlanned}</p>}
       </div>)}
       {rangeIsEmpty && view === "month" && <p className={styles.muted}>{copy.monthEmpty}</p>}
     </section>}

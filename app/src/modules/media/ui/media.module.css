@@ -121,3 +121,5 @@
 }
 
 .detailHolders a { color: var(--accent); font-weight: 650; overflow-wrap: anywhere; }
+/* Phones: two tiles per row, so a 50-image library is not 50 screens tall. */
+@media (max-width: 38rem) { .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); } }
