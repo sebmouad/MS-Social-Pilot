@@ -623,6 +623,14 @@ export const composerCatalogDefaults = {
     "en": "Unknown: too few measured posts ({basis} measured).",
     "fr": "Inconnu : trop peu de publications mesurées ({basis} mesurées)."
   },
+  "bestTime_hourEvidence": {
+    "en": "Strongest so far: {hours}.",
+    "fr": "Les meilleurs jusqu’ici : {hours}."
+  },
+  "bestTime_hourItem": {
+    "en": "{hour}:00 ({median} median over {posts} posts)",
+    "fr": "{hour} h ({median} en médiane sur {posts} publications)"
+  },
   "bestTime_reasonNoLift": {
     "en": "No time beats this channel’s typical post.",
     "fr": "Aucun horaire ne dépasse la publication typique de ce canal."
@@ -1832,8 +1840,8 @@ export const composerCatalogDefaults = {
     "fr": "Destinations et horaires de la publication"
   },
   "ui_spacingWarning": {
-    "en": "The same content will reach 3 or more channels of one network at the same time. Consider scheduling some of them at least {minutes} minutes apart.",
-    "fr": "Le même contenu touchera 3 canaux ou plus d’un même réseau au même moment. Pensez à en programmer certains à au moins {minutes} minutes d’écart."
+    "en": "The same content will reach 3 or more channels of one network at the same time, which Facebook can treat as spam. Write a distinct caption per channel, or schedule them at least {minutes} minutes apart.",
+    "fr": "Le même contenu touchera 3 canaux ou plus d’un même réseau au même moment, ce que Facebook peut considérer comme du spam. Rédigez un texte différent par canal, ou programmez-les à au moins {minutes} minutes d’écart."
   },
   "ui_uploadMissing": {
     "en": "{name} does not currently support local image uploads. Remove the uploaded image or choose another destination.",

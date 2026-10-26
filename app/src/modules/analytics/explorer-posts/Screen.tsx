@@ -50,6 +50,7 @@ export default async function PostsScreen({ searchParams }: { searchParams: Prom
   const ui = resolveInsightsCopy(insightsCopyDefaults as never, locale);
   const sortOptions = [
     { value: 'publishedAt', label: t("Publication date") },
+    { value: 'engagement', label: t("Engagement") },
     ...d.populatedMeasures.concat(d.measures.filter(m => m.key === d.input.sort && !d.populatedMeasures.some(p => p.key === m.key))).map(m => ({ value: m.key, label: measureLabel(m) })),
   ];
   const directionOptions = [

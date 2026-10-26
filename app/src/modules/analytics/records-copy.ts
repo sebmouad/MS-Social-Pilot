@@ -35,6 +35,10 @@ export const recordsCopyDefaults = {
     "en": "Sort by",
     "fr": "Trier par"
   },
+  "Engagement": {
+    "en": "Engagement (reactions, comments, shares)",
+    "fr": "Engagement (réactions, commentaires, partages)"
+  },
   "Publication date": {
     "en": "Publication date",
     "fr": "Date de publication"

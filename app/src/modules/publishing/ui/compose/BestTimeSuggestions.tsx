@@ -37,6 +37,11 @@ export function BestTimeSuggestions({ targetIds, locale, disabled, onChoose, cop
     return () => { current = false; controller.abort(); clearTimeout(timer); };
   }, [key, refresh]);
   const active = state?.key === key ? state : null;
+  // Without a qualifying slot, still show the best observed hours (2+ posts) so the choice is not blind.
+  const strongest = (channel: LabeledChannel) => {
+    const top = (channel.hours ?? []).filter(h => h.posts >= 2 && h.medianEngagement !== null).sort((a, b) => b.medianEngagement! - a.medianEngagement!).slice(0, 2);
+    return top.length ? ` ${fillComposerCopy(t.hourEvidence, { hours: top.map(h => fillComposerCopy(t.hourItem, { hour: String(h.hour).padStart(2, '0'), median: h.medianEngagement!, posts: h.posts })).join(', ') })}` : '';
+  };
   const why = (slot: { posts: number; lift: number }, basis: number, days: number) => fillComposerCopy(t.why, { posts: slot.posts, lift: Math.round(slot.lift * 10) / 10, basis, days });
   return <section className={styles.times} aria-label={t.title} aria-live="polite">
     <h3 className={styles.timesTitle}><span className={styles.timesChip} aria-hidden="true"><IconClockHour4 size={16} stroke={2} /></span>{t.title}</h3>
@@ -56,7 +61,7 @@ export function BestTimeSuggestions({ targetIds, locale, disabled, onChoose, cop
           {channel.reason === 'ok' ? <ul>{channel.slots.map(slot => <li key={slot.nextAt}>
             <Button type="button" size="sm" disabled={disabled} onClick={() => onChoose({ date: slot.date, time: slot.time })}>{slot.label}</Button>
             <small>{why(slot, channel.basis, active.data.windowDays)}</small>
-          </li>)}</ul> : <span>{fillComposerCopy(t[reasonKey(channel.reason)], { basis: channel.basis })}</span>}
+          </li>)}</ul> : <span>{fillComposerCopy(t[reasonKey(channel.reason)], { basis: channel.basis })}{strongest(channel)}</span>}
         </li>)}</ul>
       </details> : null}
       <small>{t.hint} {active.data.timeZone}. {active.data.mode === 'apply' ? t.apply : t.suggest}</small>
