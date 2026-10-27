@@ -179,9 +179,10 @@ async function AdsObjectsPage({ searchParams }: { searchParams: Promise<Params> 
     <section className="panel">
       {directory.freshness.status === 'stale' ? <p className="small-note">{t('text073')}</p> : null}
       <DataTable caption={tabTitle} rows={directory.items} rowKey={row => `${row.accountId}:${row.objectId}`} emptyMessage={t('text075')} columns={[
-        { key: 'name', label: t('text066'), render: row => <ObjectRowLabel adAccountId={row.accountId} level={directory.level} objectId={row.objectId} name={row.name} status={row.status}><span className="small-note">{accountName.get(row.accountId) ?? row.accountName} · {row.objectId}</span></ObjectRowLabel> },
+        { key: 'name', label: t('text066'), render: row => <ObjectRowLabel adAccountId={row.accountId} level={directory.level} objectId={row.objectId} name={row.name}><span className="small-note">{accountName.get(row.accountId) ?? row.accountName} · {row.objectId}</span></ObjectRowLabel> },
         ...(parentLevel ? [{ key: 'parent', label: parentLabel, render: (row: (typeof directory.items)[number]) => parentOf(row) }] : []),
-        { key: 'status', label: t('manageStatus'), render: row => <Badge tone={adsStatusTone(row.status)}>{row.status ?? t('text094')}</Badge> },
+        // Status sits in its own column only (the name no longer repeats it); "active" with no recent delivery says so, since Meta keeps a finished or unfunded campaign active.
+        { key: 'status', label: t('manageStatus'), render: row => <><Badge tone={adsStatusTone(row.status)}>{row.status ?? t('text094')}</Badge>{row.status?.toLowerCase() === 'active' && row.lastDeliveryDate && row.lastFetchedAt && Date.parse(row.lastFetchedAt) - Date.parse(row.lastDeliveryDate) > 2 * 86_400_000 ? <><br /><span className="small-note">{t('noDeliverySince', { date: formatIsoDay(locale, row.lastDeliveryDate, row.lastDeliveryDate) })}</span></> : null}</> },
         { key: 'spend', label: t('text019'), align: 'end' as const, render: row => formatMoney(locale, row.currency, row.spend, t('text094')) },
         { key: 'last', label: t('text262'), render: row => formatIsoDay(locale, row.lastDeliveryDate, t('text171')) },
         { key: 'updated', label: t('manageSynced'), render: row => formatIsoDay(locale, row.lastFetchedAt, t('text094')) },

@@ -6,3 +6,4 @@
 .ads-compare-grid div { min-width: 0; padding: var(--space-3); border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-raised); }
 .ads-compare-grid dt { color: var(--ink-soft); font-size: 0.8125rem; }
 .ads-compare-grid dd { margin: 0; font-size: 1.25rem; font-weight: 600; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.ads-compare-grid dd.small-note { margin-top: 2px; color: var(--ink-soft); font-size: 0.75rem; font-weight: 500; }

@@ -146,6 +146,16 @@ async function buildAdsComparison(actor: AdsReadActor, input: unknown, now: Date
       const slot = trendByDay.get(date) ?? { date, spend: 0, impressions: 0, clicks: 0 };
       slot.spend += row.spend; slot.impressions += row.impressions; slot.clicks += row.clicks; trendByDay.set(date, slot);
     }
+    // Meta stores no row for a day without delivery: up to the latest sync of these accounts such a day is a real zero,
+    // so the trend spans the chosen period instead of ending where the ads stopped. Later days stay unknown.
+    if (accountRows.length) {
+      const synced = Math.max(...[...group.accountIds].map(id => accountMeta.get(id)?.lastSyncedAt?.getTime() ?? 0));
+      const end = Math.min(filters.until.getTime() - 1, synced || filters.until.getTime() - 1);
+      for (let day = Date.UTC(filters.since.getUTCFullYear(), filters.since.getUTCMonth(), filters.since.getUTCDate()); day <= end; day += 86_400_000) {
+        const date = new Date(day).toISOString().slice(0, 10);
+        if (!trendByDay.has(date)) trendByDay.set(date, { date, spend: 0, impressions: 0, clicks: 0 });
+      }
+    }
     const findings = totals ? buildFindings({ current: totals, previous, objects, policy }) : [];
     const names = [...group.accountIds].map(id => accountMeta.get(id)?.name ?? current.find(row => row.adAccountId === id)?.adAccount.name ?? id);
     return {
