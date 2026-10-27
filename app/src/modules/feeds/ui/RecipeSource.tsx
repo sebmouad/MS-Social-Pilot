@@ -194,7 +194,9 @@ export function RecipeSource({ initial, locale, canWrite, copy = recipeCopy }: {
       <label>{t('template')}<textarea disabled={busy} rows={9} maxLength={view.limits.maxTemplateCharacters} value={draft.config.firstCommentTemplate} onChange={e => setConfig({ firstCommentTemplate: e.target.value })} /><span>{t('templateHint')}</span></label>
       <label>{t('delay')}<input disabled={busy} type="number" min={0} step={1} value={draft.config.firstCommentDelayMinutes} onChange={e => setConfig({ firstCommentDelayMinutes: Math.max(0, Math.trunc(Number(e.target.value)) || 0) })} /></label>
 
-      <details><summary>{t('mappingHeading')}</summary><div className={styles.form}>
+      <details open={!draft.config.mapping.captionMetaKey || undefined}><summary>{t('mappingHeading')}</summary><div className={styles.form}>
+        <p className="small-note">{t('mappingHint')}</p>
+        <div><Button type="button" variant="secondary" size="sm" disabled={busy} onClick={() => setMapping({ captionMetaKey: '', imageMetaKey: '', recipeMetaKey: '' })}>{t('usePostItself')}</Button></div>
         {([['captionKey', 'captionMetaKey'], ['imageKey', 'imageMetaKey'], ['recipeKey', 'recipeMetaKey'], ['skipKey', 'skipMetaKey'], ['attachedKey', 'attachedFileMetaKey'], ['postType', 'postType'], ['postStatus', 'postStatus']] as const).map(([label, field]) =>
           <label key={field}>{t(label)}<input disabled={busy} value={draft.config.mapping[field]} onChange={e => setMapping({ [field]: e.target.value })} /></label>)}
       </div></details>

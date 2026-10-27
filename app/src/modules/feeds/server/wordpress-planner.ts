@@ -259,7 +259,7 @@ export function captionFieldMessage(scanned: number, field: string, credential: 
     : /^[a-z][a-z0-9+.-]*:\/\//i.test(token)
       ? 'The saved WordPress credential is a database address from the former direct connection, so it is not sent. Replace it with "username:application-password" (WordPress › Users › Profile › Application passwords).'
       : `Check that "${field}" is registered with show_in_rest on the WordPress site and that the saved application password is still valid.`;
-  return `WordPress returned none of the ${scanned} recipes with the field "${field}". ${cause}`;
+  return `WordPress returned none of the ${scanned} recipes with the field "${field}". ${cause} Or leave the caption, image and recipe fields empty ("Use the post itself") to plan from each post's excerpt, featured image and article.`;
 }
 
 /** The blog's own saved credential in clear, or null when none is saved or it cannot be decrypted. */
