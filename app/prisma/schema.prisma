@@ -215,6 +215,7 @@ model SocialAccount {
   providerUserId String
   name           String
   pictureUrl     String?
+  profileUrl     String?
   accessToken    String
   refreshToken   String?
   tokenExpiresAt DateTime?

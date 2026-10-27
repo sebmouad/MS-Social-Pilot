@@ -16,7 +16,7 @@ export const facebookDiagnostics: PlatformDiagnostics = {
   async checks(connectionId) {
     const connection = connectionId ? await prisma.socialAccount.findFirst({
       where: { id: connectionId, provider: facebookModule.id },
-      select: { providerUserId: true, accessToken: true, tokenExpiresAt: true, invalidatedAt: true },
+      select: { id: true, providerUserId: true, accessToken: true, tokenExpiresAt: true, invalidatedAt: true },
     }) : null;
     const eligible = () => !connectionId ? skipped('choose_connection', 'Select a connection in the sidebar to run authenticated API reads.')
       : !connection ? fail('connection_missing', 'Selected connection is no longer available for this platform.')
@@ -35,6 +35,8 @@ export const facebookDiagnostics: PlatformDiagnostics = {
         try {
           const engine = await configuredFacebookEngine({ signal });
           const user = await engine.getCurrentUser(decryptSecret(connection!.accessToken));
+          // Facebook picture addresses expire: a successful check refreshes the stored profile.
+          if (user.id === connection!.providerUserId) await prisma.socialAccount.update({ where: { id: connection!.id }, data: { name: user.name, pictureUrl: user.pictureUrl, profileUrl: user.profileUrl } }).catch(() => undefined);
           return user.id && user.id === connection!.providerUserId ? pass('identity_verified', 'Authenticated API returned the identity stored for this connection. No remote content was changed.') : fail('identity_mismatch', 'API identity does not match the selected connection. Reconnect before using this source.');
         } catch (error) { return safeFacebookFailure(error); }
       } },

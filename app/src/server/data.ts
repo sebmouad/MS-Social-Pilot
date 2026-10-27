@@ -167,6 +167,8 @@ export async function listConnections(workspaceId: string, allowedProviders: rea
       provider: true,
       name: true,
       pictureUrl: true,
+      profileUrl: true,
+      providerUserId: true,
       invalidatedAt: true,
       tokenExpiresAt: true,
       scopes: true,

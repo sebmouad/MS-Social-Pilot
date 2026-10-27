@@ -64,11 +64,17 @@ export default async function ConnectionsPage({ searchParams }: { searchParams: 
         return <article key={account.id} className={cardStyles.card} role="listitem" aria-label={account.name}>
           <div className={cardStyles.cardHead}>
             <div className={cardStyles.cardTitle}>
-              <Avatar name={account.name} size="md" decorative />
-              <div><h3>{account.name}</h3><p>{providerName(account.provider)} · {fill(t.added, { date: dayFormat.format(account.createdAt) })}</p></div>
+              <Avatar name={account.name} src={account.pictureUrl ?? undefined} size="md" decorative />
+              <div><h3>{account.profileUrl ? <a href={account.profileUrl} target="_blank" rel="noopener noreferrer" title={fill(t.profileOpen, { platform: providerName(account.provider) })}>{account.name}</a> : account.name}</h3><p>{providerName(account.provider)} · {fill(t.added, { date: dayFormat.format(account.createdAt) })}</p></div>
             </div>
             <Status tone={state === 'connected' ? 'good' : 'warning'}>{statusLabels[state]}</Status>
           </div>
+          <div className={cardStyles.cardMeta}>
+            {account.profileUrl ? <a href={account.profileUrl} target="_blank" rel="noopener noreferrer">{fill(t.profileOpen, { platform: providerName(account.provider) })}</a> : <span>{fill(t.profileLinkMissing, { platform: providerName(account.provider) })}</span>}
+            <span>{fill(t.usernameNone, { platform: providerName(account.provider) })}</span>
+            <span>{fill(t.providerUserId, { id: account.providerUserId })}</span>
+          </div>
+          {account.targets.length > 0 && <p className={cardStyles.cardMeta}>{fill(t.connectedPages, { names: account.targets.map(target => target.name).join(', ') })}</p>}
           <div className={cardStyles.cardMeta}>
             <span>{account.targets.length ? fill(c.inUse, { enabled, total: account.targets.length }) : t.noChannels}</span>
             {account.tokenExpiresAt && state === 'connected' ? <span>{text('token.expiresOn', { date: dayFormat.format(account.tokenExpiresAt) })}</span> : null}

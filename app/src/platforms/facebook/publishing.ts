@@ -28,7 +28,8 @@ export class FacebookMediaRecoveryError extends FacebookApiError {
 }
 
 export interface FacebookPage { id: string; name: string; category: string | null; accessToken: string }
-export interface FacebookCurrentUser { id: string; name: string; pictureUrl: string | null }
+/** `profileUrl` is the profile's own link, only when the connection was granted user_link; Facebook shares no usernames. */
+export interface FacebookCurrentUser { id: string; name: string; pictureUrl: string | null; profileUrl: string | null }
 export interface FacebookGrantedPermission { permission: string; status: 'granted' | 'declined' | string }
 export interface FacebookTokenExchangeInput { accessToken: string; appId: string; appSecret: string }
 /** expiresAt is null when Meta omits expires_in (non-expiring Facebook Login for Business tokens). */
@@ -307,7 +308,10 @@ export function createFacebookEngine(rawConfig: FacebookConfig, fetchImpl: Faceb
       if (typeof raw.id !== 'string' || typeof raw.name !== 'string') throw new FacebookApiError('Facebook did not return the current user identity.', 200);
       const picture = object(raw.picture);
       const pictureData = object(picture.data);
-      return { id: raw.id, name: raw.name, pictureUrl: typeof pictureData.url === 'string' ? pictureData.url : null };
+      // The link needs the user_link permission; asked separately so a connection without it still works.
+      const link = await request('me', { token, params: { fields: 'link' } }).then(value => object(value).link, () => null);
+      const profileUrl = typeof link === 'string' && /^https:\/\/(www\.)?facebook\.com\//.test(link) ? link : null;
+      return { id: raw.id, name: raw.name, pictureUrl: typeof pictureData.url === 'string' ? pictureData.url : null, profileUrl };
     },
     async getGrantedPermissions(token) {
       const rows = await pages<FacebookGrantedPermission>(collectionUrl('me/permissions', token, 'permission,status'), token);

@@ -45,12 +45,12 @@ export async function persistFacebookDiscovery(actor: ConnectionMutationActor, i
       where: { workspaceId_provider_providerUserId: { workspaceId: actor.workspaceId, provider: 'facebook', providerUserId: input.user.id } },
       create: {
         id: randomUUID(), workspaceId: actor.workspaceId, provider: 'facebook', providerUserId: input.user.id,
-        name: input.user.name, pictureUrl: input.user.pictureUrl, accessToken: encryptSecret(input.accessToken),
+        name: input.user.name, pictureUrl: input.user.pictureUrl, profileUrl: input.user.profileUrl, accessToken: encryptSecret(input.accessToken),
         tokenExpiresAt: input.expiresAt, refreshToken: null, scopes: input.scopes.join(','), invalidatedAt: null, invalidReason: null,
         createdAt: now, updatedAt: now,
       },
       update: {
-        name: input.user.name, pictureUrl: input.user.pictureUrl, accessToken: encryptSecret(input.accessToken),
+        name: input.user.name, pictureUrl: input.user.pictureUrl, profileUrl: input.user.profileUrl, accessToken: encryptSecret(input.accessToken),
         tokenExpiresAt: input.expiresAt, refreshToken: null, scopes: input.scopes.join(','), invalidatedAt: null, invalidReason: null, updatedAt: now,
       },
       select: { id: true },
