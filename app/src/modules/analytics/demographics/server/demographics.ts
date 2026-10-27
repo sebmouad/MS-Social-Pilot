@@ -65,9 +65,12 @@ export async function readDemographics(actor: Actor, input: unknown = {}) {
   };
   const metrics = [...groups.flatMap(group => group.metrics), ...result.other];
   const countItems = () => metrics.reduce((sum, metric) => sum + metric.history.reduce((count, item) => count + 1 + item.rows.length, 0), 0);
-  const historyLimit = Number(snapshot.exportRowLimit);
+  const otherItems = result.audience.entries.length + result.groups.length + result.other.length + result.options.channels.length + result.options.adAccounts.length + result.options.metrics.length + result.groups.reduce((total, group) => total + group.metrics.length + (group.combined?.rows.length ?? 0) + group.metrics.reduce((rows, metric) => rows + metric.rows.length, 0), 0) + result.other.reduce((total, metric) => total + metric.rows.length, 0);
+  // An MCP answer must also fit its result limit, so history is trimmed to whichever limit is smaller.
+  const rowLimit = Number(snapshot.exportRowLimit);
   const historyTotalItems = countItems();
-  if (historyTotalItems > 0 && (!Number.isSafeInteger(historyLimit) || historyLimit < 1)) throw await analyticsError('unavailable', "Audience history settings are unavailable.");
+  if (historyTotalItems > 0 && (!Number.isSafeInteger(rowLimit) || rowLimit < 1)) throw await analyticsError('unavailable', "Audience history settings are unavailable.");
+  const historyLimit = Math.min(rowLimit, actor.maxResultItems !== undefined ? actor.maxResultItems - otherItems : Infinity);
   // Real Pages hold years of daily snapshots, so full history routinely exceeds the row limit. Drop the
   // oldest snapshots first (each metric always keeps its latest) and mark the cut explicitly, following
   // the compare/reports truncation precedent; only genuinely undisplayable history still refuses.
@@ -87,7 +90,7 @@ export async function readDemographics(actor: Actor, input: unknown = {}) {
   }
   const historyShownItems = countItems();
   const historyShownSnapshots = metrics.reduce((sum, metric) => sum + metric.history.length, 0);
-  const itemCount = historyShownItems + result.audience.entries.length + result.groups.length + result.other.length + result.options.channels.length + result.options.adAccounts.length + result.options.metrics.length + result.groups.reduce((total, group) => total + group.metrics.length + (group.combined?.rows.length ?? 0) + group.metrics.reduce((rows, metric) => rows + metric.rows.length, 0), 0) + result.other.reduce((total, metric) => total + metric.rows.length, 0);
+  const itemCount = historyShownItems + otherItems;
   const hiddenRows = [...result.groups.flatMap(group => group.metrics.map(metric => metric.history.length ? 0 : metric.hiddenRows)), ...result.groups.map(group => group.combined?.hiddenRows ?? 0), ...result.other.map(metric => metric.history.length ? 0 : metric.hiddenRows)].reduce((sum, count) => sum + count, 0);
   if (actor.maxResultItems !== undefined && (!Number.isSafeInteger(actor.maxResultItems) || actor.maxResultItems < 1 || itemCount > actor.maxResultItems || hiddenRows > 0)) {
     throw await analyticsError('invalid_request', "This audience breakdown is larger than the current MCP result limit. Narrow the selected channels or date range.");
