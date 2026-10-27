@@ -94,7 +94,7 @@ export function buildArticlePrompt(article: ArticleInput, context: AiContext = {
     'Reply with one JSON object only, in the same language as the material, with these keys:',
     '"caption": one social media post about the material: a first line under 125 characters that makes people stop scrolling, then a short description, then one easy question that invites comments. No links and no engagement bait (never ask people to like, share or tag someone).',
     '"description": one sentence that sums up the material.',
-    '"ingredients": the items the material lists for the reader to gather (for example ingredients, materials or tools), each as written with its quantity; an empty array when there are none.',
+    '"ingredients": what the material says goes into the result (for example ingredients or materials), each as written with its quantity, never the tools or equipment; an empty array when there are none.',
     '"steps": the steps the material gives, in order, each one short; an empty array when there are none.',
   ].join('\n');
   return { system, prompt: `${task}\n\n${material}` };
