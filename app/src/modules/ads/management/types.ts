@@ -5,7 +5,7 @@
  */
 export type AdsObjectType = 'campaign' | 'adset' | 'ad';
 export type AdsManagedObjectType = AdsObjectType | 'creative';
-export type AdsOperationId = 'status.set' | 'budget.set' | 'rename' | 'creative.assign' | 'delete' | 'campaign.create' | 'adset.create' | 'ad.create' | 'creative.create';
+export type AdsOperationId = 'status.set' | 'budget.set' | 'rename' | 'creative.assign' | 'delete' | 'campaign.create' | 'adset.create' | 'ad.create' | 'creative.create' | 'object.copy';
 
 export type AdsNeutralOperation =
   | { type: 'status.set'; objectType: AdsObjectType; objectId: string; status: 'active' | 'paused' }
@@ -13,6 +13,8 @@ export type AdsNeutralOperation =
   | { type: 'rename'; objectType: AdsObjectType; objectId: string; name: string }
   | { type: 'creative.assign'; objectType: 'ad'; objectId: string; creativeId: string }
   | { type: 'delete'; objectType: AdsObjectType; objectId: string }
+  /** A paused copy of an existing campaign, ad set or ad (with what it contains); the copy's id is the result. */
+  | { type: 'object.copy'; objectType: AdsObjectType; objectId: string }
   /** Creation carries no objectId and no status: the platform module always creates the object paused. */
   | { type: 'campaign.create'; objectType: 'campaign'; name: string; objective: string }
   /** parentId is an existing campaign remote id; the shared service verifies it belongs to the account from stored history. */
@@ -71,7 +73,9 @@ export interface AdsOpsHost {
 }
 
 export const AD_OBJECT_TYPES: readonly AdsObjectType[] = ['campaign', 'adset', 'ad'];
-export const AD_OPERATION_IDS: readonly AdsOperationId[] = ['status.set', 'budget.set', 'rename', 'creative.assign', 'delete', 'campaign.create', 'adset.create', 'ad.create', 'creative.create'];
+export const AD_OPERATION_IDS: readonly AdsOperationId[] = ['status.set', 'budget.set', 'rename', 'creative.assign', 'delete', 'campaign.create', 'adset.create', 'ad.create', 'creative.create', 'object.copy'];
+/** Operations whose result is a new remote object: creations and copies. */
+export const producesObject = (operation: AdsNeutralOperation) => isCreationOperation(operation) || operation.type === 'object.copy';
 
 export type AdsCreationOperation = Extract<AdsNeutralOperation, { type: 'campaign.create' | 'adset.create' | 'ad.create' | 'creative.create' }>;
 export function isCreationOperation(operation: AdsNeutralOperation): operation is AdsCreationOperation { return operation.type === 'campaign.create' || operation.type === 'adset.create' || operation.type === 'ad.create' || operation.type === 'creative.create'; }

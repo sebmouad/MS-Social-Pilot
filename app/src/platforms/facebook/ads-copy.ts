@@ -65,6 +65,12 @@ export const FACEBOOK_ADS_COPY = {
   },
   targetingAny: { en: 'NONE', fr: 'AUCUN' }, targetingAllAges: { en: 'ALL', fr: 'TOUS' }, targetingNoEnd: { en: 'NO END DATE', fr: 'SANS DATE DE FIN' },
   targetingInvalid: { en: 'Choose valid countries, ages 18 to 65 (minimum not above maximum) and an end date after today.', fr: 'Choisissez des pays valides, des âges de 18 à 65 ans (minimum inférieur au maximum) et une date de fin après aujourd’hui.' },
+  copyLabel: { en: 'Duplicate (paused)', fr: 'Dupliquer (en pause)' },
+  confirmCopy: {
+    en: 'DUPLICATE FACEBOOK {objectType} {objectId} IN ACCOUNT {adAccountId} AS A PAUSED COPY',
+    fr: 'DUPLIQUER {objectType} FACEBOOK {objectId} DANS LE COMPTE {adAccountId} EN COPIE EN PAUSE',
+  },
+  copyUnconfirmed: { en: 'The copy was requested but Facebook did not confirm it. Check Ads Manager before trying again.', fr: 'La copie a été demandée mais Facebook ne l’a pas confirmée. Vérifiez le Gestionnaire de publicités avant de réessayer.' },
   postInvalid: { en: 'Choose a published post of this Page.', fr: 'Choisissez une publication de cette Page.' },
   confirmCampaignCreate: {
     en: 'CREATE PAUSED FACEBOOK CAMPAIGN {nameJson} IN ACCOUNT {adAccountId} WITH OBJECTIVE {objective}',
@@ -96,5 +102,5 @@ export function facebookAdsText(copy: FacebookAdsCopy = FACEBOOK_ADS_COPY, local
 }
 export const defaultFacebookAdsText = facebookAdsText();
 export const operationLabelKeys = {
-  'status.set': 'statusLabel', 'budget.set': 'budgetLabel', rename: 'renameLabel', 'creative.assign': 'assignLabel', delete: 'deleteLabel', 'creative.create': 'creativeCreateLabel', 'campaign.create': 'campaignCreateLabel', 'ad.create': 'adCreateLabel', 'adset.create': 'adSetCreateLabel',
+  'status.set': 'statusLabel', 'budget.set': 'budgetLabel', rename: 'renameLabel', 'creative.assign': 'assignLabel', delete: 'deleteLabel', 'creative.create': 'creativeCreateLabel', 'campaign.create': 'campaignCreateLabel', 'ad.create': 'adCreateLabel', 'adset.create': 'adSetCreateLabel', 'object.copy': 'copyLabel',
 } as const satisfies Record<AdsOperationId, keyof FacebookAdsCopy>;

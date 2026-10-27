@@ -20,7 +20,7 @@ import { platformAds } from '@/server/platforms/registry';
 import { ADS_MANAGEMENT_DEFAULT_POLICY, ADS_MANAGEMENT_POLICY_SCHEMA, type AdsManagementPolicy } from './config';
 import { adsOpsHostFor } from './registry';
 import { AdsNoDispatchError, asNoDispatch } from './errors';
-import { AD_OBJECT_TYPES, AD_OPERATION_IDS, isCreationOperation, type AdsNeutralOperation, type AdsObjectType, type AdsOpsHost } from './types';
+import { AD_OBJECT_TYPES, AD_OPERATION_IDS, isCreationOperation, producesObject, type AdsNeutralOperation, type AdsObjectType, type AdsOpsHost } from './types';
 
 /** `allowedAdAccountIds` is an independent ceiling: [] allows no account (every read/write refuses), undefined adds no restriction. */
 export type AdsManageActor = { userId: string; workspaceId: string; allowedTargetIds?: readonly string[]; allowedAdAccountIds?: readonly string[] };
@@ -117,6 +117,9 @@ export function parseNeutralOperation(raw: unknown, policy: AdsManagementPolicy 
   if (typeof objectId !== 'string' || !SAFE_ID.test(objectId)) throw new OperationError('invalid_request', defaultAdsText('validation021'));
   const base = { objectType: objectType as AdsObjectType, objectId };
   switch (type) {
+    case 'object.copy':
+      keys(['type', 'objectType', 'objectId']);
+      return { type, ...base };
     case 'status.set':
       keys(['type', 'objectType', 'objectId', 'status']);
       if (value.status !== 'active' && value.status !== 'paused') throw new OperationError('invalid_request', defaultAdsText('validation022'));
@@ -349,7 +352,8 @@ export type AdsManagementOutcome =
 export type AdsCreatedObject = { objectType: 'campaign' | 'adset' | 'ad' | 'creative'; remoteId: string };
 type AdsLedgerStatus = { status: string; remoteId: string | null; operationType?: string; objectType?: string };
 function createdFrom(ledger: { operationType?: string; objectType?: string }, remoteId: string | null): { created?: AdsCreatedObject } {
-  if (!remoteId || (ledger.operationType !== 'campaign.create' && ledger.operationType !== 'adset.create' && ledger.operationType !== 'ad.create' && ledger.operationType !== 'creative.create')) return {};
+  if (!remoteId || (ledger.operationType !== 'campaign.create' && ledger.operationType !== 'adset.create' && ledger.operationType !== 'ad.create' && ledger.operationType !== 'creative.create' && ledger.operationType !== 'object.copy')) return {};
+  if (ledger.operationType === 'object.copy') return ledger.objectType === 'campaign' || ledger.objectType === 'adset' || ledger.objectType === 'ad' ? { created: { objectType: ledger.objectType, remoteId } } : {};
   return { created: { objectType: ledger.operationType === 'campaign.create' ? 'campaign' : ledger.operationType === 'creative.create' ? 'creative' : ledger.operationType === 'ad.create' ? 'ad' : 'adset', remoteId } };
 }
 class AdsIntentNoLongerPending extends Error {
@@ -491,18 +495,18 @@ export async function performAdsManagement(actor: AdsManageActor, input: { adAcc
       }
 
       const resultRemoteId = result.remoteId ?? null;
-      if (isCreationOperation(operation) && (resultRemoteId === null || !SAFE_ID.test(resultRemoteId))) {
+      if (producesObject(operation) && (resultRemoteId === null || !SAFE_ID.test(resultRemoteId))) {
         // The provider returned without a verifiable identity: it may have created an object, so hold it as uncertain.
         const held = Number(await _tx.$executeRaw`UPDATE ads_management_operations SET status = 'uncertain', "failureCode" = 'missing_remote_id', "updatedAt" = NOW(), "completedAt" = NOW() WHERE id = ${id} AND "workspaceId" = ${actor.workspaceId} AND status = 'pending'`);
         if (held !== 1) throw new AdsIntentNoLongerPending({ status: 'uncertain', remoteId: null });
         await audit(actor, 'ads.change_uncertain', { operationId: id, adAccountId: ctx.account.id, operation: operation.type, objectType: operation.objectType, objectId: ledgerObjectId(operation) }, _tx);
         return { outcome: 'uncertain' as const, operationId: id, message: await adsServiceText('service059') };
       }
-      const created = isCreationOperation(operation) ? { created: { objectType: operation.objectType, remoteId: resultRemoteId! } } : {};
+      const created = producesObject(operation) ? { created: { objectType: operation.objectType, remoteId: resultRemoteId! } } : {};
       const changed = Number(await _tx.$executeRaw`UPDATE ads_management_operations SET status = 'succeeded', "remoteId" = ${resultRemoteId}, "updatedAt" = NOW(), "completedAt" = NOW() WHERE id = ${id} AND "workspaceId" = ${actor.workspaceId} AND status = 'pending'`);
       if (changed !== 1) return { outcome: 'succeeded' as const, operationId: id, remoteId: resultRemoteId, recorded: false, warning: await adsServiceText('service060'), ...created };
       await recordAdObjectChange(_tx, ctx.account.id, operation, resultRemoteId);
-      await audit(actor, 'ads.change_applied', { operationId: id, adAccountId: ctx.account.id, operation: operation.type, objectType: operation.objectType, objectId: ledgerObjectId(operation), spendChanging: support.spendChanging, ...(isCreationOperation(operation) ? { remoteId: resultRemoteId, createdPaused: operation.type !== 'creative.create', ...(operation.type === 'creative.create' ? { delivery: 'unattached' } : {}) } : {}) }, _tx);
+      await audit(actor, 'ads.change_applied', { operationId: id, adAccountId: ctx.account.id, operation: operation.type, objectType: operation.objectType, objectId: ledgerObjectId(operation), spendChanging: support.spendChanging, ...(producesObject(operation) ? { remoteId: resultRemoteId, createdPaused: operation.type !== 'creative.create', ...(operation.type === 'creative.create' ? { delivery: 'unattached' } : {}) } : {}) }, _tx);
       return { outcome: 'succeeded' as const, operationId: id, remoteId: resultRemoteId, recorded: true, ...created };
     });
   } catch (error) {

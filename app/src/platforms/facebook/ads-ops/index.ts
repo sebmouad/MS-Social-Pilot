@@ -22,6 +22,7 @@ export const FACEBOOK_ADS_OPERATIONS: readonly AdsOperationSupport[] = [
   { id: 'rename', objectTypes: ['campaign', 'adset', 'ad'], spendChanging: false, label: defaultFacebookAdsText('renameLabel'), inputs: [{ name: 'name', kind: 'text' }] },
   { id: 'creative.assign', objectTypes: ['ad'], spendChanging: true, label: defaultFacebookAdsText('assignLabel'), inputs: [{ name: 'creativeId', kind: 'creative-ref' }] },
   { id: 'delete', objectTypes: ['campaign', 'adset', 'ad'], spendChanging: false, irreversible: true, label: defaultFacebookAdsText('deleteLabel') },
+  { id: 'object.copy', objectTypes: ['campaign', 'adset', 'ad'], spendChanging: false, label: defaultFacebookAdsText('copyLabel') },
   { id: 'creative.create', objectTypes: ['creative'], spendChanging: false, label: defaultFacebookAdsText('creativeCreateLabel') },
   { id: 'campaign.create', objectTypes: ['campaign'], spendChanging: true, label: defaultFacebookAdsText('campaignCreateLabel'), inputs: [{ name: 'name', kind: 'text' }, { name: 'objective', kind: 'choice', options: FACEBOOK_CAMPAIGN_OBJECTIVES }] },
   { id: 'ad.create', objectTypes: ['ad'], spendChanging: true, label: defaultFacebookAdsText('adCreateLabel'), inputs: [{ name: 'name', kind: 'text' }, { name: 'creativeId', kind: 'creative-ref' }] },
@@ -125,6 +126,7 @@ export function facebookAdsConfirmation(operation: AdsNeutralOperation, context:
     case 'rename': return text('confirmRename', values);
     case 'creative.assign': return text('confirmAssign', values);
     case 'delete': return text('confirmDelete', values);
+    case 'object.copy': return text('confirmCopy', values);
   }
 }
 
@@ -225,6 +227,14 @@ export function createFacebookAdsOps(loadTransport: () => Promise<FacebookAdsTra
       if (operation.type === 'campaign.create' || operation.type === 'adset.create') return executeCreation(transport, token, context, operation, text);
       await verifyOwned(transport, token, context.accountId, operation.objectId, context.signal, text);
       const path = encodeURIComponent(operation.objectId);
+      if (operation.type === 'object.copy') {
+        // Meta copies a campaign or ad set with what it contains; the copy never delivers until resumed.
+        const copied = await transport.post(`${path}/copies`, token, { status_option: 'PAUSED', ...(operation.objectType === 'ad' ? {} : { deep_copy: 'true' }) }, context.signal);
+        const remoteId = copied[`copied_${operation.objectType}_id`];
+        if (typeof remoteId !== 'string' || !SAFE_ID.test(remoteId)) throw new FacebookAdsOpsError(text('copyUnconfirmed'), { status: 200 }, 'copyUnconfirmed');
+        await context.recordReceipt?.({ remoteId });
+        return { remoteId };
+      }
       let body: Record<string, string>;
       switch (operation.type) {
         case 'status.set': body = { status: operation.status === 'active' ? 'ACTIVE' : 'PAUSED' }; break;

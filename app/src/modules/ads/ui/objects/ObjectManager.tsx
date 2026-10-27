@@ -117,9 +117,9 @@ export function ObjectManager({ adAccountId, level, objectId, name }: { adAccoun
     setBusy(true);
     try {
       const response = await fetch('/api/ads/management', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'apply', adAccountId, operation: pending.operation, confirmation: pending.confirmation, requestId: pending.requestId }) });
-      const payload = await response.json().catch(() => null) as { outcome?: string; message?: string; warning?: string; error?: string; status?: string; terminal?: boolean; replay?: boolean } | null;
+      const payload = await response.json().catch(() => null) as { outcome?: string; message?: string; warning?: string; error?: string; status?: string; terminal?: boolean; replay?: boolean; created?: { remoteId?: string } } | null;
       if (response.ok && payload?.outcome === 'succeeded') {
-        setOutcome({ tone: 'ok', key: String(Date.now()), text: payload.warning ?? t('text239') });
+        setOutcome({ tone: 'ok', key: String(Date.now()), text: pending.operation.type === 'object.copy' && payload.created?.remoteId ? t('copyDone', { id: payload.created.remoteId }) : payload.warning ?? t('text239') });
         const done = pending.operation;
         if (done.type === 'rename') {
           patchObjectRow(adAccountId, level, objectId, { name: done.name });
@@ -191,6 +191,7 @@ export function ObjectManager({ adAccountId, level, objectId, name }: { adAccoun
   const renameSupport = supportFor('rename');
   const creativeSupport = supportFor('creative.assign');
   const deleteSupport = supportFor('delete');
+  const copySupport = supportFor('object.copy');
   const statusInput = input(statusSupport, 'status');
   const budgetInput = input(budgetSupport, 'budget');
   const nameInput = input(renameSupport, 'name');
@@ -234,6 +235,7 @@ export function ObjectManager({ adAccountId, level, objectId, name }: { adAccoun
               <Button disabled={busy || !creativeId} onClick={() => void preview({ type: 'creative.assign', objectType: 'ad', objectId, creativeId }, creativeSupport, t('text114'))}>{creativeSupport.label}</Button>
             </>}
           </div> : null}
+          {copySupport ? <div className="ads-object-manager__row"><Button disabled={busy} onClick={() => void preview({ type: 'object.copy', objectType: level, objectId }, copySupport, t('copyAsk', { level: t(level) }))}>{copySupport.label}</Button></div> : null}
           {deleteSupport ? <div className="ads-object-manager__row"><Button variant="danger" disabled={busy} onClick={() => void preview({ type: 'delete', objectType: level, objectId }, deleteSupport, t('text252', { value0: t(level) }))}>{deleteSupport.label}{t('text253')}</Button></div> : null}
         </>}
       </> : null}
