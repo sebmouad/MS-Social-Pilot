@@ -15,6 +15,9 @@ import { insightsCopyDefaults, insightsPolicyDefaults, resolveInsightsCopy } fro
 import { presetRange, resolvePeriod } from '@/modules/analytics/ui/insights/period';
 import { workspaceInstantFormatter } from '@/server/instant-labels';
 import { readPosts, resolveInternalPostIds } from './service';
+import { digest, postFacts, totalsOf } from './performance';
+import { PerformancePanel } from './PerformancePanel';
+import { prisma } from '@/server/data';
 import styles from '@/modules/analytics/ui/reports/workflows.module.css';
 import local from './screen.module.css';
 
@@ -36,6 +39,18 @@ export default async function PostsScreen({ searchParams }: { searchParams: Prom
   try { data = await readPosts({ userId: viewer.user.id, workspaceId: viewer.workspaceId }, readInput); } catch { /* Safe localized recovery below. */ }
   if (!data) return <PageFrame module="analytics" scopedAccess><section role="alert"><h1>{t("Post analytics unavailable")}</h1><p>{t("Check your access and filters, then try again.")}</p><a href="/insights/posts">{t("Reset filters")}</a></section></PageFrame>;
   const d = data;
+  // "What works" over the same period and channels, against the previous period of the same length.
+  const actor = { userId: viewer.user.id, workspaceId: viewer.workspaceId };
+  const channelFilter = scope.ids.length ? { filter: '1' as const, channel: scope.ids } : {};
+  const dayMs = 86_400_000;
+  const startAt = Date.parse(`${d.period.start}T00:00:00Z`), endAt = Date.parse(`${d.period.end}T00:00:00Z`);
+  const span = Math.max(1, Math.round((endAt - startAt) / dayMs) + 1);
+  const iso = (ms: number) => new Date(ms).toISOString().slice(0, 10);
+  const [current, previous, workspace] = await Promise.all([
+    postFacts(actor, { start: d.period.start, end: d.period.end, ...channelFilter }).catch(() => null),
+    postFacts(actor, { start: iso(startAt - span * dayMs), end: iso(startAt - dayMs), ...channelFilter }).catch(() => null),
+    prisma.workspace.findUnique({ where: { id: viewer.workspaceId }, select: { timezone: true } }),
+  ]);
   // Page links carry the sidebar scope (`channel=a,b`); the download API takes the services' explicit channel filter.
   const query = (patch: Record<string, string> = {}, api = false) => {
     const q = new URLSearchParams({ start: d.period.start, end: d.period.end, sort: d.input.sort, direction: d.input.direction, page: String(d.input.page) });
@@ -67,6 +82,7 @@ export default async function PostsScreen({ searchParams }: { searchParams: Prom
   </div>;
   return <PageFrame module="analytics" scopedAccess><div className={`${styles.root} ${local.content}`}>
     <PageHeader module="analytics" title={t("Post explorer")} info={<InfoTip name={t("Post explorer")} blocks={[{ text: t("Published posts with stored measures. Measures are snapshots, not period totals. Missing data is not available.") }]} />} filters={toolbar} />
+    {current && <PerformancePanel digest={digest(current.facts, workspace?.timezone || 'UTC')} before={previous ? totalsOf(previous.facts) : null} complete={current.complete} locale={locale} />}
     <PostsTable copy={copy} rows={postsTableRows(d.items, await workspaceInstantFormatter(viewer.workspaceId, locale), await resolveInternalPostIds(viewer.workspaceId, d.items))} measures={postsTableMeasures(d.measures, locale)} locale={locale} sortKey={d.input.sort} sortDirection={d.input.direction} />
     {d.input.page > 1 || d.nextPage ? <nav aria-label={t("Pages")} className={styles.pager}>{d.input.page > 1 && <a href={`?${query({ page: String(d.input.page - 1) })}`}>{t("Previous")}</a>}<span>{t("Page")} {d.input.page}</span>{d.nextPage && <a href={`?${query({ page: String(d.nextPage) })}`}>{t("Next")}</a>}</nav> : null}
   </div></PageFrame>;
