@@ -86,8 +86,11 @@ export function buildPrompt(request: AiRequest, maxHashtags: number, context: Ai
 /** Any article (title, summary and body) turned into a post: a caption, plus the lists it contains, if any. */
 export type ArticleInput = { title: string; excerpt: string; text: string };
 export type ArticleWriting = { caption: string; description: string; ingredients: string[]; steps: string[] };
-export function buildArticlePrompt(article: ArticleInput, context: AiContext = {}): { system: string; prompt: string } {
-  const { system } = buildPrompt({ kind: 'caption', text: '-' }, 0, context);
+export function buildArticlePrompt(article: ArticleInput, context: AiContext = {}, examples: readonly string[] = []): { system: string; prompt: string } {
+  const base = buildPrompt({ kind: 'caption', text: '-' }, 0, context).system;
+  const shown = examples.map(example => strip(example).replace(/<\/?examples>/gi, '')).filter(Boolean);
+  // The audience's own best recent captions, so new posts follow what works (style only, never their facts).
+  const system = shown.length ? `${base}\nCaptions that did best with this audience lately (follow their style, opening and length; never reuse their dishes, facts or wording):\n<examples>\n${shown.join('\n---\n')}\n</examples>` : base;
   const clean = (value: string) => value.replace(/<\/?material>/gi, '');
   const material = `<material>\nTitle: ${clean(article.title)}\n${article.excerpt ? `Summary: ${clean(article.excerpt)}\n` : ''}\n${clean(article.text)}\n</material>`;
   const task = [

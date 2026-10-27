@@ -202,7 +202,8 @@ export async function writeFromArticle(actor: AiActor, article: ArticleInput, de
   const input = { title: article.title.slice(0, 500), excerpt: article.excerpt.slice(0, 2000), text: article.text.slice(0, Math.max(s.maxInput, ARTICLE_TEXT_MAX)) };
   const length = input.title.length + input.excerpt.length + input.text.length;
   await claim(actor, s, 'article', length, (deps.now ?? (() => new Date()))());
-  const { system, prompt } = buildArticlePrompt(input, workspace);
+  const { bestCaptions } = await import('@/modules/analytics/explorer-posts/performance');
+  const { system, prompt } = buildArticlePrompt(input, workspace, await bestCaptions(actor).catch(() => []));
   const raw = await complete({ ...s, maxTokens: Math.min(AI_BOUNDS.maxOutputTokens.max, Math.max(s.maxTokens, ARTICLE_OUTPUT_TOKENS)) }, system, prompt);
   await recordUsage(s.metering, actor, 'article', system.length + prompt.length, raw.length, (deps.now ?? (() => new Date()))());
   const written = parseArticleWriting(raw, s.maxInput * s.outputInputMultiplier);
