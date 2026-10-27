@@ -22,7 +22,7 @@ export async function computePoolHealth(input: { settings: WordpressSettings; po
   const config = configOf(settings, source);
   const pages = await ports.store.pages(source, settings.targetTypes, settings.maxTargets);
   const view = await supplyLedgerView(settings, ports, source, now);
-  const scan = await scanCandidates(db, settings, source, config, now, () => false);
+  const scan = await scanCandidates(db, settings, source, config, now, () => false, await ports.writer.available(source.workspaceId).catch(() => false));
   const slotsPerDay = config.slots.length;
   const consumers = config.distinctAcrossPages ? Math.max(1, pages.length) : 1;
   const rows: PoolPage[] = pages.map(page => {

@@ -83,6 +83,35 @@ export function buildPrompt(request: AiRequest, maxHashtags: number, context: Ai
   return { system, prompt: `${task}\n\n${material}` };
 }
 
+/** Any article (title, summary and body) turned into a post: a caption, plus the lists it contains, if any. */
+export type ArticleInput = { title: string; excerpt: string; text: string };
+export type ArticleWriting = { caption: string; description: string; ingredients: string[]; steps: string[] };
+export function buildArticlePrompt(article: ArticleInput, context: AiContext = {}): { system: string; prompt: string } {
+  const { system } = buildPrompt({ kind: 'caption', text: '-' }, 0, context);
+  const clean = (value: string) => value.replace(/<\/?material>/gi, '');
+  const material = `<material>\nTitle: ${clean(article.title)}\n${article.excerpt ? `Summary: ${clean(article.excerpt)}\n` : ''}\n${clean(article.text)}\n</material>`;
+  const task = [
+    'Reply with one JSON object only, in the same language as the material, with these keys:',
+    '"caption": one social media post about the material: a first line under 125 characters that makes people stop scrolling, then a short description, then one easy question that invites comments. No links and no engagement bait (never ask people to like, share or tag someone).',
+    '"description": one sentence that sums up the material.',
+    '"ingredients": the items the material lists for the reader to gather (for example ingredients, materials or tools), each as written with its quantity; an empty array when there are none.',
+    '"steps": the steps the material gives, in order, each one short; an empty array when there are none.',
+  ].join('\n');
+  return { system, prompt: `${task}\n\n${material}` };
+}
+const articleWritingSchema = z.object({ caption: z.string(), description: z.string().default(''), ingredients: z.array(z.string()).default([]), steps: z.array(z.string()).default([]) });
+/** The JSON object in the model's answer, or null when there is none or it has no caption. */
+export function parseArticleWriting(raw: string, maxChars: number): ArticleWriting | null {
+  const start = raw.indexOf('{'); const end = raw.lastIndexOf('}');
+  if (start < 0 || end <= start) return null;
+  let data: unknown; try { data = JSON.parse(raw.slice(start, end + 1)); } catch { return null; }
+  const parsed = articleWritingSchema.safeParse(data);
+  if (!parsed.success) return null;
+  const list = (items: string[]) => items.map(item => cleanOutput(item, maxChars)).filter(Boolean).slice(0, 40);
+  const caption = cleanOutput(parsed.data.caption, maxChars);
+  return caption ? { caption, description: cleanOutput(parsed.data.description, maxChars), ingredients: list(parsed.data.ingredients), steps: list(parsed.data.steps) } : null;
+}
+
 /** Recap input for report sections. `facts` is compact figure text; only it reaches the model. */
 export const summarizeSchema = (maxFacts: number, maxSubject: number, maxLanguage: number = AI_BOUNDS.languageMaxCharacters.max) => z.object({
   facts: z.string().trim().min(1).max(maxFacts).refine(noControl, 'Control characters are not allowed.'),

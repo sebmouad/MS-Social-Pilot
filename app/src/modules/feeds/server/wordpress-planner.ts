@@ -2,6 +2,7 @@ import { OperationError } from '@/lib/operation-error';
 import { prisma } from '@/server/data';
 import { decryptSecret } from '@/server/secret-crypto';
 import { defaultFetchDeps, type FetchDeps } from '@/modules/publishing/server/media/network/net-guard';
+import type { ArticleInput, ArticleWriting } from '@/modules/studio/ai';
 import { allocateRecipes, recipeTitleKey, buildImageUrl, buildPermalink, reportedPermalink, parseRecipe, renderComment, resolveConfig, slotInstants, type PlanConfig, type Recipe, type SlotNeed } from '../wordpress/recipe';
 import { openWordpressDb, type DbSettings, type WpDb } from '../wordpress/db';
 import { defaultImagePorts, prepareRecipeImage, RecipeImageError, type ImagePorts } from '../wordpress/image';
@@ -22,6 +23,8 @@ export type PlannerPorts = {
   image: ImagePorts;
   qualify(workspaceId: string): Promise<FeedAuthorization | null>;
   store: RecipeStore;
+  /** AI that writes a caption and the first comment's lists from any post's own text, when the workspace has AI on. */
+  writer: { available(workspaceId: string): Promise<boolean>; write(actor: FeedActor, article: ArticleInput): Promise<ArticleWriting> };
   now(): Date;
 };
 export type PlannedPostInput = { message: string; firstComment: string; targetIds: string[]; scheduledAt: Date; media: Array<{ kind: 'image'; url: string; altText: string }>; firstCommentDelayMinutes: number };
@@ -54,22 +57,28 @@ export function defaultPlannerPorts(net: FetchDeps = defaultFetchDeps()): Planne
     image: defaultImagePorts(net),
     qualify: workspaceId => qualifyingOwner(workspaceId),
     store: prismaRecipeStore,
+    writer: {
+      async available(workspaceId) { const { articleWritingAvailable } = await import('@/modules/studio/server/ai'); return articleWritingAvailable(workspaceId); },
+      async write(actor, article) { const { writeFromArticle } = await import('@/modules/studio/server/ai'); return writeFromArticle({ userId: actor.userId, workspaceId: actor.workspaceId }, article); },
+    },
     now: () => new Date(),
   };
 }
 
 /* ----- candidates ----- */
 
-export type Candidate = { wpPostId: string; title: string; slug: string; caption: string; imageUrl: string; permalink: string; recipe: Recipe; publishedAt: Date | null };
+/** `write` names what AI writes from the post at planning time: the caption, the recipe, or both. */
+export type Candidate = { wpPostId: string; title: string; slug: string; caption: string; imageUrl: string; permalink: string; recipe: Recipe; publishedAt: Date | null; write?: { article: ArticleInput; caption: boolean; recipe: boolean } };
 /** Why scanned posts were not candidates; shown with an empty run so the cause is visible. */
 export type ScanRejections = { shared: number; caption: number; image: number; link: number; recipe: number; captionFieldMissing?: number };
 export type Scan = { candidates: Candidate[]; scanned: number; exhausted: boolean; rejected: ScanRejections };
 
 /**
  * Read recipes from WordPress newest (or oldest) first until `enough` says the candidates found so far suffice
- * or the scan limit is reached. Rows without a usable caption, image file, link or recipe are not candidates.
+ * or the scan limit is reached. Rows without a usable caption, image file, link or recipe are not candidates; with
+ * `writer`, a post whose caption or recipe field is left empty is one when it has text for AI to write them from.
  */
-export async function scanCandidates(db: WpDb, settings: WordpressSettings, source: Pick<SourceRow, 'siteUrl'>, config: PlanConfig, now: Date, enough: (candidates: Candidate[]) => boolean): Promise<Scan> {
+export async function scanCandidates(db: WpDb, settings: WordpressSettings, source: Pick<SourceRow, 'siteUrl'>, config: PlanConfig, now: Date, enough: (candidates: Candidate[]) => boolean, writer = false): Promise<Scan> {
   const candidates: Candidate[] = [];
   let scanned = 0; let exhausted = false;
   const rejected: ScanRejections = { shared: 0, caption: 0, image: 0, link: 0, recipe: 0, captionFieldMissing: 0 };
@@ -88,23 +97,44 @@ export async function scanCandidates(db: WpDb, settings: WordpressSettings, sour
       const imageUrl = file ? buildImageUrl(source.siteUrl, settings.uploadsPath, file) : null;
       const permalink = reportedPermalink(source.siteUrl, row.link) ?? buildPermalink(settings.permalinkTemplate, source.siteUrl, row.slug);
       const recipe = parseRecipe(row.recipe, row.title, settings.minutesSuffix);
-      if (!row.caption) { rejected.caption++; if (row.captionFieldPresent === false) rejected.captionFieldMissing = (rejected.captionFieldMissing ?? 0) + 1; continue; }
+      const text = writer && row.article ? row.article : '';
+      const write = { caption: Boolean(text) && !config.mapping.captionMetaKey, recipe: Boolean(text) && !recipe && !config.mapping.recipeMetaKey };
+      if (!row.caption && !write.caption) { rejected.caption++; if (row.captionFieldPresent === false) rejected.captionFieldMissing = (rejected.captionFieldMissing ?? 0) + 1; continue; }
       if (!imageUrl) { rejected.image++; continue; }
       if (!permalink) { rejected.link++; continue; }
-      if (!recipe) { rejected.recipe++; continue; }
-      candidates.push({ wpPostId: row.id, title: (recipe.title || row.title).slice(0, settings.titleMax), slug: row.slug, caption: row.caption, imageUrl, permalink, recipe, publishedAt: row.publishedAt });
+      if (!recipe && !write.recipe) { rejected.recipe++; continue; }
+      const title = (recipe?.title || row.title).slice(0, settings.titleMax);
+      candidates.push({ wpPostId: row.id, title, slug: row.slug, caption: row.caption, imageUrl, permalink, recipe: recipe ?? emptyRecipe(title), publishedAt: row.publishedAt,
+        ...(write.caption || write.recipe ? { write: { article: { title: row.title, excerpt: row.excerpt ?? '', text }, ...write } } : {}) });
     }
     if (enough(candidates)) break;
     if (fetched < requested) { exhausted = true; break; }
     // A whole first page without the caption field means WordPress is not exposing it (credentials or REST
     // registration), not that these recipes lack captions: scanning thousands more posts would find the same.
     if (!candidates.length && rows.length > 0 && rejected.captionFieldMissing === scanned - rejected.shared) break;
+    // Likewise posts without recipe data and no AI to write it: the rest of the library is the same.
+    if (!candidates.length && rows.length > 0 && !writer && !config.mapping.recipeMetaKey && rejected.recipe === scanned - rejected.shared) break;
   }
   return { candidates, scanned, exhausted, rejected };
 }
 
 export const commentFor = (settings: WordpressSettings, config: PlanConfig, c: Pick<Candidate, 'recipe' | 'permalink'>) =>
   renderComment(config.firstCommentTemplate, c.recipe, c.permalink, { max: settings.commentMax, mark: settings.truncationMark });
+const emptyRecipe = (title: string): Recipe => ({ title, description: '', servings: '', prep: '', cook: '', total: '', ingredients: [], steps: [] });
+
+/**
+ * The caption and first comment a candidate posts with. AI writes what the post's fields left empty; a first comment
+ * template that asks for lists the post does not have is refused (invalid_request), so the planner picks another post.
+ */
+export async function writeCandidate(ports: Pick<PlannerPorts, 'writer'>, actor: FeedActor, settings: WordpressSettings, config: PlanConfig, c: Candidate): Promise<{ caption: string; firstComment: string }> {
+  if (!c.write) return { caption: c.caption, firstComment: commentFor(settings, config, c) };
+  const written = await ports.writer.write(actor, c.write.article);
+  const line = (text: string) => ({ text, heading: false });
+  const recipe = c.write.recipe ? { ...c.recipe, description: written.description, ingredients: written.ingredients.map(line), steps: written.steps.map(line) } : c.recipe;
+  const listed = (name: 'ingredients' | 'steps') => !config.firstCommentTemplate.includes(`{${name}}`) || recipe[name].length > 0;
+  if (!listed('ingredients') || !listed('steps')) throw new OperationError('invalid_request', 'This post has no list or steps for the first comment template.');
+  return { caption: c.write.caption ? written.caption : c.caption, firstComment: commentFor(settings, config, { ...c, recipe }) };
+}
 
 /* ----- ledger views ----- */
 
@@ -199,11 +229,13 @@ export async function planSource(ctx: Ctx, source: SourceRow, auth: FeedAuthoriz
   const todo = needs.slice(0, Math.max(0, ctx.budget.left));
   if (!todo.length) return { ...out, reason: needs.length ? 'budget' : 'complete' };
 
-  const scan = await scanCandidates(ctx.db, settings, source, config, now, found => !settings.reuse.enabled && allocateRecipes({ needs: todo, candidates: found, blocked: view.blocked, taken: view.taken, reused: view.reused, distinct: config.distinctAcrossPages }).unfilled === 0);
+  const writer = await ports.writer.available(source.workspaceId).catch(() => false);
+  const scan = await scanCandidates(ctx.db, settings, source, config, now, found => !settings.reuse.enabled && allocateRecipes({ needs: todo, candidates: found, blocked: view.blocked, taken: view.taken, reused: view.reused, distinct: config.distinctAcrossPages }).unfilled === 0, writer);
   out.scanned = scan.scanned; out.candidates = scan.candidates.length; out.rejected = scan.rejected;
   // Every post came back without the caption field itself: credentials or the REST exposure of that field failed, not the content.
   const readable = scan.scanned - scan.rejected.shared;
   if (readable > 0 && scan.rejected.captionFieldMissing === readable) out.reason = 'caption_field_missing';
+  else if (readable > 0 && !writer && !config.mapping.recipeMetaKey && scan.rejected.recipe === readable) out.reason = 'needs_ai';
   const { assignments, unfilled } = allocateRecipes({ needs: todo, candidates: scan.candidates, allowReuse: scan.exhausted, blocked: view.blocked, taken: view.taken, reused: view.reused, distinct: config.distinctAcrossPages });
   out.unfilled = unfilled + (needs.length - todo.length);
 
@@ -214,12 +246,22 @@ export async function planSource(ctx: Ctx, source: SourceRow, auth: FeedAuthoriz
     const claimId = await ports.store.claim({ workspaceId: source.workspaceId, sourceId: source.id, targetId, wpPostId: c.wpPostId, slotAt, title: c.title, permalink: c.permalink, skipped: priorSkipped });
     if (!claimId) continue;
     ctx.budget.left -= 1;
+    let written: { caption: string; firstComment: string };
+    try { written = await writeCandidate(ports, auth.actor, settings, config, c); }
+    catch (error) {
+      // Nothing was created: the slot fails and is planned again, without this post when it has nothing to write from.
+      const code = error instanceof OperationError ? error.code : 'unknown';
+      await ports.store.settle(source.workspaceId, claimId, { state: 'failed', reason: `writing:${code}`, skipped: code === 'invalid_request' ? [...priorSkipped, c.wpPostId] : priorSkipped }).catch(() => undefined);
+      out.failed += 1;
+      if (AUTHORITY.has(code)) return { ...out, reason: code };
+      continue;
+    }
     let postId: string;
     try {
       const image = await prepareRecipeImage(ports.image, { actor: { userId: auth.actor.userId, workspaceId: source.workspaceId }, url: c.imageUrl, fileName: safeName(c.slug), settings: settings.image });
       const post = await ports.createPost(auth.actor, {
         // The slot keeps its identity (ledger key); only the publish time is offset per Page, so Pages never post in lockstep.
-        message: c.caption, firstComment: commentFor(settings, config, c), targetIds: [targetId], scheduledAt: staggered(slotAt, targetId),
+        message: written.caption, firstComment: written.firstComment, targetIds: [targetId], scheduledAt: staggered(slotAt, targetId),
         media: [{ kind: 'image', url: `media:${image.mediaId}`, altText: c.title.slice(0, settings.altMax) }], firstCommentDelayMinutes: config.firstCommentDelayMinutes,
       });
       postId = post.id;
@@ -250,6 +292,7 @@ const emptySummary = (reason?: RecipePlanSummary['reason']): RecipePlanSummary =
 const totals = (summary: RecipePlanSummary, o: SourceOutcome) => { summary.outcomes.push(o); summary.planned += o.planned; summary.failed += o.failed; summary.uncertain += o.uncertain; summary.unfilled += o.unfilled; };
 export const recipeSummaryRecord = (o: SourceOutcome, at: Date): Record<string, unknown> => ({ at: at.toISOString(), planned: o.planned, failed: o.failed, uncertain: o.uncertain, unfilled: o.unfilled, slots: o.slots, pages: o.pages, excludedPages: o.excludedPages, scanned: o.scanned, ...(o.candidates !== undefined ? { candidates: o.candidates } : {}), ...(o.rejected ? { rejected: o.rejected } : {}), ...(o.reason ? { reason: o.reason } : {}) });
 
+export const NEEDS_AI_MESSAGE = 'These posts publish no structured recipe data. Turn on AI for this workspace so it writes the caption and the first comment from each post, or set a recipe field.';
 /** Explains a run where WordPress returned no caption field at all; the usual cause is the saved credential, so say which case applies. */
 export function captionFieldMessage(scanned: number, field: string, credential: string | null): string {
   const token = credential?.trim() ?? '';
@@ -259,7 +302,7 @@ export function captionFieldMessage(scanned: number, field: string, credential: 
     : /^[a-z][a-z0-9+.-]*:\/\//i.test(token)
       ? 'The saved WordPress credential is a database address from the former direct connection, so it is not sent. Replace it with "username:application-password" (WordPress › Users › Profile › Application passwords).'
       : `Check that "${field}" is registered with show_in_rest on the WordPress site and that the saved application password is still valid.`;
-  return `WordPress returned none of the ${scanned} recipes with the field "${field}". ${cause} Or leave the caption, image and recipe fields empty ("Use the post itself") to plan from each post's excerpt, featured image and article.`;
+  return `WordPress returned none of the ${scanned} recipes with the field "${field}". ${cause} Or leave the caption, image and recipe fields empty ("Use the post itself") to plan from each post's featured image and text, written into a post by AI.`;
 }
 
 /** The blog's own saved credential in clear, or null when none is saved or it cannot be decrypted. */
@@ -316,7 +359,7 @@ export async function runRecipePlanning(overrides: Partial<PlannerPorts> = {}, l
       }
       const outcome = await planSource({ settings, ports, db, budget, now }, source, auth);
       totals(summary, outcome);
-      await ports.store.recordRun(source.workspaceId, source.id, { at: now, error: outcome.reason === 'caption_field_missing' ? captionFieldMessage(outcome.scanned, configOf(settings, source).mapping.captionMetaKey, sourceCredential(source)) : outcome.reason && !['complete', 'budget'].includes(outcome.reason) ? `Planning stopped: ${outcome.reason}` : null, summary: recipeSummaryRecord(outcome, now) });
+      await ports.store.recordRun(source.workspaceId, source.id, { at: now, error: outcome.reason === 'caption_field_missing' ? captionFieldMessage(outcome.scanned, configOf(settings, source).mapping.captionMetaKey, sourceCredential(source)) : outcome.reason === 'needs_ai' ? NEEDS_AI_MESSAGE : outcome.reason && !['complete', 'budget'].includes(outcome.reason) ? `Planning stopped: ${outcome.reason}` : null, summary: recipeSummaryRecord(outcome, now) });
     } catch {
       totals(summary, { sourceId: source.id, planned: 0, failed: 1, uncertain: 0, unfilled: 0, slots: 0, pages: 0, excludedPages: 0, scanned: 0, reason: 'error' });
       await ports.store.recordRun(source.workspaceId, source.id, { at: now, error: 'Planning could not be completed.', summary: { at: now.toISOString(), reason: 'error' } }).catch(() => undefined);

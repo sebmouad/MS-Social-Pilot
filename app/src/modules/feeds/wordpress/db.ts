@@ -25,6 +25,9 @@ export type WpCandidateRow = {
   caption: string;
   imageId: string;
   recipe: string;
+  /** The post's own summary and body as plain text, read only when a caption or recipe field is left empty, for AI to write from. */
+  excerpt?: string;
+  article?: string;
 };
 export type CandidateQuery = {
   mapping: Mapping;
@@ -176,41 +179,8 @@ function extractRecipeFromSchemaGraph(nodes: unknown[]): string | null {
   return null;
 }
 
-/**
- * A recipe written as an article: the list right after a heading about ingredients, the list after a heading about the
- * steps (or else the first numbered list), and "Temps total : 45 minutes" style lines. Null unless both lists are found,
- * so a page without a recipe never yields a made-up one.
- */
-export function recipeFromArticle(html: string, title: string, description: string): string | null {
-  type Block = { heading: string } | { list: 'ul' | 'ol'; items: string[] };
-  const blocks: Block[] = [...html.matchAll(/<(h[2-4])\b[^>]*>([\s\S]*?)<\/\1>|<(ul|ol)\b[^>]*>([\s\S]*?)<\/\3>/gi)].map(m => m[1]
-    ? { heading: stripHtml(m[2] ?? '') }
-    : { list: (m[3] ?? 'ul').toLowerCase() as 'ul' | 'ol', items: [...(m[4] ?? '').matchAll(/<li\b[^>]*>([\s\S]*?)<\/li>/gi)].map(item => stripHtml(item[1] ?? '')).filter(Boolean) });
-  const listAfter = (pattern: RegExp) => {
-    let armed = false;
-    for (const block of blocks) {
-      if ('heading' in block) { armed = pattern.test(block.heading); continue; }
-      if (armed && block.items.length) return block.items;
-    }
-    return null;
-  };
-  // "1 litre de jus d’orange : base fruitée de la boisson." keeps the quantity; the explanation after the colon is article prose.
-  const ingredients = listAfter(/ingr[ée]dient/i)?.map(line => line.replace(/\s*;\s*$/, '').replace(/^(.*\d.*?)\s+:\s+[^:]+$/, '$1'));
-  const steps = listAfter(/[ée]tape|pr[ée]paration|instruction|step|method/i) ?? blocks.find((block): block is { list: 'ol'; items: string[] } => 'list' in block && block.list === 'ol' && block.items.length > 0)?.items;
-  if (!ingredients?.length || !steps?.length) return null;
-  const facts = blocks.flatMap(block => 'items' in block ? block.items : []);
-  const fact = (pattern: RegExp) => facts.map(line => pattern.exec(line)?.[1]?.trim()).find(Boolean) ?? '';
-  return JSON.stringify({
-    title, description,
-    servings: fact(/^(?:portions?|pour|servings?|yield)\s*:\s*(.+)$/i),
-    prep: fact(/^temps de pr[ée]paration\s*:\s*(.+)$/i) || fact(/^prep(?:aration)? time\s*:\s*(.+)$/i),
-    cook: fact(/^temps de cuisson\s*:\s*(.+)$/i) || fact(/^cook(?:ing)? time\s*:\s*(.+)$/i),
-    total: fact(/^temps total\s*:\s*(.+)$/i) || fact(/^total time\s*:\s*(.+)$/i),
-    ingredients: ingredients.slice(0, 30), steps: steps.slice(0, 20),
-  });
-}
-
-function extractRecipeJson(item: Record<string, unknown>, recipeMetaKey: string, fallbackTitle: string): string {
+/** Recipe data the post publishes in a standard form (a meta field or schema.org Recipe); empty otherwise. */
+function extractRecipeJson(item: Record<string, unknown>, recipeMetaKey: string): string {
   const fromMeta = metaValue(item, recipeMetaKey);
   if (fromMeta) return fromMeta;
 
@@ -225,7 +195,6 @@ function extractRecipeJson(item: Record<string, unknown>, recipeMetaKey: string,
   }
 
   const contentHtml = renderedOf(item['content']);
-  const excerptText = stripHtml(renderedOf(item['excerpt']));
 
   // Check embedded <script type="application/ld+json"> inside post content
   const ldMatches = contentHtml.matchAll(/<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi);
@@ -242,28 +211,6 @@ function extractRecipeJson(item: Record<string, unknown>, recipeMetaKey: string,
     } catch {
       // continue scanning
     }
-  }
-
-  // Article-style recipe (headings with lists, no structured data): the ingredients list, the steps list and the time lines.
-  const article = recipeFromArticle(contentHtml, fallbackTitle, excerptText);
-  if (article) return article;
-
-  // Check WP Recipe Maker HTML classes (.wprm-recipe-ingredient, .wprm-recipe-instruction-text) or HTML lists
-  const listItems = [...contentHtml.matchAll(/<li\b[^>]*>([\s\S]*?)<\/li>/gi)]
-    .map(m => stripHtml(m[1] ?? ''))
-    .filter(Boolean);
-  const paragraphs = [...contentHtml.matchAll(/<p\b[^>]*>([\s\S]*?)<\/p>/gi)]
-    .map(m => stripHtml(m[1] ?? ''))
-    .filter(p => p.length > 20);
-
-  if (listItems.length > 0 || paragraphs.length > 0) {
-    return JSON.stringify({
-      title: fallbackTitle,
-      description: excerptText || (paragraphs[0] ?? ''),
-      servings: '',
-      ingredients: listItems.slice(0, 20),
-      steps: paragraphs.slice(0, 12),
-    });
   }
 
   return '';
@@ -386,9 +333,11 @@ export async function openWordpressDb(settings: DbSettings): Promise<WpDb> {
           if (directRel) mediaCache.set(imageId, directRel);
         }
 
-        const recipe = q.mapping.recipeMetaKey ? metaValue(item, q.mapping.recipeMetaKey) : extractRecipeJson(item, '', title);
+        const recipe = q.mapping.recipeMetaKey ? metaValue(item, q.mapping.recipeMetaKey) : extractRecipeJson(item, '');
         const captionFieldPresent = !q.mapping.captionMetaKey || hasMetaKey(item, q.mapping.captionMetaKey);
-        rows.push({ id, title, slug, link, publishedAt, caption, imageId, recipe, captionFieldPresent });
+        const fromPost = !q.mapping.captionMetaKey || !q.mapping.recipeMetaKey;
+        const own = fromPost ? { excerpt: stripHtml(renderedOf(item['excerpt'])), article: stripHtml(renderedOf(item['content']).replace(/<\/(?:li|h[1-6]|tr)>/gi, '$&\n')) } : {};
+        rows.push({ id, title, slug, link, publishedAt, caption, imageId, recipe, captionFieldPresent, ...own });
       }
       return { rows, fetched: raw.length, requested };
     },

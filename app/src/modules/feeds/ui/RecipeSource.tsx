@@ -28,7 +28,7 @@ export type RecipeView = {
   labels?: { lastRun: string | null; poolAsOf: string | null; slots: Record<string, string> };
 };
 export type RecipePool = { asOf: string; complete: boolean; warnDays: number; low: boolean; pages: Array<{ targetId: string; targetName: string; eligible: number; daysLeft: number | null; low: boolean }> };
-type Preview = { items: Array<{ wpPostId: string; title: string; permalink: string; imageUrl: string; caption: string; firstComment: string }> };
+type Preview = { items: Array<{ wpPostId: string; title: string; permalink: string; imageUrl: string; caption: string; firstComment: string; writtenByAi?: boolean }> };
 type Review = 'save' | 'pause' | 'resume' | 'run' | 'retry';
 const PAUSE_PHRASE = 'PAUSE RECIPE SOURCE';
 const PAUSE_CANCEL_PHRASE = 'PAUSE RECIPE SOURCE AND CANCEL SCHEDULED POSTS';
@@ -154,6 +154,7 @@ export function RecipeSource({ initial, locale, canWrite, copy = recipeCopy }: {
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img className={styles.thumb} src={item.imageUrl} alt={t('previewImage', { title: item.title })} loading="lazy" width={160} height={160} />
         <div><strong>{item.title}</strong> <a href={item.permalink} target="_blank" rel="noopener noreferrer">{t('previewLink')}</a>
+          {item.writtenByAi !== undefined && <span className={styles.meta}>{t(item.writtenByAi ? 'previewByAi' : 'previewAiFailed')}</span>}
           <span className={styles.meta}>{t('previewCaption')}</span><p className={styles.reviewPreview}>{item.caption}</p>
           <span className={styles.meta}>{t('previewComment')}</span><p className={styles.reviewPreview}>{item.firstComment}</p></div>
       </li>)}</ul> : <p className={styles.empty}>{t('previewEmpty')}</p>}

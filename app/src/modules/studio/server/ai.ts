@@ -4,8 +4,8 @@ import { prisma } from '@/server/data';
 import { runtimeConfigBatch, runtimeSecret } from '@/server/config/store';
 import { AI_BOUNDS, AI_PROVIDERS, altTextPolicySchema, type AiProviderId } from '../config';
 import {
-  AI_KINDS, AI_REQUEST_SCHEMA, summarizeSchema, TONES, buildPrompt, buildSummaryPrompt, cleanOutput, parseHashtags,
-  type AiContext, type AiImageInput, type AiPort, type AiResult, type AiStatus, type SummarizeRequest, type SummaryResult,
+  AI_KINDS, AI_REQUEST_SCHEMA, summarizeSchema, TONES, buildArticlePrompt, buildPrompt, buildSummaryPrompt, cleanOutput, parseArticleWriting, parseHashtags,
+  type AiContext, type ArticleInput, type ArticleWriting, type AiImageInput, type AiPort, type AiResult, type AiStatus, type SummarizeRequest, type SummaryResult,
 } from '../ai';
 import { authorizeAi, type AiActor } from './access';
 import { METERING_KEYS, meteringFrom, monthlyUsage, recordUsage, type Metering } from './usage';
@@ -180,4 +180,32 @@ export async function summarize(actor: AiActor, input: SummarizeRequest, options
   const text = cleanOutput(rawRecap, limit);
   if (!text) throw new OperationError('upstream_failure', 'AI assist returned an empty answer. Try again.');
   return { text };
+}
+
+const ARTICLE_TEXT_MAX = 12_000;
+const ARTICLE_OUTPUT_TOKENS = 1_500;
+/** Whether articles can be written into posts for this workspace: AI configured at Root and switched on for the workspace. */
+export async function articleWritingAvailable(workspaceId: string, deps: AiDeps = {}): Promise<boolean> {
+  const [s, workspace] = await Promise.all([settings(deps), workspaceContext(workspaceId)]);
+  return Boolean(s && workspace?.enabled);
+}
+
+/**
+ * Write a post from any article: a caption plus the lists it contains (empty when it has none). Same authorization,
+ * hourly limit, budget and metering as composer assist; nothing is saved here, the caller schedules the result.
+ */
+export async function writeFromArticle(actor: AiActor, article: ArticleInput, deps: AiDeps = {}): Promise<ArticleWriting> {
+  await authorizeAi(actor, COMPOSER_FEATURE, 'write');
+  const [s, workspace] = await Promise.all([settings(deps), workspaceContext(actor.workspaceId)]);
+  if (!s || !workspace?.enabled) throw unavailable();
+  // An article is longer than a composer draft and the answer carries a caption and two lists, so both bounds are raised within the Root limits.
+  const input = { title: article.title.slice(0, 500), excerpt: article.excerpt.slice(0, 2000), text: article.text.slice(0, Math.max(s.maxInput, ARTICLE_TEXT_MAX)) };
+  const length = input.title.length + input.excerpt.length + input.text.length;
+  await claim(actor, s, 'article', length, (deps.now ?? (() => new Date()))());
+  const { system, prompt } = buildArticlePrompt(input, workspace);
+  const raw = await complete({ ...s, maxTokens: Math.min(AI_BOUNDS.maxOutputTokens.max, Math.max(s.maxTokens, ARTICLE_OUTPUT_TOKENS)) }, system, prompt);
+  await recordUsage(s.metering, actor, 'article', system.length + prompt.length, raw.length, (deps.now ?? (() => new Date()))());
+  const written = parseArticleWriting(raw, s.maxInput * s.outputInputMultiplier);
+  if (!written) throw new OperationError('upstream_failure', 'AI assist returned no usable post for this article. Try again.');
+  return written;
 }

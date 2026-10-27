@@ -10,7 +10,7 @@ import { pauseAndCancelRecipeSourceConfirmation, pauseRecipeSourceConfirmation, 
 import { authorizeFeedWrite, authorizeFeeds, type FeedActor, type FeedAuthorization } from './access';
 import { audit, bad, lockActor, protect, type Tx } from './core';
 import { feedsError } from './messages';
-import { commentFor, configOf, defaultPlannerPorts, openDatabase, planSource, recipeSummaryRecord, scanCandidates, supplyLedgerView, type PlannerPorts } from './wordpress-planner';
+import { commentFor, configOf, writeCandidate, defaultPlannerPorts, openDatabase, planSource, recipeSummaryRecord, scanCandidates, supplyLedgerView, type PlannerPorts } from './wordpress-planner';
 import { loadWordpressSettings, patchLimits, type WordpressSettings } from './wordpress-settings';
 import { cachedPoolHealth, computePoolHealth, forgetPoolHealth, type PoolHealth } from './wordpress-pool';
 import { cancelPlannedPosts, retryRecipeSlots } from './wordpress-recovery';
@@ -228,7 +228,8 @@ async function authorizedSource(actor: FeedActor) {
   return { auth, source };
 }
 
-export type PreviewItem = { wpPostId: string; title: string; permalink: string; imageUrl: string; caption: string; firstComment: string; publishedAt: string | null };
+/** `writtenByAi`: present when AI writes this post's caption or lists; false when it could not for this preview. */
+export type PreviewItem = { wpPostId: string; title: string; permalink: string; imageUrl: string; caption: string; firstComment: string; publishedAt: string | null; writtenByAi?: boolean };
 /** The next recipes exactly as they will post: image, caption and first comment. Nothing is created. */
 export async function previewRecipeSource(actor: FeedActor, input: unknown = {}, deps: RecipeDeps = {}) {
   const s = await loadWordpressSettings();
@@ -246,10 +247,14 @@ export async function previewRecipeSource(actor: FeedActor, input: unknown = {},
     for (const page of view.reused.values()) for (const [id, at] of page) dates.set(id, Math.max(dates.get(id) ?? -Infinity, at));
     const fresh = <C extends { wpPostId: string }>(found: C[], allowReuse = true): C[] => found.filter(c => !used.has(c.wpPostId) && !view.taken.has(c.wpPostId) && (allowReuse || !dates.has(c.wpPostId)))
       .sort((a, b) => (dates.get(a.wpPostId) ?? -Infinity) - (dates.get(b.wpPostId) ?? -Infinity));
-    const scan = await scanCandidates(db, s, source, config, now, found => !s.reuse.enabled && fresh(found).length >= s.previewCount);
-    const items: PreviewItem[] = fresh(scan.candidates, scan.exhausted).slice(0, s.previewCount).map(c => ({
-      wpPostId: c.wpPostId, title: c.title, permalink: c.permalink, imageUrl: c.imageUrl, caption: c.caption, firstComment: commentFor(s, config, c), publishedAt: c.publishedAt?.toISOString() ?? null,
-    }));
+    const writer = await ports.writer.available(source.workspaceId).catch(() => false);
+    const scan = await scanCandidates(db, s, source, config, now, found => !s.reuse.enabled && fresh(found).length >= s.previewCount, writer);
+    const items: PreviewItem[] = [];
+    for (const c of fresh(scan.candidates, scan.exhausted).slice(0, s.previewCount)) {
+      // AI writes the same way at planning time; a preview it cannot write shows the post's own text and says so.
+      const written = await writeCandidate(ports, actor, s, config, c).catch(() => null);
+      items.push({ wpPostId: c.wpPostId, title: c.title, permalink: c.permalink, imageUrl: c.imageUrl, caption: written?.caption ?? c.caption, firstComment: written?.firstComment ?? commentFor(s, config, c), publishedAt: c.publishedAt?.toISOString() ?? null, ...(c.write ? { writtenByAi: Boolean(written) } : {}) });
+    }
     return { items, scanned: scan.scanned, exhausted: scan.exhausted, rejected: scan.rejected };
   } catch (error) {
     if (error instanceof OperationError) throw error;
