@@ -112,6 +112,12 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
     ...(attention.reconnect?.length ? [{ key: 'reconnect', icon: <IconPlugConnected size={18} aria-hidden="true" />,
       title: attention.reconnect.length === 1 ? fill(t.attentionReconnect, { name: attention.reconnect[0]!.name }) : fill(t.attentionReconnectMany, { n: number.format(attention.reconnect.length) }),
       href: '/settings/channels' }] : []),
+    // An empty queue is the first thing to fix: nothing going out means no reach at all.
+    ...(attention.emptyQueues?.count ? [{ key: 'queue', icon: <IconClockHour4 size={18} aria-hidden="true" />,
+      title: attention.emptyQueues.count === overview.channelCount && overview.channelCount > 1 ? fill(t.attentionEmptyAll, { n: number.format(attention.emptyQueues.count) })
+        : attention.emptyQueues.count <= 3 ? fill(t.attentionEmptySome, { names: attention.emptyQueues.names.join(', ') })
+        : fill(t.attentionEmptyMore, { names: attention.emptyQueues.names.join(', '), n: number.format(attention.emptyQueues.count - 3) }),
+      href: '/content/calendar' }] : []),
     ...(attention.waitingConversations ? [{ key: 'inbox', icon: <IconInbox size={18} aria-hidden="true" />, title: fill(t.attentionConversations, { n: number.format(attention.waitingConversations) }), href: '/inbox?quick=unanswered' }] : []),
   ] : [];
 

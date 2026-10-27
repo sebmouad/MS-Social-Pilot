@@ -26,6 +26,8 @@ export type HomeAttention = {
   /** Null when the viewer may not use the owning module, or that read failed while others succeeded. */
   failedPosts: number | null; partiallyFailedPosts: number | null; pendingApprovals: number | null; waitingConversations: number | null;
   reconnect: Array<{ id: string; name: string; platform: string | null }> | null;
+  /** Publishing channels with nothing scheduled ahead (an empty queue costs reach); null when not readable. */
+  emptyQueues?: { count: number; names: string[] } | null;
   /** True when at least one permitted read failed; the strip shows what is known with a warning. */
   partial: boolean;
 };
@@ -210,7 +212,7 @@ export async function readHomeOverview(actor: HomeActor, now = new Date(), optio
     const reconnectLimit = Number(config['home.attentionReconnectLimit']);
     // Each count is read through its own module's service with the same authorization as the module's screen.
     // A failed count is withheld (null) while the others still show; all failing together is unavailable.
-    const [failed, partial, approvals, waiting, reconnect] = await Promise.all([
+    const [failed, partial, approvals, waiting, reconnect, emptyQueues] = await Promise.all([
       allowed('publishing/posts') ? readPublishingPostPage(publishingActor, { status: 'failed' }).then(page => page.total, () => null) : null,
       allowed('publishing/posts') ? readPublishingPostPage(publishingActor, { status: 'partially_failed' }).then(page => page.total, () => null) : null,
       allowed('publishing/approvals') ? pendingApprovalCount({ userId: actor.userId, workspaceId: actor.workspaceId }) : null,
@@ -219,6 +221,12 @@ export async function readHomeOverview(actor: HomeActor, now = new Date(), optio
         ? shellChannels(actor.workspaceId, channelScope ? [...channelScope] : undefined, maxChannels, now)
           .then(rows => rows.filter(row => row.health !== 'connected').slice(0, reconnectLimit).map(row => ({ id: row.id, name: row.name, platform: row.platformName })), () => null)
         : null,
+      allowed('publishing/posts') ? prisma.$queryRaw<Array<{ name: string }>>`
+        SELECT t.name FROM targets t WHERE t."workspaceId" = ${actor.workspaceId} AND t.enabled AND t."canPublish"
+          AND (${channelScope ? [...channelScope] : null}::text[] IS NULL OR t.id = ANY(${channelScope ? [...channelScope] : null}::text[]))
+          AND NOT EXISTS (SELECT 1 FROM post_targets pt JOIN posts p ON p.id = pt."postId" WHERE pt."targetId" = t.id AND p."workspaceId" = t."workspaceId"
+            AND p.status = 'scheduled' AND p."scheduledAt" > ${now} AND pt.status IN ('pending', 'scheduled_remote'))
+        ORDER BY t.name`.then(rows => ({ count: rows.length, names: rows.slice(0, 3).map(row => row.name) }), () => null) : null,
     ]);
     const attempts: Array<{ want: boolean; value: unknown }> = [
       { want: allowed('publishing/posts'), value: failed }, { want: allowed('publishing/posts'), value: partial },
@@ -227,7 +235,7 @@ export async function readHomeOverview(actor: HomeActor, now = new Date(), optio
     ];
     const wanted = attempts.filter(attempt => attempt.want);
     if (wanted.length && wanted.every(attempt => attempt.value === null)) return { state: 'unavailable' };
-    return { state: 'ready', data: { failedPosts: failed, partiallyFailedPosts: partial, pendingApprovals: approvals, waitingConversations: waiting, reconnect, partial: wanted.some(attempt => attempt.value === null) } };
+    return { state: 'ready', data: { failedPosts: failed, partiallyFailedPosts: partial, pendingApprovals: approvals, waitingConversations: waiting, reconnect, emptyQueues, partial: wanted.some(attempt => attempt.value === null) } };
   });
 
   const ads = !(allowed('ads/overview') && allowed('ads/campaigns')) ? null : settled<Data<'ads'>>(async () => {

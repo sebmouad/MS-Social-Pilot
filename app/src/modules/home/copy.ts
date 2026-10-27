@@ -35,7 +35,7 @@ const en = {
   adsEmptyTitle: 'No ad spend yet', adsEmptyBody: 'Spend shows here once your ad accounts have stored results.', adsEmptyAction: 'Open ads',
   attention: 'Needs attention', attentionFailed: 'Failed posts: {n}', attentionPartial: 'Partly failed posts: {n}',
   attentionApprovals: 'Waiting for your approval: {n}', attentionReconnect: 'Reconnect {name}', attentionReconnectMany: '{n} connections need reconnecting',
-  attentionConversations: 'Unanswered conversations: {n}', inboxNoText: 'Photo, sticker or reaction', attentionReview: 'Review', attentionPartialNote: 'Some counts could not be loaded.',
+  attentionConversations: 'Unanswered messages and comments: {n}', attentionEmptyAll: 'Nothing scheduled on any of your {n} channels', attentionEmptySome: 'Nothing scheduled on {names}', attentionEmptyMore: '{names} and {n} more have nothing scheduled', inboxNoText: 'Photo, sticker or reaction', attentionReview: 'Review', attentionPartialNote: 'Some counts could not be loaded.',
   linkClicks: 'Link clicks', openCalendar: 'Open calendar', retry: 'Retry', audienceDeltaSince: 'since {date}',
 };
 
@@ -71,7 +71,7 @@ const fr: typeof en = {
   adsEmptyTitle: 'Pas encore de dépenses', adsEmptyBody: 'Les dépenses apparaissent dès que vos comptes publicitaires ont des résultats enregistrés.', adsEmptyAction: 'Ouvrir les publicités',
   attention: 'À traiter', attentionFailed: 'Publications en échec : {n}', attentionPartial: 'Publications partiellement en échec : {n}',
   attentionApprovals: 'En attente de votre approbation : {n}', attentionReconnect: 'Reconnecter {name}', attentionReconnectMany: '{n} connexions à reconnecter',
-  attentionConversations: 'Conversations sans réponse : {n}', inboxNoText: 'Photo, autocollant ou réaction', attentionReview: 'Voir', attentionPartialNote: 'Certains chiffres n’ont pas pu être chargés.',
+  attentionConversations: 'Messages et commentaires sans réponse : {n}', attentionEmptyAll: 'Rien de programmé sur vos {n} canaux', attentionEmptySome: 'Rien de programmé sur {names}', attentionEmptyMore: '{names} et {n} autres n’ont rien de programmé', inboxNoText: 'Photo, autocollant ou réaction', attentionReview: 'Voir', attentionPartialNote: 'Certains chiffres n’ont pas pu être chargés.',
   linkClicks: 'Clics sur les liens', openCalendar: 'Ouvrir le calendrier', retry: 'Réessayer', audienceDeltaSince: 'depuis le {date}',
 };
 
