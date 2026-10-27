@@ -12,7 +12,8 @@ export const WORKSPACE_OPERATION_BOUNDS = {
   aiTone: 50, aiBrandVoice: 2000, aiAvoidWords: 1000,
 } as const;
 
-const optionalText = (max: number) => z.string().trim().max(max).transform(value => value || null);
+// Empty values are stored and read back as null, so null is accepted as well as an empty string.
+const optionalText = (max: number) => z.string().trim().max(max).nullable().transform(value => value || null);
 
 const operationsShape = z.object({
   weekStartsOn: z.number().int().min(0).max(6),
