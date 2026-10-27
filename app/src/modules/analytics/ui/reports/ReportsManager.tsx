@@ -217,11 +217,6 @@ export function ReportsManager({ templates, templateOptions, schedules, runs, ca
         <span aria-current="page" aria-label={t("Page {0}", page)}>{t("Page")} {page}</span>
         {hasMoreTemplates || hasMoreSchedules ? <a className="ui-button ui-button--secondary ui-button--sm" rel="next" href={templatesHref(page + 1)}>{t("Next page")}</a> : <span className="ui-button ui-button--secondary ui-button--sm" aria-disabled="true">{t("Next page")}</span>}
       </nav>}
-      {runPager && <nav className={styles.sidebarPager} aria-label={t("Report history pages")}>
-        {runsPage > 1 ? <a className="ui-button ui-button--secondary ui-button--sm" rel="prev" href={runsHref(runsPage - 1)}>{t("Previous history page")}</a> : <span className="ui-button ui-button--secondary ui-button--sm" aria-disabled="true">{t("Previous history page")}</span>}
-        <span aria-current="page" aria-label={t("History page {0}", runsPage)}>{t("History page")} {runsPage}</span>
-        {runsHasMore ? <a className="ui-button ui-button--secondary ui-button--sm" rel="next" href={runsHref(runsPage + 1)}>{t("Next history page")}</a> : <span className="ui-button ui-button--secondary ui-button--sm" aria-disabled="true">{t("Next history page")}</span>}
-      </nav>}
     </div>
 
     {notice && <RouteNotice error={notice.error} focusKey={`reports:${notice.key}`}>{notice.text}</RouteNotice>}
@@ -259,12 +254,18 @@ export function ReportsManager({ templates, templateOptions, schedules, runs, ca
     {(runsPage > 1 || runs.length > 0 || templates.length > 0 || schedules.length > 0 || !canGenerate) && <section className={styles.panel} aria-labelledby="run-h"><div className={styles.panelHeading}><div><h2 id="run-h"><IconHistory aria-hidden="true" /> {t("Report history")}</h2><p>{t("Preparation and email outcomes, by channel and reporting period.")}</p></div></div>
       {!canGenerate && <p className={styles.info} role="status">{t("Report preparation and history are temporarily unavailable. Existing templates and schedules remain available.")}</p>}
       {runs.length ? <DataTable caption={t("Report history")} rows={runs} rowKey={run => run.id} columns={[
-        { key: 'result', label: t("Result"), render: run => <><Badge tone={run.status === 'completed' ? 'success' : run.status === 'failed' ? 'danger' : ['partial', 'uncertain'].includes(run.status) ? 'warning' : 'neutral'}>{runStatus(run)}</Badge><span className={styles.secondaryLine}>{run.kind === 'manual' ? t("Prepared for download") : t("Scheduled email")}</span></> },
+        { key: 'result', label: t("Result"), render: run => <><Badge tone={run.status === 'completed' ? 'success' : run.status === 'failed' ? 'danger' : ['partial', 'uncertain'].includes(run.status) ? 'warning' : 'neutral'}>{runStatus(run)}</Badge><span className={styles.secondaryLine}>{run.kind === 'manual' ? t("Download") : t("Scheduled email")}</span></> },
         { key: 'period', label: t("Channel and period"), render: run => <>{channels.find(channel => channel.id === run.channelId)?.name ?? t("Channel unavailable")}<span className={styles.secondaryLine}>{run.periodStart} {t("to")} {run.periodEnd}</span></> },
         { key: 'started', label: t("Started"), render: run => <>{run.startedLabel ?? formatInZone(run.startedAt, timeZone, locale, t('Time unavailable'))}<span className={styles.secondaryLine}>{timeZone}</span></> },
         { key: 'rows', label: t("Rows"), align: 'end', render: run => <>{run.rowCount === null ? '—' : run.rowCount}{run.truncated ? t(" · shortened") : ''}{run.note && <span className={styles.secondaryLine}>{run.note}</span>}</> },
-        { key: 'delivery', label: t("Delivery"), render: run => run.deliveries.length ? run.deliveries.map((delivery, index) => <span className={styles.deliveryLine} key={`${delivery.mask}-${index}`}>{delivery.mask} · {t(DELIVERY[delivery.status] ?? t("status unavailable"))}</span>) : run.kind === 'manual' && run.status === 'completed' ? t("Download prepared") : t("No recipient details") },
+        { key: 'delivery', label: t("Delivery"), render: run => run.deliveries.length ? run.deliveries.map((delivery, index) => <span className={styles.deliveryLine} key={`${delivery.mask}-${index}`}>{delivery.mask} · {t(DELIVERY[delivery.status] ?? t("status unavailable"))}</span>) : run.kind === 'manual' ? (run.status === 'completed' ? t("Download prepared") : '—') : t("No recipient details") },
       ]} /> : <div className={styles.emptyState}><h3>{runsPage > 1 ? t("No runs on this page") : t("No report runs yet")}</h3><p>{runsPage > 1 ? t("Use Previous history page to return to report history.") : t("Prepared downloads and scheduled deliveries will appear here after the first report runs.")}</p></div>}
+      {/* History pages belong under the history they page, not in the page's top action bar. */}
+      {runPager && <nav className={styles.sidebarPager} aria-label={t("Report history pages")}>
+        {runsPage > 1 ? <a className="ui-button ui-button--secondary ui-button--sm" rel="prev" href={runsHref(runsPage - 1)}>{t("Previous history page")}</a> : <span className="ui-button ui-button--secondary ui-button--sm" aria-disabled="true">{t("Previous history page")}</span>}
+        <span aria-current="page" aria-label={t("History page {0}", runsPage)}>{t("History page")} {runsPage}</span>
+        {runsHasMore ? <a className="ui-button ui-button--secondary ui-button--sm" rel="next" href={runsHref(runsPage + 1)}>{t("Next history page")}</a> : <span className="ui-button ui-button--secondary ui-button--sm" aria-disabled="true">{t("Next history page")}</span>}
+      </nav>}
     </section>}
 
     <Dialog closeLabel={t('Close')} open={form === 'template'} title={editingTemplate ? t("Edit template") : t("New template")} description={t("A template saves report sections and a preferred period for reuse.")} busy={busy} onClose={() => !busy && setForm(null)} actions={<><Button data-dialog-cancel variant="secondary" disabled={busy} onClick={() => setForm(null)}>{t("Cancel")}</Button><Button type="submit" form="tpl-form" variant="primary" disabled={busy}>{busy ? t("Saving…") : editingTemplate ? t("Save changes") : t("Create template")}</Button></>}>

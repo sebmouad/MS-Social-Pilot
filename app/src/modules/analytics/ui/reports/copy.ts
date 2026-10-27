@@ -126,6 +126,7 @@ const french: Record<string, string> = {
   "Report preparation and history are temporarily unavailable. Existing templates and schedules remain available.": "La préparation et l’historique sont temporairement indisponibles. Les modèles et planifications existants restent disponibles.",
   "Result": "Résultat",
   "Prepared for download": "Préparé pour téléchargement",
+  "Download": "Téléchargement",
   "Scheduled email": "E-mail planifié",
   "Channel and period": "Canal et période",
   "Channel unavailable": "Canal indisponible",
