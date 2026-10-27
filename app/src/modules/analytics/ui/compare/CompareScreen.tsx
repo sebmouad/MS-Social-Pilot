@@ -93,12 +93,19 @@ export default async function ComparePage({ searchParams }: { searchParams: Prom
       <section className={styles.panel}><h2>{t("Metrics")}</h2>
         {/* The table below states A, B and the difference for every metric; a two-bar chart per metric only repeated it. */}
         {data.truncated && <p className={styles.alert} role="status">{t("Showing")}{" "}{data.metrics.length}{" "}{t("of")}{" "}{data.totalMetrics}{" "}{t("metrics.")}</p>}
-        {data.metrics.length ? <div className={styles.tableWrap} tabIndex={0} role="region" aria-label={t("Metrics")}><table><caption>{t("A is")}{" "}{data.mode === 'period' ? `${data.periods.a.start} to ${data.periods.a.end}` : t('group A')}{t("; B is")}{" "}{data.mode === 'period' ? `${data.periods.b.start} to ${data.periods.b.end}` : t('group B')}</caption><thead><tr><th scope="col">{t("Metric")}</th><th scope="col" className={styles.num}>{t("A")}</th><th scope="col" className={styles.num}>{t("B")}</th><th scope="col" className={styles.num}>{t("Difference")}</th><th scope="col">{t("Basis")}</th></tr></thead>
-          <tbody>{data.metrics.map(m => <tr key={m.key}><th scope="row">{m.label}<br /><small>{m.sourceLabel}</small></th>
+        {/* Comparable metrics first; the rest (unknown on a side, different coverage) fold away instead of making a phone page 8,000px long. */}
+        {data.metrics.length ? <>{(() => {
+          const metricRow = (m: (typeof data.metrics)[number]) => <tr key={m.key}><th scope="row">{m.label}<br /><small>{m.sourceLabel}</small></th>
             <td className={styles.num}>{m.a ? formatValue(m.a.total, m.unit, m.a.displayTotal) : t('Unknown')}<br /><small>{m.a ? `${m.a.coverage}/${m.a.available} ${m.resourceKind === 'ad-account' ? t('ad accounts') : t('channels')}` : t('no data')}</small></td>
             <td className={styles.num}>{m.b ? formatValue(m.b.total, m.unit, m.b.displayTotal) : t('Unknown')}<br /><small>{m.b ? `${m.b.coverage}/${m.b.available} ${m.resourceKind === 'ad-account' ? t('ad accounts') : t('channels')}` : t('no data')}</small></td>
             <td className={styles.num}>{m.delta === null ? '–' : `${m.delta > 0 ? '+' : ''}${formatValue(m.delta, m.unit)}${m.percent === null ? '' : ` (${m.percent > 0 ? '+' : ''}${m.percent.toFixed(1)}%)`}`}</td>
-            <td><strong>{t(LABEL[m.status] as keyof WorkspaceCopy)}</strong><br /><small>{m.reason}</small></td></tr>)}</tbody></table></div> : <p className={styles.empty}>{t("No stored metrics exist for either side.")}</p>}</section></>}
+            <td><strong>{t(LABEL[m.status] as keyof WorkspaceCopy)}</strong><br /><small>{m.reason}</small></td></tr>;
+          const table = (rows: typeof data.metrics, label: string) => <div className={styles.tableWrap} tabIndex={0} role="region" aria-label={label}><table><caption>{t("A is")}{" "}{data.mode === 'period' ? `${data.periods.a.start} to ${data.periods.a.end}` : t('group A')}{t("; B is")}{" "}{data.mode === 'period' ? `${data.periods.b.start} to ${data.periods.b.end}` : t('group B')}</caption><thead><tr><th scope="col">{t("Metric")}</th><th scope="col" className={styles.num}>{t("A")}</th><th scope="col" className={styles.num}>{t("B")}</th><th scope="col" className={styles.num}>{t("Difference")}</th><th scope="col">{t("Basis")}</th></tr></thead>
+          <tbody>{rows.map(metricRow)}</tbody></table></div>;
+          const compared = data.metrics.filter(m => m.status === 'comparable');
+          const others = data.metrics.filter(m => m.status !== 'comparable');
+          return <>{compared.length ? table(compared, t("Metrics")) : null}{others.length ? <details className={styles.otherMetrics}><summary>{t("Not comparable")} ({others.length})</summary>{table(others, t("Not comparable"))}</details> : null}</>;
+        })()}</> : <p className={styles.empty}>{t("No stored metrics exist for either side.")}</p>}</section></>}
     {benchmark && benchmark.rows.length > 1 ? <section className={styles.panel} aria-labelledby="page-benchmark">
       <h2 id="page-benchmark">{bench.title}</h2>
       <p className={styles.note}>{bench.note(benchmark.days, benchmark.rankLabel)}</p>

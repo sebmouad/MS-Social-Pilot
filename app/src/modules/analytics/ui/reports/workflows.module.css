@@ -88,3 +88,5 @@
 .history { margin-top: var(--space-3); }
 .history > summary { cursor: pointer; color: var(--accent); font-weight: 600; font-size: var(--text-sm); }
 .history > details { margin-left: var(--space-4); }
+.otherMetrics { margin-top: .8rem; }
+.otherMetrics > summary { min-height: 44px; display: flex; align-items: center; color: var(--ink-soft); font-weight: 650; cursor: pointer; }
