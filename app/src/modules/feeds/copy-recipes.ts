@@ -40,7 +40,7 @@ export const recipeCopy = {
     poolLow: 'Recipe supply is running low on {count} channels: fewer than {days} days left. Add new recipes or adjust your posting times.', poolPartial: 'Large library: counts are at least these values.', poolRowLow: 'Running low',
     colEligible: 'Recipes left', colDays: 'Days left', daysUnlimited: 'No limit', poolAsOf: 'Checked {when}.',
     previous: 'Previous', next: 'Next', pageLabel: 'Page {page}', savedNotice: 'Recipe source saved.', pausedNotice: 'Recipe planning paused.', resumedNotice: 'Recipe planning resumed.',
-    runNotice: '{planned} posts scheduled, {failed} failed, {unfilled} times still empty.', unknownError: 'The request could not be confirmed. Reload the page and check the planned posts before trying again.',
+    runNotice: '{planned} posts scheduled, {failed} failed, {unfilled} times still empty.', runContinues: 'The rest is planned on the next hourly run, or click Plan posts now again.', unknownError: 'The request could not be confirmed. Reload the page and check the planned posts before trying again.',
     enterRequired: 'Enter a name and the website address.', chooseOne: 'Choose at least one channel.', slotInvalid: 'Use times such as 07:00.',
   },
   fr: {
@@ -83,7 +83,7 @@ export const recipeCopy = {
     poolLow: 'La réserve de recettes baisse sur {count} canaux : moins de {days} jours restants. Ajoutez des recettes ou adaptez vos horaires.', poolPartial: 'Grande bibliothèque : les nombres sont au moins ces valeurs.', poolRowLow: 'Réserve basse',
     colEligible: 'Recettes restantes', colDays: 'Jours restants', daysUnlimited: 'Illimité', poolAsOf: 'Vérifié {when}.',
     previous: 'Précédent', next: 'Suivant', pageLabel: 'Page {page}', savedNotice: 'Source de recettes enregistrée.', pausedNotice: 'Planification des recettes mise en pause.', resumedNotice: 'Planification des recettes reprise.',
-    runNotice: '{planned} publications programmées, {failed} en échec, {unfilled} horaires encore vides.', unknownError: 'La demande n’a pas pu être confirmée. Actualisez la page et vérifiez les publications planifiées avant de réessayer.',
+    runNotice: '{planned} publications programmées, {failed} en échec, {unfilled} horaires encore vides.', runContinues: 'Le reste est planifié au prochain passage horaire, ou cliquez à nouveau sur Planifier maintenant.', unknownError: 'La demande n’a pas pu être confirmée. Actualisez la page et vérifiez les publications planifiées avant de réessayer.',
     enterRequired: 'Saisissez un nom et l’adresse du site.', chooseOne: 'Choisissez au moins un canal.', slotInvalid: 'Utilisez des heures comme 07:00.',
   },
 } as const;

@@ -100,8 +100,8 @@ export function RecipeSource({ initial, locale, canWrite, copy = recipeCopy }: {
       const body = await call('/api/feeds/wordpress/retry', 'POST', { confirmation: phrase }) as { planned: number; reconciled: number; unconfirmed: number; failed: number };
       await reload(); say(t('retryNotice', { planned: body.planned, reconciled: body.reconciled, unconfirmed: body.unconfirmed, failed: body.failed }));
     } else if (review === 'run') {
-      const body = await call('/api/feeds/wordpress/run', 'POST', { confirmation: phrase }) as { planned: number; failed: number; unfilled: number };
-      await reload(); say(t('runNotice', { planned: body.planned, failed: body.failed, unfilled: body.unfilled }));
+      const body = await call('/api/feeds/wordpress/run', 'POST', { confirmation: phrase }) as { planned: number; failed: number; unfilled: number; reason?: string };
+      await reload(); say(`${t('runNotice', { planned: body.planned, failed: body.failed, unfilled: body.unfilled })}${body.reason === 'time_limit' ? ` ${t('runContinues')}` : ''}`);
     }
     setReview(null);
   });

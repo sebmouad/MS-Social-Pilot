@@ -262,9 +262,12 @@ export async function previewRecipeSource(actor: FeedActor, input: unknown = {},
   } finally { await db.close(); }
 }
 
+const MANUAL_RUN_MS = 45_000;
 /** Plan now, as the signed-in member: creates scheduled posts for unfilled slots, bounded by the run budget. */
 export async function runRecipePlannerNow(actor: FeedActor, input: unknown, deps: RecipeDeps = {}) {
   const s = await loadWordpressSettings();
+  // Writing each post with AI takes seconds; a member's request stops in time and the hourly run plans the rest.
+  const deadline = Date.now() + MANUAL_RUN_MS;
   const data = await parse(confirmSchema, input);
   if (data.confirmation !== runRecipePlannerConfirmation) throw await bad();
   const { auth, source } = await authorizedSource(actor);
@@ -275,7 +278,7 @@ export async function runRecipePlannerNow(actor: FeedActor, input: unknown, deps
   if (!db) throw await feedsError('unavailable', 'The recipe library could not be reached. Try again later.');
   const now = ports.now();
   try {
-    const outcome = await planSource({ settings: s, ports, db, budget: { left: s.runBudget }, now }, source, auth);
+    const outcome = await planSource({ settings: s, ports, db, budget: { left: s.runBudget }, now, deadline }, source, auth);
     forgetPoolHealth(source.id);
     await ports.store.recordRun(actor.workspaceId, source.id, { at: now, error: null, summary: recipeSummaryRecord(outcome, now) }).catch(() => undefined);
     await audit(prisma as unknown as Tx, actor.workspaceId, actor, 'feeds.recipe_planner_run', { sourceId: source.id, planned: outcome.planned, failed: outcome.failed, uncertain: outcome.uncertain, unfilled: outcome.unfilled }).catch(() => undefined);

@@ -185,6 +185,8 @@ export type Ctx = {
   settings: WordpressSettings; ports: PlannerPorts; db: WpDb; budget: { left: number }; now: Date;
   /** Manual retry: only these slots (see slotKey) are planned, and a failed slot is revived even past its attempt cap. */
   retry?: ReadonlySet<string>;
+  /** Wall-clock end (epoch ms) for a run a member waits on; slots left then stay empty for the next run. */
+  deadline?: number;
 };
 const DEFINITIVE = new Set(['invalid_request', 'forbidden', 'unauthorized', 'unavailable', 'conflict', 'not_found']);
 const AUTHORITY = new Set(['forbidden', 'unauthorized', 'unavailable']);
@@ -239,8 +241,9 @@ export async function planSource(ctx: Ctx, source: SourceRow, auth: FeedAuthoriz
   const { assignments, unfilled } = allocateRecipes({ needs: todo, candidates: scan.candidates, allowReuse: scan.exhausted, blocked: view.blocked, taken: view.taken, reused: view.reused, distinct: config.distinctAcrossPages });
   out.unfilled = unfilled + (needs.length - todo.length);
 
-  for (const { targetId, slotAt, candidate: c } of assignments) {
+  for (const [index, { targetId, slotAt, candidate: c }] of assignments.entries()) {
     if (ctx.budget.left <= 0) break;
+    if (ctx.deadline !== undefined && Date.now() >= ctx.deadline) { out.unfilled += assignments.length - index; out.reason = 'time_limit'; break; }
     const previous = reviving.get(slotKey(targetId, slotAt));
     const priorSkipped = previous?.skipped ?? [];
     const claimId = await ports.store.claim({ workspaceId: source.workspaceId, sourceId: source.id, targetId, wpPostId: c.wpPostId, slotAt, title: c.title, permalink: c.permalink, skipped: priorSkipped });
