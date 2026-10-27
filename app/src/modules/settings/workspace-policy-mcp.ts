@@ -4,7 +4,7 @@ import { workspacePolicyConfirmation } from './workspace-policy';
 import { readWorkspacePolicy, updateWorkspacePolicy } from './server/workspace-policy';
 import type { WorkspacePolicyActor } from './workspace-policy';
 import { readWorkspaceOperations, updateWorkspaceOperations } from './server/workspace-operations';
-import { WORKSPACE_OPERATION_BOUNDS as B } from './workspace-operations';
+import { WORKSPACE_OPERATION_BOUNDS as B, workspaceOperationsConfirmation } from './workspace-operations';
 
 const text = (max: number) => ({ type: 'string', maxLength: max });
 const operationsSettingsSchema = { type: 'object', additionalProperties: false, required: ['weekStartsOn', 'businessDays', 'businessStart', 'businessEnd', 'bestTimeMode', 'utmSource', 'utmMedium', 'utmCampaignTemplate', 'shortenerEnabled', 'spamGapMinutes', 'undoSendSeconds', 'aiEnabled', 'aiTone', 'aiBrandVoice', 'aiAvoidWords', 'watchNegativeComments'], properties: {
@@ -24,11 +24,12 @@ export const workspacePolicyToolDefinitions = [
 export async function executeWorkspacePolicyTool(actor: WorkspacePolicyActor, name: string, args: Record<string, unknown>) {
   if (name === 'get_workspace_policies') {
     if (Object.keys(args).length) throw new OperationError('invalid_request', 'This policy read takes no arguments.');
-    return readWorkspacePolicy(actor);
+    // The update confirmations name the workspace; an MCP client has no other way to learn its id.
+    return { ...await readWorkspacePolicy(actor), confirmation: workspacePolicyConfirmation(actor.workspaceId) };
   }
   if (name === 'get_workspace_operations') {
     if (Object.keys(args).length) throw new OperationError('invalid_request', 'This settings read takes no arguments.');
-    return readWorkspaceOperations(actor);
+    return { ...await readWorkspaceOperations(actor), confirmation: workspaceOperationsConfirmation(actor.workspaceId) };
   }
   if (name === 'update_workspace_operations') return updateWorkspaceOperations(actor, args);
   if (name !== 'update_workspace_policies') throw new OperationError('invalid_request', 'Unknown workspace policy action.');
