@@ -28,7 +28,7 @@ export async function readConnectionDirectory(actor: { userId: string; workspace
     prisma.socialAccount.findMany({
       where, skip: offset, take: cap, orderBy: [{ name: 'asc' }, { id: 'asc' }],
       select: {
-        id: true, provider: true, name: true, invalidatedAt: true, tokenExpiresAt: true, scopes: true, createdAt: true,
+        id: true, provider: true, name: true, pictureUrl: true, profileUrl: true, providerUserId: true, invalidatedAt: true, tokenExpiresAt: true, scopes: true, createdAt: true,
         targets: { select: { id: true, type: true, name: true, enabled: true } },
         adAccounts: { select: { id: true, name: true, enabled: true } },
       },
@@ -40,6 +40,8 @@ export async function readConnectionDirectory(actor: { userId: string; workspace
     const health = summarizeConnectionHealth(account, await platformGrantHealth(account.provider, { scopes: account.scopes, hasAdAccounts: account.adAccounts.length > 0, locale: 'en' }), now);
     return {
       id: account.id, provider: account.provider, name: account.name, state: connectionState(account, now),
+      // The profile that connected these channels. Facebook shares a profile link only with user_link and no usernames.
+      profile: { name: account.name, accountId: account.providerUserId, pictureUrl: account.pictureUrl, profileUrl: account.profileUrl, username: null },
       tokenExpiresAt: account.tokenExpiresAt?.toISOString() ?? null, reconnectRecommended: health.reconnectRecommended,
       missingPermissions: health.missing.map(group => group.label), addedAt: account.createdAt.toISOString(),
       channels: account.targets.map(target => ({ id: target.id, type: target.type, name: target.name, selected: target.enabled })),
