@@ -391,7 +391,10 @@ async function logItemFailure(job: string, targetId: string, error: unknown) {
   console.warn(`[${job}] target=${targetId} failed: ${detail}`);
   // Also visible in Root › Errors, grouped by job and message, so a failed=N summary has a cause.
   // The target id makes a per-Page problem (one expired or under-permissioned Page) findable.
-  await recordError({ source: 'worker', error: new Error(`${detail ?? reason} [target ${targetId}]`), location: `facebook.${job}` });
+  // A Page or ad account name reads better than an internal id; the id stays so the row can be found.
+  const name = await prisma.target.findUnique({ where: { id: targetId }, select: { name: true } }).then(row => row?.name ?? null)
+    .then(found => found ?? prisma.adAccount.findUnique({ where: { id: targetId }, select: { name: true } }).then(row => row?.name ?? null)).catch(() => null);
+  await recordError({ source: 'worker', error: new Error(`${detail ?? reason} [${name ? `${name} · ` : ''}${targetId}]`), location: `facebook.${job}` });
 }
 
 type InboxFetch = {
