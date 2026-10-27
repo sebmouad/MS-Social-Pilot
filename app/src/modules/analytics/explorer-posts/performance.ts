@@ -17,12 +17,14 @@ const EXAMPLES = 5;
 export type PostFacts = {
   postId: string; channelId: string; channelName: string; text: string; publishedAt: Date; url: string | null;
   reach: number | null; engagement: number | null; madeHere: boolean;
+  /** The connected profile (social account) the channel was added through. */
+  profile?: string;
 };
 export type GroupRow = { key: string; posts: number; medianReach: number | null; engagementPer100: number | null; lowSample: boolean };
 export type Totals = { posts: number; measured: number; medianReach: number | null; totalReach: number; engagementPer100: number | null };
 export type Digest = {
   totals: Totals;
-  groups: Record<'hour' | 'weekday' | 'channel' | 'origin' | 'opening' | 'question' | 'length', GroupRow[]>;
+  groups: Record<'hour' | 'weekday' | 'channel' | 'profile' | 'origin' | 'opening' | 'question' | 'length', GroupRow[]>;
   best: PostSummary[]; weakest: PostSummary[];
 };
 export type PostSummary = { postId: string; channel: string; publishedAt: string; url: string | null; reach: number | null; engagement: number | null; madeHere: boolean; text: string };
@@ -72,6 +74,7 @@ export function digest(posts: PostFacts[], timeZone: string): Digest {
       hour: group(p => hourOf.format(p.publishedAt).padStart(2, '0') + ':00', 'key'),
       weekday: group(p => dayOf.format(p.publishedAt)),
       channel: group(p => p.channelName),
+      profile: group(p => p.profile ?? 'unknown profile'),
       origin: group(p => p.madeHere ? 'made in this app' : 'published elsewhere'),
       opening: group(p => captionStyle(p.text).opening),
       question: group(p => captionStyle(p.text).question),
@@ -93,9 +96,12 @@ export async function postFacts(actor: Actor, range: { start?: string; end?: str
   const ids = data.items.map(row => row.postId);
   const own = ids.length ? await prisma.post.findMany({ where: { workspaceId: actor.workspaceId, id: { in: ids } }, select: { id: true } }) : [];
   const madeHere = new Set(own.map(row => row.id));
+  const channelIds = [...new Set(data.items.map(row => row.channelId))];
+  const owners = channelIds.length ? await prisma.target.findMany({ where: { workspaceId: actor.workspaceId, id: { in: channelIds } }, select: { id: true, socialAccount: { select: { name: true } } } }) : [];
+  const profileOf = new Map(owners.map(row => [row.id, row.socialAccount?.name ?? 'unknown profile']));
   const facts = data.items.flatMap(row => row.publishedAt ? [{
     postId: row.postId, channelId: row.channelId, channelName: row.channelName, text: row.text ?? '', publishedAt: row.publishedAt, url: row.url,
-    reach: firstValue(row, REACH_KEYS), engagement: row.rankValue, madeHere: madeHere.has(row.postId),
+    reach: firstValue(row, REACH_KEYS), engagement: row.rankValue, madeHere: madeHere.has(row.postId), profile: profileOf.get(row.channelId),
   }] : []);
   return { facts, complete: data.nextPage === null, period: { start: data.period.start, end: data.period.end } };
 }
