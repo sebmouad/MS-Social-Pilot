@@ -211,3 +211,5 @@
   .main { grid-template-columns: minmax(0, 1fr) 400px; gap: var(--space-6); }
   .editor { margin-inline: 0; max-width: none; }
 }
+/* A group whose visible parts are all conditional (scheduling choices) must not draw an empty box. */
+.group:not(:has(> :not(legend):not(input[type="hidden"]))) { display: none; }

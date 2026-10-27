@@ -34,7 +34,8 @@ export function ChannelPreviewTabs({ recentPosts, channels, formats, previewPost
   const items = [{
     id: 'all', label: cc.createPreviewAll, content: <>
       <p className={styles.previewNote}>{cc.createPreviewInfo}</p>
-      <PostPreview post={previewPost} authorName={authorFallback} timeZone={timeZone} locale={locale} variant="card" mediaOverride={<AuthoringMediaPreview controller={attachments} />} />
+      {/* The post appears from the Page, not from the person writing it: lead with the first selected Page (+N for the others). */}
+      <PostPreview post={previewPost} authorName={channels[0] ? `${channels[0].displayName}${channels.length > 1 ? ` +${channels.length - 1}` : ''}` : authorFallback} {...(channels[0]?.pictureUrl ? { authorAvatarUrl: channels[0].pictureUrl } : {})} timeZone={timeZone} locale={locale} variant="card" mediaOverride={<AuthoringMediaPreview controller={attachments} />} />
     </>,
   }, ...channels.map(target => {
     const name = target.displayName;
