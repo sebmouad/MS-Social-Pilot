@@ -87,7 +87,7 @@ async function AdsPage({ searchParams }: { searchParams: Promise<AdsSearchParams
           </div>
           <div className="ads-boost__actions">
             {boost.url ? <a className="ui-button ui-button--secondary ui-button--sm" href={boost.url} target="_blank" rel="noreferrer">{t('boostOpenPost')}</a> : null}
-            <a className="ui-button ui-button--primary ui-button--sm" href="/ads/campaigns">{t('boostCreate')}</a>
+            <a className="ui-button ui-button--primary ui-button--sm" href={boost.targetId && boost.remotePostId ? `/ads/campaigns?${new URLSearchParams({ boostTarget: boost.targetId, boostPost: boost.remotePostId })}#boost` : '/ads/campaigns'}>{t('boostCreate')}</a>
           </div>
         </aside> : null}
         <AccountsTrendCharts accounts={trends} locale={locale} />

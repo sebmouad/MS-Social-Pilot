@@ -16,11 +16,15 @@ export type AdsNeutralOperation =
   /** Creation carries no objectId and no status: the platform module always creates the object paused. */
   | { type: 'campaign.create'; objectType: 'campaign'; name: string; objective: string }
   /** parentId is an existing campaign remote id; the shared service verifies it belongs to the account from stored history. */
-  | { type: 'adset.create'; objectType: 'adset'; parentId: string; name: string; dailyBudgetMinor: number; countryCode: string; optimizationGoal: string }
+  | { type: 'adset.create'; objectType: 'adset'; parentId: string; name: string; dailyBudgetMinor: number; countryCode: string; optimizationGoal: string;
+      /** Optional targeting beyond the first country: more countries, an age range (18–65) and a last delivery day (YYYY-MM-DD, end of day UTC). */
+      extraCountryCodes?: string[]; ageMin?: number; ageMax?: number; endDate?: string }
   /** parentId is an existing ad set remote id verified from stored history; creativeId is an existing account creative. The platform module always creates the ad paused. */
   | { type: 'ad.create'; objectType: 'ad'; parentId: string; name: string; creativeId: string }
   /** Stored workspace image and selected channel identity; never an arbitrary image URL or remote identity. No delivery or assignment. */
-  | { type: 'creative.create'; objectType: 'creative'; name: string; targetId: string; mediaId: string; format: 'image' | 'link'; message: string; title: string; linkUrl?: string };
+  | { type: 'creative.create'; objectType: 'creative'; name: string; targetId: string; mediaId: string; format: 'image' | 'link'; message: string; title: string; linkUrl?: string }
+  /** An already published post of the selected channel, promoted as it is (its reactions and comments stay with it). postId is the platform post id, verified against the channel's synced posts. */
+  | { type: 'creative.create'; objectType: 'creative'; name: string; targetId: string; format: 'post'; postId: string };
 
 /** Neutral description of one input an operation needs, so shared UI/MCP can render a form without provider knowledge. */
 export type AdsOperationInput =
@@ -46,7 +50,7 @@ export type AdsOperationSupport = {
 
 export type AdsCreativeSummary = { id: string; name: string | null; status: string | null; title: string | null; body: string | null; thumbnailUrl: string | null };
 export type AdsOpsCredential = { accessToken: string };
-export type AdsOpsContext = { credential: AdsOpsCredential; accountId: string; signal?: AbortSignal; creative?: { identityId: string; identityKind: string; image: { bytes: Buffer; mimeType: string } }; recordReceipt?: (receipt: Record<string, string>) => Promise<void> };
+export type AdsOpsContext = { credential: AdsOpsCredential; accountId: string; signal?: AbortSignal; creative?: { identityId: string; identityKind: string; image?: { bytes: Buffer; mimeType: string } }; recordReceipt?: (receipt: Record<string, string>) => Promise<void> };
 export type AdsOpsFailureKind = 'rejected' | 'uncertain';
 
 export interface AdsOpsHost {

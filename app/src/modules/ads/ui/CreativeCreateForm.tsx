@@ -11,9 +11,14 @@ import { useAdsCatalogs } from './AdsCopyProvider';
 
 type Creative = Extract<AdsNeutralOperation, { type: 'creative.create' }>;
 type Review = { operation: Creative; confirmation: string; requestId: string };
-type Sources = { targets: { id: string; name: string }[]; images: { id: string; mimeType: string }[]; nextTargetOffset: number | null; nextImageAfter: string | null; nameMaxCharacters: number; creativeMessageMaxCharacters: number; creativeTitleMaxCharacters: number; creativeUrlMaxCharacters: number };
+type Post = { targetId: string; postId: string; text: string; publishedAt: string | null; thumbnailUrl: string | null };
+type Sources = { targets: { id: string; name: string }[]; images: { id: string; mimeType: string }[]; posts?: Post[]; nextTargetOffset: number | null; nextImageAfter: string | null; nameMaxCharacters: number; creativeMessageMaxCharacters: number; creativeTitleMaxCharacters: number; creativeUrlMaxCharacters: number };
 
-export function CreativeCreateForm({ adAccountId, accountName, ownerScope, locale = 'en' }: { adAccountId: string; accountName: string; ownerScope: CreationOwnerScope; locale?: 'en' | 'fr' }) {
+/** What a held request was made from, for the recovery line: the image id, or the promoted post id. */
+const sourceOf = (operation: Creative) => operation.format === 'post' ? operation.postId : operation.mediaId;
+
+/** initialTargetId / initialPostId preselect a post to promote (the Boost suggestion links here). */
+export function CreativeCreateForm({ adAccountId, accountName, ownerScope, locale = 'en', initialTargetId, initialPostId }: { adAccountId: string; accountName: string; ownerScope: CreationOwnerScope; locale?: 'en' | 'fr'; initialTargetId?: string; initialPostId?: string }) {
   const localize = useAdsMessage();
   const { catalogs } = useAdsCatalogs();
   const t = catalogs.creative[locale];
@@ -26,7 +31,9 @@ export function CreativeCreateForm({ adAccountId, accountName, ownerScope, local
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
   const [held, setHeld] = useState<Review | null>(null);
-  const [format, setFormat] = useState('image');
+  const [format, setFormat] = useState(initialPostId ? 'post' : 'image');
+  const [targetId, setTargetId] = useState(initialTargetId ?? '');
+  const [postId, setPostId] = useState(initialPostId ?? '');
   const [selectedImage, setSelectedImage] = useState('');
   const [imageFailed, setImageFailed] = useState(false);
   const transmissions = useRef(0);
@@ -36,8 +43,8 @@ export function CreativeCreateForm({ adAccountId, accountName, ownerScope, local
   const validation = useFormValidation();
 
   useEffect(() => {
-    const stored = loadCreation<Review>('creative', owner, adAccountId, value => typeof value.requestId === 'string' && typeof value.confirmation === 'string' && Boolean(value.operation && typeof value.operation === 'object' && (value.operation as Creative).type === 'creative.create' && (value.operation as Creative).objectType === 'creative' && ['name', 'targetId', 'mediaId', 'message', 'title'].every(key => typeof (value.operation as Record<string, unknown>)[key] === 'string') && ['image', 'link'].includes((value.operation as Creative).format) && ((value.operation as Creative).format !== 'link' || typeof (value.operation as Creative).linkUrl === 'string')));
-    if (stored && stored.requestId === stored.request.requestId) { transmissions.current = stored.transmissions; setHeld(stored.request); setFormat(stored.request.operation.format); setSelectedImage(stored.request.operation.mediaId); }
+    const stored = loadCreation<Review>('creative', owner, adAccountId, value => typeof value.requestId === 'string' && typeof value.confirmation === 'string' && Boolean(value.operation && typeof value.operation === 'object' && (value.operation as Creative).type === 'creative.create' && (value.operation as Creative).objectType === 'creative' && (((value.operation as Creative).format === 'post' && ['name', 'targetId', 'postId'].every(key => typeof (value.operation as Record<string, unknown>)[key] === 'string')) || (['name', 'targetId', 'mediaId', 'message', 'title'].every(key => typeof (value.operation as Record<string, unknown>)[key] === 'string') && ['image', 'link'].includes((value.operation as Creative).format) && ((value.operation as Creative).format !== 'link' || typeof (value.operation as Record<string, unknown>).linkUrl === 'string')))));
+    if (stored && stored.requestId === stored.request.requestId) { transmissions.current = stored.transmissions; setHeld(stored.request); setFormat(stored.request.operation.format); setTargetId(stored.request.operation.targetId); if (stored.request.operation.format === 'post') setPostId(stored.request.operation.postId); else setSelectedImage(stored.request.operation.mediaId); }
   }, [owner, adAccountId]);
   useEffect(() => {
     const controller = new AbortController();
@@ -96,8 +103,10 @@ export function CreativeCreateForm({ adAccountId, accountName, ownerScope, local
     setError(''); setNotice('');
     if (!validation.validate(event.currentTarget)) { setError(t.invalid); return; }
     const data = new FormData(event.currentTarget);
-    const kind = data.get('format') === 'link' ? 'link' : 'image';
-    const operation: Creative = { type: 'creative.create', objectType: 'creative', name: String(data.get('name')).trim(), targetId: String(data.get('targetId')), mediaId: String(data.get('mediaId')), format: kind, message: String(data.get('message') ?? ''), title: kind === 'link' ? String(data.get('title') ?? '') : '', ...(kind === 'link' ? { linkUrl: String(data.get('linkUrl') ?? '') } : {}) };
+    const kind = data.get('format') === 'link' ? 'link' : data.get('format') === 'post' ? 'post' : 'image';
+    const operation: Creative = kind === 'post'
+      ? { type: 'creative.create', objectType: 'creative', name: String(data.get('name')).trim(), targetId: String(data.get('targetId')), format: 'post', postId: String(data.get('postId')) }
+      : { type: 'creative.create', objectType: 'creative', name: String(data.get('name')).trim(), targetId: String(data.get('targetId')), mediaId: String(data.get('mediaId')), format: kind, message: String(data.get('message') ?? ''), title: kind === 'link' ? String(data.get('title') ?? '') : '', ...(kind === 'link' ? { linkUrl: String(data.get('linkUrl') ?? '') } : {}) };
     setBusy(true);
     try {
       const response = await fetch('/api/ads/management', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'preview', adAccountId, operation }) });
@@ -105,7 +114,7 @@ export function CreativeCreateForm({ adAccountId, accountName, ownerScope, local
       if (!response.ok || typeof preview.confirmation !== 'string' || preview.blockedByOpenChange !== false) throw new Error();
       const request: Review = { operation: preview.operation, confirmation: preview.confirmation, requestId: globalThis.crypto.randomUUID() };
       setBusy(false);
-      await confirm(`${accountName} · ${operation.name} · ${operation.mediaId} · ${operation.title} · ${operation.message}${operation.linkUrl ? ` · ${operation.linkUrl}` : ""}. ${t.description}`, { exactConfirmation: request.confirmation, confirmationLabel: t.exact, pendingLabel: t.pending, failureLabel: t.failed, onConfirm: () => send(request) });
+      await confirm(operation.format === 'post' ? `${accountName} · ${operation.name} · ${sources?.posts?.find(post => post.postId === operation.postId)?.text.slice(0, 120) ?? operation.postId}. ${t.postNote}` : `${accountName} · ${operation.name} · ${operation.mediaId} · ${operation.title} · ${operation.message}${operation.linkUrl ? ` · ${operation.linkUrl}` : ""}. ${t.description}`, { exactConfirmation: request.confirmation, confirmationLabel: t.exact, pendingLabel: t.pending, failureLabel: t.failed, onConfirm: () => send(request) });
     } catch { setError(t.failed); } finally { setBusy(false); }
   }
 
@@ -115,20 +124,22 @@ export function CreativeCreateForm({ adAccountId, accountName, ownerScope, local
     {loading ? <p role="status">{t.loading}</p> : null}
     {error ? <p role="alert" className="ui-error">{localize(error)} <Button onClick={() => setReload(value => value + 1)} disabled={busy || loading}>{t.refresh}</Button></p> : null}
     {notice ? <p role="status">{localize(notice)}</p> : null}
-    {held ? <div role="alert"><p>{t.held}</p><p><strong>{held.operation.name}</strong> · {held.operation.mediaId}</p><Button disabled={busy} onClick={() => void send(held)}>{busy ? t.pending : t.check}</Button> <a href="/ads/manage#changes">{t.history}</a></div> : null}
+    {held ? <div role="alert"><p>{t.held}</p><p><strong>{held.operation.name}</strong> · {sourceOf(held.operation)}</p><Button disabled={busy} onClick={() => void send(held)}>{busy ? t.pending : t.check}</Button> <a href="/ads/manage#changes">{t.history}</a></div> : null}
     {sources ? <form noValidate onSubmit={submit} aria-label={t.title}>
       <div className="ads-campaign-create__fields">
         <label>{t.name}<input name="name" defaultValue={held?.operation.name} required maxLength={sources.nameMaxCharacters} disabled={locked} {...validation.fieldProps('name')} /><FieldError {...validation.errorProps('name')} /></label>
-        <label>{t.channel}<select name="targetId" required disabled={locked} {...validation.fieldProps('targetId')} defaultValue={held?.operation.targetId ?? ""}><option value="">{t.choose}</option>{held && !sources.targets.some(item => item.id === held.operation.targetId) ? <option value={held.operation.targetId}>{t.unavailable} · {held.operation.targetId}</option> : null}{sources.targets.map(target => <option key={target.id} value={target.id}>{target.name || t.unavailable}</option>)}</select><FieldError {...validation.errorProps('targetId')} /></label>
-        <label>{t.image}<select name="mediaId" onChange={event => { setSelectedImage(event.target.value); setImageFailed(false); }} required disabled={locked} {...validation.fieldProps('mediaId')} defaultValue={held?.operation.mediaId ?? ""}><option value="">{t.choose}</option>{held && !sources.images.some(item => item.id === held.operation.mediaId) ? <option value={held.operation.mediaId}>{t.unavailable} · {held.operation.mediaId}</option> : null}{sources.images.map(image => <option key={image.id} value={image.id}>{image.id} · {image.mimeType || t.unavailable}</option>)}</select><FieldError {...validation.errorProps('mediaId')} /></label>
-        <label>{t.format}<select name="format" value={format} onChange={event => setFormat(event.target.value)} disabled={locked}><option value="image">{t.photo}</option><option value="link">{t.link}</option></select></label>
-        <label>{t.message}<AutoTextarea defaultValue={held?.operation.message} name="message" maxLength={sources.creativeMessageMaxCharacters} disabled={locked} /></label>
-        {format === 'link' ? <><label>{t.headline}<input name="title" defaultValue={held?.operation.title} maxLength={sources.creativeTitleMaxCharacters} disabled={locked} /></label><label>{t.destination}<input name="linkUrl" defaultValue={held?.operation.linkUrl} type="url" required maxLength={sources.creativeUrlMaxCharacters} disabled={locked} {...validation.fieldProps('linkUrl')} /><FieldError {...validation.errorProps('linkUrl')} /></label></> : null}
+        <label>{t.channel}<select name="targetId" required disabled={locked} {...validation.fieldProps('targetId')} value={targetId} onChange={event => { setTargetId(event.target.value); setPostId(''); }}><option value="">{t.choose}</option>{held && !sources.targets.some(item => item.id === held.operation.targetId) ? <option value={held.operation.targetId}>{t.unavailable} · {held.operation.targetId}</option> : null}{sources.targets.map(target => <option key={target.id} value={target.id}>{target.name || t.unavailable}</option>)}</select><FieldError {...validation.errorProps('targetId')} /></label>
+        {format === 'post' ? <label>{t.postPick}<select name="postId" required disabled={locked || !targetId} {...validation.fieldProps('postId')} value={postId} onChange={event => setPostId(event.target.value)}><option value="">{t.choose}</option>{(sources.posts ?? []).filter(post => post.targetId === targetId).map(post => <option key={post.postId} value={post.postId}>{post.publishedAt ? `${new Date(post.publishedAt).toLocaleDateString(locale)} · ` : ''}{post.text.slice(0, 80) || post.postId}</option>)}</select><FieldError {...validation.errorProps('postId')} />{targetId && !(sources.posts ?? []).some(post => post.targetId === targetId) ? <span className="small-note">{t.noPosts}</span> : null}</label> : null}
+        {format !== 'post' ? <label>{t.image}<select name="mediaId" onChange={event => { setSelectedImage(event.target.value); setImageFailed(false); }} required disabled={locked} {...validation.fieldProps('mediaId')} defaultValue={held && held.operation.format !== 'post' ? held.operation.mediaId : ""}><option value="">{t.choose}</option>{held && held.operation.format !== 'post' && !sources.images.some(item => item.id === sourceOf(held.operation)) ? <option value={sourceOf(held.operation)}>{t.unavailable} · {sourceOf(held.operation)}</option> : null}{sources.images.map(image => <option key={image.id} value={image.id}>{image.id} · {image.mimeType || t.unavailable}</option>)}</select><FieldError {...validation.errorProps('mediaId')} /></label> : null}
+        <label>{t.format}<select name="format" value={format} onChange={event => setFormat(event.target.value)} disabled={locked}><option value="post">{t.post}</option><option value="image">{t.photo}</option><option value="link">{t.link}</option></select></label>
+        {format !== 'post' ? <label>{t.message}<AutoTextarea defaultValue={held && held.operation.format !== 'post' ? held.operation.message : undefined} name="message" maxLength={sources.creativeMessageMaxCharacters} disabled={locked} /></label> : null}
+        {format === 'link' ? <><label>{t.headline}<input name="title" defaultValue={held && held.operation.format !== 'post' ? held.operation.title : undefined} maxLength={sources.creativeTitleMaxCharacters} disabled={locked} /></label><label>{t.destination}<input name="linkUrl" defaultValue={held && held.operation.format !== 'post' ? held.operation.linkUrl : undefined} type="url" required maxLength={sources.creativeUrlMaxCharacters} disabled={locked} {...validation.fieldProps('linkUrl')} /><FieldError {...validation.errorProps('linkUrl')} /></label></> : null}
       </div>
-      {selectedImage && imageFailed ? <p>{t.unavailable}</p> : selectedImage ? <img onError={() => setImageFailed(true)} className="ads-creative-image" width="160" height="120" src={`/api/ads/management?${new URLSearchParams({ view: "creative-image", adAccountId, mediaId: selectedImage })}`} alt={t.image} /> : null}
+      {format === 'post' && postId ? (() => { const post = sources.posts?.find(item => item.postId === postId); return post?.thumbnailUrl ? <img className="ads-creative-image" width="160" height="120" src={post.thumbnailUrl} alt={t.postPick} referrerPolicy="no-referrer" /> : null; })()
+        : selectedImage && imageFailed ? <p>{t.unavailable}</p> : selectedImage ? <img onError={() => setImageFailed(true)} className="ads-creative-image" width="160" height="120" src={`/api/ads/management?${new URLSearchParams({ view: "creative-image", adAccountId, mediaId: selectedImage })}`} alt={t.image} /> : null}
       {sources.nextTargetOffset !== null || sources.nextImageAfter ? <Button onClick={() => void moreSources()} disabled={loading || locked}>{t.more}</Button> : null}
-      {!sources.targets.length || !sources.images.length ? <p>{t.empty} <a href="/content/library">{t.mediaLibrary}</a></p> : null}
-      <Button type="submit" variant="primary" disabled={locked || loading || !sources.targets.length || !sources.images.length}>{busy ? t.pending : t.review}</Button>
+      {format !== 'post' && (!sources.targets.length || !sources.images.length) ? <p>{t.empty} <a href="/content/library">{t.mediaLibrary}</a></p> : null}
+      <Button type="submit" variant="primary" disabled={locked || loading || !sources.targets.length || (format !== 'post' && !sources.images.length)}>{busy ? t.pending : t.review}</Button>
     </form> : null}
     {dialog}
   </section>;

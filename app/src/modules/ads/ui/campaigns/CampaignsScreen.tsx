@@ -39,7 +39,7 @@ const number = new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 });
 const money = (value: number | null, currency: string | null) => value === null ? '—' : `${currency ? `${currency} ` : ''}${new Intl.NumberFormat(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value)}`;
 const date = (value: Date) => new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeZone: 'UTC' }).format(value);
 
-async function CampaignsPage({ searchParams }: { searchParams: Promise<AdsSearchParams & { page?: string | string[] }> }) {
+async function CampaignsPage({ searchParams }: { searchParams: Promise<AdsSearchParams & { page?: string | string[]; boostTarget?: string | string[]; boostPost?: string | string[] }> }) {
   const viewer = await requireViewer({ feature: 'ads/campaigns', channelScoped: true });
   const { workspaceId } = viewer;
   const locale = adsLocale((await headers()).get('accept-language'));
@@ -50,6 +50,9 @@ async function CampaignsPage({ searchParams }: { searchParams: Promise<AdsSearch
   const allowedTargetIds = viewer.permissions.pageScope.all ? undefined : viewer.permissions.pageScope.ids;
   const [params, accounts] = await Promise.all([searchParams, getAdsAccounts(workspaceId, allowedTargetIds, allowedProviders)]);
   let filters;
+  // A post handed over by the Boost suggestion: only well-formed ids; the creative service re-verifies the post belongs to the channel.
+  const boostTarget = typeof params.boostTarget === 'string' && /^[A-Za-z0-9_-]{1,100}$/.test(params.boostTarget) ? params.boostTarget : undefined;
+  const boostPost = boostTarget && typeof params.boostPost === 'string' && /^[0-9]{1,40}_[0-9]{1,40}$/.test(params.boostPost) ? params.boostPost : undefined;
   try { filters = parseAdsFilters(params, accounts.map(account => account.id), undefined, policy); }
   catch (error) { if (!(error instanceof AdsFilterError)) throw error; return <AdsFilterErrorView catalogs={catalogs} locale={locale} accounts={accounts} input={params} error={error} action="/ads/campaigns" title={t('text041')} policy={policy} />; }
   let requestedPage: number;
@@ -95,6 +98,7 @@ async function CampaignsPage({ searchParams }: { searchParams: Promise<AdsSearch
   const pager = <AdsReportPager filters={filters} path="/ads/campaigns" kind="objects" page={objectPage} />;
   return <PageFrame module="ads"><div className="insights">
     {header}
+    {boostPost ? <aside className="ads-boost" aria-label={t('boostGuideTitle')}><div><strong>{t('boostGuideTitle')}</strong><p>{t('boostGuideSteps')}</p></div><div className="ads-boost__actions"><a className="ui-button ui-button--primary ui-button--sm" href="#boost">{t('boostGuideCreative')}</a></div></aside> : null}
     {!accounts.length ? <section className="panel"><EmptyState icon={<IconAd />} title={t('text003')} action={<a className="text-link" href="/settings/channels">{t('text004')}</a>}>{t('text043')}</EmptyState></section> : <>
     {objectPage.resultCount ? <CampaignAccountSwitcher label={t('text009')} items={[...byAccount].map(([accountId, rows]) => {
       const account = accounts.find(item => item.id === accountId);
@@ -151,7 +155,7 @@ async function CampaignsPage({ searchParams }: { searchParams: Promise<AdsSearch
     {accounts.filter(account => !filters.accountId || account.id === filters.accountId).some(account => createAvailability.get(account.id) && adsUi.get(account.id)?.campaign) ? <section className="panel"><h2>{t('text052')}</h2><p className="small-note">{t('text053')}</p>
       {accounts.filter(account => !filters.accountId || account.id === filters.accountId).filter(account => createAvailability.get(account.id) && adsUi.get(account.id)?.campaign).map(account => <CampaignCreateForm key={account.id} adAccountId={account.id} accountName={account.name} config={adsUi.get(account.id)!.campaign!} ownerScope={{ userId: viewer.user.id, workspaceId }} />)}
     </section> : null}
-    {accounts.filter(account => (!filters.accountId || account.id === filters.accountId) && creativeAvailability.get(account.id)).map(account => <section className="panel" key={`creative:${account.id}`}><CreativeCreateForm adAccountId={account.id} accountName={account.name} ownerScope={{ userId: viewer.user.id, workspaceId }} locale={locale} /></section>)}
+    {accounts.filter(account => (!filters.accountId || account.id === filters.accountId) && creativeAvailability.get(account.id)).map(account => <section className="panel" id="boost" key={`creative:${account.id}`}><CreativeCreateForm adAccountId={account.id} accountName={account.name} ownerScope={{ userId: viewer.user.id, workspaceId }} locale={locale} {...(boostPost ? { initialTargetId: boostTarget, initialPostId: boostPost } : {})} /></section>)}
     {objectPage.pageCount > 1 ? pager : null}
     {canExport && exportPolicy && dataset.maxRows ? <div className="ads-report-export"><AdsReportExport filters={filters} maxRows={dataset.maxRows} maxBytes={exportPolicy.exportMaxBytes} fileName={exportPolicy.exportFileName} /></div> : null}
     </>}

@@ -6,6 +6,7 @@ import type { TargetType } from '../../../../generated/client';
 import { listWorkspaceImages, readWorkspaceImage } from '@/modules/publishing/server/media/storage';
 import { createHash, randomBytes } from 'node:crypto';
 import { OperationError } from '@/lib/operation-error';
+import { postThumbnail } from '@/components/post-thumbnail';
 import { prisma } from '@/server/data';
 import { decryptSecret } from '@/server/secret-crypto';
 import { canUseFeature, hasPlatformCapability, loadEntitlements } from '@/server/entitlements';
@@ -50,6 +51,22 @@ function accountTargetScope(actor: AdsManageActor, pageScope: AdsPageScope) {
   return ids === null ? {} : { targets: { some: { workspaceId: actor.workspaceId, id: { in: ids } } } };
 }
 
+/** Optional ad set targeting, shape-checked only (the module checks meaning): absent fields stay absent so older requests keep their exact confirmation. */
+function adSetTargeting(value: Record<string, unknown>) {
+  const bad = () => new OperationError('invalid_request', defaultAdsText('validation013'));
+  const out: { extraCountryCodes?: string[]; ageMin?: number; ageMax?: number; endDate?: string } = {};
+  if (value.extraCountryCodes !== undefined) {
+    if (!Array.isArray(value.extraCountryCodes) || value.extraCountryCodes.length > 24 || value.extraCountryCodes.some(code => typeof code !== 'string' || !/^[A-Z]{2}$/.test(code))) throw bad();
+    if (value.extraCountryCodes.length) out.extraCountryCodes = [...new Set(value.extraCountryCodes as string[])];
+  }
+  for (const key of ['ageMin', 'ageMax'] as const) if (value[key] !== undefined) {
+    if (typeof value[key] !== 'number' || !Number.isInteger(value[key])) throw bad();
+    out[key] = value[key] as number;
+  }
+  if (value.endDate !== undefined) { if (typeof value.endDate !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value.endDate)) throw bad(); out.endDate = value.endDate; }
+  return out;
+}
+
 /** Parse and bound an untrusted neutral operation. Shape checks only; the module validates semantics. */
 export function parseNeutralOperation(raw: unknown, policy: AdsManagementPolicy = ADS_MANAGEMENT_DEFAULT_POLICY): AdsNeutralOperation {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new OperationError('invalid_request', defaultAdsText('validation007'));
@@ -66,18 +83,25 @@ export function parseNeutralOperation(raw: unknown, policy: AdsManagementPolicy 
     return { type, objectType, name: value.name.trim(), objective: text(value.objective, CREATE_TOKEN, defaultAdsText('validation009')) };
   }
   if (type === 'adset.create') {
-    keys(['type', 'objectType', 'parentId', 'name', 'dailyBudgetMinor', 'countryCode', 'optimizationGoal']);
+    keys(['type', 'objectType', 'parentId', 'name', 'dailyBudgetMinor', 'countryCode', 'optimizationGoal', 'extraCountryCodes', 'ageMin', 'ageMax', 'endDate']);
     if (objectType !== 'adset' || typeof value.name !== 'string') throw new OperationError('invalid_request', defaultAdsText('validation010'));
     if (typeof value.dailyBudgetMinor !== 'number' || !Number.isSafeInteger(value.dailyBudgetMinor) || value.dailyBudgetMinor < 1) throw new OperationError('invalid_request', defaultAdsText('validation011'));
     return {
       type, objectType, parentId: text(value.parentId, SAFE_ID, defaultAdsText('validation012')), name: value.name.trim(), dailyBudgetMinor: value.dailyBudgetMinor,
       countryCode: text(value.countryCode, /^[A-Z]{2}$/, defaultAdsText('validation013')), optimizationGoal: text(value.optimizationGoal, CREATE_TOKEN, defaultAdsText('validation014')),
+      ...adSetTargeting(value),
     };
   }
   if (type === 'ad.create') {
     keys(['type', 'objectType', 'parentId', 'name', 'creativeId']);
     if (objectType !== 'ad' || typeof value.name !== 'string') throw new OperationError('invalid_request', defaultAdsText('adCreateName'));
     return { type, objectType, parentId: text(value.parentId, SAFE_ID, defaultAdsText('adCreateParent')), name: value.name.trim(), creativeId: text(value.creativeId, SAFE_ID, defaultAdsText('validation025')) };
+  }
+  if (type === 'creative.create' && value.format === 'post') {
+    // Promote an already published post of the channel: no image, text or link of our own, only the platform post id.
+    keys(['type', 'objectType', 'name', 'targetId', 'format', 'postId']);
+    if (objectType !== 'creative' || typeof value.name !== 'string') throw new OperationError('invalid_request', defaultAdsText('validation015'));
+    return { type, objectType, name: value.name.trim(), targetId: text(value.targetId, SAFE_ID, defaultAdsText('validation018')), format: 'post', postId: text(value.postId, /^[0-9]{1,40}_[0-9]{1,40}$/, defaultAdsText('validation015')) };
   }
   if (type === 'creative.create') {
     keys(['type', 'objectType', 'name', 'targetId', 'mediaId', 'format', 'message', 'title', 'linkUrl']);
@@ -210,6 +234,13 @@ async function creativeContext(actor: AdsManageActor, ctx: Awaited<ReturnType<ty
     select: { providerId: true, type: true },
   });
   if (!target || !ctx.ops.creativeIdentityKinds?.includes(String(target.type))) throw new OperationError('not_found', await adsServiceText('service044'));
+  if (operation.format === 'post') {
+    // Only a post this channel published and the app has synced: never an arbitrary remote id.
+    const known = await prisma.$queryRaw<Array<{ ok: number }>>`SELECT 1 AS ok FROM post_targets WHERE "targetId" = ${operation.targetId} AND "remotePostId" = ${operation.postId} AND status = 'published'
+      UNION ALL SELECT 1 FROM external_posts WHERE "targetId" = ${operation.targetId} AND "remoteId" = ${operation.postId} LIMIT 1`;
+    if (!known.length || !operation.postId.startsWith(`${target.providerId}_`)) throw new OperationError('not_found', await adsServiceText('creativePostUnavailable'));
+    return { identityId: target.providerId, identityKind: String(target.type) };
+  }
   try { return { identityId: target.providerId, identityKind: String(target.type), image: await readWorkspaceImage(actor.workspaceId, operation.mediaId) }; }
   catch { throw new OperationError('not_found', await adsServiceText('service045')); }
 }
@@ -227,9 +258,23 @@ export async function listAdsCreativeSources(actor: AdsManageActor, input: { adA
   const ids = allowedTargets(actor, ctx.pageScope);
   const [targets, images] = await Promise.all([
     prisma.target.findMany({ where: { workspaceId: actor.workspaceId, enabled: true, canPublish: true, ...(ids === null ? {} : { id: { in: ids } }), type: { in: [...ctx.ops.creativeIdentityKinds] as TargetType[] }, socialAccount: { is: { workspaceId: actor.workspaceId, provider: ctx.provider, invalidatedAt: null, adAccounts: { some: { id: ctx.account.id, enabled: true } } } } }, select: { id: true, name: true }, orderBy: { id: 'asc' }, skip: offset, take: limit + 1 }),
-    listWorkspaceImages(actor.workspaceId, { limit, ...(input.imageAfter ? { cursor: input.imageAfter } : {}) }),
+    // Image storage trouble must not hide the channels and their posts: promoting a published post needs no stored image.
+    listWorkspaceImages(actor.workspaceId, { limit, ...(input.imageAfter ? { cursor: input.imageAfter } : {}) }).catch(() => ({ items: [] as Array<{ id: string; mimeType: string }>, nextCursor: null as string | null })),
   ]);
-  return { targets: targets.slice(0, limit), nextTargetOffset: targets.length > limit ? offset + limit : null, images: images.items.map(item => ({ id: item.id, mimeType: item.mimeType })), nextImageAfter: images.nextCursor, nameMaxCharacters: policy.nameMaxCharacters, creativeMessageMaxCharacters: policy.creativeMessageMaxCharacters, creativeTitleMaxCharacters: policy.creativeTitleMaxCharacters, creativeUrlMaxCharacters: policy.creativeUrlMaxCharacters };
+  // Recent published posts of the listed channels, newest first: the ones a "promote this post" creative can use.
+  const shownTargets = targets.slice(0, limit).map(target => target.id);
+  const posts = shownTargets.length ? await prisma.$queryRaw<Array<{ targetId: string; postId: string; text: string | null; publishedAt: Date | null; media: unknown; pictureUrl: string | null }>>`
+    SELECT * FROM (
+      SELECT pt."targetId", pt."remotePostId" AS "postId", p.message AS text, pt."publishedAt", p.media, NULL::text AS "pictureUrl"
+      FROM post_targets pt JOIN posts p ON p.id = pt."postId"
+      WHERE pt."targetId" = ANY(${shownTargets}::text[]) AND p."workspaceId" = ${actor.workspaceId} AND pt.status = 'published' AND pt."remotePostId" IS NOT NULL
+      UNION ALL
+      SELECT ep."targetId", ep."remoteId", ep.message, ep."createdTime", '[]'::jsonb, ep."pictureUrl"
+      FROM external_posts ep
+      WHERE ep."targetId" = ANY(${shownTargets}::text[]) AND NOT EXISTS (SELECT 1 FROM post_targets pt WHERE pt."targetId" = ep."targetId" AND pt."remotePostId" = ep."remoteId")
+    ) recent WHERE "postId" ~ '^[0-9]+_[0-9]+$' ORDER BY "publishedAt" DESC NULLS LAST LIMIT ${policy.creativePageLimit}` : [];
+  return { targets: targets.slice(0, limit), nextTargetOffset: targets.length > limit ? offset + limit : null, images: images.items.map(item => ({ id: item.id, mimeType: item.mimeType })), nextImageAfter: images.nextCursor,
+    posts: posts.map(post => ({ targetId: post.targetId, postId: post.postId, text: (post.text ?? '').slice(0, 200), publishedAt: post.publishedAt?.toISOString() ?? null, thumbnailUrl: postThumbnail(post.media, post.pictureUrl)?.url ?? null })), nameMaxCharacters: policy.nameMaxCharacters, creativeMessageMaxCharacters: policy.creativeMessageMaxCharacters, creativeTitleMaxCharacters: policy.creativeTitleMaxCharacters, creativeUrlMaxCharacters: policy.creativeUrlMaxCharacters };
 
   });
 }

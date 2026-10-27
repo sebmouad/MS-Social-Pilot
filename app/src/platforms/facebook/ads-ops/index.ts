@@ -55,7 +55,15 @@ function validateCreation(operation: CreateOperation, nameMax: number, limits?: 
   if (limits && operation.dailyBudgetMinor > limits.maxBudgetMinor) throw new FacebookAdsValidationError('invalid_request', 'budgetLimitExceeded', text);
   if (!isFacebookCountryCode(operation.countryCode)) throw new FacebookAdsValidationError('invalid_request', 'countryInvalid', text);
   if (!FACEBOOK_ADSET_OPTIMIZATION_GOALS.some(item => item.value === operation.optimizationGoal)) throw new FacebookAdsValidationError('invalid_request', 'optimizationInvalid', text);
+  const ages = [operation.ageMin, operation.ageMax].filter((age): age is number => age !== undefined);
+  const today = new Date().toISOString().slice(0, 10);
+  if ((operation.extraCountryCodes ?? []).some(code => !isFacebookCountryCode(code) || code === operation.countryCode)
+    || ages.some(age => !Number.isInteger(age) || age < 18 || age > 65) || (operation.ageMin !== undefined && operation.ageMax !== undefined && operation.ageMin > operation.ageMax)
+    || (operation.endDate !== undefined && (!/^\d{4}-\d{2}-\d{2}$/.test(operation.endDate) || Number.isNaN(Date.parse(`${operation.endDate}T00:00:00Z`)) || operation.endDate <= today))) throw new FacebookAdsValidationError('invalid_request', 'targetingInvalid', text);
 }
+
+/** True when the ad set asks for more than the original single-country targeting. */
+const hasTargetingExtras = (operation: Extract<AdsNeutralOperation, { type: 'adset.create' }>) => Boolean(operation.extraCountryCodes?.length || operation.ageMin !== undefined || operation.ageMax !== undefined || operation.endDate);
 
 export function validateFacebookAdsOperation(operation: AdsNeutralOperation, limits?: AdsOpsLimits, text: FacebookAdsText = defaultFacebookAdsText): void {
   const nameMax = Math.min(NAME_MAX, limits?.nameMaxCharacters ?? NAME_MAX);
@@ -66,6 +74,11 @@ export function validateFacebookAdsOperation(operation: AdsNeutralOperation, lim
     if (operation.objectType !== 'ad' || typeof operation.name !== 'string' || !validName(operation.name, nameMax)) throw new FacebookAdsValidationError('invalid_request', 'nameInvalid', text, { max: nameMax });
     if (typeof operation.parentId !== 'string' || !SAFE_ID.test(operation.parentId)) throw new FacebookAdsValidationError('invalid_request', 'parentAdSetInvalid', text);
     if (typeof operation.creativeId !== 'string' || !SAFE_ID.test(operation.creativeId)) throw new FacebookAdsValidationError('invalid_request', 'creativeInvalid', text);
+    return;
+  }
+  if (operation.type === 'creative.create' && operation.format === 'post') {
+    if (!validName(operation.name, nameMax) || !SAFE_ID.test(operation.targetId)) throw new FacebookAdsValidationError('invalid_request', 'creativeDetailsInvalid', text);
+    if (!/^[0-9]{1,40}_[0-9]{1,40}$/.test(operation.postId)) throw new FacebookAdsValidationError('invalid_request', 'postInvalid', text);
     return;
   }
   if (operation.type === 'creative.create') {
@@ -91,11 +104,21 @@ export function facebookAdsConfirmation(operation: AdsNeutralOperation, context:
   if ('creativeId' in operation) values.creativeId = operation.creativeId;
   switch (operation.type) {
     case 'creative.create': {
+      if (operation.format === 'post') return text('confirmCreativeFromPost', { ...values, postId: operation.postId, targetId: operation.targetId });
       const content = createHash('sha256').update(JSON.stringify({ name: operation.name, targetId: operation.targetId, mediaId: operation.mediaId, format: operation.format, message: operation.message, title: operation.title, linkUrl: operation.linkUrl ?? null })).digest('hex');
       return text('confirmCreativeCreate', { ...values, format: text(operation.format === 'image' ? 'formatImage' : 'formatLink'), targetId: operation.targetId, mediaId: operation.mediaId, content });
     }
     case 'campaign.create': return text('confirmCampaignCreate', { ...values, objective: operation.objective });
-    case 'adset.create': return text('confirmAdSetCreate', { ...values, dailyBudgetMinor: operation.dailyBudgetMinor, countryCode: operation.countryCode, optimizationGoal: operation.optimizationGoal });
+    case 'adset.create': {
+      const base = text('confirmAdSetCreate', { ...values, dailyBudgetMinor: operation.dailyBudgetMinor, countryCode: operation.countryCode, optimizationGoal: operation.optimizationGoal });
+      // Older requests (one country, no ages, no end) keep their exact confirmation; extras are spelled out after it.
+      if (!hasTargetingExtras(operation)) return base;
+      return `${base} ` + text('confirmAdSetTargeting', {
+        countries: operation.extraCountryCodes?.length ? operation.extraCountryCodes.join(',') : text('targetingAny'),
+        ages: operation.ageMin === undefined && operation.ageMax === undefined ? text('targetingAllAges') : `${operation.ageMin ?? 18}-${operation.ageMax ?? 65}`,
+        endDate: operation.endDate ?? text('targetingNoEnd'),
+      });
+    }
     case 'ad.create': return text('confirmAdCreate', values);
     case 'status.set': return text(operation.status === 'active' ? 'confirmResume' : 'confirmPause', values);
     case 'budget.set': return text('confirmBudget', { ...values, budgetKind: text(operation.budget.kind === 'daily' ? 'budgetDaily' : 'budgetLifetime'), minor: operation.budget.minor });
@@ -132,7 +155,9 @@ async function executeCreation(transport: FacebookAdsTransport, token: string, c
     body = {
       campaign_id: operation.parentId, name, daily_budget: String(operation.dailyBudgetMinor),
       billing_event: FACEBOOK_ADSET_CREATE_DEFAULTS.billing_event, optimization_goal: operation.optimizationGoal, bid_strategy: FACEBOOK_ADSET_CREATE_DEFAULTS.bid_strategy,
-      targeting: JSON.stringify({ geo_locations: { countries: [operation.countryCode], location_types: [...FACEBOOK_ADSET_CREATE_DEFAULTS.location_types] } }),
+      targeting: JSON.stringify({ geo_locations: { countries: [operation.countryCode, ...(operation.extraCountryCodes ?? [])], location_types: [...FACEBOOK_ADSET_CREATE_DEFAULTS.location_types] },
+        ...(operation.ageMin !== undefined ? { age_min: operation.ageMin } : {}), ...(operation.ageMax !== undefined ? { age_max: operation.ageMax } : {}) }),
+      ...(operation.endDate ? { end_time: `${operation.endDate}T23:59:59+0000` } : {}),
       status: FACEBOOK_CREATE_STATUS,
     };
   }

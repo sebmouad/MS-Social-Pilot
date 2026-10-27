@@ -35,7 +35,7 @@ export type AdsActionInput = {
   requestId: string;
 };
 export type AdsCampaignCreateInput = { adAccountId: string; name: string; objective: string; confirmation: string; /** Idempotency key shared with the management journal. */ requestId: string };
-export type AdsAdSetCreateInput = { adAccountId: string; campaignId: string; name: string; dailyBudgetMinor: number; countryCode: string; optimizationGoal: string; confirmation: string; requestId: string };
+export type AdsAdSetCreateInput = { adAccountId: string; campaignId: string; name: string; dailyBudgetMinor: number; countryCode: string; optimizationGoal: string; extraCountryCodes?: string[]; ageMin?: number; ageMax?: number; endDate?: string; confirmation: string; requestId: string };
 export type AdsObjectReadInput = { adAccountId: string; objectId: string; objectType: AdMutationRequest['objectType'] };
 
 function scopes(value: string) { return value.split(',').map(scope => scope.trim()).filter(Boolean); }
@@ -192,7 +192,8 @@ export async function createWorkspaceAdSet(actor: AdsActionActor, input: AdsAdSe
   if (!pageScopeAll) throw new OperationError('forbidden', await adsServiceText('service010'));
   const outcome = await performAdsManagement(performerOf(actor), {
     adAccountId: input.adAccountId, confirmation: input.confirmation, requestId: input.requestId,
-    operation: { type: 'adset.create', objectType: 'adset', parentId: input.campaignId, name: input.name, dailyBudgetMinor: input.dailyBudgetMinor, countryCode: input.countryCode, optimizationGoal: input.optimizationGoal },
+    operation: { type: 'adset.create', objectType: 'adset', parentId: input.campaignId, name: input.name, dailyBudgetMinor: input.dailyBudgetMinor, countryCode: input.countryCode, optimizationGoal: input.optimizationGoal,
+      ...(input.extraCountryCodes?.length ? { extraCountryCodes: input.extraCountryCodes } : {}), ...(input.ageMin !== undefined ? { ageMin: input.ageMin } : {}), ...(input.ageMax !== undefined ? { ageMax: input.ageMax } : {}), ...(input.endDate ? { endDate: input.endDate } : {}) },
   });
   return outcome.outcome === 'succeeded' && outcome.created?.objectType === 'adset' ? { ...outcome, adSetId: outcome.created.remoteId } : outcome;
 

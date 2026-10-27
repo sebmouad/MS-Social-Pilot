@@ -16,6 +16,10 @@ const schema = z.object({
   dailyBudgetMinor: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
   countryCode: z.string().regex(/^[A-Z]{2}$/),
   optimizationGoal: z.string().min(1).max(100),
+  extraCountryCodes: z.array(z.string().regex(/^[A-Z]{2}$/)).max(24).optional(),
+  ageMin: z.number().int().min(18).max(65).optional(),
+  ageMax: z.number().int().min(18).max(65).optional(),
+  endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   confirmation: z.string().max(500),
   requestId: z.string().regex(/^[A-Za-z0-9._:-]{8,128}$/),
 }).strict();

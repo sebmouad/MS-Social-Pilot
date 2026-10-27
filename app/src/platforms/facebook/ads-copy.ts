@@ -55,6 +55,17 @@ export const FACEBOOK_ADS_COPY = {
     en: 'CREATE UNATTACHED FACEBOOK {format} CREATIVE {nameJson} IN ACCOUNT {adAccountId} AS CHANNEL {targetId} FROM MEDIA {mediaId} WITH CONTENT {content} WITHOUT DELIVERY OR SPEND',
     fr: 'CRÉER UN VISUEL FACEBOOK {format} NON ASSOCIÉ {nameJson} DANS LE COMPTE {adAccountId} POUR LE CANAL {targetId} DEPUIS LE MÉDIA {mediaId} AVEC LE CONTENU {content} SANS DIFFUSION NI DÉPENSE',
   },
+  confirmCreativeFromPost: {
+    en: 'CREATE UNATTACHED FACEBOOK CREATIVE {nameJson} IN ACCOUNT {adAccountId} FROM POST {postId} OF CHANNEL {targetId} WITHOUT DELIVERY OR SPEND',
+    fr: 'CRÉER UN VISUEL FACEBOOK NON ASSOCIÉ {nameJson} DANS LE COMPTE {adAccountId} DEPUIS LA PUBLICATION {postId} DU CANAL {targetId} SANS DIFFUSION NI DÉPENSE',
+  },
+  confirmAdSetTargeting: {
+    en: 'ALSO IN {countries} FOR AGES {ages} UNTIL {endDate}',
+    fr: 'AUSSI EN {countries} POUR LES ÂGES {ages} JUSQU’AU {endDate}',
+  },
+  targetingAny: { en: 'NONE', fr: 'AUCUN' }, targetingAllAges: { en: 'ALL', fr: 'TOUS' }, targetingNoEnd: { en: 'NO END DATE', fr: 'SANS DATE DE FIN' },
+  targetingInvalid: { en: 'Choose valid countries, ages 18 to 65 (minimum not above maximum) and an end date after today.', fr: 'Choisissez des pays valides, des âges de 18 à 65 ans (minimum inférieur au maximum) et une date de fin après aujourd’hui.' },
+  postInvalid: { en: 'Choose a published post of this Page.', fr: 'Choisissez une publication de cette Page.' },
   confirmCampaignCreate: {
     en: 'CREATE PAUSED FACEBOOK CAMPAIGN {nameJson} IN ACCOUNT {adAccountId} WITH OBJECTIVE {objective}',
     fr: 'CRÉER UNE CAMPAGNE FACEBOOK EN PAUSE {nameJson} DANS LE COMPTE {adAccountId} AVEC L’OBJECTIF {objective}',
