@@ -11,13 +11,13 @@ const COPY = {
     title: 'What works', intro: 'Typical reach (median people reached per post) and engagement per 100 people reached, from stored measures. Groups with fewer than 5 posts are marked as too few to trust.',
     posts: 'Posts', median: 'Typical reach', per100: 'Engagement per 100 reached', total: 'People reached (sum)', vsBefore: 'vs previous period', none: 'Not enough measured posts in this period.',
     hour: 'Posting hour', weekday: 'Weekday', channel: 'Channel', profile: 'Connected profile', origin: 'Origin', opening: 'Caption opening', question: 'Question in caption', length: 'Caption length',
-    best: 'Best posts', weakest: 'Weakest posts', few: 'too few', open: 'Open', madeHere: 'made in this app', elsewhere: 'published elsewhere', incomplete: 'Only the first posts of this period were read (report row limit); narrow the period or channels for a complete view.',
+    reach: 'People reached', post: 'Post', best: 'Best posts', weakest: 'Weakest posts', few: 'too few', open: 'Open', madeHere: 'made in this app', elsewhere: 'published elsewhere', incomplete: 'Only the first posts of this period were read (report row limit); narrow the period or channels for a complete view.',
   },
   fr: {
     title: 'Ce qui marche', intro: 'Portée typique (médiane des personnes touchées par publication) et interactions pour 100 personnes touchées, d’après les mesures enregistrées. Les groupes de moins de 5 publications sont signalés comme trop petits.',
     posts: 'Publications', median: 'Portée typique', per100: 'Interactions pour 100 touchées', total: 'Personnes touchées (somme)', vsBefore: 'vs période précédente', none: 'Pas assez de publications mesurées sur cette période.',
     hour: 'Heure de publication', weekday: 'Jour', channel: 'Canal', profile: 'Profil connecté', origin: 'Origine', opening: 'Début de la légende', question: 'Question dans la légende', length: 'Longueur de la légende',
-    best: 'Meilleures publications', weakest: 'Publications les plus faibles', few: 'trop peu', open: 'Ouvrir', madeHere: 'créée dans l’application', elsewhere: 'publiée ailleurs', incomplete: 'Seules les premières publications de la période ont été lues (limite de lignes) ; réduisez la période ou les canaux pour une vue complète.',
+    reach: 'Personnes touchées', post: 'Publication', best: 'Meilleures publications', weakest: 'Publications les plus faibles', few: 'trop peu', open: 'Ouvrir', madeHere: 'créée dans l’application', elsewhere: 'publiée ailleurs', incomplete: 'Seules les premières publications de la période ont été lues (limite de lignes) ; réduisez la période ou les canaux pour une vue complète.',
   },
 } as const;
 const GROUPS = ['hour', 'weekday', 'channel', 'profile', 'origin', 'opening', 'question', 'length'] as const;
@@ -46,7 +46,7 @@ export function PerformancePanel({ digest, before, complete, locale }: { digest:
   const posts = (title: string, items: PostSummary[]) => <div>
     <h3>{title}</h3>
     <div className="ui-table-wrap"><table className="ui-table ui-table--compact">
-      <thead><tr><th scope="col">{t.median}</th><th scope="col">{t.per100}</th><th scope="col">{t.channel}</th><th scope="col">{t.posts}</th></tr></thead>
+      <thead><tr><th scope="col">{t.reach}</th><th scope="col">{t.per100}</th><th scope="col">{t.channel}</th><th scope="col">{t.post}</th></tr></thead>
       <tbody>{items.map(item => <tr key={item.postId}><td>{num(item.reach, locale)}</td><td>{item.reach ? num(Math.round(10000 * (item.engagement ?? 0) / item.reach) / 100, locale) : '—'}</td><td>{item.channel}<div className="small-note">{new Date(item.publishedAt).toLocaleString(locale, { dateStyle: 'medium', timeStyle: 'short' })} · {item.madeHere ? t.madeHere : t.elsewhere}</div></td><td>{item.text.slice(0, 140) || '—'}{item.url && <> <a href={item.url} target="_blank" rel="noopener noreferrer">{t.open}</a></>}</td></tr>)}</tbody>
     </table></div>
   </div>;
@@ -60,7 +60,7 @@ export function PerformancePanel({ digest, before, complete, locale }: { digest:
       {tile(t.per100, digest.totals.engagementPer100, before?.engagementPer100)}
       {tile(t.total, digest.totals.totalReach, before?.totalReach)}
     </div>
-    <div style={{ display: 'grid', gap: 16, gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 320px), 1fr))' }}>
+    <div style={{ display: 'grid', gap: 16, gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 440px), 1fr))' }}>
       {GROUPS.map(key => table(key, digest.groups[key]))}
     </div>
     {posts(t.best, digest.best)}
