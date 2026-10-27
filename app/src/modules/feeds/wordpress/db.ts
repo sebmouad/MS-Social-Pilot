@@ -176,6 +176,40 @@ function extractRecipeFromSchemaGraph(nodes: unknown[]): string | null {
   return null;
 }
 
+/**
+ * A recipe written as an article: the list right after a heading about ingredients, the list after a heading about the
+ * steps (or else the first numbered list), and "Temps total : 45 minutes" style lines. Null unless both lists are found,
+ * so a page without a recipe never yields a made-up one.
+ */
+export function recipeFromArticle(html: string, title: string, description: string): string | null {
+  type Block = { heading: string } | { list: 'ul' | 'ol'; items: string[] };
+  const blocks: Block[] = [...html.matchAll(/<(h[2-4])\b[^>]*>([\s\S]*?)<\/\1>|<(ul|ol)\b[^>]*>([\s\S]*?)<\/\3>/gi)].map(m => m[1]
+    ? { heading: stripHtml(m[2] ?? '') }
+    : { list: (m[3] ?? 'ul').toLowerCase() as 'ul' | 'ol', items: [...(m[4] ?? '').matchAll(/<li\b[^>]*>([\s\S]*?)<\/li>/gi)].map(item => stripHtml(item[1] ?? '')).filter(Boolean) });
+  const listAfter = (pattern: RegExp) => {
+    let armed = false;
+    for (const block of blocks) {
+      if ('heading' in block) { armed = pattern.test(block.heading); continue; }
+      if (armed && block.items.length) return block.items;
+    }
+    return null;
+  };
+  // "1 litre de jus d’orange : base fruitée de la boisson." keeps the quantity; the explanation after the colon is article prose.
+  const ingredients = listAfter(/ingr[ée]dient/i)?.map(line => line.replace(/\s*;\s*$/, '').replace(/^(.*\d.*?)\s+:\s+[^:]+$/, '$1'));
+  const steps = listAfter(/[ée]tape|pr[ée]paration|instruction|step|method/i) ?? blocks.find((block): block is { list: 'ol'; items: string[] } => 'list' in block && block.list === 'ol' && block.items.length > 0)?.items;
+  if (!ingredients?.length || !steps?.length) return null;
+  const facts = blocks.flatMap(block => 'items' in block ? block.items : []);
+  const fact = (pattern: RegExp) => facts.map(line => pattern.exec(line)?.[1]?.trim()).find(Boolean) ?? '';
+  return JSON.stringify({
+    title, description,
+    servings: fact(/^(?:portions?|pour|servings?|yield)\s*:\s*(.+)$/i),
+    prep: fact(/^temps de pr[ée]paration\s*:\s*(.+)$/i) || fact(/^prep(?:aration)? time\s*:\s*(.+)$/i),
+    cook: fact(/^temps de cuisson\s*:\s*(.+)$/i) || fact(/^cook(?:ing)? time\s*:\s*(.+)$/i),
+    total: fact(/^temps total\s*:\s*(.+)$/i) || fact(/^total time\s*:\s*(.+)$/i),
+    ingredients: ingredients.slice(0, 30), steps: steps.slice(0, 20),
+  });
+}
+
 function extractRecipeJson(item: Record<string, unknown>, recipeMetaKey: string, fallbackTitle: string): string {
   const fromMeta = metaValue(item, recipeMetaKey);
   if (fromMeta) return fromMeta;
@@ -209,6 +243,10 @@ function extractRecipeJson(item: Record<string, unknown>, recipeMetaKey: string,
       // continue scanning
     }
   }
+
+  // Article-style recipe (headings with lists, no structured data): the ingredients list, the steps list and the time lines.
+  const article = recipeFromArticle(contentHtml, fallbackTitle, excerptText);
+  if (article) return article;
 
   // Check WP Recipe Maker HTML classes (.wprm-recipe-ingredient, .wprm-recipe-instruction-text) or HTML lists
   const listItems = [...contentHtml.matchAll(/<li\b[^>]*>([\s\S]*?)<\/li>/gi)]

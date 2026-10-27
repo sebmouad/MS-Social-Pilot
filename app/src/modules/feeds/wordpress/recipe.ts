@@ -17,7 +17,8 @@ const zone = z.string().min(1).max(64).refine(v => { try { new Intl.DateTimeForm
 /** A saved config may omit any field: Root supplies the default at read time. */
 export const planConfigPatchSchema = (limits: { template: number; horizon: { min: number; max: number }; cooldown: { min: number; max: number }; age: { min: number; max: number }; delay: { min: number; max: number } }) => z.object({
   mapping: z.object({
-    captionMetaKey: key, imageMetaKey: key, recipeMetaKey: key, skipMetaKey: z.union([key, z.literal('')]), attachedFileMetaKey: key, postType: token, postStatus: token,
+    // An empty caption, image or recipe field means "use the post itself": its excerpt, featured image and the recipe written in the article.
+    captionMetaKey: z.union([key, z.literal('')]), imageMetaKey: z.union([key, z.literal('')]), recipeMetaKey: z.union([key, z.literal('')]), skipMetaKey: z.union([key, z.literal('')]), attachedFileMetaKey: key, postType: token, postStatus: token,
   }).partial().strict(),
   order: z.enum(['newest', 'oldest']), maxAgeDays: z.number().int().min(limits.age.min).max(limits.age.max), skipShared: z.boolean(),
   slots: z.array(z.string().regex(SLOT_TIME)).min(1).max(SLOTS_MAX), timezone: zone,
