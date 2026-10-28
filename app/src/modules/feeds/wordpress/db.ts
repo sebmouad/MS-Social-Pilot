@@ -76,26 +76,48 @@ const stripHtml = (html: string): string =>
     .replace(/\n{3,}/g, '\n\n')
     .trim();
 
-/** Whether the REST response carries the field at all; private meta is omitted when credentials fail or the field is not exposed. */
-const hasMetaKey = (item: Record<string, unknown>, key: string): boolean => {
-  const meta = item['meta'];
-  return Boolean(meta && typeof meta === 'object' && !Array.isArray(meta) && key in (meta as Record<string, unknown>)) || key in item;
+type Field = { found: boolean; value?: unknown };
+const MISSING: Field = { found: false };
+const ownField = (obj: unknown, key: string): Field =>
+  obj && typeof obj === 'object' && Object.prototype.hasOwnProperty.call(obj, key) ? { found: true, value: (obj as Record<string, unknown>)[key] } : MISSING;
+/** Meta stored as a JSON string (a list such as `[{"id":12,"text":"…"}]`) is read as the structure it holds. */
+const structured = (value: unknown): unknown => {
+  if (typeof value !== 'string' || !/^\s*[[{]/.test(value)) return value;
+  try { return JSON.parse(value); } catch { return value; }
 };
+const fieldRoots = (item: Record<string, unknown>): unknown[] => {
+  const meta = item['meta'];
+  return [meta && typeof meta === 'object' && !Array.isArray(meta) ? meta : null, item];
+};
+/**
+ * The field a mapping key names: the exact key first, then a dotted path into a JSON list or object, so
+ * `fb_images_data.0.text` reads the caption of the first item. `exposed` is whether the path's first key is in the response.
+ */
+const fieldOf = (item: Record<string, unknown>, key: string): Field & { exposed: boolean } => {
+  const roots = fieldRoots(item);
+  for (const root of roots) {
+    const hit = ownField(root, key);
+    if (hit.found) return { ...hit, exposed: true };
+  }
+  const [head, ...path] = key.split('.');
+  if (!head || !path.length) return { ...MISSING, exposed: false };
+  for (const root of roots) {
+    let hit = ownField(root, head);
+    if (!hit.found) continue;
+    for (const part of path) hit = hit.found ? ownField(structured(hit.value), part) : MISSING;
+    return { ...hit, exposed: true };
+  }
+  return { ...MISSING, exposed: false };
+};
+
+/** Whether the REST response carries the field at all; private meta is omitted when credentials fail or the field is not exposed. */
+const hasMetaKey = (item: Record<string, unknown>, key: string): boolean => fieldOf(item, key).exposed;
 const metaValue = (item: Record<string, unknown>, key: string): string => {
   if (!key) return '';
-  const meta = item['meta'];
-  if (meta && typeof meta === 'object' && !Array.isArray(meta) && key in (meta as Record<string, unknown>)) {
-    const val = (meta as Record<string, unknown>)[key];
-    if (typeof val === 'string') return val;
-    if (typeof val === 'number' && Number.isFinite(val)) return String(val);
-    if (val && typeof val === 'object') return JSON.stringify(val);
-  }
-  if (key in item) {
-    const val = item[key];
-    if (typeof val === 'string') return val;
-    if (typeof val === 'number' && Number.isFinite(val)) return String(val);
-    if (val && typeof val === 'object') return JSON.stringify(val);
-  }
+  const { value: val } = fieldOf(item, key);
+  if (typeof val === 'string') return val;
+  if (typeof val === 'number' && Number.isFinite(val)) return String(val);
+  if (val && typeof val === 'object') return JSON.stringify(val);
   return '';
 };
 
