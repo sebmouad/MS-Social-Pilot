@@ -130,6 +130,7 @@ export async function syncScheduledPostStatus(now = new Date(), retryLimit = 0, 
         return engine.getStatus(decryptSecret(fresh.target.accessToken ?? freshAccount.accessToken), fresh.remotePostId!, { targetId: row.target.providerId, contentKind });
       }, retryLimit, retryBackoff));
       if (status.state !== 'published') { result.skipped++; continue; }
+      const publishedId = status.remoteId || row.remotePostId;
       await withWorkspaceOperation(row.target.workspaceId, async () => {
         const outcome = await withSelectedResourceOperation(row.target.workspaceId, { kind: 'target', id: row.target.id }, async (tx, signal) => {
           signal.throwIfAborted();
@@ -144,7 +145,8 @@ export async function syncScheduledPostStatus(now = new Date(), retryLimit = 0, 
           if (!stillBound || stillBound.remotePostId !== row.remotePostId || !stillBound.target.socialAccount || !usable(stillBound.target.socialAccount, row.target.workspaceId, currentTime(now)) || !granted(stillBound.target.socialAccount.scopes, currentScopes) || !stillBound.target.accessToken && !stillBound.target.socialAccount.accessToken) return { updated: 0, skipped: 1 };
           const changed = await tx.postTarget.updateMany({
             where: { id: row.id, postId: row.postId, targetId: row.target.id, status: 'scheduled_remote', remotePostId: row.remotePostId, post: { workspaceId: row.target.workspaceId } },
-            data: { status: 'published', ...(status.publishedAt ? { publishedAt: status.publishedAt } : { publishedAt: now }) },
+            // A scheduled photo is stored by its photo id; once live, keep the feed post id Facebook reports.
+            data: { status: 'published', remotePostId: publishedId, ...(status.publishedAt ? { publishedAt: status.publishedAt } : { publishedAt: now }) },
           });
           if (!changed.count) return { updated: 0, skipped: 0 };
           const counts = await tx.postTarget.groupBy({ by: ['status'], where: { postId: row.postId, post: { workspaceId: row.target.workspaceId } }, _count: true });
@@ -157,7 +159,7 @@ export async function syncScheduledPostStatus(now = new Date(), retryLimit = 0, 
           if (nextStatus) await tx.post.updateMany({ where: { id: row.postId, workspaceId: row.target.workspaceId }, data: { status: nextStatus, ...(published && !remote ? { publishedAt: now } : {}), updatedAt: now } });
           signal.throwIfAborted();
           await assertFacebookJobAccess(row.target.workspaceId, jobFeatures.publishing);
-          const finalBinding = await tx.postTarget.findFirst({ where: { id: row.id, postId: row.postId, status: 'published', remotePostId: row.remotePostId, post: { workspaceId: row.target.workspaceId }, target: { workspaceId: row.target.workspaceId, enabled: true, providerId: row.target.providerId, socialAccount: { is: { provider: 'facebook', invalidatedAt: null } } } }, select: { id: true, target: { select: { accessToken: true, socialAccount: { select: { workspaceId: true, accessToken: true, scopes: true, tokenExpiresAt: true, invalidatedAt: true } } } } } });
+          const finalBinding = await tx.postTarget.findFirst({ where: { id: row.id, postId: row.postId, status: 'published', remotePostId: publishedId, post: { workspaceId: row.target.workspaceId }, target: { workspaceId: row.target.workspaceId, enabled: true, providerId: row.target.providerId, socialAccount: { is: { provider: 'facebook', invalidatedAt: null } } } }, select: { id: true, target: { select: { accessToken: true, socialAccount: { select: { workspaceId: true, accessToken: true, scopes: true, tokenExpiresAt: true, invalidatedAt: true } } } } } });
           const finalScopes = await configuredScopes('meta.postReadScopes');
           if (!finalBinding?.target.socialAccount || !usable(finalBinding.target.socialAccount, row.target.workspaceId, currentTime(now)) || !granted(finalBinding.target.socialAccount.scopes, finalScopes) || !finalBinding.target.accessToken && !finalBinding.target.socialAccount.accessToken) throw new OperationError('forbidden', 'Facebook job access changed before status persistence completed.');
           return { updated: 1, skipped: 0 };

@@ -448,9 +448,13 @@ export function createFacebookEngine(rawConfig: FacebookConfig, fetchImpl: Faceb
           ? { state: 'published', remoteId, targetId, publishedAt: null } : unknown();
       }
       const video = contentKind === 'video';
+      // A scheduled single photo is held as a Photo: /photos returns only its photo id, no post_id.
+      // A Photo has no is_published; its page_story_id (the feed post id) appears once it is live.
+      const photo = contentKind === 'image' && !remoteId.includes('_');
       const fields = video
         ? 'id,from,status,published,created_time,scheduled_publish_time'
-        : 'id,from,is_published,created_time,scheduled_publish_time';
+        : photo ? 'id,from,created_time,page_story_id'
+          : 'id,from,is_published,created_time,scheduled_publish_time';
       let response: unknown;
       try { response = await request(encodeURIComponent(remoteId), { token, params: { fields } }); }
       catch (error) {
@@ -482,6 +486,12 @@ export function createFacebookEngine(rawConfig: FacebookConfig, fetchImpl: Faceb
         // Video created_time is upload time, not verified publication time.
         if (mapped.status === 'published') return { state: 'published', remoteId, targetId, publishedAt: null };
         if (mapped.status === 'scheduled' && scheduledAt) return { state: 'scheduled', remoteId, targetId, publishedAt: scheduledAt };
+        return unknown();
+      }
+      if (photo) {
+        const story = raw.page_story_id;
+        // Live: report the feed post id, which comments and post insights read; not yet live stays unknown.
+        if (typeof story === 'string' && story.startsWith(`${targetId}_`) && /^[A-Za-z0-9_:-]+$/.test(story)) return { state: 'published', remoteId: story, targetId, publishedAt };
         return unknown();
       }
       if (!Object.hasOwn(raw, 'is_published') || typeof raw.is_published !== 'boolean') return unknown();
