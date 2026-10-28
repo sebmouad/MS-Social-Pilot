@@ -2,9 +2,9 @@
 # Deploy MS Social Pilot directly on the Server (Local Server Deploy)
 #
 # Can be run directly on the server as:
-#   socialpilot-deploy                 # pulls latest main, backups DB, builds, migrates, restarts
+#   socialpilot-deploy                 # pulls latest main, builds, migrates, restarts
 #   socialpilot-deploy --branch <name> # deploy specific branch
-#   socialpilot-deploy --status        # check services, memory, commit, DB backups
+#   socialpilot-deploy --status        # check services, memory, commit
 #   socialpilot-deploy --rollback      # restore previous release
 #   socialpilot-deploy --restart       # restart services & verify health
 #   socialpilot-deploy --logs          # live web logs
@@ -55,10 +55,10 @@ usage() {
   printf "  socialpilot-deploy [options]\n"
   printf "  bash %s [options]\n\n" "$0"
   printf "${BOLD}Commands / Actions:${RESET}\n"
-  printf "  (no args)             Pull latest code from '%s', backup DB, build, migrate, and deploy\n" "$BRANCH"
+  printf "  (no args)             Pull latest code from '%s', build, migrate, and deploy\n" "$BRANCH"
   printf "  --branch <name>       Deploy a specific branch or commit from git (default: main)\n"
   printf "  --commit <hash>       Deploy a specific commit hash\n"
-  printf "  --status              Show deployment status, services, health, and recent backups\n"
+  printf "  --status              Show deployment status, services, and health\n"
   printf "  --rollback            Quick rollback to the previous release\n"
   printf "  --restart             Restart web and worker services without rebuilding\n"
   printf "  --logs                View live logs for the web service\n"
@@ -130,17 +130,6 @@ show_status() {
   free -h | awk 'NR<=2 {print "  " $0}'
   echo ""
 
-  # Recent backups
-  printf "${CYAN}Recent Database Backups:${RESET}\n"
-  if ls -dt /var/backups/socialpilot-deploy-* >/dev/null 2>&1; then
-    ls -dt /var/backups/socialpilot-deploy-* | head -n 5 | while read -r b; do
-      size=$(du -sh "$b" 2>/dev/null | cut -f1)
-      printf "  %-35s (%s)\n" "$(basename "$b")" "$size"
-    done
-  else
-    echo "  No backups found in /var/backups/"
-  fi
-  echo ""
 }
 
 # Subcommand: rollback
@@ -238,19 +227,6 @@ DEPLOY_COMMIT="$(git -C "$REPO_DIR" rev-parse HEAD)"
 SHORT_COMMIT="$(git -C "$REPO_DIR" rev-parse --short HEAD)"
 COMMIT_MSG="$(git -C "$REPO_DIR" log -1 --pretty=%B | head -n 1)"
 log_info "Deploying commit: ${BOLD}$SHORT_COMMIT${RESET} ('$COMMIT_MSG')"
-
-# Step 2: Database Backup
-log_step "Creating safe database backup..."
-T=$(date +%Y%m%d-%H%M%S)
-B="/var/backups/socialpilot-deploy-$T"
-mkdir -m 700 -p "$B"
-sudo -u postgres pg_dump -Fc "$DB_NAME" > "$B/social_pilot.dump" && chmod 600 "$B/social_pilot.dump" || {
-  log_error "Database backup failed. Aborting deployment."
-  exit 1
-}
-log_ok "Backup saved to: $B"
-# Retain last 10 backups
-ls -dt /var/backups/socialpilot-deploy-* 2>/dev/null | tail -n +11 | xargs -r rm -rf
 
 # Step 3: Copy Environment
 ENVF="$LIVE_DIR/app/.env.production.local"
@@ -353,6 +329,14 @@ EnvironmentFile=/srv/ms-social-pilot/app/.env.production.local
 ExecStart=/usr/bin/env npx next start -H 127.0.0.1 -p ${APP_PORT}
 Restart=on-failure
 MemoryMax=2G
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
 [Install]
 WantedBy=multi-user.target
 UNIT
@@ -368,6 +352,14 @@ EnvironmentFile=/srv/ms-social-pilot/app/.env.production.local
 ExecStart=/usr/bin/env node --import tsx scripts/worker.ts
 Restart=on-failure
 MemoryMax=1G
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
 [Install]
 WantedBy=multi-user.target
 UNIT
@@ -408,7 +400,7 @@ else
   mv "$LIVE_DIR" "$NEW_DIR"
   mv "$PREV_DIR" "$LIVE_DIR"
   systemctl restart social-pilot social-pilot-worker
-  log_warn "Previous release restored. Database backup preserved at: $B"
+  log_warn "Previous release restored."
   exit 1
 fi
 

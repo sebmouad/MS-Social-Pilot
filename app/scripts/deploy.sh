@@ -199,10 +199,6 @@ ENV
   chown socialpilot:socialpilot "$ENVF"
 fi
 
-T=$(date +%Y%m%d-%H%M%S); B=/var/backups/socialpilot-deploy-$T; mkdir -m 700 -p "$B"
-sudo -u postgres pg_dump -Fc social_pilot > "$B/social_pilot.dump" && chmod 600 "$B/social_pilot.dump" || { echo "Backup failed; nothing changed"; exit 1; }
-echo "Backup: $B"
-ls -dt /var/backups/socialpilot-deploy-* 2>/dev/null | tail -n +3 | xargs -r rm -rf
 
 rm -rf "$BUILD/node_modules" "$BUILD/rebuild"
 rsync -a --delete --exclude 'app/node_modules' --exclude 'app/.next' --exclude 'app/generated' --exclude 'app/.lock-sum' /var/tmp/deploy-src/ "$BUILD/"
@@ -261,6 +257,14 @@ EnvironmentFile=/srv/ms-social-pilot/app/.env.production.local
 ExecStart=/usr/bin/env npx next start -H 127.0.0.1 -p ${APP_PORT}
 Restart=on-failure
 MemoryMax=2G
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
 [Install]
 WantedBy=multi-user.target
 UNIT
@@ -276,6 +280,14 @@ EnvironmentFile=/srv/ms-social-pilot/app/.env.production.local
 ExecStart=/usr/bin/env node --import tsx scripts/worker.ts
 Restart=on-failure
 MemoryMax=1G
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
 [Install]
 WantedBy=multi-user.target
 UNIT
@@ -294,6 +306,6 @@ if [ $ok = 1 ] && [ "$csrf" = 401 ] && { [ "$pub" = 200 ] || [ "$pub" = skipped 
 else
   echo "!! Health failed (local ok=$ok, sign-in=$csrf, public=$pub); restoring previous release"
   rm -rf "$NEW"; mv "$LIVE" "$NEW"; mv "$PREV" "$LIVE"; systemctl restart social-pilot social-pilot-worker
-  echo "Previous release restored. Database backup: $B"; exit 1
+  echo "Previous release restored."; exit 1
 fi
 REMOTE
