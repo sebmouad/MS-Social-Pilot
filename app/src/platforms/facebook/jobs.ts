@@ -167,7 +167,10 @@ export async function syncScheduledPostStatus(now = new Date(), retryLimit = 0, 
       });
     } catch (error) {
       if (isAccessDenied(error) || (error instanceof OperationError && error.code === 'conflict')) result.skipped++;
-      else result.failed++;
+      else {
+        result.failed++;
+        await logItemFailure('scheduledPostStatus', row.target.id, error);
+      }
     }
   }
   return result;
