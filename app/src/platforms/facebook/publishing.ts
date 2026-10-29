@@ -449,7 +449,7 @@ export function createFacebookEngine(rawConfig: FacebookConfig, fetchImpl: Faceb
       }
       const video = contentKind === 'video';
       // A scheduled single photo is held as a Photo: /photos returns only its photo id, no post_id.
-      // A Photo has no is_published; its page_story_id (the feed post id) appears once it is live.
+      // A Photo has no is_published; its page_story_id names the feed post, which carries it.
       const photo = contentKind === 'image' && !remoteId.includes('_');
       const fields = video
         ? 'id,from,status,published,created_time,scheduled_publish_time'
@@ -490,8 +490,20 @@ export function createFacebookEngine(rawConfig: FacebookConfig, fetchImpl: Faceb
       }
       if (photo) {
         const story = raw.page_story_id;
-        // Live: report the feed post id, which comments and post insights read; not yet live stays unknown.
-        if (typeof story === 'string' && story.startsWith(`${targetId}_`) && /^[A-Za-z0-9_:-]+$/.test(story)) return { state: 'published', remoteId: story, targetId, publishedAt };
+        if (typeof story !== 'string' || !story.startsWith(`${targetId}_`) || !/^[A-Za-z0-9_:-]+$/.test(story)) return unknown();
+        // A held photo already has its feed post, with is_published=false until the scheduled time; only that post says it is live.
+        let storyResponse: unknown;
+        try { storyResponse = await request(encodeURIComponent(story), { token, params: { fields: 'id,is_published,scheduled_publish_time' } }); }
+        catch (error) {
+          if (error instanceof FacebookApiError && error.code === 100 && error.subcode === 33) return unknown();
+          throw error;
+        }
+        const post = object(storyResponse);
+        if (post.id !== story || typeof post.is_published !== 'boolean') return unknown();
+        const storySeconds = typeof post.scheduled_publish_time === 'number' && Number.isSafeInteger(post.scheduled_publish_time) ? post.scheduled_publish_time : null;
+        // Report the feed post id once live, which comments and post insights read. The photo's created_time is when it was scheduled, not published.
+        if (post.is_published) return { state: 'published', remoteId: story, targetId, publishedAt: storySeconds !== null && storySeconds * 1000 <= Date.now() ? new Date(storySeconds * 1000) : null };
+        if (storySeconds !== null && storySeconds * 1000 > Date.now()) return { state: 'scheduled', remoteId, targetId, publishedAt: new Date(storySeconds * 1000) };
         return unknown();
       }
       if (!Object.hasOwn(raw, 'is_published') || typeof raw.is_published !== 'boolean') return unknown();
