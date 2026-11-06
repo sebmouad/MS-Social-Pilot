@@ -8,7 +8,7 @@ import { entry } from '@/lib/config/entry';
 export const WORDPRESS_DEFAULTS = {
   enabled: true, tablePrefix: 'wp_', siteUrl: '', uploadsPath: '/wp-content/uploads', permalinkTemplate: '{siteUrl}/{slug}/',
   dbConnectTimeoutMs: 5000, dbQueryTimeoutMs: 15000, dbPoolSize: 2, candidateBatchSize: 200, candidateMaxScan: 5000,
-  postType: 'post', postStatus: 'publish', captionMetaKey: '_msrwa_facebook_caption', imageMetaKey: '_msrwa_facebook_generated',
+  postType: 'post', postStatus: 'publish', captionMetaKey: 'fb_images_data.0.text', imageMetaKey: 'fb_images_data.0.id',
   recipeMetaKey: '_msrwa_recipe', skipMetaKey: 'fb_shared_at', attachedFileMetaKey: '_wp_attached_file', skipShared: true, order: 'newest', maxAgeDays: 0,
   slots: ['07:00', '11:00', '15:00', '17:00'] as string[], timezone: 'Europe/Paris', horizonDays: 2, minLeadMinutes: 5, pageStaggerMinutes: 9, distinctAcrossPages: true, repostCooldownDays: 365,
   targetTypes: ['page'] as string[], runBudget: 80, maxSourcesPerRun: 200, claimLeaseSeconds: 300, maxSlotAttempts: 5, previewCount: 5, ledgerPageSize: 50,
