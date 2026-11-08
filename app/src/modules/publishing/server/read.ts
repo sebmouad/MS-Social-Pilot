@@ -3,7 +3,7 @@ import { PublishingOperationError, defaultPublishingErrorText, type PublishingEr
 import { loadPublishingErrorText } from '@/modules/publishing/server/error-copy';
 import { PostStatus, Prisma } from '../../../../generated/client';
 import { OperationError } from '@/lib/operation-error';
-import { PLANNED_STATUSES } from '@/lib/post-groups';
+import { PLANNED_STATUSES, POST_VIEWS } from '@/lib/post-groups';
 import { prisma, listPostPage, listCalendarRange, getTargets } from '@/server/data';
 import { runtimeConfig } from '@/server/config/store';
 import { platformModule } from '@/platforms';
@@ -40,12 +40,15 @@ function integer(value: unknown, fallback: number, max?: number, errorText: Publ
 }
 
 /** Current authorization and selected resource visibility are shared by every Publishing read surface. */
-export async function readPublishingPostPage(actor: PublishingActor, input: { page?: number; status?: string; channelId?: string; q?: string; origin?: string; postId?: string; order?: 'scheduled_asc' | 'created_asc' } = {}, feature: PublishingFeature = 'publishing/posts') {
+export async function readPublishingPostPage(actor: PublishingActor, input: { page?: number; status?: string; statuses?: readonly string[]; channelId?: string; q?: string; origin?: string; postId?: string; order?: 'scheduled_asc' | 'created_asc' } = {}, feature: PublishingFeature = 'publishing/posts') {
   const errorText = await loadPublishingErrorText();
   if (input.order !== undefined && !['scheduled_asc', 'created_asc'].includes(input.order)) invalid(errorText('read_7'), errorText);
+  // One of the Posts page's lists (POST_VIEWS): a set of post-level statuses, on top of any single status filter.
+  if (input.statuses !== undefined && (!Array.isArray(input.statuses) || !input.statuses.length || input.statuses.some(value => !(Object.values(PostStatus) as string[]).includes(value)))) invalid(undefined, errorText);
   const query = await publishingPostReadQuery(actor, { status: input.status, channelId: input.channelId, q: input.q, origin: input.origin, ...(input.postId === undefined ? {} : { postId: input.postId }) }, feature);
   const size = await runtimeConfig('publishing.postPageSize');
-  const listing = await listPostPage(actor.workspaceId, integer(input.page, 1, undefined, errorText), size, query.scope.targetIds, query.scope.authorId, { where: query.where, order: input.order });
+  const where: Prisma.PostWhereInput = input.statuses === undefined ? query.where : { AND: [query.where, { status: { in: [...input.statuses] as PostStatus[] } }] };
+  const listing = await listPostPage(actor.workspaceId, integer(input.page, 1, undefined, errorText), size, query.scope.targetIds, query.scope.authorId, { where, order: input.order });
   return { ...listing, posts: await withPlatformNames(actor.workspaceId, listing.posts), channelUnavailable: query.channelUnavailable, filters: query.filters };
 }
 
@@ -142,12 +145,14 @@ export async function readPublishingPostList(actor: PublishingActor, input: unkn
 /** Planned-vs-outcome header counts over the same authorized scoped query as the Posts list, ignoring any status filter. `failed` covers the needs-attention outcomes (partially_failed, failed); cancelled and rejected are resolved and counted on neither side. */
 export async function readPublishingStatusCounts(actor: PublishingActor, input: { channelId?: string; q?: string; origin?: string } = {}, feature: PublishingFeature = 'publishing/posts') {
   const query = await publishingPostReadQuery(actor, { ...(input.channelId === undefined ? {} : { channelId: input.channelId }), ...(input.q === undefined ? {} : { q: input.q }), ...(input.origin === undefined ? {} : { origin: input.origin }) }, feature);
-  const [planned, published, failed] = await Promise.all([
+  const [planned, published, failed, issues] = await Promise.all([
     prisma.post.count({ where: { AND: [query.where, { status: { in: [...PLANNED_STATUSES] as PostStatus[] } }] } }),
     prisma.post.count({ where: { AND: [query.where, { status: 'published' }] } }),
     prisma.post.count({ where: { AND: [query.where, { status: { in: ['partially_failed', 'failed'] as PostStatus[] } }] } }),
+    // The Issues list (POST_VIEWS.issues): failed sends, and posts rejected or cancelled.
+    prisma.post.count({ where: { AND: [query.where, { status: { in: [...POST_VIEWS.issues] as PostStatus[] } }] } }),
   ]);
-  return { planned, published, failed, channelUnavailable: query.channelUnavailable };
+  return { planned, published, failed, issues, channelUnavailable: query.channelUnavailable };
 }
 
 /** Home uses the same current-authorized whole-post scope as Posts. */

@@ -46,7 +46,8 @@ export function PostsHeaderTools({ statuses, origins, chips, resetHref, searchMa
   const origin = params.get('origin') ?? '';
   const q = params.get('q') ?? '';
   const hidden: ReactNode[] = [];
-  for (const name of ['channel', 'status', 'origin']) { const value = params.get(name); if (value) hidden.push(<input key={name} type="hidden" name={name} value={value} />); }
+  // The open list (Planned · Published · Issues) is kept by a search too.
+  for (const name of ['view', 'channel', 'status', 'origin']) { const value = params.get(name); if (value) hidden.push(<input key={name} type="hidden" name={name} value={value} />); }
 
   return <div className={styles.filterRow}>
     <FilterButton activeCount={chips.length} onClear={() => router.push(resetHref)}>
@@ -54,12 +55,13 @@ export function PostsHeaderTools({ statuses, origins, chips, resetHref, searchMa
         <label>{copy.contentFilterStatus}
           <select value={status} onChange={event => go('status', event.currentTarget.value)}>
             <option value="">{copy.contentFilterAnyStatus}</option>
-            <optgroup label={labels.groupPlanned}>
-              {statuses.filter(item => postGroup(item.value) === 'planned').map(item => <option key={item.value} value={item.value}>{item.label}</option>)}
-            </optgroup>
-            <optgroup label={labels.groupOutcome}>
-              {statuses.filter(item => postGroup(item.value) === 'outcome').map(item => <option key={item.value} value={item.value}>{item.label}</option>)}
-            </optgroup>
+            {/* Only the open list's statuses are offered, so one of the two groups is often empty and left out. */}
+            {(['planned', 'outcome'] as const).map(group => {
+              const options = statuses.filter(item => postGroup(item.value) === group);
+              return options.length ? <optgroup key={group} label={group === 'planned' ? labels.groupPlanned : labels.groupOutcome}>
+                {options.map(item => <option key={item.value} value={item.value}>{item.label}</option>)}
+              </optgroup> : null;
+            })}
           </select>
         </label>
         {origins.length ? <label>{copy.contentFilterOrigin}

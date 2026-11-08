@@ -9,8 +9,11 @@ import type { PublishingActor } from '../types';
 import { asyncExportPolicySchema } from './config';
 import { jobStopRequested } from '@/server/jobs/job-context';
 import { postExportCopy } from './copy';
-const filtersSchema = z.object({ q: z.string().optional(), channelId: z.string().optional(), status: z.string().optional() }).strict();
+import { POST_VIEW_IDS, type PostView } from '@/lib/post-groups';
+// `view` is the Posts page's open list (Planned · Published · Issues); only the CSV query applies it.
+const filtersSchema = z.object({ q: z.string().optional(), channelId: z.string().optional(), status: z.string().optional(), view: z.enum(POST_VIEW_IDS as [PostView, ...PostView[]]).optional() }).strict();
 type Filters = z.infer<typeof filtersSchema>;
+const scopeFilters = ({ view: _view, ...filters }: Filters) => filters;
 type Job = { id: string; workspaceId: string; userId: string; filters: Filters; ceiling: string[] | null; scope: string; status: string; expiresAt: Date; csv: string | null; attempts: number };
 const fingerprint = (scope: { targetIds: string[]; authorId?: string }) => createHash('sha256').update(JSON.stringify({ targetIds: [...scope.targetIds].sort(), authorId: scope.authorId ?? null })).digest('hex');
 const missing = async () => new OperationError('not_found', (await postExportCopy()).unavailable);
@@ -18,14 +21,14 @@ const policy = async () => asyncExportPolicySchema.parse(await runtimeConfig('pu
 /** Enqueue only; the worker performs the CSV query out of the request path. */
 export async function requestPostExport(actor: PublishingActor, raw: unknown, confirmation: string) {
  const filters = filtersSchema.parse(raw);
- const query = await publishingPostReadQuery(actor, filters);
+ const query = await publishingPostReadQuery(actor, scopeFilters(filters));
  if (confirmation !== 'EXPORT POSTS') throw new OperationError('invalid_request', (await postExportCopy()).confirmation);
  const p = await policy();
  return prisma.$transaction(async tx => {
   await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${actor.workspaceId}))::text`;
   const members = await tx.$queryRaw<Array<{ role: string; disabledAt: Date | null }>>`SELECT m.role::text AS role, u."disabledAt" FROM memberships m JOIN users u ON u.id = m."userId" WHERE m."userId" = ${actor.userId} AND m."workspaceId" = ${actor.workspaceId} FOR UPDATE OF m, u`;
   if (!members[0] || members[0].disabledAt) throw await missing();
-  const current = await publishingPostReadQuery(actor, filters);
+  const current = await publishingPostReadQuery(actor, scopeFilters(filters));
   if (fingerprint(current.scope) !== fingerprint(query.scope)) throw await missing();
   await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`post-export:${actor.workspaceId}:${actor.userId}`}))::text`;
   const count = await tx.$queryRaw<Array<{ count: bigint }>>`SELECT count(*)::bigint AS count FROM post_exports WHERE "workspaceId" = ${actor.workspaceId} AND "userId" = ${actor.userId} AND status IN ('queued','processing') AND "expiresAt" > now()`;
@@ -42,7 +45,7 @@ export async function readPostExport(actor: PublishingActor, id: string, downloa
  await publishingPostReadQuery(actor, {});
  const rows = await prisma.$queryRaw<Job[]>`SELECT * FROM post_exports WHERE id = ${id} AND "workspaceId" = ${actor.workspaceId} AND "userId" = ${actor.userId} AND "expiresAt" > now()`;
  const job = rows[0]; if (!job) throw await missing();
- const query = await publishingPostReadQuery(actor, job.filters);
+ const query = await publishingPostReadQuery(actor, scopeFilters(job.filters));
  if (fingerprint(query.scope) !== job.scope) throw await missing();
  if (download && (job.status !== 'ready' || job.csv === null)) throw await missing();
  const p = await policy();
@@ -66,10 +69,10 @@ export async function runPostExportJob() {
  if (!job) return false;
  const actor: PublishingActor = { userId: job.userId, workspaceId: job.workspaceId, ...(job.ceiling === null ? {} : { allowedTargetIds: job.ceiling }) };
  try {
-  const before = await publishingPostReadQuery(actor, job.filters);
+  const before = await publishingPostReadQuery(actor, scopeFilters(job.filters));
   if (fingerprint(before.scope) !== job.scope) throw await missing();
   const result = await exportPublishingPosts(actor, job.filters);
-  const after = await publishingPostReadQuery(actor, job.filters);
+  const after = await publishingPostReadQuery(actor, scopeFilters(job.filters));
   if (fingerprint(after.scope) !== job.scope) throw await missing();
   await prisma.$transaction(async tx => {
    const updated = await tx.$executeRaw`UPDATE post_exports SET status = 'ready', csv = ${result.csv}, token = NULL, "leaseUntil" = NULL, "completedAt" = now(), "lastError" = NULL WHERE id = ${job.id} AND token = ${token} AND "expiresAt" > now() AND "leaseUntil" > now()`;

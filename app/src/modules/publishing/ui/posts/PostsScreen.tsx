@@ -7,7 +7,7 @@ import { ContentProvider } from '../ContentProvider';
 import { PublishingCopyProvider } from '../kit/CopyProvider';
 import { loadPublishingActionCopy } from '../../server/action-copy';
 import { PublishingActionCopyProvider } from '../WorkflowSubmitButtons';
-import { InfoTip, PageHeader, statusLabel } from "@/components";
+import { InfoTip, LinkTabs, PageHeader, statusLabel } from "@/components";
 import { IconPlus } from "@tabler/icons-react";
 import { redirect } from 'next/navigation';
 import { requireViewer } from "@/server/context";
@@ -33,8 +33,10 @@ import { canAccessFeature } from '@/server/permissions';
 import { loadWorkspaceOperations } from '@/modules/settings/server/workspace-operations';
 import { OperationError, isOperationErrorCode } from '@/lib/operation-error';
 import { pageChannelScope } from '@/modules/shell/server/scope';
+import { shellChrome } from '@/modules/shell/server/chrome';
+import { POST_VIEWS, POST_VIEW_IDS, parsePostView, postView, type PostView } from '@/lib/post-groups';
 
-type Params = { notice?: string; recovery?: string; page?: string; status?: string; channel?: string; q?: string; origin?: string; post?: string };
+type Params = { notice?: string; recovery?: string; page?: string; status?: string; channel?: string; q?: string; origin?: string; post?: string; view?: string };
 
 const STATUS_FILTERS = ['draft', 'pending_approval', 'rejected', 'scheduled', 'publishing', 'published', 'partially_failed', 'failed', 'cancelled'] as const;
 const POST_ID = /^[A-Za-z0-9_-]{1,200}$/;
@@ -56,13 +58,15 @@ export default async function PostsPage({ searchParams }: { searchParams: Promis
   const imageRules = { allowedMimeTypes: allowedMimeTypes as string[], maxUploadBytes: Number(maxUploadBytes), maxAltCharacters: Number(maxAltCharacters), maxMedia: Number(maxMedia), maxFirstCommentDelayMinutes: Number(maxFirstCommentDelayMinutes) };
   const requestedPage = pageParam && /^[1-9]\d*$/.test(pageParam) && Number.isSafeInteger(Number(pageParam)) ? Number(pageParam) : 1;
   const selectedStatus = Object.values(PostStatus).find(value => value === status);
+  // Planned · Published · Issues (owner directive 2026-11-08). A status filter opens its own list, so an older link or saved view still lands right.
+  const view: PostView = selectedStatus ? postView(selectedStatus) : parsePostView(params.view) ?? 'planned';
   // The sidebar's channel scope decides which channels the list covers (several channels filter as "any of"). A saved channel-group address still works.
   const scope = await pageChannelScope(viewer, params).catch(() => null);
   const selectedChannel = params.channel?.startsWith('channel-group:') ? params.channel : scope?.ids.length ? scope.ids.join(',') : undefined;
   let listing: Awaited<ReturnType<typeof readPublishingPostPage>> | null = null;
   let listingError: string | null = null;
   try {
-    listing = await readPublishingPostPage({ userId: viewer.user.id, workspaceId: viewer.workspaceId }, { page: requestedPage, status, channelId: selectedChannel, q, origin: originKind });
+    listing = await readPublishingPostPage({ userId: viewer.user.id, workspaceId: viewer.workspaceId }, { page: requestedPage, status, ...(selectedStatus ? {} : { statuses: POST_VIEWS[view] }), channelId: selectedChannel, q, origin: originKind });
   } catch (error) {
     if (!(error instanceof OperationError) || !isOperationErrorCode(error.code)) throw error;
     listingError = safeOperationError(error, copy);
@@ -76,13 +80,14 @@ export default async function PostsPage({ searchParams }: { searchParams: Promis
   if (postParam && POST_ID.test(postParam) && !listing.posts.some(post => post.id === postParam)) redirect(`/content/post/${encodeURIComponent(postParam)}`);
   // Header counts use the same channel/search/origin scope as the list but ignore the status filter, so they always split planned vs published. A failed count hides instead of showing a bare total.
   const postIds = listing.posts.map(post => post.id);
-  const [counts, targetChoices, undoSendSeconds, origins, originOptions, reach] = await Promise.all([
+  const [counts, targetChoices, undoSendSeconds, origins, originOptions, reach, { copy: shell }] = await Promise.all([
     readPublishingStatusCounts({ userId: viewer.user.id, workspaceId: viewer.workspaceId }, { ...(selectedChannel === undefined ? {} : { channelId: selectedChannel }), ...(q === undefined ? {} : { q }), ...(originKind === undefined ? {} : { origin: originKind }) }).catch(() => null),
     publishingDestinationChoices(viewer),
     loadWorkspaceOperations(viewer.workspaceId).then(value => value.undoSendSeconds, () => 0),
     loadPostOrigins(viewer.workspaceId, postIds, locale),
     originFilterOptions(viewer.workspaceId, locale).catch(() => []),
     loadPostReach(viewer.workspaceId, postIds),
+    shellChrome(),
   ]);
   const timeZone = viewer.membership.workspace.timezone;
   const canManageDrafts = ["owner", "admin", "editor"].includes(viewer.membership.role);
@@ -127,6 +132,7 @@ export default async function PostsPage({ searchParams }: { searchParams: Promis
   // Every address keeps the sidebar's channel parameter and the other filters; only the omitted one is dropped.
   const hrefWith = (page: number | null, omit?: 'status' | 'q' | 'origin') => {
     const next = new URLSearchParams();
+    if (view !== 'planned') next.set('view', view);
     if (page) next.set('page', String(page));
     if (status && omit !== 'status') next.set('status', status);
     if (params.channel) next.set('channel', params.channel);
@@ -135,7 +141,28 @@ export default async function PostsPage({ searchParams }: { searchParams: Promis
     const query = next.toString();
     return `/content${query ? `?${query}` : ''}`;
   };
-  const resetHref = params.channel ? `/content?channel=${encodeURIComponent(params.channel)}` : '/content';
+  // Clearing the filters keeps the list and the sidebar's channel.
+  const resetHref = (() => {
+    const next = new URLSearchParams();
+    if (view !== 'planned') next.set('view', view);
+    if (params.channel) next.set('channel', params.channel);
+    const query = next.toString();
+    return `/content${query ? `?${query}` : ''}`;
+  })();
+  // Each list keeps the channel, the search and who created the posts; a status belongs to one list, so it is dropped.
+  const viewHref = (target: PostView) => {
+    const next = new URLSearchParams();
+    if (target !== 'planned') next.set('view', target);
+    if (params.channel) next.set('channel', params.channel);
+    if (q) next.set('q', q);
+    if (originKind) next.set('origin', originKind);
+    const query = next.toString();
+    return `/content${query ? `?${query}` : ''}`;
+  };
+  const viewLabel: Record<PostView, string> = { planned: copy.postsViewPlanned, published: copy.postsViewPublished, issues: copy.postsViewIssues };
+  const viewCount: Record<PostView, number | undefined> = { planned: counts?.planned, published: counts?.published, issues: counts?.issues };
+  const viewTabs = <LinkTabs label={copy.postsViews} moreLabel={shell.moreTabs} activeId={view}
+    items={POST_VIEW_IDS.map(id => { const count = viewCount[id]; return { id, href: viewHref(id), label: viewLabel[id], ...(count === undefined ? {} : { count }) }; })} />;
   const manageProps = { targets: targetChoices, canPublish, canOrganize, canQueue, imageRules, timeZone, undoSendSeconds };
   const canBulk = canWritePosts && canAuthorDrafts;
   const chips: FilterChip[] = [
@@ -147,10 +174,11 @@ export default async function PostsPage({ searchParams }: { searchParams: Promis
   const emptyState = chips.length
     ? <EmptyPanel title={copy.postsNoMatchTitle} action={<a className="ui-button ui-button--secondary" href={resetHref}>{content.copy.contentFilterClear}</a>}>{copy.postsNoMatchBody}</EmptyPanel>
     : <EmptyPanel title={copy.postsEmptyTitle} action={newPostLink}>{copy.postsEmptyBody}</EmptyPanel>;
-  const statuses = STATUS_FILTERS.map(value => ({ value, label: copy[`status_${value}`] }));
+  // The status filter offers the statuses of the open list only.
+  const statuses = STATUS_FILTERS.filter(value => postView(value) === view).map(value => ({ value, label: copy[`status_${value}`] }));
   const headerActions = <>{canManageDrafts ? <ImportCsv targets={targetChoices} locale={locale} /> : null}{newPostLink}</>;
   return <ContentProvider {...content}><PublishingCopyProvider catalog={catalog} locale={locale}><PublishingActionCopyProvider catalog={actionCatalog} locale={locale}><ComposerCopyProvider catalog={composerCatalog} locale={locale}>
-    <PageHeader module="publishing" title={copy.postsTitle} count={counts ? copy.plannedPublished(counts.planned.toLocaleString(locale), counts.published.toLocaleString(locale)) : undefined} info={pageInfo} actions={headerActions}
+    <PageHeader module="publishing" title={copy.postsTitle} count={counts ? copy.plannedPublished(counts.planned.toLocaleString(locale), counts.published.toLocaleString(locale)) : undefined} info={pageInfo} actions={headerActions} tabs={viewTabs}
       filters={<PostsHeaderTools statuses={statuses} origins={originOptions} chips={chips} resetHref={resetHref} searchMaxCharacters={Number(searchMaxCharacters)} exportMaxPosts={Number(exportMaxPosts)} exportMaxBytes={Number(exportMaxBytes)} locale={locale} canExport={canAuthorDrafts} />} />
     {listing.channelUnavailable ? <p className={styles.errorNotice} role="status">{content.copy.contentChannelUnavailable}</p> : null}
     {noticeText ? <RouteNotice className={notice?.startsWith('failed') ? styles.errorNotice : styles.successNotice} error={notice?.startsWith('failed')} focusKey={`${notice}:${recovery ?? ''}`}>{noticeText}</RouteNotice> : null}

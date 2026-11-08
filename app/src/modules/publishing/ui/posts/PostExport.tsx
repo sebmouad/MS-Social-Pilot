@@ -23,7 +23,7 @@ export function PostExport({ locale = 'en' }: { maxPosts: number; maxBytes: numb
   startTransition(async () => {
   setError(false);
   try {
-   const filters = Object.fromEntries(['q','status','channel'].flatMap(key => { const value = params.get(key); return value ? [[key === 'channel' ? 'channelId' : key, value]] : []; }));
+   const filters = Object.fromEntries(['q','status','channel','view'].flatMap(key => { const value = params.get(key); return value ? [[key === 'channel' ? 'channelId' : key, value]] : []; }));
    const response = await fetch(create ? '/api/publishing/posts/export/jobs' : `/api/publishing/posts/export/jobs?action=status&id=${encodeURIComponent(job!.id)}`, create ? { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'create', filters, confirmation: confirmed ? 'EXPORT POSTS' : '' }) } : { cache: 'no-store' });
    if (!response.ok) throw new Error();
    const receipt = await response.json();

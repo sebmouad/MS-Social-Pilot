@@ -7,6 +7,7 @@ import { prisma } from '@/server/data';
 import { runtimeConfig } from '@/server/config/store';
 import { firstCommentState } from '../first-comment-state';
 import { publishingPostReadQuery } from './read-query';
+import { POST_VIEWS, parsePostView } from '@/lib/post-groups';
 import type { PublishingActor } from './types';
 
 const COLUMNS = [
@@ -91,7 +92,7 @@ export async function exportPublishingPosts(
   const errorText = await loadPublishingErrorText();
   if (!input || typeof input !== 'object' || Array.isArray(input)) invalid(undefined, errorText);
   const values = input as Record<string, unknown>;
-  if (Object.keys(values).some(key => !['q', 'status', 'channelId'].includes(key))) invalid(undefined, errorText);
+  if (Object.keys(values).some(key => !['q', 'status', 'channelId', 'view'].includes(key))) invalid(undefined, errorText);
   if (Object.values(values).some(value => value !== undefined && typeof value !== 'string')) invalid(undefined, errorText);
   if (!constraints || typeof constraints !== 'object' || Array.isArray(constraints)
     || Object.keys(constraints).some(key => key !== 'maxItems')) invalid(errorText('read_13'), errorText);
@@ -99,17 +100,21 @@ export async function exportPublishingPosts(
   if (requested !== undefined && (typeof requested !== 'number' || !Number.isSafeInteger(requested) || requested < 1)) {
     invalid(errorText('read_13'), errorText);
   }
+  // The Posts page's open list; a single status, when chosen, already lies within it.
+  const view = values.view === undefined ? undefined : parsePostView(values.view);
+  if (values.view !== undefined && view === undefined) invalid(undefined, errorText);
 
   const queryInput = {
     ...(values.q === undefined ? {} : { q: values.q as string }),
     ...(values.status === undefined ? {} : { status: values.status as string }),
     ...(values.channelId === undefined ? {} : { channelId: values.channelId as string }),
   };
-  const [query, configuredPosts, configuredBytes] = await Promise.all([
+  const [scoped, configuredPosts, configuredBytes] = await Promise.all([
     publishingPostReadQuery(actor, queryInput, 'publishing/posts'),
     runtimeConfig('publishing.exportMaxPosts'),
     runtimeConfig('publishing.exportMaxBytes'),
   ]);
+  const query = view === undefined || values.status !== undefined ? scoped : { ...scoped, where: { AND: [scoped.where, { status: { in: [...POST_VIEWS[view]] as PostStatus[] } }] } };
   const rootPostLimit = safeCap(configuredPosts, 'post export', errorText);
   const byteLimit = safeCap(configuredBytes, 'export byte', errorText);
   const maxPosts = requested === undefined ? rootPostLimit : Math.min(rootPostLimit, requested);
