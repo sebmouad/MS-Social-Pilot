@@ -2,12 +2,12 @@
 /**
  * Plugin Name: MS Social Pilot REST Fields
  * Description: Read-only exposure of the post meta used by the MS Social Pilot WordPress connector
- *              (the Facebook images list, recipe JSON, already-shared marker) in /wp-json/wp/v2/.
+ *              (the Facebook images list and the recipe JSON) in /wp-json/wp/v2/.
  *
  * `fb_images_data` is the JSON list of a post's Facebook images, newest first, as MS Recipes Writer AI
  * (0.66.1 and later) and MS FB Posts write it: `[{"id":12,"text":"caption",…}]`. The connector reads
  * `fb_images_data.0.id` and `fb_images_data.0.text`.
- * Version:     1.1.0
+ * Version:     1.2.0
  *
  * Install: copy this file to wp-content/mu-plugins/. Nothing is writable through REST: meta stays
  * editable only by users who could already edit the post (auth_callback). Override the key list with
@@ -22,7 +22,6 @@ add_action( 'init', static function () {
 	$keys = apply_filters( 'ms_social_pilot_rest_meta_keys', array(
 		'fb_images_data'            => 'string',
 		'_msrwa_recipe'             => 'string',
-		'fb_shared_at'              => 'string',
 	) );
 	$post_types = apply_filters( 'ms_social_pilot_rest_post_types', array( 'post' ) );
 	foreach ( $post_types as $post_type ) {
