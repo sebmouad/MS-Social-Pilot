@@ -58,6 +58,9 @@ export function InsightsFilterRow({ presets, period, compare, showCompare = true
     if (scope) next.set('channel', scope);
     const kind = params.get('kind');
     if (kind) next.set('kind', kind);
+    // The Post explorer's open tab stays open.
+    const view = params.get('view');
+    if (view) next.set('view', view);
     const query = next.toString();
     router?.push(`${pathname}${query ? `?${query}` : ''}`);
   };

@@ -19,6 +19,26 @@ export const recordsCopyDefaults = {
     "en": "Post explorer",
     "fr": "Explorateur de publications"
   },
+  "Post explorer views": {
+    "en": "Post explorer views",
+    "fr": "Vues de l’explorateur"
+  },
+  "Posts": {
+    "en": "Posts",
+    "fr": "Publications"
+  },
+  "Summary": {
+    "en": "Summary",
+    "fr": "Résumé"
+  },
+  "Timing": {
+    "en": "Timing",
+    "fr": "Moments"
+  },
+  "Content": {
+    "en": "Content",
+    "fr": "Contenu"
+  },
   "Start (UTC)": {
     "en": "Start (UTC)",
     "fr": "Début (UTC)"

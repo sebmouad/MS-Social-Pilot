@@ -21,6 +21,12 @@ const COPY = {
   },
 } as const;
 const GROUPS = ['hour', 'weekday', 'channel', 'profile', 'origin', 'opening', 'question', 'length'] as const;
+export type PerformanceSection = 'summary' | 'timing' | 'content';
+/** The Post explorer's tabs (owner directive 2026-11-08): the totals and examples, when posts go out, and what they say and where. */
+const SECTION_GROUPS: Record<Exclude<PerformanceSection, 'summary'>, ReadonlyArray<(typeof GROUPS)[number]>> = {
+  timing: ['hour', 'weekday'],
+  content: ['channel', 'profile', 'origin', 'opening', 'question', 'length'],
+};
 
 const num = (value: number | null, locale: Locale) => value === null ? '—' : new Intl.NumberFormat(locale, { maximumFractionDigits: 2 }).format(value);
 function change(now: number | null, before: number | null | undefined) {
@@ -29,7 +35,7 @@ function change(now: number | null, before: number | null | undefined) {
   return `${pct > 0 ? '+' : ''}${pct}%`;
 }
 
-export function PerformancePanel({ digest, before, complete, locale }: { digest: Digest; before: Totals | null; complete: boolean; locale: Locale }) {
+export function PerformancePanel({ digest, before, complete, locale, section }: { digest: Digest; before: Totals | null; complete: boolean; locale: Locale; section: PerformanceSection }) {
   const t = COPY[locale];
   if (!digest.totals.measured) return <section aria-labelledby="what-works"><h2 id="what-works">{t.title}</h2><p>{t.none}</p></section>;
   const tile = (label: string, value: number | null, previous: number | null | undefined) => {
@@ -54,16 +60,17 @@ export function PerformancePanel({ digest, before, complete, locale }: { digest:
     <h2 id="what-works">{t.title}</h2>
     <p className="small-note">{t.intro}</p>
     {!complete && <p className="small-note" role="status">{t.incomplete}</p>}
-    <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))' }}>
-      {tile(t.posts, digest.totals.posts, before?.posts)}
-      {tile(t.median, digest.totals.medianReach, before?.medianReach)}
-      {tile(t.per100, digest.totals.engagementPer100, before?.engagementPer100)}
-      {tile(t.total, digest.totals.totalReach, before?.totalReach)}
-    </div>
-    <div style={{ display: 'grid', gap: 16, gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 440px), 1fr))' }}>
-      {GROUPS.map(key => table(key, digest.groups[key]))}
-    </div>
-    {posts(t.best, digest.best)}
-    {posts(t.weakest, digest.weakest)}
+    {section === 'summary' ? <>
+      <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))' }}>
+        {tile(t.posts, digest.totals.posts, before?.posts)}
+        {tile(t.median, digest.totals.medianReach, before?.medianReach)}
+        {tile(t.per100, digest.totals.engagementPer100, before?.engagementPer100)}
+        {tile(t.total, digest.totals.totalReach, before?.totalReach)}
+      </div>
+      {posts(t.best, digest.best)}
+      {posts(t.weakest, digest.weakest)}
+    </> : <div style={{ display: 'grid', gap: 16, gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 440px), 1fr))' }}>
+      {SECTION_GROUPS[section].map(key => table(key, digest.groups[key]))}
+    </div>}
   </section>;
 }
