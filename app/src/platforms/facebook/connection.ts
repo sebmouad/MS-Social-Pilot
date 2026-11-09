@@ -112,6 +112,15 @@ export async function finishFacebookConnection(request: NextRequest, viewer: Con
         user, accessToken: longLived.accessToken, expiresAt: longLived.expiresAt,
         scopes: grantedScopes, pages, adAccounts,
       });
+      // New comments, posts and messages reach the Inbox through the Page's webhooks; Meta delivers them only once the app is
+      // subscribed to each Page, which pages_manage_metadata allows. Polling still covers a Page whose subscription fails.
+      stage = 'webhooks';
+      if (await runtimeConfig('meta.webhooksEnabled') && grantedScopes.includes('pages_manage_metadata')) {
+        const fields = ['feed', ...(grantedScopes.includes('pages_messaging') ? ['messages'] : [])];
+        const outcomes = await Promise.allSettled(pages.map(page => engine.subscribePageWebhooks(page, fields)));
+        const failed = outcomes.filter(outcome => outcome.status === 'rejected').length;
+        if (failed) console.warn('[facebook-connect] page webhook subscription failed', { pages: pages.length, failed });
+      }
       return finish(request, result.skippedPages || result.skippedAdAccounts ? 'connected_partial' : 'connected', true);
     });
   } catch (error) {

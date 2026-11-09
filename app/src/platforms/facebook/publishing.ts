@@ -77,6 +77,8 @@ export interface FacebookEngine {
   getGrantedPermissions(accessToken: string): Promise<string[]>;
   discoverPages(accessToken: string): Promise<FacebookPage[]>;
   discoverAdAccounts(accessToken: string): Promise<FacebookAdAccount[]>;
+  /** Subscribe this app to a Page's webhooks (needs pages_manage_metadata on the Page's token). */
+  subscribePageWebhooks(page: Pick<FacebookPage, 'id' | 'accessToken'>, fields: readonly string[]): Promise<void>;
   publish(input: FacebookPublishInput): Promise<FacebookPublished>;
   getStatus(accessToken: string, remoteId: string, context: { targetId: string; contentKind?: 'text' | 'image' | 'video'; nativeFormat?: 'video' | 'reel' | 'story_photo' | 'story_video' }): Promise<RemoteStatus>;
   deletePost(accessToken: string, remoteId: string): Promise<void>;
@@ -320,6 +322,10 @@ export function createFacebookEngine(rawConfig: FacebookConfig, fetchImpl: Faceb
     async discoverPages(token) {
       const raw = await pages<JsonObject>(collectionUrl('me/accounts', token, 'id,name,category,access_token'), token);
       return raw.map(toPage).filter((p): p is FacebookPage => p !== null);
+    },
+    async subscribePageWebhooks(page, fields) {
+      if (!/^\d{1,40}$/.test(page.id) || !fields.length) throw new FacebookApiError('Facebook received an invalid webhook subscription.', 0);
+      await request(`${page.id}/subscribed_apps`, { method: 'POST', token: page.accessToken, body: { subscribed_fields: fields.join(',') } });
     },
     async discoverAdAccounts(token) {
       const raw = await pages<JsonObject>(collectionUrl('me/adaccounts', token, 'id,name,currency,account_status'), token);
