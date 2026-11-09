@@ -193,7 +193,7 @@ BUILD=/srv/ms-social-pilot-build
 
 # Bootstrap directories
 id -u socialpilot >/dev/null 2>&1 || useradd --system --create-home --shell /bin/bash socialpilot
-mkdir -p "$LIVE/app" "$BUILD" /var/backups /var/lib/ms-social-pilot
+mkdir -p "$LIVE/app" "$BUILD" /var/backups /var/lib/ms-social-pilot /var/lib/ms-social-pilot/media
 chown -R socialpilot:socialpilot /var/lib/ms-social-pilot
 
 ENVF=$LIVE/app/.env.production.local

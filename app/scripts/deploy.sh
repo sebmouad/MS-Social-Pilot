@@ -170,7 +170,7 @@ if ! command -v node >/dev/null 2>&1 || [ "$(node -p 'process.versions.node.spli
   systemctl enable --now postgresql
 fi
 id -u socialpilot >/dev/null 2>&1 || useradd --system --create-home --shell /bin/bash socialpilot
-mkdir -p "$LIVE/app" "$BUILD" /var/backups /var/lib/ms-social-pilot
+mkdir -p "$LIVE/app" "$BUILD" /var/backups /var/lib/ms-social-pilot /var/lib/ms-social-pilot/media
 chown -R socialpilot:socialpilot /var/lib/ms-social-pilot
 
 if [ -d "$LIVE/rebuild" ] && [ ! -f "$LIVE/app/.env.production.local" ]; then

@@ -1,4 +1,4 @@
-import { createDecipheriv } from 'node:crypto';
+import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
 import { CONFIG_BY_KEY, CONFIG_REGISTRY, type ConfigKey, type ConfigValue } from '@/lib/config/registry';
 import { prisma } from '@/server/data';
 
@@ -82,3 +82,23 @@ export async function readConfig() {
 }
 
 export { saveRootConfig as saveConfig, configAuditDetail } from '@/modules/root/server/configuration';
+
+/** Secrets the app may create itself: random keys that no person ever needs to read or type. */
+const GENERATED_SECRETS = new Set(['publishing.mediaShareSecret']);
+
+/**
+ * The stored secret, or a new random one saved (encrypted) when none exists yet, so features that only need *a*
+ * secret work on a fresh install. Concurrent first uses keep the value stored first.
+ */
+export async function ensureGeneratedSecret(key: string): Promise<string> {
+  if (!GENERATED_SECRETS.has(key) || CONFIG_BY_KEY.get(key)?.kind !== 'secret') throw new Error('This secret cannot be generated.');
+  const existing = await runtimeSecret(key);
+  if (existing) return existing;
+  const iv = randomBytes(12);
+  const cipher = createCipheriv('aes-256-gcm', secretKey(), iv);
+  const value = randomBytes(32).toString('base64url');
+  const sealed = ['v1', iv.toString('base64url'), '', Buffer.concat([cipher.update(value, 'utf8'), cipher.final()]).toString('base64url')];
+  sealed[2] = cipher.getAuthTag().toString('base64url');
+  await prisma.$executeRaw`INSERT INTO app_settings (key, value, encrypted, "updatedAt") VALUES (${key}, ${JSON.stringify(sealed.join(':'))}::jsonb, true, NOW()) ON CONFLICT (key) DO NOTHING`;
+  return (await runtimeSecret(key)) ?? value;
+}

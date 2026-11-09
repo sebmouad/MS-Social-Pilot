@@ -205,7 +205,7 @@ log_step "Starting MS Social Pilot deployment on server..."
 
 # Ensure system requirements
 id -u "$APP_USER" >/dev/null 2>&1 || useradd --system --create-home --shell /bin/bash "$APP_USER"
-mkdir -p "$LIVE_DIR/app" "$BUILD_DIR" /var/backups /var/lib/ms-social-pilot
+mkdir -p "$LIVE_DIR/app" "$BUILD_DIR" /var/backups /var/lib/ms-social-pilot /var/lib/ms-social-pilot/media
 chown -R "$APP_USER:$APP_USER" /var/lib/ms-social-pilot
 
 # Step 1: Update or Clone Git Repository
