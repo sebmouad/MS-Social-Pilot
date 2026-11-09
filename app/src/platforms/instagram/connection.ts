@@ -26,12 +26,16 @@ async function authorize(viewer: ConnectionViewer) {
   if (!membership || !['owner', 'admin'].includes(membership.role) || !permissions || !canAccessFeature(permissions, 'settings/connections', 'write') || !access || access.workspaceId !== viewer.workspaceId || !canUseFeature(access, 'settings/connections') || !hasPlatformCapability(access, 'instagram') || !await isPlatformEnabled('instagram')) throw new OperationError('forbidden', (await configuredInstagramPolicy()).copy.permission[await instagramLocale()]);
 }
 
-/** The confirmed shared connection-start service enters here. Only selected, live Page sources are read. */
-export async function discoverSelectedInstagramAccounts(viewer: ConnectionViewer) {
+/**
+ * The confirmed shared connection-start service enters here: only selected, live Page sources are read. Right after a
+ * Facebook connection, `sourceId` reads that connection's Pages whether or not they are selected yet, so the linked
+ * Instagram accounts are offered in the same selection as the Pages.
+ */
+export async function discoverSelectedInstagramAccounts(viewer: ConnectionViewer, options: { sourceId?: string } = {}) {
   await authorize(viewer);
   const [policy, discover] = await Promise.all([configuredInstagramPolicy(), configuredInstagramDiscovery()]);
   const pages = await prisma.target.findMany({
-    where: { workspaceId: viewer.workspaceId, type: 'page', enabled: true, accessToken: { not: null }, socialAccount: { workspaceId: viewer.workspaceId, provider: 'facebook', invalidatedAt: null, OR: [{ tokenExpiresAt: null }, { tokenExpiresAt: { gt: new Date() } }] } },
+    where: { workspaceId: viewer.workspaceId, type: 'page', ...(options.sourceId ? { socialAccountId: options.sourceId } : { enabled: true }), accessToken: { not: null }, socialAccount: { workspaceId: viewer.workspaceId, provider: 'facebook', invalidatedAt: null, OR: [{ tokenExpiresAt: null }, { tokenExpiresAt: { gt: new Date() } }] } },
     include: { socialAccount: true }, orderBy: { id: 'asc' }, take: policy.connectionMaxPages + 1,
   });
   if (!pages.length || pages.length > policy.connectionMaxPages) throw new OperationError('unavailable', policy.copy.permission[await instagramLocale()]);
@@ -46,7 +50,7 @@ export async function discoverSelectedInstagramAccounts(viewer: ConnectionViewer
     await authorize(viewer);
     await prisma.$transaction(async tx => {
       await lockSelectedResources(tx, viewer.workspaceId, [{ kind: 'target', id: page.id }]);
-      const current = await tx.target.findFirst({ where: { id: page.id, workspaceId: viewer.workspaceId, enabled: true, socialAccountId: source.id, accessToken: page.accessToken }, include: { socialAccount: true } });
+      const current = await tx.target.findFirst({ where: { id: page.id, workspaceId: viewer.workspaceId, ...(options.sourceId ? {} : { enabled: true }), socialAccountId: source.id, accessToken: page.accessToken }, include: { socialAccount: true } });
       const membership = await tx.membership.findUnique({ where: { userId_workspaceId: { userId: viewer.user.id, workspaceId: viewer.workspaceId } }, select: { role: true } });
       if (!membership || !['owner', 'admin'].includes(membership.role) || !current?.socialAccount || connectionState(current.socialAccount) !== 'connected' || current.socialAccount.scopes !== source.scopes) throw new OperationError('forbidden', policy.copy.permission[await instagramLocale()]);
       for (const account of linked) {

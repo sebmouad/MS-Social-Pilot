@@ -22,6 +22,8 @@ export interface OAuthStartRequest {
   redirectUri: string;
   state: string;
   scopes: string[];
+  /** Facebook Login for Business configuration: when set, the dialog asks for what it names instead of `scopes`. */
+  configId?: string;
 }
 export interface OAuthExchangeRequest {
   appId: string;

@@ -12,13 +12,13 @@ import { fill } from '@/modules/settings/ui/shell-copy';
 import { summarizeDisconnectCounts } from './preview';
 import { CredentialConnectDialog } from './CredentialConnectDialog';
 
-type Channel = { id: string; name: string; type: string; enabled: boolean };
+type Channel = { id: string; name: string; type: string; enabled: boolean; kindLabel?: string };
 type AdAccount = { id: string; name: string; actId: string; enabled: boolean };
 type Source = { id: string; name: string; provider: string; platformName?: string; invalidatedAt: Date | null; tokenExpiresAt: Date | null; targets: Channel[]; adAccounts: AdAccount[] };
 
 type Connectable = { id: string; name: string; mark: { text: string; color: string }; credentials?: boolean };
 
-export function ConnectionManager({ statusLabels, sources, canManage, platforms, initiallyOpen = false, initialSourceId, initialAction, locale = 'en' }: { statusLabels: ConnectionStatusLabels; sources: Source[]; canManage: boolean; platforms: Connectable[]; initiallyOpen?: boolean; initialSourceId?: string; initialAction?: 'manage' | 'disconnect'; locale?: 'en' | 'fr' }) {
+export function ConnectionManager({ statusLabels, sources, canManage, platforms, initiallyOpen = false, preselect = false, initialSourceId, initialAction, locale = 'en' }: { statusLabels: ConnectionStatusLabels; sources: Source[]; canManage: boolean; platforms: Connectable[]; initiallyOpen?: boolean; preselect?: boolean; initialSourceId?: string; initialAction?: 'manage' | 'disconnect'; locale?: 'en' | 'fr' }) {
   const router = useRouter();
   const inFlight = useRef(false);
   const retrySelection = useRef<() => void>(() => {});
@@ -35,7 +35,11 @@ export function ConnectionManager({ statusLabels, sources, canManage, platforms,
   const [disconnectMode, setDisconnectMode] = useState<'retain' | 'delete'>('retain');
   const [deletePreview, setDeletePreview] = useState<Record<string, number> | null>(null);
   const [previewBusy, setPreviewBusy] = useState(false);
-  const [selected, setSelected] = useState<Record<string, boolean>>({});
+  // Right after a connection, everything just discovered is offered ticked: the person unticks what this workspace should not use.
+  const [selected, setSelected] = useState<Record<string, boolean>>(() => preselect ? Object.fromEntries(sources.filter(source => connectionState(source) === 'connected').flatMap(source => [
+    ...source.targets.filter(item => !item.enabled).map(item => [`target:${item.id}`, true] as const),
+    ...source.adAccounts.filter(item => !item.enabled).map(item => [`adAccount:${item.id}`, true] as const),
+  ])) : {});
   const deleteSummary = deletePreview ? summarizeDisconnectCounts(deletePreview, locale, t.categories) : null;
   useEffect(() => {
     if (!initialSource || !initialAction) return;
@@ -114,8 +118,8 @@ export function ConnectionManager({ statusLabels, sources, canManage, platforms,
       <header><div><p className={styles['settings-eyebrow']}>{t.dialogEyebrow}</p><h2 id="connection-dialog-title">{t.dialogTitle}</h2><p>{t.dialogDetail}</p></div><button type="button" aria-label={t.close} disabled={busy} onClick={() => setOpen(false)}>×</button></header>
       {sources.length ? sources.map(source => <fieldset id={`connection-source-${source.id}`} className={`${styles['connection-source']}${initialSourceId === source.id ? ` ${styles['connection-source--selected']}` : ''}`} data-connection-source-focus={initialSourceId === source.id ? '' : undefined} tabIndex={initialSourceId === source.id ? -1 : undefined} key={source.id}><legend>{source.name} <span>{source.platformName ?? platforms.find(platform => platform.id === source.provider)?.name ?? source.provider.replace(/[_-]/g, ' ')}</span></legend>
         {connectionState(source) !== 'connected' && <p className={styles['settings-note']}>{fill(t.reconnectHint, { status: statusLabels[connectionState(source)] })}</p>}
-        {source.targets.map(item => <label key={item.id}><input type="checkbox" checked={selected[`target:${item.id}`] ?? item.enabled} disabled={busy || (connectionState(source) !== 'connected' && !item.enabled)} onChange={event => toggle('target', item.id, event.currentTarget.checked)} /><span>{item.name || item.type}<small>{fill(t.channel, { type: item.type })}</small></span></label>)}
-        {source.adAccounts.map(item => <label key={item.id}><input type="checkbox" checked={selected[`adAccount:${item.id}`] ?? item.enabled} disabled={busy || (connectionState(source) !== 'connected' && !item.enabled)} onChange={event => toggle('adAccount', item.id, event.currentTarget.checked)} /><span>{item.name}</span></label>)}
+        {source.targets.map(item => <label key={item.id}><input type="checkbox" checked={selected[`target:${item.id}`] ?? item.enabled} disabled={busy || (connectionState(source) !== 'connected' && !item.enabled)} onChange={event => toggle('target', item.id, event.currentTarget.checked)} /><span>{item.name || item.type}<small>{item.kindLabel ?? fill(t.channel, { type: item.type })}</small></span></label>)}
+        {source.adAccounts.map(item => <label key={item.id}><input type="checkbox" checked={selected[`adAccount:${item.id}`] ?? item.enabled} disabled={busy || (connectionState(source) !== 'connected' && !item.enabled)} onChange={event => toggle('adAccount', item.id, event.currentTarget.checked)} /><span>{item.name}<small>{fill(t.adAccountLine, { id: item.actId })}</small></span></label>)}
         {!source.targets.length && !source.adAccounts.length && <p className={styles['settings-note']}>{t.nothingDiscovered}</p>}
         <button type="button" className={styles['connection-danger-link']} onClick={() => { setOpen(false); setDisconnect(source); setDisconnectMode('retain'); }}>{t.disconnectLocally}</button>
       </fieldset>) : <p>{t.noSources}</p>}

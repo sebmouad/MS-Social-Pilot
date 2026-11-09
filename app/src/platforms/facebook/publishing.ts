@@ -268,7 +268,9 @@ export function createFacebookEngine(rawConfig: FacebookConfig, fetchImpl: Faceb
       const url = new URL(`${config.oauthBaseUrl.replace(/\/+$/, '')}/dialog/oauth`);
       url.searchParams.set('client_id', input.appId); url.searchParams.set('redirect_uri', input.redirectUri);
       url.searchParams.set('state', input.state); url.searchParams.set('response_type', 'code');
-      url.searchParams.set('scope', input.scopes.join(','));
+      // Facebook Login for Business: a configuration replaces the scope list (Meta recommends not sending both).
+      if (input.configId) url.searchParams.set('config_id', input.configId);
+      else url.searchParams.set('scope', input.scopes.join(','));
       return url.toString();
     },
     async exchangeCode(input) {

@@ -9,6 +9,8 @@ import { assertWorkspaceNotPurging, withWorkspaceOperation } from '@/server/data
 import { configuredFacebookEngine, configuredFacebookOAuth } from './runtime';
 import type { ConnectionViewer } from '@/server/platforms/host';
 import { configuredInstagramPolicy } from '@/platforms/instagram/runtime';
+import { discoverSelectedInstagramAccounts } from '@/platforms/instagram/connection';
+import { prisma } from '@/server/data';
 
 /**
  * Facebook's connection flow: start the Meta authorization and finish it on the
@@ -39,7 +41,7 @@ export function withScopeDependencies(scopes: readonly string[]): string[] {
 export async function startFacebookConnection(request: Request, viewer: ConnectionViewer): Promise<NextResponse> {
   try {
     await assertWorkspaceNotPurging(viewer.workspaceId);
-    const [oauth, engine, postReadScopes, insightReadScopes, adsReadScopes, adsManageScopes, adsManagementEnabled, stateMinutes, featureScopes, instagramScopes] = await Promise.all([
+    const [oauth, engine, postReadScopes, insightReadScopes, adsReadScopes, adsManageScopes, adsManagementEnabled, stateMinutes, featureScopes, instagramScopes, configId] = await Promise.all([
       configuredFacebookOAuth(), configuredFacebookEngine(),
       runtimeConfig('meta.postReadScopes') as Promise<string[]>,
       runtimeConfig('meta.pageInsightReadScopes') as Promise<string[]>,
@@ -55,6 +57,7 @@ export async function startFacebookConnection(request: Request, viewer: Connecti
         const policy = await configuredInstagramPolicy();
         return [...policy.readScopes, ...policy.publishScopes, ...policy.commentScopes, ...policy.insightScopes];
       }),
+      runtimeConfig('meta.loginConfigId') as Promise<string>,
     ]);
     const expectedRedirect = new URL(FACEBOOK_CONNECTION_CALLBACK_PATH, requestOrigin(request)).toString();
     if (new URL(oauth.redirectUri).toString() !== expectedRedirect) {
@@ -68,7 +71,7 @@ export async function startFacebookConnection(request: Request, viewer: Connecti
       await recordFacebookConnectionFailure({ userId: viewer.user.id, workspaceId: viewer.workspaceId }, 'state', 'internal_error');
       return NextResponse.json({ error: 'Connection unavailable. Try again or contact support.' }, { status: 503 });
     }
-    const authorizationUrl = engine.getAuthorizationUrl({ appId: oauth.appId, redirectUri: oauth.redirectUri, state: pending.state, scopes });
+    const authorizationUrl = engine.getAuthorizationUrl({ appId: oauth.appId, redirectUri: oauth.redirectUri, state: pending.state, scopes, ...(configId ? { configId } : {}) });
     const response = NextResponse.json({ authorizationUrl }, { headers: { 'cache-control': 'no-store' } });
     response.cookies.set(FACEBOOK_OAUTH_STATE_COOKIE, pending.cookieValue, {
       httpOnly: true, secure: new URL(requestOrigin(request)).protocol === 'https:', sameSite: 'lax',
@@ -120,6 +123,12 @@ export async function finishFacebookConnection(request: NextRequest, viewer: Con
         const outcomes = await Promise.allSettled(pages.map(page => engine.subscribePageWebhooks(page, fields)));
         const failed = outcomes.filter(outcome => outcome.status === 'rejected').length;
         if (failed) console.warn('[facebook-connect] page webhook subscription failed', { pages: pages.length, failed });
+      }
+      // The Instagram accounts linked to these Pages are offered in the same selection, without a second « Connect » step.
+      stage = 'instagram';
+      if (await runtimeConfig('platforms.instagram.enabled')) {
+        const source = await prisma.socialAccount.findUnique({ where: { workspaceId_provider_providerUserId: { workspaceId: viewer.workspaceId, provider: 'facebook', providerUserId: user.id } }, select: { id: true } });
+        if (source) await discoverSelectedInstagramAccounts(viewer, { sourceId: source.id }).catch(error => console.warn('[facebook-connect] instagram discovery skipped', { name: error instanceof Error ? error.name : 'unknown' }));
       }
       return finish(request, result.skippedPages || result.skippedAdAccounts ? 'connected_partial' : 'connected', true);
     });

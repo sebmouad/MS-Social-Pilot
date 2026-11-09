@@ -45,7 +45,7 @@ export default async function ConnectionsPage({ searchParams }: { searchParams: 
   const notice = (key: string, tone: 'status' | 'alert', message: string) => params.notice === key && <p className={styles['settings-note']} role={tone}>{message}</p>;
 
   return <PageFrame module="settings"><SettingsPage copy={uiCopy} tab="channelsAccounts" active="settings/connections" title={t.title} description={t.description} info={<InfoTip name={t.title}>{t.footnote}</InfoTip>} locale={locale}>
-    <ConnectionManager locale={locale} statusLabels={statusLabels} sources={accounts.map(account => ({ ...account, platformName: providerName(account.provider) }))} canManage={canManage} platforms={connectable} initiallyOpen={params.select === '1'} initialSourceId={params.source} initialAction={params.action === 'disconnect' ? 'disconnect' : params.action === 'manage' ? 'manage' : undefined} />
+    <ConnectionManager locale={locale} statusLabels={statusLabels} sources={accounts.map(account => ({ ...account, platformName: providerName(account.provider), targets: account.targets.map(target => ({ ...target, kindLabel: platformModule(account.provider)?.channelKinds.find(kind => kind.kind === target.type)?.label ?? target.type })) }))} canManage={canManage} platforms={connectable} initiallyOpen={params.select === '1'} preselect={params.select === '1'} initialSourceId={params.source} initialAction={params.action === 'disconnect' ? 'disconnect' : params.action === 'manage' ? 'manage' : undefined} />
     {notice('connected_partial', 'status', t.connectedPartial)}
     {notice('connected', 'status', t.connected)}
     {notice('oauth_cancelled', 'status', t.oauthCancelled)}
@@ -71,7 +71,6 @@ export default async function ConnectionsPage({ searchParams }: { searchParams: 
           </div>
           <div className={cardStyles.cardMeta}>
             {account.profileUrl ? <a href={account.profileUrl} target="_blank" rel="noopener noreferrer">{fill(t.profileOpen, { platform: providerName(account.provider) })}</a> : null}
-            <span>{fill(t.usernameNone, { platform: providerName(account.provider) })}</span>
             <span>{fill(t.providerUserId, { id: account.providerUserId })}</span>
           </div>
           {account.targets.length > 0 && <p className={cardStyles.cardMeta}>{fill(t.connectedPages, { names: account.targets.map(target => target.name).join(', ') })}</p>}

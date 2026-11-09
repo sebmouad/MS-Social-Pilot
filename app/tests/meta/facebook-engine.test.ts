@@ -16,6 +16,13 @@ test('login dialog asks for the scopes it is given', () => {
   assert.equal(url.searchParams.get('state'), 'st');
 });
 
+test('Facebook Login for Business: a configuration ID replaces the scope list', () => {
+  const { engine } = engineWith([]);
+  const url = new URL(engine.getAuthorizationUrl({ appId: '123', redirectUri: 'https://social.example/cb', state: 'st', scopes: ['pages_show_list'], configId: '987654321' }));
+  assert.equal(url.searchParams.get('config_id'), '987654321');
+  assert.equal(url.searchParams.has('scope'), false);
+});
+
 test('pages_show_list: lists the Pages with their own Page tokens', async () => {
   const { engine, sent } = engineWith([{ path: /^\/me\/accounts$/, reply: { data: [{ id: '111', name: 'Test Page', category: 'Food', access_token: 'PAGE-TOKEN' }] } }]);
   const pages = await engine.discoverPages('USER-TOKEN');
