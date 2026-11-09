@@ -1,3 +1,4 @@
+import { LinkTabs } from '@/components/Tabs';
 import { localizeAdsMessage } from '@/modules/ads/copy';
 import { loadAdsCopy } from '@/modules/ads/server/copy';
 import { customerText } from '@/modules/ads/copy';
@@ -73,7 +74,8 @@ async function AdsComparePage({ searchParams }: { searchParams: Promise<Params> 
   const policy = await loadAdsReportPolicy();
   const outputPolicy = await loadAdsOutputPolicy();
   const accounts = await getAdsAccounts(viewer.workspaceId, viewer.permissions.pageScope.all ? undefined : viewer.permissions.pageScope.ids, entitledPlatformIds(viewer.entitlements));
-  const allowedKeys = ['period', 'since', 'until', 'account', 'compare', 'level', 'sort', 'direction'];
+  // `group` is the open tab: one ad account, or one currency's accounts (owner directive 2026-11-09).
+  const allowedKeys = ['period', 'since', 'until', 'account', 'compare', 'level', 'sort', 'direction', 'group'];
   const kindSwitch = await compareKindSwitch('ads', viewer);
   // One header (title, ⓘ, period presets, ad-account filter, Channels | Ad accounts switch) instead of a stacked form.
   let headerFilters: AdsFilters | null = null;
@@ -125,6 +127,15 @@ async function AdsComparePage({ searchParams }: { searchParams: Promise<Params> 
     { key: 'cpm', label: t('col.cpm'), align: 'end', render: row => formatMoney(locale, currency, row.cpm, t('unknown')) },
     { key: 'reach', label: t('col.reach'), align: 'end', render: row => show(row.reachPeakDay) },
   ];
+  const groupLabel = (group: (typeof result.groups)[number]) => result.compare === 'accounts' ? group.accounts[0]?.name ?? t('unknown') : `${group.currency ?? t('unknown')} · ${group.accounts.map(account => account.name).join(', ')}`;
+  const openGroup = result.groups.find(group => group.key === values.group) ?? result.groups[0];
+  const groupHref = (key: string) => {
+    const query = new URLSearchParams(Object.entries(values).flatMap(([name, value]) => value === undefined || name === 'group' ? [] : [[name, value]]));
+    query.set('group', key);
+    return `/ads/compare?${query.toString()}`;
+  };
+  const tabs = <LinkTabs label={at('compareGroupsLabel')} moreLabel={at('manageMoreTabs')} {...(openGroup ? { activeId: openGroup.key } : {})}
+    items={result.groups.map(group => ({ id: group.key, href: groupHref(group.key), label: groupLabel(group) }))} />;
   return <PageFrame module="ads"><div className="page-stack">
     {header()}
     {sidebar}
@@ -132,8 +143,9 @@ async function AdsComparePage({ searchParams }: { searchParams: Promise<Params> 
       <p className="small-note" role="status">{t('rangeLine', { from: formatIsoDay(locale, result.range.from), to: formatIsoDay(locale, result.range.to) })}{result.previousRange ? t('earlierLine', { from: formatIsoDay(locale, result.previousRange.from), to: formatIsoDay(locale, result.previousRange.to) }) : ''}</p>
       {result.groups.length ? <ComparisonExport href={`/api/ads/compare?${exportQuery.toString()}`} locale={locale} maxBytes={outputPolicy.exportMaxBytes} /> : null}
     </div>
-    {!result.groups.length ? <section className="panel empty-state"><h2>{t('emptyTitle')}</h2><p>{t('emptyHint')}</p></section> : result.groups.map(group => <section key={group.key} className="panel" aria-labelledby={`g-${group.key}`}>
-      <h2 id={`g-${group.key}`}>{result.compare === 'accounts' ? group.accounts[0]?.name : `${group.currency ?? t('unknown')} · ${group.accounts.map(account => account.name).join(', ')}`}</h2>
+    {tabs}
+    {!result.groups.length || !openGroup ? <section className="panel empty-state"><h2>{t('emptyTitle')}</h2><p>{t('emptyHint')}</p></section> : [openGroup].map(group => <section key={group.key} className="panel" aria-labelledby={`g-${group.key}`}>
+      <h2 id={`g-${group.key}`}>{groupLabel(group)}</h2>
       {!group.hasData ? <p>{t('noGroupData')}</p> : <>
         <p className="small-note">{group.freshness.status === 'stale' ? t('staleData') : ''}{group.freshness.newestFetchAt ? t('updatedAt', { when: new Date(group.freshness.newestFetchAt).toLocaleString(locale) }) : t('updateUnknown')}{group.totals ? t('dayCount', { days: group.totals.days }) : ''}
           {group.coverage ? ` ${t('coverageLine', { from: formatIsoDay(locale, group.coverage.firstDay), to: formatIsoDay(locale, group.coverage.lastDay) })}` : ''}</p>

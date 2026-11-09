@@ -287,6 +287,7 @@ export const adsCustomerCopy = {
 "campaignsTabCharts": {"en": "Charts", "fr": "Graphiques"},
 "campaignsTabTables": {"en": "Tables", "fr": "Tableaux"},
 "campaignsTabCreate": {"en": "Create", "fr": "Créer"},
+"compareGroupsLabel": {"en": "Compared ad accounts", "fr": "Comptes publicitaires comparés"},
 "manageStatus": {"en": "Status", "fr": "État"},
 "manageSynced": {"en": "Updated", "fr": "Mis à jour"},
 "manageNoCampaigns": {"en": "No campaigns are stored for this account yet. Create a campaign first.", "fr": "Aucune campagne enregistrée pour ce compte pour l’instant. Créez d’abord une campagne."},
