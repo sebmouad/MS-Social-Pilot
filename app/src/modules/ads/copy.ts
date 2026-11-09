@@ -458,8 +458,8 @@ export const adsCustomerCopy = {
     "fr": "Ouvrez les détails des campagnes, ensembles et publicités pour consulter leurs performances. Les commandes de gestion apparaissent lorsque vos comptes connectés les permettent."
   },
   "text041": {
-    "en": "Campaign, ad set, and ad results",
-    "fr": "Résultats des campagnes, ensembles et publicités"
+    "en": "Campaign results",
+    "fr": "Résultats des campagnes"
   },
   "text042": {
     "en": "Connect an advertising account to review and manage its campaigns.",

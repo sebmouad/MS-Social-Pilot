@@ -66,28 +66,29 @@ export function AgentsScreen({ agents, runs = [], hasMore = false, pageSize, cop
  return <section className={styles.root} data-module="studio" aria-busy={pending}>
   <PageHeader module="studio" title={t.title} description={t.intro} />
   <p ref={status} tabIndex={-1} role="status">{feedback}</p>{error ? <p role="alert">{error}</p> : null}
-  <div className={styles.workspace}>
-   <section className={`ui-panel ${styles.panel}`}><h2>{t.choose}</h2>
-    {!items.length ? <EmptyState icon={<IconSparkles size={22} />} title={t.empty} /> : <ul className={styles.list}>{items.map(agent => <li key={agent.id}>
+  {/* With no agent yet, the page is just the form that creates the first one; choosing and preparing appear once one exists. */}
+  <div className={styles.workspace} data-single={items.length ? undefined : ''}>
+   <section className={`ui-panel ${styles.panel}`}>{items.length ? <h2>{t.choose}</h2> : null}
+    {!items.length ? null : <ul className={styles.list}>{items.map(agent => <li key={agent.id}>
      <div className={styles.identity}><strong>{agent.name}</strong><p>{agent.instructions}</p></div>
      <div className={styles.actions}><Button disabled={pending} onClick={() => edit(agent)} aria-label={`${t.edit}: ${agent.name}`}><IconPencil size={16} aria-hidden="true" />{t.edit}</Button><Button variant="danger" disabled={pending} onClick={() => mutate('delete', agent.id)} aria-label={`${t.remove}: ${agent.name}`}><IconTrash size={16} aria-hidden="true" />{t.remove}</Button></div>
     </li>)}</ul>}
-    <h2>{editing ? t.edit : t.create}</h2><form className={styles.form} onSubmit={e => { e.preventDefault(); mutate('save'); }}>
+    <h2>{editing ? t.edit : items.length ? t.create : t.empty}</h2><form className={styles.form} onSubmit={e => { e.preventDefault(); mutate('save'); }}>
      <label className="ui-field">{t.name}<input ref={nameInput} name="name" autoComplete="off" className="ui-input" value={name} disabled={pending} onChange={e => setName(e.target.value)} required /></label>
      <label className="ui-field">{t.instructions}<AutoTextarea name="instructions" className="ui-input" value={instructions} disabled={pending} onChange={e => setInstructions(e.target.value)} required /></label>
      <label className="ui-field">{t.voice}<AutoTextarea name="voice" className="ui-input" value={voice} disabled={pending} onChange={e => setVoice(e.target.value)} /></label>
      <div className={styles.actions}><Button type="submit" disabled={pending}>{pending ? t.busy : t.save}</Button>{editing ? <Button disabled={pending} onClick={clearEditor}>{t.cancel}</Button> : null}</div>
     </form>
    </section>
-   <section className={`ui-panel ${styles.panel}`}><h2><IconSparkles size={20} aria-hidden="true" /> {t.draft}</h2>
-    {items.length ? <form className={styles.form} onSubmit={e => { e.preventDefault(); mutate('draft', selected); }}>
+   {items.length ? <section className={`ui-panel ${styles.panel}`}><h2><IconSparkles size={20} aria-hidden="true" /> {t.draft}</h2>
+    <form className={styles.form} onSubmit={e => { e.preventDefault(); mutate('draft', selected); }}>
      <label className="ui-field">{t.choose}<select name="agent" className="ui-input" value={selected} disabled={pending} onChange={e => setSelected(e.target.value)} required>{items.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}</select></label>
      <label className="ui-field">{t.material}<AutoTextarea name="material" className="ui-input" value={text} disabled={pending} onChange={e => setText(e.target.value)} required /></label>
      <label className="ui-field">{t.draft}<select name="kind" className="ui-input" value={kind} disabled={pending} onChange={e => setKind(e.target.value)}><option value="post">{t.post}</option><option value="reply">{t.reply}</option></select></label>
      <Button type="submit" disabled={pending}>{pending ? t.busy : t.draft}</Button>
-    </form> : <EmptyState icon={<IconSparkles size={22} />} title={t.empty} />}
+    </form>
     <div aria-live="polite">{suggestion ? <article className={styles.suggestion}><h3>{t.suggestion}</h3><p>{t.review}</p><p className={styles.text}>{suggestion}</p></article> : null}</div>
-   </section>
+   </section> : null}
   </div>
   <section className={`ui-panel ${styles.panel}`}><h2>{t.history}</h2>{history.length ? <ol className={styles.list}>{history.map(run => <li key={run.id}><div className={styles.identity}><strong>{run.name ?? t.unknownAgent}</strong><p>{run.kind === 'reply' ? t.reply : t.post} · <Badge tone={agentRunTone(run.status)}>{run.status === 'completed' ? t.completed : run.status === 'failed' ? t.failedRun : t.pendingRun}</Badge></p></div><time dateTime={new Date(run.createdAt).toISOString()}>{new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short', timeZone: 'UTC' }).format(new Date(run.createdAt))} {t.timeZone}</time></li>)}</ol> : <EmptyState icon={<IconSparkles size={22} />} title={t.noHistory} />}
    {offset > 0 || more ? <nav className={styles.actions} aria-label={t.history}><Button disabled={pending || offset === 0} onClick={() => start(async () => { try { await refreshHistory(Math.max(0, offset - pageSize)); } catch { setError(t.failed); } })}>{t.previous}</Button><Button disabled={pending || !more} onClick={() => start(async () => { try { await refreshHistory(offset + pageSize); } catch { setError(t.failed); } })}>{t.next}</Button></nav> : null}

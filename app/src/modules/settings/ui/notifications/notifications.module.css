@@ -11,8 +11,10 @@
 .hint { margin: 0; }
 .error { margin: 0; color: var(--danger); font-size: 12px; }
 .sidebarSection { padding-top: 16px; border-top: 1px solid var(--line); }
+.sidebarSection > :is(button, .ui-button) { justify-self: start; }
 .paging { display: grid; grid-template-columns: 1fr auto 1fr; gap: 5px; align-items: center; }
 .paging > span { color: var(--ink-soft); font-size: 11px; text-align: center; }
+.paging > :first-child { justify-self: start; }
 .paging > :last-child { justify-self: end; }
 .inbox { display: grid; gap: 16px; min-width: 0; }
 .inboxHeading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }

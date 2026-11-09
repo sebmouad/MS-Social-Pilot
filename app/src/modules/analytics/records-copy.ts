@@ -140,8 +140,8 @@ export const recordsCopyDefaults = {
     "fr": "Publicités"
   },
   "Ad-object analysis": {
-    "en": "Ads reporting",
-    "fr": "Rapports publicitaires"
+    "en": "Ads analysis",
+    "fr": "Analyse publicitaire"
   },
   "Start (UTC, inclusive)": {
     "en": "Start (UTC, inclusive)",
@@ -164,12 +164,12 @@ export const recordsCopyDefaults = {
     "fr": "Niveau"
   },
   "Parent ID (optional; select one account)": {
-    "en": "Parent ID (optional; select one account)",
-    "fr": "ID parent (facultatif ; choisissez un compte)"
+    "en": "Inside campaign or ad set ID (optional)",
+    "fr": "Dans la campagne ou l’ensemble (ID, facultatif)"
   },
   "Object ID (optional; select one account)": {
-    "en": "Object ID (optional; select one account)",
-    "fr": "ID objet (facultatif ; choisissez un compte)"
+    "en": "Campaign, ad set or ad ID (optional)",
+    "fr": "ID de campagne, d’ensemble ou de publicité (facultatif)"
   },
   "Name": {
     "en": "Name",
@@ -204,8 +204,8 @@ export const recordsCopyDefaults = {
     "fr": "Jours enregistrés"
   },
   "Last fetched UTC": {
-    "en": "Last fetched UTC",
-    "fr": "Dernière collecte UTC"
+    "en": "Updated (UTC)",
+    "fr": "Mis à jour (UTC)"
   },
   "Sorted within each account and currency. Missing values appear last.": {
     "en": "Sorted within each account and currency. Missing values appear last.",
@@ -260,40 +260,40 @@ export const recordsCopyDefaults = {
     "fr": "La devise provient des métadonnées actuelles du compte ; aucune conversion ni vérification historique. Portée, fréquence et coût par personne sont des instantanés du dernier jour, pas des totaux de période. Les mesures supplémentaires ne sont pas agrégées."
   },
   "Accounts with matching stored data": {
-    "en": "Accounts with matching stored data",
-    "fr": "Comptes avec données correspondantes"
+    "en": "Accounts with data",
+    "fr": "Comptes avec des données"
   },
   "objects": {
-    "en": "objects",
-    "fr": "objets"
+    "en": "items",
+    "fr": "éléments"
   },
   "Objects with unknown parent": {
-    "en": "Objects with unknown parent",
-    "fr": "Objets au parent inconnu"
+    "en": "Items whose campaign is unknown",
+    "fr": "Éléments sans campagne connue"
   },
   "No stored objects for these filters. Try another account or period. Unknown parent links are excluded from drill-down.": {
     "en": "No stored objects for these filters. Try another account or period. Unknown parent links are excluded from drill-down.",
     "fr": "Aucun objet enregistré pour ces filtres. Essayez un autre compte ou une autre période. Les parents inconnus sont exclus de l’exploration."
   },
   "Object": {
-    "en": "Object",
-    "fr": "Objet"
+    "en": "Name",
+    "fr": "Nom"
   },
   "Stored spend": {
-    "en": "Stored spend",
-    "fr": "Dépenses enregistrées"
+    "en": "Spend",
+    "fr": "Dépenses"
   },
   "Weighted ratios": {
-    "en": "Weighted ratios",
-    "fr": "Ratios pondérés"
+    "en": "Rates",
+    "fr": "Taux"
   },
   "Latest reach snapshot": {
-    "en": "Latest reach snapshot",
-    "fr": "Dernier instantané de portée"
+    "en": "Reach (latest day)",
+    "fr": "Portée (dernier jour)"
   },
   "Stored days / requested": {
-    "en": "Stored days / requested",
-    "fr": "Jours enregistrés / demandés"
+    "en": "Days with data",
+    "fr": "Jours avec données"
   },
   "Explore": {
     "en": "Explore",

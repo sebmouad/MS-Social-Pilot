@@ -33,6 +33,5 @@ export default async function TemplatesPage({ searchParams }: { searchParams: Pr
   return <PublishingCopyProvider catalog={catalog} locale={locale}><PublishingActionCopyProvider catalog={actionCatalog} locale={locale}>
     <LibraryHeader active="templates" viewer={viewer} />
     <TemplateManager catalog={managerCatalog} initialTemplates={result.templates.map(item => ({ ...item, createdAt: item.createdAt.toISOString(), updatedAt: item.updatedAt.toISOString() }))} labels={labels} page={result.page} hasMore={result.hasMore} query={result.query} canWrite={canWrite} limits={result.limits} locale={locale} />
-    <p className={styles.privacy}>{copy.templatesPrivate}</p>
   </PublishingActionCopyProvider></PublishingCopyProvider>;
 }

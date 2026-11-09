@@ -173,7 +173,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
       {overview.ads && (readyAds
         ? readyAds.spend.map((group, _index, all) => <Tile key={group.currency ?? 'none'} module="ads">
           <MetricCard module="ads" icon={<IconSpeakerphone size={20} />} label={t.adSpend} footer={<TileLink href={HREF.ads} label={fill(t.openModule, { name: t.moduleNames.ads })} />}
-            value={new Intl.NumberFormat(locale, group.currency ? { style: 'currency', currency: group.currency, currencyDisplay: 'code' } : undefined).format(group.total)}
+            value={new Intl.NumberFormat(locale, group.currency ? { style: 'currency', currency: group.currency } : undefined).format(group.total)}
             info={<InfoTip name={t.adSpend} warning={group.recordedDays < days}>{fill(t.adSpendNote, { n: days, from: dayFormat.format(new Date(readyAds.start)),
               to: dayFormat.format(new Date(readyAds.end)), recorded: group.recordedDays, latest: dayFormat.format(new Date(group.lastDay)) })}</InfoTip>}
             sparkline={all.length === 1 && group.recordedDays === days && group.daily.length > 1 ? group.daily.map(day => day.v) : undefined} sparklineLabel={fill(t.adSpendTrend, { n: days })} />

@@ -1,6 +1,7 @@
 'use client';
 
 import { useRef, useState } from 'react';
+import { IconPlus } from '@tabler/icons-react';
 import { Button } from '@/components/Button';
 import { Dialog } from '@/components/Dialog';
 import { RouteNotice } from '@/components/RouteNotice';
@@ -80,11 +81,12 @@ export function FeedManager({ initialFeeds, channels, page, hasMore, canWrite = 
   const reviewText = !review ? '' : review.kind === 'delete' ? t('reviewDeleteDescription', { name: review.feed?.name ?? '' }) : review.kind === 'drafts' ? t('reviewDraftsDescription') : review.kind === 'posts' ? t('reviewPostsDescription', { handling: handlingText(review.feed!.handling) }) : t('reviewSaveDescription');
   const reviewAction = !review ? '' : t(review.kind === 'delete' ? 'confirmDelete' : review.kind === 'drafts' ? 'confirmDrafts' : review.kind === 'posts' ? 'confirmPosts' : 'confirmSave');
 
-  return <div className={styles.root}>
+  return <section className={styles.root} aria-label={t('title')}>
     {notice && !formOpen && !review && <RouteNotice error={notice.error} focusKey={`feed-notice:${notice.key}`}>{notice.text}</RouteNotice>}
-    <p className={styles.help}>{t('reviewNotice')}</p>
-    <p className={styles.help}>{automaticMinutes ? t('automatic', { minutes: automaticMinutes }) : t('manualOnly')}</p>
-    {canWrite && <div className={styles.search}><Button variant="primary" onClick={() => begin()}>{t('add')}</Button></div>}
+    <div className={styles.head}>
+      <div><p className={styles.help}>{automaticMinutes ? t('automatic', { minutes: automaticMinutes }) : t('manualOnly')}</p><p className={styles.help}>{t('reviewNotice')}</p></div>
+      {canWrite && <Button variant="primary" leading={<IconPlus size={18} />} onClick={() => begin()}>{t('add')}</Button>}
+    </div>
     {feeds.length ? <div className={styles.tableWrap}><table className={styles.table}><caption className="sr-only">{t('title')}</caption><thead><tr><th scope="col">{t('colFeed')}</th><th scope="col">{t('colChannels')}</th><th scope="col">{t('colHandling')}</th><th scope="col">{t('colChecked')}</th>{canWrite && <th scope="col">{t('colActions')}</th>}</tr></thead><tbody>
       {feeds.map(feed => <tr key={feed.id}><th scope="row"><span className={styles.name}>{feed.name}</span><span className={styles.meta}>{host(feed.url)} · {t(feed.kind === 'wordpress' ? 'kindWordpress' : 'kindRss')}{feed.enabled ? '' : ` · ${t('off')}`}</span></th>
         <td>{feed.targetIds.length ? feed.targetIds.map(id => names.get(id) ?? t('channel')).join(', ') : t('noChannels')}</td>
@@ -92,7 +94,7 @@ export function FeedManager({ initialFeeds, channels, page, hasMore, canWrite = 
         <td>{when(feed.lastPolledAt)}{feed.failureCount > 0 && <span className={styles.meta}>{t('failures', { count: feed.failureCount })}</span>}{feed.lastError && <span className={styles.meta}>{feed.lastError}</span>}</td>
         {canWrite && <td><div className={styles.actions}><Button size="sm" disabled={busy || !feed.enabled} onClick={() => void performCheck(feed, 'preview')}>{t('checkNow')}</Button><Button size="sm" disabled={busy} onClick={() => begin(feed)}>{t('edit')}</Button><Button size="sm" variant="danger" disabled={busy} onClick={() => { setConfirmation(''); setReview({ kind: 'delete', feed }); }}>{t('delete')}</Button></div></td>}</tr>)}
     </tbody></table></div> : <p className={styles.empty}>{t('empty')}</p>}
-    <nav className={styles.pagination} aria-label={t('pagesNav')}>{page > 1 && <a href={`/content/feeds?page=${page - 1}`}>{t('previous')}</a>}<span>{t('pageLabel', { page })}</span>{hasMore && <a href={`/content/feeds?page=${page + 1}`}>{t('next')}</a>}</nav>
+    {(page > 1 || hasMore) && <nav className={styles.pagination} aria-label={t('pagesNav')}>{page > 1 && <a href={`/content/feeds?page=${page - 1}`}>{t('previous')}</a>}<span>{t('pageLabel', { page })}</span>{hasMore && <a href={`/content/feeds?page=${page + 1}`}>{t('next')}</a>}</nav>}
 
     <Dialog open={formOpen} title={editing ? t('dialogEdit') : t('dialogAdd')} description={t('dialogDescription')} onClose={() => !busy && setFormOpen(false)} busy={busy} actions={<><Button data-dialog-cancel disabled={busy} onClick={() => setFormOpen(false)}>{t('cancel')}</Button><Button type="submit" form="feed-form" variant="primary" disabled={busy}>{editing ? t('reviewChanges') : t('reviewFeed')}</Button></>}>
       {notice?.error && !review && <RouteNotice error focusKey={`feed-form-error:${notice.key}`}>{notice.text}</RouteNotice>}
@@ -123,5 +125,5 @@ export function FeedManager({ initialFeeds, channels, page, hasMore, canWrite = 
       {checked?.result.backlog && <p className={styles.help}>{t('resultsBacklog')}</p>}
       {checked && checked.result.destinations === 0 && <p className={styles.help}>{t('resultsNoChannels')} {t('resultsNoChannelsPosts')}</p>}
     </Dialog>
-  </div>;
+  </section>;
 }

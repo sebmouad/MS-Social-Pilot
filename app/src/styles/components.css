@@ -9,6 +9,8 @@
 .ui-button { transition: background var(--ease), border-color var(--ease), color var(--ease), transform var(--ease), box-shadow var(--ease); }
 .ui-button:active:not(:disabled):not([aria-busy=true]) { transform: scale(0.985) translateY(1px); }
 .ui-button--primary { box-shadow: 0 1px 2px rgb(0 0 0 / 14%); }
+/* A button placed straight in a grid form keeps its own width: stretched across the form it reads as a bar, not an action. */
+:is(form, fieldset) > :is(button, .ui-button) { justify-self: start; }
 .ui-button--secondary:hover:not(:disabled) { border-color: var(--ink-faint); }
 .ui-button--danger:active:not(:disabled) { filter: brightness(.85); }
 .ui-button[aria-label]:not(:has(> span:not(.ui-button__icon):not(:empty))) { padding-inline: 0; aspect-ratio: 1; }

@@ -1,8 +1,9 @@
 .workspace { display: grid; gap: 24px; min-width: 0; }
-.tools, .form { display: grid; gap: 16px; min-width: 0; }
-.tools a { display: flex; gap: 10px; align-items: center; min-height: 44px; color: var(--ink); text-decoration: none; border-radius: var(--radius-sm); padding: 6px 10px; }
-.tools a:hover, .tools a[aria-current='page'] { background: var(--surface-muted); }
-.tools a:focus-visible, .workspace summary:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; }
+.form { display: grid; gap: 16px; min-width: 0; }
+.filters { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; min-width: 0; }
+.filters .ui-field { flex: 0 1 200px; min-width: 150px; }
+.filters .choice { min-height: 40px; }
+.workspace summary:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; }
 .panel { border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface); min-width: 0; padding: 20px; }
 .panel h2 { font-size: 1rem; margin: 0 0 16px; }
 .agenda { list-style: none; margin: 0; padding: 0; }
