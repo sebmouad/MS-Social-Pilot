@@ -59,6 +59,10 @@ export const demographicsCopyDefaults = {
     "en": "Audience size",
     "fr": "Taille de l’audience"
   },
+  "Audience breakdowns": {
+    "en": "Audience breakdowns",
+    "fr": "Répartitions de l’audience"
+  },
   "selected channels": {
     "en": "selected channels",
     "fr": "canaux sélectionnés"

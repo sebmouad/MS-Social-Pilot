@@ -5,7 +5,8 @@ import { headers } from 'next/headers';
 import { Button } from '@/components/Button';
 import { EmptyState } from '@/components/EmptyState';
 import { IconDownload, IconUsers } from '@tabler/icons-react';
-import { InfoTip } from '@/components';
+import { InfoTip, LinkTabs } from '@/components';
+import { shellChrome } from '@/modules/shell/server/chrome';
 import { AudienceChart } from './AudienceCharts';
 import { PageFrame } from '@/server/PageFrame';
 import { requireViewer } from '@/server/context';
@@ -13,7 +14,7 @@ import { readDemographics } from '@/modules/analytics/demographics/server/demogr
 import { demographicsCopyDefaults } from '@/modules/analytics/demographics/copy';
 import { readAnalyticsSnapshot } from '@/modules/analytics/server/read';
 import { pageChannelScope } from '@/modules/shell/server/scope';
-import { insightsReadInput } from '@/modules/analytics/ui/insights/scope';
+import { insightsReadInput, withParams } from '@/modules/analytics/ui/insights/scope';
 import { InsightsFilterRow } from '@/modules/analytics/ui/insights/InsightsFilterRow';
 import { insightsCopyDefaults, insightsPolicyDefaults, resolveInsightsCopy } from '@/modules/analytics/ui/insights/insights-config';
 import { presetRange, resolvePeriod } from '@/modules/analytics/ui/insights/period';
@@ -30,7 +31,7 @@ export default async function DemographicsPage({ searchParams }: { searchParams:
   const { demographics: copy } = await analyticsCopy();
   const t = (key: keyof typeof copy) => copy[key][locale];
   // Saved catalogs predate the truncation notice; fall back to the shipped default until Root re-saves.
-  const notice = (key: 'Showing the latest' | 'of' | 'stored snapshots. Narrow the dates or channels to see older ones.') =>
+  const notice = (key: 'Showing the latest' | 'of' | 'stored snapshots. Narrow the dates or channels to see older ones.' | 'Audience breakdowns') =>
     (copy as Record<string, { en: string; fr: string } | undefined>)[key]?.[locale] ?? demographicsCopyDefaults[key][locale];
   const number = new Intl.NumberFormat(locale, { maximumFractionDigits: 1 });
   const unknown = t("Not available");
@@ -44,6 +45,7 @@ export default async function DemographicsPage({ searchParams }: { searchParams:
   const presetPeriod = first(params.period) ? resolvePeriod(params, insightsPolicyDefaults) : null;
   const readInput = insightsReadInput(params, scope.ids, presetPeriod ? { start: presetPeriod.start, end: presetPeriod.end } : {});
   delete readInput.period;
+  delete readInput.breakdown;
   try { data = await readDemographics({ userId: viewer.user.id, workspaceId: viewer.workspaceId }, readInput); }
   catch { failed = true; }
   if (!data) {
@@ -78,7 +80,12 @@ export default async function DemographicsPage({ searchParams }: { searchParams:
       labels={{ period: ui.datePeriod, compare: ui.compareToggle, active: ui.activeFilters, remove: ui.removeFilter, reset: ui.resetFilters, filters: t("Date range (UTC)"), customSummary: t("Date range (UTC)") }} />
     {data && <a className="ui-button ui-button--quiet ui-button--sm" href={`/api/analytics/demographics?${query}`} download><IconDownload size={16} aria-hidden="true" />{t("Export full history (CSV)")}</a>}
   </div>;
-  const metrics = data ? [...data.groups.flatMap(group => group.metrics), ...data.other] : [];
+  const allMetrics = data ? [...data.groups.flatMap(group => group.metrics), ...data.other] : [];
+  // One tab per breakdown (owner directive 2026-11-09), each keeping the period and the channels; the audience size stays above them.
+  const open = allMetrics.find(metric => metric.key === first(params.breakdown)) ?? allMetrics[0];
+  const metrics = open ? [open] : [];
+  const { copy: shell } = await shellChrome();
+  const tabs = <LinkTabs label={notice("Audience breakdowns")} moreLabel={shell.moreTabs} {...(open ? { activeId: open.key } : {})} items={allMetrics.map(metric => ({ id: metric.key, href: `/insights/audience?${withParams(params, { breakdown: metric.key })}`, label: metric.label }))} />;
   return <PageFrame module="analytics" scopedAccess><div className={styles.root}>
     <PageHeader module="analytics" title={t("Audience history")} info={<InfoTip name={t("Audience history")} blocks={[{ text: t("Stored age, gender, country, city and language categories, as supplied by the provider. Each snapshot stands alone; counts are never added across dates or sources.") }]} />} filters={filters} />
     {!channels.length && <p className={styles.note}>{t("No channels available.")}</p>}
@@ -86,6 +93,7 @@ export default async function DemographicsPage({ searchParams }: { searchParams:
     {data && <section className={styles.panel}><h2>{t("Audience size")}</h2><p>{data.audience.covered ? number.format(data.audience.total) : unknown} · {data.audience.covered} / {data.audience.selected} {t("selected channels")}</p><p>{t("Latest valid figure per covered channel. This is not a count of unique people across networks.")}</p></section>}
     {data?.historyTruncated && <p className={styles.note} role="status">{notice("Showing the latest")} {number.format(data.historyShownSnapshots)} {notice("of")} {number.format(data.historyTotalSnapshots)} {notice("stored snapshots. Narrow the dates or channels to see older ones.")}</p>}
     {data?.empty && <section className={styles.panel}><EmptyState icon={<IconUsers />} title={t("No stored breakdowns")} action={<a href="/insights/audience">{t("Reset filters")}</a>}>{t("Not available for these channels and dates. Try another period or channel.")}</EmptyState></section>}
+    {tabs}
     {metrics.map(metric => <section key={metric.key} className={styles.panel}><h2>{metric.label}</h2><p>{metric.sourceLabel} · {metric.unit}</p>
       <p>{t("Channels with stored snapshots")} : {metric.historyCoverage.covered} / {metric.historyCoverage.selected} · {when(metric.historyCoverage.oldestAsOf)} — {when(metric.historyCoverage.newestAsOf)}</p>
       <AudienceChart copy={copy} locale={fr ? 'fr' : 'en'} label={`${metric.label} · ${t("latest stored figures")}`} rows={metric.rows} />
