@@ -9,7 +9,7 @@ const AREA_PAGES: Record<RootAreaId, readonly string[]> = {
   overview: ['/root'],
   people: ['/root/users', '/root/workspaces', '/root/plans', '/root/registration', '/root/sessions', '/root/privileges', '/root/lifecycle'],
   modules: ['/root/config', '/root/modules', '/root/platforms'],
-  operations: ['/root/operations', '/root/errors', '/root/backups', '/root/connections'],
+  operations: ['/root/operations', '/root/updates', '/root/errors', '/root/backups', '/root/connections'],
   activity: ['/root/activity', '/root/changelog'],
 };
 const AREA_ICONS: Record<RootAreaId, Icon> = { overview: IconLayoutDashboard, people: IconUsers, modules: IconApps, operations: IconTool, activity: IconActivity };

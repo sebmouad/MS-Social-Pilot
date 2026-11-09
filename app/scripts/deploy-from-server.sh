@@ -241,7 +241,7 @@ if [ ! -f "$ENVF" ]; then
   umask 077
   cat > "$ENVF" <<ENV
 DATABASE_URL="postgresql://${APP_USER}:${DB_PASS}@127.0.0.1:5432/${DB_NAME}?schema=public"
-ENCRYPTION_KEY="$(openssl rand -hex 32)"
+ENCRYPTION_KEY="$(openssl rand -base64 32)"
 SESSION_SECRET="$(openssl rand -hex 32)"
 NODE_ENV="production"
 PORT="${APP_PORT}"
@@ -275,7 +275,7 @@ log_step "Building application (CPU Limit: $BUILD_CPU_QUOTA, Nice: $BUILD_NICE).
 start=$(date +%s)
 systemd-run --quiet --wait --collect --uid="$APP_USER" --gid="$APP_USER" \
   -p CPUQuota="$BUILD_CPU_QUOTA" -p Nice="$BUILD_NICE" -p IOSchedulingClass=idle --working-directory="$BUILD_DIR" \
-  /bin/bash -c "set -e; cd app; if [ $INSTALL = 1 ]; then npm ci --no-audit --no-fund >/tmp/deploy-npm.log 2>&1; fi; npx prisma generate >/dev/null; npm run build >/tmp/deploy-build.log 2>&1" \
+  /bin/bash -c "set -e; cd app; if [ $INSTALL = 1 ]; then npm ci --no-audit --no-fund >/tmp/deploy-npm.log 2>&1; fi; npx prisma generate >/dev/null; npm run build >/tmp/deploy-build.log 2>&1 && npm test >>/tmp/deploy-build.log 2>&1" \
   || { log_error "Build failed! Recent log:"; tail -n 35 /tmp/deploy-build.log; exit 1; }
 
 echo "$LOCK_SUM" > "$BUILD_DIR/app/.lock-sum"
@@ -364,8 +364,31 @@ LockPersonality=true
 WantedBy=multi-user.target
 UNIT
 
+# Self-update: the app records updates (GitHub push, Root › Updates) and this root timer installs them.
+install -m 0755 "$BUILD_DIR/app/scripts/updater.sh" /usr/local/lib/social-pilot-updater.sh
+cat > /etc/systemd/system/social-pilot-updater.service <<'UNIT'
+[Unit]
+Description=MS Social Pilot updater (installs the updates the app records)
+After=network-online.target postgresql.service
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/env bash /usr/local/lib/social-pilot-updater.sh
+TimeoutStartSec=95min
+UNIT
+cat > /etc/systemd/system/social-pilot-updater.timer <<'UNIT'
+[Unit]
+Description=Look for MS Social Pilot updates every 30 seconds
+[Timer]
+OnBootSec=2min
+OnUnitInactiveSec=30s
+AccuracySec=5s
+[Install]
+WantedBy=timers.target
+UNIT
+
 systemctl daemon-reload
 systemctl enable social-pilot social-pilot-worker >/dev/null 2>&1 || true
+systemctl enable --now social-pilot-updater.timer >/dev/null 2>&1 || true
 
 # Step 8: Atomic Swap & Restart
 log_step "Performing atomic release swap & restarting services..."

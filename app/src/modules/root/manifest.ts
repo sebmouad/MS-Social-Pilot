@@ -19,6 +19,7 @@ export const rootManifest = {
       { title: 'Errors', href: '/root/errors' },
       { title: 'Backup records', href: '/root/backups' },
       { title: 'Operations', href: '/root/operations' },
+      { title: 'Updates', href: '/root/updates' },
       { title: 'Activity', href: '/root/activity' },
       { title: 'Changelog', href: '/root/changelog' },
       { title: 'Shared configuration', href: '/root/config' },

@@ -191,7 +191,7 @@ if [ ! -f "$ENVF" ]; then
   umask 077
   cat > "$ENVF" <<ENV
 DATABASE_URL="postgresql://socialpilot:${DB_PASS}@127.0.0.1:5432/social_pilot?schema=public"
-ENCRYPTION_KEY="$(openssl rand -hex 32)"
+ENCRYPTION_KEY="$(openssl rand -base64 32)"
 SESSION_SECRET="$(openssl rand -hex 32)"
 NODE_ENV="production"
 PORT="${APP_PORT}"
@@ -208,7 +208,7 @@ LOCK_SUM="$(cat "$BUILD/app/package-lock.json" 2>/dev/null | sha256sum | cut -d'
 INSTALL=1; [ -d "$BUILD/app/node_modules" ] && [ "$(cat "$BUILD/app/.lock-sum" 2>/dev/null)" = "$LOCK_SUM" ] && INSTALL=0
 start=$(date +%s)
 systemd-run --quiet --wait --collect --uid=socialpilot --gid=socialpilot -p CPUQuota="$BUILD_CPU_QUOTA" -p Nice="$BUILD_NICE" -p IOSchedulingClass=idle --working-directory="$BUILD" \
-  /bin/bash -c "set -e; cd app; if [ $INSTALL = 1 ]; then npm ci --no-audit --no-fund >/tmp/deploy-npm.log 2>&1; fi; npx prisma generate >/dev/null; npm run build >/tmp/deploy-build.log 2>&1" \
+  /bin/bash -c "set -e; cd app; if [ $INSTALL = 1 ]; then npm ci --no-audit --no-fund >/tmp/deploy-npm.log 2>&1; fi; npx prisma generate >/dev/null; npm run build >/tmp/deploy-build.log 2>&1 && npm test >>/tmp/deploy-build.log 2>&1" \
   || { echo "Build failed; nothing changed"; tail -n 25 /tmp/deploy-build.log; exit 1; }
 echo "$LOCK_SUM" > "$BUILD/app/.lock-sum"
 echo "Build: OK in $(( $(date +%s) - start ))s (dependencies $( [ $INSTALL = 1 ] && echo reinstalled || echo reused ))"
@@ -292,8 +292,31 @@ LockPersonality=true
 WantedBy=multi-user.target
 UNIT
 
+# Self-update: the app records updates (GitHub push, Root › Updates) and this root timer installs them.
+install -m 0755 "$BUILD/app/scripts/updater.sh" /usr/local/lib/social-pilot-updater.sh
+cat > /etc/systemd/system/social-pilot-updater.service <<'UNIT'
+[Unit]
+Description=MS Social Pilot updater (installs the updates the app records)
+After=network-online.target postgresql.service
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/env bash /usr/local/lib/social-pilot-updater.sh
+TimeoutStartSec=95min
+UNIT
+cat > /etc/systemd/system/social-pilot-updater.timer <<'UNIT'
+[Unit]
+Description=Look for MS Social Pilot updates every 30 seconds
+[Timer]
+OnBootSec=2min
+OnUnitInactiveSec=30s
+AccuracySec=5s
+[Install]
+WantedBy=timers.target
+UNIT
+
 systemctl daemon-reload
 systemctl enable social-pilot social-pilot-worker >/dev/null 2>&1 || true
+systemctl enable --now social-pilot-updater.timer >/dev/null 2>&1 || true
 
 PUBLIC_ORIGIN="$(sudo -u postgres psql -d social_pilot -Atc "select value #>> '{}' from app_settings where key='app.publicOrigin'" 2>/dev/null || true)"
 rm -rf "$PREV"; mv "$LIVE" "$PREV"; mv "$NEW" "$LIVE"

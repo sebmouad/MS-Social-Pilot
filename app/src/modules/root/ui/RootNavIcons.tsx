@@ -1,6 +1,6 @@
 import {
   IconActivity, IconAlertTriangle, IconApps, IconBuildingCommunity, IconServer2, IconCreditCard, IconDatabaseExport, IconKey, IconLayoutDashboard,
-  IconLock, IconMailPlus, IconPlugConnected, IconPuzzle, IconSettings2, IconShieldCheck, IconSpeakerphone, IconTool, IconUsers, IconWorld,
+  IconCloudDownload, IconLock, IconMailPlus, IconPlugConnected, IconPuzzle, IconSettings2, IconShieldCheck, IconSpeakerphone, IconTool, IconUsers, IconWorld,
   type Icon,
 } from '@tabler/icons-react';
 import { PAGE_ICONS } from '@/components/icons';
@@ -18,6 +18,7 @@ const ROOT_PAGE_ICONS: Record<string, Icon> = {
   '/root/connections': IconPlugConnected,
   '/root/errors': IconAlertTriangle,
   '/root/backups': IconDatabaseExport,
+  '/root/updates': IconCloudDownload,
   '/root/operations': IconTool,
   '/root/activity': IconActivity,
   '/root/changelog': IconSpeakerphone,
