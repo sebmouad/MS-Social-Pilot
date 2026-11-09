@@ -8,16 +8,38 @@ import { requestOrigin } from '@/server/request-origin';
 import { assertWorkspaceNotPurging, withWorkspaceOperation } from '@/server/data-control/guard';
 import { configuredFacebookEngine, configuredFacebookOAuth } from './runtime';
 import type { ConnectionViewer } from '@/server/platforms/host';
+import { configuredInstagramPolicy } from '@/platforms/instagram/runtime';
 
 /**
  * Facebook's connection flow: start the Meta authorization and finish it on the
  * callback. The generic routes under /api/connections/[platform]/ check the
  * viewer, the role and that the module is on, then hand over to these.
  */
+/**
+ * Permissions Meta grants only together with others (developers.facebook.com/docs/permissions, 2026-11): asking for one
+ * without the ones it depends on leaves the dependent one unusable and fails App Review, so the dependencies are added.
+ */
+const META_SCOPE_DEPENDENCIES: Readonly<Record<string, readonly string[]>> = {
+  pages_read_engagement: ['pages_show_list'], pages_read_user_content: ['pages_show_list'], pages_manage_metadata: ['pages_show_list'],
+  pages_manage_posts: ['pages_read_engagement', 'pages_show_list'], read_insights: ['pages_read_engagement', 'pages_show_list'],
+  pages_messaging: ['pages_manage_metadata', 'pages_show_list'], pages_manage_engagement: ['pages_read_user_content', 'pages_show_list'],
+  instagram_basic: ['pages_read_user_content', 'pages_show_list'], instagram_content_publish: ['instagram_basic', 'pages_read_engagement', 'pages_show_list'],
+  instagram_manage_comments: ['instagram_basic', 'pages_read_engagement', 'pages_show_list'], instagram_manage_insights: ['instagram_basic', 'pages_read_engagement', 'pages_show_list'],
+  ads_management: ['pages_read_engagement', 'pages_show_list'],
+};
+
+/** The requested scopes with every dependency, each once, in a stable order. */
+export function withScopeDependencies(scopes: readonly string[]): string[] {
+  const out = new Set<string>();
+  const add = (scope: string) => { if (out.has(scope)) return; out.add(scope); (META_SCOPE_DEPENDENCIES[scope] ?? []).forEach(add); };
+  scopes.map(scope => scope.trim()).filter(Boolean).forEach(add);
+  return [...out];
+}
+
 export async function startFacebookConnection(request: Request, viewer: ConnectionViewer): Promise<NextResponse> {
   try {
     await assertWorkspaceNotPurging(viewer.workspaceId);
-    const [oauth, engine, postReadScopes, insightReadScopes, adsReadScopes, adsManageScopes, adsManagementEnabled, stateMinutes] = await Promise.all([
+    const [oauth, engine, postReadScopes, insightReadScopes, adsReadScopes, adsManageScopes, adsManagementEnabled, stateMinutes, featureScopes, instagramScopes] = await Promise.all([
       configuredFacebookOAuth(), configuredFacebookEngine(),
       runtimeConfig('meta.postReadScopes') as Promise<string[]>,
       runtimeConfig('meta.pageInsightReadScopes') as Promise<string[]>,
@@ -25,13 +47,21 @@ export async function startFacebookConnection(request: Request, viewer: Connecti
       runtimeConfig('meta.adsManageScopes') as Promise<string[]>,
       runtimeConfig('ads.managementEnabled') as Promise<boolean>,
       runtimeConfig('meta.oauthStateMinutes') as Promise<number>,
+      // Every scope a Facebook feature checks before it runs is asked for here, or the feature reports a missing permission on a fresh connection.
+      Promise.all((['meta.postPublishScopes', 'meta.postDeleteScopes', 'meta.firstCommentScopes', 'meta.inboxReadScopes', 'meta.inboxWriteScopes'] as const).map(key => runtimeConfig(key) as Promise<string[]>)).then(lists => lists.flat()),
+      // Instagram professional accounts are reached through these Pages, so their scopes come with this authorization when Instagram is on.
+      (runtimeConfig('platforms.instagram.enabled') as Promise<boolean>).then(async enabled => {
+        if (!enabled) return [];
+        const policy = await configuredInstagramPolicy();
+        return [...policy.readScopes, ...policy.publishScopes, ...policy.commentScopes, ...policy.insightScopes];
+      }),
     ]);
     const expectedRedirect = new URL(FACEBOOK_CONNECTION_CALLBACK_PATH, requestOrigin(request)).toString();
     if (new URL(oauth.redirectUri).toString() !== expectedRedirect) {
       await recordFacebookConnectionFailure({ userId: viewer.user.id, workspaceId: viewer.workspaceId }, 'configuration', 'internal_error');
       return NextResponse.json({ error: 'Connection unavailable. Try again or contact support.' }, { status: 503 });
     }
-    const scopes = [...new Set([...oauth.scopes, ...postReadScopes, ...insightReadScopes, ...adsReadScopes, ...(adsManagementEnabled ? adsManageScopes : [])])];
+    const scopes = withScopeDependencies([...oauth.scopes, ...postReadScopes, ...insightReadScopes, ...featureScopes, ...instagramScopes, ...adsReadScopes, ...(adsManagementEnabled ? adsManageScopes : [])]);
     const stateTtlSeconds = stateMinutes * 60;
     const pending = createFacebookOAuthState(viewer.user.id, viewer.workspaceId, scopes, stateTtlSeconds);
     if (pending.cookieValue.length > 3000) {
