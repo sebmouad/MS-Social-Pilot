@@ -12,7 +12,8 @@ export function fakeGraph(routes: Route[]) {
     const url = new URL(String(input));
     const query = Object.fromEntries(url.searchParams);
     const form = init?.body instanceof URLSearchParams ? Object.fromEntries(init.body) : init?.body instanceof FormData ? Object.fromEntries([...init.body].filter(([, v]) => typeof v === 'string')) as Record<string, string> : {};
-    const token = query.access_token ?? form.access_token ?? null;
+    const bearer = new Headers(init?.headers).get('authorization')?.replace(/^Bearer /, '') ?? null;
+    const token = query.access_token ?? form.access_token ?? bearer;
     const proof = Boolean(query.appsecret_proof ?? form.appsecret_proof);
     for (const bag of [query, form]) { delete bag.access_token; delete bag.appsecret_proof; }
     const entry: Sent = { method: init?.method ?? 'GET', path: url.pathname.replace(/^\/v\d+\.\d+/, ''), query, body: form, token, proof };
