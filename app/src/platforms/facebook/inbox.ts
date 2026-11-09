@@ -164,7 +164,7 @@ export async function replyToFacebookInbox(actor: InboxActor, input: { kind: 'me
     if (replyWindow.state === 'no_recipient') throw new OperationError('conflict', 'This conversation has no stored visitor message to reply to.');
     if (replyWindow.state === 'closed') throw new OperationError('conflict', `The Messenger reply window closed ${windowHours} hours after the visitor’s last message. Facebook only accepts replies within this window.`);
     const engine = await configuredFacebookEngine();
-    const remoteId = await engine.replyToConversation(channel.token, row.remoteId, text);
+    const remoteId = await engine.replyToConversation(channel.token, channel.providerId, lastInbound!.fromId!, text);
     await prisma.conversationMessage.create({ data: { id: `msg_${randomBytes(12).toString('hex')}`, conversationId: row.id, remoteId, fromName: null, fromId: null, message: text, createdTime: new Date(), sentById: actor.userId } });
     await prisma.conversation.update({ where: { id: row.id }, data: { snippet: text, updatedTime: new Date() } });
     await audit(actor, 'inbox.message_replied', { targetId: row.targetId, conversationId: row.id, remoteId });

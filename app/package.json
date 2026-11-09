@@ -10,7 +10,8 @@
     "worker": "node --env-file-if-exists=.env --import tsx scripts/worker.ts",
     "deploy": "bash scripts/deploy-from-mac.sh",
     "deploy:mac": "bash scripts/deploy-from-mac.sh",
-    "deploy:server": "bash scripts/deploy-from-server.sh"
+    "deploy:server": "bash scripts/deploy-from-server.sh",
+    "test": "node --import tsx --test \"tests/**/*.test.ts\""
   },
   "dependencies": {
     "@prisma/client": "6.19.3",

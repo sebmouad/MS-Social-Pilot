@@ -96,7 +96,8 @@ export interface FacebookEngine {
   readAdObject(input: AdObjectReadRequest): Promise<AdObjectSnapshot>;
   updateAd(input: AdMutationRequest): Promise<void>;
   createCampaign(input: AdCampaignCreateRequest): Promise<{ remoteId: string }>;
-  replyToConversation(accessToken: string, conversationId: string, text: string): Promise<string>;
+  /** Messenger Send API reply from the Page to a visitor (their page-scoped id), inside Meta's 24-hour window. */
+  replyToConversation(accessToken: string, pageId: string, recipientId: string, text: string): Promise<string>;
   replyToComment(accessToken: string, commentId: string, text: string): Promise<string>;
   /** Messenger "private reply" to a comment's author (one per comment, within Meta's window). */
   privateReplyToComment(accessToken: string, pageId: string, commentId: string, text: string): Promise<string>;
@@ -540,10 +541,14 @@ export function createFacebookEngine(rawConfig: FacebookConfig, fetchImpl: Faceb
           onConfirmed?.();
         } });
     },
-    async replyToConversation(token, conversationId, text) {
-      const result = object(await request(`${encodeURIComponent(conversationId)}/messages`, { method: 'POST', token, body: { message: text } }));
-      if (typeof result.id !== 'string') throw new FacebookApiError('Facebook did not return a reply id.', 200);
-      return result.id;
+    async replyToConversation(token, pageId, recipientId, text) {
+      // A conversation's own /messages edge refuses sends; Pages answer through the Send API.
+      if (!/^\d{1,40}$/.test(pageId) || !/^\d{1,40}$/.test(recipientId)) throw new FacebookApiError('Facebook received an invalid Messenger recipient.', 0);
+      const result = object(await request(`${pageId}/messages`, { method: 'POST', token, body: {
+        recipient: JSON.stringify({ id: recipientId }), messaging_type: 'RESPONSE', message: JSON.stringify({ text }),
+      } }));
+      if (typeof result.message_id !== 'string') throw new FacebookApiError('Facebook did not return a reply id.', 200);
+      return result.message_id;
     },
     async replyToComment(token, commentId, text) {
       const result = object(await request(`${encodeURIComponent(commentId)}/comments`, { method: 'POST', token, body: { message: text } }));
@@ -907,7 +912,8 @@ export function createFacebookAdapter(config: FacebookConfig, fetchImpl: Faceboo
     },
     async replyToInbox(request) {
       if (!request.text?.trim()) throw new FacebookApiError('A reply needs text.', 0);
-      const remoteId = await engine.replyToConversation(request.credential.accessToken, request.remoteId, request.text.trim());
+      // Like hide and delete below, the generic inbox action targets a comment; Messenger replies go through the Facebook inbox host.
+      const remoteId = await engine.replyToComment(request.credential.accessToken, request.remoteId, request.text.trim());
       return { remoteId };
     },
     async hideInboxItem(request) { await engine.moderateComment(request.credential.accessToken, request.remoteId, request.hidden); },
