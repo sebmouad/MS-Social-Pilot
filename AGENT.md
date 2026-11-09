@@ -100,6 +100,7 @@ Before committing or deploying any change, always run from `app/`:
 cd app
 npx prisma generate
 npm run typecheck
+npm test
 npm run build
 ```
 
