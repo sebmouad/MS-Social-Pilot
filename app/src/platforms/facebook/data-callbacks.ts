@@ -44,25 +44,45 @@ async function audit(tx: Pick<typeof prisma, '$executeRaw'>, entry: Audit) {
   await tx.$executeRaw`INSERT INTO activity_logs (id, "workspaceId", "actorId", action, detail, "createdAt") VALUES (${randomUUID()}, ${entry.workspaceId}, NULL, ${entry.action}, ${JSON.stringify(entry.detail)}::jsonb, NOW())`;
 }
 
-/** Every token we hold for this person is already dead: flag the connections now instead of at the next publish. */
+/** Instagram accounts reached through this Facebook connection hold copies of its Page tokens (their binding names it as the source). */
+async function instagramAccountsFrom(tx: Pick<typeof prisma, '$queryRaw'>, account: { id: string; workspaceId: string }) {
+  const rows = await tx.$queryRaw<Array<{ id: string }>>`SELECT id FROM social_accounts WHERE provider = 'instagram' AND "workspaceId" = ${account.workspaceId} AND meta->>'sourceId' = ${account.id}`;
+  return rows.map(row => row.id);
+}
+
+/**
+ * Erase the access this Facebook connection holds and stop the work that needs it: its tokens, the tokens of its Pages and of
+ * the Instagram accounts reached through them, and their posts still waiting to go out. Published posts, insights and
+ * conversations are the workspace's own business records about its Pages, so they stay; the workspace owner can still delete
+ * them from Settings.
+ */
+async function eraseAccess(tx: Pick<typeof prisma, '$queryRaw' | 'target' | 'postTarget' | 'socialAccount'>, account: { id: string; workspaceId: string }, reason: string) {
+  const linked = await instagramAccountsFrom(tx, account);
+  const targets = await tx.target.findMany({ where: { socialAccountId: { in: [account.id, ...linked] } }, select: { id: true } });
+  const targetIds = targets.map(target => target.id);
+  const cancelled = targetIds.length
+    ? await tx.postTarget.updateMany({ where: { targetId: { in: targetIds }, status: { in: ['pending', 'scheduled_remote'] } }, data: { status: 'cancelled' } })
+    : { count: 0 };
+  await tx.target.updateMany({ where: { id: { in: targetIds } }, data: { accessToken: null, enabled: false, canPublish: false } });
+  await tx.socialAccount.updateMany({ where: { id: { in: [account.id, ...linked] } }, data: { accessToken: '', refreshToken: null, tokenExpiresAt: null, invalidatedAt: new Date(), invalidReason: reason } });
+  return { instagramAccounts: linked.length, channels: targetIds.length, cancelledDestinations: cancelled.count };
+}
+
+/** The person removed the app in Facebook: the tokens are already dead there, and the access stored here is erased now (the data deletion page says so). */
 export async function handleFacebookDeauthorize(signedRequest: string): Promise<PlatformDataCallbackResult> {
   const userId = await verifiedUserId(signedRequest);
   if (!userId) return { ok: false, reason: 'invalid_signature' };
   const accounts = await prisma.socialAccount.findMany({ where: { provider: 'facebook', providerUserId: userId, invalidatedAt: null }, select: { id: true, workspaceId: true } });
   for (const account of accounts) {
     await prisma.$transaction(async (tx) => {
-      await tx.socialAccount.updateMany({ where: { id: account.id, invalidatedAt: null }, data: { invalidatedAt: new Date(), invalidReason: DEAUTHORIZED_REASON } });
-      await audit(tx, { workspaceId: account.workspaceId, action: FACEBOOK_DEAUTHORIZE_ACTION, detail: { provider: 'facebook', socialAccountId: account.id } });
+      const counts = await eraseAccess(tx, account, DEAUTHORIZED_REASON);
+      await audit(tx, { workspaceId: account.workspaceId, action: FACEBOOK_DEAUTHORIZE_ACTION, detail: { provider: 'facebook', socialAccountId: account.id, ...counts } });
     });
   }
   return { ok: true, affected: accounts.length };
 }
 
-/**
- * Erase the credentials the person authorised and stop work that needs them. Published posts, insights and
- * conversations are the workspace's own business records about its Pages, so they stay; the workspace owner
- * can still delete them from Settings. The customer-facing outcome is stored under the confirmation code.
- */
+/** The person asked Meta to delete their data: the same erasure, with the customer-facing outcome stored under the confirmation code. */
 export async function handleFacebookDataDeletion(signedRequest: string): Promise<PlatformDataCallbackResult> {
   const userId = await verifiedUserId(signedRequest);
   if (!userId) return { ok: false, reason: 'invalid_signature' };
@@ -70,14 +90,8 @@ export async function handleFacebookDataDeletion(signedRequest: string): Promise
   const accounts = await prisma.socialAccount.findMany({ where: { provider: 'facebook', providerUserId: userId }, select: { id: true, workspaceId: true } });
   for (const account of accounts) {
     await prisma.$transaction(async (tx) => {
-      const targets = await tx.target.findMany({ where: { socialAccountId: account.id }, select: { id: true } });
-      const targetIds = targets.map(target => target.id);
-      const cancelled = targetIds.length
-        ? await tx.postTarget.updateMany({ where: { targetId: { in: targetIds }, status: { in: ['pending', 'scheduled_remote'] } }, data: { status: 'cancelled' } })
-        : { count: 0 };
-      await tx.target.updateMany({ where: { id: { in: targetIds } }, data: { accessToken: null, enabled: false, canPublish: false } });
-      await tx.socialAccount.update({ where: { id: account.id }, data: { accessToken: '', refreshToken: null, tokenExpiresAt: null, invalidatedAt: new Date(), invalidReason: DELETION_REASON } });
-      await audit(tx, { workspaceId: account.workspaceId, action: FACEBOOK_DATA_DELETION_ACTION, detail: { provider: 'facebook', confirmationCode, socialAccountId: account.id, channels: targetIds.length, cancelledDestinations: cancelled.count } });
+      const counts = await eraseAccess(tx, account, DELETION_REASON);
+      await audit(tx, { workspaceId: account.workspaceId, action: FACEBOOK_DATA_DELETION_ACTION, detail: { provider: 'facebook', confirmationCode, socialAccountId: account.id, ...counts } });
     });
   }
   return { ok: true, affected: accounts.length, confirmationCode };
