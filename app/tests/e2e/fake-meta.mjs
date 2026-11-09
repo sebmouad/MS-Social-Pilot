@@ -13,9 +13,9 @@ const VISITOR = { id: '700800900', name: 'Sara Visitor' };
 const SCOPES = ['pages_show_list', 'pages_read_engagement', 'pages_manage_posts', 'read_insights', 'pages_read_user_content', 'pages_manage_engagement', 'pages_messaging', 'pages_manage_metadata',
   'instagram_basic', 'instagram_content_publish', 'instagram_manage_comments', 'instagram_manage_insights', 'ads_read', 'ads_management', 'public_profile'];
 const now = () => new Date().toISOString().replace(/\.\d+Z$/, '+0000');
-let seq = 1000;
+let seq = Math.floor(Date.now() / 1000) % 100000000; // never reused across restarts, like real ids
 const state = { posts: new Map(), comments: new Map(), conversations: new Map(), containers: new Map(), igMedia: new Map(), campaigns: new Map(), subscribed: [] };
-state.campaigns.set('6100001', { id: '6100001', name: 'Autumn recipes', objective: 'OUTCOME_TRAFFIC', status: 'PAUSED', effective_status: 'PAUSED' });
+state.campaigns.set('6100001', { id: '6100001', account_id: AD.id.replace('act_', ''), name: 'Autumn recipes', objective: 'OUTCOME_TRAFFIC', status: 'PAUSED', effective_status: 'PAUSED' });
 
 const json = (res, status, body) => { res.writeHead(status, { 'content-type': 'application/json' }); res.end(JSON.stringify(body)); };
 const error = (res, message, code = 100) => json(res, 400, { error: { message, type: 'OAuthException', code } });
@@ -47,6 +47,7 @@ function graph(method, path, q, body, res) {
   if (p === '/me/adaccounts') return json(res, 200, { data: [{ id: AD.id, name: AD.name, currency: AD.currency, account_status: 1 }] });
   // Page
   if (head === PAGE.id && !edge && method === 'GET') return json(res, 200, { id: PAGE.id, name: PAGE.name, fan_count: 6262, followers_count: 6262, instagram_business_account: { id: IG.id, username: IG.username }, picture: { data: { url: '' } } });
+  if (head === PAGE.id && edge === 'picture') return json(res, 200, { data: { url: `https://localhost:${port}/page.png`, width: 50, height: 50 } });
   if (head === PAGE.id && edge === 'subscribed_apps') { state.subscribed.push(body.subscribed_fields); return json(res, 200, { success: true }); }
   if (head === PAGE.id && (edge === 'feed' || edge === 'photos') && method === 'POST') {
     const id = `${PAGE.id}_${++seq}`; state.posts.set(id, { id, message: body.message ?? body.caption ?? '', created_time: now(), comments: [] });
@@ -67,7 +68,7 @@ function graph(method, path, q, body, res) {
   if (state.posts.has(head) && !edge) {
     if (method === 'DELETE') { state.posts.delete(head); return json(res, 200, { success: true }); }
     const post = state.posts.get(head);
-    return json(res, 200, { id: post.id, message: post.message, created_time: post.created_time, is_published: true, permalink_url: `https://www.facebook.com/${post.id}`, status_type: 'mobile_status_update', shares: { count: 2 }, reactions: { summary: { total_count: 12 } }, comments: { summary: { total_count: post.comments.length } } });
+    return json(res, 200, { id: post.id, message: post.message, created_time: post.created_time, is_published: true, permalink_url: `https://www.facebook.com/${post.id.replace('_', '/posts/')}`, status_type: 'mobile_status_update', shares: { count: 2 }, reactions: { summary: { total_count: 12 } }, comments: { summary: { total_count: post.comments.length } } });
   }
   if (state.posts.has(head) && edge === 'comments' && method === 'GET') return json(res, 200, { data: state.posts.get(head).comments.map(id => state.comments.get(id)) });
   if (state.posts.has(head) && edge === 'comments' && method === 'POST') { const id = `${head}_c${++seq}`; state.comments.set(id, { id, message: body.message, created_time: now(), from: { id: PAGE.id, name: PAGE.name } }); state.posts.get(head).comments.push(id); return json(res, 200, { id }); }
@@ -89,8 +90,10 @@ function graph(method, path, q, body, res) {
   if (state.comments.has(head) && edge === 'replies' && method === 'POST') { const id = `${head}_r${++seq}`; state.comments.set(id, { id, text: body.message, timestamp: now(), from: { id: IG.id, username: IG.username } }); return json(res, 200, { id }); }
   if (state.comments.has(head) && !edge && body.hide !== undefined) { state.comments.get(head).hidden = body.hide === 'true'; return json(res, 200, { success: true }); }
   // Ads
-  if (head === AD.id && edge === 'insights') return json(res, 200, { data: Array.from({ length: 7 }, (_, i) => { const d = new Date(Date.now() - (6 - i) * 864e5).toISOString().slice(0, 10); return { date_start: d, date_stop: d, impressions: String(900 + i * 80), reach: String(700 + i * 50), spend: (4.2 + i).toFixed(2), clicks: String(20 + i * 3), cpc: '0.21', cpm: '4.60', campaign_id: '6100001', campaign_name: 'Autumn recipes' }; }) });
-  if (head === AD.id && edge === 'campaigns' && method === 'POST') { const id = String(6100000 + ++seq); state.campaigns.set(id, { id, name: body.name, objective: body.objective, status: body.status, effective_status: body.status }); return json(res, 200, { id }); }
+  // Like Graph: each level's rows carry the ids of that level (adset_id at adset level, ad_id at ad level).
+  if (head === AD.id && edge === 'insights') { const level = q.level ?? 'account'; return json(res, 200, { data: Array.from({ length: 7 }, (_, i) => { const d = new Date(Date.now() - (6 - i) * 864e5).toISOString().slice(0, 10); return { date_start: d, date_stop: d, impressions: String(900 + i * 80), reach: String(700 + i * 50), spend: (4.2 + i).toFixed(2), clicks: String(20 + i * 3), cpc: '0.21', cpm: '4.60', account_id: AD.id.replace('act_', ''), account_name: AD.name,
+    ...(level !== 'account' ? { campaign_id: '6100001', campaign_name: 'Autumn recipes' } : {}), ...(level === 'adset' || level === 'ad' ? { adset_id: '6200001', adset_name: 'France · 25-54' } : {}), ...(level === 'ad' ? { ad_id: '6300001', ad_name: 'Pumpkin soup photo' } : {}) }; }) }); }
+  if (head === AD.id && edge === 'campaigns' && method === 'POST') { const id = String(6100000 + ++seq); state.campaigns.set(id, { id, account_id: AD.id.replace('act_', ''), name: body.name, objective: body.objective, status: body.status, effective_status: body.status }); return json(res, 200, { id }); }
   if (head === AD.id && edge === 'campaigns') return json(res, 200, { data: [...state.campaigns.values()] });
   if (head === AD.id && (edge === 'adsets' || edge === 'ads' || edge === 'adcreatives')) return json(res, 200, { data: [] });
   if (head === AD.id && !edge) return json(res, 200, { id: AD.id, name: AD.name, currency: AD.currency, account_status: 1 });
