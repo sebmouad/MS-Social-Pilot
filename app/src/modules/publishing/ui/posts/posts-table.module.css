@@ -77,3 +77,7 @@
 .destMetrics { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
 .destMetrics span { display: inline-flex; align-items: center; gap: 2px; }
 
+
+/* « View on Facebook » beside a published destination (more specific than the icon-only `.destinations a`). */
+.destinations a.viewLive { display: inline-flex; width: auto; height: auto; gap: 4px; padding: 2px 6px; font-size: 13px; font-weight: 650; color: var(--accent); white-space: nowrap; }
+.destinations a.viewLive:hover, .destinations a.viewLive:focus-visible { color: var(--accent-hover); text-decoration: underline; background: none; }

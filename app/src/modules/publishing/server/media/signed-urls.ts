@@ -1,5 +1,5 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
-import { runtimeConfig, runtimeSecret } from '@/server/config/store';
+import { ensureGeneratedSecret, runtimeConfig } from '@/server/config/store';
 
 const IMAGE_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const WORKSPACE_ID = /^[A-Za-z0-9._-]+$/;
@@ -36,7 +36,7 @@ export function mediaSharePath(grant: MediaShareGrant): string {
 export async function mintMediaShareUrl(workspaceId: string, id: string, now = new Date()): Promise<string | null> {
   if (!WORKSPACE_ID.test(workspaceId) || !IMAGE_ID.test(id)) return null;
   const [secret, lifetime, origin] = await Promise.all([
-    runtimeSecret('publishing.mediaShareSecret'),
+    ensureGeneratedSecret('publishing.mediaShareSecret').catch(() => null),
     runtimeConfig('publishing.mediaShareExpirySeconds'),
     runtimeConfig('app.publicOrigin'),
   ]);
@@ -53,7 +53,7 @@ export async function mintMediaShareUrl(workspaceId: string, id: string, now = n
 export async function mintMediaSharePath(workspaceId: string, id: string, now = new Date()): Promise<string | null> {
   if (!WORKSPACE_ID.test(workspaceId) || !IMAGE_ID.test(id)) return null;
   const [secret, lifetime] = await Promise.all([
-    runtimeSecret('publishing.mediaShareSecret'),
+    ensureGeneratedSecret('publishing.mediaShareSecret').catch(() => null),
     runtimeConfig('publishing.mediaShareExpirySeconds'),
   ]);
   if (!secret) return null;
@@ -64,16 +64,16 @@ export async function mintMediaSharePath(workspaceId: string, id: string, now = 
 
 /** Providers advertise uploaded-image support only while signed delivery can be minted for them. */
 export async function mediaShareDelivery(): Promise<{ origin: string } | null> {
-  const [secret, origin] = await Promise.all([
-    runtimeSecret('publishing.mediaShareSecret'),
-    runtimeConfig('app.publicOrigin'),
-  ]);
-  if (!secret || typeof origin !== 'string') return null;
+  const origin = await runtimeConfig('app.publicOrigin');
+  if (typeof origin !== 'string') return null;
   // Providers fetch over the public internet, so only an HTTPS origin can deliver.
   if (!origin.startsWith('https://')) return null;
   try {
     const url = new URL(origin);
     if (url.origin !== origin || url.username || url.password) return null;
   } catch { return null; }
+  // Instagram fetches photos through these signed links: the signing key is created on first use rather than left
+  // for Root to invent, so uploads work on a fresh install.
+  try { await ensureGeneratedSecret('publishing.mediaShareSecret'); } catch { return null; }
   return { origin };
 }

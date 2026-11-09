@@ -1,6 +1,5 @@
 "use server";
 import { publishingErrorClassificationMessage, PublishingOperationError, defaultPublishingErrorText, type PublishingErrorText } from '@/modules/publishing/error-catalog';
-import { loadContent } from '@/modules/publishing/server/content-copy';
 import { loadPublishingErrorText } from '@/modules/publishing/server/error-copy';
 
 
@@ -8,7 +7,7 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { requireViewer } from '@/server/context';
 import { canAccessFeature } from '@/server/permissions';
-import { cancelScheduledPost, createPost, deletePost, importPostsCsv, publishPost, reviewPost, schedulePost, submitPostForApproval, syncPostStatus, updatePost } from '@/modules/publishing/server/lifecycle';
+import { cancelScheduledPost, createPost, deletePost, importPostsCsv, publishNow, publishPost, reviewPost, schedulePost, submitPostForApproval, syncPostStatus, updatePost } from '@/modules/publishing/server/lifecycle';
 import { OperationError, operationFailure } from '@/lib/operation-error';
 import { wallTimeToInstant } from '@/lib/calendar-dates';
 import { recordFirstCommentOutcome, sendFirstComment } from '@/modules/publishing/server/first-comment';
@@ -126,13 +125,14 @@ export async function createPostWithRecoveryAction(previous: ComposerActionState
     const viewer = await requireViewer({ feature: 'publishing/posts', channelScoped: true, write: true });
     if (!canAccessFeature(viewer.permissions, 'publishing/posts', 'write')) throw new Error('permission');
     if (values.intent !== 'draft' && values.intent !== 'schedule') throw new Error('intent');
-    const publishNowLead = values.intent === 'schedule' && data.get('publishNow') === '1' ? (await loadContent()).policy.publishNowLeadMinutes : null;
-    const scheduledAt = publishNowLead !== null ? new Date(Date.now() + publishNowLead * 60_000) : values.intent === 'schedule' ? (() => {
+    // "Publish now": saved as a draft, then sent in this request (publishNow below).
+    const sendNow = values.intent === 'schedule' && data.get('publishNow') === '1';
+    const scheduledAt = sendNow ? undefined : values.intent === 'schedule' ? (() => {
       const result = wallTimeToInstant(values.scheduleDate, values.scheduleTime, viewer.membership.workspace.timezone);
       if (!result.ok) throw new Error('schedule');
       return result.instant;
     })() : undefined;
-    await createPost(actor(viewer), {
+    const created = await createPost(actor(viewer), {
       message: values.message,
       firstComment: values.firstComment,
       firstCommentDelayMinutes: await parsedCommentDelay(values.firstCommentDelayMinutes),
@@ -142,6 +142,9 @@ export async function createPostWithRecoveryAction(previous: ComposerActionState
       scheduledAt,
       ...(scheduledAt && parseScheduleMode(values.scheduleMode) ? { scheduleMode: parseScheduleMode(values.scheduleMode) } : {}),
       ...(scheduledAt && parseDestinationScheduleModesJson(values.destinationScheduleModesJson, errorText) ? { destinationScheduleModes: parseDestinationScheduleModesJson(values.destinationScheduleModesJson, errorText) } : {}),
+    });
+    if (sendNow) await publishNow(actor(viewer), created.id, {
+      ...(parseScheduleMode(values.scheduleMode) ? { scheduleMode: parseScheduleMode(values.scheduleMode)! } : {}),
     });
   } catch (error) {
     if (isRedirect(error)) throw error;

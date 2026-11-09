@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { requireViewer } from '@/server/context';
 import { previewQueueTimes, createQueuedPost, QueueAfterSaveError } from '@/modules/publishing/server/queue-compose';
-import { createPost, updatePost, schedulePost } from '@/modules/publishing/server/lifecycle';
+import { createPost, updatePost, schedulePost, publishNow } from '@/modules/publishing/server/lifecycle';
 import { parseScheduleMode } from '@/modules/publishing/remote-scheduling';
 import { parseDestinationScheduleModesJson } from '@/modules/publishing/server/schedule-modes';
 import { parsePublishingMedia } from '@/modules/publishing/media-support';
@@ -11,7 +11,6 @@ import { parseFirstCommentDelay } from '@/modules/publishing/first-comment-delay
 import { runtimeConfig } from '@/server/config/store';
 import { wallTimeToInstant } from '@/lib/calendar-dates';
 import type { ComposerActionState as BaseState } from '@/modules/publishing/ui/posts/actions';
-import { loadContent } from '@/modules/publishing/server/content-copy';
 import { formatDate } from '../publishing-ui';
 import { pageLocale } from '../kit/locale';
 import { loadComposerCopy } from '../../server/composer-copy';
@@ -61,8 +60,8 @@ export async function saveQueueComposerAction(previous: QueueComposerState, data
     else if (draftPostId && ['draft', 'schedule'].includes(field('intent'))) {
       await updatePost(actor(viewer), { ...input, postId: draftPostId });
       if (field('intent') === 'schedule') {
-        // "Publish now" is computed here (now plus the Root lead), never from a browser-derived wall time.
-        if (field('publishNow') === '1') await schedulePost(actor(viewer), draftPostId, new Date(Date.now() + (await loadContent()).policy.publishNowLeadMinutes * 60_000), modes);
+        // "Publish now" sends in this request; the confirmation dialog was the last chance to cancel.
+        if (field('publishNow') === '1') await publishNow(actor(viewer), draftPostId, modes);
         else {
           const at = wallTimeToInstant(field('scheduleDate'), field('scheduleTime'), viewer.membership.workspace.timezone);
           if (!at.ok) throw new Error('schedule');

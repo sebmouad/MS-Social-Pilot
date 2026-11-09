@@ -435,7 +435,10 @@ export function createFacebookEngine(rawConfig: FacebookConfig, fetchImpl: Faceb
       }
       const id = payload.id;
       if (typeof id !== 'string' || !id) throw new FacebookApiError('Facebook did not return a post id.', 200);
-      return { remoteId: id, url: null };
+      // The post's link is offered right away (« View on Facebook »); a failed read never undoes a confirmed post.
+      const url = await request(encodeURIComponent(id), { token: input.accessToken, params: { fields: 'permalink_url' } })
+        .then(value => { const link = object(value).permalink_url; return typeof link === 'string' && link.startsWith('https://') ? link : null; }, () => null);
+      return { remoteId: id, url };
     },
     async getStatus(token, remoteId, context) {
       const targetId = context?.targetId;

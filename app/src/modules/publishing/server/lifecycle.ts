@@ -756,3 +756,15 @@ async function markTarget(actor: PublishingActor, postId: string, id: string, st
 async function audit(tx: Prisma.TransactionClient, actor: PublishingActor, action: string, detail: Record<string, unknown>) {
   await tx.$executeRaw`INSERT INTO root_activities (id, "actorId", action, detail, "createdAt") VALUES (${`pub_${randomBytes(12).toString('hex')}`}, ${actor.userId}, ${action}, ${JSON.stringify({ workspaceId: actor.workspaceId, ...detail })}::jsonb, NOW())`;
 }
+
+/**
+ * « Publish now » from the composer or the post editor. The post is scheduled for this instant, so approval holds and
+ * every scheduling check still apply, then sent in the same request instead of waiting for the next delivery run.
+ * A post held for approval, or changed in between, is left as it is: publishPost does nothing when it no longer matches.
+ */
+export async function publishNow(actor: PublishingActor, postId: string, options: Parameters<typeof schedulePost>[3] = {}) {
+  const at = new Date(Date.now() + 1000);
+  await schedulePost(actor, postId, at, options);
+  await new Promise(resolve => setTimeout(resolve, Math.max(0, at.getTime() - Date.now() + 50)));
+  return publishPost(actor, postId, at);
+}

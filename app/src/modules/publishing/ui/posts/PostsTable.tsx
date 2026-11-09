@@ -159,7 +159,10 @@ export function PostsTable({ rows, caption, locale = 'en', timeZone = 'UTC', sel
                   </div>
                 ) : null}
                 <StatusChip status={status} compact locale={locale} />
-                {remoteUrl || destMetric?.remoteUrl ? <a href={remoteUrl || destMetric?.remoteUrl || '#'} target="_blank" rel="noopener noreferrer" aria-label={`${copy.openDetails}: ${target.name}`}><IconExternalLink size={15} aria-hidden="true" /></a> : null}
+                {/* Spelled out: the place to open the live post on the network, e.g. for a reviewer following the post through. */}
+                {remoteUrl || destMetric?.remoteUrl ? <a href={remoteUrl || destMetric?.remoteUrl || '#'} target="_blank" rel="noopener noreferrer" className={styles.viewLive}>
+                  {target.type === 'page' ? content.postsPanelViewOn.replace('{network}', 'Facebook') : target.type === 'instagram' ? content.postsPanelViewOn.replace('{network}', 'Instagram') : content.postsPanelViewPublished}
+                  <IconExternalLink size={14} aria-hidden="true" /></a> : null}
               </li>;
             })}</ul> : <p>{content.postsPanelNoDestinations}</p>}
           </section>

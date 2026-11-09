@@ -44,10 +44,12 @@ test('pages_manage_metadata: subscribes the app to the Page webhooks with the Pa
 test('pages_manage_posts: publishes a text post to the Page feed and deletes it', async () => {
   const { engine, sent } = engineWith([
     { method: 'POST', path: /^\/111\/feed$/, reply: { id: '111_222' } },
+    { method: 'GET', path: /^\/111_222$/, reply: { permalink_url: 'https://www.facebook.com/111/posts/222' } },
     { method: 'DELETE', path: /^\/111_222$/, reply: { success: true } },
   ]);
   const published = await engine.publish({ accessToken: 'PAGE-TOKEN', targetId: '111', text: 'Hello from the test' } as never);
-  assert.equal((published as { remoteId?: string }).remoteId ?? (published as { id?: string }).id, '111_222');
+  assert.equal(published.remoteId, '111_222');
+  assert.equal(published.url, 'https://www.facebook.com/111/posts/222', 'the link is read right after publishing');
   assert.equal(sent[0]!.body.message, 'Hello from the test');
   assert.equal(sent[0]!.token, 'PAGE-TOKEN');
   await engine.deletePost('PAGE-TOKEN', '111_222');
@@ -116,6 +118,11 @@ test('ads_management: creates campaigns paused only', async () => {
   assert.equal(sent[0]!.body.status, 'PAUSED');
   assert.equal(sent[0]!.body.objective, 'OUTCOME_TRAFFIC');
   await assert.rejects(engine.createCampaign({ credential: { accessToken: 'x' }, accountId: 'act_9', name: 'x', objective: 'LINK_CLICKS' } as never));
+});
+
+test('a failed permalink read never turns a confirmed post into a failure', async () => {
+  const { engine } = engineWith([{ method: 'POST', path: /^\/111\/feed$/, reply: { id: '111_333' } }]);
+  assert.deepEqual(await engine.publish({ accessToken: 'PAGE-TOKEN', targetId: '111', text: 'x' } as never), { remoteId: '111_333', url: null });
 });
 
 test('a Graph error reaches the caller instead of passing as success', async () => {
