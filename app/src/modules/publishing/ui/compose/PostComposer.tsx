@@ -535,7 +535,7 @@ function PostComposerContent({ recentPosts = [], copyCatalog = composerCatalogDe
         {profiles && postable.length > 1 && <GroupShortcut groups={profiles.groups} allowedIds={postable.map(target => target.id)} onSelect={setSelectedTargets} locale={aiLocale} disabled={busy} />}
         {postable.length || blocked.length ? <div className={styles.chips} role="group" aria-labelledby={`${titleId}-channels`}>
           {postable.map(target => { const on = selectedTargets.includes(target.id); return <button key={target.id} type="button" className={styles.chip} aria-pressed={on} disabled={busy} onClick={() => toggleTarget(target.id)}>
-            <Avatar name={channelName(target)} src={target.pictureUrl} size={24} /><span className={styles.chipName}>{channelName(target)}</span>{on && <IconCheck size={15} stroke={2.4} aria-hidden="true" />}
+            <Avatar name={channelName(target)} src={target.pictureUrl} size={24} /><span className={styles.chipName}>{channelName(target)}</span>{target.platformName ? <span className={styles.chipPlatform}>{target.platformName}</span> : null}{on && <IconCheck size={15} stroke={2.4} aria-hidden="true" />}
           </button>; })}
           {blocked.map(target => <span key={target.id} className={styles.chipBlocked} title={fillContent(cc.createChannelBlocked, { name: channelName(target) })}>
             <Avatar name={channelName(target)} src={target.pictureUrl} size={24} /><span className={styles.chipName}>{channelName(target)}</span><a href={policy.reconnectHref}>{cc.createReconnect}</a>
