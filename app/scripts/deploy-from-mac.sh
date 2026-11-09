@@ -207,7 +207,7 @@ if [ ! -f "$ENVF" ]; then
   umask 077
   cat > "$ENVF" <<ENV
 DATABASE_URL="postgresql://socialpilot:${DB_PASS}@127.0.0.1:5432/social_pilot?schema=public"
-ENCRYPTION_KEY="$(openssl rand -hex 32)"
+ENCRYPTION_KEY="$(openssl rand -base64 32)"
 SESSION_SECRET="$(openssl rand -hex 32)"
 NODE_ENV="production"
 PORT="${APP_PORT}"
