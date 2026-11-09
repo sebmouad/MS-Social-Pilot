@@ -70,7 +70,7 @@ export default async function ConnectionsPage({ searchParams }: { searchParams: 
             <Status tone={state === 'connected' ? 'good' : 'warning'}>{statusLabels[state]}</Status>
           </div>
           <div className={cardStyles.cardMeta}>
-            {account.profileUrl ? <a href={account.profileUrl} target="_blank" rel="noopener noreferrer">{fill(t.profileOpen, { platform: providerName(account.provider) })}</a> : <span>{fill(t.profileLinkMissing, { platform: providerName(account.provider) })}</span>}
+            {account.profileUrl ? <a href={account.profileUrl} target="_blank" rel="noopener noreferrer">{fill(t.profileOpen, { platform: providerName(account.provider) })}</a> : null}
             <span>{fill(t.usernameNone, { platform: providerName(account.provider) })}</span>
             <span>{fill(t.providerUserId, { id: account.providerUserId })}</span>
           </div>
