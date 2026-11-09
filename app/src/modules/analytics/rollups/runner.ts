@@ -56,7 +56,8 @@ export function deriveWeeklyRollups(daily: ChannelRollupRow[]): WeeklyRollupRow[
  * rows, and weekly rows derive from those. Suspended and purging workspaces are
  * skipped; read-time authorization still decides who may use the rows.
  */
-export async function runAnalyticsRollups(now = new Date()): Promise<AnalyticsRollupsSummary> {
+/** `scope` rolls one workspace now (after its « Sync now ») and leaves the run history alone. */
+export async function runAnalyticsRollups(now = new Date(), scope?: { workspaceId: string }): Promise<AnalyticsRollupsSummary> {
   const policy = await configOrDefault('analytics.rollups.policy', ROLLUPS_POLICY_SCHEMA);
   const total: AnalyticsRollupsSummary = { workspaces: 0, examined: 0, written: 0, skipped: 0, failed: 0 };
   for (const provider of await analyticsPlatformIds()) {
@@ -71,6 +72,7 @@ export async function runAnalyticsRollups(now = new Date()): Promise<AnalyticsRo
       WHERE t.enabled = true ORDER BY t."workspaceId" ASC, t.id ASC`;
     const byWorkspace = new Map<string, string[]>();
     for (const target of targets) {
+      if (scope && target.workspaceId !== scope.workspaceId) continue;
       const list = byWorkspace.get(target.workspaceId) ?? [];
       list.push(target.id);
       byWorkspace.set(target.workspaceId, list);
@@ -89,6 +91,7 @@ export async function runAnalyticsRollups(now = new Date()): Promise<AnalyticsRo
       }
     }
   }
+  if (scope) return total;
   try {
     const cutoff = new Date(now.getTime() - policy.runHistoryDays * DAY_MS);
     await prisma.$executeRaw`DELETE FROM analytics_rollup_runs WHERE "finishedAt" < ${cutoff}`;

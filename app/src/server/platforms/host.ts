@@ -254,7 +254,8 @@ export interface PlatformHost {
   linkPreview?: PlatformLinkPreviewHost;
   /** Build the engine from Root settings. */
   adapter(): Promise<PlatformAdapter>;
-  jobs?: Partial<Record<PlatformJobName, (now: Date, retryLimit: number, retryBackoff: RetryBackoff) => Promise<JobSummary>>>;
+  /** `scope` limits a run to one workspace (a « Sync now »); without it the job covers every workspace in fair batches. */
+  jobs?: Partial<Record<PlatformJobName, (now: Date, retryLimit: number, retryBackoff: RetryBackoff, scope?: { workspaceId: string }) => Promise<JobSummary>>>;
   /** Optional provider-owned inbound webhooks (verification, signed ingestion, diagnostics). */
   webhooks?: PlatformWebhooksHost;
   /** Provider-signed callbacks for access removal and data erasure; the module verifies the provider's signature. */

@@ -35,15 +35,18 @@ async function binding(target: Target, now: Date) {
 }
 
 /** Background system collector. Provider reads finish before acquiring selected-resource persistence locks. */
-export async function syncInstagramAnalytics(now = new Date(), retryLimit = 0, retryBackoff?: RetryBackoff): Promise<JobSummary> {
+/** `scope` reads one workspace now (its « Sync now »), without moving the shared cursor. */
+export async function syncInstagramAnalytics(now = new Date(), retryLimit = 0, retryBackoff?: RetryBackoff, scope?: { workspaceId: string }): Promise<JobSummary> {
   const result: JobSummary = { examined: 0, updated: 0, skipped: 0, failed: 0 };
   if (await runtimeConfig('platforms.instagram.enabled') !== true) return result;
   const [policy, limit, saved] = await Promise.all([configuredInstagramPolicy(), runtimeConfig('sync.maxItemsPerJob'), prisma.appSetting.findUnique({ where: { key: CURSOR_KEY }, select: { value: true } })]);
   const cursor = typeof saved?.value === 'string' ? saved.value : null;
   const base = { enabled: true, type: 'instagram' as const, socialAccount: { is: { provider: 'instagram', invalidatedAt: null } } };
   const select = { id: true, workspaceId: true, providerId: true, socialAccountId: true } as const;
-  let targets = await prisma.target.findMany({ where: { ...base, ...(cursor ? { id: { gt: cursor } } : {}) }, select, orderBy: { id: 'asc' }, take: limit });
-  if (cursor && targets.length < limit) targets = targets.concat(await prisma.target.findMany({ where: { ...base, id: { lte: cursor } }, select, orderBy: { id: 'asc' }, take: limit - targets.length }));
+  let targets = scope
+    ? await prisma.target.findMany({ where: { ...base, workspaceId: scope.workspaceId }, select, orderBy: { id: 'asc' }, take: limit })
+    : await prisma.target.findMany({ where: { ...base, ...(cursor ? { id: { gt: cursor } } : {}) }, select, orderBy: { id: 'asc' }, take: limit });
+  if (!scope && cursor && targets.length < limit) targets = targets.concat(await prisma.target.findMany({ where: { ...base, id: { lte: cursor } }, select, orderBy: { id: 'asc' }, take: limit - targets.length }));
   const since = new Date(now.getTime() - policy.analyticsLookbackDays * DAY_MS);
   for (const target of targets) {
     if (jobStopRequested()) break;
@@ -94,7 +97,7 @@ export async function syncInstagramAnalytics(now = new Date(), retryLimit = 0, r
       if (error instanceof OperationError && ['forbidden', 'not_found', 'conflict'].includes(error.code)) result.skipped++;
       else result.failed++;
     } finally {
-      await prisma.appSetting.upsert({ where: { key: CURSOR_KEY }, create: { key: CURSOR_KEY, value: target.id, encrypted: false, updatedAt: now }, update: { value: target.id, updatedAt: now } });
+      if (!scope) await prisma.appSetting.upsert({ where: { key: CURSOR_KEY }, create: { key: CURSOR_KEY, value: target.id, encrypted: false, updatedAt: now }, update: { value: target.id, updatedAt: now } });
     }
   }
   return result;

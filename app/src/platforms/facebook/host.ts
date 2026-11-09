@@ -48,9 +48,9 @@ export const facebookHost = {
   },
   jobs: {
     posts: syncFacebookPosts,
-    analytics: async (now, retryLimit, retryBackoff) => {
-      const page = await syncPageAnalytics(now, retryLimit, retryBackoff);
-      const ads = await syncAdsAnalytics(now, retryLimit, retryBackoff);
+    analytics: async (now, retryLimit, retryBackoff, scope) => {
+      const page = await syncPageAnalytics(now, retryLimit, retryBackoff, scope);
+      const ads = await syncAdsAnalytics(now, retryLimit, retryBackoff, scope);
       return { examined: page.examined + ads.examined, updated: page.updated + ads.updated, skipped: page.skipped + ads.skipped, failed: page.failed + ads.failed };
     },
     inbox: syncInbox,

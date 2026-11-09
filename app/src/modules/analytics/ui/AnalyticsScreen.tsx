@@ -14,6 +14,7 @@ import { readPosts } from '@/modules/analytics/explorer-posts/service';
 import { loadChartAnnotations } from '@/modules/calendar-extras/server/chart-notes';
 import { calendarExtrasLinks } from '@/modules/calendar-extras/server/links';
 import { InsightsHeader } from './insights/InsightsHeader';
+import { SyncNowButton } from './SyncNowButton';
 import { InsightsTiles } from './insights/InsightsTiles';
 import { MainChartCard } from './insights/MainChartCard';
 import { GoalsCard, PublishingActivityCard, TopPostsCard, type GoalBar, type TopPostItem } from './insights/OverviewCards';
@@ -89,11 +90,12 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
   const notesLink = (await calendarExtrasLinks(locale, ['notes']).catch(() => []))[0];
   return <PageFrame module="analytics" scopedAccess><div className="insights">
     <InsightsHeader runtime={runtime} title={copy.overviewTitle} info={copy.overviewInfo} period={period}
-      actions={(canExport && reportQuery) || may('analytics/pins') || notesLink ? <>
+      actions={<>
+        <SyncNowButton locale={locale} />
         {may('analytics/pins') && snapshot && channelIds.length > 0 && <a className="ui-button ui-button--quiet ui-button--md" href="/insights/pins"><IconPin size={16} stroke={1.9} aria-hidden="true" /> {copy.pinsManage}</a>}
         {notesLink && <a className="ui-button ui-button--quiet ui-button--md" href={notesLink.href}>{notesLink.label}</a>}
         {canExport && reportQuery && <a className="ui-button ui-button--secondary ui-button--md" href={`/api/reports/export?${reportQuery}`}><IconDownload size={16} stroke={1.9} aria-hidden="true" /> {copy.downloadReport}</a>}
-      </> : undefined} />
+      </>} />
     {failure && <EmptyState tone="error" title={copy.loadFailedTitle} action={<a href={retry}>{copy.retry}</a>}>{failure}</EmptyState>}
     {snapshot && !snapshot.options.channels.length && <EmptyState icon={<IconPlugConnected />} title={copy.noChannelsTitle} action={canConnect ? <a className="ui-button ui-button--primary ui-button--md" href="/settings/channels">{copy.noChannelsAction}</a> : undefined}>{copy.noChannelsBody}</EmptyState>}
     {snapshot && snapshot.options.channels.length > 0 && !channelIds.length && <EmptyState icon={<IconChartBar />} title={copy.noDataTitle}>{copy.noDataBody}</EmptyState>}

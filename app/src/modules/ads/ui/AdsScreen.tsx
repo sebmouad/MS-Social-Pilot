@@ -1,4 +1,5 @@
 import { loadAdsCopy } from '@/modules/ads/server/copy';
+import { SyncNowButton } from '@/modules/analytics/ui/SyncNowButton';
 import { customerText } from '@/modules/ads/copy';
 import { AdsCopyProvider } from '@/modules/ads/ui/AdsCopyProvider';
 import { headers } from 'next/headers';
@@ -76,7 +77,7 @@ async function AdsPage({ searchParams }: { searchParams: Promise<AdsSearchParams
 
   return <PageFrame module="ads"><div className="insights">
     <AdsHeader title={t('text001')} copy={ui} locale={locale} policy={policy} filters={filters} accounts={dataset.accounts} count={scoped.length}
-      periodLabel={t('text081')} customLabel={t('text083')} />
+      periodLabel={t('text081')} customLabel={t('text083')} actions={dataset.accounts.length ? <SyncNowButton locale={locale} /> : undefined} />
     {!dataset.accounts.length
       ? <EmptyState title={ui.emptyTitle} icon={<IconAd />} action={<a className="ui-button ui-button--primary ui-button--md" href="/settings/channels">{ui.emptyAction}</a>}>{ui.emptyBody}</EmptyState>
       : <section className="insights-accounts" aria-label={ui.caption}>

@@ -240,11 +240,15 @@ async function fetchPageAnalytics(target: PageTarget, now: Date, today: Date, re
 }
 
 /** Refresh current daily Page snapshots for enabled connections in their own workspace. */
-export async function syncPageAnalytics(now = new Date(), retryLimit = 0, retryBackoff?: RetryBackoff): Promise<JobSummary> {
+/** `scope` reads one workspace now (its « Sync now »), without moving the shared fair-batch cursor. */
+export async function syncPageAnalytics(now = new Date(), retryLimit = 0, retryBackoff?: RetryBackoff, scope?: { workspaceId: string }): Promise<JobSummary> {
   if (await runtimeConfig('platforms.facebook.enabled') !== true) return { examined: 0, updated: 0, skipped: 0, failed: 0 };
   const limit = await runtimeConfig('sync.maxItemsPerJob') as number;
   const targetWhere = { type: 'page' as const, enabled: true, socialAccount: { is: { provider: 'facebook', invalidatedAt: null } } };
-  const targets = await fairBatch('page-analytics', limit, (cursor, direction, take) => prisma.target.findMany({
+  const targetSelect = { id: true, workspaceId: true, providerId: true } as const;
+  const targets = scope
+    ? await prisma.target.findMany({ where: { ...targetWhere, workspaceId: scope.workspaceId }, orderBy: { id: 'asc' }, take: limit, select: targetSelect })
+    : await fairBatch('page-analytics', limit, (cursor, direction, take) => prisma.target.findMany({
     where: { AND: [targetWhere, ...(cursor ? [{ id: { [direction === 'after' ? 'gt' : 'lte']: cursor } }] : [])] },
     orderBy: { id: 'asc' }, take,
     select: { id: true, workspaceId: true, providerId: true },
@@ -311,11 +315,14 @@ async function currentAdsBinding(account: AdsAccount, now: Date): Promise<{ toke
 }
 
 /** Refresh account-level Ads Insights for each enabled account in its own workspace. */
-export async function syncAdsAnalytics(now = new Date(), retryLimit = 0, retryBackoff?: RetryBackoff): Promise<JobSummary> {
+/** `scope` reads one workspace now (its « Sync now »), without moving the shared fair-batch cursor. */
+export async function syncAdsAnalytics(now = new Date(), retryLimit = 0, retryBackoff?: RetryBackoff, scope?: { workspaceId: string }): Promise<JobSummary> {
   if (await runtimeConfig('platforms.facebook.enabled') !== true) return { examined: 0, updated: 0, skipped: 0, failed: 0 };
   const limit = await runtimeConfig('sync.maxItemsPerJob') as number;
   const accountWhere = { enabled: true, socialAccount: { is: { provider: 'facebook', invalidatedAt: null } } };
-  const accounts = await fairBatch('ads-analytics', limit, (cursor, direction, take) => prisma.adAccount.findMany({
+  const accounts = scope
+    ? await prisma.adAccount.findMany({ where: { ...accountWhere, workspaceId: scope.workspaceId }, orderBy: { id: 'asc' }, take: limit, select: { id: true, workspaceId: true, actId: true, name: true } })
+    : await fairBatch('ads-analytics', limit, (cursor, direction, take) => prisma.adAccount.findMany({
     where: { AND: [accountWhere, ...(cursor ? [{ id: { [direction === 'after' ? 'gt' : 'lte']: cursor } }] : [])] },
     orderBy: { id: 'asc' }, take,
     select: { id: true, workspaceId: true, actId: true, name: true },

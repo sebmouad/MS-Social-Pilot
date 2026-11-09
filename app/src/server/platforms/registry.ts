@@ -154,11 +154,11 @@ export async function enabledSocialAccountWhere(allowedProviders?: readonly stri
 }
 
 /** Run a job hook for each installed and enabled module that provides it. */
-export async function runEnabledPlatformJob(job: PlatformJobName, now: Date, retryLimit: number, retryBackoff: RetryBackoff): Promise<JobSummary> {
+export async function runEnabledPlatformJob(job: PlatformJobName, now: Date, retryLimit: number, retryBackoff: RetryBackoff, scope?: { workspaceId: string }): Promise<JobSummary> {
   const results = await Promise.all((PLATFORM_MODULES as readonly PlatformModule[]).map(async module => {
     if (!await isPlatformEnabled(module.id)) return null;
     const hook = hostFor(module.id)?.jobs?.[job];
-    return hook ? hook(now, retryLimit, retryBackoff) : null;
+    return hook ? hook(now, retryLimit, retryBackoff, scope) : null;
   }));
   return results.filter((value): value is JobSummary => value !== null).reduce((total, value) => ({
     examined: total.examined + value.examined, updated: total.updated + value.updated,
