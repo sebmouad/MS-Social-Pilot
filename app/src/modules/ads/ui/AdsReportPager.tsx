@@ -4,11 +4,13 @@ import type { AdsFilters } from '@/modules/ads/server/queries';
 import type { AdsPageSlice } from '@/modules/ads/report-page';
 import { adsQuery } from './query';
 
-export function AdsReportPager<T>({ filters, path, kind, page }: { filters: AdsFilters; path: string; kind: 'accounts' | 'objects'; page: AdsPageSlice<T> }) {
+export function AdsReportPager<T>({ filters, path, kind, page, params: keep = {} }: { filters: AdsFilters; path: string; kind: 'accounts' | 'objects'; page: AdsPageSlice<T>; params?: Record<string, string> }) {
   const t = useAdsText();
   const href = (pageNumber: number) => {
     const [pathname, query = ''] = adsQuery(filters, path).split('?', 2);
     const params = new URLSearchParams(query);
+    // The screen's own state (a tab) stays across pages.
+    for (const [key, value] of Object.entries(keep)) params.set(key, value);
     params.set('page', String(pageNumber));
     return `${pathname}?${params.toString()}`;
   };

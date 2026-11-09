@@ -34,12 +34,15 @@ import { pageAdsRows, parseAdsResultPage } from '@/modules/ads/report-page';
 import { canUseFeature } from '@/server/entitlements';
 import { canAccessFeature } from '@/server/permissions';
 import { loadAdsOutputPolicy } from '@/modules/ads/server/output-policy';
+import { LinkTabs } from '@/components/Tabs';
+import { adsQuery } from '../query';
 
 const number = new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 });
 const money = (value: number | null, currency: string | null) => value === null ? '—' : `${currency ? `${currency} ` : ''}${new Intl.NumberFormat(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value)}`;
+const VIEWS = ['charts', 'tables', 'create'] as const;
 const date = (value: Date) => new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeZone: 'UTC' }).format(value);
 
-async function CampaignsPage({ searchParams }: { searchParams: Promise<AdsSearchParams & { page?: string | string[]; boostTarget?: string | string[]; boostPost?: string | string[] }> }) {
+async function CampaignsPage({ searchParams }: { searchParams: Promise<AdsSearchParams & { page?: string | string[]; boostTarget?: string | string[]; boostPost?: string | string[]; view?: string | string[] }> }) {
   const viewer = await requireViewer({ feature: 'ads/campaigns', channelScoped: true });
   const { workspaceId } = viewer;
   const locale = adsLocale((await headers()).get('accept-language'));
@@ -95,70 +98,93 @@ async function CampaignsPage({ searchParams }: { searchParams: Promise<AdsSearch
   const canExport = canUseFeature(viewer.entitlements, 'ads/campaigns') && canAccessFeature(viewer.permissions, 'ads/campaigns', 'read');
   const exportPolicy = canExport ? await loadAdsOutputPolicy().catch(() => null) : null;
   const header = await adsHeaderFor({ title: t('text041'), locale, policy, filters, accounts, periodLabel: t('text081'), customLabel: t('text083'), count: accounts.length ? objectPage.resultCount : undefined });
-  const pager = <AdsReportPager filters={filters} path="/ads/campaigns" kind="objects" page={objectPage} />;
+  // Charts · Tables · Create (owner directive 2026-11-09); a post handed over by Boost opens Create.
+  const view = boostPost ? 'create' : VIEWS.find(id => id === (Array.isArray(params.view) ? params.view[0] : params.view)) ?? 'charts';
+  const viewHref = (target: (typeof VIEWS)[number]) => {
+    const [pathname, query = ''] = adsQuery(filters, '/ads/campaigns').split('?', 2);
+    const next = new URLSearchParams(query);
+    if (target !== 'charts') next.set('view', target);
+    return `${pathname}?${next.toString()}`;
+  };
+  const viewLabel = { charts: t('campaignsTabCharts'), tables: t('campaignsTabTables'), create: t('campaignsTabCreate') };
+  const tabs = accounts.length ? <LinkTabs label={t('campaignsTabsLabel')} moreLabel={t('manageMoreTabs')} activeId={view} items={VIEWS.map(id => ({ id, href: viewHref(id), label: viewLabel[id] }))} /> : null;
+  const pager = <AdsReportPager filters={filters} path="/ads/campaigns" kind="objects" page={objectPage} params={view === 'charts' ? {} : { view }} />;
+  const levels = [
+    { value: 'campaign', label: t('text057') }, { value: 'adset', label: t('text058') }, { value: 'ad', label: t('text059') },
+  ];
+  // One switcher per tab: each ad account's charts, or its campaign, ad set and ad tables.
+  const switcher = (tab: 'charts' | 'tables') => <CampaignAccountSwitcher label={t('text009')} items={[...byAccount].map(([accountId, rows]) => {
+    const account = accounts.find(item => item.id === accountId);
+    const accountLabel = rows[0]?.accountName ?? account?.name ?? t('text044');
+    const accountMeta = [account?.actId, account?.currency].filter(Boolean).join(' · ');
+    return {
+      id: accountId,
+      name: accountLabel,
+      meta: accountMeta || undefined,
+      badge: `${rows.length} ${t('text045')}`,
+      content: <section className="panel ads-results-panel" key={accountId}>
+      <div className="analytics-panel-title"><div><div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}><h2>{accountLabel}</h2><InfoTip name={accountLabel} blocks={[{ text: t('hierarchyNote') }, { text: t('text054') }]} /></div><p className="small-note">{accountMeta}</p></div><span className="badge">{rows.length} {t('text045')}</span></div>
+      {tab === 'charts' ? <CampaignCharts accountName={accountLabel} rows={rows} locale={locale} /> : null}
+      {reconnectAccounts.has(accountId) ? <p className="small-note" role="note">{t('needsReconnectAccount', { account: accountLabel })} <a href="/settings/channels">{t('needsReconnectAction')}</a></p> : null}
+      {tab === 'tables' ? levels.map(level => {
+        const resolveParent = parentResolvers.get(accountId);
+        const known = summaries.filter(row => row.accountId === accountId);
+        const named = new Map(known.map(row => [`${row.level}:${row.id}`, row] as const));
+        const parentOf = (row: typeof known[number]) => {
+          const parentId = row.parentId ?? (resolveParent && (row.level === 'adset' || row.level === 'ad') ? resolveParent({ level: row.level, fields: row.fields }) : null);
+          return parentId ? named.get(`${row.level === 'ad' ? 'adset' : 'campaign'}:${parentId}`) : undefined;
+        };
+        // Campaign > ad set > ad: a row's path lists its ancestors that are present in stored data.
+        const pathOf = (row: typeof known[number]) => {
+          const parent = parentOf(row), grand = parent ? parentOf(parent) : undefined;
+          return [grand?.name, parent?.name].filter(Boolean).join(' › ');
+        };
+        const levelRows = rows.filter(row => row.level === level.value).sort((a, b) => pathOf(a).localeCompare(pathOf(b)) || a.name.localeCompare(b.name) || a.id.localeCompare(b.id));
+        if (!levelRows.length) return null;
+        const slot = (row: typeof levelRows[number]) => readAvailability.get(accountId) || actionAvailability.get(accountId)
+          ? <AdsObjectActions adAccountId={accountId} objectId={row.id} name={row.name} objectType={row.level as 'campaign' | 'adset' | 'ad'} currency={row.currency} canRead={Boolean(readAvailability.get(accountId))} canManage={Boolean(actionAvailability.get(accountId))} /> : null;
+        return <div className="ads-result-level" key={level.value}><h3>{level.label}</h3>
+          <HierarchyTable locale={locale} caption={t('resultsCaption', { level: level.label, account: account?.name ?? rows[0]?.accountName ?? t('accountFallback') })} objectsHref="/ads/manage"
+            rows={levelRows.map(row => ({ key: row.key, id: row.id, name: row.name, level: row.level as 'campaign' | 'adset' | 'ad', currency: row.currency, spend: row.spend, impressions: row.impressions, clicks: row.clicks, ctr: row.ctr, cpc: row.cpc, days: row.rows, path: pathOf(row),
+              spendSeries: [...row.dailyMetrics].sort((a, b) => a.date.getTime() - b.date.getTime()).map(entry => entry.spend) }))}
+            actions={Object.fromEntries(levelRows.map(row => [row.key, slot(row)]))}
+            details={Object.fromEntries(levelRows.map(row => [row.key, <details className="ads-stored-details" key={row.key}><summary>{t('dailyRowCount', { count: row.rows, suffix: row.rows === 1 ? '' : 's' })}</summary><div className="ads-detail-content"><h4>{t('text029')}</h4>{row.actions.length ? <ul>{row.actions.map(action => <li key={action.name}><span>{action.name}</span><strong>{number.format(action.value)}</strong></li>)}</ul> : <p>{t('text030')}</p>}<h4>{t('text031')}</h4><DailyMetrics rows={row.dailyMetrics} currency={row.currency} /></div></details>]))} />
+        </div>;
+      }) : null}
+    </section>,
+    };
+  })} />;
+  const noResults = <section className="panel"><EmptyState icon={<IconSpeakerphone />} title={t('text049')} action={<a className="text-link" href="/ads">{t('text050')}</a>}>{t('text051')}</EmptyState></section>;
+  // The Create tab offers every form the scoped accounts allow; the pickers list all stored campaigns and ad sets, not one page of them.
+  const scopedAccounts = accounts.filter(account => !filters.accountId || account.id === filters.accountId);
+  const stored = (accountId: string, level: 'campaign' | 'adset') => summaries.filter(row => row.accountId === accountId && row.level === level);
+  const adSetAccounts = scopedAccounts.filter(account => viewer.permissions.pageScope.all && createAvailability.get(account.id) && adsUi.get(account.id)?.adSet && stored(account.id, 'campaign').length);
+  const adAccounts = scopedAccounts.filter(account => adCreateAvailability.get(account.id) && stored(account.id, 'adset').length);
+  const createTab = <>
+    {boostPost ? <aside className="ads-boost" aria-label={t('boostGuideTitle')}><div><strong>{t('boostGuideTitle')}</strong><p>{t('boostGuideSteps')}</p></div><div className="ads-boost__actions"><a className="ui-button ui-button--primary ui-button--sm" href="#boost">{t('boostGuideCreative')}</a></div></aside> : null}
+    {scopedAccounts.some(account => createAvailability.get(account.id) && adsUi.get(account.id)?.campaign) ? <section className="panel"><h2>{t('text052')}</h2><p className="small-note">{t('text053')}</p>
+      {scopedAccounts.filter(account => createAvailability.get(account.id) && adsUi.get(account.id)?.campaign).map(account => <CampaignCreateForm key={account.id} adAccountId={account.id} accountName={account.name} config={adsUi.get(account.id)!.campaign!} ownerScope={{ userId: viewer.user.id, workspaceId }} />)}
+    </section> : null}
+    {adSetAccounts.length ? <section className="panel"><h2>{t('text047')}</h2><p className="small-note">{t('text048')}</p>
+      {/* One form with a campaign picker per account, not one form per campaign. */}
+      {adSetAccounts.map(account => <div key={account.id}><h3>{account.name}</h3><AdSetCreatePicker adAccountId={account.id} currency={stored(account.id, 'campaign')[0]?.currency ?? null} campaigns={stored(account.id, 'campaign').map(row => ({ id: row.id, name: row.name }))} config={adsUi.get(account.id)!.adSet!} ownerScope={{ userId: viewer.user.id, workspaceId }} /></div>)}
+    </section> : null}
+    {adAccounts.length ? <section className="panel"><h2>{t('adCreateAction')}</h2><p className="small-note">{t('adCreateDescription')}</p>
+      {adAccounts.map(account => <div key={account.id}><h3>{account.name}</h3><AdCreatePicker adAccountId={account.id} adSets={stored(account.id, 'adset').map(row => ({ id: row.id, name: row.name }))} nameMaxCharacters={nameMaxByAccount.get(account.id) ?? 100} /></div>)}
+    </section> : null}
+    {scopedAccounts.filter(account => creativeAvailability.get(account.id)).map(account => <section className="panel" id="boost" key={`creative:${account.id}`}><CreativeCreateForm adAccountId={account.id} accountName={account.name} ownerScope={{ userId: viewer.user.id, workspaceId }} locale={locale} {...(boostPost ? { initialTargetId: boostTarget, initialPostId: boostPost } : {})} /></section>)}
+    {[...reconnectAccounts].filter(id => scopedAccounts.some(account => account.id === id)).map(id => <p key={`reconnect:${id}`} className="small-note" role="note">{t('needsReconnectAccount', { account: accounts.find(account => account.id === id)?.name ?? t('text044') })} <a href="/settings/channels">{t('needsReconnectAction')}</a></p>)}
+  </>;
   return <PageFrame module="ads"><div className="insights">
     {header}
-    {boostPost ? <aside className="ads-boost" aria-label={t('boostGuideTitle')}><div><strong>{t('boostGuideTitle')}</strong><p>{t('boostGuideSteps')}</p></div><div className="ads-boost__actions"><a className="ui-button ui-button--primary ui-button--sm" href="#boost">{t('boostGuideCreative')}</a></div></aside> : null}
-    {!accounts.length ? <section className="panel"><EmptyState icon={<IconAd />} title={t('text003')} action={<a className="text-link" href="/settings/channels">{t('text004')}</a>}>{t('text043')}</EmptyState></section> : <>
-    {objectPage.resultCount ? <CampaignAccountSwitcher label={t('text009')} items={[...byAccount].map(([accountId, rows]) => {
-      const account = accounts.find(item => item.id === accountId);
-      const accountLabel = rows[0]?.accountName ?? account?.name ?? t('text044');
-      const accountMeta = [account?.actId, account?.currency].filter(Boolean).join(' · ');
-      const levels = [
-        { value: 'campaign', label: t('text057') }, { value: 'adset', label: t('text058') }, { value: 'ad', label: t('text059') },
-      ];
-      return {
-        id: accountId,
-        name: accountLabel,
-        meta: accountMeta || undefined,
-        badge: `${rows.length} ${t('text045')}`,
-        content: <section className="panel ads-results-panel" key={accountId}>
-        <div className="analytics-panel-title"><div><div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}><h2>{accountLabel}</h2><InfoTip name={accountLabel} blocks={[{ text: t('hierarchyNote') }, { text: t('text054') }]} /></div><p className="small-note">{accountMeta}</p></div><span className="badge">{rows.length} {t('text045')}</span></div>
-        <CampaignCharts accountName={accountLabel} rows={rows} locale={locale} />
-        {reconnectAccounts.has(accountId) ? <p className="small-note" role="note">{t('needsReconnectAccount', { account: accountLabel })} <a href="/settings/channels">{t('needsReconnectAction')}</a></p> : null}
-        {levels.map(level => {
-          const resolveParent = parentResolvers.get(accountId);
-          const known = summaries.filter(row => row.accountId === accountId);
-          const named = new Map(known.map(row => [`${row.level}:${row.id}`, row] as const));
-          const parentOf = (row: typeof known[number]) => {
-            const parentId = row.parentId ?? (resolveParent && (row.level === 'adset' || row.level === 'ad') ? resolveParent({ level: row.level, fields: row.fields }) : null);
-            return parentId ? named.get(`${row.level === 'ad' ? 'adset' : 'campaign'}:${parentId}`) : undefined;
-          };
-          // Campaign > ad set > ad: a row's path lists its ancestors that are present in stored data.
-          const pathOf = (row: typeof known[number]) => {
-            const parent = parentOf(row), grand = parent ? parentOf(parent) : undefined;
-            return [grand?.name, parent?.name].filter(Boolean).join(' › ');
-          };
-          const levelRows = rows.filter(row => row.level === level.value).sort((a, b) => pathOf(a).localeCompare(pathOf(b)) || a.name.localeCompare(b.name) || a.id.localeCompare(b.id));
-          if (!levelRows.length) return null;
-          const slot = (row: typeof levelRows[number]) => readAvailability.get(accountId) || actionAvailability.get(accountId)
-            ? <AdsObjectActions adAccountId={accountId} objectId={row.id} name={row.name} objectType={row.level as 'campaign' | 'adset' | 'ad'} currency={row.currency} canRead={Boolean(readAvailability.get(accountId))} canManage={Boolean(actionAvailability.get(accountId))} /> : null;
-          return <div className="ads-result-level" key={level.value}><h3>{level.label}</h3>
-            <HierarchyTable locale={locale} caption={t('resultsCaption', { level: level.label, account: account?.name ?? rows[0]?.accountName ?? t('accountFallback') })} objectsHref="/ads/manage"
-              rows={levelRows.map(row => ({ key: row.key, id: row.id, name: row.name, level: row.level as 'campaign' | 'adset' | 'ad', currency: row.currency, spend: row.spend, impressions: row.impressions, clicks: row.clicks, ctr: row.ctr, cpc: row.cpc, days: row.rows, path: pathOf(row),
-                spendSeries: [...row.dailyMetrics].sort((a, b) => a.date.getTime() - b.date.getTime()).map(entry => entry.spend) }))}
-              actions={Object.fromEntries(levelRows.map(row => [row.key, slot(row)]))}
-              details={Object.fromEntries(levelRows.map(row => [row.key, <details className="ads-stored-details" key={row.key}><summary>{t('dailyRowCount', { count: row.rows, suffix: row.rows === 1 ? '' : 's' })}</summary><div className="ads-detail-content"><h4>{t('text029')}</h4>{row.actions.length ? <ul>{row.actions.map(action => <li key={action.name}><span>{action.name}</span><strong>{number.format(action.value)}</strong></li>)}</ul> : <p>{t('text030')}</p>}<h4>{t('text031')}</h4><DailyMetrics rows={row.dailyMetrics} currency={row.currency} /></div></details>]))} />
-          </div>;
-        })}
-        {viewer.permissions.pageScope.all && actionAvailability.get(accountId) && adsUi.get(accountId)?.adSet && rows.some(row => row.level === 'campaign') ? <div className="ads-result-level"><h3>{t('text047')}</h3><p className="small-note">{t('text048')}</p>
-          {/* One form with a campaign picker, not one form per campaign. */}
-          {adsUi.get(accountId)?.adSet ? <AdSetCreatePicker adAccountId={accountId} currency={rows.find(row => row.level === 'campaign')?.currency ?? null} campaigns={rows.filter(row => row.level === 'campaign').map(row => ({ id: row.id, name: row.name }))} config={adsUi.get(accountId)!.adSet!} ownerScope={{ userId: viewer.user.id, workspaceId }} /> : null}
-        </div> : null}
-        {adCreateAvailability.get(accountId) && rows.some(row => row.level === 'adset') ? <div className="ads-result-level"><h3>{t('adCreateAction')}</h3><p className="small-note">{t('adCreateDescription')}</p>
-          {/* One form with an ad set picker, not one form per ad set. */}
-          <AdCreatePicker adAccountId={accountId} adSets={rows.filter(row => row.level === 'adset').map(row => ({ id: row.id, name: row.name }))} nameMaxCharacters={nameMaxByAccount.get(accountId) ?? 100} />
-        </div> : null}
-      </section>,
-      };
-    })} /> : <section className="panel"><EmptyState icon={<IconSpeakerphone />} title={t('text049')} action={<a className="text-link" href="/ads">{t('text050')}</a>}>{t('text051')}</EmptyState></section>}
-    {accounts.filter(account => !filters.accountId || account.id === filters.accountId).some(account => createAvailability.get(account.id) && adsUi.get(account.id)?.campaign) ? <section className="panel"><h2>{t('text052')}</h2><p className="small-note">{t('text053')}</p>
-      {accounts.filter(account => !filters.accountId || account.id === filters.accountId).filter(account => createAvailability.get(account.id) && adsUi.get(account.id)?.campaign).map(account => <CampaignCreateForm key={account.id} adAccountId={account.id} accountName={account.name} config={adsUi.get(account.id)!.campaign!} ownerScope={{ userId: viewer.user.id, workspaceId }} />)}
-    </section> : null}
-    {accounts.filter(account => (!filters.accountId || account.id === filters.accountId) && creativeAvailability.get(account.id)).map(account => <section className="panel" id="boost" key={`creative:${account.id}`}><CreativeCreateForm adAccountId={account.id} accountName={account.name} ownerScope={{ userId: viewer.user.id, workspaceId }} locale={locale} {...(boostPost ? { initialTargetId: boostTarget, initialPostId: boostPost } : {})} /></section>)}
-    {objectPage.pageCount > 1 ? pager : null}
-    {canExport && exportPolicy && dataset.maxRows ? <div className="ads-report-export"><AdsReportExport filters={filters} maxRows={dataset.maxRows} maxBytes={exportPolicy.exportMaxBytes} fileName={exportPolicy.exportFileName} /></div> : null}
-    </>}
+    {tabs}
+    {!accounts.length ? <section className="panel"><EmptyState icon={<IconAd />} title={t('text003')} action={<a className="text-link" href="/settings/channels">{t('text004')}</a>}>{t('text043')}</EmptyState></section>
+      : view === 'create' ? createTab
+      : <>
+        {objectPage.resultCount ? switcher(view) : noResults}
+        {objectPage.pageCount > 1 ? pager : null}
+        {view === 'tables' && canExport && exportPolicy && dataset.maxRows ? <div className="ads-report-export"><AdsReportExport filters={filters} maxRows={dataset.maxRows} maxBytes={exportPolicy.exportMaxBytes} fileName={exportPolicy.exportFileName} /></div> : null}
+      </>}
   </div></PageFrame>;
 }
 

@@ -41,6 +41,8 @@ import { AdSetCreatePicker, AdCreatePicker } from './ManageCreatePickers';
 import { CreativesBrowser } from './CreativesBrowser';
 import { parseManageLevel, manageTabHref, isManageDirectoryLevel } from './manage-tabs';
 import { platformAds } from '@/server/platforms/registry';
+import { CreateDrawer } from './CreateDrawer';
+import type { ReactNode } from 'react';
 
 type Params = AdsSearchParams & { level?: string; q?: string; sort?: string; direction?: string; parentId?: string; offset?: string };
 const first = (value: string | string[] | undefined) => (Array.isArray(value) ? undefined : value);
@@ -69,7 +71,7 @@ async function AdsObjectsPage({ searchParams }: { searchParams: Promise<Params> 
   const params = await searchParams;
   const actor = { userId: viewer.user.id, workspaceId: viewer.workspaceId };
   const level = parseManageLevel(first(params.level));
-  const tabTitle = level === 'campaign' ? t('text057') : level === 'adset' ? t('text058') : level === 'ad' ? t('text059') : t('manageTabCreatives');
+  const tabTitle = level === 'campaign' ? t('text057') : level === 'adset' ? t('text058') : level === 'ad' ? t('text059') : level === 'history' ? t('text079') : t('manageTabCreatives');
   const policy = await loadAdsReportPolicy();
   const managementPolicy = await loadAdsManagementPolicy();
   const accounts = await getAdsAccounts(viewer.workspaceId, viewer.permissions.pageScope.all ? undefined : viewer.permissions.pageScope.ids, entitledPlatformIds(viewer.entitlements));
@@ -81,6 +83,7 @@ async function AdsObjectsPage({ searchParams }: { searchParams: Promise<Params> 
     { id: 'adset', href: manageTabHref(rawValues, 'adset'), label: t('text058') },
     { id: 'ad', href: manageTabHref(rawValues, 'ad'), label: t('text059') },
     { id: 'creative', href: manageTabHref(rawValues, 'creative'), label: t('manageTabCreatives') },
+    { id: 'history', href: manageTabHref(rawValues, 'history'), label: t('manageTabHistory') },
   ]} />;
   const hiddenParams = Object.fromEntries(
     (['period', 'since', 'until', 'account', 'level', 'sort', 'direction'] as const).map(key => [key, key === 'level' ? level : first(params[key])]),
@@ -88,10 +91,13 @@ async function AdsObjectsPage({ searchParams }: { searchParams: Promise<Params> 
   // The shared Ads header carries period and account; a period the header cannot parse falls back to the full filter form.
   let headerFilters: AdsFilters | null = null;
   try { headerFilters = parseAdsFilters(params, accounts.map(account => account.id), undefined, policy); } catch { headerFilters = null; }
-  const header = headerFilters
-    ? await adsHeaderFor({ title: tabTitle, locale, policy, filters: headerFilters, accounts, periodLabel: t('text081'), customLabel: t('text083') })
-    : <><AdsFiltersSidebar catalogs={catalogs} locale={locale} accounts={accounts} input={params} action="/ads/manage" policy={policy} /><PageHeader module="ads" title={tabTitle} /></>;
-  const sidebar = <ManageSearchFilter
+  // The header carries the tab's « New … » button, once the page knows which forms the accounts allow.
+  const headerWith = async (actions?: ReactNode) => headerFilters
+    ? await adsHeaderFor({ title: tabTitle, locale, policy, filters: headerFilters, accounts, periodLabel: t('text081'), customLabel: t('text083'), actions })
+    : <><AdsFiltersSidebar catalogs={catalogs} locale={locale} accounts={accounts} input={params} action="/ads/manage" policy={policy} /><PageHeader module="ads" title={tabTitle} actions={actions} /></>;
+  const header = await headerWith();
+  // The history has nothing to search.
+  const sidebar = level === 'history' ? null : <ManageSearchFilter
     ariaLabel={t('text055')}
     searchLabel={t('text060')}
     parentLabel={t('text061')}
@@ -110,24 +116,33 @@ async function AdsObjectsPage({ searchParams }: { searchParams: Promise<Params> 
     return <PageFrame module="ads"><div className="insights">{header}{tabs}{sidebar}
       <section className="panel"><RouteNotice error className="ui-error" focusKey={localizeAdsMessage(catalogs, locale, error.message)}>{localizeAdsMessage(catalogs, locale, error.message)}</RouteNotice></section></div></PageFrame>;
   }
-  const managementPort = adsDirectoryManagementPort();
-  const instants = await workspaceInstantFormatter(actor.workspaceId, locale);
-  const history = managementPort ? await managementPort.listChanges(actor).catch(() => null) : null;
-  const historySection = history ? <section className="panel" id="changes" aria-labelledby="changes-title"><h2 id="changes-title">{t('text079')}</h2><ChangeHistory noteMaxCharacters={managementPolicy.recoveryNoteMaxCharacters} locale={locale} items={history.map(item => labelInstants(item, { createdAt: 'dateTime' }, instants))} /></section> : null;
+  if (level === 'history') {
+    const managementPort = adsDirectoryManagementPort();
+    const instants = await workspaceInstantFormatter(actor.workspaceId, locale);
+    const history = managementPort ? await managementPort.listChanges(actor).catch(() => null) : null;
+    return <PageFrame module="ads"><div className="insights">
+      {header}
+      {tabs}
+      <section className="panel" id="changes" aria-label={t('text079')}>
+        {history ? <ChangeHistory noteMaxCharacters={managementPolicy.recoveryNoteMaxCharacters} locale={locale} items={history.map(item => labelInstants(item, { createdAt: 'dateTime' }, instants))} /> : <p className="small-note">{t('manageHistoryUnavailable')}</p>}
+      </section>
+    </div></PageFrame>;
+  }
   const filteredAccounts = !values.account || values.account === 'all' ? accounts : accounts.filter(account => account.id === values.account);
 
   if (!isManageDirectoryLevel(level)) {
     const managementByAccount = new Map(await Promise.all(filteredAccounts.map(async account => [account.id, await describeAdsManagement(actor, account.id)] as const)));
     const creativeAccounts = filteredAccounts.filter(account => managementByAccount.get(account.id)?.operations.some(op => op.id === 'creative.create'));
+    const create = creativeAccounts.length ? <CreateDrawer label={t('manageNewCreative')} closeLabel={t('manageCloseForm')}>
+      {creativeAccounts.map(account => <CreativeCreateForm key={account.id} adAccountId={account.id} accountName={account.name} ownerScope={actor} locale={locale} />)}
+    </CreateDrawer> : null;
     return <PageFrame module="ads"><div className="insights">
-      {header}
+      {await headerWith(create)}
       {tabs}
       {sidebar}
       <section className="panel"><h2>{t('manageCreativesList')}</h2>
         {filteredAccounts.length ? <CreativesBrowser accounts={filteredAccounts.map(account => ({ id: account.id, name: account.name }))} /> : <p className="small-note">{t('text075')}</p>}
       </section>
-      {creativeAccounts.map(account => <section className="panel" key={`creative:${account.id}`}><CreativeCreateForm adAccountId={account.id} accountName={account.name} ownerScope={actor} locale={locale} /></section>)}
-      {historySection}
     </div></PageFrame>;
   }
 
@@ -171,8 +186,25 @@ async function AdsObjectsPage({ searchParams }: { searchParams: Promise<Params> 
     const management = managementByAccount.get(accountId);
     return management && 'limits' in management && management.limits ? management.limits.nameMaxCharacters : 100;
   };
+  // Each level's creation form opens from its « New … » button; the tab itself shows only its list.
+  const campaignAccounts = filteredAccounts.filter(account => managementByAccount.get(account.id)?.canManage && adsUi.get(account.id)?.campaign);
+  const adSetAccounts = filteredAccounts.filter(account => managementByAccount.get(account.id)?.canManage && adsUi.get(account.id)?.adSet);
+  const adAccounts = filteredAccounts.filter(account => {
+    const management = managementByAccount.get(account.id);
+    return viewer.permissions.pageScope.all && management?.canManage && management.canListCreatives && management.operations.some(op => op.id === 'ad.create');
+  });
+  const create = level === 'campaign' ? campaignAccounts.length ? <CreateDrawer label={t('manageNewCampaign')} closeLabel={t('manageCloseForm')} description={t('text053')}>
+      {campaignAccounts.map(account => <CampaignCreateForm key={account.id} adAccountId={account.id} accountName={account.name} config={adsUi.get(account.id)!.campaign!} ownerScope={actor} />)}
+    </CreateDrawer> : null
+    : level === 'adset' ? !viewer.permissions.pageScope.all ? <CreateDrawer label={t('manageNewAdSet')} closeLabel={t('manageCloseForm')}><p className="small-note">{t('validation027')}</p></CreateDrawer>
+    : adSetAccounts.length ? <CreateDrawer label={t('manageNewAdSet')} closeLabel={t('manageCloseForm')}>
+      {adSetAccounts.map(account => <div key={account.id}><h3>{account.name}</h3><AdSetCreatePicker adAccountId={account.id} currency={account.currency} campaigns={parentInventory.filter(item => item.adAccountId === account.id).map(item => ({ id: item.objectId, name: item.name ?? item.objectId }))} config={adsUi.get(account.id)!.adSet!} ownerScope={actor} /></div>)}
+    </CreateDrawer> : null
+    : adAccounts.length ? <CreateDrawer label={t('manageNewAd')} closeLabel={t('manageCloseForm')} description={t('adCreateDescription')}>
+      {adAccounts.map(account => <div key={account.id}><h3>{account.name}</h3><AdCreatePicker adAccountId={account.id} adSets={parentInventory.filter(item => item.adAccountId === account.id).map(item => ({ id: item.objectId, name: item.name ?? item.objectId }))} nameMaxCharacters={nameMax(account.id)} /></div>)}
+    </CreateDrawer> : null;
   return <PageFrame module="ads"><div className="insights">
-    {header}
+    {await headerWith(create)}
     {tabs}
     {sidebar}
     <p className="small-note">{directory.total.toLocaleString(locale)} {t(directory.total === 1 ? 'resultOne' : 'text071')} {formatIsoDay(locale, directory.range.from, directory.range.from)} {t('text072')} {formatIsoDay(locale, directory.range.to, directory.range.to)}</p>
@@ -191,22 +223,7 @@ async function AdsObjectsPage({ searchParams }: { searchParams: Promise<Params> 
       <nav aria-label={t('text076')}>{directory.offset > 0 ? <a href={pageLink(Math.max(0, directory.offset - directory.limit))}>{t('text077')}</a> : null}{' '}{directory.nextOffset !== null ? <a href={pageLink(directory.nextOffset)}>{t('text078')}</a> : null}</nav>
       <p className="small-note">{directory.note}</p>
     </section>
-    {level === 'campaign' && filteredAccounts.some(account => managementByAccount.get(account.id)?.canManage && adsUi.get(account.id)?.campaign) ? <section className="panel"><h2>{t('text052')}</h2><p className="small-note">{t('text053')}</p>
-      {filteredAccounts.filter(account => managementByAccount.get(account.id)?.canManage && adsUi.get(account.id)?.campaign).map(account => <CampaignCreateForm key={account.id} adAccountId={account.id} accountName={account.name} config={adsUi.get(account.id)!.campaign!} ownerScope={actor} />)}
-    </section> : null}
-    {level === 'campaign' ? filteredAccounts.map(account => <div key={`reconnect:${account.id}`}>{reconnectNote(account.id, account.name)}</div>) : null}
-    {level === 'adset' ? <section className="panel"><h2>{t('text047')}</h2>
-      {viewer.permissions.pageScope.all ? filteredAccounts.filter(account => managementByAccount.get(account.id)?.canManage && adsUi.get(account.id)?.adSet).map(account => <div key={account.id}><h3>{account.name}</h3><AdSetCreatePicker adAccountId={account.id} currency={account.currency} campaigns={parentInventory.filter(item => item.adAccountId === account.id).map(item => ({ id: item.objectId, name: item.name ?? item.objectId }))} config={adsUi.get(account.id)!.adSet!} ownerScope={actor} /></div>) : <p className="small-note">{t('validation027')}</p>}
-      {filteredAccounts.map(account => <div key={`reconnect:${account.id}`}>{reconnectNote(account.id, account.name)}</div>)}
-    </section> : null}
-    {level === 'ad' ? <section className="panel"><h2>{t('adCreateAction')}</h2><p className="small-note">{t('adCreateDescription')}</p>
-      {filteredAccounts.filter(account => {
-        const management = managementByAccount.get(account.id);
-        return viewer.permissions.pageScope.all && management?.canManage && management.canListCreatives && management.operations.some(op => op.id === 'ad.create');
-      }).map(account => <div key={account.id}><h3>{account.name}</h3><AdCreatePicker adAccountId={account.id} adSets={parentInventory.filter(item => item.adAccountId === account.id).map(item => ({ id: item.objectId, name: item.name ?? item.objectId }))} nameMaxCharacters={nameMax(account.id)} /></div>)}
-      {filteredAccounts.map(account => <div key={`reconnect:${account.id}`}>{reconnectNote(account.id, account.name)}</div>)}
-    </section> : null}
-    {historySection}
+    {filteredAccounts.map(account => <div key={`reconnect:${account.id}`}>{reconnectNote(account.id, account.name)}</div>)}
   </div></PageFrame>;
 }
 

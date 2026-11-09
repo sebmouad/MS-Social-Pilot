@@ -1,5 +1,6 @@
 /** Manage tabs for /ads/manage. Pure URL helpers; the page and its tests share them. */
-export const MANAGE_LEVELS = ['campaign', 'adset', 'ad', 'creative'] as const;
+// `history` is the change history (owner directive 2026-11-09), a tab of its own rather than a section under every list.
+export const MANAGE_LEVELS = ['campaign', 'adset', 'ad', 'creative', 'history'] as const;
 export type ManageLevel = (typeof MANAGE_LEVELS)[number];
 export type ManageDirectoryLevel = 'campaign' | 'adset' | 'ad';
 
@@ -22,7 +23,7 @@ export function manageTabHref(values: Record<string, string | undefined>, level:
   for (const key of TAB_PARAMS) {
     const value = values[key];
     if (value === undefined || value === '') continue;
-    if (key === 'parentId' && (level === 'campaign' || level === 'creative')) continue;
+    if (key === 'parentId' && (level === 'campaign' || level === 'creative' || level === 'history')) continue;
     params.set(key, value);
   }
   params.set('level', level);
