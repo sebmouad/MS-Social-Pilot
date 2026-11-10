@@ -286,8 +286,8 @@ server steps and do not take the pre-migration dump; `deploy-from-server.sh` is 
   « November 10, 2026 ». Still missing: street address, privacy contact email, hosting provider (the policy says
   « the operator of this installation » for the contact until the email is set).
 - The reviewer uses their own workspace (« Meta Review's workspace », reviewer connects Facebook themselves).
-  Its 8 ad accounts from a removed connection are still there: Root › Workspaces › « Remove 8 unlinked ad accounts »
-  (owner to click; the session's safety check blocked Claude from running the deletion).
+  Its 8 ad accounts from a removed connection were removed on 2026-11-10 (owner's go-ahead), so it is empty: no
+  channels, no ad accounts, 2 old draft posts. Root › Workspaces shows « Remove N unlinked ad accounts » if it recurs.
 
 ### 7.2 Phase 2 — next
 
