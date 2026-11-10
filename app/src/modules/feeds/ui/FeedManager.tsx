@@ -7,6 +7,7 @@ import { Dialog } from '@/components/Dialog';
 import { RouteNotice } from '@/components/RouteNotice';
 import { feedsCopy, feedsText, type FeedsCopyCatalog, type FeedsCopyKey, type FeedsLocale } from '../copy';
 import styles from './feeds.module.css';
+import { formatStableDateTime } from '@/components/LocalTime';
 
 type Handling = 'review' | 'schedule';
 export type Feed = { id: string; name: string; url: string; kind: 'rss' | 'wordpress'; enabled: boolean; messageTemplate: string; hashtags: string; targetIds: string[]; handling: Handling; spreadMinutes: number; failureCount: number; lastPolledAt: string | null; lastError: string | null; createdAt: string; updatedAt: string };
@@ -35,7 +36,7 @@ export function FeedManager({ initialFeeds, channels, page, hasMore, canWrite = 
   const inFlight = useRef(false);
   const say = (text: string, error = false) => setNotice(v => ({ error, text, key: (v?.key ?? 0) + 1 }));
   const names = new Map(channels.map(c => [c.id, c.name]));
-  const when = (v: string | null) => v && Number.isFinite(Date.parse(v)) ? `${new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short', timeZone: 'UTC' }).format(new Date(v))} UTC` : t('never');
+  const when = (v: string | null) => v && Number.isFinite(Date.parse(v)) ? `${formatStableDateTime(new Date(v), { locale: locale, dateStyle: 'medium', timeStyle: 'short', timeZone: 'UTC' })} UTC` : t('never');
   const errorText = (body: unknown) => body && typeof body === 'object' && 'error' in body && typeof (body as { error: unknown }).error === 'string' ? (body as { error: string }).error : t('unknownRequest');
   const saveWord = editing ? `UPDATE FEED ${editing.id}` : `CREATE FEED ${draft.name.trim()}`;
   const wordFor = (r: Review) => r.kind === 'delete' ? `DELETE FEED ${r.feed!.id}` : r.kind === 'drafts' ? `CREATE FEED DRAFTS ${r.feed!.id}` : r.kind === 'posts' ? `CREATE FEED POSTS ${r.feed!.id}` : saveWord;

@@ -16,6 +16,7 @@ import { StatusChip } from '@/components';
 import { refreshPostMetricsAction } from '@/modules/publishing/ui/posts/actions';
 import type { PostPerformanceMetrics } from '../../../../server/post-reach';
 import styles from './performance-card.module.css';
+import { formatStableDateTime } from '@/components/LocalTime';
 
 interface Props {
   postId: string;
@@ -48,7 +49,7 @@ export function PostPerformanceCard({ postId, initialMetrics, locale = 'en', tim
 
   const hasMetrics = metrics && (metrics.measured > 0 || metrics.reach > 0 || metrics.likes > 0 || metrics.views > 0);
   const lastSyncLabel = metrics?.lastSyncedAt
-    ? new Intl.DateTimeFormat(locale, { dateStyle: 'short', timeStyle: 'short', timeZone }).format(new Date(metrics.lastSyncedAt))
+    ? formatStableDateTime(new Date(metrics.lastSyncedAt), { locale: locale, dateStyle: 'short', timeStyle: 'short', timeZone })
     : null;
 
   return (

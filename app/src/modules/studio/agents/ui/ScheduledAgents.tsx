@@ -11,6 +11,7 @@ import { useConfirm } from '@/components/useConfirm';
 import type { AgentCopy } from '../copy';
 import { agentRunTone } from './status-tone';
 import styles from './agents.module.css';
+import { formatStableDateTime } from '@/components/LocalTime';
 
 export type ScheduledResult = { agents?: ScheduledAgent[]; channels?: ScheduledChannel[]; history?: ScheduledRun[]; policy?: ResolvedAutopilotPolicy; error?: string; ok?: boolean; id?: string; drafts?: number; maxDrafts?: number; briefMax?: number };
 const CREATE = 'CREATE SCHEDULED AGENT';
@@ -133,7 +134,7 @@ export function ScheduledAgents({ agents, channels, maxDrafts, briefMax, history
     const agent = items.find(item => item.id === run.agentId);
     const ok = run.code === null;
     const tierName = run.tier === 'manual' || run.tier === 'assisted' || run.tier === 'supervised_auto' ? tierLabel(t, run.tier) : null;
-    return <li key={`${run.agentId}-${run.at}-${index}`}><div className={styles.identity}><strong>{agent?.targetName ?? agent?.targetId ?? t.unknownAgent}</strong><p><Badge tone={agentRunTone(ok ? 'completed' : 'failed')}>{ok ? t.completed : t.failedRun}</Badge>{ok ? ` · ${t.historyDrafts.replace('{count}', String(run.drafts ?? 0))}${tierName ? ` · ${tierName}` : ''}${typeof run.scheduled === 'number' && run.scheduled > 0 ? ` · ${t.autopilotSends.replace('{count}', String(run.scheduled))}` : ''}` : ''}</p></div><time dateTime={run.at}>{new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short', timeZone: 'UTC' }).format(new Date(run.at))} {t.timeZone}</time></li>;
+    return <li key={`${run.agentId}-${run.at}-${index}`}><div className={styles.identity}><strong>{agent?.targetName ?? agent?.targetId ?? t.unknownAgent}</strong><p><Badge tone={agentRunTone(ok ? 'completed' : 'failed')}>{ok ? t.completed : t.failedRun}</Badge>{ok ? ` · ${t.historyDrafts.replace('{count}', String(run.drafts ?? 0))}${tierName ? ` · ${tierName}` : ''}${typeof run.scheduled === 'number' && run.scheduled > 0 ? ` · ${t.autopilotSends.replace('{count}', String(run.scheduled))}` : ''}` : ''}</p></div><time dateTime={run.at}>{formatStableDateTime(new Date(run.at), { locale: locale, dateStyle: 'medium', timeStyle: 'short', timeZone: 'UTC' })} {t.timeZone}</time></li>;
   })}</ol> : <EmptyState icon={<IconCalendarWeek size={22} />} title={t.noHistory} />}
   {confirmation}{removal}
  </section>;

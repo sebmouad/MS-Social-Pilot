@@ -56,3 +56,10 @@ test('the backup script stops with an error, and leaves no partial dump, when th
   assert.equal(code, 1);
   assert.equal(execFileSync('bash', ['-c', `ls ${join(dir, 'out', 'db')} | wc -l`]).toString().trim(), '0');
 });
+
+test('date and time are joined the same way in every engine (no « at » from WebKit)', async () => {
+  const { formatStableDateTime } = await import('@/components/LocalTime');
+  const text = formatStableDateTime('2026-10-21T10:53:20Z', { locale: 'en', timeZone: 'UTC', dateStyle: 'medium', timeStyle: 'short' });
+  assert.match(text, /^Oct 21, 2026, 10:53\s?AM$/);
+  assert.doesNotMatch(text, / at /);
+});

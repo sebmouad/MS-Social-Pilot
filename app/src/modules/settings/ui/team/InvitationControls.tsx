@@ -10,6 +10,7 @@ import { FieldError, useFormValidation } from '@/components/FormValidation';
 import { fill } from '@/modules/settings/ui/shell-copy';
 
 import styles from './invitations.module.css';
+import { formatStableDateTime } from '@/components/LocalTime';
 
 type Invitation = { id: string; email: string; role: string; expiresAt: string; acceptedAt: string | null; createdAt: string; status: 'pending' | 'expired' | 'accepted' };
 type Delivery = 'sent' | 'failed' | 'uncertain' | 'unavailable';
@@ -31,10 +32,9 @@ export function InvitationControls({ invitations, actorRole, available, locale =
   const t = useSettingsCopy('invitations', locale);
   const roles = useSettingsCopy('roles', locale);
   const roleLabel = (role: string) => (roles as Record<string, string>)[role] ?? role;
-  const dateFormatter = new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short', timeZone: 'UTC' });
   const utcDate = (value: string) => {
     const date = new Date(value);
-    return Number.isNaN(date.getTime()) ? t.dateUnavailable : `${dateFormatter.format(date)} UTC`;
+    return Number.isNaN(date.getTime()) ? t.dateUnavailable : `${formatStableDateTime(date, { locale, dateStyle: 'medium', timeStyle: 'short', timeZone: 'UTC' })} UTC`;
   };
   const router = useRouter();
   const validation = useFormValidation();

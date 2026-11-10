@@ -11,6 +11,7 @@ import { useConfirm } from '@/components/useConfirm';
 import type { AgentCopy } from '../copy';
 import { agentRunTone } from './status-tone';
 import styles from './agents.module.css';
+import { formatStableDateTime } from '@/components/LocalTime';
 export type AgentResult = { agents?: Agent[]; runs?: AgentRun[]; suggestion?: string; error?: string; hasMore?: boolean; pageSize?: number; offset?: number; ok?: boolean; id?: string; runId?: string; reviewRequired?: boolean };
 /** One injected action boundary keeps all mutations in the authenticated shared service. */
 export function AgentsScreen({ agents, runs = [], hasMore = false, pageSize, copy: t, locale, execute }: { agents: Agent[]; runs?: AgentRun[]; hasMore?: boolean; pageSize: number; copy: AgentCopy; locale: 'en' | 'fr'; execute: (input: unknown) => Promise<AgentResult> }) {
@@ -90,7 +91,7 @@ export function AgentsScreen({ agents, runs = [], hasMore = false, pageSize, cop
     <div aria-live="polite">{suggestion ? <article className={styles.suggestion}><h3>{t.suggestion}</h3><p>{t.review}</p><p className={styles.text}>{suggestion}</p></article> : null}</div>
    </section> : null}
   </div>
-  <section className={`ui-panel ${styles.panel}`}><h2>{t.history}</h2>{history.length ? <ol className={styles.list}>{history.map(run => <li key={run.id}><div className={styles.identity}><strong>{run.name ?? t.unknownAgent}</strong><p>{run.kind === 'reply' ? t.reply : t.post} · <Badge tone={agentRunTone(run.status)}>{run.status === 'completed' ? t.completed : run.status === 'failed' ? t.failedRun : t.pendingRun}</Badge></p></div><time dateTime={new Date(run.createdAt).toISOString()}>{new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short', timeZone: 'UTC' }).format(new Date(run.createdAt))} {t.timeZone}</time></li>)}</ol> : <EmptyState icon={<IconSparkles size={22} />} title={t.noHistory} />}
+  <section className={`ui-panel ${styles.panel}`}><h2>{t.history}</h2>{history.length ? <ol className={styles.list}>{history.map(run => <li key={run.id}><div className={styles.identity}><strong>{run.name ?? t.unknownAgent}</strong><p>{run.kind === 'reply' ? t.reply : t.post} · <Badge tone={agentRunTone(run.status)}>{run.status === 'completed' ? t.completed : run.status === 'failed' ? t.failedRun : t.pendingRun}</Badge></p></div><time dateTime={new Date(run.createdAt).toISOString()}>{formatStableDateTime(new Date(run.createdAt), { locale: locale, dateStyle: 'medium', timeStyle: 'short', timeZone: 'UTC' })} {t.timeZone}</time></li>)}</ol> : <EmptyState icon={<IconSparkles size={22} />} title={t.noHistory} />}
    {offset > 0 || more ? <nav className={styles.actions} aria-label={t.history}><Button disabled={pending || offset === 0} onClick={() => start(async () => { try { await refreshHistory(Math.max(0, offset - pageSize)); } catch { setError(t.failed); } })}>{t.previous}</Button><Button disabled={pending || !more} onClick={() => start(async () => { try { await refreshHistory(offset + pageSize); } catch { setError(t.failed); } })}>{t.next}</Button></nav> : null}
   </section>{confirmation}{removal}
  </section>;
