@@ -76,8 +76,10 @@ export function ApprovalPipeline({ stages, locale = 'en', timeZone, viewerId, ca
   stages: PipelineStage[]; locale?: KitLocale; timeZone: string; viewerId: string; canReview: boolean; canWriteNotes: boolean; canModerateNotes: boolean; reviewAction: (data: FormData) => void | Promise<void>;
 }) {
   const { copy: content } = useContent();
-  return <div className={styles.board} role="group" aria-label={content.approvalsBoardLabel}>
-    {stages.map(stage => <section key={stage.id} className={styles.stage} aria-labelledby={`pipeline-${stage.id}`}>
+  // Mixed board: empty stages shrink to slim tiles and each stage with posts takes the full width.
+  const mixed = stages.some(stage => stage.rows.length === 0) && stages.some(stage => stage.rows.length > 0);
+  return <div className={`${styles.board}${mixed ? ` ${styles.boardMixed}` : ''}`} role="group" aria-label={content.approvalsBoardLabel}>
+    {stages.map(stage => <section key={stage.id} className={`${styles.stage}${stage.rows.length ? ` ${styles.stageFilled}` : ''}`} aria-labelledby={`pipeline-${stage.id}`}>
       <div className={styles.stageHead}><h2 id={`pipeline-${stage.id}`}>{stage.title}</h2><span className={styles.stageCount}>{fillContent(stage.total === 1 ? content.contentCountOne : content.contentCount, { count: stage.total.toLocaleString(locale) })}</span></div>
       {stage.rows.length ? <ul className={styles.stageList}>{stage.rows.map(row => <li key={row.id}>
         {stage.id === 'review'

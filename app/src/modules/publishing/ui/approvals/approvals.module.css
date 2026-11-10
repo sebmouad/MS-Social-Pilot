@@ -54,7 +54,7 @@
 /* When some stages are empty they shrink to a row of slim tiles and each stage that holds posts takes the full
    width with its cards side by side, instead of every stage getting an equal column. */
 @media (min-width: 761px) {
-  .board:has(.stage:not(:has(.stageList))) { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); grid-auto-flow: dense; }
-  .board:has(.stage:not(:has(.stageList))) .stage:has(.stageList) { grid-column: 1 / -1; }
-  .board:has(.stage:not(:has(.stageList))) .stage:has(.stageList) .stageList { grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); align-items: start; }
+  .board.boardMixed { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); grid-auto-flow: dense; }
+  .boardMixed .stageFilled { grid-column: 1 / -1; }
+  .boardMixed .stageFilled .stageList { grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); align-items: start; }
 }

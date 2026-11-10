@@ -35,3 +35,8 @@
   .root-directory__actions, .root-directory__workspace-actions { min-width: 0; }
   .root-directory__table-wrap { border: 0; background: transparent; overflow: visible; }
 }
+/* Desktop: the first column (name and email) keeps a readable width; action cells take only what they need. */
+@media (min-width: 481px) {
+  .root-directory .ui-table td:first-child { min-width: 240px; }
+  .root-directory .ui-table .root-directory__actions, .root-directory .ui-table .root-directory__workspace-actions { min-width: 0; }
+}

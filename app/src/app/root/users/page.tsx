@@ -43,7 +43,7 @@ export default async function RootUsersPage({ searchParams }: { searchParams: Pr
       <p className="root-activity__summary">{data.total} {filtered ? 'matching ' : ''}{data.total === 1 ? 'user' : 'users'} · {data.installationTotal} in this installation</p>
       {data.users.length === 0 ? <RootEmptyState route="/root/users" title={filtered ? 'No users match these filters' : 'No users found'}>{filtered ? 'Try another name, email or account status.' : 'There are no user accounts in this installation.'}</RootEmptyState> : <>
         <DataTable caption="User directory" rows={data.users} rowKey={user => user.id} columns={[
-        { key: 'column0', label: t.colUser, width: '26%', render: user => <><strong>{user.name}</strong><br /><span>{user.email}</span></> },
+        { key: 'column0', label: t.colUser, render: user => <><strong>{user.name}</strong><br /><span>{user.email}</span></> },
         { key: 'column1', label: t.colAccountStatus, render: user => <><div className="root-user__status"><StatusChip status={user.disabledAt ? 'disabled' : 'active'} />{user.isInstanceOwner && <span className="root-user__owner">{t.valueInstallationOwner}</span>}</div></> },
         { key: 'column2', label: t.workspaces, render: user => <>{user._count.memberships}</> },
         { key: 'column3', label: t.colActiveSessions, render: user => <>{user._count.sessions}</> },
