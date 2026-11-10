@@ -33,19 +33,16 @@ html, body { max-width: 100%; overflow-x: clip; }
   input[type="checkbox"]:not(.ui-radio-card input), input[type="radio"]:not(.ui-radio-card input) { min-width: 22px; min-height: 22px; }
 }
 
-/* Dialogs and drawers take the whole screen on phones and keep their action bar reachable. */
+/* Phones: dialogs rise from the bottom edge as sheets, as tall as their content and never taller than the screen,
+   so the title stays in view and the actions sit within thumb reach. Drawers take the whole screen. */
 @media (max-width: 640px) {
-  .ui-dialog { width: 100vw; max-width: 100vw; height: 100dvh; max-height: 100dvh; margin: 0; border: 0; border-radius: 0; }
-  .ui-dialog[open] { display: flex; flex-direction: column; }
-  .ui-dialog__header { padding: calc(14px + env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) 14px max(16px, env(safe-area-inset-left)); }
-  .ui-dialog__body { flex: 1; min-height: 0; padding: 16px max(16px, env(safe-area-inset-right)) 16px max(16px, env(safe-area-inset-left)); overflow: auto; }
+  .ui-dialog { top: auto; bottom: 0; width: 100vw; max-width: 100vw; height: auto; max-height: calc(100dvh - 28px - env(safe-area-inset-top)); margin: auto 0 0; border: 0; border-top: 1px solid var(--line); border-radius: var(--radius-lg) var(--radius-lg) 0 0; box-shadow: var(--shadow-sheet); }
+  .ui-dialog[open] { display: flex; flex-direction: column; animation: ui-sheet-in .22s cubic-bezier(.2, .8, .2, 1); }
+  .ui-dialog::before { content: ''; flex: 0 0 auto; align-self: center; width: 36px; height: 4px; margin-top: 8px; border-radius: var(--radius-full); background: var(--line-strong); }
+  .ui-dialog__header { padding: 12px max(16px, env(safe-area-inset-right)) 12px max(16px, env(safe-area-inset-left)); }
+  .ui-dialog__body { flex: 0 1 auto; min-height: 0; padding: 16px max(16px, env(safe-area-inset-right)) 16px max(16px, env(safe-area-inset-left)); overflow: auto; }
+  .ui-dialog > form { display: flex; flex-direction: column; min-height: 0; }
   .ui-dialog__actions { padding: 12px max(16px, env(safe-area-inset-right)) calc(12px + env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); }
-  /* Sheet: short dialogs rise from the bottom edge at the height of their content, within thumb reach. */
-  .ui-dialog--sheet { top: auto; bottom: 0; height: auto; max-height: 88dvh; margin: auto 0 0; border-top: 1px solid var(--line); border-radius: var(--radius-lg) var(--radius-lg) 0 0; box-shadow: var(--shadow-sheet); }
-  .ui-dialog--sheet[open] { animation: ui-sheet-in .22s cubic-bezier(.2, .8, .2, 1); }
-  .ui-dialog--sheet::before { content: ''; flex: 0 0 auto; align-self: center; width: 36px; height: 4px; margin-top: 8px; border-radius: var(--radius-full); background: var(--line-strong); }
-  .ui-dialog--sheet .ui-dialog__header { padding-top: 12px; border-bottom: 0; }
-  .ui-dialog--sheet .ui-dialog__body { flex: 0 1 auto; padding-top: 4px; }
   .ui-drawer { height: 100dvh; }
   .ui-drawer__header { padding: calc(14px + env(safe-area-inset-top)) 16px 14px; }
   .ui-drawer__body { padding: 16px; }
@@ -63,4 +60,4 @@ html, body { max-width: 100%; overflow-x: clip; }
   .ui-tabs__list, .shell-settings__list { padding-inline-end: 32px; scroll-padding-inline: 16px; -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent); } /* taste-skill-ignore: monochrome alpha mask that fades a clipped tab strip, not a decorative gradient */
 }
 @keyframes ui-sheet-in { from { transform: translateY(100%); } }
-@media (prefers-reduced-motion: reduce) { .ui-dialog--sheet[open] { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .ui-dialog[open] { animation: none; } }

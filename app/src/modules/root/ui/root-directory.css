@@ -26,3 +26,12 @@
 .root-directory__create .ui-field { flex: 1 1 180px; }
 .root-directory__create .ui-button { flex: 0 0 auto; }
 .root-directory__workspace-actions { display: flex; gap: 6px; flex-wrap: wrap; min-width: 160px; }
+/* Phones: the shared card layout of stacked tables owns cell spacing. */
+@media (max-width: 480px) {
+  .root-directory .ui-table--stack td { padding: 0 0 0 38%; border-bottom: 0; }
+  .root-directory .ui-table--stack td:not([data-label]) { padding-left: 0; }
+  .root-directory .ui-table--stack td:first-child { padding: 0 0 10px; border-bottom: 1px solid var(--line-subtle); }
+  .root-directory .ui-table--stack ul { margin: 0; padding-left: 16px; }
+  .root-directory__actions, .root-directory__workspace-actions { min-width: 0; }
+  .root-directory__table-wrap { border: 0; background: transparent; overflow: visible; }
+}

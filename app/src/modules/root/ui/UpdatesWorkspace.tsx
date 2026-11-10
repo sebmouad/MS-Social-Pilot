@@ -35,7 +35,7 @@ function LogDialog({ item, title, copy, onClose }: { item: UpdateItem; title: st
       .then((body: { log?: string }) => { if (live) setLog(body.log ?? ''); }).catch(() => { if (live) setFailed(true); });
     return () => { live = false; };
   }, [item.id]);
-  return <Dialog open sheet title={copy.logTitle} description={title} onClose={onClose} closeLabel={copy.close} actions={log ? <CopyButton value={log} copy={copy} /> : undefined}>
+  return <Dialog open title={copy.logTitle} description={title} onClose={onClose} closeLabel={copy.close} actions={log ? <CopyButton value={log} copy={copy} /> : undefined}>
     {failed ? <p role="alert" className="ui-error">{copy.logFailed}</p>
       : log === null ? <p role="status" className="upd-muted">{copy.logLoading}</p>
       : log ? <pre className="upd-log" tabIndex={0}>{log}</pre> : <p className="upd-muted">{copy.logEmpty}</p>}
@@ -165,12 +165,12 @@ export function UpdatesWorkspace({ copy, items, running, automatic, connected, b
       </ol>}
     </section>
 
-    <Dialog open={confirming} sheet title={updatesCopyText(copy.confirmTitle, values)} onClose={() => setConfirming(false)} busy={busy} closeLabel={copy.close}
+    <Dialog open={confirming} title={updatesCopyText(copy.confirmTitle, values)} onClose={() => setConfirming(false)} busy={busy} closeLabel={copy.close}
       actions={<><Button onClick={() => setConfirming(false)} disabled={busy}>{copy.cancel}</Button><Button variant="primary" busy={busy} leading={<IconCloudDownload size={17} />} onClick={update}>{copy.confirmAction}</Button></>}>
       <p className="upd-dialog-text">{copy.confirmBody}</p>
     </Dialog>
 
-    <Dialog open={connecting} sheet title={copy.webhookSetupTitle} description={copy.webhookSetupIntro} onClose={() => setConnecting(false)} closeLabel={copy.close}>
+    <Dialog open={connecting} title={copy.webhookSetupTitle} description={copy.webhookSetupIntro} onClose={() => setConnecting(false)} closeLabel={copy.close}>
       <ol className="upd-steps">
         <li>{copy.webhookStep1}</li>
         <li>{updatesCopyText(copy.webhookStep2, values)}</li>

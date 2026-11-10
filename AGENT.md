@@ -133,7 +133,10 @@ bash app/scripts/deploy.sh --host <SERVER_IP> --user root --key <SSH_KEY_PATH>
 - Root › Updates (2026-11-10 redesign): `modules/root/ui/UpdatesWorkspace.tsx` + `app/root/updates/updates.css`. Status
   card for the running version, update list with filter, confirm before « Update now », log and GitHub steps in
   modals (log fetched from `GET /api/root/updates/[id]`), list refreshes every 10 s while something waits or installs.
-  `Dialog` takes `sheet`: on phones it rises from the bottom edge instead of covering the screen.
+  Shared, app-wide (same day): on phones every `.ui-dialog` is a bottom sheet (`styles/responsive.css`) and every
+  stacked `DataTable` row is its own card with the first column as headline (`styles/components.css`); class-less
+  `select`/`input` inside `main` or a dialog get the standard control look (polish layer at the end of
+  `components.css`). Reviewed on screenshots with an empty workspace only: no connected channels, posts or messages.
 - **Activation status (2026-11-09): not active yet.** It needs, once: (1) one manual deploy of current `main`
   (installs the timer), (2) Root › Configuration › Updates: save a webhook secret and turn on « Install GitHub pushes
   automatically », (3) GitHub › sebmouad/MS-Social-Pilot › Settings › Webhooks › Add webhook: payload URL
