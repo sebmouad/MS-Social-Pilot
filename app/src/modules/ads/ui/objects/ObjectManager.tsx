@@ -203,7 +203,7 @@ export function ObjectManager({ adAccountId, level, objectId, name }: { adAccoun
   const creativeFieldProps = validation.fieldProps('creativeId');
 
   return <div className="ads-object-manager">
-    <Button size="sm" aria-haspopup="dialog" onClick={() => void toggle()} disabled={busy && !open}>{t('text092')}</Button>
+    <Button size="sm" aria-haspopup="dialog" data-row-open onClick={() => void toggle()} disabled={busy && !open}>{t('text092')}</Button>
     <SidePanel open={open} title={name} closeLabel={t('text091')} onClose={() => setOpen(false)}><div id={`${id}-panel`} className="ads-object-manager__panel">
       {busy && !detail ? <p role="status">{t('text093')}</p> : null}
       {loadError ? <RouteNotice error className="ui-error" focusKey={localize(loadError)}>{localize(loadError)}</RouteNotice> : null}

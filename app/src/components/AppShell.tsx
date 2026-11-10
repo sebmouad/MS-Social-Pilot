@@ -125,6 +125,18 @@ export function AppShell({ children, activeModule, enabledModules, enabledFeatur
   const settingsActive = !installationMode && activeArea === "settings";
   const settingsPages = areaPages("settings", enabledFeatures);
   const pageLabel = (page: { id: string; title: string }) => (copy.pageTitles as Record<string, string>)[page.id] ?? page.title;
+  // A table row that has a details window opens it from anywhere on the row, not only from its small « Details » button:
+  // the button (or link) marked `data-row-open` is the row's main action. Controls, links and open windows are left alone.
+  useEffect(() => {
+    const onClick = (event: MouseEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (!target || event.defaultPrevented || event.button !== 0 || window.getSelection()?.toString()) return;
+      if (target.closest('a,button,input,select,textarea,label,summary,[role=menu],[role=dialog],dialog')) return;
+      target.closest('tr')?.querySelector<HTMLElement>('[data-row-open]:not(:disabled)')?.click();
+    };
+    document.addEventListener('click', onClick);
+    return () => document.removeEventListener('click', onClick);
+  }, []);
   // Every signed-in page shares the root layout's title; name the tab after the current page so history and tabs stay readable.
   const documentTitle = installationMode ? copy.root : activePage ? pageLabel(activePage) : undefined;
   useEffect(() => {

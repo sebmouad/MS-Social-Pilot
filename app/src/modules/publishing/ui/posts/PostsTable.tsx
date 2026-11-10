@@ -72,7 +72,8 @@ export function PostsTable({ rows, caption, locale = 'en', timeZone = 'UTC', sel
       <div className={styles.listPane}>
         <div className={styles.desktopList}>
           <DataTable columns={columns} rows={rows} rowKey={row => row.id} caption={caption} stackOnPhone={false}
-            onRowClick={row => router.push(`/content/post/${encodeURIComponent(row.id)}`)}
+            // Anywhere on a row opens the post's details window; the full page stays one click away inside it and in the row menu.
+            onRowClick={row => show(row.id)}
             selection={selectable ? { selected, onChange: setSelected, rowLabel: row => copy.selectPost(label(row).slice(0, 60)), selectAllLabel: copy.selectAll } : undefined}
             rowActionsLabel={row => copy.actionsFor(label(row).slice(0, 60))}
             rowActions={row => [
@@ -87,7 +88,8 @@ export function PostsTable({ rows, caption, locale = 'en', timeZone = 'UTC', sel
             const reachNum = row.reach?.reach ?? row.reach?.value ?? null;
             const likes = row.reach?.likes ?? 0;
             const comments = row.reach?.comments ?? 0;
-            return <li key={row.id}><ListRow href={`/content/post/${encodeURIComponent(row.id)}`}
+            // The link is the fallback without script; with it, a tap opens the details window (a bottom sheet on phones).
+            return <li key={row.id} onClickCapture={event => { if ((event.target as HTMLElement).closest('a[href^="/content/post/"]')) { event.preventDefault(); show(row.id); } }}><ListRow href={`/content/post/${encodeURIComponent(row.id)}`}
               leading={<MediaThumb url={postThumbUrl(row.media)} alt="" count={Array.isArray(row.media) ? row.media.length : 0} video={false} locale={locale} />}
               title={label(row)}
               meta={<>
