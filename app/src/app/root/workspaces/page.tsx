@@ -4,7 +4,7 @@ import { RootFrame } from '@/modules/root/ui/RootFrame';
 import { listRootWorkspaces } from '@/server/root/directory';
 import { runtimeConfig } from '@/server/config/store';
 import { requireRootPage } from '@/server/config/access';
-import { CreateRootWorkspace, RenameRootWorkspace } from './RootWorkspaceControls';
+import { CreateRootWorkspace, RemoveUnlinkedAdAccounts, RenameRootWorkspace } from './RootWorkspaceControls';
 import { WorkspaceAccessControl } from './WorkspaceAccessControl';
 import { RootDirectorySearch } from '@/modules/root/ui/RootDirectorySearch';
 import { loadRootDates, loadRootInterfaceCopy, rootText } from '@/modules/root/ui/interface-copy';
@@ -30,7 +30,7 @@ export default async function RootWorkspacesPage({ searchParams }: { searchParam
           { key: 'column5', label: t.colPosts, render: (workspace) => <>{workspace._count.posts}</> },
           { key: 'column6', label: t.colAdAccounts, render: (workspace) => <>{workspace._count.adAccounts}</> },
           { key: 'column7', label: t.colDataState, render: (workspace) => <>{workspace.dataPurge?.status ?? t.valueNoDeletion}</> },
-          { key: 'column8', label: t.colAction, render: (workspace) => <><div className="root-directory__workspace-actions"><RenameRootWorkspace id={workspace.id} currentName={workspace.name} maxName={maxName} deleting={Boolean(workspace.dataPurge)} /><WorkspaceAccessControl id={workspace.id} name={workspace.name} suspended={Boolean(workspace.suspendedAt)} deleting={Boolean(workspace.dataPurge && workspace.dataPurge.status !== 'completed')} /></div></> }
+          { key: 'column8', label: t.colAction, render: (workspace) => <><div className="root-directory__workspace-actions"><RenameRootWorkspace id={workspace.id} currentName={workspace.name} maxName={maxName} deleting={Boolean(workspace.dataPurge)} />{workspace._count.adAccounts > 0 ? <RemoveUnlinkedAdAccounts id={workspace.id} /> : null}<WorkspaceAccessControl id={workspace.id} name={workspace.name} suspended={Boolean(workspace.suspendedAt)} deleting={Boolean(workspace.dataPurge && workspace.dataPurge.status !== 'completed')} /></div></> }
         ]} />
     {data.total > data.take && <div className="root-directory__pager"><span>{rootText(t.userPageOf, { page: data.page, total: Math.max(1, Math.ceil(data.total / data.take)) })}</span><span>{data.page > 1 && <a href={url(data.page - 1)}>{t.userPrevious}</a>}{data.page * data.take < data.total && <> · <a href={url(data.page + 1)}>{t.userNext}</a></>}</span></div>}
   </RootFrame>;

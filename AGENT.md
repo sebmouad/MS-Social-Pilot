@@ -276,6 +276,19 @@ start-up. `schema.prisma` lists all tables but 97 are `@@ignore`d: adding them t
 types so large that `next build` runs out of memory. `deploy.sh` and `deploy-from-mac.sh` still carry their own copy of the
 server steps and do not take the pre-migration dump; `deploy-from-server.sh` is the path that does.
 
+### 7.1d Done for the resubmission (2026-11-10, owner approved by form)
+
+- Webhooks live: `meta.webhookVerifyToken` set on the site (Root config, encrypted), Meta app subscription `page`
+  → `https://social.newsgeet.com/api/platforms/facebook/webhooks` with `feed` and `messages`; Meta's test delivery
+  arrived (Root › Platforms › Facebook › Health, « Meta webhook deliveries »). Each Page is subscribed to the app
+  (`subscribed_apps`) when Facebook is (re)connected, so the Oct 10 connection must be reconnected for real events.
+- Operator details set: ANASSO TRAVAUX, Morocco, Moroccan law 09-08 (+ GDPR where it applies), updated
+  « November 10, 2026 ». Still missing: street address, privacy contact email, hosting provider (the policy says
+  « the operator of this installation » for the contact until the email is set).
+- The reviewer uses their own workspace (« Meta Review's workspace », reviewer connects Facebook themselves).
+  Its 8 ad accounts from a removed connection are still there: Root › Workspaces › « Remove 8 unlinked ad accounts »
+  (owner to click; the session's safety check blocked Claude from running the deletion).
+
 ### 7.2 Phase 2 — next
 
 1. User: deploy `main`; fill Root › Public site › Operator details (address, privacy email, law, host,

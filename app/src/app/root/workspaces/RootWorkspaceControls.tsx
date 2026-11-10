@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { ModalDialog } from '@/components/ModalDialog';
 import { Button } from '@/components/Button';
 import { FieldError, useFormValidation } from '@/components/FormValidation';
@@ -69,6 +69,39 @@ export function RenameRootWorkspace({ id, currentName, maxName, deleting }: { id
       <div className="ui-dialog__header"><h2 id={`root-rename-${id}`}>Rename workspace?</h2></div>
       <div className="ui-dialog__body"><label className="ui-field">New name<input className="ui-input" value={name} onChange={event => { setName(event.target.value); setConfirmation(''); }} maxLength={maxName} required /></label><p>Existing links and workspace slug stay unchanged.</p><label className="ui-field"><span>Type <strong>{phrase}</strong> to confirm</span><input className="ui-input" value={confirmation} onChange={event => setConfirmation(event.target.value)} autoComplete="off" /></label>{error && <p className="ui-error" role="alert">{error}</p>}</div>
       <div className="ui-dialog__actions"><Button type="button" data-dialog-cancel onClick={() => setOpen(false)} disabled={busy}>Cancel</Button><Button type="button" variant="primary" onClick={() => void rename()} disabled={busy || !cleanName || confirmation !== phrase}>{busy ? 'Saving…' : 'Rename workspace'}</Button></div>
+    </ModalDialog>}
+  </>;
+}
+
+/** Ad accounts left behind by a removed connection: shown only when there are some, removed after an exact phrase. */
+export function RemoveUnlinkedAdAccounts({ id }: { id: string }) {
+  const [preview, setPreview] = useState<{ count: number; names: string[]; confirmation: string } | null>(null);
+  const [open, setOpen] = useState(false);
+  const [confirmation, setConfirmation] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  useEffect(() => {
+    let live = true;
+    fetch(`/api/root/workspaces/${encodeURIComponent(id)}/ad-accounts`).then(response => response.ok ? response.json() : null).then(body => { if (live && body && typeof body.count === 'number') setPreview(body); }).catch(() => {});
+    return () => { live = false; };
+  }, [id]);
+  if (!preview?.count) return null;
+  async function remove() {
+    setBusy(true); setError('');
+    try {
+      const response = await fetch(`/api/root/workspaces/${encodeURIComponent(id)}/ad-accounts`, { method: 'DELETE', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ confirmation }) });
+      const payload = await response.json().catch(() => ({})) as { error?: string };
+      if (!response.ok) throw new Error(payload.error ?? 'The ad accounts could not be removed.');
+      window.location.reload();
+    } catch (cause) { setError(cause instanceof Error ? cause.message : 'The ad accounts could not be removed.'); setBusy(false); }
+  }
+  return <><Button type="button" onClick={() => { setConfirmation(''); setError(''); setOpen(true); }}>Remove {preview.count} unlinked ad account{preview.count === 1 ? '' : 's'}</Button>
+    {open && <ModalDialog className="ui-dialog" labelledBy={`root-unlinked-${id}`} onDismiss={() => { if (!busy) setOpen(false); }} busy={busy}>
+      <div className="ui-dialog__header"><h2 id={`root-unlinked-${id}`}>Remove unlinked ad accounts?</h2></div>
+      <div className="ui-dialog__body"><p>No Facebook connection of this workspace holds these ad accounts any more. Removing them deletes their stored figures, campaigns and change history from this installation. Nothing changes in Meta, and they come back if someone connects them again.</p>
+        <ul>{preview.names.map((name, index) => <li key={`${name}-${index}`}>{name}</li>)}</ul>
+        <label className="ui-field"><span>Type <strong>{preview.confirmation}</strong> to confirm</span><input className="ui-input" value={confirmation} onChange={event => setConfirmation(event.target.value)} autoComplete="off" /></label>{error && <p className="ui-error" role="alert">{error}</p>}</div>
+      <div className="ui-dialog__actions"><Button type="button" data-dialog-cancel onClick={() => setOpen(false)} disabled={busy}>Cancel</Button><Button type="button" variant="danger" onClick={() => void remove()} disabled={busy || confirmation !== preview.confirmation}>{busy ? 'Removing…' : 'Remove ad accounts'}</Button></div>
     </ModalDialog>}
   </>;
 }
