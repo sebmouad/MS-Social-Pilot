@@ -228,6 +228,16 @@ SHORT_COMMIT="$(git -C "$REPO_DIR" rev-parse --short HEAD)"
 COMMIT_MSG="$(git -C "$REPO_DIR" log -1 --pretty=%B | head -n 1)"
 log_info "Deploying commit: ${BOLD}$SHORT_COMMIT${RESET} ('$COMMIT_MSG')"
 
+# Continue with the deploy script of the version being installed: an older copy (the installed socialpilot-deploy
+# command) would build the new app but skip newer server steps such as the updater timer.
+OWN_SCRIPT="$(readlink -f "${BASH_SOURCE[0]}")"
+FRESH_SCRIPT="$REPO_DIR/app/scripts/deploy-from-server.sh"
+if [ -z "${SP_DEPLOY_HANDED_OVER:-}" ] && [ -f "$FRESH_SCRIPT" ] && ! cmp -s "$OWN_SCRIPT" "$FRESH_SCRIPT"; then
+  log_info "This deploy script is older than the version being installed; continuing with the new one."
+  cp "$FRESH_SCRIPT" /run/social-pilot-deploy.handover
+  SP_DEPLOY_HANDED_OVER=1 BRANCH="$BRANCH" exec bash /run/social-pilot-deploy.handover --commit "$DEPLOY_COMMIT"
+fi
+
 # Step 3: Copy Environment
 ENVF="$LIVE_DIR/app/.env.production.local"
 if [ ! -f "$ENVF" ]; then
@@ -366,6 +376,8 @@ UNIT
 
 # Self-update: the app records updates (GitHub push, Root › Updates) and this root timer installs them.
 install -m 0755 "$BUILD_DIR/app/scripts/updater.sh" /usr/local/lib/social-pilot-updater.sh
+# Keep the installed socialpilot-deploy command at the version being installed.
+[ -f /usr/local/bin/socialpilot-deploy ] && install -m 0755 "$BUILD_DIR/app/scripts/deploy-from-server.sh" /usr/local/bin/socialpilot-deploy
 cat > /etc/systemd/system/social-pilot-updater.service <<'UNIT'
 [Unit]
 Description=MS Social Pilot updater (installs the updates the app records)

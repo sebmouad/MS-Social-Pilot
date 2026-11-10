@@ -30,9 +30,17 @@ export default async function RootUpdatesPage() {
     readUpdates().catch(() => [] as UpdateRow[]),
   ]);
   const values = { branch, repository, url: `${origin || ''}/api/updates/github` };
+  // Nothing has picked up a request for two minutes although the updater looks every 30 seconds: it is not running.
+  const stalled = !items.some(row => row.status === 'running') && items.some(row => row.status === 'requested' && Date.now() - new Date(row.createdAt).getTime() > 120_000);
+  const text = { ...ROOT_UPDATES_COPY, ...copy };
   const when = (date: Date | null) => date ? new Date(date).toISOString().replace('T', ' ').slice(0, 16) + ' UTC' : '—';
   return <RootFrame active="/root/updates"><div className="root-ops">
     <PageHeader module="root" title={copy.title} description={<>{copy.intro}</>} actions={<UpdateNowButton label={copy.updateNow} requested={copy.requested} failure={copy.failure} />} />
+    {stalled ? <section className="root-control__notice" role="status" aria-label={text.stalledTitle}>
+      <h2>{text.stalledTitle}</h2>
+      <p>{text.stalled}</p>
+      <pre style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}><code>{updatesCopyText(text.stalledCommand, values)}</code></pre>
+    </section> : null}
     <section className="root-control__notice" aria-label={copy.running}>
       <h2>{copy.running}</h2>
       <p><code>{running ?? copy.runningUnknown}</code></p>

@@ -294,6 +294,7 @@ UNIT
 
 # Self-update: the app records updates (GitHub push, Root › Updates) and this root timer installs them.
 install -m 0755 "$BUILD/app/scripts/updater.sh" /usr/local/lib/social-pilot-updater.sh
+[ -f /usr/local/bin/socialpilot-deploy ] && install -m 0755 "$BUILD/app/scripts/deploy-from-server.sh" /usr/local/bin/socialpilot-deploy
 cat > /etc/systemd/system/social-pilot-updater.service <<'UNIT'
 [Unit]
 Description=MS Social Pilot updater (installs the updates the app records)
