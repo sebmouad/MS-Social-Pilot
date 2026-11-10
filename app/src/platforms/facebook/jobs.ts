@@ -241,6 +241,18 @@ async function fetchPageAnalytics(target: PageTarget, now: Date, today: Date, re
 
 /** Refresh current daily Page snapshots for enabled connections in their own workspace. */
 /** `scope` reads one workspace now (its « Sync now »), without moving the shared fair-batch cursor. */
+/**
+ * « Sync now » reads one workspace while someone waits: its Pages and ad accounts are read a few at a time instead of
+ * one after another (ten Pages took about seven minutes). Each item still takes its own locks and writes its own rows,
+ * so items never share a transaction. The scheduled job keeps reading one item at a time across all workspaces.
+ */
+const SCOPED_CONCURRENCY = 4;
+async function eachInTurn<T>(items: readonly T[], concurrency: number, work: (item: T) => Promise<void>) {
+  let next = 0;
+  const lane = async () => { while (next < items.length && !jobStopRequested()) { const item = items[next++]!; await work(item); } };
+  await Promise.all(Array.from({ length: Math.max(1, Math.min(concurrency, items.length)) }, lane));
+}
+
 export async function syncPageAnalytics(now = new Date(), retryLimit = 0, retryBackoff?: RetryBackoff, scope?: { workspaceId: string }): Promise<JobSummary> {
   if (await runtimeConfig('platforms.facebook.enabled') !== true) return { examined: 0, updated: 0, skipped: 0, failed: 0 };
   const limit = await runtimeConfig('sync.maxItemsPerJob') as number;
@@ -255,8 +267,7 @@ export async function syncPageAnalytics(now = new Date(), retryLimit = 0, retryB
   }));
   const result: JobSummary = { examined: targets.length, updated: 0, skipped: 0, failed: 0 };
   const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
-  for (const target of targets) {
-    if (jobStopRequested()) break;
+  const one = async (target: (typeof targets)[number]) => {
     try {
       await admitWorkspace(target.workspaceId);
       const fetched = await fetchPageAnalytics(target, now, today, retryLimit, retryBackoff);
@@ -300,7 +311,8 @@ export async function syncPageAnalytics(now = new Date(), retryLimit = 0, retryB
         result.failed += outcome.failed;
       });
     } catch (error) { if (isAccessDenied(error)) result.skipped++; else { result.failed++; await logItemFailure('pageAnalytics', target.id, error); } }
-  }
+  };
+  await eachInTurn(targets, scope ? SCOPED_CONCURRENCY : 1, one);
   return result;
 }
 
@@ -329,8 +341,7 @@ export async function syncAdsAnalytics(now = new Date(), retryLimit = 0, retryBa
   }));
   const result: JobSummary = { examined: accounts.length, updated: 0, skipped: 0, failed: 0 };
   const until = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
-  for (const account of accounts) {
-    if (jobStopRequested()) break;
+  const one = async (account: (typeof accounts)[number]) => {
     try {
       await admitWorkspace(account.workspaceId);
       // Provider read first, with no transaction or lock held.
@@ -391,7 +402,8 @@ export async function syncAdsAnalytics(now = new Date(), retryLimit = 0, retryBa
         result.skipped += outcome.skipped;
       });
     } catch (error) { if (isAccessDenied(error)) result.skipped++; else { result.failed++; await logItemFailure('adsAnalytics', account.id, error); } }
-  }
+  };
+  await eachInTurn(accounts, scope ? SCOPED_CONCURRENCY : 1, one);
   return result;
 }
 
