@@ -144,6 +144,10 @@ bash app/scripts/deploy.sh --host <SERVER_IP> --user root --key <SSH_KEY_PATH>
 - Screen changes of 2026-11-10: Queue « By day » is an agenda (`queue.module.css` `.entry*`, rows are `<details>`);
   Library tiles open details from the picture, rename has no typed phrase; Approvals folds team notes and lays out
   non-empty stages full width; Root Users/Workspaces show reset and pager only when useful.
+- Root › Configuration (2026-11-10): search bar pinned on top, results directly under it (they used to render
+  ~3,600 px lower, under 72 section buttons); sections in a grouped side list on desktop and one picker below 1024 px;
+  results ranked name > key > description, first 60 shown; `/` focuses the search; the address carries `?search=`
+  (`?q=` accepted). Module and platform settings pages share the form (`root-config-form.tsx`).
 - Earlier note, kept for history. **Activation status (2026-11-09): not active yet.** It needs, once: (1) one manual deploy of current `main`
   (installs the timer), (2) Root › Configuration › Updates: save a webhook secret and turn on « Install GitHub pushes
   automatically », (3) GitHub › sebmouad/MS-Social-Pilot › Settings › Webhooks › Add webhook: payload URL

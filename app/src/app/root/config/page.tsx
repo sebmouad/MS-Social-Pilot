@@ -18,7 +18,7 @@ export async function generateMetadata() {
   return { title: copy.metadataTitle };
 }
 
-export default async function RootConfigPage({ searchParams }: { searchParams: Promise<{ search?: string | string[]; tab?: string | string[] }> }) {
+export default async function RootConfigPage({ searchParams }: { searchParams: Promise<{ search?: string | string[]; q?: string | string[]; tab?: string | string[] }> }) {
   const actor = await requireRootPage();
   // readConfig validates the same registry snapshot used by HTTP and MCP and masks secrets.
   // Registry defaults keep the recovery screen available if the store cannot be read.
@@ -29,7 +29,8 @@ export default async function RootConfigPage({ searchParams }: { searchParams: P
   const locale = rootCopyLocale((await headers()).get('accept-language'));
   const interfaceCopy = ((values?.find(value => value.key === 'root.interfaceCopy')?.value ?? ROOT_INTERFACE_COPY) as RootInterfaceCatalog)[locale];
   const query = await searchParams;
-  const search = query?.search;
+  // « q » is accepted too: it is what people type by hand.
+  const search = query?.search ?? query?.q;
   const initialSearch = typeof search === 'string' ? search.slice(0, searchLimit) : '';
   // Shared controls expose Settings and Availability; their installation-wide diagnostics and health live under Operations.
   const tab = query?.tab === 'availability' ? 'availability' : 'settings';
