@@ -1,6 +1,7 @@
 export const mcpCopy = {
   en: {
     title: 'MCP API keys', description: 'Manage scoped credentials for MCP clients.', issueDescription: 'Issue workspace-scoped bearer keys for {workspace}.',
+    newKey: 'New key', advanced: 'Choose feature by feature',
     presets: 'Quick permissions', presetRead: 'Read everything', presetReadWrite: 'Read and write everything', presetPublisher: 'Publisher (read all, write posts)', presetAds: 'Ads manager (read all, write ads)', presetClear: 'Clear', summary: '{read} readable · {write} writable', moduleAll: 'Select all', moduleAllLabel: 'Read every {module} feature',
     lifetimeRange: 'Enter a whole number of days from 1 to {max}.', lifetimeHint: 'Up to {max} days.',
     restricted: 'Access restricted', managersOnly: 'Only workspace owners and admins can manage MCP API keys.',
@@ -28,6 +29,7 @@ export const mcpCopy = {
   },
   fr: {
     title: 'Clés d’API MCP', description: 'Gérez les identifiants à portée limitée des clients MCP.', issueDescription: 'Émettez des clés porteur limitées à l’espace {workspace}.',
+    newKey: 'Nouvelle clé', advanced: 'Choisir fonction par fonction',
     presets: 'Permissions rapides', presetRead: 'Tout en lecture', presetReadWrite: 'Tout en lecture et écriture', presetPublisher: 'Publication (tout lire, écrire les publications)', presetAds: 'Publicités (tout lire, écrire les publicités)', presetClear: 'Effacer', summary: '{read} en lecture · {write} en écriture', moduleAll: 'Tout sélectionner', moduleAllLabel: 'Lire toutes les fonctionnalités {module}',
     lifetimeRange: 'Saisissez un nombre entier de jours entre 1 et {max}.', lifetimeHint: 'Jusqu’à {max} jours.',
     restricted: 'Accès restreint', managersOnly: 'Seuls les propriétaires et administrateurs de l’espace peuvent gérer les clés d’API MCP.',

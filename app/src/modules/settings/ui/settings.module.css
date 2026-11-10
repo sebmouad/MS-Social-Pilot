@@ -201,3 +201,9 @@ button.settings-row-actions__link:disabled { cursor: progress; opacity: .6; }
 .retention-list dd { margin: 0; color: var(--ink-soft); font-size: 13px; font-variant-numeric: tabular-nums; text-align: end; }
 /* Channels toolbar: the sentence takes the room, the two buttons stay side by side at the right. */
 @media (min-width: 621px) { .connection-toolbar > p { flex: 1 1 auto; min-width: 0; } .connection-toolbar > div { flex: 0 0 auto; flex-wrap: nowrap; } .connection-toolbar > div > button { display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; } }
+
+/* API keys: the list is the page, the creation form opens in a window; the feature matrix is folded under the presets. */
+.mcp-key-toolbar { display: flex; justify-content: flex-end; margin-bottom: var(--space-3); }
+.mcp-key-advanced { margin-top: var(--space-3); }
+.mcp-key-advanced > summary { min-height: 36px; color: var(--accent); font-size: var(--text-sm); font-weight: 650; cursor: pointer; }
+.mcp-key-advanced[open] > summary { margin-bottom: var(--space-3); }

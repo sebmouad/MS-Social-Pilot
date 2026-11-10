@@ -161,3 +161,12 @@
 /* On/off settings: the card title already names the setting, so the toggle shows its state instead of the name again. */
 .root-config__toggle { display: flex; align-items: center; gap: 10px; color: var(--ink); font-size: var(--text-sm); font-weight: 650; }
 .root-config__toggle .ui-switch__text > span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+/* Job tiles: a coloured mark tells the outcome before the words do. */
+.root-jobs__latest li { position: relative; padding-left: 30px; border-radius: var(--radius-md); }
+.root-jobs__latest li::before { content: ''; position: absolute; left: 12px; top: 17px; width: 9px; height: 9px; border-radius: var(--radius-full); background: var(--line-strong); }
+.root-jobs__latest li[data-state="ok"]::before { background: var(--success); }
+.root-jobs__latest li[data-state="failed"]::before { background: var(--danger); }
+.root-jobs__latest li[data-state="failed"] { border-color: color-mix(in srgb, var(--danger) 45%, var(--line)); }
+.root-jobs__latest li[data-state="unknown"]::before { background: var(--warning); }
+.root-jobs__latest li[data-state="idle"] strong { color: var(--ink-soft); font-weight: 600; }
+.root-jobs td { font-variant-numeric: tabular-nums; }

@@ -3,7 +3,8 @@ import { useSettingsCopy } from '@/modules/settings/ui/copy-context';
 
 import { useRef, useState } from 'react';
 import { DataTable, Badge, ConfirmDialog, useToast } from '@/components';
-import { IconKey } from '@tabler/icons-react';
+import { IconKey, IconPlus } from '@tabler/icons-react';
+import { SidePanel } from '@/components/SidePanel';
 import { Button } from '@/components/Button';
 import { AutoTextarea } from '@/components/AutoTextarea';
 import { FieldError, useFormValidation } from '@/components/FormValidation';
@@ -18,7 +19,7 @@ export function McpKeyManager({ features, initialKeys, maxLifetimeDays, defaultL
   const toast = useToast();
   const t = useSettingsCopy('mcp', locale);
   const [keys, setKeys] = useState(initialKeys);
-  const [allResources,setAllResources]=useState(false); const [selectedResources,setSelectedResources]=useState<string[]>([]); const [consent,setConsent]=useState(false); const [pendingRevoke,setPendingRevoke]=useState<string|null>(null); const inFlight=useRef(false);
+  const [allResources,setAllResources]=useState(false); const [selectedResources,setSelectedResources]=useState<string[]>([]); const [consent,setConsent]=useState(false); const [pendingRevoke,setPendingRevoke]=useState<string|null>(null); const inFlight=useRef(false); const [creating, setCreating] = useState(false);
   const [name, setName] = useState('');
   const [expiresInDays, setExpiresInDays] = useState(Math.min(maxLifetimeDays, defaultLifetimeDays));
   const [readFeatures, setReadFeatures] = useState<string[]>([]);
@@ -64,7 +65,7 @@ export function McpKeyManager({ features, initialKeys, maxLifetimeDays, defaultL
       const response = await fetch('/api/settings/mcp-keys', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name, readFeatures, writeFeatures, expiresInDays, resourceScope:allResources?{version:1,mode:'all'}:{version:1,mode:'selected',ids:resources.filter(r=>r.kind==='channel'&&selectedResources.includes(`${r.kind}:${r.id}`)).map(r=>r.id),adAccountIds:resources.filter(r=>r.kind==='adAccount'&&selectedResources.includes(`${r.kind}:${r.id}`)).map(r=>r.id)},confirmation:`CREATE MCP KEY ${name.trim()}` }) });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error ?? t.createFailed);
-      setNewToken(result.token);
+      setNewToken(result.token); setCreating(false);
       setKeys(current => [{ ...result.key, revokedAt: null, createdAt: new Date().toISOString(), lastUsedAt: null }, ...current]);
       setName(''); setReadFeatures([]); setWriteFeatures([]);setConsent(false);setSelectedResources([]);setAllResources(false);
       setNotice(t.created); toast.notify({ title: t.created });
@@ -92,6 +93,9 @@ export function McpKeyManager({ features, initialKeys, maxLifetimeDays, defaultL
     }
   }
   return <>
+    {/* The list of keys is the page; creating one happens in a window opened from « New key ». */}
+    <div className={styles['mcp-key-toolbar']}><Button variant="primary" leading={<IconPlus size={16} />} onClick={() => setCreating(true)}>{t.newKey}</Button></div>
+    <SidePanel open={creating} title={t.createKey} closeLabel={t.cancel} onClose={() => { if (!busy) setCreating(false); }}>
     <form method="post" noValidate className={styles['mcp-key-form']} onSubmit={createKey}>
       <div className={styles['mcp-key-fields']}>
         <label>{t.keyName}<input name="name" required maxLength={100} value={name} onChange={event => { setName(event.currentTarget.value); setConsent(false); validation.clear('name'); }} autoComplete="off" placeholder={t.namePlaceholder} disabled={busy} {...validation.fieldProps('name')} /><FieldError {...validation.errorProps('name')} /></label>
@@ -106,6 +110,7 @@ export function McpKeyManager({ features, initialKeys, maxLifetimeDays, defaultL
           <Button type="button" disabled={busy || !readFeatures.length} onClick={() => applyPreset('none')}>{t.presetClear}</Button>
           <span className={styles['mcp-key-summary']} role="status">{fill(t.summary, { read: readFeatures.length, write: writeFeatures.length })}</span>
         </div>
+        <details className={styles['mcp-key-advanced']}><summary>{t.advanced}</summary>
         <div className={styles['mcp-key-feature-grid']}>{[...new Set(features.map(feature=>feature.module))].map(module=><fieldset className={styles['mcp-key-feature-group']} key={module}><legend>{features.find(feature=>feature.module===module)?.moduleLabel??module}</legend>
         <label className={styles['mcp-key-module-all']}><input type="checkbox" aria-label={fill(t.moduleAllLabel, { module: features.find(feature=>feature.module===module)?.moduleLabel??module })} checked={features.some(f=>f.module===module&&f.canRead)&&features.filter(f=>f.module===module&&f.canRead).every(f=>readFeatures.includes(f.id))} disabled={busy} onChange={event=>toggleModule(module,event.currentTarget.checked)} /> {t.moduleAll}</label>
         {features.filter(feature=>feature.module===module).map(feature => <div key={feature.id} className={styles['mcp-key-feature']}>
@@ -114,6 +119,7 @@ export function McpKeyManager({ features, initialKeys, maxLifetimeDays, defaultL
           <label><input aria-label={fill(t.writeLabel, { module: feature.moduleLabel??feature.module, name: feature.name })} type="checkbox" checked={writeFeatures.includes(feature.id)} onChange={event => toggleWrite(feature.id, event.currentTarget.checked)} disabled={!feature.canWrite || busy} /> {t.write}</label>
         </div>)}
         </fieldset>)}</div>
+        </details>
       </fieldset><FieldError {...validation.errorProps('features')} />
       <fieldset><legend>{t.allowedResources}</legend>
         <label><input type="checkbox" checked={allResources} disabled={busy} onChange={event=>{setAllResources(event.target.checked);setConsent(false);}} /> {t.allResources}</label>
@@ -124,10 +130,11 @@ export function McpKeyManager({ features, initialKeys, maxLifetimeDays, defaultL
       <label><input type="checkbox" name="permissionConsent" checked={consent} disabled={busy} onChange={event=>setConsent(event.target.checked)} /> {t.consent}</label>
       <Button type="submit" variant="primary" disabled={busy||!consent||(!allResources&&resourcesTruncated)}>{busy ? t.creating : t.createKey}</Button>
     </form>
+    </SidePanel>
     {notice && <p role="status" className={styles['settings-note']}>{notice}</p>}
     {newToken && <div className={styles['mcp-key-token']}><label htmlFor="new-api-token">{t.copyNow}</label><AutoTextarea id="new-api-token" readOnly value={tokenVisible ? newToken : '•'.repeat(Math.min(newToken.length, 48))} rows={1} autoComplete="off" aria-label={tokenVisible ? t.bearer : t.maskedBearer} onFocus={event => { if (tokenVisible) event.currentTarget.select(); }} /><Button type="button" aria-pressed={tokenVisible} aria-controls="new-api-token" onClick={() => setTokenVisible(value => !value)}>{tokenVisible ? t.hideToken : t.showToken}</Button><Button type="button" onClick={() => void copyToken()}>{t.copyToken}</Button><span id="new-api-token-copy-status" role="status">{copyNotice}</span></div>}
     {pendingRevoke && <ConfirmDialog open title={t.confirmRevoke} objectName={keys.find(key => key.id === pendingRevoke)?.name ?? pendingRevoke} consequence={t.revokeWarning} confirmLabel={t.confirmRevokeButton} cancelLabel={t.cancel} failureLabel={t.revokeFailed} onClose={() => setPendingRevoke(null)} onConfirm={async () => (await revoke(pendingRevoke)) ?? null} />}
-    <DataTable caption={t.allowedFeatures} rows={keys} rowKey={key => key.id} emptyMessage={t.none} emptyIcon={<IconKey />} emptyAction={<Button onClick={() => document.querySelector<HTMLInputElement>('[name="name"]')?.focus()}>{t.createKey}</Button>} columns={[
+    <DataTable caption={t.allowedFeatures} rows={keys} rowKey={key => key.id} emptyMessage={t.none} emptyIcon={<IconKey />} emptyAction={<Button onClick={() => setCreating(true)}>{t.newKey}</Button>} columns={[
       { key: 'name', label: t.name, render: key => <><strong>{key.name}</strong><span className={styles['settings-table__secondary']}>{fill(t.createdOn, { prefix: key.tokenPrefix, date: key.labels?.createdAt ?? '' })}</span></> },
       { key: 'scopes', label: t.scopes, render: key => <><span className={styles['settings-table__secondary']}>{!key.resourceScope ? t.legacyScope : key.resourceScope.mode === 'all' ? t.allScope : fill(t.countScope, { channels: key.resourceScope.ids?.length ?? 0, adAccounts: key.resourceScope.adAccountIds?.length ?? 0 })}</span>{key.readFeatures.map(id => fill(key.writeFeatures.includes(id) ? t.featureWrite : t.featureRead, { name: features.find(feature => feature.id === id)?.name ?? id })).join(', ')}</> },
       { key: 'expires', label: t.expires, render: key => key.labels?.expiresAt ?? '' },

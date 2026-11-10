@@ -14,7 +14,8 @@ const WIDE = '(min-width: 1280px)';
  */
 export function ThreadDetailsLayout({ head, actions, main, details, locale = 'en' }: { head: ReactNode; actions?: ReactNode; main: ReactNode; details: ReactNode; locale?: InboxLocale }) {
   const copy = useInboxCatalog('round3Copy')[locale].screen;
-  const [collapsed, setCollapsed] = useState(false);
+  // The conversation and the reply box come first; the contact details open on demand.
+  const [collapsed, setCollapsed] = useState(true);
   const [drawer, setDrawer] = useState(false);
   const [isWide, setIsWide] = useState(true);
   useEffect(() => {

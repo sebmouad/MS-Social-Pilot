@@ -203,10 +203,11 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
     const main = <>
       {origin}
       <ThreadScroll label={copy.historyLabel} resetKey={`${thread.kind}:${thread.id}:${requestedHistoryCursor ?? ''}`}>
-      <p className={styles.contextNote}>{thread.kind === 'review' ? reviewLabel(locale, 'note') : copy.syncedNote}</p>
+      {/* The note about synced activity moved out of the reading flow: it sat between the post and the comment itself. */}
+      {thread.kind === 'review' ? <p className={styles.contextNote}>{reviewLabel(locale, 'note')}</p> : null}
       <div className={styles.historyHead}>
         <h3>{thread.kind === 'comment' ? copy.commentHistory : thread.kind === 'review' ? reviewLabel(locale, 'reviewHistory') : copy.conversationHistory}</h3>
-        <span>{copy.historyShown(history.shown, history.total, historyNoun)}</span>
+        {history.total > 0 ? <span title={thread.kind === 'review' ? undefined : copy.syncedNote}>{copy.historyShown(history.shown, history.total, historyNoun)}</span> : null}
         {history.olderCursor || history.newerCursor || history.cursor ? historyNav : null}
       </div>
       {history.cursor && history.shown === 0 ? <p className={styles.contextNote}>{copy.noHistory}</p> : null}
