@@ -56,6 +56,13 @@ export async function persistFacebookDiscovery(actor: ConnectionMutationActor, i
       select: { id: true },
     });
 
+    // A connection emptied by a Meta deletion request (data-callbacks.ts) no longer belongs to anyone: its Pages and ad
+    // accounts are free to be taken by the connection the person makes afterwards, exactly like unowned ones.
+    const erased = new Set((await tx.socialAccount.findMany({
+      where: { workspaceId: actor.workspaceId, provider: 'facebook', providerUserId: { startsWith: 'deleted:' } }, select: { id: true },
+    })).map(row => row.id));
+    const adoptable = (ownerId: string | null) => ownerId === null || erased.has(ownerId);
+
     let savedPages = 0;
     let skippedPages = 0;
     for (const page of input.pages) {
@@ -69,8 +76,8 @@ export async function persistFacebookDiscovery(actor: ConnectionMutationActor, i
         // Served with the Page's own token (app/api/channels/[id]/picture); CDN picture URLs are signed and expire.
         await tx.target.create({ data: { id, workspaceId: actor.workspaceId, providerId: page.id, ...pageData, pictureUrl: `/api/channels/${id}/picture`, enabled: false, createdAt: now } });
         savedPages++;
-      } else if (existing.socialAccountId === null || existing.socialAccountId === account.id) {
-        await tx.target.update({ where: { id: existing.id }, data: { ...pageData, pictureUrl: `/api/channels/${existing.id}/picture`, ...(existing.socialAccountId === null ? { enabled: false } : {}) } });
+      } else if (adoptable(existing.socialAccountId) || existing.socialAccountId === account.id) {
+        await tx.target.update({ where: { id: existing.id }, data: { ...pageData, pictureUrl: `/api/channels/${existing.id}/picture`, ...(adoptable(existing.socialAccountId) ? { enabled: false } : {}) } });
         savedPages++;
       } else {
         skippedPages++;
@@ -85,8 +92,8 @@ export async function persistFacebookDiscovery(actor: ConnectionMutationActor, i
       if (!existing) {
         await tx.adAccount.create({ data: { id: randomUUID(), workspaceId: actor.workspaceId, actId: adAccount.id, ...adData, enabled: false } });
         savedAdAccounts++;
-      } else if (existing.socialAccountId === null || existing.socialAccountId === account.id) {
-        await tx.adAccount.update({ where: { id: existing.id }, data: { ...adData, ...(existing.socialAccountId === null ? { enabled: false } : {}) } });
+      } else if (adoptable(existing.socialAccountId) || existing.socialAccountId === account.id) {
+        await tx.adAccount.update({ where: { id: existing.id }, data: { ...adData, ...(adoptable(existing.socialAccountId) ? { enabled: false } : {}) } });
         savedAdAccounts++;
       } else {
         skippedAdAccounts++;
