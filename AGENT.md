@@ -283,8 +283,8 @@ server steps and do not take the pre-migration dump; `deploy-from-server.sh` is 
   arrived (Root › Platforms › Facebook › Health, « Meta webhook deliveries »). Each Page is subscribed to the app
   (`subscribed_apps`) when Facebook is (re)connected, so the Oct 10 connection must be reconnected for real events.
 - Operator details set: ANASSO TRAVAUX, Morocco, Moroccan law 09-08 (+ GDPR where it applies), updated
-  « November 10, 2026 ». Still missing: street address, privacy contact email, hosting provider (the policy says
-  « the operator of this installation » for the contact until the email is set).
+  « November 10, 2026 », address 56 Hay Ghizlan, Ain Aouda, Temara, contact contact@newsgeet.com, hosting Ikoula.
+  Privacy policy, terms and data deletion now name the company, address and contact everywhere.
 - The reviewer uses their own workspace (« Meta Review's workspace », reviewer connects Facebook themselves).
   Its 8 ad accounts from a removed connection were removed on 2026-11-10 (owner's go-ahead), so it is empty: no
   channels, no ad accounts, 2 old draft posts. Root › Workspaces shows « Remove N unlinked ad accounts » if it recurs.
