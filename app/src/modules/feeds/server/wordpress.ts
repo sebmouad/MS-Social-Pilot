@@ -12,7 +12,7 @@ import { audit, bad, lockActor, protect, type Tx } from './core';
 import { feedsError } from './messages';
 import { commentFor, configOf, writeCandidate, defaultPlannerPorts, openDatabase, planSource, recipeSummaryRecord, scanCandidates, supplyLedgerView, type PlannerPorts } from './wordpress-planner';
 import { loadWordpressSettings, patchLimits, type WordpressSettings } from './wordpress-settings';
-import { cachedPoolHealth, computePoolHealth, forgetPoolHealth, type PoolHealth } from './wordpress-pool';
+import { computePoolHealth, forgetPoolHealth, poolHealthWithin, type PoolHealth } from './wordpress-pool';
 import { cancelPlannedPosts, retryRecipeSlots } from './wordpress-recovery';
 import { countPlans, selectPlans, selectSource, type LedgerRow, type SourceRow } from './wordpress-store';
 
@@ -68,14 +68,18 @@ async function selectablePages(workspaceId: string, s: WordpressSettings, auth: 
 /* ----- read ----- */
 
 /** Pool health for the source's channels the viewer may see; null when the library cannot be read right now. */
+/** How long a screen waits for a first library scan before showing the page without its figures. */
+const POOL_WAIT_MS = 2500;
+
 async function readPool(s: WordpressSettings, source: SourceRow, ports: PlannerPorts, auth: FeedAuthorization): Promise<PoolHealth | null> {
   try {
     const now = ports.now();
-    const health = await cachedPoolHealth(`${source.id}|${JSON.stringify([source.workspaceId, source.config, source.targetIds, source.allTargets, s, auth.actor])}`, s.poolCacheSeconds, now, async () => {
+    const health = await poolHealthWithin(`${source.id}|${JSON.stringify([source.workspaceId, source.config, source.targetIds, source.allTargets, s, auth.actor])}`, s.poolCacheSeconds, now, async () => {
       const db = await openDatabase(ports, s, source);
       if (!db) throw new Error('library_unavailable');
       try { return await computePoolHealth({ settings: s, ports, db, source, now }); } finally { await db.close(); }
-    });
+    }, POOL_WAIT_MS);
+    if (!health) return null;
     const allowed = auth.actor.allowedTargetIds;
     if (allowed === undefined) return health;
     const pages = health.pages.filter(p => allowed.includes(p.targetId));

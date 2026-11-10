@@ -35,14 +35,44 @@ export async function computePoolHealth(input: { settings: WordpressSettings; po
 }
 
 const cache = new Map<string, { at: number; health: PoolHealth }>();
+// One scan per key at a time: visits during a scan share it instead of each opening the library again.
+const inflight = new Map<string, Promise<PoolHealth>>();
+// A result past its freshness is still shown while a new scan runs, for at most this long.
+const STALE_LIMIT_MS = 24 * 60 * 60 * 1000;
+
+function scan(key: string, ttlSeconds: number, compute: () => Promise<PoolHealth>): Promise<PoolHealth> {
+  let pending = inflight.get(key);
+  if (!pending) {
+    pending = compute().then(health => { if (ttlSeconds > 0) cache.set(key, { at: Date.now(), health }); return health; }).finally(() => inflight.delete(key));
+    inflight.set(key, pending);
+    pending.catch(() => {}); // a failure is never cached; whoever awaits it sees it
+  }
+  return pending;
+}
+
 /** Reuse a recent result for `ttlSeconds` (the library is scanned in full otherwise). A failure is never cached. */
 export async function cachedPoolHealth(key: string, ttlSeconds: number, now: Date, compute: () => Promise<PoolHealth>): Promise<PoolHealth> {
-  for (const [cachedKey, entry] of cache) if (now.getTime() - entry.at >= ttlSeconds * 1000) cache.delete(cachedKey);
+  for (const [cachedKey, entry] of cache) if (now.getTime() - entry.at >= Math.max(ttlSeconds * 1000, STALE_LIMIT_MS)) cache.delete(cachedKey);
   const hit = cache.get(key);
   if (hit && ttlSeconds > 0 && now.getTime() - hit.at < ttlSeconds * 1000) return hit.health;
-  const health = await compute();
-  if (ttlSeconds > 0) cache.set(key, { at: now.getTime(), health });
-  return health;
+  return scan(key, ttlSeconds, compute);
+}
+
+/**
+ * For screens: never keeps a page waiting on the library. A fresh result is returned as is; an older one is returned
+ * while a new scan runs behind it; with nothing stored, the scan gets `waitMs` and the screen shows no figures (null)
+ * if it is not done by then. The scan carries on and the next visit has its result. A scan of a large library over a
+ * slow connection took about a minute, which held the whole Content feeds page.
+ */
+export async function poolHealthWithin(key: string, ttlSeconds: number, now: Date, compute: () => Promise<PoolHealth>, waitMs: number): Promise<PoolHealth | null> {
+  for (const [cachedKey, entry] of cache) if (now.getTime() - entry.at >= Math.max(ttlSeconds * 1000, STALE_LIMIT_MS)) cache.delete(cachedKey);
+  const hit = cache.get(key);
+  if (hit && ttlSeconds > 0 && now.getTime() - hit.at < ttlSeconds * 1000) return hit.health;
+  const pending = scan(key, ttlSeconds, compute);
+  if (hit) return hit.health;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<null>(resolve => { timer = setTimeout(() => resolve(null), waitMs); });
+  try { return await Promise.race([pending, deadline]); } catch { return null; } finally { clearTimeout(timer); }
 }
 export const forgetPoolHealth = (key: string) => {
   for (const cachedKey of cache.keys()) if (cachedKey === key || cachedKey.startsWith(`${key}|`)) cache.delete(cachedKey);
