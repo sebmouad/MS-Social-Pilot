@@ -105,7 +105,7 @@ export function MediaLibrary({ items, usage, page, hasMore, filters, canWrite, w
 
   const performRename = () => run(async () => {
     if (!renaming) return;
-    const result = await renameMediaAction({ id: renaming.id, name: renameName.trim(), confirmation });
+    const result = await renameMediaAction({ id: renaming.id, name: renameName.trim(), confirmation: `RENAME MEDIA ${renaming.id}` });
     if (!('renamed' in result) || result.renamed !== true || result.id !== renaming.id || result.name !== renameName.trim()) throw new Error(errorText(result));
     setAssets(cur => cur.map(a => a.id === result.id ? { ...a, name: result.name } : a));
     setRenaming(null); say(t('renamed')); router.refresh();
@@ -135,25 +135,23 @@ export function MediaLibrary({ items, usage, page, hasMore, filters, canWrite, w
     {usageMayBeIncomplete && <p className={styles.help}>{t('usageIncomplete')}</p>}
     {visibleAssets.length ? <ul className={styles.grid} aria-label={t('tableCaption')}>
       {visibleAssets.map(a => <li key={a.id} className={styles.tile}>
-        <div className={styles.preview}>{a.kind === 'image' && a.source === 'stored-image' ? <img className={styles.tileImage} src={`/api/media/${encodeURIComponent(a.id)}?w=640`} alt="" loading="lazy" /> : <span className={styles.tileKind}>{a.kind === 'video' ? t('video') : t('image')}</span>}
-          <span className={`${styles.badge}${a.inUse ? ` ${styles.badgeUsed}` : ''}`}>{a.inUse ? usedLabel(a.holderCount) : t('unused')}</span></div>
+        <button type="button" className={`${styles.preview} ${styles.previewButton}`} aria-label={`${t('details')}: ${a.name}`} onClick={() => setDetailId(a.id)}>{a.kind === 'image' && a.source === 'stored-image' ? <img className={styles.tileImage} src={`/api/media/${encodeURIComponent(a.id)}?w=640`} alt="" loading="lazy" /> : <span className={styles.tileKind}>{a.kind === 'video' ? t('video') : t('image')}</span>}
+          <span className={`${styles.badge}${a.inUse ? ` ${styles.badgeUsed}` : ''}`}>{a.inUse ? usedLabel(a.holderCount) : t('unused')}</span></button>
         <div className={styles.tileBody}>
           <span className={styles.name}>{a.name}</span>
           <span className={styles.meta}>{a.mimeType} · {size(a.size)} · {t('added', { date: day(a.createdAt) })}</span>
-          {a.holders && a.holders.length > 0 && <ul className={styles.holders}>{a.holders.map(h => <li key={h.postId}>{h.excerpt || t('untitled')} ({h.status.replace(/_/g, ' ')})</li>)}</ul>}
         </div>
         <div className={styles.tileActions}>
           <a className="ui-button ui-button--primary ui-button--sm" href={`/create?media=${encodeURIComponent(`media:${a.id}`)}`}>{t('createPost')}</a>
-          <Button size="sm" variant="secondary" onClick={() => setDetailId(a.id)}>{t('details')}</Button>
-          {canWrite && workspaceWide && <Button size="sm" disabled={busy} onClick={() => { setNotice(null); setConfirmation(''); setRenameName(a.name); setRenaming(a); }}>{t('rename')}</Button>}
+          <Button size="sm" variant="quiet" onClick={() => setDetailId(a.id)}>{t('details')}</Button>
         </div>
       </li>)}
     </ul> : <p className={styles.empty}>{filtered ? t('noMatch') : t('empty')}</p>}
-    <nav className={styles.pagination} aria-label={t('pages')}>
+    {(page > 1 || hasMore) && <nav className={styles.pagination} aria-label={t('pages')}>
       {page > 1 ? <a className="ui-button ui-button--secondary ui-button--sm" rel="prev" href={query(page - 1)}>{t('previous')}</a> : <span className="ui-button ui-button--secondary ui-button--sm" aria-disabled="true">{t('previous')}</span>}
       <span aria-current="page">{t('page', { page })}</span>
       {hasMore ? <a className="ui-button ui-button--secondary ui-button--sm" rel="next" href={query(page + 1)}>{t('next')}</a> : <span className="ui-button ui-button--secondary ui-button--sm" aria-disabled="true">{t('next')}</span>}
-    </nav>
+    </nav>}
     {canWrite && !workspaceWide && <p className={styles.help}>{t('deleteNeedsAll')}</p>}
 
     {detail ? <SidePanel open title={detail.name} closeLabel={t('close')} onClose={() => setDetailId(null)}
@@ -217,10 +215,9 @@ export function MediaLibrary({ items, usage, page, hasMore, filters, canWrite, w
     </SidePanel> : null}
 
     <Dialog open={Boolean(renaming)} title={t('renameTitle')} onClose={() => !busy && setRenaming(null)} busy={busy}
-      actions={<><Button data-dialog-cancel disabled={busy} onClick={() => setRenaming(null)}>{t('cancel')}</Button><Button variant="primary" disabled={busy || !renameName.trim() || confirmation !== `RENAME MEDIA ${renaming?.id}`} onClick={() => void performRename()}>{t('rename')}</Button></>}>
+      actions={<><Button data-dialog-cancel disabled={busy} onClick={() => setRenaming(null)}>{t('cancel')}</Button><Button variant="primary" disabled={busy || !renameName.trim() || renameName.trim() === renaming?.name} onClick={() => void performRename()}>{t('rename')}</Button></>}>
       {notice?.error && <RouteNotice error focusKey={`media-rename-error:${notice.key}`}>{notice.text}</RouteNotice>}
       <label>{t('renameName')}<input disabled={busy} maxLength={maxName} value={renameName} onChange={e => setRenameName(e.target.value)} /></label>
-      <label>{t('importConfirm', { phrase: `RENAME MEDIA ${renaming?.id ?? ''}` })}<input disabled={busy} autoComplete="off" value={confirmation} onChange={e => setConfirmation(e.target.value)} /></label>
     </Dialog>
 
     <Dialog open={importing} title={t('importTitle')} description={t('importDescription')} onClose={() => !busy && setImporting(false)} busy={busy}

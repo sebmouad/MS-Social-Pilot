@@ -41,3 +41,12 @@
 .compact img { width: 56px; height: 56px; border-radius: var(--radius-sm); object-fit: cover; }
 .compact p { grid-column: 2; margin: 0; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; color: var(--ink); font-size: var(--text-md); line-height: 1.45; }
 .compact p:only-child { grid-column: 1 / -1; }
+
+/* Team notes fold away under each card. */
+.notes { border-top: 1px solid var(--line-subtle); padding-top: var(--space-2); }
+.notes > summary { display: inline-flex; align-items: center; gap: 8px; min-height: 36px; padding: 0 8px; margin-left: -8px; border-radius: var(--radius-sm); color: var(--ink-soft); font-size: var(--text-sm); font-weight: 650; list-style: none; cursor: pointer; }
+.notes > summary::-webkit-details-marker { display: none; }
+.notes > summary:hover { background: var(--surface-hover); color: var(--ink); }
+.notes > summary:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.notes[open] > summary { color: var(--ink); margin-bottom: var(--space-2); }
+.notesCount { min-width: 20px; padding: 1px 7px; border-radius: var(--radius-full); background: var(--accent-soft); color: var(--accent); font-size: var(--text-2xs); font-weight: 700; text-align: center; }

@@ -15,3 +15,8 @@
 
 .root-user-filters nav { display: grid; gap: 10px; }
 .root-user-filters nav p { margin: 0; color: var(--ink-soft); }
+
+/* Filters sit on one line where there is room: fields share the width, the button keeps its own. */
+.root-user-filters form { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; }
+.root-user-filters form .ui-field { flex: 1 1 220px; min-width: 0; }
+.root-user-filters form .ui-button { flex: 0 0 auto; }

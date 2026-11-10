@@ -39,7 +39,7 @@ export function FilterPanel({ title, children, onReset, resetLabel = "Reset filt
     <header className="ui-filter-panel__head"><h2>{title}</h2>{activeCount > 0 && <span className="ui-filter-panel__count" aria-label={`${activeCount}`}>{activeCount}</span>}</header>
     {summary}
     <div className="ui-filter-panel__body">{children}</div>
-    {onReset && <Button variant="quiet" size="sm" className="ui-filter-panel__reset" leading={<IconFilterOff size={15} stroke={1.75} />} disabled={activeCount === 0} onClick={onReset}>{resetLabel}</Button>}
+    {onReset && activeCount > 0 && <Button variant="quiet" size="sm" className="ui-filter-panel__reset" leading={<IconFilterOff size={15} stroke={1.75} />} onClick={onReset}>{resetLabel}</Button>}
   </section>;
 }
 

@@ -54,7 +54,7 @@ export default async function RootUsersPage({ searchParams }: { searchParams: Pr
         { key: 'column5', label: t.colCreated, render: user => <><time dateTime={user.createdAt.toISOString()}>{dates.date(user.createdAt)}</time></> },
         { key: 'column6', label: t.colAccountActions, render: user => <><RootUserControls id={user.id} email={user.email} disabled={Boolean(user.disabledAt)} root={user.isInstanceOwner} self={user.id === actor.id} /></> }
       ]} />
-        <p className="root-directory__pager">{rootText(t.userPageOf, { page: data.page, total: Math.max(1, Math.ceil(data.total / data.take)) })}</p>
+        {data.total > data.take && <p className="root-directory__pager">{rootText(t.userPageOf, { page: data.page, total: Math.max(1, Math.ceil(data.total / data.take)) })}</p>}
       </>}
     </>}
   </RootFrame>;

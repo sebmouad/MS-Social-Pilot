@@ -33,3 +33,37 @@
 .sidePanel section h2 { font-size: var(--text-sm); overflow-wrap: normal; word-break: normal; white-space: normal; }
 .sidePanel section p { font-size: var(--text-xs); line-height: 1.5; }
 .sidePanel table { min-width: 100% !important; }
+
+/* Agenda (2026-11-10): one line per queued post, opened in place for the full preview and its actions. */
+.days { display: flex; gap: 8px; margin: 0 0 var(--space-2); padding: 2px 0 6px; overflow-x: auto; scrollbar-width: none; }
+.days::-webkit-scrollbar { display: none; }
+.day { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 8px; min-height: 36px; padding: 0 12px; border: 1px solid var(--line); border-radius: var(--radius-full); background: var(--surface); color: var(--ink); font-size: var(--text-sm); font-weight: 650; white-space: nowrap; transition: border-color var(--ease-fast), background var(--ease-fast); }
+.day:hover { border-color: var(--line-strong); background: var(--surface-hover); }
+.dayCount { min-width: 22px; padding: 1px 7px; border-radius: var(--radius-full); background: var(--surface-muted); color: var(--ink-soft); font-size: var(--text-2xs); font-weight: 700; text-align: center; font-variant-numeric: tabular-nums; }
+.agenda { display: grid; gap: 8px; scroll-margin-top: 96px; }
+.agenda + .agenda { margin-top: var(--space-5); }
+.agendaHead { display: flex; align-items: center; gap: 10px; margin: 0; color: var(--ink); font-size: var(--text-md); font-weight: 700; }
+.agendaList { margin: 0; padding: 0; list-style: none; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface); box-shadow: var(--shadow-card); overflow: hidden; }
+.agendaItem + .agendaItem { border-top: 1px solid var(--line-subtle); }
+.entryHead { display: grid; grid-template-columns: 62px 44px minmax(0, 1fr) 18px; align-items: center; gap: 12px; min-height: 68px; padding: 10px 14px; list-style: none; cursor: pointer; transition: background var(--ease-fast); }
+.entryHead::-webkit-details-marker { display: none; }
+.entryHead:hover { background: var(--surface-hover); }
+.entryHead:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
+.entryTime { color: var(--ink); font-size: var(--text-sm); font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.entryThumb { display: block; width: 44px; height: 44px; border-radius: var(--radius-sm); background: var(--surface-muted); object-fit: cover; }
+.entryBody { display: grid; gap: 3px; min-width: 0; }
+.entryText { display: -webkit-box; overflow: hidden; -webkit-line-clamp: 2; -webkit-box-orient: vertical; color: var(--ink); font-size: var(--text-md); font-weight: 600; line-height: 1.35; overflow-wrap: anywhere; }
+.entryMeta { display: flex; flex-wrap: wrap; gap: 4px 10px; overflow: hidden; color: var(--ink-soft); font-size: var(--text-xs); }
+.entryDue { color: var(--warning); font-weight: 650; }
+.entryChevron { color: var(--ink-faint); transition: transform var(--ease-fast); }
+.entry[open] > .entryHead { background: color-mix(in srgb, var(--surface-muted) 60%, var(--surface)); }
+.entry[open] > .entryHead .entryChevron { transform: rotate(180deg); }
+.entry[open] > .entryHead .entryText { -webkit-line-clamp: 1; }
+.entryDetail { padding: 12px 14px 16px; border-top: 1px solid var(--line-subtle); background: color-mix(in srgb, var(--surface-muted) 35%, var(--surface)); }
+@media (max-width: 480px) {
+  .entryHead { grid-template-columns: 52px 40px minmax(0, 1fr) 16px; gap: 10px; padding: 10px 12px; }
+  .entryThumb { width: 40px; height: 40px; }
+  .entryTime { font-size: var(--text-xs); }
+  .entryDetail { padding: 10px 10px 14px; }
+}
+@media (prefers-reduced-motion: reduce) { .entryChevron, .entryHead, .day { transition: none; } }

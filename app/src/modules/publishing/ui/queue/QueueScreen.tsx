@@ -2,7 +2,8 @@ import { loadPublishingCopy } from '../../server/customer-copy';
 import { PublishingCopyProvider } from '../kit/CopyProvider';
 import { loadPublishingActionCopy } from '../../server/action-copy';
 import { PublishingActionCopyProvider } from '../WorkflowSubmitButtons';
-import { IconCalendarPlus } from '@tabler/icons-react';
+import { IconCalendarPlus, IconChevronDown } from '@tabler/icons-react';
+import { postThumbnail } from '@/components/post-thumbnail';
 import { InfoTip, PageHeader, Tabs } from '@/components';
 import { loadContent } from '../../server/content-copy';
 import { ContentProvider } from '../ContentProvider';
@@ -63,22 +64,43 @@ export default async function QueuePage({ searchParams }: { searchParams: Promis
   const dayHeading = (key: string) => key === "unscheduled" ? copy.queueUnscheduled : `${key === today ? `${copy.queueToday} · ` : key === tomorrow ? `${copy.queueTomorrow} · ` : ""}${new Intl.DateTimeFormat(locale, { weekday: "long", month: "long", day: "numeric", timeZone: "UTC" }).format(new Date(`${key}T12:00:00Z`))}`;
   const authorName = (authorId: string) => authorId === viewer.user.id ? viewer.user.name : copy.approvalsMember;
 
+  const timeFormat = new Intl.DateTimeFormat(locale, { timeZone, hour: "numeric", minute: "2-digit" });
+  const shortDay = (key: string) => key === "unscheduled" ? copy.queueUnscheduled : key === today ? copy.queueToday : key === tomorrow ? copy.queueTomorrow
+    : new Intl.DateTimeFormat(locale, { weekday: "short", day: "numeric", timeZone: "UTC" }).format(new Date(`${key}T12:00:00Z`));
+  // An agenda: one short line per post (time, picture, opening words, channels). A line opens in place to the full
+  // preview with its actions, so fifty posts stay a few screens long instead of fifty full cards.
   const byDay = <>
-    {[...groups.entries()].map(([key, posts]) => <section key={key} className={workflow.group} aria-labelledby={`queue-${key}`}>
-      <h2 id={`queue-${key}`} className={workflow.groupHeading}>{dayHeading(key)}</h2>
-      <ul className={workflow.items} aria-label={dayHeading(key)}>{posts.map(post => {
+    {groups.size > 1 ? <nav className={styles.days} aria-label={copy.byDay}>
+      {[...groups.entries()].map(([key, posts]) => <a key={key} className={styles.day} href={`#queue-${key}`}><span>{shortDay(key)}</span><span className={styles.dayCount}>{posts.length.toLocaleString(locale)}</span></a>)}
+    </nav> : null}
+    {[...groups.entries()].map(([key, posts]) => <section key={key} className={styles.agenda} aria-labelledby={`queue-${key}`}>
+      <h2 id={`queue-${key}`} className={styles.agendaHead}><span>{dayHeading(key)}</span><span className={styles.dayCount}>{posts.length.toLocaleString(locale)}</span></h2>
+      <ul className={styles.agendaList} aria-label={dayHeading(key)}>{posts.map(post => {
         const due = post.scheduledAt !== null && post.scheduledAt <= now;
         const mayCancel = canCancelQueuedPost({ canWritePosts: viewer.permissions.features["publishing/posts"].write, role: viewer.membership.role, userId: viewer.user.id, authorId: post.authorId });
         const mayMove = mayCancel && post.scheduledAt && post.targets.length > 0 && isWaitingToReschedule(post);
         const wall = post.scheduledAt ? instantToWall(post.scheduledAt, timeZone) : null;
+        const thumb = postThumbnail(post.media);
+        const channels = post.targets.map(row => row.target.name);
         const actions = <div className={workflow.actions}>
           {origins.get(post.id) ? <OriginBadge origin={origins.get(post.id)!} compact /> : null}
+          <a className="ui-button ui-button--secondary ui-button--sm" href={`/content/post/${encodeURIComponent(post.id)}`}>{content.copy.approvalsOpenPost}</a>
           {mayCancel ? <><CancelScheduleForm postId={post.id} action={cancelScheduledPostAction} locale={locale} /><p className={workflow.help}>{copy.queueCancelHelp}</p></>
             : <p className={workflow.help}>{viewer.permissions.features["publishing/posts"].write ? copy.queueCancelOnly : copy.queueViewOnly}</p>}
           {mayMove && wall ? <RescheduleQueuedPost postId={post.id} date={wall.date} time={wall.time} timeZone={timeZone} text={post.message} targetIds={post.targets.map(row => row.target.id)} /> : null}
-          {due ? <p className={workflow.help} role="status">{copy.queueDue}</p> : null}
         </div>;
-        return <li key={post.id} className={workflow.item}><PostPreview variant="compact" post={post} authorName={authorName(post.authorId)} timeZone={timeZone} locale={locale} actions={actions} /></li>;
+        return <li key={post.id} className={styles.agendaItem}><details className={styles.entry}>
+          <summary className={styles.entryHead}>
+            <span className={styles.entryTime}>{post.scheduledAt ? timeFormat.format(post.scheduledAt) : "—"}</span>
+            {thumb?.url ? <img className={styles.entryThumb} src={thumb.url} alt="" loading="lazy" /> : <span className={styles.entryThumb} aria-hidden="true" />}
+            <span className={styles.entryBody}>
+              <span className={styles.entryText}>{post.message}</span>
+              <span className={styles.entryMeta}>{channels[0] ?? ""}{channels.length > 1 ? ` +${channels.length - 1}` : ""}{due ? <span className={styles.entryDue}>{copy.queueDue}</span> : null}</span>
+            </span>
+            <IconChevronDown className={styles.entryChevron} size={18} aria-hidden="true" />
+          </summary>
+          <div className={styles.entryDetail}><PostPreview variant="compact" post={post} authorName={authorName(post.authorId)} timeZone={timeZone} locale={locale} actions={actions} /></div>
+        </details></li>;
       })}</ul>
     </section>)}
   </>;

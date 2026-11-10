@@ -8,6 +8,8 @@ import { submitForApprovalAction } from '../posts/actions';
 import { ReviewCard, type ApprovalRow } from './ApprovalsList';
 import type { KitLocale } from '../kit/copy';
 import { postThumbnail } from '@/components/post-thumbnail';
+import { IconMessage2 } from '@tabler/icons-react';
+import { useCollaborationCopy } from '../compose/CopyProvider';
 import styles from './approvals.module.css';
 
 export type PipelineNote = { id: string; body: string; authorId: string | null; authorName: string | null; createdAt: string; createdLabel?: string };
@@ -41,6 +43,7 @@ function PipelineCard({ row, locale, timeZone, viewerId, canWriteNotes, canModer
   const { copy: content } = useContent();
   // Library pictures are stored as references; the shared helper turns them into the authorized media address.
   const cover = postThumbnail(row.media)?.url ?? null;
+  const collab = useCollaborationCopy();
   return <article className={styles.card} aria-label={fillContent(content.approvalsSubmittedBy, { name: row.authorName })}>
     <header className={styles.cardHead}>
       <div><strong>{row.authorName}</strong><span className={styles.when}>{row.whenLabel}</span></div>
@@ -56,7 +59,11 @@ function PipelineCard({ row, locale, timeZone, viewerId, canWriteNotes, canModer
       {row.canSubmit ? <form noValidate action={submitForApprovalAction}><input type="hidden" name="postId" value={row.id} /><button className="ui-button ui-button--primary ui-button--sm" type="submit">{t('submitForApproval')}</button></form> : null}
       <a className="ui-button ui-button--secondary ui-button--sm" href={`/content/post/${encodeURIComponent(row.id)}`}>{content.approvalsOpenPost}</a>
     </div>
-    <Thread row={row} timeZone={timeZone} viewerId={viewerId} canWriteNotes={canWriteNotes} canModerateNotes={canModerateNotes} />
+    {/* Notes open on demand: a note form inside every card made the board several screens long. */}
+    <details className={styles.notes} open={row.notes.length > 0 && row.notes.length <= 2}>
+      <summary><IconMessage2 size={15} aria-hidden="true" /><span>{collab.team_notes}</span>{row.notes.length > 0 ? <span className={styles.notesCount}>{row.notes.length.toLocaleString(locale)}</span> : null}</summary>
+      <Thread row={row} timeZone={timeZone} viewerId={viewerId} canWriteNotes={canWriteNotes} canModerateNotes={canModerateNotes} />
+    </details>
   </article>;
 }
 

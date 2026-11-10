@@ -123,3 +123,9 @@
 .detailHolders a { color: var(--accent); font-weight: 650; overflow-wrap: anywhere; }
 /* Phones: two tiles per row, so a 50-image library is not 50 screens tall. */
 @media (max-width: 38rem) { .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); } }
+
+/* The picture opens the details; the tile keeps one main action. */
+.previewButton { width: 100%; padding: 0; border: 0; font: inherit; color: inherit; cursor: pointer; }
+.previewButton:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
+.tileActions { justify-content: space-between; }
+@media (max-width: 38rem) { .tileBody { padding: var(--space-2) var(--space-3); } .tileActions { padding: 0 var(--space-3) var(--space-3); } .tileBody .meta { display: -webkit-box; overflow: hidden; -webkit-line-clamp: 2; -webkit-box-orient: vertical; } }
