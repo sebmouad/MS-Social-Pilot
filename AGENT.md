@@ -137,7 +137,14 @@ bash app/scripts/deploy.sh --host <SERVER_IP> --user root --key <SSH_KEY_PATH>
   stacked `DataTable` row is its own card with the first column as headline (`styles/components.css`); class-less
   `select`/`input` inside `main` or a dialog get the standard control look (polish layer at the end of
   `components.css`). Reviewed on screenshots with an empty workspace only: no connected channels, posts or messages.
-- **Activation status (2026-11-09): not active yet.** It needs, once: (1) one manual deploy of current `main`
+- **Auto-update is active (2026-11-10):** pushes to `main` install themselves on social.newsgeet.com in about 3 minutes.
+  Verify a change there with the `SP_*` credentials (read-only: navigate and screenshot, never submit forms).
+  The local database has no connected account, so content screens (Queue, Approvals, Library, Insights) can only be
+  judged on the live site.
+- Screen changes of 2026-11-10: Queue « By day » is an agenda (`queue.module.css` `.entry*`, rows are `<details>`);
+  Library tiles open details from the picture, rename has no typed phrase; Approvals folds team notes and lays out
+  non-empty stages full width; Root Users/Workspaces show reset and pager only when useful.
+- Earlier note, kept for history. **Activation status (2026-11-09): not active yet.** It needs, once: (1) one manual deploy of current `main`
   (installs the timer), (2) Root › Configuration › Updates: save a webhook secret and turn on « Install GitHub pushes
   automatically », (3) GitHub › sebmouad/MS-Social-Pilot › Settings › Webhooks › Add webhook: payload URL
   `https://social.newsgeet.com/api/updates/github`, content type `application/json`, the same secret, push events
