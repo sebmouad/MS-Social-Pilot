@@ -179,8 +179,9 @@ th[aria-sort="ascending"], th[aria-sort="descending"] { color: var(--ink); }
   .ui-table--stack tbody { display: grid; gap: 10px; }
   .ui-table--stack tbody tr { position: relative; display: grid; gap: 8px; padding: 14px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface); box-shadow: var(--shadow-card); }
   .ui-table--stack tbody tr.is-selected { border-color: var(--accent); background: var(--accent-soft); }
-  .ui-table--stack td { position: relative; display: block; height: auto; min-height: 20px; padding: 0 0 0 38%; border: 0; background: transparent !important; color: var(--ink); text-align: left !important; overflow-wrap: anywhere; }
-  .ui-table--stack td[data-label]::before { content: attr(data-label); position: absolute; left: 0; top: 1px; width: calc(38% - 12px); color: var(--ink-faint); font-size: var(--text-xs); font-weight: 650; line-height: 1.5; }
+  /* The label floats into the cell's left padding, so a label that wraps makes its own line taller instead of running into the next one. */
+  .ui-table--stack td { position: relative; display: flow-root; height: auto; min-height: 20px; padding: 0 0 0 38%; border: 0; background: transparent !important; color: var(--ink); text-align: left !important; overflow-wrap: anywhere; }
+  .ui-table--stack td[data-label]::before { content: attr(data-label); position: static; float: left; width: calc(61.29% - 12px); margin-left: -61.29%; padding-top: 1px; color: var(--ink-faint); font-size: var(--text-xs); font-weight: 650; line-height: 1.5; overflow-wrap: break-word; }
   .ui-table--stack td:not([data-label]) { padding-left: 0; }
   .ui-table--stack td:not(.ui-table__check):not(.ui-table__actions):first-child, .ui-table--stack td.ui-table__check + td { padding: 0 0 10px; border-bottom: 1px solid var(--line-subtle); font-size: var(--text-md); font-weight: 650; }
   .ui-table--stack td:not(.ui-table__check):not(.ui-table__actions):first-child::before, .ui-table--stack td.ui-table__check + td::before { content: none; }
@@ -188,6 +189,9 @@ th[aria-sort="ascending"], th[aria-sort="descending"] { color: var(--ink); }
   .ui-table--stack td.ui-table__check { position: absolute; top: 12px; right: 12px; z-index: 1; width: auto; min-height: 0; padding: 0 !important; }
   .ui-table--stack td.ui-table__actions { display: flex; justify-content: flex-end; width: auto; padding: 0 !important; }
   .ui-table--stack tbody tr[aria-hidden] td { padding-left: 0; }
+  /* A cell that holds only a button or link button is the card's action: no label, left edge. */
+  .ui-table--stack td:has(> :is(.ui-button, button, form):only-child) { padding-left: 0; }
+  .ui-table--stack td:has(> :is(.ui-button, button, form):only-child)::before { content: none; }
   .ui-table--stack td:empty { display: none; }
   .ui-table-wrap:has(.ui-table--sticky) { max-height: none; }
 }

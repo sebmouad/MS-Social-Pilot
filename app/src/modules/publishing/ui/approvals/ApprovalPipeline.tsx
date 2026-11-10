@@ -7,6 +7,7 @@ import { ChannelsCell } from '../posts/PostTableCells';
 import { submitForApprovalAction } from '../posts/actions';
 import { ReviewCard, type ApprovalRow } from './ApprovalsList';
 import type { KitLocale } from '../kit/copy';
+import { postThumbnail } from '@/components/post-thumbnail';
 import styles from './approvals.module.css';
 
 export type PipelineNote = { id: string; body: string; authorId: string | null; authorName: string | null; createdAt: string; createdLabel?: string };
@@ -38,8 +39,8 @@ function Thread({ row, timeZone, viewerId, canWriteNotes, canModerateNotes }: { 
 function PipelineCard({ row, locale, timeZone, viewerId, canWriteNotes, canModerateNotes }: { row: PipelineRow; locale: KitLocale; timeZone: string; viewerId: string; canWriteNotes: boolean; canModerateNotes: boolean }) {
   const t = usePublishingActionText(locale);
   const { copy: content } = useContent();
-  const first = Array.isArray(row.media) ? row.media[0] as { kind?: unknown; url?: unknown } | undefined : undefined;
-  const cover = first?.kind === 'image' && typeof first.url === 'string' ? first.url : null;
+  // Library pictures are stored as references; the shared helper turns them into the authorized media address.
+  const cover = postThumbnail(row.media)?.url ?? null;
   return <article className={styles.card} aria-label={fillContent(content.approvalsSubmittedBy, { name: row.authorName })}>
     <header className={styles.cardHead}>
       <div><strong>{row.authorName}</strong><span className={styles.when}>{row.whenLabel}</span></div>
@@ -48,7 +49,7 @@ function PipelineCard({ row, locale, timeZone, viewerId, canWriteNotes, canModer
     {row.stageNote ? <p className={styles.help}>{row.stageNote}</p> : null}
     {/* Outside review, a compact summary: the full preview (with first comment) made one column thousands of pixels tall. */}
     <div className={styles.compact}>
-      {cover ? <img src={/^\/api\/media\//.test(cover) ? `${cover}?w=160` : cover} alt="" loading="lazy" /> : null}
+      {cover ? <img src={cover} alt="" loading="lazy" /> : null}
       <p>{row.message}</p>
     </div>
     <div className={styles.actions}>
