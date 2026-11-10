@@ -62,3 +62,46 @@ export async function deleteRootWorkspace(actorId: string, workspaceId: string, 
   }, { timeout });
   return { deleted: true as const, workspaceId, counts };
 }
+
+export const rootOrphanAdAccountsConfirmation = (workspaceId: string) => `REMOVE UNLINKED AD ACCOUNTS ${workspaceId}`;
+// An ad account is unlinked when no Facebook connection of its workspace holds it any more (the connection was removed
+// or erased after a Meta deletion request). Its figures, stored campaigns and change history go with it (ON DELETE CASCADE).
+const unlinked = (workspaceId: string) => prisma.$queryRaw<Array<{ id: string; name: string }>>`
+  SELECT a.id, a.name FROM ad_accounts a WHERE a."workspaceId" = ${workspaceId}
+    AND (a."socialAccountId" IS NULL OR NOT EXISTS (SELECT 1 FROM social_accounts s WHERE s.id = a."socialAccountId" AND s."workspaceId" = a."workspaceId"))
+  ORDER BY a.name, a.id`;
+
+/** Read-only: the ad accounts of a workspace that no connection holds. */
+export async function previewRootOrphanAdAccounts(actorId: string, workspaceId: string) {
+  if (!rootUserIdSchema.safeParse(workspaceId).success) throw new OperationError('invalid_request', 'Choose a valid workspace.');
+  const actor = await prisma.user.findUnique({ where: { id: actorId }, select: { isInstanceOwner: true, disabledAt: true } });
+  if (!actor?.isInstanceOwner || actor.disabledAt) throw new OperationError('forbidden', 'Installation-owner access is required.');
+  const rows = await unlinked(workspaceId);
+  return { workspaceId, count: rows.length, names: rows.map(row => row.name).slice(0, 50), confirmation: rootOrphanAdAccountsConfirmation(workspaceId) };
+}
+
+/**
+ * Root cleanup: removes the ad accounts no connection holds, with an exact confirmation. Linked ad accounts are never
+ * touched, and nothing is sent to Meta. Refused while an ads change is still being applied for one of them.
+ */
+export async function removeRootOrphanAdAccounts(actorId: string, workspaceId: string, confirmation: string) {
+  if (!rootUserIdSchema.safeParse(workspaceId).success || !rootUserConfirmationSchema.safeParse(confirmation).success) throw new OperationError('invalid_request', 'Enter the exact confirmation shown.');
+  if (confirmation !== rootOrphanAdAccountsConfirmation(workspaceId)) throw new OperationError('invalid_request', 'Enter the exact confirmation shown.');
+  const [timeout, maxWait] = await Promise.all([runtimeConfig('data.workspaceOperationTimeoutMs'), runtimeConfig('data.workspaceOperationLockWaitMs')]);
+  const { assertAdsOperationsSettled } = await import('@/modules/ads/management/retention');
+  return prisma.$transaction(async tx => {
+    const actor = await tx.user.findUnique({ where: { id: actorId }, select: { isInstanceOwner: true, disabledAt: true } });
+    if (!actor?.isInstanceOwner || actor.disabledAt) throw new OperationError('forbidden', 'Installation-owner access is required.');
+    const rows = await tx.$queryRaw<WorkspaceAccessRow[]>`SELECT id, name, "suspendedAt" FROM workspaces WHERE id = ${workspaceId} FOR UPDATE`;
+    if (!rows[0]) throw new OperationError('not_found', 'Workspace not found.');
+    const ids = (await tx.$queryRaw<Array<{ id: string }>>`
+      SELECT a.id FROM ad_accounts a WHERE a."workspaceId" = ${workspaceId}
+        AND (a."socialAccountId" IS NULL OR NOT EXISTS (SELECT 1 FROM social_accounts s WHERE s.id = a."socialAccountId" AND s."workspaceId" = a."workspaceId"))
+      FOR UPDATE`).map(row => row.id);
+    if (!ids.length) return { removed: 0 };
+    await assertAdsOperationsSettled(tx, workspaceId, ids);
+    const removed = await tx.adAccount.deleteMany({ where: { workspaceId, id: { in: ids } } });
+    await tx.$executeRaw`INSERT INTO root_activities (id, "actorId", action, detail, "createdAt") VALUES (${randomUUID()}, ${actorId}, 'root.workspace_orphan_ad_accounts_removed', ${JSON.stringify({ workspaceId, adAccounts: removed.count })}::jsonb, NOW())`;
+    return { removed: removed.count };
+  }, { timeout, maxWait });
+}
