@@ -199,3 +199,5 @@ button.settings-row-actions__link:disabled { cursor: progress; opacity: .6; }
 .retention-list dt { color: var(--ink); font-size: 13px; font-weight: 600; }
 .retention-list dt small { display: block; margin-top: 2px; color: var(--ink-faint); font-size: 12px; font-weight: 400; }
 .retention-list dd { margin: 0; color: var(--ink-soft); font-size: 13px; font-variant-numeric: tabular-nums; text-align: end; }
+/* Channels toolbar: the sentence takes the room, the two buttons stay side by side at the right. */
+@media (min-width: 621px) { .connection-toolbar > p { flex: 1 1 auto; min-width: 0; } .connection-toolbar > div { flex: 0 0 auto; flex-wrap: nowrap; } .connection-toolbar > div > button { display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; } }

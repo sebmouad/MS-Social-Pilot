@@ -606,3 +606,5 @@ th[aria-sort="ascending"], th[aria-sort="descending"] { color: var(--ink); }
 .ui-segmented__option[aria-checked=true] { color: var(--ink); box-shadow: 0 1px 3px rgb(20 24 40 / 14%), 0 0 0 1px var(--line); }
 /* An empty state already inside a card needs no second frame. */
 :where(.panel, .ui-fieldgroup, [class*="card"], [class*="Card"], [class*="panel"], [class*="Panel"]) > .ui-state { border-color: transparent; background: transparent; box-shadow: none; }
+/* A date in a table cell stays on one line; narrow columns used to break it across three. */
+@media (min-width: 481px) { .ui-table td > time { white-space: nowrap; } }

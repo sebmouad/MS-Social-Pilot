@@ -16,6 +16,8 @@ export const ROOT_CONFIG_COPY = {
   "allSections": "All sections",
   "searchMore": "Showing the first {shown} of {count}. Add a word to narrow the search.",
   "customValue": "Changed",
+  "on": "On",
+  "off": "Off",
   "saving": "Saving…",
   "clearing": "Clearing…",
   "saveFailure": "Could not save this setting. Check your connection and try again.",

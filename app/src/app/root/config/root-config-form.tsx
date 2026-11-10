@@ -176,7 +176,7 @@ export function RootConfigForm({ definitions, initialValues, availability, group
         <div className="root-config__card-head"><h2>{definition.label}</h2>{current?.source === 'database' ? <Badge tone="brand">{text.customValue}</Badge> : null}</div>
         <div className="root-config__group">{search ? <span>{groupByOwner ? `${ownerName(definition)} · ` : ''}{definition.group}</span> : null}<code>{definition.key}</code></div>
         <p>{definition.description}</p>
-        {definition.kind === 'boolean' ? <Switch label={definition.label} disabled={isPending} checked={Boolean(current?.value)} onChange={checked => void write(definition.key, 'save', checked)} /> : <Field label={definition.label} error={fieldErrors[definition.key]}>
+        {definition.kind === 'boolean' ? <div className="root-config__toggle"><Switch label={definition.label} disabled={isPending} checked={Boolean(current?.value)} onChange={checked => void write(definition.key, 'save', checked)} /><span aria-hidden="true">{current?.value ? text.on : text.off}</span></div> : <Field label={definition.label} error={fieldErrors[definition.key]}>
           <div className="root-config__controls">
           {definition.kind === 'select' ? <SettingSelect label={definition.label} disabled={isPending} value={String(current?.value ?? definition.defaultValue)} options={[...(definition.options ?? [])]} onChange={value => void write(definition.key, 'save', value)} />
             : definition.kind === 'json' ? <SettingJson label={definition.label} disabled={isPending} value={inputs[definition.key] ?? JSON.stringify(current?.value ?? definition.defaultValue, null, 2)} onChange={value => setInputs(old => ({ ...old, [definition.key]: value }))} />
