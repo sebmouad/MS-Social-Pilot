@@ -130,6 +130,10 @@ bash app/scripts/deploy.sh --host <SERVER_IP> --user root --key <SSH_KEY_PATH>
   itself was run locally and works); most likely the server's installed `socialpilot-deploy` was an older copy. The
   deploy script now hands over to the script of the version it installs and refreshes `socialpilot-deploy`;
   Root › Updates shows the one-time server command when a request waits more than two minutes.
+- Root › Updates (2026-11-10 redesign): `modules/root/ui/UpdatesWorkspace.tsx` + `app/root/updates/updates.css`. Status
+  card for the running version, update list with filter, confirm before « Update now », log and GitHub steps in
+  modals (log fetched from `GET /api/root/updates/[id]`), list refreshes every 10 s while something waits or installs.
+  `Dialog` takes `sheet`: on phones it rises from the bottom edge instead of covering the screen.
 - **Activation status (2026-11-09): not active yet.** It needs, once: (1) one manual deploy of current `main`
   (installs the timer), (2) Root › Configuration › Updates: save a webhook secret and turn on « Install GitHub pushes
   automatically », (3) GitHub › sebmouad/MS-Social-Pilot › Settings › Webhooks › Add webhook: payload URL

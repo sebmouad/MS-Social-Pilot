@@ -48,6 +48,12 @@ export async function readUpdates(limit = 20): Promise<UpdateRow[]> {
   return prisma.$queryRaw<UpdateRow[]>`SELECT id, "commit", branch, source, status, summary, "deployedCommit", log, "createdAt", "startedAt", "finishedAt" FROM app_updates ORDER BY "createdAt" DESC LIMIT ${limit}`;
 }
 
+/** The end of one update's log, read when its log is opened. */
+export async function readUpdateLog(id: string): Promise<string | null | undefined> {
+  const rows = await prisma.$queryRaw<Array<{ log: string | null }>>`SELECT log FROM app_updates WHERE id = ${id} LIMIT 1`;
+  return rows[0] ? rows[0].log : undefined;
+}
+
 /** The deploy script writes the release's commit beside the app ("abc1234 - message (date)"); absent before the first update. */
 export async function runningVersion(): Promise<string | null> {
   try { return (await readFile(path.join(process.cwd(), '.current-commit'), 'utf8')).trim().slice(0, 300) || null; } catch { return null; }
