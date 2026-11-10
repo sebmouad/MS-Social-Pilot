@@ -6,6 +6,7 @@ import { Avatar } from '@/components/Avatar';
 import { PostThumb } from '@/components/PostThumb';
 import type { PostThumbnail } from '@/components/post-thumbnail';
 import { DataTable } from '@/components/DataTable';
+import { SidePanel } from '@/components/SidePanel';
 import '../analytics.css';
 
 export type PostsTableRow = {
@@ -45,6 +46,8 @@ export function PostsTable({ rows, measures: allMeasures, locale, emptyAction, c
   const shownKeys = (picked ?? [...measures].sort((a, b) => preference(a.key) - preference(b.key)).slice(0, DEFAULT_COLUMNS).map(measure => measure.key)).filter(key => measures.some(measure => measure.key === key));
   const toggle = (key: string) => setPicked(() => { const current = new Set(shownKeys); if (current.has(key)) current.delete(key); else current.add(key); return measures.filter(measure => current.has(measure.key)).map(measure => measure.key); });
   const number = useMemo(() => new Intl.NumberFormat(locale), [locale]);
+  const [openKey, setOpenKey] = useState<string | null>(null);
+  const opened = rows.find(row => row.key === openKey) ?? null;
   const when = (value: string | null, label?: string) => value ? <time dateTime={value}>{label ?? ''}</time> : unavailable;
   const chosen = measures.filter(measure => shownKeys.includes(measure.key));
   const peak = (key: string) => Math.max(0, ...rows.map(row => row.measures[key]).filter((value): value is number => typeof value === 'number' && Number.isFinite(value)));
@@ -70,7 +73,7 @@ export function PostsTable({ rows, measures: allMeasures, locale, emptyAction, c
         </label>)}
       </fieldset>
     </details>}
-    <DataTable caption={t("Published posts")} rows={rows} rowKey={row => row.key} density="compact"
+    <DataTable caption={t("Published posts")} rows={rows} rowKey={row => row.key} density="compact" onRowClick={row => setOpenKey(row.key)}
       emptyIcon={<IconChartBar />} emptyMessage={t("No published posts for this selection and period.")} emptyAction={emptyAction}
       sort={activeSortColumn ? { key: activeSortColumn, direction: sortDirection === 'asc' ? 'ascending' : 'descending', onChange: handleSort } : undefined}
       columns={[
@@ -93,5 +96,18 @@ export function PostsTable({ rows, measures: allMeasures, locale, emptyAction, c
         } })),
         { key: 'measuredAt', label: t("Measured"), render: row => when(row.measuredAt, row.labels?.measuredAt) },
       ]} />
+    {/* A row opens the post with every stored figure, not only the chosen columns. */}
+    <SidePanel open={opened !== null} title={t("Post")} closeLabel={locale === 'fr' ? 'Fermer' : 'Close'} onClose={() => setOpenKey(null)}
+      actions={opened ? <>{opened.url ? <a className="ui-button ui-button--secondary" href={opened.url} rel="noreferrer" target="_blank">{opened.channelName}<IconExternalLink size={14} aria-hidden="true" /></a> : null}{opened.postHref ? <a className="ui-button ui-button--primary" href={opened.postHref}>{t("Open in Posts")}</a> : null}</> : undefined}>
+      {opened ? <div className="analytics-posts__detail">
+        <div className="analytics-posts__detail-head">
+          <span data-module="analytics" className="analytics-posts__media"><PostThumb thumb={opened.thumbnail ?? null} size="lg" /></span>
+          <div><p className="analytics-posts__detail-text">{opened.text || unavailable}</p>
+            <small className="analytics-posts__channel"><Avatar name={opened.channelName} size="sm" decorative />{opened.channelName} · {when(opened.publishedAt, opened.labels?.publishedAt)}</small></div>
+        </div>
+        <dl className="analytics-posts__figures">{measures.filter(measure => typeof opened.measures[measure.key] === 'number').map(measure => <div key={measure.key}><dt>{measure.label}</dt><dd>{number.format(opened.measures[measure.key] as number)}</dd></div>)}</dl>
+        <p className="small-note">{t("Measured")}: {when(opened.measuredAt, opened.labels?.measuredAt)}</p>
+      </div> : null}
+    </SidePanel>
   </div>;
 }

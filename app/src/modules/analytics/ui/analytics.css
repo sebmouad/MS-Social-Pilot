@@ -128,3 +128,13 @@
 .analytics-period__chip small { padding: 1px 6px; border-radius: 6px; background: color-mix(in srgb, var(--mod, var(--accent)) 16%, var(--surface)); font-size: 10.5px; font-weight: 750; }
 .analytics-period__chip[data-kind="compare"] { background: var(--surface-muted); color: var(--ink-soft); font-weight: 550; }
 @media (forced-colors: active) { .analytics-posts__bar > span { background: CanvasText; forced-color-adjust: none; } }
+
+/* A Post explorer row opened in the detail window: the post, then every stored figure as a tile. */
+.analytics-posts__detail { display: grid; gap: var(--space-4); }
+.analytics-posts__detail-head { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--space-4); align-items: start; }
+.analytics-posts__detail-text { margin: 0 0 8px; color: var(--ink); font-size: var(--text-md); line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
+.analytics-posts__figures { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin: 0; }
+.analytics-posts__figures > div { display: grid; gap: 4px; padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--radius-md); background: color-mix(in srgb, var(--surface-muted) 55%, var(--surface)); }
+.analytics-posts__figures dt { color: var(--ink-soft); font-size: var(--text-xs); font-weight: 650; }
+.analytics-posts__figures dd { margin: 0; font-size: var(--text-xl); font-weight: 700; font-variant-numeric: tabular-nums; }
+.ui-table--clickable tbody tr { cursor: pointer; }

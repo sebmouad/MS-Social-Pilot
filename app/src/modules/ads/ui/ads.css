@@ -191,7 +191,7 @@
 .ads-creative__kind[aria-checked=true] { border-color: var(--accent); background: var(--accent-soft); box-shadow: 0 0 0 1px var(--accent); }
 .ads-creative__pictures { display: grid; grid-template-columns: repeat(auto-fill, minmax(76px, 1fr)); gap: 8px; max-height: 268px; padding: 2px; overflow-y: auto; scrollbar-width: thin; }
 .ads-creative__picture { position: relative; aspect-ratio: 1; padding: 0; border: 2px solid transparent; border-radius: var(--radius-sm); background: var(--surface-muted); overflow: hidden; cursor: pointer; }
-.ads-creative__picture img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.ads-creative__picture img { position: absolute; inset: 0; display: block; width: 100%; height: 100%; object-fit: cover; }
 .ads-creative__picture:hover:not(:disabled) { border-color: var(--line-strong); }
 .ads-creative__picture[aria-checked=true] { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
 .ads-creative__picture[aria-checked=true]::after { content: '✓'; position: absolute; top: 4px; right: 4px; display: grid; place-items: center; width: 20px; height: 20px; border-radius: var(--radius-full); background: var(--accent); color: var(--on-accent); font-size: 12px; font-weight: 700; }
