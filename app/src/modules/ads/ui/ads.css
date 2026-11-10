@@ -255,3 +255,18 @@
 .ads-creatives__detail p { margin: 0 0 10px; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.5; }
 @media (max-width: 760px) { .ads-creatives__detail { grid-template-columns: minmax(0, 1fr); } .ads-creatives__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); } }
 @media (prefers-reduced-motion: reduce) { .ads-creatives__card { transition: none; } }
+
+/* Ad set form: one field per half row, the action on its own row; extra countries as removable names. */
+.ads-campaign-create__fields > label, .ads-campaign-create__fields > .ads-country-more { flex: 1 1 calc(50% - .75rem); min-width: min(100%, 12rem); }
+.ads-campaign-create__fields > button[type="submit"] { flex: 1 1 100%; justify-content: center; }
+.ads-campaign-create__fields select, .ads-campaign-create__fields input { width: 100%; }
+.ads-country-more { display: grid; gap: .3rem; align-content: start; }
+.ads-country-more ul { display: flex; flex-wrap: wrap; gap: .35rem; margin: 0; padding: 0; list-style: none; }
+.ads-country-more li { display: inline-flex; align-items: center; gap: .25rem; padding: .15rem .25rem .15rem .6rem; border: 1px solid var(--line); border-radius: 999px; background: var(--surface-muted); font-size: var(--text-sm); }
+.ads-country-more li button { width: 22px; height: 22px; min-height: 0; padding: 0; border: 0; border-radius: 50%; background: none; color: var(--ink-soft); font-size: 15px; line-height: 1; cursor: pointer; }
+.ads-country-more li button:hover { background: var(--surface-hover); color: var(--ink); }
+/* In the creation drawer the drawer is the frame and carries the title: no second box, no repeated heading. */
+.ui-drawer__body .ads-campaign-create { margin: 0; padding: 0; border: 0; border-radius: 0; background: none; }
+.ui-drawer__body .ads-campaign-create > :is(h3, h4) { display: none; }
+.ui-drawer__body .ads-campaign-create > .small-note { margin-top: 0; }
+.ui-drawer__body .ads-campaign-create__fields { align-items: flex-start; }

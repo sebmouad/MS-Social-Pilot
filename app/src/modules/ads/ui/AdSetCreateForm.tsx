@@ -9,6 +9,8 @@ import { budgetFractionDigits, formatBudgetMinor, parseBudgetAmount } from './bu
 import { fillAdsTemplate as fill, type AdsUiSchema } from '@/platforms/ads-ui';
 import { classifyCreationResponse, creationSuccessMessage, NETWORK_HELD_MESSAGE, REFUSED_HELD_NOTE, RESTORED_HELD_MESSAGE } from './CampaignCreateForm';
 import { clearCreation, loadCreation, saveCreation, type CreationOwnerScope } from './creationRequestStore';
+import { useAdsCatalogs } from '@/modules/ads/ui/AdsCopyProvider';
+import { COUNTRY_PICKER_TEXT, countryName, countryOptions } from './countries';
 
 type Config = NonNullable<AdsUiSchema['adSet']>;
 type Targeting = { extraCountryCodes?: string[]; ageMin?: number; ageMax?: number; endDate?: string };
@@ -26,6 +28,10 @@ export function AdSetCreateForm({ adAccountId, campaignId, campaignName, currenc
   const [countryCode, setCountryCode] = useState('');
   const [optimizationGoal, setOptimizationGoal] = useState(config.defaultOption);
   const [moreCountries, setMoreCountries] = useState('');
+  const { locale } = useAdsCatalogs();
+  const countries = useMemo(() => countryOptions(locale), [locale]);
+  const pick = COUNTRY_PICKER_TEXT[locale];
+  const extraCodes = moreCountries.toUpperCase().split(/[\s,;]+/).filter(code => /^[A-Z]{2}$/.test(code));
   const [ageMin, setAgeMin] = useState('');
   const [ageMax, setAgeMax] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -125,8 +131,11 @@ export function AdSetCreateForm({ adAccountId, campaignId, campaignName, currenc
     <div className="ads-campaign-create__fields">
       <label>{config.nameLabel}<input name="name" value={name} onChange={event => setName(event.target.value)} maxLength={config.nameMaxLength} required disabled={locked} {...validation.fieldProps('name')} /><FieldError {...validation.errorProps('name')} /></label>
       <label>{config.budgetLabel}{currency ? ` (${currency})` : ''}<input name="budget" type="number" min={10 ** -budgetFractionDigits(currency)} step={10 ** -budgetFractionDigits(currency)} value={budget} onChange={event => setBudget(event.target.value)} inputMode="decimal" required disabled={locked} {...validation.fieldProps('budget')} /><FieldError {...validation.errorProps('budget')} /></label>
-      <label>{config.countryLabel}<input name="countryCode" value={countryCode} onChange={event => setCountryCode(event.target.value.toUpperCase())} maxLength={2} pattern="[A-Za-z]{2}" placeholder={t('text222')} required disabled={locked} {...validation.fieldProps('countryCode')} /><FieldError {...validation.errorProps('countryCode')} /></label>
-      <label>{t('adSetMoreCountries')}<input name="moreCountries" value={moreCountries} onChange={event => setMoreCountries(event.target.value.toUpperCase())} maxLength={80} disabled={locked} /></label>
+      <label>{config.countryLabel}<select name="countryCode" value={countryCode} onChange={event => setCountryCode(event.target.value)} required disabled={locked} {...validation.fieldProps('countryCode')}><option value="">{pick.choose}</option>{countries.map(country => <option key={country.code} value={country.code}>{country.name}</option>)}</select><FieldError {...validation.errorProps('countryCode')} /></label>
+      <div className="ads-country-more"><span id={`adset-more-${campaignId}`}>{t('adSetMoreCountries')}</span>
+        {extraCodes.length > 0 && <ul aria-labelledby={`adset-more-${campaignId}`}>{extraCodes.map(code => <li key={code}>{countryName(code, locale)}<button type="button" disabled={locked} aria-label={pick.remove.replace('{name}', countryName(code, locale))} onClick={() => setMoreCountries(extraCodes.filter(item => item !== code).join(', '))}>×</button></li>)}</ul>}
+        <select aria-labelledby={`adset-more-${campaignId}`} value="" disabled={locked} onChange={event => { if (event.target.value) setMoreCountries([...extraCodes, event.target.value].join(', ')); }}><option value="">{pick.add}</option>{countries.filter(country => country.code !== countryCode && !extraCodes.includes(country.code)).map(country => <option key={country.code} value={country.code}>{country.name}</option>)}</select>
+      </div>
       <label>{t('adSetAgeMin')}<input name="ageMin" type="number" min={18} max={65} value={ageMin} onChange={event => setAgeMin(event.target.value)} placeholder="18" disabled={locked} /></label>
       <label>{t('adSetAgeMax')}<input name="ageMax" type="number" min={18} max={65} value={ageMax} onChange={event => setAgeMax(event.target.value)} placeholder="65" disabled={locked} /></label>
       <label>{t('adSetEndDate')}<input name="endDate" type="date" value={endDate} min={new Date(Date.now() + 86_400_000).toISOString().slice(0, 10)} onChange={event => setEndDate(event.target.value)} disabled={locked} aria-describedby={`adset-end-hint-${campaignId}`} /><span id={`adset-end-hint-${campaignId}`} className="small-note">{t('adSetEndHint')}</span></label>
@@ -141,7 +150,7 @@ export function AdSetCreateForm({ adAccountId, campaignId, campaignName, currenc
     </div> : null}
     {confirmationOpen && pendingRequest ? <ModalDialog className="ui-dialog" labelledBy={`adset-confirm-title-${adAccountId}-${campaignId}`} onDismiss={() => { if (!busy) setConfirmationOpen(false); }} busy={busy}>
       <div className="ui-dialog__header"><div><h2 id={`adset-confirm-title-${adAccountId}-${campaignId}`}>{config.confirmTitle}</h2><p>{config.confirmDescription}</p></div></div>
-      <div className="ui-dialog__body"><p><strong>{pendingRequest.name}</strong> {t('text224')}{campaignName}</p><p>{config.budgetLabel}{t('text225')}{formatBudgetMinor(pendingRequest.dailyBudgetMinor, currency)} {t('text166')}{pendingRequest.countryCode} {t('text166')}{config.options.find(option => option.value === pendingRequest.optimizationGoal)?.label ?? pendingRequest.optimizationGoal}</p>{pendingRequest.extraCountryCodes?.length || pendingRequest.ageMin !== undefined || pendingRequest.ageMax !== undefined || pendingRequest.endDate ? <p>{[pendingRequest.extraCountryCodes?.length ? `${t('adSetMoreCountries').split(' (')[0]}: ${pendingRequest.extraCountryCodes.join(', ')}` : '', pendingRequest.ageMin !== undefined || pendingRequest.ageMax !== undefined ? `${pendingRequest.ageMin ?? 18}–${pendingRequest.ageMax ?? 65}` : '', pendingRequest.endDate ? `${t('adSetEndDate').split(' (')[0]}: ${pendingRequest.endDate}` : ''].filter(Boolean).join(' · ')}</p> : null}{dialogError ? <p role="alert" className="ui-error">{localize(dialogError)}{refusalReason === 'blocked_by_other_request' ? <> <a href="/ads/manage?level=history#changes">{t('text214')}</a> {t('text215')}</> : null}</p> : null}</div>
+      <div className="ui-dialog__body"><p><strong>{pendingRequest.name}</strong> {t('text224')} {campaignName}</p><p>{config.budgetLabel}{t('text225')} {formatBudgetMinor(pendingRequest.dailyBudgetMinor, currency)} {t('text166')} {[pendingRequest.countryCode, ...(pendingRequest.extraCountryCodes ?? [])].map(code => countryName(code, locale)).join(', ')} {t('text166')} {config.options.find(option => option.value === pendingRequest.optimizationGoal)?.label ?? pendingRequest.optimizationGoal}</p>{pendingRequest.ageMin !== undefined || pendingRequest.ageMax !== undefined || pendingRequest.endDate ? <p>{[pendingRequest.ageMin !== undefined || pendingRequest.ageMax !== undefined ? `${pendingRequest.ageMin ?? 18}–${pendingRequest.ageMax ?? 65}` : '', pendingRequest.endDate ? `${t('adSetEndDate').split(' (')[0]}: ${pendingRequest.endDate}` : ''].filter(Boolean).join(' · ')}</p> : null}{dialogError ? <p role="alert" className="ui-error">{localize(dialogError)}{refusalReason === 'blocked_by_other_request' ? <> <a href="/ads/manage?level=history#changes">{t('text214')}</a> {t('text215')}</> : null}</p> : null}</div>
       <div className="ui-dialog__actions"><button className="ui-button ui-button--secondary" type="button" data-dialog-cancel onClick={() => setConfirmationOpen(false)} disabled={busy}>{t('text125')}</button><button className="ui-button ui-button--primary" type="button" onClick={() => void confirmCreate()} disabled={busy}>{busy ? t('text208') : config.actionLabel}</button></div>
     </ModalDialog> : null}
   </form>;

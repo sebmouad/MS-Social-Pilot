@@ -39,9 +39,9 @@ export const FACEBOOK_ADS_UI_DEFAULTS = {
       confirmationTemplate: 'CREATE PAUSED FACEBOOK CAMPAIGN {nameJson} IN ACCOUNT {adAccountId} WITH OBJECTIVE {objective}',
     },
     adSet: {
-      nameLabel: 'Ad set name', nameMaxLength: 100, budgetLabel: 'Daily budget', countryLabel: 'Country code', goalLabel: 'Optimize for',
+      nameLabel: 'Ad set name', nameMaxLength: 100, budgetLabel: 'Daily budget', countryLabel: 'Country', goalLabel: 'Optimize for',
       title: 'Create paused ad set under {campaignName}',
-      description: 'Uses impressions billing. Enter a daily amount{currency}; delivery targets one country.',
+      description: 'Set a daily amount{currency} and where the ads are shown. You are billed per impression, and nothing is spent while the ad set is paused.',
       actionLabel: 'Create paused ad set', confirmTitle: 'Create this paused ad set?', confirmDescription: 'It will not deliver until activated separately.',
       defaultOption: 'LINK_CLICKS', options: [{ value: 'LINK_CLICKS', label: 'Link clicks' }, { value: 'IMPRESSIONS', label: 'Impressions' }],
       confirmationTemplate: 'CREATE PAUSED FACEBOOK AD SET {nameJson} UNDER CAMPAIGN {campaignId} IN ACCOUNT {adAccountId} WITH DAILY BUDGET {dailyBudgetMinor} MINOR UNITS{currencySuffix} TARGETING {countryCode} OPTIMIZED FOR {optimizationGoal}',

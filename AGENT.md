@@ -163,7 +163,8 @@ bash app/scripts/deploy.sh --host <SERVER_IP> --user root --key <SSH_KEY_PATH>
   retype a phrase only when money can be spent or data lost (`useConfirm` without `exactConfirmation` otherwise).
   Applied to Posts, Post explorer, Tasks, Library, Ads accounts, Ads › Manage (details, creatives gallery, creative
   builder with live preview, parent picker by name), Inbox (details folded, comment first), Settings › Integrations
-  (« New key » window), Root › Operations (plain wording, outcome marks). Not yet done in this pattern: Reports and
+  (« New key » window), Root › Operations (plain wording, outcome marks). Ad set creation picks countries by name (`modules/ads/ui/countries.ts`) and the creation
+  drawer shows one frame and one title. Not yet done in this pattern: Reports and
   schedules, Content feeds, campaign / ad set / ad creation forms, Settings › Team and Channels, Root lists.
   `npm run build` sometimes fails while fetching Google Fonts (`next/font` TypeError): retry, it is not the code.
 - Earlier note, kept for history. **Activation status (2026-11-09): not active yet.** It needs, once: (1) one manual deploy of current `main`
