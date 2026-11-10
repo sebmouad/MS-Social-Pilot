@@ -228,11 +228,12 @@ SHORT_COMMIT="$(git -C "$REPO_DIR" rev-parse --short HEAD)"
 COMMIT_MSG="$(git -C "$REPO_DIR" log -1 --pretty=%B | head -n 1)"
 log_info "Deploying commit: ${BOLD}$SHORT_COMMIT${RESET} ('$COMMIT_MSG')"
 
-# Continue with the deploy script of the version being installed: an older copy (the installed socialpilot-deploy
-# command) would build the new app but skip newer server steps such as the updater timer.
+# A deploy run by a person continues with the deploy script of the version being installed: an older installed copy
+# would build the new app but skip newer server steps. An automatic update never does this: it keeps running the
+# installed script, so the repository's content cannot choose what root executes (see the self-update step below).
 OWN_SCRIPT="$(readlink -f "${BASH_SOURCE[0]}")"
 FRESH_SCRIPT="$REPO_DIR/app/scripts/deploy-from-server.sh"
-if [ -z "${SP_DEPLOY_HANDED_OVER:-}" ] && [ -f "$FRESH_SCRIPT" ] && ! cmp -s "$OWN_SCRIPT" "$FRESH_SCRIPT"; then
+if [ -z "${SOCIAL_PILOT_UPDATER:-}" ] && [ -z "${SP_DEPLOY_HANDED_OVER:-}" ] && [ -f "$FRESH_SCRIPT" ] && ! cmp -s "$OWN_SCRIPT" "$FRESH_SCRIPT"; then
   log_info "This deploy script is older than the version being installed; continuing with the new one."
   cp "$FRESH_SCRIPT" /run/social-pilot-deploy.handover
   SP_DEPLOY_HANDED_OVER=1 BRANCH="$BRANCH" exec bash /run/social-pilot-deploy.handover --commit "$DEPLOY_COMMIT"
@@ -258,6 +259,9 @@ PORT="${APP_PORT}"
 ENV
   chown "$APP_USER:$APP_USER" "$ENVF"
 fi
+# The app listens on 127.0.0.1 only, so every request arrives through the reverse proxy in front of it: its statement
+# of the visitor's address is used for sign-in limits. Without it one stranger's wrong guesses lock an account for all.
+grep -q '^TRUST_PROXY=' "$ENVF" || echo 'TRUST_PROXY="1"' >> "$ENVF"
 
 # Step 4: Populate Build Directory
 log_step "Preparing build workspace..."
@@ -310,6 +314,16 @@ if [ -d "$MIG_SRC" ]; then
     f="$m_dir/migration.sql"
     [ -f "$f" ] || continue
     
+    # A dump of the database as it stands, once, before the first change of this release. No dump, no migration.
+    if [ "$applied" -eq 0 ] && [ -n "$DONE" ]; then
+      log_info "Backing up the database before changing it..."
+      # An automatic update uses the backup script installed on this server; only a deploy run by a person may use the new one.
+      BACKUP_SCRIPT=/usr/local/lib/social-pilot-backup.sh
+      [ -z "${SOCIAL_PILOT_UPDATER:-}" ] && BACKUP_SCRIPT="$REPO_DIR/app/scripts/backup.sh"
+      [ -f "$BACKUP_SCRIPT" ] || { log_error "The backup script is not installed. Run 'socialpilot-deploy' on the server once by hand."; exit 1; }
+      bash "$BACKUP_SCRIPT" --database-only \
+        || { log_error "The database could not be backed up, so no migration was applied. The running version is unchanged."; exit 1; }
+    fi
     log_info "Applying migration: $m"
     sudo -u postgres psql -d "$DB_NAME" -v ON_ERROR_STOP=1 -q < "$f" >/dev/null 2>/tmp/deploy-mig-err.txt || {
       log_error "Migration $m failed! Aborting release."
@@ -374,10 +388,39 @@ LockPersonality=true
 WantedBy=multi-user.target
 UNIT
 
-# Self-update: the app records updates (GitHub push, Root › Updates) and this root timer installs them.
-install -m 0755 "$BUILD_DIR/app/scripts/updater.sh" /usr/local/lib/social-pilot-updater.sh
-# Keep the installed socialpilot-deploy command at the version being installed.
-[ -f /usr/local/bin/socialpilot-deploy ] && install -m 0755 "$BUILD_DIR/app/scripts/deploy-from-server.sh" /usr/local/bin/socialpilot-deploy
+# Self-update: the app records updates (GitHub push, Root › Updates) and a root timer installs them.
+# The scripts that run as root are replaced only when a person runs this deploy on the server (or from their own
+# machine). An update that arrives from a GitHub push runs the copies already installed here and never replaces
+# them, so pushing to the repository cannot change what runs as root on this server.
+if [ -z "${SOCIAL_PILOT_UPDATER:-}" ]; then
+  install -m 0755 "$BUILD_DIR/app/scripts/updater.sh" /usr/local/lib/social-pilot-updater.sh
+  install -m 0755 "$BUILD_DIR/app/scripts/backup.sh" /usr/local/lib/social-pilot-backup.sh
+  install -m 0755 "$BUILD_DIR/app/scripts/deploy-from-server.sh" /usr/local/bin/socialpilot-deploy
+  ln -sf /usr/local/bin/socialpilot-deploy /usr/local/bin/deploy
+elif ! cmp -s "$BUILD_DIR/app/scripts/deploy-from-server.sh" /usr/local/bin/socialpilot-deploy \
+  || ! cmp -s "$BUILD_DIR/app/scripts/updater.sh" /usr/local/lib/social-pilot-updater.sh \
+  || ! cmp -s "$BUILD_DIR/app/scripts/backup.sh" /usr/local/lib/social-pilot-backup.sh; then
+  log_warn "This version changes the server scripts. They were NOT replaced by this automatic update: run 'socialpilot-deploy' on the server once to adopt them."
+fi
+cat > /etc/systemd/system/social-pilot-backup.service <<'UNIT'
+[Unit]
+Description=MS Social Pilot backup (database dump and media copy)
+After=postgresql.service
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/env bash /usr/local/lib/social-pilot-backup.sh
+TimeoutStartSec=2h
+UNIT
+cat > /etc/systemd/system/social-pilot-backup.timer <<'UNIT'
+[Unit]
+Description=Back up MS Social Pilot every night
+[Timer]
+OnCalendar=*-*-* 03:17:00
+RandomizedDelaySec=10min
+Persistent=true
+[Install]
+WantedBy=timers.target
+UNIT
 cat > /etc/systemd/system/social-pilot-updater.service <<'UNIT'
 [Unit]
 Description=MS Social Pilot updater (installs the updates the app records)
@@ -401,6 +444,7 @@ UNIT
 systemctl daemon-reload
 systemctl enable social-pilot social-pilot-worker >/dev/null 2>&1 || true
 systemctl enable --now social-pilot-updater.timer >/dev/null 2>&1 || true
+[ -f /usr/local/lib/social-pilot-backup.sh ] && { systemctl enable --now social-pilot-backup.timer >/dev/null 2>&1 || true; }
 
 # Step 8: Atomic Swap & Restart
 log_step "Performing atomic release swap & restarting services..."

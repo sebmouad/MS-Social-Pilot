@@ -79,11 +79,14 @@ Every domain module separates browser UI (`ui/`) from server logic (`server/`):
 - Every connector implements `PlatformModule` (`src/platforms/module.ts`) and `PlatformAdapter` (`src/platforms/types.ts`).
 
 ### 3.4 Database & Migrations (`app/prisma/`)
-- All database tables use clean, unprefixed names (`job_leases`, `sync_runs`, `notifications`, `publication_attempts`, `workspace_exports`, `export_file_cleanups`, `channel_profiles`, `chat_deliveries`, `writing_agents`, etc.). Never introduce `rebuild_` prefixes.
+- All database tables use clean, unprefixed names. Never introduce `rebuild_` prefixes.
+- The numbered SQL files in `app/prisma/migrations/` are the source of truth; the deploy script applies them with `psql`.
+  `schema.prisma` is introspected from the migrated database and describes all 136 tables. CI fails when they differ.
+  **Never run `prisma db push` or `prisma migrate dev` against a real database.**
 - When adding a schema change:
-  1. Update `app/prisma/schema.prisma`.
-  2. Create a new timestamped or numbered SQL migration under `app/prisma/migrations/`.
-  3. Run `npx prisma generate` and `npm run typecheck`.
+  1. Add a new numbered SQL migration under `app/prisma/migrations/` (idempotent where possible).
+  2. Apply every migration to a local database, then `npx prisma db pull` and commit the updated `schema.prisma`.
+  3. Run `npx prisma generate`, `npm run typecheck`, `npm run lint`, `npm test`.
 
 ### 3.5 Styling, Theme & Bilingual (EN/FR) Parity
 - **Tokens**: Always use semantic CSS custom properties from `src/styles/tokens.css` (`--bg`, `--surface`, `--surface-raised`, `--text`, `--text-muted`, `--line`, `--brand`, `--success`, `--warning`, `--danger`). Never hardcode hex colors in components.
@@ -104,6 +107,7 @@ Commit messages say what was verified and what was not run.
 cd app
 npx prisma generate
 npm run typecheck
+npm run lint
 npm test
 npm run build
 ```
@@ -118,8 +122,13 @@ bash app/scripts/deploy.sh --host <SERVER_IP> --user root --key <SSH_KEY_PATH>
 ## 5. Releases and Auto-Update
 
 - `app/scripts/deploy-from-server.sh` (installed on the server as `socialpilot-deploy`) and `app/scripts/deploy.sh`
-  build apart, run `npm test`, apply SQL migrations in `app/prisma/migrations/`, switch releases, check health and roll
-  back on failure. They also install the updater timer.
+  build apart, run `npm test`, dump the database, apply SQL migrations in `app/prisma/migrations/`, switch releases,
+  check health and roll back on failure. A deploy run by a person also installs the updater, backup and deploy scripts.
+- Root-run scripts (`updater.sh`, `backup.sh`, `deploy-from-server.sh`) are never replaced by an automatic update: the
+  updater runs the installed copies with `SOCIAL_PILOT_UPDATER=1`. After changing one of them, tell the user to run
+  `socialpilot-deploy` on the server once. Do not reintroduce running a script from the pushed commit as root.
+- Backups: `social-pilot-backup.timer` nightly (`backup.sh`: database dump + media copy to
+  `/var/backups/ms-social-pilot/`, optional off-site rsync via `/etc/ms-social-pilot-backup.conf`).
 - Auto-update: GitHub calls `POST /api/updates/github` on each push (HMAC-checked with Root secret
   `updates.githubWebhookSecret`); a push to `updates.branch` (default `main`) of `updates.repository` is recorded in
   `app_updates` while `updates.automatic` is on. The root timer `social-pilot-updater` (every 30 s) runs
@@ -253,6 +262,18 @@ Fixed in code the same day: privacy policy names Instagram and ad accounts and h
 (comment text goes to the AI provider for sentiment in opted-in workspaces; AI is on in production), page titles
 say « MS Social Pilot », Inbox page title matches its heading. The guide artifact is not yet updated for the
 screens changed on 2026-11-10 (Queue, Library, Approvals, Updates).
+
+### 7.1c Audit fixes (2026-11-10), on `main`
+
+Next 15.5.29 with the image optimizer closed; nodemailer 10, sharp 0.35. Security headers on every response. Sign-in
+lock counted per visitor and address. WordPress requests through the pinned network guard. A Meta deletion request
+also erases the person's name, picture and ID from the connection record. ESLint (`npm run lint`) and CI
+(`.github/workflows/ci.yml`). **Not upgraded, on purpose:** zod 3 → 4 (295 files and code reading zod internals;
+needs its own tested change) and Prisma 6 → 7. `experimental.esmExternals: false` in `next.config.ts` is required: sharp
+and nodemailer now ship ES-module builds, and loading those breaks the platform registry's circular imports at
+start-up. `schema.prisma` lists all tables but 97 are `@@ignore`d: adding them to the generated client makes its
+types so large that `next build` runs out of memory. `deploy.sh` and `deploy-from-mac.sh` still carry their own copy of the
+server steps and do not take the pre-migration dump; `deploy-from-server.sh` is the path that does.
 
 ### 7.2 Phase 2 — next
 

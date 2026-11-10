@@ -1,5 +1,6 @@
 import type { Mapping } from './recipe';
 import { decodeWordpressText, normalizeWordpressCaption } from './text';
+import { defaultFetchDeps, guardedFetch } from '@/modules/publishing/server/media/network/net-guard';
 
 /**
  * Standard WordPress REST API connector (`/wp-json/wp/v2/`).
@@ -251,20 +252,19 @@ function authHeaders(apiToken?: string | null): Record<string, string> {
   return headers;
 }
 
+/** Largest REST answer read from a site: a page of posts with their content. */
+const WP_REST_MAX_BYTES = 20 * 1024 * 1024;
+
+/**
+ * Every request to the site goes through the address-pinned public fetch: the name is resolved once, private and
+ * internal addresses are refused, the connection is made to the address that was checked, and each redirect is checked
+ * the same way. The credential is not sent on to another origin.
+ */
 async function fetchJson(url: string, settings: DbSettings): Promise<unknown> {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), Math.max(settings.connectTimeoutMs, settings.queryTimeoutMs));
-  try {
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: authHeaders(settings.apiToken),
-      signal: controller.signal,
-    });
-    if (!response.ok) throw new Error(`wp_rest_status_${response.status}`);
-    return await response.json();
-  } finally {
-    clearTimeout(timeout);
-  }
+  const policy = { timeoutMs: Math.max(settings.connectTimeoutMs, settings.queryTimeoutMs), maxBytes: WP_REST_MAX_BYTES, maxRedirects: 3, allowHttp: url.startsWith('http://'), hostAllowlist: [] };
+  const result = await guardedFetch(url, policy, defaultFetchDeps(), { headers: authHeaders(settings.apiToken) });
+  if (result.notModified) throw new Error('wp_rest_unexpected_not_modified');
+  return JSON.parse(result.bytes.toString('utf8')) as unknown;
 }
 
 export async function openWordpressDb(settings: DbSettings): Promise<WpDb> {

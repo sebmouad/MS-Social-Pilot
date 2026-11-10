@@ -26,6 +26,8 @@ export function CommandPalette({ copy: t }: { copy: CommandCopy }) {
   const [actions, setActions] = useState<CommandAction[]>([]);
   const [items, setItems] = useState<CommandItem[]>([]);
   const [channels, setChannels] = useState<CommandChannel[]>([]);
+  // Always called, once per render; the try/catch covers a palette rendered outside the theme provider.
+  // eslint-disable-next-line react-hooks/rules-of-hooks
   const themeCtx = (() => { try { return useTheme(); } catch { return null; } })();
   const [active, setActive] = useState(0);
   const loaded = useRef(false);

@@ -33,6 +33,9 @@ export function parseFacebookSignedRequest(signedRequest: string, appSecret: str
   }
 }
 
+/** Shown in place of the person's name once they asked for deletion. */
+export const ERASED_PROFILE_NAME = 'Deleted Facebook profile';
+
 async function verifiedUserId(signedRequest: string): Promise<string | null> {
   const secret = await runtimeSecret('meta.appSecret').catch(() => null);
   return secret ? parseFacebookSignedRequest(signedRequest, secret) : null;
@@ -68,6 +71,15 @@ async function eraseAccess(tx: Pick<typeof prisma, '$queryRaw' | 'target' | 'pos
   return { instagramAccounts: linked.length, channels: targetIds.length, cancelledDestinations: cancelled.count };
 }
 
+/**
+ * A deletion request is about the person, not only their access: what identifies them on the connection record (their
+ * Facebook name, picture, profile address, user id, granted scopes and profile details) is removed too. The record itself
+ * stays, emptied, so the workspace still sees that a connection existed and why its channels stopped.
+ */
+async function eraseProfile(tx: Pick<typeof prisma, '$executeRaw'>, account: { id: string }) {
+  await tx.$executeRaw`UPDATE social_accounts SET name = ${ERASED_PROFILE_NAME}, "providerUserId" = ${`deleted:${account.id}`}, "pictureUrl" = NULL, "profileUrl" = NULL, scopes = '', meta = NULL, "updatedAt" = NOW() WHERE id = ${account.id}`;
+}
+
 /** The person removed the app in Facebook: the tokens are already dead there, and the access stored here is erased now (the data deletion page says so). */
 export async function handleFacebookDeauthorize(signedRequest: string): Promise<PlatformDataCallbackResult> {
   const userId = await verifiedUserId(signedRequest);
@@ -91,7 +103,8 @@ export async function handleFacebookDataDeletion(signedRequest: string): Promise
   for (const account of accounts) {
     await prisma.$transaction(async (tx) => {
       const counts = await eraseAccess(tx, account, DELETION_REASON);
-      await audit(tx, { workspaceId: account.workspaceId, action: FACEBOOK_DATA_DELETION_ACTION, detail: { provider: 'facebook', confirmationCode, socialAccountId: account.id, ...counts } });
+      await eraseProfile(tx, account);
+      await audit(tx, { workspaceId: account.workspaceId, action: FACEBOOK_DATA_DELETION_ACTION, detail: { provider: 'facebook', confirmationCode, socialAccountId: account.id, profileErased: true, ...counts } });
     });
   }
   return { ok: true, affected: accounts.length, confirmationCode };

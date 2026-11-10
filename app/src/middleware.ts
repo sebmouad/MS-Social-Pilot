@@ -15,6 +15,8 @@ function next(request: NextRequest) {
 
 /** Every route family and server-action POST passes through the same guard. */
 export async function middleware(request: NextRequest) {
+  // The app serves its own images and never uses Next's image optimizer; the endpoint is closed so its parsers cannot be reached.
+  if (request.nextUrl.pathname === '/_next/image') return new NextResponse(null, { status: 404, headers: { 'cache-control': 'no-store' } });
   if (request.method === 'GET' || request.method === 'HEAD') {
     // Moved customer routes (declared by module manifests) redirect permanently, keeping the query string.
     const target = resolveRedirect(request.nextUrl.pathname, request.nextUrl.search);

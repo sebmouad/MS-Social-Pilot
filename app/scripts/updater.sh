@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Carries out the updates the app records (a signed GitHub push, or Root › Updates › Update now), one at a time.
 # Run as root by social-pilot-updater.timer every 30 seconds; does nothing when no update is waiting.
-# Each update runs the deploy script of the commit being installed (build apart, tests, migrations, switch,
+# Each update runs the deploy command installed on this server (build apart, tests, migrations, switch,
 # health check, automatic rollback) and writes the outcome and the end of its log back for Root › Updates.
 set -uo pipefail
 cd /tmp
@@ -10,7 +10,8 @@ DB_NAME="${DB_NAME:-social_pilot}"
 REPO_URL="${REPO_URL:-https://github.com/sebmouad/MS-Social-Pilot.git}"
 REPO_DIR="${REPO_DIR:-/srv/ms-social-pilot-repo}"
 LOG_DIR="${LOG_DIR:-/var/lib/ms-social-pilot/updates}"
-DEPLOY_SCRIPT="${DEPLOY_SCRIPT:-}"   # tests point this at a stand-in; empty = the commit's own deploy script
+DEPLOY_SCRIPT="${DEPLOY_SCRIPT:-}"   # tests point this at a stand-in; empty = the deploy command installed on this server
+INSTALLED_DEPLOY="${INSTALLED_DEPLOY:-/usr/local/bin/socialpilot-deploy}"
 PSQL="${PSQL:-sudo -u postgres psql}"
 
 sql() { $PSQL -d "$DB_NAME" -v ON_ERROR_STOP=1 -X -Atq "$@"; }
@@ -56,14 +57,11 @@ sha="$(git -C "$REPO_DIR" rev-parse --verify --quiet "${commit:-origin/$branch}^
 git -C "$REPO_DIR" merge-base --is-ancestor "$sha" "origin/$branch" \
   || { finish failed "" "Commit $sha is not on $branch; not installed."; exit 0; }
 
-script="$DEPLOY_SCRIPT"
-if [ -z "$script" ]; then
-  script="$(mktemp /run/social-pilot-deploy.XXXXXX)"
-  git -C "$REPO_DIR" show "$sha:app/scripts/deploy-from-server.sh" >"$script" \
-    || { finish failed "" "The commit has no deploy script."; rm -f "$script"; exit 0; }
-fi
-BRANCH="$branch" timeout 80m bash "$script" --commit "$sha" >>"$log" 2>&1
+# The deploy script that runs is the one installed on this server by a person, never the one inside the commit being
+# installed: this runs as root, and what a push to the repository contains must not decide what root executes.
+script="${DEPLOY_SCRIPT:-$INSTALLED_DEPLOY}"
+[ -x "$script" ] || { finish failed "" "The deploy command is not installed on this server. Run the deploy once by hand (socialpilot-deploy, or app/scripts/deploy-from-server.sh) to install it."; exit 0; }
+SOCIAL_PILOT_UPDATER=1 BRANCH="$branch" timeout 80m bash "$script" --commit "$sha" >>"$log" 2>&1
 rc=$?
-[ -z "$DEPLOY_SCRIPT" ] && rm -f "$script"
 if [ $rc -eq 0 ]; then finish succeeded "$sha"; else finish failed "" "Exit code $rc: the previous version keeps running."; fi
 exit 0

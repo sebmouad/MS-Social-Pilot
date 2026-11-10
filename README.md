@@ -44,16 +44,14 @@ cd app
 npm install
 
 # Configure environment variables (.env)
-cat << 'EOF' > .env
+cat << EOF > .env
 DATABASE_URL="postgresql://postgres:postgres@127.0.0.1:5432/social_pilot?schema=public"
-APP_URL="http://localhost:3200"
-SESSION_SECRET="replace-with-at-least-32-random-bytes-hex"
-CREDENTIAL_ENCRYPTION_KEY="replace-with-64-hex-chars-for-aes-256-gcm"
-MEDIA_STORAGE_ROOT="/tmp/ms-social-pilot-media"
+SESSION_SECRET="$(openssl rand -hex 32)"
+ENCRYPTION_KEY="$(openssl rand -base64 32)"   # base64 of exactly 32 bytes
 EOF
 
-# Apply database migrations & generate Prisma client
-npx prisma migrate deploy
+# Build the database from the SQL migrations & generate the Prisma client
+for f in prisma/migrations/*/migration.sql; do psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -q -f "$f"; done
 npx prisma generate
 
 # Start the web server (http://localhost:3200) and background worker
@@ -65,6 +63,8 @@ npm run worker
 ```bash
 cd app
 npm run typecheck   # TypeScript strict verification (tsc --noEmit)
+npm run lint        # ESLint (errors fail CI; warnings are reported)
+npm test            # node --test suite
 npm run build       # Prisma client generation + Next.js production build
 ```
 
@@ -86,7 +86,7 @@ bash app/scripts/deploy.sh --host <SERVER_IP> --user root --key ~/.ssh/id_ed2551
 bash app/scripts/deploy.sh --host <SERVER_IP> --user root --pass 'YOUR_SSH_PASSWORD'
 
 # Custom SSH port or internal app port
-bash app/scripts/deploy.sh --host <SERVER_IP> --user root --key ~/.ssh/id_ed25519 --port 2222 --app-port 3200
+bash app/scripts/deploy.sh --host <SERVER_IP> --user root --key ~/.ssh/id_ed25519 --port 2222 --app-port 3100
 ```
 
 You can also pass parameters via environment variables:
@@ -111,8 +111,30 @@ bash app/scripts/deploy.sh --host <SERVER_IP> --key ~/.ssh/id_ed25519 --set-root
 bash app/scripts/deploy.sh --host <SERVER_IP> --key ~/.ssh/id_ed25519 --reset-2fa admin@example.com
 ```
 
-### What `deploy.sh` Automates
-1. **System Provisioning (First Run)**: Installs Node.js 20, PostgreSQL, `rsync`, and `openssl` if missing; creates system user `socialpilot`, PostgreSQL database `social_pilot`, media directory `/var/lib/ms-social-pilot`, and `/etc/ms-social-pilot.env` with auto-generated cryptographic secrets.
-2. **Code Sync & Build**: Syncs `app/` to `/srv/ms-social-pilot/app`, installs dependencies (`npm install`), generates the Prisma client, and compiles the production Next.js build (`npm run build`).
-3. **Database Migrations**: Applies all pending SQL migrations in `app/prisma/migrations/` (`npx prisma migrate deploy`), including automatic migration of any legacy table names.
-4. **Systemd Services & Health Check**: Configures and restarts `social-pilot.service` (Next.js server on `127.0.0.1:3200`) and `social-pilot-worker.service` (background job runner), then verifies `http://127.0.0.1:3200/api/health`.
+### What a deploy does
+1. **First run**: installs Node.js, PostgreSQL and tools if missing; creates the system user `socialpilot`, the database `social_pilot`, the media directory `/var/lib/ms-social-pilot/media` and the environment file with generated secrets.
+2. **Build apart**: builds the new version in its own directory as the `socialpilot` user and runs `npm test`; the running version is untouched until this passes.
+3. **Backup, then migrations**: dumps the database to `/var/backups/ms-social-pilot/db/` and only then applies the pending SQL files of `app/prisma/migrations/`. If the dump fails, nothing is changed.
+4. **Switch and check**: swaps the release, restarts `social-pilot.service` (web, `127.0.0.1:3100`) and `social-pilot-worker.service`, checks `/api/health`, and puts the previous release back if the check fails.
+
+### On the server: `socialpilot-deploy`
+
+`app/scripts/deploy-from-server.sh` is the script the server itself runs; a deploy installs it as `socialpilot-deploy` (`--status`, `--rollback`, `--restart`, `--logs`, `--logs-worker`). `deploy.sh` and `deploy-from-mac.sh` start a deploy over SSH from another machine.
+
+### Automatic updates
+
+A push to `main` is recorded by `POST /api/updates/github` (signed with the secret saved in Root › Configuration › Updates) and installed by the `social-pilot-updater` timer. The updater runs as root, so it only ever runs the scripts **installed on the server**, never a script taken from the pushed commit: a push can change the app, not what root executes. When a version changes the server scripts, the update log says so; run `socialpilot-deploy` on the server once to adopt them.
+
+### Backups
+
+`social-pilot-backup.timer` runs `app/scripts/backup.sh` every night: a compressed database dump (the last 14 are kept) and a copy of the uploaded media, under `/var/backups/ms-social-pilot/`. These sit on the same disk as the app. For a copy that survives losing the server, set `BACKUP_RSYNC_TARGET="user@host:/path"` in `/etc/ms-social-pilot-backup.conf`; each run then sends the backups there and Root › Backups shows the result.
+
+```bash
+socialpilot-deploy --status                       # services, health, running commit
+bash /usr/local/lib/social-pilot-backup.sh --list # dumps kept on this server
+sudo -u postgres pg_restore --clean --if-exists -d social_pilot /var/backups/ms-social-pilot/db/<file>.dump   # restore (stop the services first)
+```
+
+### Database schema
+
+The SQL files in `app/prisma/migrations/` are the source of truth and are applied by the deploy script. `app/prisma/schema.prisma` is introspected from the resulting database and must describe every table; CI fails when they differ. Never run `prisma db push` or `prisma migrate dev` against a real database. After adding a migration, run `npx prisma db pull` against a migrated database and commit the schema with it.

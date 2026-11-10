@@ -136,7 +136,7 @@ const en: SitePageContent = {
     sections: [
       { title: 'Remove the app from Facebook', body: 'Open your Facebook settings, go to Apps and websites, find {productName} and choose Remove. Facebook tells us, and at once we delete the stored access for your profile, its Pages and the Instagram accounts linked to them, and cancel the posts still waiting to go out.' },
       { title: 'Disconnect in the app', body: 'A workspace owner or admin can disconnect a Facebook profile at any time in Settings › Channels. Choosing to delete its data at the same time erases its access tokens, posts, comments, messages and statistics.' },
-      { title: 'Check the outcome', body: 'When you ask Facebook to delete your data you receive a confirmation code. Enter it below or open the link Facebook shows you: the deletion is done as soon as Facebook tells us.' },
+      { title: 'Check the outcome', body: 'When you ask Facebook to delete your data you receive a confirmation code. Enter it below or open the link Facebook shows you: the deletion is done as soon as Facebook tells us. It removes the stored access and also your Facebook name, picture and ID from our records.' },
       { title: 'Delete the rest', body: 'Posts already published belong to the workspace that managed the Page. Its owner can delete workspace data from Settings › Data and privacy. You can also write to {operatorEmail} and we will erase your account data on request.' },
     ],
     lookupLabel: 'Confirmation code', lookupButton: 'Check status', ...enResults,
@@ -212,7 +212,7 @@ const fr: SitePageContent = {
     sections: [
       { title: 'Retirer l’application de Facebook', body: 'Ouvrez vos paramètres Facebook, allez dans Applications et sites web, trouvez {productName} et choisissez Supprimer. Facebook nous prévient et nous supprimons aussitôt l’accès enregistré pour votre profil, ses Pages et les comptes Instagram qui leur sont liés, et annulons les publications encore en attente.' },
       { title: 'Déconnecter dans l’application', body: 'Le propriétaire ou un administrateur de l’espace peut déconnecter un profil Facebook à tout moment dans Paramètres › Canaux. S’il choisit d’en supprimer aussi les données, ses jetons d’accès, publications, commentaires, messages et statistiques sont effacés.' },
-      { title: 'Vérifier le résultat', body: 'Lorsque vous demandez à Facebook de supprimer vos données, vous recevez un code de confirmation. Saisissez-le ci-dessous ou ouvrez le lien affiché par Facebook : la suppression est faite dès que Facebook nous prévient.' },
+      { title: 'Vérifier le résultat', body: 'Lorsque vous demandez à Facebook de supprimer vos données, vous recevez un code de confirmation. Saisissez-le ci-dessous ou ouvrez le lien affiché par Facebook : la suppression est faite dès que Facebook nous prévient. Elle retire l’accès enregistré ainsi que votre nom, votre photo et votre identifiant Facebook de nos données.' },
       { title: 'Supprimer le reste', body: 'Les publications déjà parues appartiennent à l’espace de travail qui gérait la Page. Son propriétaire peut supprimer les données de l’espace depuis Paramètres › Données et confidentialité. Vous pouvez aussi écrire à {operatorEmail} pour demander l’effacement des données de votre compte.' },
     ],
     lookupLabel: 'Code de confirmation', lookupButton: 'Vérifier le statut', ...frResults,

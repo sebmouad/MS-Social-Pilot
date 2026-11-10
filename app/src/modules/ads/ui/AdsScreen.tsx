@@ -71,9 +71,9 @@ async function AdsPage({ searchParams }: { searchParams: Promise<AdsSearchParams
     id: account.id, name: account.name, actId: account.actId, currency: account.currency, enabled: account.enabled,
     lastSyncedAt: account.lastSyncedAt?.toISOString() ?? null, summary: summaries.get(account.id) ?? null,
   }));
-  const use = (feature: string) => canUseFeature(entitlements, feature) && canAccessFeature(permissions, feature, 'read');
-  const exportPolicy = use('ads/campaigns') ? await loadAdsOutputPolicy().catch(() => null) : null;
-  const boost = use('ads/campaigns') && use('analytics/posts') ? await readBoostSuggestion({ userId, workspaceId, ...(allowedTargetIds ? { allowedChannelIds: allowedTargetIds } : {}) }) : null;
+  const allowed = (feature: string) => canUseFeature(entitlements, feature) && canAccessFeature(permissions, feature, 'read');
+  const exportPolicy = allowed('ads/campaigns') ? await loadAdsOutputPolicy().catch(() => null) : null;
+  const boost = allowed('ads/campaigns') && allowed('analytics/posts') ? await readBoostSuggestion({ userId, workspaceId, ...(allowedTargetIds ? { allowedChannelIds: allowedTargetIds } : {}) }) : null;
 
   return <PageFrame module="ads"><div className="insights">
     <AdsHeader title={t('text001')} copy={ui} locale={locale} policy={policy} filters={filters} accounts={dataset.accounts} count={scoped.length}

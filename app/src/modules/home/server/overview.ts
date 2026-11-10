@@ -93,7 +93,7 @@ export async function readHomeOverview(actor: HomeActor, now = new Date(), optio
   const channels = snapshot ? snapshot.options.channels.filter(channel => snapshot.selected.channelIds.includes(channel.id)) : [];
   const readChannels = channels.slice(0, maxChannels);
   // The provider lookup must not reject the whole overview; dependents report unavailable instead of empty.
-  let providerChannels = new Map<string, typeof readChannels>();
+  const providerChannels = new Map<string, typeof readChannels>();
   let channelsFailed = false;
   try {
     const providers = readChannels.length ? new Map((await prisma.$queryRaw<Array<{ id: string; provider: string }>>`SELECT t.id, a.provider FROM targets t JOIN social_accounts a ON a.id = t."socialAccountId" AND a."workspaceId" = t."workspaceId" WHERE t."workspaceId" = ${actor.workspaceId} AND t.id = ANY(${readChannels.map(channel => channel.id)}::text[])`).map(row => [row.id, row.provider])) : new Map<string, string>();

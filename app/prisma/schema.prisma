@@ -1,5 +1,7 @@
-// MS Social Pilot — Primary Prisma Schema
-// Maps PostgreSQL tables managed by prisma/migrations/.
+// MS Social Pilot — Prisma schema, introspected from the database that prisma/migrations builds.
+// It must describe every table: a schema that omits tables makes `prisma db push` or `migrate dev` drop them.
+// CI applies the migrations to an empty database and fails when this file and that database differ. After adding
+// a migration, run `npx prisma db pull` against a migrated database and commit the result with it.
 generator client {
   provider = "prisma-client-js"
   output   = "../generated/client"
@@ -10,83 +12,80 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum WorkspaceRole {
-  owner
-  admin
-  editor
-  contributor
-  viewer
-  client
-}
-
-enum TargetType {
-  page
-  group
-  instagram
-  bluesky
-  mastodon
-  linkedin
-  threads
-  x
-  pinterest
-  telegram
-  youtube
-  tiktok
-}
-
-enum PostStatus {
-  draft
-  pending_approval
-  rejected
-  scheduled
-  publishing
-  published
-  partially_failed
-  failed
-  cancelled
-}
-
-enum PostTargetStatus {
-  pending
-  processing
-  published
-  scheduled_remote
-  failed
-  cancelled
-  skipped
-}
-
 model User {
-  id           String       @id
-  email        String       @unique
-  name         String
-  passwordHash String
-  disabledAt   DateTime?
-  isInstanceOwner Boolean @default(false)
-  totpSecret String?
-  totpPendingSecret String?
-  totpEnabledAt DateTime?
-  totpLastStep Int?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  passkeys     Passkey[]
-  recoveryCodes RecoveryCode[]
-  memberships  Membership[]
-  posts        Post[]
-  sessions     Session[]
-  mcpApiKeys   McpApiKey[]
+  id                               String                  @id
+  email                            String                  @unique
+  name                             String
+  passwordHash                     String
+  locale                           Locale                  @default(en)
+  lastActiveWorkspaceId            String?
+  createdAt                        DateTime                @default(now())
+  updatedAt                        DateTime                @updatedAt
+  isInstanceOwner                  Boolean                 @default(false)
+  theme                            String                  @default("facebook")
+  knownDevices                     String[]                @default([])
+  disabledAt                       DateTime?
+  totpEnabledAt                    DateTime?
+  totpLastStep                     Int?
+  totpPendingSecret                String?
+  totpSecret                       String?
+  pinnedMetrics                    String[]                @default([])
+  emailVerifiedAt                  DateTime?
+  planId                           String?
+  extraChannels                    Int                     @default(0)
+  ai_generations                   ai_generations[] @ignore
+  api_tokens                       api_tokens[] @ignore
+  app_settings                     AppSetting[]
+  autopilot_policies               autopilot_policies[] @ignore
+  calendar_feeds                   calendar_feeds[] @ignore
+  chart_notes                      chart_notes[] @ignore
+  client_invitations               client_invitations[] @ignore
+  email_tokens                     email_tokens[] @ignore
+  inbox_notes                      inbox_notes[] @ignore
+  invitations                      invitations[] @ignore
+  mcpApiKeys                       McpApiKey[]
+  mcp_oauth_codes                  mcp_oauth_codes[] @ignore
+  memberships                      Membership[]
+  metric_alert_rules               metric_alert_rules[] @ignore
+  notification_mutes               notification_mutes[] @ignore
+  notification_settings            notification_settings[] @ignore
+  notifications                    Notification[]
+  passkeys                         Passkey[]
+  person_mcp_keys                  person_mcp_keys[] @ignore
+  post_export_runs                 post_export_runs[] @ignore
+  post_exports                     post_exports[] @ignore
+  post_notes                       post_notes[] @ignore
+  post_versions                    post_versions[] @ignore
+  posts                            Post[]
+  posts_posts_reviewedByIdTousers  Post[]                  @relation("posts_reviewedByIdTousers")
+  posts_posts_submittedByIdTousers Post[]                  @relation("posts_submittedByIdTousers")
+  recoveryCodes                    RecoveryCode[]
+  root_activities                  root_activities[] @ignore
+  saved_views                      SavedView[]
+  sessions                         Session[]
+  task_checklist_items             task_checklist_items[] @ignore
+  task_comments                    task_comments[] @ignore
+  trusted_devices                  trusted_devices[] @ignore
+  plans                            plans?                  @relation(fields: [planId], references: [id]) @ignore
+  writing_agent_runs               WritingAgentRun[]
+  writing_agents                   WritingAgent[]
 
   @@map("users")
 }
 
 model Session {
-  id        String   @id
-  userId    String
-  tokenHash String   @unique
-  expiresAt DateTime
-  pending   String?
-  challenge String?
-  user      User     @relation(fields: [userId], references: [id])
+  id         String   @id
+  userId     String
+  tokenHash  String   @unique
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  country    String?
+  ip         String?
+  lastSeenAt DateTime @default(now())
+  userAgent  String?
+  challenge  String?
+  pending    String?
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([expiresAt])
@@ -94,16 +93,16 @@ model Session {
 }
 
 model Passkey {
-  id           String   @id
+  id           String    @id
   userId       String
-  credentialId String   @unique
+  credentialId String    @unique
   publicKey    Bytes
-  counter      Int      @default(0)
+  counter      Int       @default(0)
   transports   String[]
   name         String
   lastUsedAt   DateTime?
-  createdAt    DateTime
-  user         User     @relation(fields: [userId], references: [id])
+  createdAt    DateTime  @default(now())
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@map("passkeys")
@@ -114,81 +113,182 @@ model RecoveryCode {
   userId    String
   codeHash  String
   usedAt    DateTime?
-  createdAt DateTime
-  user      User      @relation(fields: [userId], references: [id])
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@map("recovery_codes")
 }
 
 model AppSetting {
-  key       String   @id
-  value     Json
-  encrypted Boolean  @default(false)
-  updatedAt DateTime
+  key         String   @id
+  value       Json
+  encrypted   Boolean  @default(false)
+  updatedAt   DateTime
+  updatedById String?
+  users       User?    @relation(fields: [updatedById], references: [id])
 
   @@map("app_settings")
 }
 
 model Workspace {
-  reportRuns ReportRun[]
-  id             String          @id
-  name           String
-  slug           String          @unique
-  timezone       String
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-  memberships    Membership[]
-  targets        Target[]
-  posts          Post[]
-  socialAccounts SocialAccount[]
-  adAccounts     AdAccount[]
-  instagramAccounts InstagramAccount[]
-  mcpApiKeys     McpApiKey[]
-  dataPurge      WorkspaceDataPurge?
-  exports WorkspaceExport[]
-
-  inboxDeletions InboxDeletion[]
-  postDeletions  PostDeletion[]
-  publicationAttempts PublicationAttempt[]
+  id                               String                             @id
+  name                             String
+  slug                             String                             @unique
+  timezone                         String                             @default("UTC")
+  defaultLocale                    Locale                             @default(en)
+  requiresApproval                 Boolean                            @default(false)
+  logoUrl                          String?
+  accentColor                      String?
+  utmSource                        String?
+  utmMedium                        String?
+  utmCampaignTemplate              String?
+  shortenerEnabled                 Boolean                            @default(false)
+  aiEnabled                        Boolean                            @default(true)
+  aiTone                           String?
+  aiBrandVoice                     String?
+  createdAt                        DateTime                           @default(now())
+  updatedAt                        DateTime                           @updatedAt
+  reportFooter                     String?
+  reportSubtitle                   String?
+  reportTitle                      String?
+  weekStartsOn                     Int                                @default(1)
+  spamGapMinutes                   Int                                @default(20)
+  bestTimeMode                     String                             @default("suggest")
+  bestTimesRunAt                   DateTime?
+  audienceCalendars                String[]                           @default([])
+  audienceCountries                String[]                           @default([])
+  audienceLanguages                String[]                           @default([])
+  audienceTimezone                 String?
+  undoSendSeconds                  Int                                @default(30)
+  mixAutoFill                      Boolean                            @default(false)
+  businessDays                     Int[]                              @default([])
+  businessEnd                      Int                                @default(18)
+  businessStart                    Int                                @default(9)
+  disabledModules                  String[]                           @default([])
+  suspendedAt                      DateTime?
+  watchNegativeComments            Boolean                            @default(false)
+  trendKeywords                    String[]                           @default([])
+  developerFeatures                Boolean                            @default(false)
+  clientAccess                     String[]                           @default(["analytics"])
+  aiAvoidWords                     String?
+  clientApprovalAfterTeam          Boolean                            @default(false)
+  tasksAreaEnabled                 Boolean                            @default(false)
+  scheduleMode                     String?
+  activity_logs                    activity_logs[] @ignore
+  adAccounts                       AdAccount[]
+  ads_management_operations        ads_management_operations[] @ignore
+  ai_agents                        ai_agents[] @ignore
+  ai_generations                   ai_generations[] @ignore
+  ai_videos                        ai_videos[] @ignore
+  analytics_rollup_daily           analytics_rollup_daily[] @ignore
+  analytics_rollup_runs            analytics_rollup_runs[] @ignore
+  analytics_rollup_weekly          analytics_rollup_weekly[] @ignore
+  api_tokens                       api_tokens[] @ignore
+  autopilot_policies               autopilot_policies? @ignore
+  bio_pages                        bio_pages? @ignore
+  calendar_feeds                   calendar_feeds[] @ignore
+  caption_tests                    caption_tests[] @ignore
+  chart_notes                      chart_notes[] @ignore
+  chat_channels                    ChatChannel[]
+  chat_deliveries                  ChatDelivery[]
+  content_mix_rules                content_mix_rules[] @ignore
+  custom_fields                    custom_fields[] @ignore
+  email_logs                       email_logs[] @ignore
+  facebook_media_deletions         facebook_media_deletions[] @ignore
+  facebook_media_resolutions       facebook_media_resolutions[] @ignore
+  facebook_media_steps             facebook_media_steps[] @ignore
+  facebook_native_journal          facebook_native_journal[] @ignore
+  facebook_native_schedule_changes facebook_native_schedule_changes[] @ignore
+  facebook_native_status_proofs    facebook_native_status_proofs[] @ignore
+  facebook_sync_cursors            facebook_sync_cursors[] @ignore
+  feed_sources                     feed_sources[] @ignore
+  inboxDeletions                   InboxDeletion[]
+  inbox_notes                      inbox_notes[] @ignore
+  instagramAccounts                InstagramAccount[]
+  invitations                      invitations[] @ignore
+  key_dates                        key_dates[] @ignore
+  labels                           labels[] @ignore
+  mcpApiKeys                       McpApiKey[]
+  mcp_oauth_codes                  mcp_oauth_codes[] @ignore
+  media                            media[] @ignore
+  memberships                      Membership[]
+  metric_alert_firings             metric_alert_firings[] @ignore
+  metric_alert_rules               metric_alert_rules[] @ignore
+  moderation_actions               moderation_actions[] @ignore
+  moderation_rules                 moderation_rules[] @ignore
+  notification_settings            notification_settings[] @ignore
+  notifications                    Notification[]
+  page_goals                       page_goals[] @ignore
+  page_groups                      page_groups[] @ignore
+  postDeletions                    PostDeletion[]
+  post_export_runs                 post_export_runs[] @ignore
+  post_exports                     post_exports[] @ignore
+  post_language_variants           post_language_variants[] @ignore
+  post_templates                   post_templates[] @ignore
+  posts                            Post[]
+  publicationAttempts              PublicationAttempt[]
+  queue_slots                      queue_slots[] @ignore
+  reportRuns                       ReportRun[]
+  report_schedules                 report_schedules[] @ignore
+  report_templates                 report_templates[] @ignore
+  saved_replies                    saved_replies[] @ignore
+  saved_views                      SavedView[]
+  seasonal_modes                   seasonal_modes[] @ignore
+  share_links                      share_links[] @ignore
+  short_links                      short_links[] @ignore
+  snippets                         snippets[] @ignore
+  socialAccounts                   SocialAccount[]
+  targets                          Target[]
+  task_checklist_items             task_checklist_items[] @ignore
+  task_comments                    task_comments[] @ignore
+  tasks                            tasks[] @ignore
+  webhook_endpoints                webhook_endpoints[] @ignore
+  wordpress_recipe_plans           WordpressRecipePlan[]
+  wordpress_recipe_sources         WordpressRecipeSource?
+  dataPurge                        WorkspaceDataPurge?
+  exports                          WorkspaceExport[]
+  workspace_watermarks             WorkspaceWatermark?
+  writing_agent_runs               WritingAgentRun[]
+  writing_agents                   WritingAgent[]
 
   @@map("workspaces")
 }
 
 model WorkspaceDataPurge {
-  workspaceId   String   @id
-  status        String   @default("requested")
+  workspaceId   String    @id
+  status        String    @default("requested")
   requestedById String
   apiKeyId      String?
   mediaRoot     String
   counts        Json?
   error         String?
-  requestedAt   DateTime @default(now())
+  requestedAt   DateTime  @default(now())
   dbDeletedAt   DateTime?
   completedAt   DateTime?
-  updatedAt     DateTime @updatedAt
-  workspace     Workspace @relation(fields: [workspaceId], references: [id])
+  updatedAt     DateTime  @default(now()) @updatedAt
+  workspace     Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   @@index([status, updatedAt])
   @@map("workspace_data_purges")
 }
 
 model McpApiKey {
-  id          String    @id
-  workspaceId String
-  createdById String
-  name        String
-  tokenHash   String    @unique
-  tokenPrefix String
-  readFeatures String[] @default([])
-  writeFeatures String[] @default([])
+  id            String    @id
+  workspaceId   String
+  createdById   String
+  name          String
+  tokenHash     String    @unique
+  tokenPrefix   String
+  readFeatures  String[]  @default([])
+  writeFeatures String[]  @default([])
+  expiresAt     DateTime
+  revokedAt     DateTime?
+  createdAt     DateTime  @default(now())
+  lastUsedAt    DateTime?
   resourceScope Json?
-  expiresAt   DateTime
-  revokedAt   DateTime?
-  createdAt   DateTime  @default(now())
-  lastUsedAt  DateTime?
-  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  createdBy   User      @relation(fields: [createdById], references: [id], onDelete: Restrict)
+  createdBy     User      @relation(fields: [createdById], references: [id])
+  workspace     Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   @@index([workspaceId, createdAt])
   @@index([expiresAt])
@@ -196,12 +296,16 @@ model McpApiKey {
 }
 
 model Membership {
-  id          String        @id
-  userId      String
-  workspaceId String
-  role        WorkspaceRole
-  user        User          @relation(fields: [userId], references: [id])
-  workspace   Workspace     @relation(fields: [workspaceId], references: [id])
+  id                 String               @id
+  userId             String
+  workspaceId        String
+  role               WorkspaceRole        @default(contributor)
+  createdAt          DateTime             @default(now())
+  allPages           Boolean              @default(true)
+  disabledModules    String[]             @default([])
+  member_page_access member_page_access[] @ignore
+  user               User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace          Workspace            @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   @@unique([userId, workspaceId])
   @@index([workspaceId])
@@ -209,24 +313,29 @@ model Membership {
 }
 
 model SocialAccount {
-  id             String      @id
-  workspaceId    String
-  provider       String
-  providerUserId String
-  name           String
-  pictureUrl     String?
-  profileUrl     String?
-  accessToken    String
-  refreshToken   String?
-  tokenExpiresAt DateTime?
-  scopes         String @default("")
-  invalidatedAt  DateTime?
-  invalidReason  String?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-  workspace      Workspace   @relation(fields: [workspaceId], references: [id])
-  targets        Target[]
-  adAccounts     AdAccount[]
+  id                  String             @id
+  workspaceId         String
+  provider            String             @default("facebook")
+  providerUserId      String
+  name                String
+  pictureUrl          String?
+  accessToken         String
+  tokenExpiresAt      DateTime?
+  scopes              String             @default("")
+  invalidatedAt       DateTime?
+  invalidReason       String?
+  lastSyncedAt        DateTime?
+  expiryWarningSentAt DateTime?
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+  meta                Json?
+  refreshToken        String?
+  profileUrl          String?
+  adAccounts          AdAccount[]
+  instagram_accounts  InstagramAccount[]
+  notifications       Notification[]
+  workspace           Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  targets             Target[]
 
   @@unique([workspaceId, provider, providerUserId])
   @@index([workspaceId])
@@ -234,26 +343,67 @@ model SocialAccount {
 }
 
 model Target {
-  reportRuns ReportRun[]
-  id              String         @id
-  workspaceId     String
-  socialAccountId String?
-  type            TargetType
-  providerId      String
-  name            String
-  pictureUrl      String?
-  accessToken     String?
-  enabled         Boolean
-  canPublish      Boolean
-  followersCount Int?
-  profileSyncedAt DateTime?
-  createdAt       DateTime
-  updatedAt       DateTime @updatedAt
-  workspace       Workspace      @relation(fields: [workspaceId], references: [id])
-  socialAccount   SocialAccount? @relation(fields: [socialAccountId], references: [id])
-  postTargets     PostTarget[]
-  insights        PageInsight[]
-  conversations   Conversation[]
+  id                      String                    @id
+  workspaceId             String
+  socialAccountId         String?
+  type                    TargetType
+  providerId              String
+  name                    String
+  pictureUrl              String?
+  category                String?
+  accessToken             String?
+  enabled                 Boolean                   @default(true)
+  canPublish              Boolean                   @default(true)
+  publishBlocker          String?
+  lastSyncedAt            DateTime?
+  createdAt               DateTime                  @default(now())
+  updatedAt               DateTime                  @updatedAt
+  fanCount                Int?
+  followersCount          Int?
+  profileSyncedAt         DateTime?
+  talkingAboutCount       Int?
+  reviewsBackfilled       Boolean                   @default(false)
+  publishBlockerCode      String?
+  firstReadAt             DateTime?
+  queueEmptyNotifiedAt    DateTime?
+  queueFilledAt           DateTime?
+  brandVoice              String?
+  utmCampaign             String?
+  utmMedium               String?
+  utmSource               String?
+  audienceCalendars       String[]                  @default([])
+  audienceCountries       String[]                  @default([])
+  audienceLanguages       String[]                  @default([])
+  audienceTimezone        String?
+  watermark               Json?
+  negativeAlertAt         DateTime?
+  locale                  String?
+  analytics_rollup_daily  analytics_rollup_daily[] @ignore
+  analytics_rollup_weekly analytics_rollup_weekly[] @ignore
+  channel_profiles        channel_profiles? @ignore
+  chart_notes             chart_notes[] @ignore
+  content_mix_rules       content_mix_rules[] @ignore
+  conversations           Conversation[]
+  external_posts          external_posts[] @ignore
+  facebook_sync_cursors   facebook_sync_cursors[] @ignore
+  instagram_accounts      InstagramAccount[]
+  member_page_access      member_page_access[] @ignore
+  metric_alert_rules      metric_alert_rules[] @ignore
+  metric_availability     metric_availability[] @ignore
+  notification_mutes      notification_mutes[] @ignore
+  notifications           Notification[]
+  page_goals              page_goals[] @ignore
+  page_group_targets      page_group_targets[] @ignore
+  insights                PageInsight[]
+  page_reviews            page_reviews[] @ignore
+  page_videos             page_videos[] @ignore
+  postTargets             PostTarget[]
+  queue_slots             queue_slots[] @ignore
+  reportRuns              ReportRun[]
+  short_links             short_links[] @ignore
+  socialAccount           SocialAccount?            @relation(fields: [socialAccountId], references: [id])
+  workspace               Workspace                 @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  wordpress_recipe_plans  WordpressRecipePlan[]
 
   @@unique([workspaceId, providerId])
   @@index([socialAccountId])
@@ -269,17 +419,18 @@ model PageInsight {
   endTime   DateTime
   value     Json
   numeric   Float?
-  fetchedAt DateTime
-  target    Target   @relation(fields: [targetId], references: [id])
+  fetchedAt DateTime @default(now())
+  target    Target   @relation(fields: [targetId], references: [id], onDelete: Cascade)
 
   @@unique([targetId, metric, period, endTime])
   @@index([targetId, metric, endTime])
+  @@index([targetId, endTime, metric], map: "page_insights_target_time_metric")
   @@map("page_insights")
 }
 
 /// Read-only compatibility mapping to existing Instagram account snapshots.
 model InstagramAccount {
-  id                String   @id
+  id                String             @id
   workspaceId       String
   socialAccountId   String?
   targetId          String?
@@ -290,11 +441,13 @@ model InstagramAccount {
   followersCount    Int?
   followsCount      Int?
   mediaCount        Int?
-  enabled           Boolean
+  enabled           Boolean            @default(true)
   lastSyncedAt      DateTime?
-  createdAt         DateTime
-  updatedAt         DateTime @updatedAt
-  workspace         Workspace @relation(fields: [workspaceId], references: [id])
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  social_accounts   SocialAccount?     @relation(fields: [socialAccountId], references: [id])
+  targets           Target?            @relation(fields: [targetId], references: [id])
+  workspace         Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   insights          InstagramInsight[]
   media             InstagramMedia[]
 
@@ -305,15 +458,15 @@ model InstagramAccount {
 
 /// Stored Instagram account metrics captured by the existing Meta sync.
 model InstagramInsight {
-  id        String   @id
+  id        String           @id
   accountId String
   metric    String
   period    String
   endTime   DateTime
   value     Json
   numeric   Float?
-  fetchedAt DateTime
-  account   InstagramAccount @relation(fields: [accountId], references: [id])
+  fetchedAt DateTime         @default(now())
+  account   InstagramAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
 
   @@unique([accountId, metric, period, endTime])
   @@index([accountId, metric, endTime])
@@ -322,7 +475,7 @@ model InstagramInsight {
 
 /// Stored post-level Instagram metrics and media metadata.
 model InstagramMedia {
-  id               String   @id
+  id               String           @id
   accountId        String
   remoteId         String
   caption          String?
@@ -336,8 +489,8 @@ model InstagramMedia {
   commentsCount    Int?
   insights         Json?
   insightsSyncedAt DateTime?
-  fetchedAt        DateTime
-  account          InstagramAccount @relation(fields: [accountId], references: [id])
+  fetchedAt        DateTime         @default(now())
+  account          InstagramAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
 
   @@unique([accountId, remoteId])
   @@index([accountId, timestamp])
@@ -345,135 +498,211 @@ model InstagramMedia {
 }
 
 model Post {
-  id          String       @id
-  workspaceId String
-  authorId    String
-  message     String
-  firstComment String?
-  firstCommentDelayMinutes Int @default(0)
+  id                               String                   @id
+  workspaceId                      String
+  authorId                         String
+  message                          String                   @default("")
+  link                             String?
+  linkPreview                      Json?
+  media                            Json                     @default("[]")
+  status                           PostStatus               @default(draft)
+  publishMode                      PublishMode              @default(worker)
+  scheduledAt                      DateTime?
+  timezone                         String                   @default("UTC")
+  publishedAt                      DateTime?
+  approvalStatus                   ApprovalStatus           @default(not_required)
+  submittedById                    String?
+  submittedAt                      DateTime?
+  reviewedById                     String?
+  reviewedAt                       DateTime?
+  reviewNote                       String?
+  variants                         Json                     @default("[]")
+  recycleEnabled                   Boolean                  @default(false)
+  recycleEveryDays                 Int?
+  recycleLimit                     Int?
+  recycleCount                     Int                      @default(0)
+  recycleNextAt                    DateTime?
+  originPostId                     String?
+  sourceFeedItemId                 String?
+  createdAt                        DateTime                 @default(now())
+  updatedAt                        DateTime
+  mediaKeys                        String[]                 @default([])
+  firstComment                     String?
+  firstCommentDelayMinutes         Int                      @default(0)
   /// Existing legacy column; opaque module format identity, not interpreted by the shared core.
-  format      String       @default("post")
-  link        String?
-  media       Json         @default("[]")
-  status      PostStatus
-  scheduledAt DateTime?
-  publishedAt DateTime?
-  createdAt   DateTime
-  updatedAt   DateTime
-  workspace   Workspace    @relation(fields: [workspaceId], references: [id])
-  author      User         @relation(fields: [authorId], references: [id])
-  targets     PostTarget[]
+  format                           String                   @default("post")
+  captionLabel                     String?
+  captionTestId                    String?
+  teamApprovedById                 String?
+  teamApprovedAt                   DateTime?
+  place                            String?
+  textBackground                   String?
+  notifications                    Notification[]
+  post_field_values                post_field_values[] @ignore
+  post_labels                      post_labels[] @ignore
+  post_language_variants           post_language_variants[] @ignore
+  post_notes                       post_notes[] @ignore
+  targets                          PostTarget[]
+  post_versions                    post_versions[] @ignore
+  author                           User                     @relation(fields: [authorId], references: [id])
+  caption_tests                    caption_tests?           @relation(fields: [captionTestId], references: [id]) @ignore
+  users_posts_reviewedByIdTousers  User?                    @relation("posts_reviewedByIdTousers", fields: [reviewedById], references: [id])
+  feed_items                       feed_items?              @relation(fields: [sourceFeedItemId], references: [id]) @ignore
+  users_posts_submittedByIdTousers User?                    @relation("posts_submittedByIdTousers", fields: [submittedById], references: [id])
+  workspace                        Workspace                @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  review_decisions                 review_decisions[] @ignore
+  short_links                      short_links[] @ignore
 
   @@index([workspaceId, status])
   @@index([workspaceId, scheduledAt])
+  @@index([authorId])
+  @@index([captionTestId])
+  @@index([mediaKeys], type: Gin)
+  @@index([message(ops: raw("gin_trgm_ops"))], map: "posts_message_trgm_idx", type: Gin)
+  @@index([originPostId])
+  @@index([recycleEnabled, recycleNextAt])
+  @@index([scheduledAt])
+  @@index([sourceFeedItemId])
+  @@index([workspaceId, approvalStatus])
+  @@index([workspaceId, createdAt, id], map: "posts_workspace_created_order")
+  @@index([workspaceId, scheduledAt, createdAt, id], map: "posts_workspace_schedule_order")
+  @@index([workspaceId, status, scheduledAt, createdAt, id], map: "posts_workspace_status_schedule_order")
   @@map("posts")
 }
 
 model PostTarget {
-  id           String           @id
-  postId       String
-  targetId     String
-  status       PostTargetStatus
+  id                 String           @id
+  postId             String
+  targetId           String
+  status             PostTargetStatus @default(pending)
+  remotePostId       String?
+  remoteUrl          String?
+  nativeScheduledFor DateTime?
+  attempts           Int              @default(0)
+  nextAttemptAt      DateTime?
+  lockedAt           DateTime?
+  lockedBy           String?
+  errorCode          String?
+  errorMessage       String?
+  publishedAt        DateTime?
+  insights           Json?
+  insightsSyncedAt   DateTime?
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+  firstCommentId     String?
+  firstCommentAt     DateTime?
+  firstCommentError  String?
+  remoteMissingAt    DateTime?
+  removedAt          DateTime?
+  messageOverride    String?
+  skipMedia          Boolean          @default(false)
   /// Opaque module format identity; null means existing legacy intent.
-  formatId String?
+  formatId           String?
   /// Where this destination's schedule waits: 'application' or 'remote'. Null follows the post-level choice (posts.publishMode).
-  scheduleMode String?
-  remotePostId String?
-  remoteUrl    String?
-  firstCommentId String?
-  firstCommentAt DateTime?
-  firstCommentError String?
-  publishedAt  DateTime?
-  updatedAt    DateTime         @updatedAt
-  post         Post             @relation(fields: [postId], references: [id])
-  target       Target           @relation(fields: [targetId], references: [id])
-  comments     PostComment[]
+  scheduleMode       String?
+  comments           PostComment[]
+  post               Post             @relation(fields: [postId], references: [id], onDelete: Cascade)
+  target             Target           @relation(fields: [targetId], references: [id], onDelete: Cascade)
 
   @@unique([postId, targetId])
   @@index([targetId])
+  @@index([status, insightsSyncedAt])
+  @@index([status, nextAttemptAt])
   @@map("post_targets")
 }
 
 /// Inbox records mapped to the existing legacy tables; provider writes are performed by the server action layer.
+/// This model contains an expression index which requires additional setup for migrations. Visit https://pris.ly/d/expression-indexes for more info.
 model PostComment {
-  id             String   @id
-  postTargetId   String
-  remoteId       String
-  parentRemoteId String?
-  message        String
-  fromName       String?
-  fromId         String?
-  likeCount      Int      @default(0)
-  replyCount     Int      @default(0)
-  isHidden       Boolean  @default(false)
-  createdTime    DateTime
-  fetchedAt      DateTime @default(now())
-  firstSeenAt    DateTime @default(now())
-  resolvedAt     DateTime?
-  assigneeId     String?
-  sentById       String?
+  id                   String     @id
+  postTargetId         String
+  remoteId             String
+  parentRemoteId       String?
+  message              String
+  fromName             String?
+  fromId               String?
+  likeCount            Int        @default(0)
+  replyCount           Int        @default(0)
+  isHidden             Boolean    @default(false)
+  createdTime          DateTime
+  fetchedAt            DateTime   @default(now())
+  resolvedAt           DateTime?
+  firstSeenAt          DateTime   @default(now())
+  sentById             String?
+  sentiment            String?
+  assigneeId           String?
   sentimentAttemptedAt DateTime?
-  sentimentProvenance Json?
-  sentiment      String?
-  postTarget     PostTarget @relation(fields: [postTargetId], references: [id])
+  sentimentProvenance  Json?
+  inboxMetadata        Json?
+  postTarget           PostTarget @relation(fields: [postTargetId], references: [id], onDelete: Cascade)
 
   @@unique([postTargetId, remoteId])
   @@index([postTargetId, createdTime])
+  @@index([fromName(ops: raw("gin_trgm_ops"))], map: "post_comments_author_trgm_idx", type: Gin)
+  @@index([message(ops: raw("gin_trgm_ops"))], map: "post_comments_message_trgm_idx", type: Gin)
   @@map("post_comments")
 }
 
 model Conversation {
-  id           String   @id
-  targetId     String
-  remoteId     String
-  snippet      String?
-  unreadCount  Int      @default(0)
-  messageCount Int      @default(0)
-  participants Json?
-  updatedTime  DateTime
-  fetchedAt    DateTime @default(now())
-  resolvedAt   DateTime?
-  assigneeId   String?
-  target       Target   @relation(fields: [targetId], references: [id])
-  messages     ConversationMessage[]
+  id            String                @id
+  targetId      String
+  remoteId      String
+  snippet       String?
+  unreadCount   Int                   @default(0)
+  messageCount  Int                   @default(0)
+  participants  Json?
+  updatedTime   DateTime
+  fetchedAt     DateTime              @default(now())
+  resolvedAt    DateTime?
+  assigneeId    String?
+  inboxMetadata Json?
+  messages      ConversationMessage[]
+  target        Target                @relation(fields: [targetId], references: [id], onDelete: Cascade)
 
   @@unique([targetId, remoteId])
   @@index([targetId, updatedTime])
+  @@index([snippet(ops: raw("gin_trgm_ops"))], map: "conversations_snippet_trgm_idx", type: Gin)
   @@map("conversations")
 }
 
+/// This model contains an expression index which requires additional setup for migrations. Visit https://pris.ly/d/expression-indexes for more info.
 model ConversationMessage {
-  id             String   @id
+  id             String       @id
   conversationId String
   remoteId       String
   fromName       String?
   fromId         String?
   message        String?
   createdTime    DateTime
-  firstSeenAt    DateTime @default(now())
+  firstSeenAt    DateTime     @default(now())
   sentById       String?
-  conversation   Conversation @relation(fields: [conversationId], references: [id])
+  inboxMetadata  Json?
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
 
   @@unique([conversationId, remoteId])
   @@index([conversationId, createdTime])
+  @@index([fromName(ops: raw("gin_trgm_ops"))], map: "conversation_messages_author_trgm_idx", type: Gin)
+  @@index([message(ops: raw("gin_trgm_ops"))], map: "conversation_messages_message_trgm_idx", type: Gin)
   @@map("conversation_messages")
 }
 
 model AdAccount {
-  id              String         @id
-  workspaceId     String
-  socialAccountId String?
-  actId           String
-  name            String
-  currency        String?
-  accountStatus   Int?
-  enabled         Boolean
-  lastSyncedAt    DateTime?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  workspace       Workspace      @relation(fields: [workspaceId], references: [id])
-  socialAccount   SocialAccount? @relation(fields: [socialAccountId], references: [id])
-  insights        AdInsight[]
+  id                        String                      @id
+  workspaceId               String
+  socialAccountId           String?
+  actId                     String
+  name                      String
+  currency                  String?
+  accountStatus             Int?
+  enabled                   Boolean                     @default(true)
+  lastSyncedAt              DateTime?
+  createdAt                 DateTime                    @default(now())
+  updatedAt                 DateTime                    @updatedAt
+  socialAccount             SocialAccount?              @relation(fields: [socialAccountId], references: [id])
+  workspace                 Workspace                   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  insights                  AdInsight[]
+  ads_management_operations ads_management_operations[] @ignore
+  ads_objects               ads_objects[] @ignore
 
   @@unique([workspaceId, actId])
   @@index([workspaceId])
@@ -482,16 +711,16 @@ model AdAccount {
 
 /// Stored daily delivery metrics for an ad account, campaign, ad set or ad.
 model AdInsight {
-  id          String   @id
+  id          String    @id
   adAccountId String
   level       String
   objectId    String
   objectName  String?
   date        DateTime
-  spend       Float
-  impressions Int
-  clicks      Int
-  reach       Int
+  spend       Float     @default(0)
+  impressions Int       @default(0)
+  clicks      Int       @default(0)
+  reach       Int       @default(0)
   cpc         Float?
   cpm         Float?
   cpp         Float?
@@ -499,8 +728,8 @@ model AdInsight {
   frequency   Float?
   actions     Json?
   fields      Json?
-  fetchedAt   DateTime
-  adAccount   AdAccount @relation(fields: [adAccountId], references: [id])
+  fetchedAt   DateTime  @default(now())
+  adAccount   AdAccount @relation(fields: [adAccountId], references: [id], onDelete: Cascade)
 
   @@unique([adAccountId, level, objectId, date])
   @@index([adAccountId, date])
@@ -549,10 +778,10 @@ model InboxDeletion {
   actorId             String
   state               String
   reason              String?
-  createdAt           DateTime  @default(now()) @db.Timestamp(3)
-  updatedAt           DateTime  @default(now()) @updatedAt @db.Timestamp(3)
-  remoteConfirmedAt   DateTime? @db.Timestamp(3)
-  completedAt         DateTime? @db.Timestamp(3)
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @default(now()) @updatedAt
+  remoteConfirmedAt   DateTime?
+  completedAt         DateTime?
   workspace           Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   @@unique([workspaceId, provider, targetId, remoteId])
@@ -572,72 +801,76 @@ model PostDeletion {
   localPostTargetIds String[]  @default([])
   state              String
   reason             String?
-  createdAt          DateTime  @default(now()) @db.Timestamp(3)
-  updatedAt          DateTime  @default(now()) @updatedAt @db.Timestamp(3)
-  remoteConfirmedAt  DateTime? @db.Timestamp(3)
-  completedAt        DateTime? @db.Timestamp(3)
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @default(now()) @updatedAt
+  remoteConfirmedAt  DateTime?
+  completedAt        DateTime?
   workspace          Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   @@index([workspaceId, targetId, updatedAt])
-  @@index([localPostIds], type: Gin)
+  @@index([localPostIds], map: "post_deletions_localPostIds_gin_idx", type: Gin)
   @@map("post_deletions")
 }
 
 /// Durable, content-free provider publication attempt and receipt journal.
 model PublicationAttempt {
-  id           String    @id @default(uuid())
-  workspaceId  String
-  postId       String
-  postTargetId String
-  targetId     String
-  provider     String
-  actorId      String
-  state        String
-  reason       String?
-  remotePostId String?
-  remoteUrl    String?
-  receiptAt    DateTime? @db.Timestamp(3)
-  projectedAt  DateTime? @db.Timestamp(3)
-  attestedAt   DateTime? @db.Timestamp(3)
-  attestedBy   String?
-  createdAt    DateTime  @default(now()) @db.Timestamp(3)
-  updatedAt    DateTime  @default(now()) @updatedAt @db.Timestamp(3)
-  workspace    Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  id                            String                          @id @default(uuid())
+  workspaceId                   String
+  postId                        String
+  postTargetId                  String
+  targetId                      String
+  provider                      String
+  actorId                       String
+  state                         String
+  reason                        String?
+  remotePostId                  String?
+  remoteUrl                     String?
+  receiptAt                     DateTime?
+  projectedAt                   DateTime?
+  attestedAt                    DateTime?
+  attestedBy                    String?
+  createdAt                     DateTime                        @default(now())
+  updatedAt                     DateTime                        @default(now()) @updatedAt
+  facebook_native_journal       facebook_native_journal? @ignore
+  facebook_native_status_proofs facebook_native_status_proofs[] @ignore
+  workspace                     Workspace                       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
+  @@unique([workspaceId, id])
   @@index([workspaceId, targetId, updatedAt])
   @@index([workspaceId, postId, postTargetId])
   @@map("publication_attempts")
 }
 
-
 /// Durable report outcomes; content receipts are retained only for manual downloads.
 model ReportRun {
-  id String @id
-  workspaceId String
-  scheduleId String?
-  targetId String
-  kind String
-  idempotencyKey String @unique
-  claimToken String
-  requestHash String? @db.Char(64)
-  periodStart String
-  periodEnd String
-  status String
-  leaseUntil DateTime @db.Timestamptz(6)
-  startedAt DateTime @default(now()) @db.Timestamptz(6)
-  finishedAt DateTime? @db.Timestamptz(6)
-  rowCount Int?
-  truncated Boolean @default(false)
-  failureReason String?
-  deliveries Json @default("[]")
-  requestedById String?
-  output Json?
-  outputExpiresAt DateTime? @db.Timestamptz(6)
-  createdAt DateTime @default(now()) @db.Timestamptz(6)
-  workspace Workspace @relation(fields:[workspaceId], references:[id], onDelete:Cascade)
-  target Target @relation(fields:[targetId], references:[id], onDelete:Cascade)
-  @@index([workspaceId,startedAt(sort:Desc),id], map:"report_runs_workspace_history")
-  @@index([workspaceId,targetId,startedAt(sort:Desc),id], map:"report_runs_channel_history")
+  id               String            @id
+  workspaceId      String
+  scheduleId       String?
+  targetId         String
+  kind             String
+  idempotencyKey   String            @unique
+  claimToken       String
+  requestHash      String?           @db.Char(64)
+  periodStart      String
+  periodEnd        String
+  status           String
+  leaseUntil       DateTime          @db.Timestamptz(6)
+  startedAt        DateTime          @default(now()) @db.Timestamptz(6)
+  finishedAt       DateTime?         @db.Timestamptz(6)
+  rowCount         Int?
+  truncated        Boolean           @default(false)
+  failureReason    String?
+  deliveries       Json              @default("[]")
+  requestedById    String?
+  output           Json?
+  outputExpiresAt  DateTime?         @db.Timestamptz(6)
+  createdAt        DateTime          @default(now()) @db.Timestamptz(6)
+  report_schedules report_schedules? @relation(fields: [scheduleId], references: [id], onUpdate: NoAction) @ignore
+  target           Target            @relation(fields: [targetId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  workspace        Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([workspaceId, startedAt(sort: Desc), id], map: "report_runs_workspace_history")
+  @@index([workspaceId, targetId, startedAt(sort: Desc), id], map: "report_runs_channel_history")
   @@map("report_runs")
 }
 
@@ -645,42 +878,44 @@ model ReportRun {
 /// 20261019090000_saved_views (no rebuild DDL needed). Accessed through
 /// src/modules/publishing/server/saved-views.ts with workspace+user binding.
 model SavedView {
-  id          String   @id
+  id          String    @id
   workspaceId String
   userId      String
   name        String
   screen      String
   query       String
-  createdAt   DateTime @default(now())
+  createdAt   DateTime  @default(now())
+  users       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspaces  Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
   @@index([workspaceId, userId, screen])
   @@map("saved_views")
 }
 
 model WorkspaceExport {
-  id String @id
-  workspaceId String
+  id            String    @id
+  workspaceId   String
   requestedById String
-  apiKeyId String?
-  status String @default("requested")
-  mediaRoot String
-  leaseToken String?
-  leaseUntil DateTime?
-  createdAt DateTime @default(now())
-  expiresAt DateTime
-  error String?
-  bytes Int?
-  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  apiKeyId      String?
+  status        String    @default("requested")
+  mediaRoot     String
+  leaseToken    String?
+  leaseUntil    DateTime?
+  createdAt     DateTime  @default(now())
+  expiresAt     DateTime
+  error         String?
+  bytes         Int?
+  workspace     Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@index([status, createdAt], map: "workspace_exports_due")
   @@index([workspaceId, createdAt], map: "workspace_exports_workspace")
   @@map("workspace_exports")
 }
 
-// Deletion outbox: no FK so file cleanup survives erasure and a worker restart.
 model ExportFileCleanup {
-  id String @id
-  workspaceId String
-  mediaRoot String
+  id            String   @id
+  workspaceId   String
+  mediaRoot     String
   nextAttemptAt DateTime @default(now())
 
   @@index([workspaceId], map: "export_file_cleanups_workspace")
@@ -689,28 +924,29 @@ model ExportFileCleanup {
 
 /// WordPress / CMS recipe & content source configured per workspace.
 model WordpressRecipeSource {
-  id          String   @id
-  workspaceId String   @unique
-  name        String
-  siteUrl     String
+  id            String                @id
+  workspaceId   String                @unique(map: "wordpress_recipe_sources_workspace_key")
+  name          String
+  siteUrl       String
+  enabled       Boolean               @default(false)
+  allTargets    Boolean               @default(true)
+  targetIds     Json                  @default("[]")
+  config        Json                  @default("{}")
+  lastRunAt     DateTime?
+  lastError     String?
+  lastSummary   Json?
+  createdAt     DateTime              @default(now())
+  updatedAt     DateTime              @default(now()) @updatedAt
   apiCredential String?
-  enabled     Boolean  @default(false)
-  allTargets  Boolean  @default(true)
-  targetIds   Json     @default("[]")
-  config      Json     @default("{}")
-  lastRunAt   DateTime?
-  lastError   String?
-  lastSummary Json?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  plans       WordpressRecipePlan[]
+  plans         WordpressRecipePlan[]
+  workspaces    Workspace             @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   @@map("wordpress_recipe_sources")
 }
 
 /// Planned slot ledger for WordPress / CMS recipe automation.
 model WordpressRecipePlan {
-  id          String   @id
+  id          String                @id
   workspaceId String
   sourceId    String
   targetId    String
@@ -718,74 +954,95 @@ model WordpressRecipePlan {
   slotAt      DateTime
   state       String
   postId      String?
-  title       String
+  title       String                @default("")
   permalink   String?
   reason      String?
-  skipped     Json     @default("[]")
-  claimedAt   DateTime @default(now())
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  skipped     Json                  @default("[]")
+  claimedAt   DateTime              @default(now())
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @default(now()) @updatedAt
   source      WordpressRecipeSource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  targets     Target                @relation(fields: [targetId], references: [id], onDelete: Cascade)
+  workspaces  Workspace             @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
-  @@unique([sourceId, targetId, slotAt])
-  @@index([workspaceId, sourceId, slotAt])
+  @@unique([sourceId, targetId, slotAt], map: "wordpress_recipe_plans_slot_key")
+  @@index([sourceId, wpPostId], map: "wordpress_recipe_plans_recipe_idx")
+  @@index([workspaceId, slotAt], map: "wordpress_recipe_plans_workspace_slot_idx")
   @@map("wordpress_recipe_plans")
 }
 
 /// In-app and email notification ledger.
 model Notification {
-  id                String    @id
-  workspaceId       String
-  recipientId       String
-  eventId           String
-  kind              String
-  context           Json      @default("{}")
-  readAt            DateTime?
-  emailStatus       String
-  emailAttempts     Int       @default(0)
-  emailNextAttemptAt DateTime?
-  emailClaimToken   String?
-  emailClaimedAt    DateTime?
-  emailSentAt       DateTime?
-  emailLastError    String?
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  id              String         @id
+  eventId         String
+  workspaceId     String
+  userId          String
+  kind            String
+  postId          String?
+  noteId          String?
+  targetId        String?
+  labelId         String?
+  createdAt       DateTime       @default(now()) @db.Timestamptz(6)
+  updatedAt       DateTime       @default(now()) @updatedAt @db.Timestamptz(6)
+  readAt          DateTime?      @db.Timestamptz(6)
+  emailSentAt     DateTime?      @db.Timestamptz(6)
+  lastAttemptAt   DateTime?      @db.Timestamptz(6)
+  emailState      String         @default("pending")
+  attempt         Int            @default(0)
+  nextAt          DateTime?      @db.Timestamptz(6)
+  claimToken      String?
+  claimUntil      DateTime?      @db.Timestamptz(6)
+  safeReason      String?
+  accountId       String?
+  social_accounts SocialAccount? @relation(fields: [accountId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  labels          labels?        @relation(fields: [labelId], references: [id], onDelete: Cascade, onUpdate: NoAction) @ignore
+  post_notes      post_notes?    @relation(fields: [noteId], references: [id], onDelete: Cascade, onUpdate: NoAction) @ignore
+  posts           Post?          @relation(fields: [postId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  targets         Target?        @relation(fields: [targetId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users           User           @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  workspaces      Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
-  @@unique([workspaceId, eventId, recipientId], map: "notifications_event_recipient_uq")
-  @@index([workspaceId, recipientId, createdAt(sort: Desc), id(sort: Desc)], map: "notifications_recipient_page_idx")
+  @@unique([workspaceId, eventId, userId], map: "notifications_event_recipient_uq")
+  @@index([workspaceId, userId, createdAt(sort: Desc), id(sort: Desc)], map: "notifications_recipient_page_idx")
   @@map("notifications")
 }
 
 /// Outbound Slack / Discord / Telegram chat channel webhooks.
 model ChatChannel {
-  id          String   @id
-  workspaceId String
-  name        String
-  kind        String
-  secret      String
-  events      String[] @default([])
-  enabled     Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id              String         @id
+  workspaceId     String
+  kind            String
+  name            String
+  secret          String
+  events          String[]
+  enabled         Boolean        @default(true)
+  lastError       String?
+  lastSentAt      DateTime?
+  createdAt       DateTime       @default(now())
+  workspaces      Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  chat_deliveries ChatDelivery[]
 
+  @@unique([id, workspaceId], map: "chat_channels_id_workspace_id")
   @@index([workspaceId])
   @@map("chat_channels")
 }
 
 /// Durable delivery queue for outbound chat notifications.
 model ChatDelivery {
-  id           String    @id
-  workspaceId  String
-  channelId    String
-  eventId      String
-  event        String
-  operatorOnly Boolean   @default(false)
-  source       Json?
-  status       String    @default("pending")
-  claimToken   String?
-  claimedAt    DateTime?
-  createdAt    DateTime  @default(now())
-  finishedAt   DateTime?
+  id            String      @id
+  workspaceId   String
+  channelId     String
+  eventId       String
+  event         String
+  source        Json?
+  operatorOnly  Boolean     @default(false)
+  status        String      @default("pending")
+  claimedAt     DateTime?
+  claimToken    String?
+  finishedAt    DateTime?
+  createdAt     DateTime    @default(now())
+  chat_channels ChatChannel @relation(fields: [channelId, workspaceId], references: [id, workspaceId], onDelete: Cascade, onUpdate: NoAction)
+  workspaces    Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@unique([workspaceId, channelId, eventId, event])
   @@index([status, createdAt], map: "chat_deliveries_pending")
@@ -794,45 +1051,1929 @@ model ChatDelivery {
 
 /// Custom AI writing personas per workspace.
 model WritingAgent {
-  id           String   @id
-  workspaceId  String
-  name         String
-  instructions String
-  voice        String
-  createdById  String
-  updatedAt    DateTime @default(now())
+  id                 String            @id
+  workspaceId        String
+  name               String
+  instructions       String
+  voice              String
+  createdById        String
+  updatedAt          DateTime          @default(now()) @db.Timestamptz(6)
+  writing_agent_runs WritingAgentRun[]
+  users              User              @relation(fields: [createdById], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  workspaces         Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@unique([id, workspaceId])
   @@index([workspaceId, id])
+  @@index([workspaceId, id], map: "writing_agents_workspaceId_id_idx1")
   @@map("writing_agents")
 }
 
 /// Execution log for custom AI writing agents.
 model WritingAgentRun {
-  id          String    @id
-  workspaceId String
-  agentId     String?
-  createdById String
-  kind        String
-  status      String
-  errorCode   String?
-  createdAt   DateTime  @default(now())
-  completedAt DateTime?
+  id             String        @id
+  workspaceId    String
+  agentId        String?
+  createdById    String
+  kind           String
+  status         String
+  errorCode      String?
+  createdAt      DateTime      @default(now()) @db.Timestamptz(6)
+  completedAt    DateTime?     @db.Timestamptz(6)
+  writing_agents WritingAgent? @relation(fields: [agentId, workspaceId], references: [id, workspaceId], onDelete: SetNull, onUpdate: NoAction)
+  users          User          @relation(fields: [createdById], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  workspaces     Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@index([workspaceId, createdAt(sort: Desc), id])
+  @@index([workspaceId, createdAt(sort: Desc), id], map: "writing_agent_runs_workspaceId_createdAt_id_idx1")
   @@map("writing_agent_runs")
 }
 
 /// Workspace watermark image configuration.
 model WorkspaceWatermark {
-  workspaceId String   @id
-  mediaId     String
+  workspaceId String    @id
+  logo        Bytes
   position    String
-  opacity     Int
-  scale       Int
-  updatedById String
-  updatedAt   DateTime @default(now())
+  opacity     Float
+  scale       Float
+  workspaces  Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@map("workspace_watermarks")
 }
 
+model OAuthClient {
+  id           String      @id
+  name         String
+  redirectUris String[]
+  createdAt    DateTime    @default(now())
+  OAuthCode    OAuthCode[]
+
+  @@ignore
+}
+
+model OAuthCode {
+  id            String      @id
+  codeHash      String      @unique
+  clientId      String
+  userId        String
+  workspaceId   String
+  redirectUri   String
+  codeChallenge String
+  scope         String
+  expiresAt     DateTime
+  createdAt     DateTime    @default(now())
+  OAuthClient   OAuthClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@ignore
+}
+
+model activity_logs {
+  id          String    @id
+  workspaceId String
+  actorId     String?
+  action      String
+  detail      Json?
+  createdAt   DateTime  @default(now())
+  workspaces  Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, createdAt])
+
+  @@ignore
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model ads_management_operations {
+  id             String    @id
+  workspaceId    String
+  adAccountId    String
+  actorId        String
+  requestId      String
+  requestHash    String    @db.Char(64)
+  operationType  String
+  objectType     String
+  objectId       String
+  params         Json
+  status         String
+  remoteId       String?
+  failureCode    String?
+  createdAt      DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt      DateTime  @default(now()) @db.Timestamptz(6)
+  completedAt    DateTime? @db.Timestamptz(6)
+  resolvedBy     String?
+  resolvedAt     DateTime? @db.Timestamptz(6)
+  resolutionNote String?
+  ad_accounts    AdAccount @relation(fields: [adAccountId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  workspaces     Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([workspaceId, actorId, requestId], map: "ads_management_operations_actor_request")
+  @@index([workspaceId, adAccountId, createdAt(sort: Desc), id], map: "ads_management_operations_history")
+
+  @@ignore
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model ads_objects {
+  adAccountId String
+  level       String
+  objectId    String
+  name        String?
+  parentId    String?
+  status      String?
+  fetchedAt   DateTime
+  ad_accounts AdAccount @relation(fields: [adAccountId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([adAccountId, level, objectId])
+
+  @@ignore
+}
+
+model ai_agents {
+  id          String    @id
+  workspaceId String
+  userId      String
+  targetId    String
+  brief       String
+  weekday     Int
+  count       Int       @default(5)
+  enabled     Boolean   @default(true)
+  lastRunOn   String?
+  createdAt   DateTime  @default(now())
+  workspaces  Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+
+  @@ignore
+}
+
+model ai_generations {
+  id           String           @id
+  workspaceId  String
+  userId       String
+  kind         AiGenerationKind
+  prompt       String
+  output       String
+  model        String
+  inputTokens  Int              @default(0)
+  outputTokens Int              @default(0)
+  createdAt    DateTime         @default(now())
+  costUsd      Float?
+  provider     String?
+  users        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspaces   Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([createdAt])
+  @@index([workspaceId, createdAt])
+
+  @@ignore
+}
+
+model ai_videos {
+  id          String    @id
+  workspaceId String
+  userId      String
+  prompt      String
+  aspectRatio String
+  operation   String
+  status      String    @default("working")
+  mediaId     String?
+  error       String?
+  createdAt   DateTime  @default(now())
+  workspaces  Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+  @@index([workspaceId, createdAt])
+
+  @@ignore
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model analytics_rollup_daily {
+  id          String    @id
+  workspaceId String
+  provider    String
+  targetId    String
+  metric      String
+  period      String    @default("day")
+  day         DateTime  @db.Date
+  kind        String
+  value       Float
+  samples     Int
+  asOf        DateTime
+  fetchedAt   DateTime
+  updatedAt   DateTime  @default(now())
+  targets     Target    @relation(fields: [targetId], references: [id], onDelete: Cascade)
+  workspaces  Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([targetId, metric, period, day], map: "analytics_rollup_daily_target_uniq")
+  @@index([workspaceId, provider, day], map: "analytics_rollup_daily_workspace_idx")
+
+  @@ignore
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model analytics_rollup_runs {
+  id          String    @id
+  workspaceId String
+  provider    String
+  granularity String
+  windowFrom  DateTime
+  windowTo    DateTime
+  targetIds   Json      @default("[]")
+  status      String
+  examined    Int       @default(0)
+  written     Int       @default(0)
+  startedAt   DateTime  @default(now())
+  finishedAt  DateTime  @default(now())
+  workspaces  Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, provider, granularity, finishedAt(sort: Desc)], map: "analytics_rollup_runs_workspace_idx")
+
+  @@ignore
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model analytics_rollup_weekly {
+  id          String    @id
+  workspaceId String
+  provider    String
+  targetId    String
+  metric      String
+  period      String    @default("day")
+  weekStart   DateTime  @db.Date
+  kind        String
+  value       Float
+  samples     Int
+  asOf        DateTime
+  fetchedAt   DateTime
+  updatedAt   DateTime  @default(now())
+  targets     Target    @relation(fields: [targetId], references: [id], onDelete: Cascade)
+  workspaces  Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([targetId, metric, period, weekStart], map: "analytics_rollup_weekly_target_uniq")
+  @@index([workspaceId, provider, weekStart], map: "analytics_rollup_weekly_workspace_idx")
+
+  @@ignore
+}
+
+model api_tokens {
+  id          String    @id
+  workspaceId String
+  userId      String
+  name        String
+  tokenHash   String    @unique
+  prefix      String
+  scope       String    @default("read")
+  lastUsedAt  DateTime?
+  revokedAt   DateTime?
+  createdAt   DateTime  @default(now())
+  users       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspaces  Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+
+  @@ignore
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model app_updates {
+  id             String    @id
+  commit         String?
+  branch         String
+  source         String
+  status         String
+  requestedBy    String?
+  summary        String?
+  deployedCommit String?
+  log            String?
+  createdAt      DateTime  @default(now()) @db.Timestamptz(6)
+  startedAt      DateTime? @db.Timestamptz(6)
+  finishedAt     DateTime? @db.Timestamptz(6)
+
+  @@index([createdAt], map: "app_updates_created")
+  @@index([status, createdAt], map: "app_updates_status_created")
+
+  @@ignore
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model autopilot_policies {
+  workspaceId String    @id
+  tier        String    @default("assisted")
+  guardrails  Json      @default("{}")
+  updatedById String?
+  updatedAt   DateTime  @default(now())
+  users       User?     @relation(fields: [updatedById], references: [id])
+  workspaces  Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@ignore
+}
+
+model backup_runs {
+  id         String   @id
+  kind       String
+  status     String
+  detail     String?
+  startedAt  DateTime
+  finishedAt DateTime @default(now())
+
+  @@index([kind, finishedAt])
+
+  @@ignore
+}
+
+model bio_links {
+  id        String    @id
+  pageId    String
+  label     String
+  url       String
+  position  Int       @default(0)
+  clicks    Int       @default(0)
+  bio_pages bio_pages @relation(fields: [pageId], references: [id], onDelete: Cascade)
+
+  @@index([pageId, position])
+
+  @@ignore
+}
+
+model bio_pages {
+  id          String      @id
+  workspaceId String      @unique
+  slug        String      @unique
+  title       String
+  description String?
+  avatarUrl   String?
+  enabled     Boolean     @default(true)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime
+  bio_links   bio_links[]
+  workspaces  Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@ignore
+}
+
+model calendar_feeds {
+  id          String    @id
+  workspaceId String
+  userId      String
+  name        String
+  tokenHash   String    @unique
+  pageIds     String[]  @default([])
+  groupId     String?
+  lastUsedAt  DateTime?
+  createdAt   DateTime  @default(now())
+  users       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspaces  Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, userId])
+
+  @@ignore
+}
+
+model caption_tests {
+  id          String    @id
+  workspaceId String
+  name        String
+  hours       Int       @default(48)
+  minViews    Int       @default(500)
+  status      String    @default("running")
+  reason      String?
+  winnerLabel String?
+  lift        Float?
+  results     Json?
+  decidedAt   DateTime?
+  learnedAt   DateTime?
+  createdById String?
+  createdAt   DateTime  @default(now())
+  workspaces  Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  posts       Post[]
+
+  @@index([status])
+  @@index([workspaceId, createdAt])
+
+  @@ignore
+}
+
+model changelog_entries {
+  id          String   @id
+  publishedOn DateTime @db.Date
+  title       String
+  body        String   @default("")
+  createdAt   DateTime @default(now())
+
+  @@index([publishedOn])
+
+  @@ignore
+}
+
+model channel_profiles {
+  targetId String   @id
+  labels   String[] @default([])
+  targets  Target   @relation(fields: [targetId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@ignore
+}
+
+model chart_notes {
+  id          String    @id
+  workspaceId String
+  targetId    String?
+  day         String
+  label       String
+  color       String    @default("blue")
+  authorId    String?
+  createdAt   DateTime  @default(now())
+  users       User?     @relation(fields: [authorId], references: [id])
+  targets     Target?   @relation(fields: [targetId], references: [id], onDelete: Cascade)
+  workspaces  Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, day])
+
+  @@ignore
+}
+
+model client_invitations {
+  id               String    @id
+  email            String
+  tokenHash        String    @unique
+  workspaceName    String?
+  invitedById      String
+  expiresAt        DateTime
+  acceptedAt       DateTime?
+  acceptedByUserId String?
+  createdAt        DateTime  @default(now())
+  users            User      @relation(fields: [invitedById], references: [id], onDelete: Cascade)
+
+  @@index([email])
+
+  @@ignore
+}
+
+model content_mix_rules {
+  id            String       @id
+  workspaceId   String
+  targetId      String?
+  groupId       String?
+  labelId       String
+  perWeek       Int
+  dryNotifiedAt DateTime?
+  createdAt     DateTime     @default(now())
+  page_groups   page_groups? @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  labels        labels       @relation(fields: [labelId], references: [id], onDelete: Cascade)
+  targets       Target?      @relation(fields: [targetId], references: [id], onDelete: Cascade)
+  workspaces    Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+
+  @@ignore
+}
+
+model custom_fields {
+  id                String              @id
+  workspaceId       String
+  name              String
+  kind              String              @default("text")
+  options           String[]            @default([])
+  position          Int                 @default(0)
+  createdAt         DateTime            @default(now())
+  workspaces        Workspace           @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  post_field_values post_field_values[]
+
+  @@unique([workspaceId, name])
+
+  @@ignore
+}
+
+model email_logs {
+  id          String      @id
+  workspaceId String?
+  to          String
+  template    String
+  subject     String
+  providerId  String?
+  status      EmailStatus
+  error       String?
+  createdAt   DateTime    @default(now())
+  workspaces  Workspace?  @relation(fields: [workspaceId], references: [id])
+
+  @@index([workspaceId, createdAt])
+
+  @@ignore
+}
+
+model email_tokens {
+  id        String    @id
+  userId    String
+  purpose   String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+  users     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, purpose])
+
+  @@ignore
+}
+
+model error_events {
+  id          String    @id
+  fingerprint String    @unique
+  source      String
+  name        String
+  message     String
+  stack       String?
+  location    String?
+  release     String
+  count       Int       @default(1)
+  firstSeenAt DateTime  @default(now())
+  lastSeenAt  DateTime  @default(now())
+  resolvedAt  DateTime?
+
+  @@index([lastSeenAt])
+
+  @@ignore
+}
+
+model external_posts {
+  id               String    @id
+  targetId         String
+  remoteId         String
+  message          String?
+  permalink        String?
+  statusType       String?
+  createdTime      DateTime
+  insights         Json?
+  insightsSyncedAt DateTime?
+  fetchedAt        DateTime  @default(now())
+  pictureUrl       String?
+  targets          Target    @relation(fields: [targetId], references: [id], onDelete: Cascade)
+
+  @@unique([targetId, remoteId])
+  @@index([targetId, createdTime])
+
+  @@ignore
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model facebook_media_deletions {
+  id             String    @id
+  workspaceId    String
+  mediaStepId    String
+  operationId    String
+  postId         String
+  postTargetId   String
+  targetId       String
+  remoteTargetId String
+  remotePhotoId  String
+  actorId        String
+  state          String    @default("started")
+  receiptAt      DateTime? @db.Timestamptz(6)
+  createdAt      DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt      DateTime  @default(now()) @db.Timestamptz(6)
+  attestedAt     DateTime? @db.Timestamptz(6)
+  attestedBy     String?
+  workspaces     Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "facebook_media_deletions_workspace_fk")
+
+  @@index([workspaceId, mediaStepId, createdAt(sort: Desc), id(sort: Desc)], map: "facebook_media_deletions_step_history_idx")
+  @@index([workspaceId, updatedAt(sort: Desc), id(sort: Desc)], map: "facebook_media_deletions_workspace_updated_idx")
+
+  @@ignore
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model facebook_media_resolutions {
+  id                 String    @id
+  workspaceId        String
+  operationId        String
+  mediaStepId        String
+  deletionId         String?
+  postId             String
+  postTargetId       String
+  targetId           String
+  remoteTargetId     String
+  publicationActorId String
+  eventActorId       String?
+  phase              String
+  ordinal            Int
+  source             String
+  outcome            String
+  remoteId           String?
+  createdAt          DateTime  @default(now()) @db.Timestamptz(6)
+  workspaces         Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "facebook_media_resolutions_workspace_fk")
+
+  @@index([workspaceId, operationId, createdAt(sort: Desc), id(sort: Desc)], map: "facebook_media_resolutions_operation_history_idx")
+  @@index([workspaceId, mediaStepId, createdAt(sort: Desc), id(sort: Desc)], map: "facebook_media_resolutions_step_history_idx")
+
+  @@ignore
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model facebook_media_steps {
+  id             String    @id
+  workspaceId    String
+  operationId    String
+  postId         String
+  postTargetId   String
+  targetId       String
+  actorId        String
+  remoteTargetId String
+  phase          String
+  ordinal        Int
+  state          String
+  remoteId       String?
+  receiptAt      DateTime?
+  rejectedAt     DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @default(now())
+  attestedAt     DateTime?
+  attestedBy     String?
+  workspaces     Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([operationId, phase, ordinal], map: "facebook_media_steps_operation_phase_ordinal_key")
+  @@index([workspaceId, operationId, phase, ordinal], map: "facebook_media_steps_workspace_operation_idx")
+  @@index([workspaceId, targetId, updatedAt], map: "facebook_media_steps_workspace_target_updated_idx")
+
+  @@ignore
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model facebook_native_journal {
+  operationId                      String                             @id
+  workspaceId                      String
+  postId                           String
+  postTargetId                     String
+  targetId                         String
+  actorId                          String
+  remoteTargetId                   String
+  format                           String
+  sourceFormatId                   String
+  payloadHash                      String
+  ownerToken                       String                             @db.Uuid
+  revision                         Int                                @default(0)
+  state                            String                             @default("started")
+  knownIds                         Json                               @default("[]")
+  steps                            Json                               @default("[]")
+  remoteId                         String?
+  conflicted                       Boolean                            @default(false)
+  createdAt                        DateTime                           @default(now())
+  updatedAt                        DateTime                           @default(now())
+  publication_attempts             PublicationAttempt                 @relation(fields: [workspaceId, operationId], references: [workspaceId, id], onDelete: Cascade, map: "facebook_native_journal_parent_fkey")
+  workspaces                       Workspace                          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  facebook_native_schedule_changes facebook_native_schedule_changes[]
+  facebook_native_status_proofs    facebook_native_status_proofs[]
+
+  @@unique([workspaceId, operationId])
+  @@index([workspaceId, targetId, updatedAt], map: "facebook_native_journal_workspace_target_updated_idx")
+
+  @@ignore
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model facebook_native_schedule_changes {
+  changeId                String                  @id
+  workspaceId             String
+  publishOperationId      String
+  kind                    String
+  scheduledUnix           BigInt?
+  remoteId                String
+  remoteTargetId          String
+  ownerToken              String                  @db.Uuid
+  revision                Int                     @default(0)
+  state                   String                  @default("started")
+  createdAt               DateTime                @default(now())
+  updatedAt               DateTime                @default(now())
+  facebook_native_journal facebook_native_journal @relation(fields: [workspaceId, publishOperationId], references: [workspaceId, operationId], onDelete: Cascade, map: "facebook_native_schedule_changes_journal_fkey")
+  workspaces              Workspace               @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, publishOperationId, createdAt], map: "facebook_native_schedule_changes_publish_idx")
+
+  @@ignore
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model facebook_native_status_proofs {
+  id                      String                  @id
+  workspaceId             String
+  operationId             String
+  observedRevision        Int
+  appliedRevision         Int?
+  payloadHash             String
+  format                  String
+  remoteTargetId          String
+  remoteId                String
+  actorId                 String
+  outcome                 String
+  detail                  String?
+  observedAt              DateTime
+  accepted                Boolean
+  createdAt               DateTime                @default(now())
+  facebook_native_journal facebook_native_journal @relation(fields: [operationId], references: [operationId], onDelete: Cascade, map: "facebook_native_status_proofs_operation_fkey")
+  publication_attempts    PublicationAttempt      @relation(fields: [workspaceId, operationId], references: [workspaceId, id], onDelete: Cascade, map: "facebook_native_status_proofs_parent_fkey")
+  workspaces              Workspace               @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, operationId, observedAt], map: "fb_native_proofs_workspace_operation_time_idx")
+
+  @@ignore
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model facebook_sync_cursors {
+  workspaceId String
+  targetId    String
+  providerId  String
+  kind        String
+  cursor      Json
+  updatedAt   DateTime  @default(now())
+  targets     Target    @relation(fields: [targetId], references: [id], onDelete: Cascade)
+  workspaces  Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@id([workspaceId, targetId, kind])
+  @@index([targetId], map: "facebook_sync_cursors_target_idx")
+
+  @@ignore
+}
+
+model feed_items {
+  id           String       @id
+  feedSourceId String
+  guid         String
+  url          String?
+  title        String?
+  publishedAt  DateTime?
+  createdAt    DateTime     @default(now())
+  feed_sources feed_sources @relation(fields: [feedSourceId], references: [id], onDelete: Cascade)
+  posts        Post[]
+
+  @@unique([feedSourceId, guid])
+  @@index([feedSourceId])
+
+  @@ignore
+}
+
+model feed_sources {
+  id              String       @id
+  workspaceId     String
+  name            String
+  url             String
+  enabled         Boolean      @default(true)
+  messageTemplate String       @default("{{title}}\n\n{{link}}")
+  targetIds       Json         @default("[]")
+  publishMode     PublishMode  @default(worker)
+  autoApprove     Boolean      @default(true)
+  lastPolledAt    DateTime?
+  lastEtag        String?
+  lastModified    String?
+  ingestFrom      DateTime     @default(now())
+  pollErrorCount  Int          @default(0)
+  lastError       String?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime
+  hashtags        String       @default("")
+  kind            String       @default("rss")
+  spreadMinutes   Int          @default(0)
+  feed_items      feed_items[]
+  workspaces      Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([enabled, lastPolledAt])
+  @@index([workspaceId])
+
+  @@ignore
+}
+
+model graph_usage {
+  key      String   @id
+  snapshot Json
+  savedAt  DateTime @default(now())
+
+  @@ignore
+}
+
+model holiday_years {
+  country   String
+  year      Int
+  count     Int
+  fetchedAt DateTime @default(now())
+
+  @@id([country, year])
+
+  @@ignore
+}
+
+model inbox_notes {
+  id          String    @id
+  workspaceId String
+  kind        String
+  itemId      String
+  authorId    String?
+  body        String
+  createdAt   DateTime  @default(now())
+  mentionIds  String[]  @default([])
+  users       User?     @relation(fields: [authorId], references: [id])
+  workspaces  Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, kind, itemId])
+
+  @@ignore
+}
+
+model invitations {
+  id               String        @id
+  workspaceId      String
+  email            String
+  role             WorkspaceRole @default(contributor)
+  tokenHash        String        @unique
+  invitedById      String
+  expiresAt        DateTime
+  acceptedAt       DateTime?
+  acceptedByUserId String?
+  createdAt        DateTime      @default(now())
+  users            User          @relation(fields: [invitedById], references: [id])
+  workspaces       Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, email])
+  @@index([email])
+  @@index([workspaceId])
+
+  @@ignore
+}
+
+model key_dates {
+  id          String    @id
+  workspaceId String
+  date        String
+  title       String
+  yearly      Boolean   @default(false)
+  targetIds   String[]  @default([])
+  createdById String?
+  createdAt   DateTime  @default(now())
+  workspaces  Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, date])
+
+  @@ignore
+}
+
+model labels {
+  id                String              @id
+  workspaceId       String
+  name              String
+  color             String              @default("blue")
+  createdAt         DateTime            @default(now())
+  content_mix_rules content_mix_rules[]
+  workspaces        Workspace           @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  notifications     Notification[]
+  post_labels       post_labels[]
+  post_templates    post_templates[]
+
+  @@unique([workspaceId, name])
+
+  @@ignore
+}
+
+model link_clicks {
+  id          String      @id
+  shortLinkId String
+  ipHash      String?
+  userAgent   String?
+  referer     String?
+  country     String?
+  createdAt   DateTime    @default(now())
+  short_links short_links @relation(fields: [shortLinkId], references: [id], onDelete: Cascade)
+
+  @@index([shortLinkId, createdAt])
+  @@index([shortLinkId, ipHash, createdAt])
+
+  @@ignore
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model link_preview_cache {
+  urlHash   String   @id
+  url       String
+  preview   Json
+  fetchedAt DateTime @default(now())
+  expiresAt DateTime
+
+  @@index([expiresAt])
+
+  @@ignore
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model mcp_oauth_clients {
+  id              String            @id
+  name            String
+  redirectUris    String[]
+  createdAt       DateTime          @default(now())
+  lastUsedAt      DateTime?
+  mcp_oauth_codes mcp_oauth_codes[]
+
+  @@index([createdAt])
+
+  @@ignore
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model mcp_oauth_codes {
+  id                String            @id
+  codeHash          String            @unique
+  clientId          String
+  userId            String
+  workspaceId       String
+  redirectUri       String
+  codeChallenge     String
+  readFeatures      String[]
+  writeFeatures     String[]          @default([])
+  resourceScope     Json
+  expiresAt         DateTime
+  usedAt            DateTime?
+  keyId             String?
+  createdAt         DateTime          @default(now())
+  mcp_oauth_clients mcp_oauth_clients @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  users             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspaces        Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([clientId])
+  @@index([expiresAt])
+
+  @@ignore
+}
+
+model media {
+  id              String          @id
+  workspaceId     String
+  filename        String
+  mimeType        String
+  size            Int
+  kind            MediaKind
+  storageProvider StorageProvider @default(local)
+  storageKey      String?
+  checksum        String?
+  url             String
+  width           Int?
+  height          Int?
+  createdAt       DateTime        @default(now())
+  derivedFromId   String?
+  variant         String?
+  media           media?          @relation("mediaTomedia", fields: [derivedFromId], references: [id], onDelete: Cascade)
+  other_media     media[]         @relation("mediaTomedia")
+  workspaces      Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([derivedFromId, variant])
+  @@index([workspaceId, createdAt])
+  @@index([workspaceId])
+
+  @@ignore
+}
+
+model member_page_access {
+  membershipId String
+  targetId     String
+  memberships  Membership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+  targets      Target     @relation(fields: [targetId], references: [id], onDelete: Cascade)
+
+  @@id([membershipId, targetId])
+  @@index([targetId])
+
+  @@ignore
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model meta_webhook_deliveries {
+  id             String   @id
+  provider       String
+  eventId        String   @unique(map: "meta_webhook_deliveries_event_uniq")
+  pageId         String
+  eventKind      String
+  status         String
+  matchedTargets Int      @default(0)
+  detail         Json     @default("{}")
+  receivedAt     DateTime @default(now())
+
+  @@index([provider, receivedAt(sort: Desc)], map: "meta_webhook_deliveries_provider_idx")
+
+  @@ignore
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model metric_alert_firings {
+  id                 String             @id
+  workspaceId        String
+  ruleId             String
+  periodStart        DateTime
+  periodEnd          DateTime
+  actual             Float
+  state              String             @default("fired")
+  firedAt            DateTime           @default(now())
+  resolvedAt         DateTime?
+  metric_alert_rules metric_alert_rules @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  workspaces         Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, firedAt(sort: Desc)], map: "metric_alert_firings_workspace_idx")
+
+  @@ignore
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model metric_alert_rules {
+  id                   String                 @id
+  workspaceId          String
+  targetId             String
+  name                 String
+  metric               String
+  operator             String
+  threshold            Float
+  windowDays           Int
+  enabled              Boolean                @default(true)
+  createdById          String?
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @default(now())
+  metric_alert_firings metric_alert_firings[]
+  users                User?                  @relation(fields: [createdById], references: [id])
+  targets              Target                 @relation(fields: [targetId], references: [id], onDelete: Cascade)
+  workspaces           Workspace              @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, targetId], map: "metric_alert_rules_workspace_idx")
+
+  @@ignore
+}
+
+model metric_availability {
+  id        String   @id
+  targetId  String
+  metric    String
+  period    String
+  available Boolean
+  reason    String?
+  checkedAt DateTime @default(now())
+  targets   Target   @relation(fields: [targetId], references: [id], onDelete: Cascade)
+
+  @@unique([targetId, metric, period])
+  @@index([targetId])
+
+  @@ignore
+}
+
+model moderation_actions {
+  id               String            @id
+  workspaceId      String
+  ruleId           String?
+  ruleName         String
+  targetId         String
+  remoteCommentId  String
+  authorId         String?
+  authorName       String?
+  message          String
+  action           String
+  replyRemoteId    String?
+  error            String?
+  undoneAt         DateTime?
+  undoneById       String?
+  createdAt        DateTime          @default(now())
+  moderation_rules moderation_rules? @relation(fields: [ruleId], references: [id])
+  workspaces       Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([ruleId, remoteCommentId])
+  @@index([ruleId, createdAt])
+  @@index([workspaceId, createdAt])
+
+  @@ignore
+}
+
+model moderation_rules {
+  id                 String               @id
+  workspaceId        String
+  name               String
+  enabled            Boolean              @default(true)
+  targetIds          String[]             @default([])
+  match              String
+  keywords           String[]             @default([])
+  action             String
+  replyText          String?
+  dailyCap           Int                  @default(20)
+  oncePerUser        Boolean              @default(true)
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime
+  moderation_actions moderation_actions[]
+  workspaces         Workspace            @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+
+  @@ignore
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model monitoring_deliveries {
+  id         String    @id
+  key        String
+  state      String
+  status     String
+  createdAt  DateTime  @default(now())
+  claimedAt  DateTime?
+  finishedAt DateTime?
+
+  @@index([status, createdAt], map: "monitoring_deliveries_status_created")
+
+  @@ignore
+}
+
+model notification_mutes {
+  id       String @id
+  userId   String
+  targetId String
+  event    String
+  targets  Target @relation(fields: [targetId], references: [id], onDelete: Cascade)
+  users    User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, targetId, event])
+  @@index([targetId, event])
+
+  @@ignore
+}
+
+model notification_settings {
+  id                 String    @id
+  userId             String
+  workspaceId        String
+  onPublishFailure   Boolean   @default(true)
+  onTokenExpiry      Boolean   @default(true)
+  onApprovalRequest  Boolean   @default(true)
+  onApprovalDecision Boolean   @default(true)
+  inboxDigestAt      DateTime?
+  onNewInbox         Boolean   @default(false)
+  onQueueEmpty       Boolean   @default(true)
+  onDraftUpdated     Boolean   @default(true)
+  onModerationAlert  Boolean   @default(true)
+  onNoteMention      Boolean   @default(true)
+  onMetricAlert      Boolean   @default(true)
+  onReportDelivered  Boolean   @default(true)
+  onTriageAssigned   Boolean   @default(true)
+  users              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspaces         Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, workspaceId])
+
+  @@ignore
+}
+
+model page_goals {
+  id          String    @id
+  workspaceId String
+  targetId    String
+  metric      String
+  target      Int
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime
+  targets     Target    @relation(fields: [targetId], references: [id], onDelete: Cascade)
+  workspaces  Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([targetId, metric])
+  @@index([workspaceId])
+
+  @@ignore
+}
+
+model page_group_targets {
+  groupId     String
+  targetId    String
+  page_groups page_groups @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  targets     Target      @relation(fields: [targetId], references: [id], onDelete: Cascade)
+
+  @@id([groupId, targetId])
+  @@index([targetId])
+
+  @@ignore
+}
+
+model page_groups {
+  id                 String               @id
+  workspaceId        String
+  name               String
+  color              String               @default("blue")
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime
+  content_mix_rules  content_mix_rules[]
+  page_group_targets page_group_targets[]
+  workspaces         Workspace            @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, name])
+
+  @@ignore
+}
+
+model page_reviews {
+  id                 String    @id
+  targetId           String
+  remoteId           String
+  reviewerName       String?
+  rating             Int?
+  recommendationType String?
+  reviewText         String?
+  createdTime        DateTime
+  fetchedAt          DateTime  @default(now())
+  resolvedAt         DateTime?
+  targets            Target    @relation(fields: [targetId], references: [id], onDelete: Cascade)
+
+  @@unique([targetId, remoteId])
+  @@index([reviewerName(ops: raw("gin_trgm_ops"))], map: "page_reviews_author_trgm_idx", type: Gin)
+  @@index([targetId, createdTime])
+  @@index([reviewText(ops: raw("gin_trgm_ops"))], map: "page_reviews_text_trgm_idx", type: Gin)
+
+  @@ignore
+}
+
+model page_videos {
+  id               String    @id
+  targetId         String
+  remoteId         String
+  title            String?
+  description      String?
+  permalink        String?
+  thumbnailUrl     String?
+  lengthSeconds    Float?
+  createdTime      DateTime
+  insights         Json?
+  insightsSyncedAt DateTime?
+  fetchedAt        DateTime  @default(now())
+  targets          Target    @relation(fields: [targetId], references: [id], onDelete: Cascade)
+
+  @@unique([targetId, remoteId])
+  @@index([targetId, createdTime])
+
+  @@ignore
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model person_mcp_keys {
+  id          String    @id
+  userId      String
+  name        String
+  tokenHash   String    @unique
+  tokenPrefix String
+  readFeature String    @default("agency/overview")
+  expiresAt   DateTime
+  revokedAt   DateTime?
+  createdAt   DateTime  @default(now())
+  users       User      @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@ignore
+}
+
+model plans {
+  id                String   @id
+  key               String   @unique
+  name              String
+  position          Int      @default(0)
+  currency          String   @default("EUR")
+  priceMonthly      Int      @default(0)
+  priceYearly       Int      @default(0)
+  extraChannelPrice Int      @default(0)
+  channels          Int?
+  members           Int?
+  workspaces        Int?
+  postsPerMonth     Int?
+  aiCredits         Int?
+  features          String[] @default([])
+  isDefault         Boolean  @default(false)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @default(now())
+  users             User[]
+
+  @@ignore
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model post_export_runs {
+  id                                                                      String       @id
+  exportId                                                                String
+  workspaceId                                                             String
+  userId                                                                  String
+  attempt                                                                 Int
+  outcome                                                                 String
+  errorCode                                                               String?
+  startedAt                                                               DateTime     @default(now()) @db.Timestamptz(6)
+  finishedAt                                                              DateTime?    @db.Timestamptz(6)
+  postCount                                                               Int?
+  byteLength                                                              Int?
+  post_exports_post_export_runs_exportIdTopost_exports                    post_exports @relation("post_export_runs_exportIdTopost_exports", fields: [exportId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  post_exports_post_export_runs_exportId_workspaceId_userIdTopost_exports post_exports @relation("post_export_runs_exportId_workspaceId_userIdTopost_exports", fields: [exportId, workspaceId, userId], references: [id, workspaceId, userId], onDelete: Cascade, onUpdate: NoAction)
+  users                                                                   User         @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  workspaces                                                              Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([exportId, attempt])
+  @@index([workspaceId, exportId, attempt])
+  @@index([workspaceId, exportId, attempt], map: "post_export_runs_workspaceId_exportId_attempt_idx1")
+
+  @@ignore
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model post_exports {
+  id                                                                          String             @id
+  workspaceId                                                                 String
+  userId                                                                      String
+  filters                                                                     Json
+  ceiling                                                                     Json
+  scope                                                                       String
+  status                                                                      String
+  expiresAt                                                                   DateTime           @db.Timestamptz(6)
+  leaseUntil                                                                  DateTime?          @db.Timestamptz(6)
+  token                                                                       String?
+  csv                                                                         String?
+  attempts                                                                    Int                @default(0)
+  nextAttemptAt                                                               DateTime           @default(now()) @db.Timestamptz(6)
+  lastError                                                                   String?
+  completedAt                                                                 DateTime?          @db.Timestamptz(6)
+  createdAt                                                                   DateTime           @default(now()) @db.Timestamptz(6)
+  post_export_runs_post_export_runs_exportIdTopost_exports                    post_export_runs[] @relation("post_export_runs_exportIdTopost_exports")
+  post_export_runs_post_export_runs_exportId_workspaceId_userIdTopost_exports post_export_runs[] @relation("post_export_runs_exportId_workspaceId_userIdTopost_exports")
+  users                                                                       User               @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  workspaces                                                                  Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([id, workspaceId, userId])
+  @@index([status, nextAttemptAt, createdAt])
+  @@index([status, nextAttemptAt, createdAt], map: "post_exports_status_nextAttemptAt_createdAt_idx1")
+
+  @@ignore
+}
+
+model post_field_values {
+  id            String        @id
+  postId        String
+  fieldId       String
+  value         String
+  custom_fields custom_fields @relation(fields: [fieldId], references: [id], onDelete: Cascade)
+  posts         Post          @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, fieldId])
+  @@index([fieldId])
+
+  @@ignore
+}
+
+model post_labels {
+  postId  String
+  labelId String
+  labels  labels @relation(fields: [labelId], references: [id], onDelete: Cascade)
+  posts   Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@id([postId, labelId])
+  @@index([labelId])
+
+  @@ignore
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model post_language_variants {
+  id          String    @id
+  postId      String
+  workspaceId String
+  locale      String
+  message     String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @default(now())
+  posts       Post      @relation(fields: [postId], references: [id], onDelete: Cascade)
+  workspaces  Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, locale], map: "post_language_variants_post_locale_unique")
+  @@index([postId])
+  @@index([workspaceId])
+
+  @@ignore
+}
+
+model post_notes {
+  id            String         @id
+  postId        String
+  authorId      String?
+  body          String
+  mentionIds    String[]       @default([])
+  createdAt     DateTime       @default(now())
+  notifications Notification[]
+  users         User?          @relation(fields: [authorId], references: [id])
+  posts         Post           @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@index([authorId])
+  @@index([postId, createdAt])
+
+  @@ignore
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model post_templates {
+  id                       String    @id
+  workspaceId              String
+  name                     String
+  category                 String    @default("")
+  body                     String
+  hashtags                 String    @default("")
+  firstComment             String    @default("")
+  labelId                  String?
+  createdAt                DateTime  @default(now())
+  updatedAt                DateTime
+  firstCommentDelayMinutes Int       @default(0)
+  labels                   labels?   @relation(fields: [labelId], references: [id])
+  workspaces               Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, name])
+
+  @@ignore
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model post_versions {
+  id                       String    @id
+  postId                   String
+  authorId                 String?
+  createdAt                DateTime  @default(now())
+  message                  String
+  firstComment             String?
+  link                     String?
+  media                    Json      @default("[]")
+  format                   String
+  targetIds                String[]  @default([])
+  labelIds                 String[]  @default([])
+  scheduledAt              DateTime?
+  timezone                 String
+  destinationFormats       Json      @default("{}")
+  firstCommentDelayMinutes Int       @default(0)
+  users                    User?     @relation(fields: [authorId], references: [id])
+  posts                    Post      @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@index([authorId])
+  @@index([postId, createdAt])
+
+  @@ignore
+}
+
+model public_holidays {
+  country   String
+  date      String
+  name      String
+  localName String
+
+  @@id([country, date, name])
+  @@index([date])
+
+  @@ignore
+}
+
+model queue_slots {
+  id          String    @id
+  workspaceId String
+  dayOfWeek   Int
+  hour        Int
+  minute      Int
+  createdAt   DateTime  @default(now())
+  targetId    String?
+  targets     Target?   @relation(fields: [targetId], references: [id], onDelete: Cascade)
+  workspaces  Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, targetId, dayOfWeek, hour, minute])
+  @@index([targetId])
+  @@index([workspaceId])
+
+  @@ignore
+}
+
+model report_schedules {
+  id               String            @id
+  workspaceId      String
+  templateId       String?
+  targetId         String
+  frequency        String
+  recipients       String[]
+  nextRunAt        DateTime
+  lastRunAt        DateTime?
+  lastError        String?
+  createdAt        DateTime          @default(now())
+  aiRecap          Boolean           @default(false)
+  createdById      String?
+  report_runs      ReportRun[]
+  report_templates report_templates? @relation(fields: [templateId], references: [id])
+  workspaces       Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([nextRunAt])
+
+  @@ignore
+}
+
+model report_templates {
+  id               String             @id
+  workspaceId      String
+  name             String
+  sections         Json               @default("[]")
+  rangeKey         String             @default("30d")
+  createdAt        DateTime           @default(now())
+  report_schedules report_schedules[]
+  workspaces       Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, name])
+
+  @@ignore
+}
+
+model review_decisions {
+  id          String      @id
+  shareLinkId String
+  postId      String
+  decision    String
+  comment     String?
+  authorName  String
+  createdAt   DateTime    @default(now())
+  posts       Post        @relation(fields: [postId], references: [id], onDelete: Cascade)
+  share_links share_links @relation(fields: [shareLinkId], references: [id], onDelete: Cascade)
+
+  @@index([postId])
+  @@index([shareLinkId])
+
+  @@ignore
+}
+
+model root_activities {
+  id        String   @id
+  actorId   String?
+  action    String
+  detail    Json?
+  createdAt DateTime @default(now())
+  users     User?    @relation(fields: [actorId], references: [id])
+
+  @@index([createdAt])
+
+  @@ignore
+}
+
+model saved_replies {
+  id          String    @id
+  workspaceId String
+  name        String
+  body        String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime
+  workspaces  Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+
+  @@ignore
+}
+
+model seasonal_modes {
+  id           String    @id
+  workspaceId  String
+  name         String
+  startsOn     String
+  endsOn       String
+  targetIds    String[]  @default([])
+  rule         String
+  shiftMinutes Int       @default(0)
+  extraTimes   String[]  @default([])
+  createdAt    DateTime  @default(now())
+  workspaces   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+
+  @@ignore
+}
+
+model share_links {
+  id                 String             @id
+  workspaceId        String
+  kind               String
+  tokenHash          String             @unique
+  title              String
+  description        String?
+  targetIds          Json               @default("[]")
+  daysBack           Int                @default(7)
+  daysAhead          Int                @default(30)
+  allowComments      Boolean            @default(true)
+  revokedAt          DateTime?
+  createdById        String
+  createdAt          DateTime           @default(now())
+  decides            Boolean            @default(false)
+  publishAnywayHours Int?
+  expiresAt          DateTime?
+  review_decisions   review_decisions[]
+  workspaces         Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+
+  @@ignore
+}
+
+model short_links {
+  id          String        @id
+  workspaceId String
+  slug        String        @unique
+  targetUrl   String
+  postId      String?
+  clickCount  Int           @default(0)
+  createdAt   DateTime      @default(now())
+  targetId    String?
+  link_clicks link_clicks[]
+  posts       Post?         @relation(fields: [postId], references: [id])
+  targets     Target?       @relation(fields: [targetId], references: [id])
+  workspaces  Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([postId])
+  @@index([targetId])
+  @@index([workspaceId])
+
+  @@ignore
+}
+
+model snippets {
+  id          String    @id
+  workspaceId String
+  name        String
+  body        String
+  createdAt   DateTime  @default(now())
+  workspaces  Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+
+  @@ignore
+}
+
+model system_alerts {
+  id         String    @id
+  key        String
+  detail     Json?
+  openedAt   DateTime  @default(now())
+  resolvedAt DateTime?
+
+  @@index([key, resolvedAt])
+  @@index([openedAt])
+
+  @@ignore
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model task_checklist_items {
+  id          String    @id
+  taskId      String
+  workspaceId String
+  text        String
+  done        Boolean   @default(false)
+  position    Int       @default(0)
+  createdById String?
+  createdAt   DateTime  @default(now())
+  users       User?     @relation(fields: [createdById], references: [id])
+  tasks       tasks     @relation(fields: [taskId, workspaceId], references: [id, workspaceId], onDelete: Cascade, map: "task_checklist_items_task_fkey")
+  workspaces  Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([createdById])
+  @@index([taskId, position, id])
+  @@index([workspaceId])
+
+  @@ignore
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model task_comments {
+  id          String    @id
+  taskId      String
+  workspaceId String
+  authorId    String?
+  body        String
+  createdAt   DateTime  @default(now())
+  users       User?     @relation(fields: [authorId], references: [id])
+  tasks       tasks     @relation(fields: [taskId, workspaceId], references: [id, workspaceId], onDelete: Cascade, map: "task_comments_task_fkey")
+  workspaces  Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([authorId])
+  @@index([taskId, createdAt, id])
+  @@index([workspaceId])
+
+  @@ignore
+}
+
+model tasks {
+  id                   String                 @id
+  workspaceId          String
+  title                String
+  notes                String?
+  status               String                 @default("todo")
+  assigneeId           String?
+  dueOn                String?
+  postId               String?
+  createdById          String?
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime
+  task_checklist_items task_checklist_items[]
+  task_comments        task_comments[]
+  workspaces           Workspace              @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([id, workspaceId])
+  @@index([workspaceId, status])
+
+  @@ignore
+}
+
+model trending_topics {
+  id        String    @id
+  country   String
+  title     String
+  traffic   String?
+  newsTitle String?
+  newsUrl   String?
+  startedAt DateTime?
+  fetchedAt DateTime  @default(now())
+
+  @@unique([country, title])
+  @@index([country, fetchedAt])
+
+  @@ignore
+}
+
+model trusted_devices {
+  id         String    @id
+  userId     String
+  tokenHash  String    @unique
+  label      String?
+  expiresAt  DateTime
+  lastUsedAt DateTime?
+  createdAt  DateTime  @default(now())
+  users      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+
+  @@ignore
+}
+
+model uptime_days {
+  day       String
+  component String
+  minutes   Int    @default(0)
+
+  @@id([day, component])
+
+  @@ignore
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model uptime_samples {
+  minute    DateTime
+  component String
+
+  @@id([minute, component])
+
+  @@ignore
+}
+
+model webhook_deliveries {
+  id                String            @id
+  endpointId        String
+  workspaceId       String
+  event             String
+  payload           Json
+  status            String            @default("pending")
+  attempts          Int               @default(0)
+  nextAttemptAt     DateTime          @default(now())
+  responseStatus    Int?
+  error             String?
+  deliveredAt       DateTime?
+  createdAt         DateTime          @default(now())
+  webhook_endpoints webhook_endpoints @relation(fields: [endpointId], references: [id], onDelete: Cascade)
+
+  @@index([endpointId, createdAt])
+  @@index([status, nextAttemptAt])
+
+  @@ignore
+}
+
+model webhook_endpoints {
+  id                 String               @id
+  workspaceId        String
+  name               String
+  url                String
+  secret             String
+  events             String[]
+  enabled            Boolean              @default(true)
+  apiTokenId         String?
+  lastError          String?
+  lastSentAt         DateTime?
+  createdAt          DateTime             @default(now())
+  webhook_deliveries webhook_deliveries[]
+  workspaces         Workspace            @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+
+  @@ignore
+}
+
+model worker_heartbeats {
+  workerId String   @id
+  seenAt   DateTime @default(now())
+  jobs     String[]
+
+  @@index([seenAt])
+
+  @@ignore
+}
+
+model worker_job_runs {
+  name        String    @id
+  finishedAt  DateTime?
+  durationMs  Int?
+  failures    Int       @default(0)
+  lastError   String?
+  lastErrorAt DateTime?
+  outcome     String?
+  startedAt   DateTime?
+  summary     String?
+
+  @@ignore
+}
+
+enum WorkspaceRole {
+  owner
+  admin
+  editor
+  contributor
+  viewer
+  client
+}
+
+enum TargetType {
+  page
+  group
+  instagram
+  bluesky
+  mastodon
+  linkedin
+  threads
+  x
+  pinterest
+  telegram
+  youtube
+  tiktok
+}
+
+enum PostStatus {
+  draft
+  pending_approval
+  rejected
+  scheduled
+  publishing
+  published
+  partially_failed
+  failed
+  cancelled
+}
+
+enum PostTargetStatus {
+  pending
+  processing
+  published
+  scheduled_remote
+  failed
+  cancelled
+  skipped
+}
+
+enum AiGenerationKind {
+  generate
+  improve
+  recap
+  hashtags
+  plan
+  translate
+  sentiment
+  altText
+  image
+  video
+  voice
+}
+
+enum ApprovalStatus {
+  not_required
+  pending
+  approved
+  rejected
+}
+
+enum EmailStatus {
+  sent
+  failed
+  skipped
+}
+
+enum Locale {
+  en
+  fr
+}
+
+enum MediaKind {
+  image
+  video
+}
+
+enum PublishMode {
+  immediate
+  worker
+  native
+}
+
+enum StorageProvider {
+  local
+  s3
+}

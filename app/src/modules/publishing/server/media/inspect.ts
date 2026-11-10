@@ -262,6 +262,7 @@ async function runBounded(executable: string, args: string[], settings: MediaIns
     let outputBytes = 0;
     let settled = false;
     const child = spawn(executable, args, { shell: false, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
+    // eslint-disable-next-line prefer-const -- assigned once below, after the handlers that clear it are defined
     let timer: ReturnType<typeof setTimeout>;
     const onAbort = () => { child.kill('SIGKILL'); settleFailure(); };
     const settleFailure = () => {

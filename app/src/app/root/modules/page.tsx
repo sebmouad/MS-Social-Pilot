@@ -14,7 +14,7 @@ export default async function RootModulesPage() {
   await requireRootPage();
   const definitions = safeConfigShape();
   return <RootFrame active="/root/modules">
-    <PageHeader module="root" title="Product modules" description={<>Manage each installed module's availability, feature controls and settings in its own section. Workspace permissions and plans still apply.</>} />
+    <PageHeader module="root" title="Product modules" description={<>Manage each installed module’s availability, feature controls and settings in its own section. Workspace permissions and plans still apply.</>} />
     {await ModuleHealth({})}
     <div className="root-control__module-grid">{moduleManifests.map(module => <section className="root-control__panel" key={module.id}>
       <PageHeader level={2} module={module.id} title={module.title} />

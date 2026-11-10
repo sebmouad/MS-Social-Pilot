@@ -11,8 +11,8 @@ type Viewer = Awaited<ReturnType<typeof requireViewer>>;
  */
 export async function compareKindSwitch(current: 'channels' | 'ads', viewer: Pick<Viewer, 'entitlements' | 'permissions'>) {
   const { copy } = await loadInsightsUi();
-  const use = (feature: string) => canUseFeature(viewer.entitlements, feature) && canAccessFeature(viewer.permissions, feature, 'read');
-  if (!use('analytics/compare') || !use('ads/compare')) return null;
+  const allowed = (feature: string) => canUseFeature(viewer.entitlements, feature) && canAccessFeature(viewer.permissions, feature, 'read');
+  if (!allowed('analytics/compare') || !allowed('ads/compare')) return null;
   const items = [{ id: 'channels' as const, href: '/insights/compare', label: copy.compareChannels }, { id: 'ads' as const, href: '/ads/compare', label: copy.compareAdAccounts }];
   return <nav className="insights-kindswitch" aria-label={copy.compareKind}>
     {items.map(item => <a key={item.id} href={item.href} aria-current={item.id === current ? 'true' : undefined}>{item.label}</a>)}

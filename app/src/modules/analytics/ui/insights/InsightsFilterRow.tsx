@@ -7,6 +7,8 @@ import './insights.css';
 export type InsightsPresetOption = { id: string; label: string; start: string; end: string };
 export type InsightsChip = { key: string; label: string; value: string };
 
+// The hooks below always run, in the same order; the try/catch only absorbs the missing router of a bare server render in tests.
+/* eslint-disable react-hooks/rules-of-hooks */
 function useSafeNavigation() {
   let router: ReturnType<typeof useRouter> | null = null;
   let pathname = '';
@@ -19,6 +21,7 @@ function useSafeNavigation() {
   } catch { /* SSR test fallback */ }
   return { router, pathname, params };
 }
+/* eslint-enable react-hooks/rules-of-hooks */
 
 /**
  * The Insights filter row (design v2 S9): the period picker with its compare switch, then the page's one Filter
