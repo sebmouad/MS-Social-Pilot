@@ -148,6 +148,15 @@ bash app/scripts/deploy.sh --host <SERVER_IP> --user root --key <SSH_KEY_PATH>
   ~3,600 px lower, under 72 section buttons); sections in a grouped side list on desktop and one picker below 1024 px;
   results ranked name > key > description, first 60 shown; `/` focuses the search; the address carries `?search=`
   (`?q=` accepted). Module and platform settings pages share the form (`root-config-form.tsx`).
+- UX pattern agreed with the owner (2026-11-10, by form): a list row opens its details in a **centered window**
+  (`components/SidePanel.tsx`, now a modal; bottom sheet on phones), creation forms that need a preview use
+  `CreateDrawer wide`, identifiers stay out of lists under a folded « Technical details », and a confirmation asks to
+  retype a phrase only when money can be spent or data lost (`useConfirm` without `exactConfirmation` otherwise).
+  Applied to Posts, Post explorer, Tasks, Library, Ads accounts, Ads › Manage (details, creatives gallery, creative
+  builder with live preview, parent picker by name), Inbox (details folded, comment first), Settings › Integrations
+  (« New key » window), Root › Operations (plain wording, outcome marks). Not yet done in this pattern: Reports and
+  schedules, Content feeds, campaign / ad set / ad creation forms, Settings › Team and Channels, Root lists.
+  `npm run build` sometimes fails while fetching Google Fonts (`next/font` TypeError): retry, it is not the code.
 - Earlier note, kept for history. **Activation status (2026-11-09): not active yet.** It needs, once: (1) one manual deploy of current `main`
   (installs the timer), (2) Root › Configuration › Updates: save a webhook secret and turn on « Install GitHub pushes
   automatically », (3) GitHub › sebmouad/MS-Social-Pilot › Settings › Webhooks › Add webhook: payload URL
