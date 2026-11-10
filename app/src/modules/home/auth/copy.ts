@@ -8,9 +8,9 @@ const en = {
   tooMany: 'Too many attempts. Try again later.',
   offline: 'The request could not be confirmed. Check your connection and try again.',
   backToSignIn: 'Back to sign in',
-  shell: { brand: 'Social Pilot', mark: 'SP', dismiss: 'Dismiss' },
+  shell: { brand: 'MS Social Pilot', mark: 'MS', dismiss: 'Dismiss' },
   signIn: {
-    title: 'Sign in to your workspace', lead: 'Use your Social Pilot account.',
+    title: 'Sign in to your workspace', lead: 'Use your MS Social Pilot account.',
     email: 'Email', password: 'Password', submit: 'Sign in', busy: 'Signing in…',
     emailEmpty: 'Enter your email address.', emailInvalid: 'Enter a valid email address.', passwordEmpty: 'Enter your password.',
     failed: 'Sign-in failed. Check your email and password.', unavailable: 'Sign-in is temporarily unavailable. Please try again.',
@@ -84,9 +84,9 @@ const fr: CatalogLocale = {
   tooMany: 'Trop de tentatives. Réessayez plus tard.',
   offline: 'La demande n’a pas pu être confirmée. Vérifiez votre connexion et réessayez.',
   backToSignIn: 'Retour à la connexion',
-  shell: { brand: 'Social Pilot', mark: 'SP', dismiss: 'Fermer' },
+  shell: { brand: 'MS Social Pilot', mark: 'MS', dismiss: 'Fermer' },
   signIn: {
-    title: 'Connectez-vous à votre espace', lead: 'Utilisez votre compte Social Pilot.',
+    title: 'Connectez-vous à votre espace', lead: 'Utilisez votre compte MS Social Pilot.',
     email: 'E-mail', password: 'Mot de passe', submit: 'Se connecter', busy: 'Connexion…',
     emailEmpty: 'Saisissez votre adresse e-mail.', emailInvalid: 'Saisissez une adresse e-mail valide.', passwordEmpty: 'Saisissez votre mot de passe.',
     failed: 'Échec de la connexion. Vérifiez votre e-mail et votre mot de passe.', unavailable: 'La connexion est momentanément indisponible. Réessayez.',

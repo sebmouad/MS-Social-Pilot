@@ -5,6 +5,7 @@ import styles from './PostPreview.module.css';
 import { firstCommentLabels, firstCommentState } from '@/modules/publishing/first-comment-state';
 import { PostImage, ScheduleBadge } from '@/modules/publishing/ui/kit/kit';
 import { fillCopy, kitCopy, type KitLocale } from '@/modules/publishing/ui/kit/copy';
+import { IconDeviceDesktop, IconDeviceMobile } from '@tabler/icons-react';
 
 export type PostPreviewPost = {
   id: string;
@@ -309,8 +310,8 @@ export function PostPreview({ post, authorName, authorAvatarUrl, timeZone, varia
         <div className={styles.deviceControls}>
           <div className={styles.deviceToggleGroup} role="radiogroup" aria-label="Device Preview">
             <button type="button" className={styles.deviceButton} data-active={deviceFrame === 'none'} onClick={() => setDeviceFrame('none')}>Standard</button>
-            <button type="button" className={styles.deviceButton} data-active={deviceFrame === 'mobile'} onClick={() => setDeviceFrame('mobile')}>📱 Mobile</button>
-            <button type="button" className={styles.deviceButton} data-active={deviceFrame === 'desktop'} onClick={() => setDeviceFrame('desktop')}>💻 Desktop</button>
+            <button type="button" className={styles.deviceButton} data-active={deviceFrame === 'mobile'} onClick={() => setDeviceFrame('mobile')}><IconDeviceMobile size={14} aria-hidden="true" /> Mobile</button>
+            <button type="button" className={styles.deviceButton} data-active={deviceFrame === 'desktop'} onClick={() => setDeviceFrame('desktop')}><IconDeviceDesktop size={14} aria-hidden="true" /> Desktop</button>
           </div>
         </div>
       )}

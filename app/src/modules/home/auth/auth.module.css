@@ -42,3 +42,7 @@
 @keyframes authSpin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .spinner { animation-duration: 2.4s; } }
 @media (max-width: 500px) { .page { justify-content: flex-start; padding: 24px 12px; } .card { padding: 22px 18px; } .heading h1 { font-size: 22px; } .codes { grid-template-columns: 1fr; } }
+.legal { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 18px; font-size: var(--text-sm); }
+.legal a { color: var(--ink-faint); text-decoration: none; }
+.legal a:hover { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
+.legal a:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: 2px; }

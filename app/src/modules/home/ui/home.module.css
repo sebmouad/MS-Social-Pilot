@@ -40,3 +40,7 @@
 @media (forced-colors: active) { .card, .attention { border-color: CanvasText; } }
 /* Key-number tiles and empty-state cards share one even row. */
 .kpis > .card.card, .main > .card.card { grid-column: auto; }
+/* An empty card is one quiet block: no second frame inside the card's own. */
+.card :global(.ui-state) { padding: var(--space-3) 0 var(--space-2); border: 0; border-radius: 0; background: none; box-shadow: none; }
+/* Two key-number cards do not fit side by side on a phone. */
+@media (max-width: 520px) { .kpis { grid-template-columns: minmax(0, 1fr); } }

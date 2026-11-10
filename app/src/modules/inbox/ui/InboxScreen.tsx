@@ -240,7 +240,8 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
   const listRevision = createHash('sha256').update(JSON.stringify({ actor, constraints, channels: listPage?.channels, locale, baseLocation, cursor: listPage?.cursor, thread: requestedThread, items: listPage?.items, abilities: [...abilities], total: listPage?.total, progressivePageLimit, previewMaxCharacters })).digest('hex');
   const syncTarget = scope.ids.length === 1 ? scope.ids[0] : undefined;
 
-  const listNav = listPage ? <nav className={styles.listPaging} aria-label={catalog['navigation.listPages'][locale]}>
+  // A pager with three dead links under an empty list is noise: it shows once there is another page to go to.
+  const listNav = listPage && (listPage.olderCursor || listPage.newerCursor || listPage.cursor) ? <nav className={styles.listPaging} aria-label={catalog['navigation.listPages'][locale]}>
     {listPage.olderCursor ? <a href={inboxHref({ ...listPagingLocation, cursor: listPage.olderCursor })}>{copy.older}</a> : <span aria-disabled="true">{copy.older}</span>}
     {listPage.cursor ? <a href={inboxHref({ ...listPagingLocation, cursor: undefined })}>{copy.latest}</a> : <span aria-disabled="true">{copy.latest}</span>}
     {listPage.newerCursor ? <a href={inboxHref({ ...listPagingLocation, cursor: listPage.newerCursor })}>{copy.newer}</a> : <span aria-disabled="true">{copy.newer}</span>}

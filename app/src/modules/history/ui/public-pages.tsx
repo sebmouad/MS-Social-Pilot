@@ -7,6 +7,8 @@ import { fillText, parseBlocks, parseInline, resolveDataDeletionResults, resolve
 import { listPublicPlans, loadOperator, loadPublicChangelog, loadPublicHealth, loadSiteContent, siteIsPublic } from '../server/site';
 import { runtimeConfig } from '@/server/config/store';
 import { registrationAvailable } from '@/modules/settings/server/registration';
+import { IconBrandInstagram, IconCalendarEvent, IconChartBar, IconInbox, IconSpeakerphone, IconUsers } from '@tabler/icons-react';
+import { LANDING_COPY, type LandingFeature } from '../public/landing-copy';
 import styles from './public.module.css';
 
 type Page = 'help' | 'pricing' | 'privacy' | 'terms' | 'status' | 'changelog' | 'dataDeletion';
@@ -60,6 +62,42 @@ async function SiteFrame({ content, operator, locale, current, children }: { con
       <nav aria-label={nav.label}>{link('privacy', nav.privacy)}{link('terms', nav.terms)}{link('dataDeletion', nav.dataDeletion)}</nav>
     </div></footer>
   </div>;
+}
+
+const FEATURE_ICONS: Record<LandingFeature['key'], ReactNode> = {
+  publish: <IconCalendarEvent size={20} />, inbox: <IconInbox size={20} />, insights: <IconChartBar size={20} />,
+  ads: <IconSpeakerphone size={20} />, instagram: <IconBrandInstagram size={20} />, team: <IconUsers size={20} />,
+};
+
+/** The front page for signed-out visitors. Always reachable, like the legal pages: Meta's reviewer opens the site address first. */
+export async function LandingPage() {
+  const locale = siteLocale((await headers()).get('accept-language'));
+  const [content, { operator }, signUpOpen] = await Promise.all([loadSiteContent(locale), loadOperator(), registrationAvailable()]);
+  const t = LANDING_COPY[locale];
+  const values = { product: operator.productName };
+  return <SiteFrame content={content} operator={operator} locale={locale} current={null}>
+    <header className={styles.hero}>
+      <h1>{t.title}</h1>
+      <p>{fillText(t.lead, values)}</p>
+      <div className={styles.heroActions}>
+        <a className={styles.button} href="/sign-in">{t.signIn}</a>
+        {signUpOpen && <a className={`${styles.button} ${styles.buttonQuiet}`} href="/sign-up">{t.signUp}</a>}
+      </div>
+    </header>
+    <section className={styles.features} aria-labelledby="landing-features">
+      <h2 id="landing-features">{t.featuresTitle}</h2>
+      <ul>{t.features.map(feature => <li key={feature.key}>
+        <span className={styles.featureIcon} aria-hidden="true">{FEATURE_ICONS[feature.key]}</span>
+        <h3>{feature.title}</h3><p>{feature.body}</p>
+      </li>)}</ul>
+    </section>
+    <section className={styles.dataUse} aria-labelledby="landing-data">
+      <h2 id="landing-data">{t.dataTitle}</h2>
+      <p>{t.dataLead}</p>
+      <ul>{t.dataPoints.map((point, index) => <li key={index}>{point}</li>)}</ul>
+      <p className={styles.dataLinks}><a href={PATHS.privacy}>{t.privacy}</a><a href={PATHS.dataDeletion}>{t.dataDeletion}</a><a href={PATHS.terms}>{t.terms}</a></p>
+    </section>
+  </SiteFrame>;
 }
 
 const Intro = ({ title, lead }: { title: string; lead?: string }) => <header className={styles.intro}><h1>{title}</h1>{lead && <p>{lead}</p>}</header>;

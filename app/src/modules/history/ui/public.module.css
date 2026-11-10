@@ -59,3 +59,24 @@
 .footerBar nav { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-4); }
 /* Links inside running text are underlined, not told apart by colour alone (WCAG 1.4.1). */
 .main p a, .main li a { text-decoration: underline; text-underline-offset: 2px; }
+/* Front page */
+.hero { display: grid; gap: var(--space-4); max-width: 50rem; padding-block: var(--space-6) var(--space-2); }
+.hero h1 { margin: 0; font-size: clamp(2rem, 5vw, 3.25rem); line-height: 1.06; letter-spacing: -.04em; text-wrap: balance; }
+.hero p { margin: 0; max-width: 44rem; color: var(--ink-soft); font-size: 1.15rem; line-height: 1.6; }
+.heroActions { display: flex; flex-wrap: wrap; gap: var(--space-3); padding-top: var(--space-2); }
+.heroActions .button { min-width: 9rem; padding: 0 var(--space-5); }
+.buttonQuiet { border: 1px solid var(--line-strong); background: var(--surface); color: var(--ink); }
+.buttonQuiet:hover { background: var(--surface-hover); }
+.features { display: grid; gap: var(--space-4); }
+.features h2, .dataUse h2 { margin: 0; font-size: 1.35rem; letter-spacing: -.02em; }
+.features ul { display: grid; grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr)); gap: var(--space-4); margin: 0; padding: 0; list-style: none; }
+.features li { display: grid; align-content: start; gap: var(--space-2); padding: var(--space-5); border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface); }
+.features h3 { margin: 0; font-size: 1.05rem; letter-spacing: -.01em; }
+.features li p { margin: 0; color: var(--ink-soft); line-height: 1.6; }
+.featureIcon { display: grid; place-items: center; width: 40px; height: 40px; margin-bottom: var(--space-1); border-radius: var(--radius-md); background: var(--accent-soft); color: var(--accent); }
+.dataUse { display: grid; gap: var(--space-3); padding: var(--space-6); border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface); }
+.dataUse > p { margin: 0; max-width: 46rem; color: var(--ink-soft); line-height: 1.6; }
+.dataUse ul { display: grid; gap: var(--space-2); max-width: 46rem; margin: 0; padding-inline-start: 1.25rem; line-height: 1.6; }
+.dataLinks { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-5); padding-top: var(--space-2); font-weight: 650; }
+.dataLinks a { color: var(--accent); text-underline-offset: .2em; }
+@media (max-width: 620px) { .hero { padding-block: var(--space-2) 0; } .dataUse { padding: var(--space-4); } .heroActions .button { flex: 1; } }

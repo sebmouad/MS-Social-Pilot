@@ -125,7 +125,8 @@
 .weekHead[data-today] { background: color-mix(in srgb, var(--mod, var(--accent)) 6%, var(--surface)); box-shadow: inset 0 3px 0 var(--mod, var(--accent)); }
 .todayTag { padding: 1px 6px; border-radius: 999px; background: var(--accent-soft); color: var(--accent-ink); font-size: 10px; font-weight: 750; letter-spacing: .02em; }
 .day:hover .add { color: var(--mod-ink, var(--accent)); }
-.empty { border-color: var(--mod, var(--line-strong)); background: var(--mod-soft, transparent); }
+/* The empty note is information, not a warning: neutral frame, no module tint. */
+.empty { border-color: var(--line); background: var(--surface-muted); }
 @media (prefers-reduced-motion: reduce) { .post { transition: none; } }
 @media (forced-colors: active) { .post, .day, .slot { border-color: CanvasText; } }
 .milestones { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; }

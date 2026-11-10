@@ -4,16 +4,23 @@ import { ToastProvider } from '@/components/Toast';
 import { authCopyDefaults, type AuthLocale } from './copy';
 import styles from './auth.module.css';
 
+// Fixed labels, not part of the Root-edited auth catalog: a saved catalog from before these links must stay valid.
+const LEGAL = {
+  en: { label: 'Legal', privacy: 'Privacy policy', terms: 'Terms', dataDeletion: 'Data deletion' },
+  fr: { label: 'Mentions légales', privacy: 'Confidentialité', terms: 'Conditions', dataDeletion: 'Suppression des données' },
+} as const;
+
 /** Shared frame for every signed-out page: brand, one card, one heading, and the toast region. */
 export function AuthShell({ title, titleId = 'auth-title', lead, brand, children, footer, locale = 'en', shellCopy }: { shellCopy?: typeof authCopyDefaults.en.shell; title: string; titleId?: string; lead?: ReactNode; brand?: string; children?: ReactNode; footer?: ReactNode; locale?: AuthLocale }) {
   const copy = shellCopy ?? authCopyDefaults[locale].shell;
   return <ToastProvider dismissLabel={copy.dismiss}><main className={styles.page}>
-    <a className={styles.brand} href="/sign-in"><span className={styles.brandMark} aria-hidden="true">{copy.mark}</span>{brand ?? copy.brand}</a>
+    <a className={styles.brand} href="/"><span className={styles.brandMark} aria-hidden="true">{copy.mark}</span>{brand ?? copy.brand}</a>
     <section className={styles.card} aria-labelledby={titleId}>
       <header className={styles.heading}><h1 id={titleId}>{title}</h1>{lead && <p className={styles.lead}>{lead}</p>}</header>
       <div className={styles.body}>{children}</div>
     </section>
     {footer && <p className={styles.footer}>{footer}</p>}
+    <nav className={styles.legal} aria-label={LEGAL[locale].label}><a href="/privacy-policy">{LEGAL[locale].privacy}</a><a href="/terms">{LEGAL[locale].terms}</a><a href="/data-deletion">{LEGAL[locale].dataDeletion}</a></nav>
   </main></ToastProvider>;
 }
 

@@ -329,7 +329,7 @@ export function AppShell({ children, activeModule, enabledModules, enabledFeatur
       <a className="shell-skip-link" href="#main-content">{copy.skipLink}</a>
       <aside ref={sidebarRef} id="shell-sidebar" className="shell-sidebar" role={menuOpen ? "dialog" : undefined} aria-modal={menuOpen ? true : undefined} aria-label={copy.mainNavigation} tabIndex={menuOpen ? -1 : undefined}>
         <div className="shell-sidebar__head">
-          <a className="shell-brand" href={installationMode ? "/root" : "/home"} aria-label={`Social Pilot, ${installationMode ? copy.root : copy.areas.home}`}><Mark /><span className="shell-wordmark">Social Pilot</span></a>
+          <a className="shell-brand" href={installationMode ? "/root" : "/home"} aria-label={`MS Social Pilot, ${installationMode ? copy.root : copy.areas.home}`}><Mark /><span className="shell-wordmark">MS Social Pilot</span></a>
           <button type="button" className="shell-sidebar__close" onClick={closeMenu} aria-label={copy.closeMenu}><IconX size={20} stroke={1.9} aria-hidden="true" /></button>
         </div>
         <div className="shell-workspace">

@@ -179,6 +179,13 @@ once and stores the post link (« View on Facebook/Instagram »). « Sync now »
 by default (media root default, media share secret generated). Deauthorize/data deletion erase Facebook and linked
 Instagram tokens. Plain wording on Channels; network shown on composer chips. Auto-update (above).
 
+### 7.1b Review-readiness pass (2026-11-10), on branch `claude/elegant-brown-5fjxyf`, not merged or deployed
+
+Public front page at `/` for signed-out visitors (`LandingPage` in `modules/history/ui/public-pages.tsx`, text in
+`modules/history/public/landing-copy.ts`; signed-in people still land on `/home`). Sign-in pages link to the privacy
+policy, terms and data deletion. One product name everywhere: « MS Social Pilot » (sidebar, sign-in, public pages).
+Home cards, Channels empty state, calendar empty note and inbox pager tidied. Auto-update follows `main`: merge first.
+
 ### 7.2 Phase 2 — next
 
 1. User: deploy `main`; fill Root › Public site › Operator details (address, privacy email, law, host,

@@ -39,9 +39,11 @@ function Card({ module, icon, title, t, span, children, id, count }: { module: M
 }
 
 const CTA = 'ui-button ui-button--primary ui-button--md';
+// Inside a dashboard card the next step is one quiet button: five primary buttons on one screen compete with « Create a post ».
+const CARD_CTA = 'ui-button ui-button--secondary ui-button--sm';
 
 function Empty({ title, body, action, href }: { title: string; body: string; action: string; href: string }) {
-  return <EmptyState title={title} action={<a className={CTA} href={href}><span>{action}</span></a>}>{body}</EmptyState>;
+  return <EmptyState title={title} action={<a className={CARD_CTA} href={href}><span>{action}</span></a>}>{body}</EmptyState>;
 }
 
 function Unavailable({ t }: { t: Copy }) {

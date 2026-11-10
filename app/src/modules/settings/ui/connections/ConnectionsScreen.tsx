@@ -53,9 +53,9 @@ export default async function ConnectionsPage({ searchParams }: { searchParams: 
     {notice('oauth_invalid_state', 'alert', t.invalidState)}
     {notice('saved', 'status', t.saved)}
     {notice('failed', 'alert', t.failed)}
-    {!accounts.length && !adRows.length ? <SettingsPanel title={t.noneTitle} detail={t.noneDetail}>
-      <EmptyState title={t.noneTitle} icon={<IconPlugConnected />} action={connectable.length && canManage ? <a href="#connection-actions">{t.manageSelections}</a> : <a href="/settings/account">{t.account}</a>}>{canManage && connectable.length ? t.noneConnect : t.noneAvailable}</EmptyState>
-    </SettingsPanel> : <>
+    {!accounts.length && !adRows.length ? <>
+      <EmptyState title={t.noneTitle} icon={<IconPlugConnected />} action={connectable.length && canManage ? undefined : <a className="text-link" href="/settings/account">{t.account}</a>}>{canManage && connectable.length ? t.noneConnect : t.noneAvailable}</EmptyState>
+    </> : <>
     <div className={cardStyles.cards} role="list" aria-label={t.socialPanel}>
       {accounts.map(account => {
         const health = healthById.get(account.id)!;
@@ -90,10 +90,10 @@ export default async function ConnectionsPage({ searchParams }: { searchParams: 
         { key: 'account', label: t.adAccount, render: ad => <><strong>{ad.name}</strong><span className={styles['settings-table__secondary']}>{ad.provider ? providerName(ad.provider) : t.platformMissing} · {ad.actId}</span></> },
         { key: 'profile', label: c.adLinked, render: ad => ad.owner ?? t.noLinkedProfile },
         { key: 'status', label: t.status, render: ad => <Status tone={ad.enabled && ad.state === 'connected' ? 'good' : 'warning'}>{!ad.enabled ? c.inUseOff : ad.state && ad.state !== 'connected' ? statusLabels[ad.state] : c.inUseOn}</Status> },
-        ...(canManage ? [{ key: 'actions', label: t.actions, render: (ad: (typeof adRows)[number]) => ad.socialAccountId && socialById.has(ad.socialAccountId) ? <a href={`/settings/channels?source=${encodeURIComponent(ad.socialAccountId)}&action=manage`}>{c.adManage}</a> : t.reconnectFirst }] : []),
+        ...(canManage ? [{ key: 'actions', label: t.actions, render: (ad: (typeof adRows)[number]) => ad.socialAccountId && socialById.has(ad.socialAccountId) ? <a className="text-link" href={`/settings/channels?source=${encodeURIComponent(ad.socialAccountId)}&action=manage`}>{c.adManage}</a> : t.reconnectFirst }] : []),
       ]} />
     </SettingsPanel>
     </>}
-    <SettingsPanel title={c.groupsTitle} detail={c.groupsDetail}><a href="/settings/channels/groups">{c.groupsOpen}</a></SettingsPanel>
+    <SettingsPanel title={c.groupsTitle} detail={c.groupsDetail}><a className="text-link" href="/settings/channels/groups">{c.groupsOpen}</a></SettingsPanel>
   </SettingsPage></PageFrame>;
 }
