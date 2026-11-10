@@ -202,12 +202,17 @@ once and stores the post link (« View on Facebook/Instagram »). « Sync now »
 by default (media root default, media share secret generated). Deauthorize/data deletion erase Facebook and linked
 Instagram tokens. Plain wording on Channels; network shown on composer chips. Auto-update (above).
 
-### 7.1b Review-readiness pass (2026-11-10), on branch `claude/elegant-brown-5fjxyf`, not merged or deployed
+### 7.1b Review-readiness pass (2026-11-10), on `main`, live on social.newsgeet.com
 
 Public front page at `/` for signed-out visitors (`LandingPage` in `modules/history/ui/public-pages.tsx`, text in
 `modules/history/public/landing-copy.ts`; signed-in people still land on `/home`). Sign-in pages link to the privacy
 policy, terms and data deletion. One product name everywhere: « MS Social Pilot » (sidebar, sign-in, public pages).
-Home cards, Channels empty state, calendar empty note and inbox pager tidied. Auto-update follows `main`: merge first.
+Home cards, Channels empty state, calendar empty note and inbox pager tidied.
+Webhooks: only the Page object is handled; a signed delivery for another object (`instagram`, `user`) is acknowledged
+and dropped. Instagram comments arrive through the inbox sync. The guide's screen names were corrected to the app's
+(« Posts », « Channels » in the composer, « Save selections », « Sync now » in the Inbox).
+Checked on the live site without signing in: front page, legal pages, callbacks refuse unsigned requests. Still blank
+there: operator details (name, contact, update date) on the privacy policy and terms.
 
 ### 7.1c Audit for the resubmission (2026-11-10): what still blocks it
 

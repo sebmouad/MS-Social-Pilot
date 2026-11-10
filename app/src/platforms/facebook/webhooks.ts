@@ -269,6 +269,11 @@ export async function ingestMetaWebhookDelivery(rawBody: string, signature: stri
   } catch {
     throw new OperationError('invalid_request', 'This Meta webhook payload is not valid JSON.');
   }
+  // A signed delivery for another object (an `instagram` or `user` subscription added in the Meta dashboard) is
+  // acknowledged and dropped: answering 400 makes Meta retry it and, after enough failures, switch the callback off
+  // for the Page events too. Instagram comments reach the Inbox through its own sync, not through this endpoint.
+  const object = (payload as { object?: unknown } | null)?.object;
+  if (typeof object === 'string' && object !== 'page') return summary;
   const events = parseMetaWebhookPayload(payload);
   summary.received = events.length;
   const enabled = await runtimeConfig('meta.webhooksEnabled').catch(() => true);
