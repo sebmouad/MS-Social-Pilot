@@ -205,6 +205,37 @@ Public front page at `/` for signed-out visitors (`LandingPage` in `modules/hist
 policy, terms and data deletion. One product name everywhere: « MS Social Pilot » (sidebar, sign-in, public pages).
 Home cards, Channels empty state, calendar empty note and inbox pager tidied. Auto-update follows `main`: merge first.
 
+### 7.1c Audit for the resubmission (2026-11-10): what still blocks it
+
+Checked: Meta's own records for the app (settings, review requirements, compliance), the public pages signed out,
+and the reviewer-facing screens on the live site with the owner account (read-only).
+
+Blocking, for the user:
+1. `public.operator` is empty on the live site: the privacy policy and terms name no company and no contact
+   (« the operator of this installation »). Fill Root › Configuration › Public site › operator details.
+2. The 7 new permissions (`pages_messaging`, `pages_manage_metadata`, `instagram_basic`, `instagram_content_publish`,
+   `instagram_manage_comments`, `instagram_manage_insights`, `ads_management`) cannot be added to the submission yet:
+   Meta wants one successful API call with each first, counted up to 24 h later. The live Facebook connection dates
+   from Oct 10 and holds the old 8 permissions: reconnect it, then use Inbox messages, an Instagram account and a
+   paused campaign so each permission is called. `instagram_content_publish` and `ads_management` also list access
+   verification.
+3. No Instagram account is connected (10 Facebook Pages only): the four Instagram permissions cannot be shown.
+4. Meta app settings: data deletion URL empty (set the callback
+   `https://social.newsgeet.com/api/platforms/facebook/data-deletion` or the page `/data-deletion`), contact email
+   not verified, display name « MS-Social-Pilot » while the site says « MS Social Pilot », a stale redirect URI
+   (`/api/facebook/callback`).
+5. `meta.webhookVerifyToken` is empty although webhooks are on: Meta cannot verify the webhook, so comments and
+   messages arrive only on « Sync now ».
+6. The reviewer account's workspace (« Meta Review's workspace ») has no channels but 8 ad accounts from an earlier
+   connection; it is not a member of the workspace that has the Pages. Decide which workspace the reviewer uses and
+   clean the other state before recording.
+Fine: app is live, compliant, business verification passes, two-step is off, callbacks reject unsigned requests,
+no console or network errors on the audited screens, public pages are reachable signed out and in English.
+Fixed in code the same day: privacy policy names Instagram and ad accounts and has an « AI assistance » section
+(comment text goes to the AI provider for sentiment in opted-in workspaces; AI is on in production), page titles
+say « MS Social Pilot », Inbox page title matches its heading. The guide artifact is not yet updated for the
+screens changed on 2026-11-10 (Queue, Library, Approvals, Updates).
+
 ### 7.2 Phase 2 — next
 
 1. User: deploy `main`; fill Root › Public site › Operator details (address, privacy email, law, host,

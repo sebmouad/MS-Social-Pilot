@@ -12,7 +12,7 @@ const en = {
   pageTitles: {
     'home/overview': 'Overview', 'publishing/posts': 'Posts', 'publishing/calendar': 'Calendar', 'publishing/queue': 'Queue', 'publishing/approvals': 'Approvals',
     'publishing/media': 'Library', 'publishing/feeds': 'Content feeds', 'studio/ai-studio': 'AI studio', 'publishing/collaboration': 'Organize', 'publishing/labels': 'Labels', 'publishing/templates': 'Templates',
-    'studio/agents': 'Writing agents', 'inbox/conversations': 'Messages', 'analytics/overview': 'Overview', 'analytics/explorer': 'Explore', 'analytics/demographics': 'Audience',
+    'studio/agents': 'Writing agents', 'inbox/conversations': 'Inbox', 'analytics/overview': 'Overview', 'analytics/explorer': 'Explore', 'analytics/demographics': 'Audience',
     'analytics/compare': 'Compare', 'analytics/ads': 'Ads analysis', 'analytics/posts': 'Posts', 'studio/tests': 'Caption tests', 'analytics/goals': 'Goals', 'analytics/pins': 'Pinned metrics', 'analytics/reports': 'Reports', 'analytics/notes': 'Chart notes',
     'ads/overview': 'Accounts', 'ads/compare': 'Compare', 'ads/objects': 'Manage', 'ads/campaigns': 'Campaigns', 'tasks/board': 'Tasks',
     'agency/overview': 'Workspaces', 'agency/clients': 'Clients', 'settings/connections': 'Channels', 'settings/team': 'Team', 'settings/workspace': 'Workspace',
