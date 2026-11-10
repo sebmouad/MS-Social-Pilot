@@ -608,3 +608,9 @@ th[aria-sort="ascending"], th[aria-sort="descending"] { color: var(--ink); }
 :where(.panel, .ui-fieldgroup, [class*="card"], [class*="Card"], [class*="panel"], [class*="Panel"]) > .ui-state { border-color: transparent; background: transparent; box-shadow: none; }
 /* A date in a table cell stays on one line; narrow columns used to break it across three. */
 @media (min-width: 481px) { .ui-table td > time { white-space: nowrap; } }
+/* Detail window: a list item opened from its row. Wide, with the body scrolling between a fixed title and actions. */
+.ui-dialog--detail { width: min(880px, calc(100% - 32px)); max-height: min(92dvh, 940px); overflow: hidden; }
+.ui-dialog--detail[open] { display: flex; flex-direction: column; }
+.ui-dialog--detail > .ui-dialog__header { flex: 0 0 auto; align-items: center; padding: 14px 16px 14px 24px; }
+.ui-dialog--detail > .ui-dialog__body { flex: 1 1 auto; min-height: 0; overflow: auto; overscroll-behavior: contain; }
+.ui-dialog--detail > .ui-dialog__actions { flex: 0 0 auto; padding: 14px 24px; }

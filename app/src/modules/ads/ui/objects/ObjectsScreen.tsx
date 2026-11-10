@@ -97,7 +97,10 @@ async function AdsObjectsPage({ searchParams }: { searchParams: Promise<Params> 
     : <><AdsFiltersSidebar catalogs={catalogs} locale={locale} accounts={accounts} input={params} action="/ads/manage" policy={policy} /><PageHeader module="ads" title={tabTitle} actions={actions} /></>;
   const header = await headerWith();
   // The history has nothing to search.
-  const sidebar = level === 'history' ? null : <ManageSearchFilter
+  const filter = (parentOptions?: Array<{ id: string; name: string }>, parentPickLabel?: string) => level === 'history' ? null : <ManageSearchFilter
+    parentOptions={parentOptions}
+    parentPickLabel={parentPickLabel}
+    allLabel={t('manageAllParents')}
     ariaLabel={t('text055')}
     searchLabel={t('text060')}
     parentLabel={t('text061')}
@@ -108,6 +111,7 @@ async function AdsObjectsPage({ searchParams }: { searchParams: Promise<Params> 
     showParent={level === 'adset' || level === 'ad'}
     hiddenParams={hiddenParams}
   />;
+  const sidebar = filter();
   let values: Record<string, string | undefined>;
   try {
     values = pageSearchRecord(params, ['period', 'since', 'until', 'account', 'level', 'parentId', 'q', 'sort', 'direction', 'offset'], policy.maxFilterCharacters);
@@ -133,7 +137,7 @@ async function AdsObjectsPage({ searchParams }: { searchParams: Promise<Params> 
   if (!isManageDirectoryLevel(level)) {
     const managementByAccount = new Map(await Promise.all(filteredAccounts.map(async account => [account.id, await describeAdsManagement(actor, account.id)] as const)));
     const creativeAccounts = filteredAccounts.filter(account => managementByAccount.get(account.id)?.operations.some(op => op.id === 'creative.create'));
-    const create = creativeAccounts.length ? <CreateDrawer label={t('manageNewCreative')} closeLabel={t('manageCloseForm')}>
+    const create = creativeAccounts.length ? <CreateDrawer wide label={t('manageNewCreative')} closeLabel={t('manageCloseForm')}>
       {creativeAccounts.map(account => <CreativeCreateForm key={account.id} adAccountId={account.id} accountName={account.name} ownerScope={actor} locale={locale} />)}
     </CreateDrawer> : null;
     return <PageFrame module="ads"><div className="insights">
@@ -206,12 +210,12 @@ async function AdsObjectsPage({ searchParams }: { searchParams: Promise<Params> 
   return <PageFrame module="ads"><div className="insights">
     {await headerWith(create)}
     {tabs}
-    {sidebar}
+    {filter(parentLevel ? [...new Map(parentInventory.map(item => [item.objectId, { id: item.objectId, name: item.name ?? item.objectId }])).values()].sort((a, b) => a.name.localeCompare(b.name)) : undefined, parentLabel)}
     <p className="small-note">{directory.total.toLocaleString(locale)} {t(directory.total === 1 ? 'resultOne' : 'text071')} {formatIsoDay(locale, directory.range.from, directory.range.from)} {t('text072')} {formatIsoDay(locale, directory.range.to, directory.range.to)}</p>
     <section className="panel">
       {directory.freshness.status === 'stale' ? <p className="small-note">{t('text073')}</p> : null}
       <DataTable caption={tabTitle} rows={directory.items} rowKey={row => `${row.accountId}:${row.objectId}`} emptyMessage={t('text075')} columns={[
-        { key: 'name', label: t('text066'), render: row => <ObjectRowLabel adAccountId={row.accountId} level={directory.level} objectId={row.objectId} name={row.name}><span className="small-note">{accountName.get(row.accountId) ?? row.accountName} · {row.objectId}</span></ObjectRowLabel> },
+        { key: 'name', label: t('text066'), render: row => <ObjectRowLabel adAccountId={row.accountId} level={directory.level} objectId={row.objectId} name={row.name}><span className="small-note">{accountName.get(row.accountId) ?? row.accountName}</span></ObjectRowLabel> },
         ...(parentLevel ? [{ key: 'parent', label: parentLabel, render: (row: (typeof directory.items)[number]) => parentOf(row) }] : []),
         // Status sits in its own column only (the name no longer repeats it); "active" with no recent delivery says so, since Meta keeps a finished or unfunded campaign active.
         { key: 'status', label: t('manageStatus'), render: row => <><Badge tone={adsStatusTone(row.status)}>{row.status ?? t('text094')}</Badge>{row.status?.toLowerCase() === 'active' && row.lastDeliveryDate && row.lastFetchedAt && Date.parse(row.lastFetchedAt) - Date.parse(row.lastDeliveryDate) > 2 * 86_400_000 ? <><br /><span className="small-note">{t('noDeliverySince', { date: formatIsoDay(locale, row.lastDeliveryDate, row.lastDeliveryDate) })}</span></> : null}</> },

@@ -37,7 +37,6 @@
 
 @media (max-width: 1279px) {
   .split[data-open="true"] { grid-template-columns: minmax(0, 1fr); }
-  .split[data-open="true"] .listPane { display: none; }
 }
 /* Phone: compact 72px rows; the post opens on its own page. */
 @media (max-width: 760px) {
@@ -81,3 +80,9 @@
 /* « View on Facebook » beside a published destination (more specific than the icon-only `.destinations a`). */
 .destinations a.viewLive { display: inline-flex; width: auto; height: auto; gap: 4px; padding: 2px 6px; font-size: 13px; font-weight: 650; color: var(--accent); white-space: nowrap; }
 .destinations a.viewLive:hover, .destinations a.viewLive:focus-visible { color: var(--accent-hover); text-decoration: underline; background: none; }
+
+/* Post details open in a centered window (2026-11-10): the list keeps its full width and stays visible behind it. */
+.split[data-open="true"] { grid-template-columns: minmax(0, 1fr); }
+.split .panel { width: min(880px, calc(100% - 32px)); max-height: min(92dvh, 940px); }
+@media (max-width: 640px) { .split .panel { width: 100vw; max-height: calc(100dvh - 28px - env(safe-area-inset-top)); } }
+@media (min-width: 761px) { .panelBody { grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); align-items: start; } .panelBody > :first-child { grid-row: 1 / span 6; } }

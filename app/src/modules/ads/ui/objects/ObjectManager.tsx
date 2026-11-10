@@ -9,6 +9,7 @@ import { useToast } from '@/components/Toast';
 import { Button } from '@/components/Button';
 import { FieldError, useFormValidation } from '@/components/FormValidation';
 import { ModalDialog } from '@/components/ModalDialog';
+import { SidePanel } from '@/components/SidePanel';
 import { RouteNotice } from '@/components/RouteNotice';
 import type { AdsNeutralOperation, AdsOperationInput, AdsOperationSupport, AdsOpsLimits } from '@/modules/ads/management/types';
 import { budgetFractionDigits, formatBudgetMinor, parseBudgetAmount } from '@/modules/ads/ui/budget';
@@ -73,6 +74,7 @@ export function ObjectManager({ adAccountId, level, objectId, name }: { adAccoun
   const limits = capabilities?.limits;
   const supportFor = (opId: string) => supports.find(item => item.id === opId && item.objectTypes.includes(level));
 
+  const [copied, setCopied] = useState(false);
   async function toggle() {
     if (open) { setOpen(false); return; }
     setOpen(true); setLoadError(''); if (!pending) setOperationBlocked(false); setBusy(true);
@@ -201,8 +203,8 @@ export function ObjectManager({ adAccountId, level, objectId, name }: { adAccoun
   const creativeFieldProps = validation.fieldProps('creativeId');
 
   return <div className="ads-object-manager">
-    <Button aria-expanded={open} aria-controls={`${id}-panel`} onClick={() => void toggle()} disabled={busy && !open}>{open ? t('text091') : t('text092')}</Button>
-    {open ? <div id={`${id}-panel`} className="ads-object-manager__panel">
+    <Button size="sm" aria-haspopup="dialog" onClick={() => void toggle()} disabled={busy && !open}>{t('text092')}</Button>
+    <SidePanel open={open} title={name} closeLabel={t('text091')} onClose={() => setOpen(false)}><div id={`${id}-panel`} className="ads-object-manager__panel">
       {busy && !detail ? <p role="status">{t('text093')}</p> : null}
       {loadError ? <RouteNotice error className="ui-error" focusKey={localize(loadError)}>{localize(loadError)}</RouteNotice> : null}
       {detail ? <>
@@ -240,7 +242,11 @@ export function ObjectManager({ adAccountId, level, objectId, name }: { adAccoun
         </>}
       </> : null}
       {outcome ? <><RouteNotice error={outcome.tone !== 'ok'} className={outcome.tone === 'ok' ? 'small-note' : 'ui-error'} focusKey={outcome.key}>{localize(outcome.text)}</RouteNotice>{outcome.tone === 'unknown' ? <a href="/ads/manage?level=history#changes">{t('text102')}</a> : null}</> : null}
-    </div> : null}
+      {/* Identifiers stay out of the lists; they are here for matching an item with Meta Ads Manager. */}
+      <details className="ads-object-manager__technical"><summary>{t('manageTechnical')}</summary>
+        <p><span>{t('manageTechnicalId')}</span> <code>{objectId}</code> <Button size="sm" variant="quiet" onClick={() => { void navigator.clipboard?.writeText(objectId).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1800); }).catch(() => {}); }}><span aria-live="polite">{copied ? t('manageCopied') : t('manageCopyId')}</span></Button></p>
+      </details>
+    </div></SidePanel>
     {pending && !pendingDialogOpen ? <div className="ads-object-manager__pending" role="region" aria-labelledby={`${id}-pending-title`}>
       <h3 id={`${id}-pending-title`}>{t('text115')}</h3>
       <RouteNotice error className="ui-error" focusKey={pending.feedback ?? 'unknown-ads-change'}>{pending.feedback ?? t('text116')}</RouteNotice>

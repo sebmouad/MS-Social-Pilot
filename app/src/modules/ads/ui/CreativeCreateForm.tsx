@@ -8,6 +8,7 @@ import { useConfirm } from '@/components/useConfirm';
 import type { AdsNeutralOperation } from '../management/types';
 import { clearCreation, loadCreation, saveCreation, type CreationOwnerScope } from './creationRequestStore';
 import { useAdsCatalogs } from './AdsCopyProvider';
+import { creativeCopy } from './creative-copy';
 
 type Creative = Extract<AdsNeutralOperation, { type: 'creative.create' }>;
 type Review = { operation: Creative; confirmation: string; requestId: string };
@@ -21,7 +22,8 @@ const sourceOf = (operation: Creative) => operation.format === 'post' ? operatio
 export function CreativeCreateForm({ adAccountId, accountName, ownerScope, locale = 'en', initialTargetId, initialPostId }: { adAccountId: string; accountName: string; ownerScope: CreationOwnerScope; locale?: 'en' | 'fr'; initialTargetId?: string; initialPostId?: string }) {
   const localize = useAdsMessage();
   const { catalogs } = useAdsCatalogs();
-  const t = catalogs.creative[locale];
+  // Wording saved before a release lacks that release's new labels.
+  const t = { ...creativeCopy[locale], ...catalogs.creative[locale] };
   const { userId, workspaceId } = ownerScope;
   const owner = useMemo(() => ({ userId, workspaceId }), [userId, workspaceId]);
   const [sources, setSources] = useState<Sources | null>(null);
@@ -36,6 +38,8 @@ export function CreativeCreateForm({ adAccountId, accountName, ownerScope, local
   const [postId, setPostId] = useState(initialPostId ?? '');
   const [selectedImage, setSelectedImage] = useState('');
   const [imageFailed, setImageFailed] = useState(false);
+  const [draft, setDraft] = useState({ message: '', title: '', linkUrl: '' });
+  const [pickError, setPickError] = useState('');
   const transmissions = useRef(0);
   const sending = useRef(false);
   const sourceRequest = useRef(0);
@@ -101,9 +105,12 @@ export function CreativeCreateForm({ adAccountId, accountName, ownerScope, local
     event.preventDefault();
     if (busy || held) return;
     setError(''); setNotice('');
+    setPickError('');
     if (!validation.validate(event.currentTarget)) { setError(t.invalid); return; }
     const data = new FormData(event.currentTarget);
     const kind = data.get('format') === 'link' ? 'link' : data.get('format') === 'post' ? 'post' : 'image';
+    // The picture and post pickers are not native fields, so they are checked here.
+    if (kind === 'post' ? !postId : !selectedImage) { setPickError(kind === 'post' ? t.pickPost : t.pickPicture); return; }
     const operation: Creative = kind === 'post'
       ? { type: 'creative.create', objectType: 'creative', name: String(data.get('name')).trim(), targetId: String(data.get('targetId')), format: 'post', postId: String(data.get('postId')) }
       : { type: 'creative.create', objectType: 'creative', name: String(data.get('name')).trim(), targetId: String(data.get('targetId')), mediaId: String(data.get('mediaId')), format: kind, message: String(data.get('message') ?? ''), title: kind === 'link' ? String(data.get('title') ?? '') : '', ...(kind === 'link' ? { linkUrl: String(data.get('linkUrl') ?? '') } : {}) };
@@ -114,32 +121,72 @@ export function CreativeCreateForm({ adAccountId, accountName, ownerScope, local
       if (!response.ok || typeof preview.confirmation !== 'string' || preview.blockedByOpenChange !== false) throw new Error();
       const request: Review = { operation: preview.operation, confirmation: preview.confirmation, requestId: globalThis.crypto.randomUUID() };
       setBusy(false);
-      await confirm(operation.format === 'post' ? `${accountName} · ${operation.name} · ${sources?.posts?.find(post => post.postId === operation.postId)?.text.slice(0, 120) ?? operation.postId}. ${t.postNote}` : `${accountName} · ${operation.name} · ${operation.mediaId} · ${operation.title} · ${operation.message}${operation.linkUrl ? ` · ${operation.linkUrl}` : ""}. ${t.description}`, { exactConfirmation: request.confirmation, confirmationLabel: t.exact, pendingLabel: t.pending, failureLabel: t.failed, onConfirm: () => send(request) });
+      const pageLabel = sources?.targets.find(target => target.id === operation.targetId)?.name ?? '';
+      await confirm(`${operation.name}${pageLabel ? ` · ${pageLabel}` : ''}. ${operation.format === 'post' ? t.postNote : t.description}`, { pendingLabel: t.pending, failureLabel: t.failed, onConfirm: () => send(request) });
     } catch { setError(t.failed); } finally { setBusy(false); }
   }
 
   const locked = busy || Boolean(held);
-  return <section className="ads-campaign-create ads-creative-create" aria-label={`${t.title} · ${accountName}`}>
-    <h3>{t.title} · {accountName}</h3><p className="small-note">{t.description}</p>
-    {loading ? <p role="status">{t.loading}</p> : null}
-    {error ? <p role="alert" className="ui-error">{localize(error)} <Button onClick={() => setReload(value => value + 1)} disabled={busy || loading}>{t.refresh}</Button></p> : null}
-    {notice ? <p role="status">{localize(notice)}</p> : null}
-    {held ? <div role="alert"><p>{t.held}</p><p><strong>{held.operation.name}</strong> · {sourceOf(held.operation)}</p><Button disabled={busy} onClick={() => void send(held)}>{busy ? t.pending : t.check}</Button> <a href="/ads/manage?level=history#changes">{t.history}</a></div> : null}
-    {sources ? <form noValidate onSubmit={submit} aria-label={t.title}>
-      <div className="ads-campaign-create__fields">
-        <label>{t.name}<input name="name" defaultValue={held?.operation.name} required maxLength={sources.nameMaxCharacters} disabled={locked} {...validation.fieldProps('name')} /><FieldError {...validation.errorProps('name')} /></label>
-        <label>{t.channel}<select name="targetId" required disabled={locked} {...validation.fieldProps('targetId')} value={targetId} onChange={event => { setTargetId(event.target.value); setPostId(''); }}><option value="">{t.choose}</option>{held && !sources.targets.some(item => item.id === held.operation.targetId) ? <option value={held.operation.targetId}>{t.unavailable} · {held.operation.targetId}</option> : null}{sources.targets.map(target => <option key={target.id} value={target.id}>{target.name || t.unavailable}</option>)}</select><FieldError {...validation.errorProps('targetId')} /></label>
-        {format === 'post' ? <label>{t.postPick}<select name="postId" required disabled={locked || !targetId} {...validation.fieldProps('postId')} value={postId} onChange={event => setPostId(event.target.value)}><option value="">{t.choose}</option>{(sources.posts ?? []).filter(post => post.targetId === targetId).map(post => <option key={post.postId} value={post.postId}>{post.publishedAt ? `${new Date(post.publishedAt).toLocaleDateString(locale)} · ` : ''}{post.text.slice(0, 80) || post.postId}</option>)}</select><FieldError {...validation.errorProps('postId')} />{targetId && !(sources.posts ?? []).some(post => post.targetId === targetId) ? <span className="small-note">{t.noPosts}</span> : null}</label> : null}
-        {format !== 'post' ? <label>{t.image}<select name="mediaId" onChange={event => { setSelectedImage(event.target.value); setImageFailed(false); }} required disabled={locked} {...validation.fieldProps('mediaId')} defaultValue={held && held.operation.format !== 'post' ? held.operation.mediaId : ""}><option value="">{t.choose}</option>{held && held.operation.format !== 'post' && !sources.images.some(item => item.id === sourceOf(held.operation)) ? <option value={sourceOf(held.operation)}>{t.unavailable} · {sourceOf(held.operation)}</option> : null}{sources.images.map(image => <option key={image.id} value={image.id}>{image.id} · {image.mimeType || t.unavailable}</option>)}</select><FieldError {...validation.errorProps('mediaId')} /></label> : null}
-        <label>{t.format}<select name="format" value={format} onChange={event => setFormat(event.target.value)} disabled={locked}><option value="post">{t.post}</option><option value="image">{t.photo}</option><option value="link">{t.link}</option></select></label>
-        {format !== 'post' ? <label>{t.message}<AutoTextarea defaultValue={held && held.operation.format !== 'post' ? held.operation.message : undefined} name="message" maxLength={sources.creativeMessageMaxCharacters} disabled={locked} /></label> : null}
-        {format === 'link' ? <><label>{t.headline}<input name="title" defaultValue={held && held.operation.format !== 'post' ? held.operation.title : undefined} maxLength={sources.creativeTitleMaxCharacters} disabled={locked} /></label><label>{t.destination}<input name="linkUrl" defaultValue={held && held.operation.format !== 'post' ? held.operation.linkUrl : undefined} type="url" required maxLength={sources.creativeUrlMaxCharacters} disabled={locked} {...validation.fieldProps('linkUrl')} /><FieldError {...validation.errorProps('linkUrl')} /></label></> : null}
+  const imageUrl = (mediaId: string) => `/api/ads/management?${new URLSearchParams({ view: 'creative-image', adAccountId, mediaId })}`;
+  const pageName = sources?.targets.find(target => target.id === targetId)?.name ?? '';
+  const pickedPost = format === 'post' ? sources?.posts?.find(item => item.postId === postId) : undefined;
+  const pagePosts = (sources?.posts ?? []).filter(post => post.targetId === targetId);
+  const previewPicture = format === 'post' ? pickedPost?.thumbnailUrl ?? null : selectedImage && !imageFailed ? imageUrl(selectedImage) : null;
+  const previewText = format === 'post' ? pickedPost?.text ?? '' : draft.message;
+  let linkHost = '';
+  try { linkHost = draft.linkUrl ? new URL(draft.linkUrl).host : ''; } catch { /* still typing */ }
+
+  return <section className="ads-creative" aria-label={`${t.title} · ${accountName}`}>
+    <header className="ads-creative__head"><h3>{t.title}</h3><p>{accountName} · {t.safe}</p></header>
+    {loading && !sources ? <p role="status" className="ads-creative__note">{t.loading}</p> : null}
+    {error ? <p role="alert" className="ui-error">{localize(error)} <Button size="sm" onClick={() => setReload(value => value + 1)} disabled={busy || loading}>{t.refresh}</Button></p> : null}
+    {notice ? <p role="status" className="ads-creative__done">{localize(notice)}</p> : null}
+    {held ? <div role="alert" className="ads-creative__held"><p>{t.held}</p><p><strong>{held.operation.name}</strong></p><Button disabled={busy} onClick={() => void send(held)}>{busy ? t.pending : t.check}</Button> <a href="/ads/manage?level=history#changes">{t.history}</a></div> : null}
+    {sources ? <form noValidate onSubmit={submit} aria-label={t.title} className="ads-creative__grid">
+      <div className="ads-creative__form">
+        <input type="hidden" name="format" value={format} />
+        <input type="hidden" name="mediaId" value={selectedImage} />
+        <input type="hidden" name="postId" value={postId} />
+        <div className="ads-creative__field"><span className="ads-creative__label">{t.format}</span>
+          <div className="ads-creative__kinds" role="radiogroup" aria-label={t.format}>
+            {([['image', t.photo, t.photoHint], ['link', t.link, t.linkHint], ['post', t.postShort, t.postHint]] as const).map(([value, label, hint]) =>
+              <button key={value} type="button" role="radio" aria-checked={format === value} disabled={locked} className="ads-creative__kind" onClick={() => setFormat(value)}><strong>{label}</strong><span>{hint}</span></button>)}
+          </div>
+        </div>
+        <label className="ads-creative__field"><span className="ads-creative__label">{t.channel}</span>
+          <select name="targetId" required disabled={locked} {...validation.fieldProps('targetId')} value={targetId} onChange={event => { setTargetId(event.target.value); setPostId(''); }}><option value="">{t.choose}</option>{held && !sources.targets.some(item => item.id === held.operation.targetId) ? <option value={held.operation.targetId}>{t.unavailable}</option> : null}{sources.targets.map(target => <option key={target.id} value={target.id}>{target.name || t.unavailable}</option>)}</select><FieldError {...validation.errorProps('targetId')} /></label>
+        {format === 'post' ? <div className="ads-creative__field"><span className="ads-creative__label">{t.postPick}</span>
+          {!targetId ? <p className="ads-creative__note">{t.pickPageFirst}</p> : pagePosts.length === 0 ? <p className="ads-creative__note">{t.noPosts}</p>
+            : <div className="ads-creative__posts" role="radiogroup" aria-label={t.postPick}>{pagePosts.map(post => <button key={post.postId} type="button" role="radio" aria-checked={postId === post.postId} disabled={locked} className="ads-creative__post" onClick={() => setPostId(post.postId)}>
+              {post.thumbnailUrl ? <img src={post.thumbnailUrl} alt="" loading="lazy" referrerPolicy="no-referrer" /> : <span className="ads-creative__nopic" aria-hidden="true" />}
+              <span><span className="ads-creative__posttext">{post.text || t.untitledPost}</span>{post.publishedAt ? <small>{new Date(post.publishedAt).toLocaleDateString(locale, { day: 'numeric', month: 'short', year: 'numeric' })}</small> : null}</span>
+            </button>)}</div>}
+        </div> : <div className="ads-creative__field"><span className="ads-creative__label">{t.picture}</span>
+          {sources.images.length === 0 ? <p className="ads-creative__note">{t.empty} <a href="/content/library">{t.mediaLibrary}</a></p>
+            : <div className="ads-creative__pictures" role="radiogroup" aria-label={t.picture}>{sources.images.map((image, index) => <button key={image.id} type="button" role="radio" aria-checked={selectedImage === image.id} aria-label={`${t.picture} ${index + 1}`} disabled={locked} className="ads-creative__picture" onClick={() => { setSelectedImage(image.id); setImageFailed(false); }}><img src={imageUrl(image.id)} alt="" loading="lazy" /></button>)}</div>}
+          {sources.nextTargetOffset !== null || sources.nextImageAfter ? <button type="button" className="ads-creative__more" onClick={() => void moreSources()} disabled={loading || locked}>{loading ? t.loading : t.more}</button> : null}
+        </div>}
+        {format !== 'post' ? <label className="ads-creative__field"><span className="ads-creative__label">{t.message}</span><AutoTextarea className="ui-input" rows={3} defaultValue={held && held.operation.format !== 'post' ? held.operation.message : undefined} name="message" maxLength={sources.creativeMessageMaxCharacters} disabled={locked} placeholder={t.messageHint} onChange={event => setDraft(old => ({ ...old, message: event.target.value }))} /></label> : null}
+        {format === 'link' ? <div className="ads-creative__pair">
+          <label className="ads-creative__field"><span className="ads-creative__label">{t.headline}</span><input name="title" defaultValue={held && held.operation.format !== 'post' ? held.operation.title : undefined} maxLength={sources.creativeTitleMaxCharacters} disabled={locked} onChange={event => setDraft(old => ({ ...old, title: event.target.value }))} /></label>
+          <label className="ads-creative__field"><span className="ads-creative__label">{t.destinationShort}</span><input name="linkUrl" defaultValue={held && held.operation.format !== 'post' ? held.operation.linkUrl : undefined} type="url" placeholder="https://" required maxLength={sources.creativeUrlMaxCharacters} disabled={locked} {...validation.fieldProps('linkUrl')} onChange={event => setDraft(old => ({ ...old, linkUrl: event.target.value }))} /><FieldError {...validation.errorProps('linkUrl')} /></label>
+        </div> : null}
+        <label className="ads-creative__field"><span className="ads-creative__label">{t.name}</span><input name="name" defaultValue={held?.operation.name} required maxLength={sources.nameMaxCharacters} disabled={locked} placeholder={t.nameHint} {...validation.fieldProps('name')} /><FieldError {...validation.errorProps('name')} /><small className="ads-creative__help">{t.nameHelp}</small></label>
       </div>
-      {format === 'post' && postId ? (() => { const post = sources.posts?.find(item => item.postId === postId); return post?.thumbnailUrl ? <img className="ads-creative-image" width="160" height="120" src={post.thumbnailUrl} alt={t.postPick} referrerPolicy="no-referrer" /> : null; })()
-        : selectedImage && imageFailed ? <p>{t.unavailable}</p> : selectedImage ? <img onError={() => setImageFailed(true)} className="ads-creative-image" width="160" height="120" src={`/api/ads/management?${new URLSearchParams({ view: "creative-image", adAccountId, mediaId: selectedImage })}`} alt={t.image} /> : null}
-      {sources.nextTargetOffset !== null || sources.nextImageAfter ? <Button onClick={() => void moreSources()} disabled={loading || locked}>{t.more}</Button> : null}
-      {format !== 'post' && (!sources.targets.length || !sources.images.length) ? <p>{t.empty} <a href="/content/library">{t.mediaLibrary}</a></p> : null}
-      <Button type="submit" variant="primary" disabled={locked || loading || !sources.targets.length || (format !== 'post' && !sources.images.length)}>{busy ? t.pending : t.review}</Button>
+      <aside className="ads-creative__preview" aria-label={t.preview}>
+        <span className="ads-creative__label">{t.preview}</span>
+        <div className="ads-creative__ad">
+          <div className="ads-creative__adhead"><span className="ads-creative__avatar" aria-hidden="true">{(pageName || '?').slice(0, 1).toUpperCase()}</span><span><strong>{pageName || t.channel}</strong><small>{t.sponsored}</small></span></div>
+          {previewText ? <p className="ads-creative__adtext">{previewText}</p> : <p className="ads-creative__adtext is-empty">{format === 'post' ? t.previewPost : t.previewText}</p>}
+          {previewPicture ? <img className="ads-creative__adimage" src={previewPicture} alt="" referrerPolicy="no-referrer" onError={() => { if (format !== 'post') setImageFailed(true); }} /> : <div className="ads-creative__adimage is-empty">{selectedImage && imageFailed ? t.unavailable : t.previewPicture}</div>}
+          {format === 'link' ? <div className="ads-creative__adlink"><span><small>{linkHost || 'example.com'}</small><strong>{draft.title || t.headline}</strong></span><span className="ads-creative__cta">{t.learnMore}</span></div> : null}
+        </div>
+        <p className="ads-creative__help">{t.previewNote}</p>
+      </aside>
+      <div className="ads-creative__actions">
+        {pickError ? <p role="alert" className="ui-error">{pickError}</p> : null}
+        <Button type="submit" variant="primary" disabled={locked || loading || !sources.targets.length || (format !== 'post' && !sources.images.length)}>{busy ? t.pending : t.create}</Button>
+      </div>
     </form> : null}
     {dialog}
   </section>;

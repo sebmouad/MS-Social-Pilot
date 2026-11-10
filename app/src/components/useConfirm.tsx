@@ -5,8 +5,9 @@ import { Button } from './Button';
 import { Dialog } from './Dialog';
 
 type ConfirmOptions = {
-  exactConfirmation: string;
-  confirmationLabel: string;
+  /** A phrase the person must retype before confirming; leave out for changes that are safe to undo or cannot spend. */
+  exactConfirmation?: string;
+  confirmationLabel?: string;
   pendingLabel: string;
   failureLabel: string;
   /** Return a safe localized error to keep the dialog and input open for retry. */
@@ -28,7 +29,7 @@ export function useConfirm(labels: { title: string; cancel: string; confirm: str
   }), []);
   const answer = (ok: boolean) => { resolver.current?.(ok); resolver.current = null; setRequest(null); };
   const submit = async () => {
-    if (pending.current || !request || request.options && value !== request.options.exactConfirmation) return;
+    if (pending.current || !request || request.options?.exactConfirmation !== undefined && value !== request.options.exactConfirmation) return;
     if (!request.options) { answer(true); return; }
     pending.current = true; setBusy(true); setError('');
     try {
@@ -38,9 +39,9 @@ export function useConfirm(labels: { title: string; cancel: string; confirm: str
     finally { pending.current = false; setBusy(false); }
   };
   const dialog = <Dialog open={request !== null} title={labels.title} closeLabel={labels.cancel} busy={busy} onClose={() => { if (!pending.current) answer(false); }}
-    actions={<><Button data-dialog-cancel disabled={busy} onClick={() => answer(false)}>{labels.cancel}</Button><Button disabled={busy || Boolean(request?.options && value !== request.options.exactConfirmation)} variant={labels.danger === false ? 'primary' : 'danger'} onClick={() => void submit()}>{busy ? request?.options?.pendingLabel : labels.confirm}</Button></>}>
+    actions={<><Button data-dialog-cancel disabled={busy} onClick={() => answer(false)}>{labels.cancel}</Button><Button disabled={busy || Boolean(request?.options?.exactConfirmation !== undefined && value !== request.options.exactConfirmation)} variant={labels.danger === false ? 'primary' : 'danger'} onClick={() => void submit()}>{busy ? request?.options?.pendingLabel : labels.confirm}</Button></>}>
     <p>{request?.text}</p>
-    {request?.options && <label className="ui-field"><span>{request.options.confirmationLabel}: <code>{request.options.exactConfirmation}</code></span><input className="ui-input" value={value} disabled={busy} onChange={event => setValue(event.target.value)} autoComplete="off" spellCheck={false} /></label>}
+    {request?.options?.exactConfirmation !== undefined && <label className="ui-field"><span>{request.options.confirmationLabel}: <code>{request.options.exactConfirmation}</code></span><input className="ui-input" value={value} disabled={busy} onChange={event => setValue(event.target.value)} autoComplete="off" spellCheck={false} /></label>}
     {error && <p role="alert" className="ui-error">{error}</p>}
   </Dialog>;
   return [ask, dialog];

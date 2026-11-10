@@ -12,6 +12,9 @@ export function ManageSearchFilter({
   maxParentCharacters,
   showParent,
   hiddenParams,
+  parentOptions,
+  parentPickLabel,
+  allLabel,
 }: {
   ariaLabel: string;
   searchLabel: string;
@@ -22,6 +25,10 @@ export function ManageSearchFilter({
   maxParentCharacters: number;
   showParent: boolean;
   hiddenParams: Record<string, string | undefined>;
+  /** Parents by name: the filter becomes a picker instead of a box for a numeric ID. */
+  parentOptions?: Array<{ id: string; name: string }>;
+  parentPickLabel?: string;
+  allLabel?: string;
 }) {
   const router = useRouter();
   const [query, setQuery] = useState(initialQuery);
@@ -70,8 +77,10 @@ export function ManageSearchFilter({
       </label>
       {showParent ? (
         <label>
-          {parentLabel}
-          <input type="search" name="parentId" value={parentId} maxLength={maxParentCharacters} onChange={event => setParentId(event.target.value)} />
+          {parentOptions ? parentPickLabel ?? parentLabel : parentLabel}
+          {parentOptions
+            ? <select name="parentId" value={parentId} onChange={event => setParentId(event.target.value)}><option value="">{allLabel ?? ''}</option>{parentId && !parentOptions.some(option => option.id === parentId) ? <option value={parentId}>{parentId}</option> : null}{parentOptions.map(option => <option key={option.id} value={option.id}>{option.name}</option>)}</select>
+            : <input type="search" name="parentId" value={parentId} maxLength={maxParentCharacters} onChange={event => setParentId(event.target.value)} />}
         </label>
       ) : null}
     </form>
