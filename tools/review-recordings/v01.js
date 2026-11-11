@@ -1,0 +1,23 @@
+const { record } = require('./lib');
+record('01-pages_show_list', 'pages_show_list', async r => {
+  const { page } = r;
+  await r.caption('After Facebook Login, the Pages this person manages appear in Settings › Channels');
+  await r.click(page.getByRole('link', { name: 'Settings', exact: true }).first());
+  await page.waitForLoadState('networkidle');
+  await r.click(page.getByRole('link', { name: 'Channels', exact: true }).first());
+  await page.waitForLoadState('networkidle'); await r.caption('The connected Facebook profile and the Pages it manages, read with pages_show_list');
+  await r.box(page.getByText(/Connected through this profile/)); await r.pause(4000); await r.unbox();
+  await r.caption('The person chooses which of their Pages this workspace uses');
+  await r.click(page.getByRole('button', { name: 'Manage selections' }));
+  await r.pause(1500);
+  const list = page.locator('dialog[open]').last();
+  await r.box(list.getByText('Facebook Page').first()); await r.pause(1500);
+  await r.box(list.getByText('Cuisine Pleine d’Envie')); await r.pause(2500); await r.unbox();
+  await r.click(list.getByRole('button', { name: 'Cancel' }));
+  await r.caption('The chosen Pages are the channels offered when writing a post');
+  await r.click(page.getByRole('link', { name: 'Create post' }).first());
+  await page.waitForLoadState('networkidle'); await r.pause(1500);
+  await r.box(page.getByRole('button', { name: /Cuisine Pleine d’Envie.*Facebook/ }).first()); await r.pause(3500); await r.unbox();
+  await r.caption('pages_show_list is used only to list the person’s Pages so they can pick where to publish and what to measure');
+  await r.pause(3500);
+}).catch(e => { console.error(e); process.exit(1); });

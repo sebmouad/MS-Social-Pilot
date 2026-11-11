@@ -296,6 +296,17 @@ server steps and do not take the pre-migration dump; `deploy-from-server.sh` is 
   Its 8 ad accounts from a removed connection were removed on 2026-11-10 (owner's go-ahead), so it is empty: no
   channels, no ad accounts, 2 old draft posts. Root › Workspaces shows « Remove N unlinked ad accounts » if it recurs.
 
+### 7.1e Recordings (2026-11-11)
+
+App-side videos recorded on the live site with `tools/review-recordings` (owner account, workspace MS) and sent to the
+owner: 01 pages_show_list, 02 business_management, 03 pages_read_engagement, 04 read_insights, 05
+pages_read_user_content, 06 pages_manage_posts (published one real post on Cuisine Pleine d'Envie, kept, approved),
+07 pages_manage_engagement (replied « Merci ! 😊 » to a real comment on Recettes Sans Soucis, hid it, showed it again,
+approved). Still to record: pages_messaging (owner sends a Messenger message to a Page first), pages_manage_metadata
+(live webhook comment, after reconnecting Facebook), the 4 instagram_* (owner links an Instagram account), ads_read and
+ads_management (owner asked to rework Ads like Meta Ads Manager first). The submission guide artifact
+(NhkTtdKNASCrYEhpy3biKN) could not be opened from this session.
+
 ### 7.2 Phase 2 — next
 
 1. User: deploy `main`; fill Root › Public site › Operator details (address, privacy email, law, host,
