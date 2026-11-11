@@ -198,7 +198,7 @@ async function AdsObjectsPage({ searchParams }: { searchParams: Promise<Params> 
     const management = managementByAccount.get(account.id);
     return viewer.permissions.pageScope.all && management?.canManage && management.canListCreatives && management.operations.some(op => op.id === 'ad.create');
   });
-  const create = level === 'campaign' ? campaignAccounts.length ? <CreateDrawer label={t('manageNewCampaign')} closeLabel={t('manageCloseForm')} description={t('text053')}>
+  const create = level === 'campaign' ? campaignAccounts.length ? <CreateDrawer wide label={t('manageNewCampaign')} closeLabel={t('manageCloseForm')} description={t('text053')}>
       {campaignAccounts.map(account => <CampaignCreateForm key={account.id} adAccountId={account.id} accountName={account.name} config={adsUi.get(account.id)!.campaign!} ownerScope={actor} />)}
     </CreateDrawer> : null
     : level === 'adset' ? !viewer.permissions.pageScope.all ? <CreateDrawer label={t('manageNewAdSet')} closeLabel={t('manageCloseForm')}><p className="small-note">{t('validation027')}</p></CreateDrawer>

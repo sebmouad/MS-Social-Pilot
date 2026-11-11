@@ -208,37 +208,44 @@ export function ObjectManager({ adAccountId, level, objectId, name, label, quiet
       {busy && !detail ? <p role="status">{t('text093')}</p> : null}
       {loadError ? <RouteNotice error className="ui-error" focusKey={localize(loadError)}>{localize(loadError)}</RouteNotice> : null}
       {detail ? <>
+        <section className="am-edit__section"><h3>{t('amPerformance')}</h3>
         <dl className="ads-compare-grid"><div><dt>{t('text019')}</dt><dd>{detail.currency ? `${detail.currency} ` : ''}{number.format(detail.totals.spend)}</dd></div><div><dt>{t('text020')}</dt><dd>{number.format(detail.totals.impressions)}</dd></div><div><dt>{t('text022')}</dt><dd>{number.format(detail.totals.clicks)}</dd></div><div><dt>{t('text064')}</dt><dd>{detail.totals.cpc === null ? t('text094') : number.format(detail.totals.cpc)}</dd></div><div><dt>{t('text063')}</dt><dd>{detail.totals.ctr === null ? t('text094') : `${number.format(detail.totals.ctr)}%`}</dd></div><div><dt>{t('text065')}</dt><dd>{detail.totals.cpm === null ? t('text094') : number.format(detail.totals.cpm)}</dd></div></dl>
-        <details><summary>{t('text095')}</summary><ul>{detail.daily.map(day => <li key={day.date}>{t('objectDailyLine', { date: day.date, currency: detail.currency ? `${detail.currency} ` : '', spend: number.format(day.spend), impressions: number.format(day.impressions), clicks: number.format(day.clicks) })}</li>)}</ul></details>
-        <p className="small-note">{detail.live.available ? t('text249', { value0: detail.live.configuredStatus ?? t('text094'), value1: detail.live.effectiveStatus ?? t('text094') }) : t('text098')}</p>
+        <details><summary>{t('text095')}</summary><ul>{detail.daily.map(day => <li key={day.date}>{t('objectDailyLine', { date: day.date, currency: detail.currency ? `${detail.currency} ` : '', spend: number.format(day.spend), impressions: number.format(day.impressions), clicks: number.format(day.clicks) })}</li>)}</ul></details></section>
+        <section className="am-edit__section"><h3>{t('amDelivery')}</h3>
+        <p className="small-note">{detail.live.available ? t('text249', { value0: detail.live.configuredStatus ?? t('text094'), value1: detail.live.effectiveStatus ?? t('text094') }) : t('text098')}</p></section>
         {needsReconnect ? <p className="small-note" role="note">{t('needsReconnectObject', { kind: t(level) })} <a href="/settings/channels">{t('needsReconnectAction')}</a></p>
           : !canManage || !supports.length ? <p className="small-note">{t('viewOnlyObject', { kind: t(level) })}</p> : operationBlocked ? <p className="small-note">{t('text101')}<a href="/ads/manage?level=history#changes">{t('text102')}</a>{t('text103')}</p> : <>
           {statusSupport && statusInput?.kind === 'choice' ? <div className="ads-object-manager__row">{statusInput.options.map(option => {
             if (option.value !== 'paused' && option.value !== 'active') return null;
+            // Only the change that applies: Pause when it is on, Resume when it is off.
+            const current = (detail.live.configuredStatus ?? '').toLowerCase();
+            if (current && option.value === current) return null;
             const status = option.value as 'paused' | 'active';
             return <Button key={status} disabled={busy} onClick={() => void preview({ type: 'status.set', objectType: level, objectId, status }, statusSupport, `${option.label} this ${t(level)}.`)}>{option.label}</Button>;
           })}</div> : null}
-          {budgetSupport && budgetInput?.kind === 'money-minor' && budgetInput.budgetKinds.length ? <form className="ads-object-manager__row" onSubmit={event => submitBudget(event, budgetSupport, budgetInput.budgetKinds)} noValidate>
+          {budgetSupport && budgetInput?.kind === 'money-minor' && budgetInput.budgetKinds.length ? <section className="am-edit__section"><h3>{t('amBudget')}</h3><form className="ads-object-manager__row" onSubmit={event => submitBudget(event, budgetSupport, budgetInput.budgetKinds)} noValidate>
             <label><span className="sr-only">{t('text104')}</span><select value={budgetInput.budgetKinds.includes(budgetKind) ? budgetKind : budgetInput.budgetKinds[0]} onChange={event => setBudgetKind(event.target.value as 'daily' | 'lifetime')} disabled={busy}>{budgetInput.budgetKinds.map(kind => <option key={kind} value={kind}>{kind === 'daily' ? t('text105') : t('text106')}</option>)}</select></label>
             <label htmlFor={budgetFieldProps.id}><span className="sr-only">{t('text107')}{detail.currency ? t('currencyDetail', { currency: detail.currency }) : ''}</span><input {...budgetFieldProps} name="budget" aria-label={t('text250', { value0: detail.currency ? t('currencyDetail', { currency: detail.currency }) : '' })} inputMode="decimal" value={budget} onChange={event => { setBudget(event.target.value); validation.clear('budget'); }} placeholder={detail.currency ?? t('text108')} required disabled={busy} /></label>
             <FieldError {...validation.errorProps('budget')} />
             <Button type="submit" disabled={busy}>{budgetSupport.label}</Button>
             {limits ? <p className="small-note">{t('text109')}{formatBudgetMinor(limits.maxBudgetMinor, detail.currency)}{t('text251')}</p> : null}
-          </form> : null}
-          {renameSupport && nameInput?.kind === 'text' ? <form className="ads-object-manager__row" onSubmit={event => submitRename(event, renameSupport)} noValidate>
+          </form></section> : null}
+          {renameSupport && nameInput?.kind === 'text' ? <section className="am-edit__section"><h3>{t('amName')}</h3><form className="ads-object-manager__row" onSubmit={event => submitRename(event, renameSupport)} noValidate>
             <label htmlFor={nameFieldProps.id}><span className="sr-only">{t('text110')}</span><input {...nameFieldProps} name="name" aria-label={t('text110')} value={newName} onChange={event => { setNewName(event.target.value); validation.clear('name'); }} maxLength={limits?.nameMaxCharacters} required disabled={busy} /></label>
             <FieldError {...validation.errorProps('name')} />
             <Button type="submit" disabled={busy}>{renameSupport.label}</Button>
-          </form> : null}
-          {creativeSupport && creativeInput?.kind === 'creative-ref' && capabilities?.canListCreatives ? <div className="ads-object-manager__row">
+          </form></section> : null}
+          {creativeSupport && creativeInput?.kind === 'creative-ref' && capabilities?.canListCreatives ? <section className="am-edit__section"><h3>{t('amCreative')}</h3><div className="ads-object-manager__row">
             {creatives === null ? <Button disabled={busy} onClick={() => void loadCreatives()}>{t('text111')}</Button> : creatives.length === 0 ? <p className="small-note">{t('text112')}</p> : <>
               <label htmlFor={creativeFieldProps.id}><span className="sr-only">{t('text113')}</span><select {...creativeFieldProps} name="creativeId" aria-label={t('text113')} value={creativeId} onChange={event => { setCreativeId(event.target.value); validation.clear('creativeId'); }} disabled={busy}><option value="">{t('text111')}</option>{creatives.map(item => <option key={item.id} value={item.id}>{item.name || item.title || item.id}</option>)}</select></label>
               <FieldError {...validation.errorProps('creativeId')} />
               <Button disabled={busy || !creativeId} onClick={() => void preview({ type: 'creative.assign', objectType: 'ad', objectId, creativeId }, creativeSupport, t('text114'))}>{creativeSupport.label}</Button>
             </>}
-          </div> : null}
+          </div></section> : null}
+          {copySupport || deleteSupport ? <section className="am-edit__section am-edit__more"><h3>{t('amMore')}</h3><div className="am-edit__buttons">
           {copySupport ? <div className="ads-object-manager__row"><Button disabled={busy} onClick={() => void preview({ type: 'object.copy', objectType: level, objectId }, copySupport, t('copyAsk', { level: t(level) }))}>{copySupport.label}</Button></div> : null}
           {deleteSupport ? <div className="ads-object-manager__row"><Button variant="danger" disabled={busy} onClick={() => void preview({ type: 'delete', objectType: level, objectId }, deleteSupport, t('text252', { value0: t(level) }))}>{deleteSupport.label}{t('text253')}</Button></div> : null}
+          </div></section> : null}
         </>}
       </> : null}
       {outcome ? <><RouteNotice error={outcome.tone !== 'ok'} className={outcome.tone === 'ok' ? 'small-note' : 'ui-error'} focusKey={outcome.key}>{localize(outcome.text)}</RouteNotice>{outcome.tone === 'unknown' ? <a href="/ads/manage?level=history#changes">{t('text102')}</a> : null}</> : null}

@@ -319,3 +319,31 @@
 .am-pager { display: flex; gap: var(--space-4); }
 @media (pointer: coarse) { .am-actions { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .am-switch, .am-switch span, .am-actions { transition: none; } }
+/* Edit window: Performance, Delivery, Budget, Name, Creative and More actions as titled sections, like Ads Manager's editor. */
+.am-edit__section { display: grid; gap: 10px; padding: var(--space-4) 0; border-top: 1px solid var(--line-subtle); }
+.am-edit__section:first-child { padding-top: 0; border-top: 0; }
+.am-edit__section > h3 { margin: 0; color: var(--ink); font-size: var(--text-md); font-weight: 700; }
+.am-edit__section .ads-object-manager__row { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px; margin: 0; }
+.am-edit__section .ads-object-manager__row select, .am-edit__section .ads-object-manager__row input { min-height: var(--control-height); padding: 0 12px; border: 1px solid var(--control-border); border-radius: var(--radius-sm); background: var(--surface); color: var(--ink); font: inherit; font-size: var(--text-md); }
+.am-edit__section .ads-object-manager__row input { flex: 1 1 200px; min-width: 0; }
+.am-edit__section .ads-compare-grid { margin: 0; }
+.am-edit__section details summary { cursor: pointer; color: var(--accent); font-size: var(--text-sm); font-weight: 650; }
+.am-edit__buttons { display: flex; flex-wrap: wrap; gap: 8px; }
+.am-edit__buttons .ads-object-manager__row { display: contents; }
+/* Campaign objective cards. */
+.am-objectives { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 8px; flex: 1 1 100%; margin: 0; padding: 0; border: 0; }
+.am-objectives legend { margin-bottom: 8px; padding: 0; color: var(--ink); font-size: var(--text-sm); font-weight: 650; }
+.am-objective { position: relative; display: grid; grid-template-columns: 36px minmax(0, 1fr); gap: 10px; align-items: start; padding: 12px; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface); cursor: pointer; transition: border-color var(--ease-fast), background var(--ease-fast); }
+.am-objective input { position: absolute; opacity: 0; pointer-events: none; }
+.am-objective:hover { border-color: var(--ink-faint); }
+.am-objective[data-checked] { border-color: var(--accent); background: var(--accent-soft); box-shadow: 0 0 0 1px var(--accent); }
+.am-objective:has(input:focus-visible) { outline: 2px solid var(--focus); outline-offset: 2px; }
+.am-objective__icon { display: grid; place-items: center; width: 36px; height: 36px; border-radius: var(--radius-sm); background: var(--surface-muted); color: var(--accent); }
+.am-objective__text { display: grid; gap: 2px; min-width: 0; }
+.am-objective__text strong { color: var(--ink); font-size: var(--text-sm); }
+.am-objective__text span { color: var(--ink-soft); font-size: var(--text-xs); line-height: 1.45; }
+.ui-dialog--detail .ads-campaign-create { margin: 0; padding: 0; border: 0; background: none; }
+.ui-dialog--detail .ads-campaign-create__fields { display: grid; gap: var(--space-4); }
+.ui-dialog--detail .ads-campaign-create__fields > label { display: grid; gap: 6px; font-size: var(--text-sm); font-weight: 650; }
+.ui-dialog--detail .ads-campaign-create__fields input { min-height: var(--control-height); padding: 0 12px; border: 1px solid var(--control-border); border-radius: var(--radius-sm); background: var(--surface); color: var(--ink); font: inherit; font-size: var(--text-md); }
+.ui-dialog--detail .ads-campaign-create__fields > .ui-button { justify-self: end; }

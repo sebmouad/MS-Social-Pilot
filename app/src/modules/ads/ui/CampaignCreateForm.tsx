@@ -4,6 +4,8 @@ import { adsTranslator, type AdsTranslator } from '../copy';
 import { useAdsText } from '@/modules/ads/ui/AdsCopyProvider';
 
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
+import { IconClick, IconDeviceMobile, IconFilter, IconMessageCircle, IconShoppingBag, IconSpeakerphone, IconTarget } from '@tabler/icons-react';
+import { useAdsCatalogs } from '@/modules/ads/ui/AdsCopyProvider';
 import { ModalDialog } from '@/components/ModalDialog';
 import { FieldError, useFormValidation } from '@/components/FormValidation';
 import { fillAdsTemplate as fill, type AdsUiSchema } from '@/platforms/ads-ui';
@@ -52,11 +54,19 @@ export function creationSuccessMessage(noun: 'campaign' | 'ad set', result: { re
 export const RESTORED_HELD_MESSAGE = adsTranslator()('restoredHeld');
 export const NETWORK_HELD_MESSAGE = adsTranslator()('networkHeld');
 
+// Meta's campaign objectives as cards, each with what it is for (Ads Manager's « Choose a campaign objective »).
+const OBJECTIVE_ICON: Record<string, typeof IconTarget> = { OUTCOME_AWARENESS: IconSpeakerphone, OUTCOME_TRAFFIC: IconClick, OUTCOME_ENGAGEMENT: IconMessageCircle, OUTCOME_LEADS: IconFilter, OUTCOME_APP_PROMOTION: IconDeviceMobile, OUTCOME_SALES: IconShoppingBag };
+const OBJECTIVE_HINT: Record<'en' | 'fr', Record<string, string>> = {
+  en: { OUTCOME_AWARENESS: 'Show your ads to people most likely to remember them.', OUTCOME_TRAFFIC: 'Send people to a destination, such as your website or a recipe.', OUTCOME_ENGAGEMENT: 'Get more messages, video views, post engagement or Page likes.', OUTCOME_LEADS: 'Collect leads for your business, such as sign-ups.', OUTCOME_APP_PROMOTION: 'Find new people to install and use your app.', OUTCOME_SALES: 'Find people likely to buy your product or service.' },
+  fr: { OUTCOME_AWARENESS: 'Montrer vos publicités aux personnes les plus susceptibles de s’en souvenir.', OUTCOME_TRAFFIC: 'Envoyer des personnes vers une destination, comme votre site ou une recette.', OUTCOME_ENGAGEMENT: 'Obtenir plus de messages, de vues de vidéos, d’interactions ou de mentions J’aime.', OUTCOME_LEADS: 'Recueillir des prospects pour votre activité, comme des inscriptions.', OUTCOME_APP_PROMOTION: 'Trouver de nouvelles personnes qui installent et utilisent votre application.', OUTCOME_SALES: 'Trouver des personnes susceptibles d’acheter votre produit ou service.' },
+};
+
 type Review = { name: string; objective: string; confirmation: string; requestId: string };
 
 export function CampaignCreateForm({ adAccountId, accountName, config, ownerScope }: { adAccountId: string; accountName: string; config: Config; ownerScope: CreationOwnerScope }) {
   const localize = useAdsMessage();
   const t = useAdsText();
+  const { locale } = useAdsCatalogs();
   const { userId, workspaceId } = ownerScope;
   const owner = useMemo(() => ({ userId, workspaceId }), [userId, workspaceId]);
   const transmissions = useRef(0);
@@ -135,7 +145,13 @@ export function CampaignCreateForm({ adAccountId, accountName, config, ownerScop
     <p className="small-note">{config.description}</p>
     <div className="ads-campaign-create__fields">
       <label>{config.nameLabel}<input name="name" value={name} onChange={event => setName(event.target.value)} maxLength={config.nameMaxLength} required disabled={locked} {...validation.fieldProps('name')} /><FieldError {...validation.errorProps('name')} /></label>
-      <label>{config.optionLabel}<select value={objective} onChange={event => setObjective(event.target.value)} disabled={locked}>{config.options.map(({value, label}) => <option key={value} value={value}>{label}</option>)}</select></label>
+      <fieldset className="am-objectives"><legend>{config.optionLabel}</legend>
+        {config.options.map(({ value, label }) => { const Icon = OBJECTIVE_ICON[value] ?? IconTarget; return <label key={value} className="am-objective" data-checked={objective === value || undefined}>
+          <input type="radio" name="objective" value={value} checked={objective === value} onChange={() => setObjective(value)} disabled={locked} />
+          <span className="am-objective__icon" aria-hidden="true"><Icon size={20} /></span>
+          <span className="am-objective__text"><strong>{label}</strong><span>{OBJECTIVE_HINT[locale][value] ?? ''}</span></span>
+        </label>; })}
+      </fieldset>
       <button className="ui-button ui-button--primary" type="submit" disabled={locked}>{busy ? t('text208') : config.actionLabel}</button>
     </div>
     {message ? <p role="status" className="small-note">{localize(message)}</p> : null}
