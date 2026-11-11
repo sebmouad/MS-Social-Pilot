@@ -354,5 +354,5 @@
 .am-form__group legend { padding: 0 .35rem; font-weight: 600; font-size: .92rem; }
 .am-form__group label { display: grid; gap: .3rem; }
 .am-form__group input, .am-form__group select { min-height: var(--control-height); padding: .4rem .55rem; width: 100%; }
-.am-form__row { display: grid; grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr)); gap: .75rem; }
+.am-form__row { display: grid; align-items: start; grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr)); gap: .75rem; }
 .am-form__actions { display: flex; justify-content: flex-end; }

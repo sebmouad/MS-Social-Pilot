@@ -1310,8 +1310,8 @@ export const adsCustomerCopy = {
     "fr": "Les visuels n’ont pas pu être chargés."
   },
   "text249": {
-    "en": "Current status: {value0} · delivery: {value1}",
-    "fr": "État actuel : {value0} · diffusion : {value1}"
+    "en": "Status: {value0} · Delivery: {value1}",
+    "fr": "État : {value0} · Diffusion : {value1}"
   },
   "text250": {
     "en": "New budget{value0}",
