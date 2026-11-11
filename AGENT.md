@@ -167,6 +167,13 @@ bash app/scripts/deploy.sh --host <SERVER_IP> --user root --key <SSH_KEY_PATH>
   drawer shows one frame and one title. Not yet done in this pattern: Reports and
   schedules, Content feeds, campaign / ad set / ad creation forms, Settings › Team and Channels, Root lists.
   `npm run build` sometimes fails while fetching Google Fonts (`next/font` TypeError): retry, it is not the code.
+- Analytics dates (2026-11-11): Facebook Page insights carry the END of the period (`end_time` 08:00 UTC = midnight
+  Pacific); `coveredDays` in `platforms/facebook/analytics.ts` moves each Page row back one day at read time, for
+  detailed rows and stored daily summaries alike (both are keyed by the end date). Page figures therefore change once a
+  day, when Meta closes its day; Insights says so in a note. Post figures (external_posts) refresh hourly and are not
+  shifted. Sync now reads 4 items at a time (`SCOPED_CONCURRENCY` in `platforms/facebook/jobs.ts`), ~2.5 min live.
+- If a push to `main` does not show in Root › Updates within a few minutes, GitHub's webhook did not arrive (seen
+  once on 2026-11-11): use « Update now » there, and check GitHub › Settings › Webhooks › Recent deliveries.
 - Earlier note, kept for history. **Activation status (2026-11-09): not active yet.** It needs, once: (1) one manual deploy of current `main`
   (installs the timer), (2) Root › Configuration › Updates: save a webhook secret and turn on « Install GitHub pushes
   automatically », (3) GitHub › sebmouad/MS-Social-Pilot › Settings › Webhooks › Add webhook: payload URL
