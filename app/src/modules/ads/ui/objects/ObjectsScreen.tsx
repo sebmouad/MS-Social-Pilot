@@ -31,6 +31,7 @@ import { ManageSearchFilter } from './ManageSearchFilter';
 import { adsHeaderFor } from '../AdsTabsFor';
 import { Button } from '@/components/Button';
 import { ObjectRowLabel } from './ObjectRowLabel';
+import { AdsManagerTable } from './AdsManagerTable';
 import { adsStatusTone } from './status-tone';
 import { Badge } from '@/components/Badge';
 import { labelInstants, workspaceInstantFormatter } from '@/server/instant-labels';
@@ -210,23 +211,27 @@ async function AdsObjectsPage({ searchParams }: { searchParams: Promise<Params> 
   return <PageFrame module="ads"><div className="insights">
     {await headerWith(create)}
     {tabs}
-    {filter(parentLevel ? [...new Map(parentInventory.map(item => [item.objectId, { id: item.objectId, name: item.name ?? item.objectId }])).values()].sort((a, b) => a.name.localeCompare(b.name)) : undefined, parentLabel)}
-    <p className="small-note">{directory.total.toLocaleString(locale)} {t(directory.total === 1 ? 'resultOne' : 'text071')} {formatIsoDay(locale, directory.range.from, directory.range.from)} {t('text072')} {formatIsoDay(locale, directory.range.to, directory.range.to)}</p>
-    <section className="panel">
-      {directory.freshness.status === 'stale' ? <p className="small-note">{t('text073')}</p> : null}
-      <DataTable caption={tabTitle} rows={directory.items} rowKey={row => `${row.accountId}:${row.objectId}`} emptyMessage={t('text075')} columns={[
-        { key: 'name', label: t('text066'), render: row => <ObjectRowLabel adAccountId={row.accountId} level={directory.level} objectId={row.objectId} name={row.name}><span className="small-note">{accountName.get(row.accountId) ?? row.accountName}</span></ObjectRowLabel> },
-        ...(parentLevel ? [{ key: 'parent', label: parentLabel, render: (row: (typeof directory.items)[number]) => parentOf(row) }] : []),
-        // Status sits in its own column only (the name no longer repeats it); "active" with no recent delivery says so, since Meta keeps a finished or unfunded campaign active.
-        { key: 'status', label: t('manageStatus'), render: row => <><Badge tone={adsStatusTone(row.status)}>{row.status ?? t('text094')}</Badge>{row.status?.toLowerCase() === 'active' && row.lastDeliveryDate && row.lastFetchedAt && Date.parse(row.lastFetchedAt) - Date.parse(row.lastDeliveryDate) > 2 * 86_400_000 ? <><br /><span className="small-note">{t('noDeliverySince', { date: formatIsoDay(locale, row.lastDeliveryDate, row.lastDeliveryDate) })}</span></> : null}</> },
-        { key: 'spend', label: t('text019'), align: 'end' as const, render: row => formatMoney(locale, row.currency, row.spend, t('text094')) },
-        { key: 'last', label: t('text262'), render: row => formatIsoDay(locale, row.lastDeliveryDate, t('text171')) },
-        { key: 'updated', label: t('manageSynced'), render: row => formatIsoDay(locale, row.lastFetchedAt, t('text094')) },
-        { key: 'manage', label: t('text264'), render: row => <ObjectManager adAccountId={row.accountId} level={directory.level} objectId={row.objectId} name={row.name} /> },
-      ]} />
-      <nav aria-label={t('text076')}>{directory.offset > 0 ? <a href={pageLink(Math.max(0, directory.offset - directory.limit))}>{t('text077')}</a> : null}{' '}{directory.nextOffset !== null ? <a href={pageLink(directory.nextOffset)}>{t('text078')}</a> : null}</nav>
-      <p className="small-note">{directory.note}</p>
-    </section>
+    {/* Ads Manager list (2026-11-12): level tabs above, then search, the parent being viewed, and one table with on/off,
+        delivery and results per row and a totals row. A name opens the level below it; « Edit » opens the item. */}
+    <p className="am-range">{formatIsoDay(locale, directory.range.from, directory.range.from)} – {formatIsoDay(locale, directory.range.to, directory.range.to)}{directory.freshness.status === 'stale' ? ` · ${t('text073')}` : ''}</p>
+    <AdsManagerTable level={directory.level} locale={locale}
+      rows={directory.items.map(row => ({ key: `${row.accountId}:${row.objectId}`, accountId: row.accountId, accountName: accountName.get(row.accountId) ?? row.accountName, objectId: row.objectId, name: row.name, status: row.status, currency: row.currency,
+        spend: row.spend, impressions: row.impressions, clicks: row.clicks, ctr: row.ctr, cpc: row.cpc, cpm: row.cpm, lastDeliveryDate: row.lastDeliveryDate, lastFetchedAt: row.lastFetchedAt,
+        parentId: row.parentId, parentName: row.parentId ? parentNames.get(`${row.accountId}:${row.parentId}`) ?? null : null }))}
+      money={Object.fromEntries(directory.items.map(row => [`${row.accountId}:${row.objectId}`, formatMoney(locale, row.currency, row.spend, t('text094'))]))}
+      number={Object.fromEntries(directory.items.flatMap(row => {
+        const key = `${row.accountId}:${row.objectId}`;
+        return [[`${key}:impressions`, row.impressions.toLocaleString(locale)], [`${key}:clicks`, row.clicks.toLocaleString(locale)],
+          [`${key}:cpc`, formatMoney(locale, row.currency, row.cpc, '—')], [`${key}:cpm`, formatMoney(locale, row.currency, row.cpm, '—')]];
+      }))}
+      drillHref={Object.fromEntries(directory.level === 'ad' ? [] : directory.items.map(row => [`${row.accountId}:${row.objectId}`, manageTabHref({ ...values, parentId: row.objectId, q: undefined }, directory.level === 'campaign' ? 'adset' : 'ad')]))}
+      parent={values.parentId ? { level: directory.level === 'adset' ? 'campaign' : 'adset', name: parentInventory.find(item => item.objectId === values.parentId)?.name ?? values.parentId } : null}
+      clearParentHref={manageTabHref({ ...values, parentId: undefined }, directory.level)}
+      searchQuery={values.q ?? ''} searchAction="/ads/manage"
+      hiddenParams={Object.fromEntries(Object.entries({ ...values, level } as Record<string, string | undefined>).filter(([key, value]) => key !== 'q' && key !== 'offset' && typeof value === 'string' && value !== '') as Array<[string, string]>)}
+      edit={Object.fromEntries(directory.items.map(row => [`${row.accountId}:${row.objectId}`, <ObjectManager key={row.objectId} adAccountId={row.accountId} level={directory.level} objectId={row.objectId} name={row.name} label={locale === 'fr' ? 'Modifier' : 'Edit'} quiet />]))}
+      canManage={Object.fromEntries(filteredAccounts.map(account => [account.id, Boolean(managementByAccount.get(account.id)?.canManage)]))} />
+    {directory.offset > 0 || directory.nextOffset !== null ? <nav className="am-pager" aria-label={t('text076')}>{directory.offset > 0 ? <a href={pageLink(Math.max(0, directory.offset - directory.limit))}>{t('text077')}</a> : null}{directory.nextOffset !== null ? <a href={pageLink(directory.nextOffset)}>{t('text078')}</a> : null}</nav> : null}
     {filteredAccounts.map(account => <div key={`reconnect:${account.id}`}>{reconnectNote(account.id, account.name)}</div>)}
   </div></PageFrame>;
 }

@@ -40,7 +40,7 @@ type Outcome = { tone: 'ok' | 'error' | 'unknown'; text: string; key: string };
 const number = new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 });
 const input = (support: AdsOperationSupport | undefined, name: AdsOperationInput['name']) => support?.inputs?.find(item => item.name === name);
 
-export function ObjectManager({ adAccountId, level, objectId, name }: { adAccountId: string; level: Level; objectId: string; name: string }) {
+export function ObjectManager({ adAccountId, level, objectId, name, label, quiet = false }: { adAccountId: string; level: Level; objectId: string; name: string; /** Button text; « Details » when absent. */ label?: string; /** A small text link, as under a name in Ads Manager. */ quiet?: boolean }) {
   const localize = useAdsMessage();
   const t = useAdsText();
   const id = useId();
@@ -203,7 +203,7 @@ export function ObjectManager({ adAccountId, level, objectId, name }: { adAccoun
   const creativeFieldProps = validation.fieldProps('creativeId');
 
   return <div className="ads-object-manager">
-    <Button size="sm" aria-haspopup="dialog" data-row-open onClick={() => void toggle()} disabled={busy && !open}>{t('text092')}</Button>
+    {quiet ? <button type="button" className="am-link" aria-haspopup="dialog" onClick={() => void toggle()} disabled={busy && !open}>{label ?? t('text092')}</button> : <Button size="sm" aria-haspopup="dialog" data-row-open onClick={() => void toggle()} disabled={busy && !open}>{label ?? t('text092')}</Button>}
     <SidePanel open={open} title={name} closeLabel={t('text091')} onClose={() => setOpen(false)}><div id={`${id}-panel`} className="ads-object-manager__panel">
       {busy && !detail ? <p role="status">{t('text093')}</p> : null}
       {loadError ? <RouteNotice error className="ui-error" focusKey={localize(loadError)}>{localize(loadError)}</RouteNotice> : null}
