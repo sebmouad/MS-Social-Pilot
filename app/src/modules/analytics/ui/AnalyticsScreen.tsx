@@ -34,6 +34,11 @@ type Search = Record<string, string | string[] | undefined>;
  * activity and goal progress. The channel list in the sidebar scopes the page; the period and compare switch sit in
  * the header. Every caveat is behind an ⓘ. All numbers come from the same scoped snapshot REST and MCP read.
  */
+const FRESHNESS = {
+  en: 'Page figures run to {day}, the last full day: Facebook adds each day once it is over (Pacific time), usually by mid-morning here. Post figures update through the day. Last checked at {checked}.',
+  fr: 'Les chiffres des Pages vont jusqu’au {day}, dernier jour complet : Facebook ajoute chaque journée une fois terminée (heure du Pacifique), en général dans la matinée ici. Les chiffres des publications se mettent à jour dans la journée. Dernière vérification à {checked}.',
+} as const;
+
 export default async function AnalyticsPage({ searchParams }: { searchParams: Promise<Search> }) {
   const viewer = await requireViewer({ feature: 'analytics/overview', channelScoped: true });
   const params = await searchParams;
@@ -67,6 +72,15 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
     loadChartAnnotations({ ...actor, locale }, range.start, range.end, channelIds),
   ]) : [null, null, null, null];
 
+  // Say which day the Page figures stop at and when they were last checked: Facebook adds a day's Page figures once a
+  // day, so a number that does not move during the day is expected, not a stuck sync.
+  const pageMetrics = (snapshot?.allMetrics ?? []).filter(item => item.latestAt && item.resourceKind !== 'ad-account' && !String(item.label).includes('Posts published'));
+  const iso = (value: unknown) => value instanceof Date ? value.toISOString() : typeof value === 'string' ? value : '';
+  const latestDay = pageMetrics.map(item => iso(item.latestAt)).filter(Boolean).sort().at(-1);
+  const checkedAt = (snapshot?.allMetrics ?? []).map(item => iso(item.updatedAt)).filter(Boolean).sort().at(-1);
+  const freshness = latestDay && checkedAt ? FRESHNESS[locale]
+    .replace('{day}', new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'long', timeZone: 'UTC' }).format(new Date(latestDay)))
+    .replace('{checked}', new Intl.DateTimeFormat(locale, { hour: 'numeric', minute: '2-digit', timeZone: viewer.membership.workspace.timezone }).format(new Date(checkedAt))) : null;
   const headline = snapshot ? headlineTiles(snapshot, policy, context) : { tiles: [], metrics: [] };
   const pinned = (pins?.pins ?? []).map(pin => pinnedTile(pin, context));
   const tiles = [...headline.tiles, ...pinned].slice(0, policy.tilesMax);
@@ -100,6 +114,7 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
     {snapshot && !snapshot.options.channels.length && <EmptyState icon={<IconPlugConnected />} title={copy.noChannelsTitle} action={canConnect ? <a className="ui-button ui-button--primary ui-button--md" href="/settings/channels">{copy.noChannelsAction}</a> : undefined}>{copy.noChannelsBody}</EmptyState>}
     {snapshot && snapshot.options.channels.length > 0 && !channelIds.length && <EmptyState icon={<IconChartBar />} title={copy.noDataTitle}>{copy.noDataBody}</EmptyState>}
     {snapshot && channelIds.length > 0 && <>
+      {freshness ? <p className="insights-freshness" role="note">{freshness}</p> : null}
       {tiles.length > 0 && <InsightsTiles tiles={tiles} visible={policy.tilesVisible} labels={{ group: copy.tilesLabel, showAll: copy.tilesShowAll, showLess: copy.tilesShowLess }} />}
       <MainChartCard title={copy.overviewTitle} metrics={metrics} locale={locale} annotations={annotations}
         labels={{ switcher: copy.chartMetrics, chartLabel: copy.chartLabel, empty: copy.chartNoSeries, scrollHint: copy.chartScrollHint, previous: copy.chartPrevious, openExplore: copy.chartOpenExplore, info: copy.chartInfo }} />

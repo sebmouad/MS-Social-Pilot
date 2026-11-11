@@ -434,6 +434,21 @@ async function resolveDayRollup(workspaceId: string, targetIds: string[], range:
 }
 
 /** Facebook-only adapter from the legacy Page and Ads tables to provider-neutral analytics inputs. */
+/**
+ * Facebook stamps a Page figure with the END of the period it covers: the value for 10 November (a day on Meta's
+ * Pacific calendar) arrives with end_time 11 November 08:00 UTC. Charts and totals are by the day covered, so each row
+ * moves back one day (stored summaries are keyed by that end date too, so both move alike). Without this the newest
+ * point read « today » and stayed the same all day, though it was yesterday's complete figure. A row that lands before
+ * the range then falls outside it.
+ */
+function coveredDays(rows: PageRow[], from: Date): PageRow[] {
+  const start = Date.UTC(from.getUTCFullYear(), from.getUTCMonth(), from.getUTCDate());
+  return rows.flatMap(row => {
+    const covered = new Date(row.endTime.getTime() - 86_400_000);
+    return covered.getTime() < start ? [] : [{ ...row, endTime: covered }];
+  });
+}
+
 export const facebookAnalyticsHost = {
   postPerformance: readFacebookPostPerformance,
   goalMeasures: readFacebookGoalMeasures,
@@ -489,7 +504,7 @@ export const facebookAnalyticsHost = {
         AND ep."createdTime" >= ${request.range.from} AND ep."createdTime" <= ${request.range.to} AND ep."insightsSyncedAt" IS NOT NULL
       ORDER BY ep."createdTime" DESC LIMIT ${presentation['meta.postSeriesMaxPosts'] as number}`))
       .map(row => ({ createdTime: row.createdTime, insights: row.insights, insightsSyncedAt: row.insightsSyncedAt, target: { id: row.targetId, name: row.targetName } }) satisfies PostRow) : [];
-    const normalized = normalizeFacebookAnalytics({ locale, postRows: postRows as PostRow[], metricLabels: presentation['meta.metricLabels'] as PagePresentation['metricLabels'], pageCopy: presentation['meta.pageAnalyticsCopy'] as PagePresentation['pageCopy'], pageRows: [...rollupDayRows, ...detailedPageRows] as PageRow[], selectedTargets, audienceRows: audienceRows as PageRow[], adRows: adRows as AdRow[], selectedAdAccounts, audienceAsOf: request.range.to, weeklySeriesNote: rollup?.granularity === 'weekly' });
+    const normalized = normalizeFacebookAnalytics({ locale, postRows: postRows as PostRow[], metricLabels: presentation['meta.metricLabels'] as PagePresentation['metricLabels'], pageCopy: presentation['meta.pageAnalyticsCopy'] as PagePresentation['pageCopy'], pageRows: coveredDays([...rollupDayRows, ...detailedPageRows] as PageRow[], request.range.from), selectedTargets, audienceRows: audienceRows as PageRow[], adRows: adRows as AdRow[], selectedAdAccounts, audienceAsOf: request.range.to, weeklySeriesNote: rollup?.granularity === 'weekly' });
     return { targets: visible.map(({ socialAccountId: _socialAccountId, providerId: _pageId, ...target }) => ({ ...target, providerId: FACEBOOK_PLATFORM_ID })), selectedTargets: selectedTargets.map(({ socialAccountId: _socialAccountId, providerId: _pageId, ...target }) => ({ ...target, providerId: FACEBOOK_PLATFORM_ID })), adAccounts, selectedAdAccountIds, ...normalized };
   },
 };
