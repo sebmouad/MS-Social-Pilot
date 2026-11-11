@@ -128,19 +128,28 @@ export function AdSetCreateForm({ adAccountId, campaignId, campaignName, currenc
   return <form method="post" noValidate className="ads-campaign-create" onSubmit={event => void handleSubmit(event)} aria-label={t('text221', { value0: campaignName })}>
     <h4>{fill(config.title, { campaignName })}</h4>
     <p className="small-note">{fill(config.description, { currency: currency ? t('currencyDetail', { currency }) : '' })}</p>
-    <div className="ads-campaign-create__fields">
+    <div className="am-form">
+      <fieldset className="am-form__group"><legend>{t('amName')}</legend>
       <label>{config.nameLabel}<input name="name" value={name} onChange={event => setName(event.target.value)} maxLength={config.nameMaxLength} required disabled={locked} {...validation.fieldProps('name')} /><FieldError {...validation.errorProps('name')} /></label>
+      </fieldset>
+      <fieldset className="am-form__group"><legend>{t('amBudgetSchedule')}</legend><div className="am-form__row">
       <label>{config.budgetLabel}{currency ? ` (${currency})` : ''}<input name="budget" type="number" min={10 ** -budgetFractionDigits(currency)} step={10 ** -budgetFractionDigits(currency)} value={budget} onChange={event => setBudget(event.target.value)} inputMode="decimal" required disabled={locked} {...validation.fieldProps('budget')} /><FieldError {...validation.errorProps('budget')} /></label>
+      <label>{t('adSetEndDate')}<input name="endDate" type="date" value={endDate} min={new Date(Date.now() + 86_400_000).toISOString().slice(0, 10)} onChange={event => setEndDate(event.target.value)} disabled={locked} aria-describedby={`adset-end-hint-${campaignId}`} /><span id={`adset-end-hint-${campaignId}`} className="small-note">{t('adSetEndHint')}</span></label>
+      </div></fieldset>
+      <fieldset className="am-form__group"><legend>{t('amAudience')}</legend>
       <label>{config.countryLabel}<select name="countryCode" value={countryCode} onChange={event => setCountryCode(event.target.value)} required disabled={locked} {...validation.fieldProps('countryCode')}><option value="">{pick.choose}</option>{countries.map(country => <option key={country.code} value={country.code}>{country.name}</option>)}</select><FieldError {...validation.errorProps('countryCode')} /></label>
       <div className="ads-country-more"><span id={`adset-more-${campaignId}`}>{t('adSetMoreCountries')}</span>
         {extraCodes.length > 0 && <ul aria-labelledby={`adset-more-${campaignId}`}>{extraCodes.map(code => <li key={code}>{countryName(code, locale)}<button type="button" disabled={locked} aria-label={pick.remove.replace('{name}', countryName(code, locale))} onClick={() => setMoreCountries(extraCodes.filter(item => item !== code).join(', '))}>×</button></li>)}</ul>}
         <select aria-labelledby={`adset-more-${campaignId}`} value="" disabled={locked} onChange={event => { if (event.target.value) setMoreCountries([...extraCodes, event.target.value].join(', ')); }}><option value="">{pick.add}</option>{countries.filter(country => country.code !== countryCode && !extraCodes.includes(country.code)).map(country => <option key={country.code} value={country.code}>{country.name}</option>)}</select>
       </div>
+      <div className="am-form__row">
       <label>{t('adSetAgeMin')}<input name="ageMin" type="number" min={18} max={65} value={ageMin} onChange={event => setAgeMin(event.target.value)} placeholder="18" disabled={locked} /></label>
       <label>{t('adSetAgeMax')}<input name="ageMax" type="number" min={18} max={65} value={ageMax} onChange={event => setAgeMax(event.target.value)} placeholder="65" disabled={locked} /></label>
-      <label>{t('adSetEndDate')}<input name="endDate" type="date" value={endDate} min={new Date(Date.now() + 86_400_000).toISOString().slice(0, 10)} onChange={event => setEndDate(event.target.value)} disabled={locked} aria-describedby={`adset-end-hint-${campaignId}`} /><span id={`adset-end-hint-${campaignId}`} className="small-note">{t('adSetEndHint')}</span></label>
+      </div></fieldset>
+      <fieldset className="am-form__group"><legend>{t('amOptimization')}</legend>
       <label>{config.goalLabel}<select value={optimizationGoal} onChange={event => setOptimizationGoal(event.target.value)} disabled={locked}>{config.options.map(({value, label}) => <option key={value} value={value}>{label}</option>)}</select></label>
-      <button className="ui-button ui-button--primary" type="submit" disabled={locked}>{busy ? t('text208') : config.actionLabel}</button>
+      </fieldset>
+      <div className="am-form__actions"><button className="ui-button ui-button--primary" type="submit" disabled={locked}>{busy ? t('text208') : config.actionLabel}</button></div>
     </div>
     {message ? <p role="status" className="small-note">{localize(message)}</p> : null}
     {held && pendingRequest ? <div role="region" aria-label={t('text223')} className="ads-object-manager__pending">

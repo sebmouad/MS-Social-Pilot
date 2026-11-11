@@ -212,7 +212,7 @@ export function ObjectManager({ adAccountId, level, objectId, name, label, quiet
         <dl className="ads-compare-grid"><div><dt>{t('text019')}</dt><dd>{detail.currency ? `${detail.currency} ` : ''}{number.format(detail.totals.spend)}</dd></div><div><dt>{t('text020')}</dt><dd>{number.format(detail.totals.impressions)}</dd></div><div><dt>{t('text022')}</dt><dd>{number.format(detail.totals.clicks)}</dd></div><div><dt>{t('text064')}</dt><dd>{detail.totals.cpc === null ? t('text094') : number.format(detail.totals.cpc)}</dd></div><div><dt>{t('text063')}</dt><dd>{detail.totals.ctr === null ? t('text094') : `${number.format(detail.totals.ctr)}%`}</dd></div><div><dt>{t('text065')}</dt><dd>{detail.totals.cpm === null ? t('text094') : number.format(detail.totals.cpm)}</dd></div></dl>
         <details><summary>{t('text095')}</summary><ul>{detail.daily.map(day => <li key={day.date}>{t('objectDailyLine', { date: day.date, currency: detail.currency ? `${detail.currency} ` : '', spend: number.format(day.spend), impressions: number.format(day.impressions), clicks: number.format(day.clicks) })}</li>)}</ul></details></section>
         <section className="am-edit__section"><h3>{t('amDelivery')}</h3>
-        <p className="small-note">{detail.live.available ? t('text249', { value0: detail.live.configuredStatus ?? t('text094'), value1: detail.live.effectiveStatus ?? t('text094') }) : t('text098')}</p></section>
+        <p className="small-note">{detail.live.available ? t('text249', { value0: humanStatus(detail.live.configuredStatus) ?? t('text094'), value1: humanStatus(detail.live.effectiveStatus) ?? t('text094') }) : t('text098')}</p></section>
         {needsReconnect ? <p className="small-note" role="note">{t('needsReconnectObject', { kind: t(level) })} <a href="/settings/channels">{t('needsReconnectAction')}</a></p>
           : !canManage || !supports.length ? <p className="small-note">{t('viewOnlyObject', { kind: t(level) })}</p> : operationBlocked ? <p className="small-note">{t('text101')}<a href="/ads/manage?level=history#changes">{t('text102')}</a>{t('text103')}</p> : <>
           {statusSupport && statusInput?.kind === 'choice' ? <div className="ads-object-manager__row">{statusInput.options.map(option => {
@@ -278,4 +278,11 @@ export function ObjectManager({ adAccountId, level, objectId, name, label, quiet
       </div>
     </ModalDialog> : null}
   </div>;
+}
+
+/** ACTIVE → Active, CAMPAIGN_PAUSED → Campaign paused: Meta's codes read as words. */
+function humanStatus(value: string | null | undefined) {
+  if (!value) return null;
+  const words = value.toLowerCase().replace(/_/g, ' ');
+  return words.charAt(0).toUpperCase() + words.slice(1);
 }
