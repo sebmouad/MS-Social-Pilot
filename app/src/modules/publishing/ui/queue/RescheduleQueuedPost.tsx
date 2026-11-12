@@ -24,10 +24,12 @@ export function RescheduleQueuedPost({ postId, date: initialDate, time: initialT
   const [date, setDate] = useState(initialDate);
   const [time, setTime] = useState(initialTime);
   const [notice, setNotice] = useState('');
+  const [opened, setOpened] = useState(false);
   const [error, setError] = useState('');
   const [confirm, dialog] = useConfirm({ title: copy.rescheduleTitle, cancel: copy.rescheduleCancel, confirm: copy.rescheduleConfirm, danger: false });
 
-  return <details>
+  // Best times are asked for only once Move is opened: fifty closed forms made fifty requests on every Queue visit.
+  return <details onToggle={event => { if (event.currentTarget.open) setOpened(true); }}>
     <summary>{copy.rescheduleAction}</summary>
     <p>{copy.rescheduleZone}: {timeZone}</p>
     <form noValidate onSubmit={async event => {
@@ -50,7 +52,7 @@ export function RescheduleQueuedPost({ postId, date: initialDate, time: initialT
     }}>
       <label className="ui-field"><span>{copy.rescheduleDate}</span><input className="ui-input" type="date" name="date" required value={date} onChange={event => setDate(event.target.value)} {...validation.fieldProps('date')} /><FieldError {...validation.errorProps('date')} /></label>
       <label className="ui-field"><span>{copy.rescheduleTime}</span><input className="ui-input" type="time" name="time" required value={time} onChange={event => setTime(event.target.value)} {...validation.fieldProps('time')} /><FieldError {...validation.errorProps('time')} /></label>
-      <BestTimeSuggestions copyCatalog={catalog} targetIds={targetIds} locale={locale} disabled={false} onChoose={({ date: day, time: at }) => { setDate(day); setTime(at); }} />
+      {opened ? <BestTimeSuggestions copyCatalog={catalog} targetIds={targetIds} locale={locale} disabled={false} onChoose={({ date: day, time: at }) => { setDate(day); setTime(at); }} /> : null}
       <Button type="submit" size="sm">{copy.rescheduleReview}</Button>
       {error && <p role="alert">{error}</p>}
     </form>
