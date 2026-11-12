@@ -81,7 +81,7 @@ export default async function PostsScreen({ searchParams }: { searchParams: Prom
   const ui = resolveInsightsCopy(insightsCopyDefaults as never, locale);
   // One toolbar on the title row (period picker, export); sorting is done from the column headers (2026-11-12).
   const toolbar = <div className={styles.toolbar} role="group" aria-label={t("Post explorer")}>
-    <InsightsFilterRow presets={presets} period={periodValue} compare={false} showCompare={false} writePresetDates
+    <InsightsFilterRow locale={locale} presets={presets} period={periodValue} compare={false} showCompare={false} writePresetDates
       labels={{ period: ui.datePeriod, compare: ui.compareToggle, active: ui.activeFilters, remove: ui.removeFilter, reset: ui.resetFilters, filters: t("Post explorer"), customSummary: ui.datePeriod }} />
     {view === 'posts' ? <>
       <a className="ui-button ui-button--quiet ui-button--sm" href={`/api/analytics/posts?${query({ format: 'csv' }, true)}`}><IconDownload size={16} aria-hidden="true" />{t("Export selection (CSV)")}</a>

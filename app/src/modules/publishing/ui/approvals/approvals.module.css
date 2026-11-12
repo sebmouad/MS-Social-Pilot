@@ -35,7 +35,6 @@
 .viewAll { justify-self: start; min-height: 40px; padding: 8px var(--space-1); color: var(--accent); font-size: var(--text-md); font-weight: 650; }
 .viewAll:hover { text-decoration: underline; }
 .viewAll:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
-@media (max-width: 1400px) { .board { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 760px) { .board { grid-template-columns: minmax(0, 1fr); } .stage { padding: var(--space-2); } }
 .compact { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--space-3); align-items: start; }
 .compact img { width: 56px; height: 56px; border-radius: var(--radius-sm); object-fit: cover; }
@@ -51,10 +50,19 @@
 .notes[open] > summary { color: var(--ink); margin-bottom: var(--space-2); }
 .notesCount { min-width: 20px; padding: 1px 7px; border-radius: var(--radius-full); background: var(--accent-soft); color: var(--accent); font-size: var(--text-2xs); font-weight: 700; text-align: center; }
 
-/* When some stages are empty they shrink to a row of slim tiles and each stage that holds posts takes the full
-   width with its cards side by side, instead of every stage getting an equal column. */
+/* Kanban board (2026-11-12): Draft → In review → Approved → Scheduled always side by side, each column scrolling on
+   its own, like a planning board. Phones stack the columns. */
 @media (min-width: 761px) {
-  .board.boardMixed { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); grid-auto-flow: dense; }
-  .boardMixed .stageFilled { grid-column: 1 / -1; }
-  .boardMixed .stageFilled .stageList { grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); align-items: start; }
+  .board, .board.boardMixed { grid-template-columns: repeat(4, minmax(260px, 1fr)); overflow-x: auto; padding-bottom: 4px; }
+  .stage { max-height: calc(100vh - 220px); grid-template-rows: auto minmax(0, 1fr) auto; }
+  .stageHead { position: sticky; top: 0; }
+  .stageList { overflow-y: auto; padding-right: 2px; align-content: start; }
 }
+.stageHead h2::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-right: 8px; border-radius: var(--radius-full); background: var(--stage-tone, var(--line-strong)); vertical-align: 1px; }
+.stage:nth-child(2) { --stage-tone: var(--warning); }
+.stage:nth-child(3) { --stage-tone: var(--success); }
+.stage:nth-child(4) { --stage-tone: var(--accent); }
+.stage > .help { padding: var(--space-4) var(--space-2); border: 1px dashed var(--line); border-radius: var(--radius-md); text-align: center; }
+.compact p { -webkit-line-clamp: 2; font-size: var(--text-sm); }
+.compact img { width: 48px; height: 48px; }
+.card { padding: var(--space-3); gap: var(--space-2); }

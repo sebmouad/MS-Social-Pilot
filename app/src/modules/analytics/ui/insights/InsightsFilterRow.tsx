@@ -28,7 +28,9 @@ function useSafeNavigation() {
  * button for everything else. Both write the address, so a view can be shared; the sidebar's `channel` scope and
  * every other parameter are kept, and paging restarts.
  */
-export function InsightsFilterRow({ presets, period, compare, showCompare = true, chips = [], activeCount = 0, labels, children, hidePeriod = false, names = { from: 'start', to: 'end' }, customPeriod, writePresetDates = false }: {
+export function InsightsFilterRow({ presets, period, compare, showCompare = true, chips = [], activeCount = 0, labels, children, hidePeriod = false, names = { from: 'start', to: 'end' }, customPeriod, writePresetDates = false, locale = 'en' }: {
+  /** Language of the period summary (« Oct 14 – Nov 12, 2026 »). */
+  locale?: 'en' | 'fr';
   /** Address parameters of a typed range; Ads uses `since`/`until`. */
   names?: { from: string; to: string };
   /** Preset id written for a typed range when the page needs one (Ads: `custom`); otherwise the preset parameter is removed. */
@@ -67,7 +69,10 @@ export function InsightsFilterRow({ presets, period, compare, showCompare = true
     const query = next.toString();
     router?.push(`${pathname}${query ? `?${query}` : ''}`);
   };
-  const customSummary = `${period.start} – ${period.end}`;
+  // « Oct 14 – Nov 12, 2026 » like the rest of the app; the address keeps the ISO dates.
+  const lang = locale;
+  const day = (iso: string, year: boolean) => /^\d{4}-\d{2}-\d{2}$/.test(iso) ? new Intl.DateTimeFormat(lang, { month: 'short', day: 'numeric', ...(year ? { year: 'numeric' } : {}), timeZone: 'UTC' }).format(new Date(`${iso}T12:00:00Z`)) : iso;
+  const customSummary = `${day(period.start, period.start.slice(0, 4) !== period.end.slice(0, 4))} – ${day(period.end, true)}`;
   return <div className="insights-filterrow" role="group" aria-label={labels.filters}>
     {!hidePeriod && <DateRangePicker label={labels.period} presets={presets.map(item => ({ id: item.id, label: item.label }))}
       value={{ preset: period.preset, from: period.start, to: period.end }} customSummary={period.preset === 'custom' ? customSummary : labels.customSummary}

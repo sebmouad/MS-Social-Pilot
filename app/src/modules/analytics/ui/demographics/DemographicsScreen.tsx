@@ -35,7 +35,9 @@ export default async function DemographicsPage({ searchParams }: { searchParams:
     (copy as Record<string, { en: string; fr: string } | undefined>)[key]?.[locale] ?? demographicsCopyDefaults[key][locale];
   const number = new Intl.NumberFormat(locale, { maximumFractionDigits: 1 });
   const unknown = t("Not available");
-  const when = (date: Date | null) => date ? date.toISOString().replace('T', ' ').replace('.000Z', ' UTC') : unknown;
+  // Dates read like the rest of the app (« Nov 8, 2026 »), in the workspace time zone.
+  const dayFormat = new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeZone: viewer.membership.workspace.timezone || 'UTC' });
+  const when = (date: Date | null) => date ? dayFormat.format(date) : unknown;
   const params = await searchParams;
   let data: Awaited<ReturnType<typeof readDemographics>> | null = null;
   let options: Awaited<ReturnType<typeof readAnalyticsSnapshot>> | null = null;
@@ -76,7 +78,7 @@ export default async function DemographicsPage({ searchParams }: { searchParams:
     {scope.ids.length ? <input type="hidden" name="channel" value={scope.ids.join(',')} /> : null}
     <Button type="submit" variant="secondary" size="sm">{t("Apply filters")}</Button>
   </form> : <div className={styles.toolbar}>
-    <InsightsFilterRow presets={presets} period={periodValue} compare={false} showCompare={false} writePresetDates
+    <InsightsFilterRow locale={locale} presets={presets} period={periodValue} compare={false} showCompare={false} writePresetDates
       labels={{ period: ui.datePeriod, compare: ui.compareToggle, active: ui.activeFilters, remove: ui.removeFilter, reset: ui.resetFilters, filters: t("Date range (UTC)"), customSummary: t("Date range (UTC)") }} />
     {data && <a className="ui-button ui-button--quiet ui-button--sm" href={`/api/analytics/demographics?${query}`} download><IconDownload size={16} aria-hidden="true" />{t("Export full history (CSV)")}</a>}
   </div>;

@@ -33,7 +33,7 @@ export function AdsHeader({ title, copy, locale, policy, filters, accounts, acti
   const presets = policy.presets.map(item => ({ id: item.id, label: item.label, start: day(new Date(end.getTime() - (item.days - 1) * DAY)), end: day(end) }));
   const period = { preset: filters.period, start: day(filters.since), end: day(new Date(filters.until.getTime() - DAY)) };
   return <PageHeader module="ads" title={title} count={count} info={<InfoTip name={title} blocks={[{ text: copy.info }, { text: copy.totalsNote }]} />} actions={actions}
-    filters={<InsightsFilterRow presets={presets} period={period} compare={false} showCompare={false} names={{ from: 'since', to: 'until' }} customPeriod="custom" activeCount={filters.accountId ? 1 : 0}
+    filters={<InsightsFilterRow locale={locale} presets={presets} period={period} compare={false} showCompare={false} names={{ from: 'since', to: 'until' }} customPeriod="custom" activeCount={filters.accountId ? 1 : 0}
       labels={{ period: periodLabel, compare: '', active: '', remove: '', reset: '', filters: copy.accountFilter, customSummary: customLabel }}>
       <AdsAccountField accounts={accounts} label={copy.accountFilter} allLabel={copy.accountAll} />
     </InsightsFilterRow>} />;

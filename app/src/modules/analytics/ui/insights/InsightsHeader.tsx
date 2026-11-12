@@ -29,6 +29,6 @@ export function InsightsHeader({ runtime, title, info, actions, period, filterBo
   const now = new Date();
   const presets = policy.rangePresets.map(item => ({ id: item.id, label: item.label[locale], ...presetRange(item, now) }));
   return <PageHeader module={module} title={title} count={count} info={info ? <InfoTip name={title} blocks={[{ text: info }]} /> : undefined} actions={actions}
-    filters={<InsightsFilterRow presets={presets} period={period} compare={period.compare !== 'none'} showCompare={showCompare} hidePeriod={hidePeriod} chips={chips} activeCount={activeCount}
+    filters={<InsightsFilterRow locale={locale} presets={presets} period={period} compare={period.compare !== 'none'} showCompare={showCompare} hidePeriod={hidePeriod} chips={chips} activeCount={activeCount}
       labels={{ period: copy.datePeriod, compare: copy.compareToggle, active: copy.activeFilters, remove: copy.removeFilter, reset: copy.resetFilters, filters: copy.filtersTitle, customSummary: copy.datePeriod }}>{filterBody}</InsightsFilterRow>} />;
 }
