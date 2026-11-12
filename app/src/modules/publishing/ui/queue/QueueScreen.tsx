@@ -104,7 +104,7 @@ export default async function QueuePage({ searchParams }: { searchParams: Promis
               {thumb?.url ? <img className={styles.detailImage} src={thumb.url} alt="" loading="lazy" /> : null}
               <div>
                 <p className={styles.detailText}>{post.message}</p>
-                {post.firstComment ? <p className={styles.detailComment}><span>{locale === "fr" ? "Premier commentaire" : "First comment"}</span>{post.firstComment}</p> : null}
+                {post.firstComment ? <p className={styles.detailComment}><span>{locale === "fr" ? "Premier commentaire" : "First comment"}</span>{post.firstComment.length > 280 ? `${post.firstComment.slice(0, 280).trimEnd()}…` : post.firstComment}</p> : null}
                 <p className={styles.detailChannels}>{channels.join(" · ")}</p>
               </div>
             </div>
