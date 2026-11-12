@@ -199,7 +199,7 @@ export function AdsManagerTable({ level, rows, locale, money, number, drillHref,
         </tbody>
         {rows.length ? <tfoot><tr>
           <td /><td />
-          <th scope="row" className="am-col-name">{fill(t.totals, { count: fmt.format(rows.length), items: items.toLowerCase() })}</th>
+          <th scope="row" className="am-col-name">{fill(t.totals, { count: fmt.format(rows.length), items: (rows.length === 1 ? t[level] : items).toLowerCase() })}</th>
           <td />
           <td className="is-num">{totalSpend}</td>
           <td className="is-num">{fmt.format(totalImpressions)}</td>

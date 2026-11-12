@@ -300,10 +300,10 @@
 /* Row actions show on hover or keyboard focus, as under a name in Ads Manager. */
 .am-slot { display: grid; margin-top: 2px; }
 .am-slot > * { grid-area: 1 / 1; }
-.am-slot .am-sub { margin-top: 0; transition: opacity var(--ease-fast); }
-.am-actions { display: flex; gap: 14px; opacity: 0; transition: opacity var(--ease-fast); }
-.am-table tbody tr:hover .am-actions, .am-actions:focus-within { opacity: 1; }
-.am-table tbody tr:hover .am-slot .am-sub, .am-slot:focus-within .am-sub { opacity: 0; }
+.am-slot .am-sub { margin-top: 0; }
+.am-actions { display: flex; gap: 14px; visibility: hidden; }
+.am-table tbody tr:hover .am-actions, .am-actions:focus-within { visibility: visible; }
+.am-table tbody tr:hover .am-slot .am-sub, .am-slot:focus-within .am-sub { visibility: hidden; }
 .am-actions a, .am-link { padding: 0; border: 0; background: none; color: var(--accent); font: inherit; font-size: var(--text-xs); font-weight: 650; text-decoration: none; cursor: pointer; }
 .am-actions a:hover, .am-link:hover { text-decoration: underline; }
 .am-actions .ads-object-manager { display: contents; }
