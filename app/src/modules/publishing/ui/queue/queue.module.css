@@ -67,3 +67,10 @@
   .entryDetail { padding: 10px 10px 14px; }
 }
 @media (prefers-reduced-motion: reduce) { .entryChevron, .entryHead, .day { transition: none; } }
+.detailBody { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 14px; align-items: start; margin-bottom: 12px; }
+.detailImage { width: 120px; height: 120px; border-radius: var(--radius-md); object-fit: cover; }
+.detailText { margin: 0; color: var(--ink); font-size: var(--text-md); line-height: 1.5; white-space: pre-line; }
+.detailComment { display: grid; gap: 2px; margin: 10px 0 0; padding: 8px 10px; border-left: 3px solid var(--line-strong); color: var(--ink-soft); font-size: var(--text-sm); white-space: pre-line; }
+.detailComment span { color: var(--ink-faint); font-size: var(--text-xs); font-weight: 650; }
+.detailChannels { margin: 10px 0 0; color: var(--ink-soft); font-size: var(--text-sm); }
+@media (max-width: 640px) { .detailBody { grid-template-columns: minmax(0, 1fr); } .detailImage { width: 100%; height: auto; max-height: 240px; } }

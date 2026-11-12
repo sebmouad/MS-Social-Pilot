@@ -11,7 +11,6 @@ import { loadComposerCopy } from '../../server/composer-copy';
 import { ComposerCopyProvider } from '../compose/CopyProvider';
 import { QueueSidePanel } from './QueueSidePanel';
 import { pageChannelScope } from '@/modules/shell/server/scope';
-import { PostPreview } from "@/components/PostPreview";
 import { requireViewer } from "@/server/context";
 import { runtimeConfig } from '@/server/config/store';
 import { readPublishingPostPage, readPublishingStatusCounts } from "@/modules/publishing/server/read";
@@ -31,11 +30,6 @@ import { QueueTimeline } from "./QueueTimeline";
 import { loadPostOrigins } from "../origins/load";
 import { OriginBadge } from "../origins/OriginBadge";
 import styles from "./queue.module.css";
-
-/** Only what the preview shows: the page sends this for every queued post, so the full rows (accounts, tokens' metadata) stay on the server. */
-function previewOf<P extends { targets: Array<{ target: { id: string; type: string; name: string; pictureUrl: string | null; platformName?: string | null } }> }>(post: P): P {
-  return { ...post, targets: post.targets.map(row => ({ ...row, target: { id: row.target.id, type: row.target.type, name: row.target.name, pictureUrl: row.target.pictureUrl, platformName: row.target.platformName ?? null } })) };
-}
 
 export default async function QueuePage({ searchParams }: { searchParams: Promise<{ page?: string; channel?: string }> }) {
   const viewer = await requireViewer({ feature: "publishing/queue", channelScoped: true });
@@ -67,7 +61,6 @@ export default async function QueuePage({ searchParams }: { searchParams: Promis
     groups.set(key, [...(groups.get(key) ?? []), post]);
   }
   const dayHeading = (key: string) => key === "unscheduled" ? copy.queueUnscheduled : `${key === today ? `${copy.queueToday} · ` : key === tomorrow ? `${copy.queueTomorrow} · ` : ""}${new Intl.DateTimeFormat(locale, { weekday: "long", month: "long", day: "numeric", timeZone: "UTC" }).format(new Date(`${key}T12:00:00Z`))}`;
-  const authorName = (authorId: string) => authorId === viewer.user.id ? viewer.user.name : copy.approvalsMember;
 
   const timeFormat = new Intl.DateTimeFormat(locale, { timeZone, hour: "numeric", minute: "2-digit" });
   const shortDay = (key: string) => key === "unscheduled" ? copy.queueUnscheduled : key === today ? copy.queueToday : key === tomorrow ? copy.queueTomorrow
@@ -104,7 +97,19 @@ export default async function QueuePage({ searchParams }: { searchParams: Promis
             </span>
             <IconChevronDown className={styles.entryChevron} size={18} aria-hidden="true" />
           </summary>
-          <div className={styles.entryDetail}><PostPreview variant="compact" post={previewOf(post)} authorName={authorName(post.authorId)} timeZone={timeZone} locale={locale} actions={actions} /></div>
+          <div className={styles.entryDetail}>
+            {/* A light detail (full text, picture, first comment, channels) instead of the full preview card: fifty
+                previews made this page over 1 MB. The post page keeps the full preview. */}
+            <div className={styles.detailBody}>
+              {thumb?.url ? <img className={styles.detailImage} src={thumb.url} alt="" loading="lazy" /> : null}
+              <div>
+                <p className={styles.detailText}>{post.message}</p>
+                {post.firstComment ? <p className={styles.detailComment}><span>{locale === "fr" ? "Premier commentaire" : "First comment"}</span>{post.firstComment}</p> : null}
+                <p className={styles.detailChannels}>{channels.join(" · ")}</p>
+              </div>
+            </div>
+            {actions}
+          </div>
         </details></li>;
       })}</ul>
     </section>)}
