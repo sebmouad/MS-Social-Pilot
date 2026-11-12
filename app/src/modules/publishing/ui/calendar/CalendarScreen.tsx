@@ -111,7 +111,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
         id: post.id, authorId: post.authorId, message: post.message, firstComment: post.firstComment, link: post.link, media: post.media,
         status: post.status, scheduledAt: post.scheduledAt, publishedAt: post.publishedAt, createdAt: post.createdAt,
         displayTime: formatPostPreviewTime(post.publishedAt ?? post.scheduledAt ?? post.createdAt, timeZone, locale),
-        targets: post.targets.map(({ id, status, remotePostId, remoteUrl, firstCommentId, firstCommentAt, firstCommentError, target }) => ({ id, status, remotePostId, remoteUrl, firstCommentId, firstCommentAt, firstCommentError, target })),
+        targets: post.targets.map(({ id, status, remotePostId, remoteUrl, firstCommentId, firstCommentAt, firstCommentError, target }) => ({ id, status, remotePostId, remoteUrl, firstCommentId, firstCommentAt, firstCommentError, target: { id: target.id, type: target.type, name: target.name, pictureUrl: target.pictureUrl, platformName: (target as { platformName?: string | null }).platformName ?? null } })),
       },
     }]);
   }
@@ -138,7 +138,12 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
       const slot = wallTimeToInstant(key, time, timeZone);
       return [time, slot.ok ? slot.instant.getTime() + 60 * 60 * 1000 <= now.getTime() : key < today];
     })) : undefined,
-    posts: (byDay.get(key) ?? []).sort((a, b) => a.whenIso.localeCompare(b.whenIso)),
+    // Month cells show the first few posts and « +N more »: only those are sent to the page (a busy month was ~3 MB).
+    ...(() => {
+      const all = (byDay.get(key) ?? []).sort((a, b) => a.whenIso.localeCompare(b.whenIso));
+      const shown = view === "month" ? all.slice(0, content.policy.monthPostsShown) : all;
+      return { posts: shown, moreCount: all.length - shown.length };
+    })(),
   }));
 
   const filterQuery = `${params.channel ? `&channel=${encodeURIComponent(params.channel)}` : ""}${status ? `&status=${status}` : ""}${originKind ? `&origin=${encodeURIComponent(originKind)}` : ""}`;

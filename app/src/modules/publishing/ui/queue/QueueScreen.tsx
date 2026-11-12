@@ -32,6 +32,11 @@ import { loadPostOrigins } from "../origins/load";
 import { OriginBadge } from "../origins/OriginBadge";
 import styles from "./queue.module.css";
 
+/** Only what the preview shows: the page sends this for every queued post, so the full rows (accounts, tokens' metadata) stay on the server. */
+function previewOf<P extends { targets: Array<{ target: { id: string; type: string; name: string; pictureUrl: string | null; platformName?: string | null } }> }>(post: P): P {
+  return { ...post, targets: post.targets.map(row => ({ ...row, target: { id: row.target.id, type: row.target.type, name: row.target.name, pictureUrl: row.target.pictureUrl, platformName: row.target.platformName ?? null } })) };
+}
+
 export default async function QueuePage({ searchParams }: { searchParams: Promise<{ page?: string; channel?: string }> }) {
   const viewer = await requireViewer({ feature: "publishing/queue", channelScoped: true });
   const timeZone = viewer.membership.workspace.timezone;
@@ -99,7 +104,7 @@ export default async function QueuePage({ searchParams }: { searchParams: Promis
             </span>
             <IconChevronDown className={styles.entryChevron} size={18} aria-hidden="true" />
           </summary>
-          <div className={styles.entryDetail}><PostPreview variant="compact" post={post} authorName={authorName(post.authorId)} timeZone={timeZone} locale={locale} actions={actions} /></div>
+          <div className={styles.entryDetail}><PostPreview variant="compact" post={previewOf(post)} authorName={authorName(post.authorId)} timeZone={timeZone} locale={locale} actions={actions} /></div>
         </details></li>;
       })}</ul>
     </section>)}
@@ -124,7 +129,7 @@ export default async function QueuePage({ searchParams }: { searchParams: Promis
           : <>
             <Tabs label={copy.queueTitle} items={[
               { id: 'day', label: copy.byDay, count: listing.posts.length, content: byDay },
-              { id: 'channel', label: copy.queueByChannel, content: <QueueTimeline posts={listing.posts.map(post => ({ ...post, scheduledLabel: post.scheduledAt ? slotFormat.format(post.scheduledAt) : undefined }))} locale={locale} maxPerChannel={Number(slotsPerChannel)} /> },
+              { id: 'channel', label: copy.queueByChannel, content: <QueueTimeline posts={listing.posts.map(post => ({ id: post.id, message: post.message, link: post.link, media: post.media, status: post.status, scheduledAt: post.scheduledAt, scheduledLabel: post.scheduledAt ? slotFormat.format(post.scheduledAt) : undefined, targets: post.targets.map(row => ({ status: row.status, target: { id: row.target.id, name: row.target.name, pictureUrl: row.target.pictureUrl, platformName: row.target.platformName ?? null } })) }))} locale={locale} maxPerChannel={Number(slotsPerChannel)} /> },
             ]} />
             <PublishingPagination path="/content/queue" page={listing.page} pages={listing.pages} locale={locale} copy={copy} />
           </>}

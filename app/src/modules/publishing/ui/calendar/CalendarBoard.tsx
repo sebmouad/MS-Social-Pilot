@@ -217,7 +217,7 @@ export function CalendarBoard({ view, days, timeZone, nowIso, canCreate, filterQ
           <div className={styles.dayHead}><time dateTime={day.key} aria-label={day.longLabel + (day.isToday ? copy.todaySuffix : "")}>{Number(day.key.slice(8))}</time>{day.isToday && <span className={styles.todayTag}>{copy.today}</span>}</div>
           {milestoneList(day)}
           {day.posts.slice(0, policy.monthPostsShown).map(post => postCard(post, true))}
-          {day.posts.length > policy.monthPostsShown && <a className={styles.more} href={`/content/calendar?view=week&date=${day.key}${filterQuery}`}>+{day.posts.length - policy.monthPostsShown}{copy.more}<span className="ui-visually-hidden">{copy.onDay}{day.longLabel}</span></a>}
+          {day.posts.length + (day.moreCount ?? 0) > policy.monthPostsShown && <a className={styles.more} href={`/content/calendar?view=week&date=${day.key}${filterQuery}`}>+{day.posts.length + (day.moreCount ?? 0) - policy.monthPostsShown}{copy.more}<span className="ui-visually-hidden">{copy.onDay}{day.longLabel}</span></a>}
           {canCreate && !day.isPast && day.freeSlots?.map(time => freePill(day, time))}
           {canCreate && !day.isPast && <a className={styles.add} href={newPostHref(day.key, defaultScheduleTime)}>{copy.addPost}<span className="ui-visually-hidden">{copy.onDay}{day.longLabel}</span></a>}
         </li>;
@@ -284,7 +284,7 @@ export function CalendarBoard({ view, days, timeZone, nowIso, canCreate, filterQ
         {milestoneList(day)}
         {/* The phone agenda uses compact cards; in month view a busy day shows its first posts and links to the rest, like the month grid. */}
         {day.posts.length ? <div className={styles.agendaPosts}>{(view === "month" ? day.posts.slice(0, policy.monthPostsShown) : day.posts).map(post => postCard(post, true))}
-          {view === "month" && day.posts.length > policy.monthPostsShown && <a className={styles.more} href={`/content/calendar?view=week&date=${day.key}${filterQuery}`}>+{day.posts.length - policy.monthPostsShown}{copy.more}<span className="ui-visually-hidden">{copy.onDay}{day.longLabel}</span></a>}
+          {view === "month" && day.posts.length + (day.moreCount ?? 0) > policy.monthPostsShown && <a className={styles.more} href={`/content/calendar?view=week&date=${day.key}${filterQuery}`}>+{day.posts.length + (day.moreCount ?? 0) - policy.monthPostsShown}{copy.more}<span className="ui-visually-hidden">{copy.onDay}{day.longLabel}</span></a>}
         </div> : <p className={styles.muted}>{copy.nothingPlanned}</p>}
       </div>)}
       {rangeIsEmpty && view === "month" && <p className={styles.muted}>{copy.monthEmpty}</p>}

@@ -50,4 +50,6 @@ export type BoardDay = {
   /** Free queue times (HH:MM) in the workspace time zone, shown as pills that open Create at that time. */
   freeSlots?: string[];
   posts: BoardPost[];
+  /** Posts of this day not sent to the page (month view shows the first few and « +N more »). */
+  moreCount?: number;
 };
