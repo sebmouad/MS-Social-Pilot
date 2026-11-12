@@ -1,3 +1,4 @@
+import { redirect } from 'next/navigation';
 import { listStoredAdObjects } from '../../server/object-store';
 import { mergeAdObjectSummaries } from '../../server/object-summaries';
 import { AdsReportLimitError } from '../../read-policy';
@@ -56,6 +57,13 @@ async function CampaignsPage({ searchParams }: { searchParams: Promise<AdsSearch
   // A post handed over by the Boost suggestion: only well-formed ids; the creative service re-verifies the post belongs to the channel.
   const boostTarget = typeof params.boostTarget === 'string' && /^[A-Za-z0-9_-]{1,100}$/.test(params.boostTarget) ? params.boostTarget : undefined;
   const boostPost = boostTarget && typeof params.boostPost === 'string' && /^[0-9]{1,40}_[0-9]{1,40}$/.test(params.boostPost) ? params.boostPost : undefined;
+  // Campaign results were folded into Ads › Manage (2026-11-12); this address stays only for the « Boost » flow.
+  if (!boostPost) {
+    const keep = new URLSearchParams();
+    for (const key of ['period', 'since', 'until', 'account'] as const) { const value = params[key as keyof typeof params]; if (typeof value === 'string' && value) keep.set(key, value); }
+    keep.set('level', 'campaign');
+    redirect(`/ads/manage?${keep}`);
+  }
   try { filters = parseAdsFilters(params, accounts.map(account => account.id), undefined, policy); }
   catch (error) { if (!(error instanceof AdsFilterError)) throw error; return <AdsFilterErrorView catalogs={catalogs} locale={locale} accounts={accounts} input={params} error={error} action="/ads/campaigns" title={t('text041')} policy={policy} />; }
   let requestedPage: number;

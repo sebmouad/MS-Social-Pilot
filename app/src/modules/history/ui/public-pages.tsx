@@ -1,5 +1,7 @@
 import type { Metadata } from 'next';
-import { headers } from 'next/headers';
+import { cookies, headers } from 'next/headers';
+import { SESSION_COOKIE, hashSessionToken, isUsableSession } from '@/server/auth';
+import { getSessionByTokenHash } from '@/server/data';
 import { notFound } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { deletionRequestStatus } from '@/server/platforms/deletion-status';
@@ -18,9 +20,19 @@ const GATED: readonly Page[] = ['help', 'pricing', 'status', 'changelog'];
 
 async function context(page: Page) {
   const locale = siteLocale((await headers()).get('accept-language'));
-  if (GATED.includes(page) && !(await siteIsPublic())) notFound();
+  // Help stays open to signed-in members even while the public site is off: it is how they (and app reviewers) learn the product.
+  if (GATED.includes(page) && !(await siteIsPublic()) && !(page === 'help' && await signedIn())) notFound();
   const [content, { operator, appUrl }] = await Promise.all([loadSiteContent(locale), loadOperator()]);
   return { locale, content, operator, appUrl };
+}
+
+async function signedIn(): Promise<boolean> {
+  const token = (await cookies()).get(SESSION_COOKIE)?.value;
+  if (!token) return false;
+  const hash = hashSessionToken(token);
+  if (!hash) return false;
+  const session = await getSessionByTokenHash(hash).catch(() => null);
+  return isUsableSession(session, undefined);
 }
 
 export async function pageMetadata(page: Page): Promise<Metadata> {

@@ -1,7 +1,7 @@
 'use client';
 import { recordsCopyDefaults, type RecordsCopy } from '../../records-copy';
 import { useMemo, useState } from 'react';
-import { IconChartBar, IconExternalLink } from '@tabler/icons-react';
+import { IconChartBar, IconExternalLink, IconColumns } from '@tabler/icons-react';
 import { Avatar } from '@/components/Avatar';
 import { PostThumb } from '@/components/PostThumb';
 import type { PostThumbnail } from '@/components/post-thumbnail';
@@ -64,7 +64,7 @@ export function PostsTable({ rows, measures: allMeasures, locale, emptyAction, c
 
   return <div className="analytics-posts">
     {measures.length > 0 && <details className="analytics-posts__columns">
-      <summary>{t("Columns")} · {chosen.length}/{measures.length}</summary>
+      <summary><IconColumns size={16} aria-hidden="true" />{t("Columns")} <span className="analytics-posts__count">{chosen.length}</span></summary>
       <fieldset>
         <legend className="ui-visually-hidden">{t("Columns")}</legend>
         {measures.map(measure => <label key={measure.key} className="analytics-posts__column-option">

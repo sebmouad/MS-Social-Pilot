@@ -75,8 +75,12 @@
 .analytics-insights { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr)); gap: 16px; }
 
 /* Post explorer table. */
-.analytics-posts__columns { margin-bottom: 12px; }
-.analytics-posts__columns summary { cursor: pointer; font-weight: 600; min-height: 44px; display: flex; align-items: center; }
+.analytics-posts__columns { position: relative; margin-bottom: 12px; }
+.analytics-posts__columns summary { cursor: pointer; font-weight: 600; min-height: 36px; display: inline-flex; align-items: center; gap: 8px; padding: 0 12px; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface); list-style: none; font-size: var(--text-sm); }
+.analytics-posts__columns summary::-webkit-details-marker { display: none; }
+.analytics-posts__columns summary:hover { border-color: var(--ink-faint); }
+.analytics-posts__count { min-width: 20px; padding: 0 6px; border-radius: var(--radius-full); background: var(--accent-soft); color: var(--accent); font-size: var(--text-xs); text-align: center; }
+.analytics-posts__columns[open] fieldset { position: absolute; z-index: 20; top: calc(100% + 6px); left: 0; width: min(560px, 92vw); padding: 12px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-raised, var(--surface)); box-shadow: var(--shadow-pop, 0 12px 32px rgb(0 0 0 / 30%)); }
 .analytics-posts__columns summary:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
 .analytics-posts__columns fieldset { border: 0; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr)); gap: 4px 12px; }
 .analytics-posts__column-option { display: flex; align-items: center; gap: 8px; min-height: 36px; }

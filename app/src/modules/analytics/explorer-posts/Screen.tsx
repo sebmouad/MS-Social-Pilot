@@ -10,7 +10,6 @@ import { PostsTable } from '@/modules/analytics/ui/posts/PostsTable';
 import { postsTableMeasures, postsTableRows } from '@/modules/analytics/ui/posts/rows';
 import { pageChannelScope } from '@/modules/shell/server/scope';
 import { insightsReadInput } from '@/modules/analytics/ui/insights/scope';
-import { AddressSelect } from '@/modules/analytics/ui/insights/AddressSelect';
 import { InsightsFilterRow } from '@/modules/analytics/ui/insights/InsightsFilterRow';
 import { insightsCopyDefaults, insightsPolicyDefaults, resolveInsightsCopy } from '@/modules/analytics/ui/insights/insights-config';
 import { presetRange, resolvePeriod } from '@/modules/analytics/ui/insights/period';
@@ -65,7 +64,6 @@ export default async function PostsScreen({ searchParams }: { searchParams: Prom
     if (api) { q.set('filter', '1'); d.selectedIds.forEach(id => q.append('channel', id)); } else if (scope.ids.length) q.set('channel', scope.ids.join(','));
     Object.entries(patch).forEach(([k, v]) => q.set(k, v)); return q.toString();
   };
-  const measureLabel = (m: { label: string; labelFr?: string }) => fr ? m.labelFr ?? m.label : m.label;
   const now = new Date();
   const presets = insightsPolicyDefaults.rangePresets.map(item => ({ id: item.id, label: item.label[locale], ...presetRange(item, now) }));
   const matchedPreset = presets.find(item => item.id === first(raw.period)) ?? presets.find(item => item.start === d.period.start && item.end === d.period.end);
@@ -81,22 +79,11 @@ export default async function PostsScreen({ searchParams }: { searchParams: Prom
   const viewLabel = { posts: t("Posts"), summary: t("Summary"), timing: t("Timing"), content: t("Content") };
   const viewTabs = <LinkTabs label={t("Post explorer views")} moreLabel={shell.moreTabs} activeId={view} items={VIEWS.map(id => ({ id, href: viewHref(id), label: viewLabel[id] }))} />;
   const ui = resolveInsightsCopy(insightsCopyDefaults as never, locale);
-  const sortOptions = [
-    { value: 'publishedAt', label: t("Publication date") },
-    { value: 'engagement', label: t("Engagement") },
-    ...d.populatedMeasures.concat(d.measures.filter(m => m.key === d.input.sort && !d.populatedMeasures.some(p => p.key === m.key))).map(m => ({ value: m.key, label: measureLabel(m) })),
-  ];
-  const directionOptions = [
-    { value: 'desc', label: t("Descending") },
-    { value: 'asc', label: t("Ascending") },
-  ];
-  // One toolbar on the title row (period picker, sort, order); export beside it and paging under the table.
+  // One toolbar on the title row (period picker, export); sorting is done from the column headers (2026-11-12).
   const toolbar = <div className={styles.toolbar} role="group" aria-label={t("Post explorer")}>
     <InsightsFilterRow presets={presets} period={periodValue} compare={false} showCompare={false} writePresetDates
       labels={{ period: ui.datePeriod, compare: ui.compareToggle, active: ui.activeFilters, remove: ui.removeFilter, reset: ui.resetFilters, filters: t("Post explorer"), customSummary: ui.datePeriod }} />
     {view === 'posts' ? <>
-      <AddressSelect className={styles.inlineField} name="sort" label={t("Sort by")} defaultValue={d.input.sort} options={sortOptions} />
-      <AddressSelect className={styles.inlineField} name="direction" label={t("Order")} hideLabel defaultValue={d.input.direction} options={directionOptions} />
       <a className="ui-button ui-button--quiet ui-button--sm" href={`/api/analytics/posts?${query({ format: 'csv' }, true)}`}><IconDownload size={16} aria-hidden="true" />{t("Export selection (CSV)")}</a>
     </> : null}
   </div>;

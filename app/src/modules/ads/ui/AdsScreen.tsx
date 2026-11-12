@@ -92,7 +92,7 @@ async function AdsPage({ searchParams }: { searchParams: Promise<AdsSearchParams
           </div>
         </aside> : null}
         <AccountsTrendCharts accounts={trends} locale={locale} />
-        <AccountsTable rows={rows} copy={ui} locale={locale} campaignsHref={adsQuery(filters, '/ads/campaigns')} rowLabel={ui.colAccount} />
+        <AccountsTable rows={rows} copy={ui} locale={locale} campaignsHref={`${adsQuery(filters, '/ads/manage')}${adsQuery(filters, '/ads/manage').includes('?') ? '&' : '?'}level=campaign`} rowLabel={ui.colAccount} />
         <AdsReportPager filters={filters} path={PATH} kind="accounts" page={page} />
         {exportPolicy && dataset.maxRows ? <div className="ads-report-export"><AdsReportExport filters={filters} maxRows={dataset.maxRows} maxBytes={exportPolicy.exportMaxBytes} fileName={exportPolicy.exportFileName} /></div> : null}
       </section>}
