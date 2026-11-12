@@ -31,7 +31,7 @@ import { ManageSearchFilter } from './ManageSearchFilter';
 import { adsHeaderFor } from '../AdsTabsFor';
 import { Button } from '@/components/Button';
 import { ObjectRowLabel } from './ObjectRowLabel';
-import { AdsManagerTable } from './AdsManagerTable';
+import { AdsManagerTable, type SortKey } from './AdsManagerTable';
 import { adsStatusTone } from './status-tone';
 import { Badge } from '@/components/Badge';
 import { labelInstants, workspaceInstantFormatter } from '@/server/instant-labels';
@@ -208,13 +208,23 @@ async function AdsObjectsPage({ searchParams }: { searchParams: Promise<Params> 
     : adAccounts.length ? <CreateDrawer label={t('manageNewAd')} closeLabel={t('manageCloseForm')} description={t('adCreateDescription')}>
       {adAccounts.map(account => <div key={account.id}><h3>{account.name}</h3><AdCreatePicker adAccountId={account.id} adSets={parentInventory.filter(item => item.adAccountId === account.id).map(item => ({ id: item.objectId, name: item.name ?? item.objectId }))} nameMaxCharacters={nameMax(account.id)} /></div>)}
     </CreateDrawer> : null;
+  // Sorting keeps every other choice and restarts paging; the active column flips direction, a new one starts high to low.
+  const sortKey = (directory.sort ?? 'name') as SortKey;
+  const sortDirection = directory.direction === 'asc' ? 'asc' : 'desc';
+  const sortHref = Object.fromEntries((['name', 'spend', 'impressions', 'clicks', 'ctr', 'cpc', 'cpm'] as const).map(key => {
+    const next = key === sortKey ? (sortDirection === 'asc' ? 'desc' : 'asc') : key === 'name' ? 'asc' : 'desc';
+    const params = new URLSearchParams(Object.entries({ ...values, level, sort: key, direction: next }).flatMap(([name, value]) => (value !== undefined && name !== 'offset' ? [[name, value]] : [])));
+    return [key, `/ads/manage?${params}`];
+  })) as Record<SortKey, string>;
   return <PageFrame module="ads"><div className="insights">
-    {await headerWith(create)}
-    {tabs}
-    {/* Ads Manager list (2026-11-12): level tabs above, then search, the parent being viewed, and one table with on/off,
-        delivery and results per row and a totals row. A name opens the level below it; « Edit » opens the item. */}
-    <p className="am-range">{formatIsoDay(locale, directory.range.from, directory.range.from)} – {formatIsoDay(locale, directory.range.to, directory.range.to)}{directory.freshness.status === 'stale' ? ` · ${t('text073')}` : ''}</p>
+    {await headerWith()}
+    {/* Ads Manager list (2026-11-12): Campaigns / Ad sets / Ads tab cards on the table, a toolbar with « Create », search and
+        the parent being viewed, then one table with selection, on/off, delivery and results per row and a totals row. */}
     <AdsManagerTable level={directory.level} locale={locale}
+      levelTabs={(['campaign', 'adset', 'ad'] as const).map(id => ({ id, href: manageTabHref(rawValues, id), active: id === directory.level }))}
+      moreTabs={<><a href={manageTabHref(rawValues, 'creative')}>{t('manageTabCreatives')}</a><a href={manageTabHref(rawValues, 'history')}>{t('manageTabHistory')}</a></>}
+      rangeLabel={`${formatIsoDay(locale, directory.range.from, directory.range.from)} – ${formatIsoDay(locale, directory.range.to, directory.range.to)}${directory.freshness.status === 'stale' ? ` · ${t('text073')}` : ''}`}
+      sort={{ key: sortKey, direction: sortDirection }} sortHref={sortHref} createButton={create}
       rows={directory.items.map(row => ({ key: `${row.accountId}:${row.objectId}`, accountId: row.accountId, accountName: accountName.get(row.accountId) ?? row.accountName, objectId: row.objectId, name: row.name, status: row.status, currency: row.currency,
         spend: row.spend, impressions: row.impressions, clicks: row.clicks, ctr: row.ctr, cpc: row.cpc, cpm: row.cpm, lastDeliveryDate: row.lastDeliveryDate, lastFetchedAt: row.lastFetchedAt,
         parentId: row.parentId, parentName: row.parentId ? parentNames.get(`${row.accountId}:${row.parentId}`) ?? null : null }))}
