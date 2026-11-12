@@ -294,7 +294,7 @@ export function CalendarBoard({ view, days, timeZone, nowIso, canCreate, filterQ
 
     {previewPost?.preview && <Dialog open title={copy.previewTitle} description={copy.previewDescription} onClose={() => setPreviewPost(null)}
       actions={<>
-        <a className="ui-button ui-button--secondary" href={`/create?duplicate=${encodeURIComponent(previewPost.id)}`}>Duplicate</a>
+        <a className="ui-button ui-button--secondary" href={`/create?duplicate=${encodeURIComponent(previewPost.id)}`}>{locale === "fr" ? "Dupliquer" : "Duplicate"}</a>
         <a className="ui-button ui-button--secondary" href={`/content/post/${encodeURIComponent(previewPost.id)}`}>{copy.openDetails}</a>
         {previewPost.movable && (
           <Button variant="secondary" onClick={() => { const p = previewPost; setPreviewPost(null); startMove(p); }}>

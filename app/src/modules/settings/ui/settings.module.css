@@ -207,3 +207,8 @@ button.settings-row-actions__link:disabled { cursor: progress; opacity: .6; }
 .mcp-key-advanced { margin-top: var(--space-3); }
 .mcp-key-advanced > summary { min-height: 36px; color: var(--accent); font-size: var(--text-sm); font-weight: 650; cursor: pointer; }
 .mcp-key-advanced[open] > summary { margin-bottom: var(--space-3); }
+.settings-panel__actions { display: flex; flex-wrap: wrap; gap: 8px; flex: 0 0 auto; }
+.settings-more { margin-top: 12px; }
+.settings-more > summary { cursor: pointer; width: fit-content; padding: 6px 0; color: var(--accent); font-size: 13px; font-weight: 650; }
+.settings-more > summary:hover { text-decoration: underline; }
+.settings-more[open] > summary { margin-bottom: 10px; }

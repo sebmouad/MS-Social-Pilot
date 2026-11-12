@@ -115,32 +115,32 @@ export function PostsTable({ rows, caption, locale = 'en', timeZone = 'UTC', sel
 
           {/* Real Platform Performance Metrics */}
           {current.reach && (current.reach.measured > 0 || current.reach.reach > 0 || current.reach.likes > 0) ? (
-            <section className={styles.panelMetricsSection} aria-label="Platform performance">
-              <h3 className={styles.panelSectionTitle}>Real Platform Performance</h3>
+            <section className={styles.panelMetricsSection} aria-label={locale === 'fr' ? 'Résultats sur la plateforme' : 'Results on the platform'}>
+              <h3 className={styles.panelSectionTitle}>{locale === 'fr' ? 'Résultats sur la plateforme' : 'Results on the platform'}</h3>
               <div className={styles.panelMetricsGrid}>
                 <div className={styles.panelMetricCard}>
                   <div className={styles.metricVal}>{(current.reach.reach || current.reach.views || 0).toLocaleString(locale)}</div>
-                  <div className={styles.metricLbl}>Reach</div>
+                  <div className={styles.metricLbl}>{locale === 'fr' ? 'Portée' : 'Reach'}</div>
                 </div>
                 <div className={styles.panelMetricCard}>
                   <div className={styles.metricVal}>{current.reach.likes.toLocaleString(locale)}</div>
-                  <div className={styles.metricLbl}>Likes</div>
+                  <div className={styles.metricLbl}>{locale === 'fr' ? 'J’aime' : 'Likes'}</div>
                 </div>
                 <div className={styles.panelMetricCard}>
                   <div className={styles.metricVal}>{current.reach.comments.toLocaleString(locale)}</div>
-                  <div className={styles.metricLbl}>Comments</div>
+                  <div className={styles.metricLbl}>{locale === 'fr' ? 'Commentaires' : 'Comments'}</div>
                 </div>
                 <div className={styles.panelMetricCard}>
                   <div className={styles.metricVal}>{current.reach.shares.toLocaleString(locale)}</div>
-                  <div className={styles.metricLbl}>Shares</div>
+                  <div className={styles.metricLbl}>{locale === 'fr' ? 'Partages' : 'Shares'}</div>
                 </div>
                 <div className={styles.panelMetricCard}>
                   <div className={styles.metricVal}>{current.reach.views.toLocaleString(locale)}</div>
-                  <div className={styles.metricLbl}>Views</div>
+                  <div className={styles.metricLbl}>{locale === 'fr' ? 'Vues' : 'Views'}</div>
                 </div>
                 <div className={styles.panelMetricCard}>
                   <div className={styles.metricVal}>{current.reach.clicks.toLocaleString(locale)}</div>
-                  <div className={styles.metricLbl}>Clicks</div>
+                  <div className={styles.metricLbl}>{locale === 'fr' ? 'Clics' : 'Clicks'}</div>
                 </div>
               </div>
             </section>

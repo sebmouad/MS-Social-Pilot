@@ -1,3 +1,4 @@
+import { AutoOpenFirst } from './AutoOpenFirst';
 import { createHash } from 'node:crypto';
 import { loadInboxCustomerCopy } from '@/modules/inbox/server/customer-copy';
 import { resolveInboxCatalog } from '@/modules/inbox/customer-copy';
@@ -330,6 +331,10 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
         {listNav}
       </section>
       {threadView ?? <section className={`${styles.threadPane} ${styles.pick}`} aria-label={copy.openConversation}><EmptyState icon={<IconMessages size={26} />} title={copy.selectTitle}>{copy.selectBody}</EmptyState></section>}
+      {!requestedThread && !threadOutcome.error && listPage.items.length ? (() => {
+        const first = listPage.items.find(item => item.needsReply && !item.resolved) ?? listPage.items[0]!;
+        return <AutoOpenFirst href={inboxHref({ ...baseLocation, ...(listPage.cursor ? { cursor: listPage.cursor } : {}), thread: first.key })} />;
+      })() : null}
     </div> : null}
   </div></PageFrame></InboxCopyProvider>;
 }

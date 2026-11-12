@@ -85,14 +85,25 @@ export default async function ConnectionsPage({ searchParams }: { searchParams: 
       })}
     </div>
     {!canManage && <p className={styles['settings-note']}>{t.managersOnly}</p>}
-    <SettingsPanel title={c.adTitle} detail={c.adDetail}>
-      <DataTable caption={c.adTitle} rows={adRows} rowKey={ad => ad.id} emptyMessage={t.noAds} emptyIcon={<IconPlugConnected />} columns={[
-        { key: 'account', label: t.adAccount, render: ad => <><strong>{ad.name}</strong><span className={styles['settings-table__secondary']}>{ad.provider ? providerName(ad.provider) : t.platformMissing} · {ad.actId}</span></> },
-        { key: 'profile', label: c.adLinked, render: ad => ad.owner ?? t.noLinkedProfile },
-        { key: 'status', label: t.status, render: ad => <Status tone={ad.enabled && ad.state === 'connected' ? 'good' : 'warning'}>{!ad.enabled ? c.inUseOff : ad.state && ad.state !== 'connected' ? statusLabels[ad.state] : c.inUseOn}</Status> },
-        ...(canManage ? [{ key: 'actions', label: t.actions, render: (ad: (typeof adRows)[number]) => ad.socialAccountId && socialById.has(ad.socialAccountId) ? <a className="text-link" href={`/settings/channels?source=${encodeURIComponent(ad.socialAccountId)}&action=manage`}>{c.adManage}</a> : t.reconnectFirst }] : []),
-      ]} />
-    </SettingsPanel>
+    {(() => {
+      // Ad accounts in use come first; the others wait behind « Show N not in use ». One « Choose ad accounts » button for the panel.
+      const adColumns = [
+        { key: 'account', label: t.adAccount, render: (ad: (typeof adRows)[number]) => <><strong>{ad.name}</strong><span className={styles['settings-table__secondary']}>{ad.provider ? providerName(ad.provider) : t.platformMissing} · {ad.actId}</span></> },
+        { key: 'profile', label: c.adLinked, render: (ad: (typeof adRows)[number]) => ad.owner ?? t.noLinkedProfile },
+        { key: 'status', label: t.status, render: (ad: (typeof adRows)[number]) => <Status tone={ad.enabled && ad.state === 'connected' ? 'good' : 'warning'}>{!ad.enabled ? c.inUseOff : ad.state && ad.state !== 'connected' ? statusLabels[ad.state] : c.inUseOn}</Status> },
+      ];
+      const inUse = adRows.filter(ad => ad.enabled);
+      const notInUse = adRows.filter(ad => !ad.enabled);
+      const source = adRows.find(ad => ad.socialAccountId && socialById.has(ad.socialAccountId))?.socialAccountId;
+      const choose = canManage && source ? <a className="ui-button ui-button--secondary ui-button--sm" href={`/settings/channels?source=${encodeURIComponent(source)}&action=manage`}>{c.adManage}</a> : undefined;
+      const showMore = locale === 'fr' ? `Afficher ${notInUse.length} non utilisé(s)` : `Show ${notInUse.length} not in use`;
+      return <SettingsPanel title={c.adTitle} detail={c.adDetail} actions={choose}>
+        {inUse.length || !notInUse.length ? <DataTable caption={c.adTitle} rows={inUse} rowKey={ad => ad.id} emptyMessage={t.noAds} emptyIcon={<IconPlugConnected />} columns={adColumns} /> : null}
+        {notInUse.length ? <details className={styles['settings-more']} open={!inUse.length}><summary>{showMore}</summary>
+          <DataTable caption={showMore} rows={notInUse} rowKey={ad => ad.id} emptyMessage={t.noAds} columns={adColumns} />
+        </details> : null}
+      </SettingsPanel>;
+    })()}
     </>}
     <SettingsPanel title={c.groupsTitle} detail={c.groupsDetail}><a className="text-link" href="/settings/channels/groups">{c.groupsOpen}</a></SettingsPanel>
   </SettingsPage></PageFrame>;

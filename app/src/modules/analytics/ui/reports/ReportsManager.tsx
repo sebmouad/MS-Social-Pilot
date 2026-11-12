@@ -239,7 +239,7 @@ export function ReportsManager({ templates, templateOptions, schedules, runs, ca
       { text: t("Reports use stored analytics. Missing data is shown as unavailable, not zero. “Prepare report” creates a download and does not email anyone; scheduled runs send to their saved recipients.") },
       { text: t("Top posts includes saved destination text, media links and article details. Content may have changed since publication; links may expire.") },
     ]} /></div><p>{canSchedule ? t("Reports go to the selected recipients on the workspace schedule.") : t("Existing schedules stay available for review and editing.")}</p></div></div>
-      {!canSchedule && <p className={styles.info} role="status">{t("Scheduled email is temporarily unavailable. You can still review and edit saved schedules.")}</p>}
+      {!canSchedule && schedules.length > 0 && <p className={styles.info} role="status">{t("Scheduled email is temporarily unavailable. You can still review and edit saved schedules.")}</p>}
       {schedules.length ? <DataTable caption={t("Scheduled reports")} rows={schedules} rowKey={row => row.id} columns={[
         { key: 'channel', label: t("Channel and frequency"), render: row => <><strong>{row.channelName ?? t("Unavailable channel")}</strong><span className={styles.secondaryLine}>{t(policy.frequencyOptions.find(option => option.id === row.frequency)?.label ?? t('Saved frequency ({0})', row.frequency))}</span></> },
         { key: 'report', label: t("Report"), render: row => row.templateName ?? (row.templateId ? t("Saved template unavailable") : t("All selected sections")) },

@@ -39,8 +39,8 @@ export function SettingsPage({ title, description, info, children, copy = settin
   </div></SettingsCopyProvider>;
 }
 
-export function SettingsPanel({ title, detail, children }: { title: string; detail?: string; children: ReactNode }) {
-  return <section className={styles['settings-panel']}><div className={styles['settings-panel__heading']}><div><h2>{title}</h2>{detail && <p>{detail}</p>}</div></div>{children}</section>;
+export function SettingsPanel({ title, detail, children, actions }: { title: string; detail?: string; children: ReactNode; actions?: ReactNode }) {
+  return <section className={styles['settings-panel']}><div className={styles['settings-panel__heading']}><div><h2>{title}</h2>{detail && <p>{detail}</p>}</div>{actions ? <div className={styles['settings-panel__actions']}>{actions}</div> : null}</div>{children}</section>;
 }
 
 export { Status } from './Status';
