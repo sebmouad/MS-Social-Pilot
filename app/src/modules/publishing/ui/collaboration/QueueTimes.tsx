@@ -84,8 +84,15 @@ export function QueueTimes({ slots, targets, canEditShared, canEditChannels, lim
     <div>{action.banner}</div>
     <section className={styles.section}><h2>{scope === '' ? c.shared_queue_times : fillComposerCopy(c.channelQueueTitle, { name: targets.find(target => target.id === scope)?.name ?? c.channel })}</h2>
       <p className={styles.help}>{c.queued_posts_take_the_next_available_saved_time_saving_changes_affects_future}</p>
-      {rows.length ? <div className={styles.tableWrap}><table className={styles.table}><caption className="sr-only">{scope === '' ? c.shared_queue_times : c.channel_queue_times}</caption><thead><tr><th scope="col">{c.day}</th><th scope="col">{c.time}</th>{canEdit && <th scope="col">{c.actions}</th>}</tr></thead>
-        <tbody>{rows.map(row => <tr key={slotKey(row)}><th scope="row">{DAYS[row.dayOfWeek]}</th><td>{pad(row.hour)}:{pad(row.minute)}</td>{canEdit && <td><Button size="sm" variant="quiet" disabled={action.busy} onClick={() => setRowsDraft(rows.filter(item => slotKey(item) !== slotKey(row)))}>{c.remove}</Button></td>}</tr>)}</tbody></table></div>
+      {/* A week at a glance (2026-11-12): one line per day with its times as chips; × removes a time from the draft. */}
+      {rows.length ? <ul className={styles.week} aria-label={scope === '' ? c.shared_queue_times : c.channel_queue_times}>{[1, 2, 3, 4, 5, 6, 0].map(dayIndex => {
+        const dayRows = rows.filter(row => row.dayOfWeek === dayIndex);
+        return <li key={dayIndex} className={styles.weekDay} data-empty={dayRows.length ? undefined : true}>
+          <span className={styles.weekDayName}>{DAYS[dayIndex]}</span>
+          <span className={styles.weekTimes}>{dayRows.length ? dayRows.map(row => <span key={slotKey(row)} className={styles.weekTime}>{pad(row.hour)}:{pad(row.minute)}{canEdit ? <button type="button" aria-label={`${c.remove} ${DAYS[row.dayOfWeek]} ${pad(row.hour)}:${pad(row.minute)}`} disabled={action.busy} onClick={() => setRowsDraft(rows.filter(item => slotKey(item) !== slotKey(row)))}>×</button> : null}</span>) : <span className={styles.weekNone}>—</span>}
+            {canEdit && rows.length < limit ? <button type="button" className={styles.weekAdd} aria-label={`${c.add_time} · ${DAYS[dayIndex]}`} disabled={action.busy} onClick={() => changeAdd({ ...add, dayOfWeek: dayIndex })} data-active={add.dayOfWeek === dayIndex || undefined}>+</button> : null}</span>
+        </li>;
+      })}</ul>
         : <p className={styles.empty}>{scope === '' ? c.no_shared_queue_times_yet : c.this_channel_has_no_own_times_and_currently_uses_the_shared_times}</p>}
       {canEdit ? <form noValidate className={styles.slotRow} onSubmit={event => { event.preventDefault(); if (!action.busy && rows.length < limit) addTime(); }}>
         <label className={styles.form}><span className={styles.meta}>{c.day}</span><select value={add.dayOfWeek} disabled={action.busy} onChange={event => changeAdd({ ...add, dayOfWeek: Number(event.currentTarget.value) })}>{DAYS.map((day, index) => <option key={day} value={index}>{day}</option>)}</select></label>

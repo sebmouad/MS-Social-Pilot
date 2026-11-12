@@ -141,8 +141,16 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
     // Month cells show the first few posts and « +N more »: only those are sent to the page (a busy month was ~3 MB).
     ...(() => {
       const all = (byDay.get(key) ?? []).sort((a, b) => a.whenIso.localeCompare(b.whenIso));
-      const shown = view === "month" ? all.slice(0, content.policy.monthPostsShown) : all;
-      return { posts: shown, moreCount: all.length - shown.length };
+      const busy = view === "month" && all.length > content.policy.monthPostsShown;
+      // A busy day in the month grid becomes one summary tile (count, channels, published vs planned) with a few pictures.
+      const shown = busy ? all.slice(0, 4) : all;
+      const summary = busy ? {
+        total: all.length,
+        channels: new Set(all.flatMap(post => post.channels.map(channel => channel.id))).size,
+        published: all.filter(post => post.status === "published" || post.status === "partially_failed").length,
+        failed: all.filter(post => post.status === "failed").length,
+      } : undefined;
+      return { posts: shown, moreCount: all.length - shown.length, ...(summary ? { summary } : {}) };
     })(),
   }));
 

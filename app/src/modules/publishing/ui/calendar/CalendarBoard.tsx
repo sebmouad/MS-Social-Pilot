@@ -216,8 +216,14 @@ export function CalendarBoard({ view, days, timeZone, nowIso, canCreate, filterQ
         return <li key={day.key} className={styles.day} data-outside={!day.inMonth || undefined} data-past={day.isPast || undefined} data-today={day.isToday || undefined} data-over={over === dropKey || undefined} {...dropProps(dropKey, day.key, undefined, day.isPast)}>
           <div className={styles.dayHead}><time dateTime={day.key} aria-label={day.longLabel + (day.isToday ? copy.todaySuffix : "")}>{Number(day.key.slice(8))}</time>{day.isToday && <span className={styles.todayTag}>{copy.today}</span>}</div>
           {milestoneList(day)}
-          {day.posts.slice(0, policy.monthPostsShown).map(post => postCard(post, true))}
-          {day.posts.length + (day.moreCount ?? 0) > policy.monthPostsShown && <a className={styles.more} href={`/content/calendar?view=week&date=${day.key}${filterQuery}`}>+{day.posts.length + (day.moreCount ?? 0) - policy.monthPostsShown}{copy.more}<span className="ui-visually-hidden">{copy.onDay}{day.longLabel}</span></a>}
+          {day.summary ? <a className={styles.daySummary} href={`/content/calendar?view=week&date=${day.key}${filterQuery}`}>
+            <span className={styles.daySummaryThumbs} aria-hidden="true">{day.posts.map(post => { const thumb = post.preview ? postThumbnail(post.preview.media) : null; return thumb?.url ? <img key={post.id} src={thumb.url} alt="" loading="lazy" /> : null; })}</span>
+            <strong>{fillCopy(locale === "fr" ? "{n} publications" : "{n} posts", { n: day.summary.total })}</strong>
+            <span>{fillCopy(locale === "fr" ? "{n} canaux" : "{n} channels", { n: day.summary.channels })}</span>
+            <span className={styles.daySummaryStates}>{day.summary.published ? <span data-tone="done">{fillCopy(locale === "fr" ? "{n} publiées" : "{n} published", { n: day.summary.published })}</span> : null}{day.summary.total - day.summary.published - day.summary.failed ? <span data-tone="planned">{fillCopy(locale === "fr" ? "{n} prévues" : "{n} planned", { n: day.summary.total - day.summary.published - day.summary.failed })}</span> : null}{day.summary.failed ? <span data-tone="failed">{fillCopy(locale === "fr" ? "{n} en échec" : "{n} failed", { n: day.summary.failed })}</span> : null}</span>
+            <span className="ui-visually-hidden">{copy.onDay}{day.longLabel}</span>
+          </a> : day.posts.slice(0, policy.monthPostsShown).map(post => postCard(post, true))}
+          {!day.summary && day.posts.length + (day.moreCount ?? 0) > policy.monthPostsShown && <a className={styles.more} href={`/content/calendar?view=week&date=${day.key}${filterQuery}`}>+{day.posts.length + (day.moreCount ?? 0) - policy.monthPostsShown}{copy.more}<span className="ui-visually-hidden">{copy.onDay}{day.longLabel}</span></a>}
           {canCreate && !day.isPast && day.freeSlots?.map(time => freePill(day, time))}
           {canCreate && !day.isPast && <a className={styles.add} href={newPostHref(day.key, defaultScheduleTime)}>{copy.addPost}<span className="ui-visually-hidden">{copy.onDay}{day.longLabel}</span></a>}
         </li>;

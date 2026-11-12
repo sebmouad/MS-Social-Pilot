@@ -34,3 +34,17 @@
 .slotRow > span:first-child { flex: 1 1 auto; min-width: 0; }
 .slotRow > button { white-space: nowrap; }
 .slotRow > p { flex: 1 0 100%; }
+
+/* Queue times as a week: one line per day, times as chips. */
+.week { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; border: 1px solid var(--line); border-radius: var(--radius-md); overflow: hidden; }
+.weekDay { display: grid; grid-template-columns: 84px minmax(0, 1fr); align-items: center; gap: 8px; min-height: 40px; padding: 6px 10px; background: var(--surface); }
+.weekDay + .weekDay { border-top: 1px solid var(--line-subtle); }
+.weekDayName { color: var(--ink-soft); font-size: var(--text-sm); font-weight: 650; }
+.weekTimes { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.weekTime { display: inline-flex; align-items: center; gap: 2px; padding: 2px 4px 2px 9px; border-radius: var(--radius-full); background: var(--accent-soft); color: var(--accent); font-size: var(--text-sm); font-weight: 650; font-variant-numeric: tabular-nums; }
+.weekTime button { width: 20px; height: 20px; padding: 0; border: 0; border-radius: var(--radius-full); background: none; color: inherit; font-size: 14px; line-height: 1; cursor: pointer; }
+.weekTime button:hover { background: color-mix(in srgb, var(--accent) 20%, transparent); }
+.weekNone { color: var(--ink-faint); }
+.weekAdd { width: 24px; height: 24px; padding: 0; border: 1px dashed var(--line-strong); border-radius: var(--radius-full); background: none; color: var(--ink-soft); cursor: pointer; }
+.weekAdd:hover, .weekAdd[data-active] { border-style: solid; border-color: var(--accent); color: var(--accent); }
+.weekTime button:focus-visible, .weekAdd:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }

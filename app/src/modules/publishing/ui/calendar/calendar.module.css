@@ -266,3 +266,16 @@
 .postTextButton { padding: 0; border: 0; background: none; font: inherit; text-align: start; cursor: pointer; }
 .postTextButton:hover { text-decoration: underline; }
 .postTextButton:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: 3px; }
+
+/* Busy day in the month grid: one summary tile instead of three cards and « +86 more ». */
+.daySummary { display: grid; gap: 4px; padding: 8px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface); color: var(--ink-soft); font-size: var(--text-xs); text-decoration: none; transition: border-color var(--ease-fast), background var(--ease-fast); }
+.daySummary:hover { border-color: var(--accent); background: var(--accent-soft); }
+.daySummary:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.daySummary strong { color: var(--ink); font-size: var(--text-md); font-weight: 750; }
+.daySummaryThumbs { display: flex; margin-bottom: 2px; }
+.daySummaryThumbs img { width: 26px; height: 26px; margin-right: -8px; border: 2px solid var(--surface); border-radius: var(--radius-full); object-fit: cover; }
+.daySummaryStates { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 2px; }
+.daySummaryStates span { padding: 1px 6px; border-radius: var(--radius-full); background: var(--surface-muted); font-weight: 650; }
+.daySummaryStates [data-tone="done"] { background: color-mix(in srgb, var(--success) 18%, transparent); color: var(--success); }
+.daySummaryStates [data-tone="planned"] { background: var(--accent-soft); color: var(--accent); }
+.daySummaryStates [data-tone="failed"] { background: color-mix(in srgb, var(--danger) 18%, transparent); color: var(--danger); }

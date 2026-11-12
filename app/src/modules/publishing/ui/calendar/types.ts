@@ -52,4 +52,6 @@ export type BoardDay = {
   posts: BoardPost[];
   /** Posts of this day not sent to the page (month view shows the first few and « +N more »). */
   moreCount?: number;
+  /** Month view, busy day: totals for the summary tile. */
+  summary?: { total: number; channels: number; published: number; failed: number };
 };
