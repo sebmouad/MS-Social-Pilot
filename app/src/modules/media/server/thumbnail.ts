@@ -36,3 +36,22 @@ export async function thumbnailWebp(bytes: Buffer, mimeType: string, width: numb
     if (timer) clearTimeout(timer);
   }
 }
+
+/**
+ * Made thumbnails, kept in memory by « workspace:image:width » (stored images never change under an id). Pages ask
+ * for dozens at once; without this every visit resized every picture again. Oldest entries go first past the budget.
+ */
+const CACHE_BUDGET_BYTES = 64 * 1024 * 1024;
+const cache = new Map<string, Buffer>();
+let cachedBytes = 0;
+export function cachedThumbnail(key: string): Buffer | null {
+  const hit = cache.get(key);
+  if (!hit) return null;
+  cache.delete(key); cache.set(key, hit);
+  return hit;
+}
+export function rememberThumbnail(key: string, value: Buffer) {
+  if (value.length > CACHE_BUDGET_BYTES / 16 || cache.has(key)) return;
+  cache.set(key, value); cachedBytes += value.length;
+  for (const [oldKey, oldValue] of cache) { if (cachedBytes <= CACHE_BUDGET_BYTES) break; cache.delete(oldKey); cachedBytes -= oldValue.length; }
+}
