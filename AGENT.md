@@ -318,3 +318,13 @@ ads_management (owner asked to rework Ads like Meta Ads Manager first). The subm
 3. User records F1–F6 (Facebook in English, app removed from Facebook's Apps and websites first so the grant is
    first-time); Claude cuts, captions and joins them into 14 videos; the user submits with the guide's texts and the
    reviewer instructions (current screen names, not the October ones).
+
+### 7.1f UX pass (2026-11-12)
+- Ads: three tabs (Overview · Manage · Compare). `/ads/campaigns` forwards to Manage except for the Boost flow
+  (`boostTarget`/`boostPost`); `/ads/analysis` forwards to Manage. Manage = `AdsManagerTable` (level cards,
+  selection with bulk on/off through preview→apply per item, sortable headers via `sort`/`direction`).
+- Calendar month: busy days send only 4 posts plus `summary`/`moreCount` (page went 2.9 MB → 0.5 MB). Keep
+  client props trimmed (targets: id/type/name/pictureUrl/platformName only).
+- Inbox: `AutoOpenFirst` opens the first item needing a reply on ≥1024px when no thread is chosen.
+- Approvals is a fixed 4-column board; Queue times show as a week of chips; Help is visible to signed-in members.
+- Still open: Queue page ~1.1 MB (per-post hidden details are server-rendered; load them on demand).
