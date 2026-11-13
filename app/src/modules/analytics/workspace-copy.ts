@@ -92,8 +92,8 @@ export const workspaceCopyDefaults = {
     "fr": "Deux groupes de canaux sur une période"
   },
   "Period A (UTC)": {
-    "en": "Period A (UTC)",
-    "fr": "Période A (UTC)"
+    "en": "This period",
+    "fr": "Cette période"
   },
   "From": {
     "en": "From",
@@ -104,16 +104,16 @@ export const workspaceCopyDefaults = {
     "fr": "Au"
   },
   "Period B (UTC)": {
-    "en": "Period B (UTC)",
-    "fr": "Période B (UTC)"
+    "en": "Compared with",
+    "fr": "Comparée à"
   },
   "Channels (none selected means all)": {
-    "en": "Channels (none selected means all)",
-    "fr": "Canaux (aucune sélection signifie tous)"
+    "en": "Channels",
+    "fr": "Canaux"
   },
   "One period (UTC)": {
-    "en": "One period (UTC)",
-    "fr": "Une période (UTC)"
+    "en": "Period",
+    "fr": "Période"
   },
   "Group A": {
     "en": "Group A",

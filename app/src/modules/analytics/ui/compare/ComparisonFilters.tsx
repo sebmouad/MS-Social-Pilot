@@ -46,7 +46,8 @@ export function ComparisonFilters({ mode: initialMode, channels, initial, copy =
     const endVal = dates[to];
     const matched = presets.find(item => item.start === startVal && item.end === endVal);
     const presetId = matched?.id ?? 'custom';
-    const summary = startVal && endVal ? `${startVal} – ${endVal}` : label;
+    const day = (iso: string, year: boolean) => /^\d{4}-\d{2}-\d{2}$/.test(iso) ? new Intl.DateTimeFormat(locale, { month: 'short', day: 'numeric', ...(year ? { year: 'numeric' } : {}), timeZone: 'UTC' }).format(new Date(`${iso}T12:00:00Z`)) : iso;
+    const summary = startVal && endVal ? `${day(startVal, startVal.slice(0, 4) !== endVal.slice(0, 4))} – ${day(endVal, true)}` : label;
     return <div className={styles.dates}>
       <input type="hidden" name={fromName} value={startVal} />
       <input type="hidden" name={toName} value={endVal} />
@@ -68,16 +69,25 @@ export function ComparisonFilters({ mode: initialMode, channels, initial, copy =
   };
   return <form noValidate action="/insights/compare" method="get" className={styles.card}>
     <div className={styles.top}>
-      <label>{t("Compare")}<select className="ui-input" name="mode" value={mode} onChange={event => setMode(event.currentTarget.value as typeof mode)}><option value="period">{t("The same channels across two periods")}</option><option value="channels">{t("Two groups of channels in one period")}</option></select></label>
+      {/* Mode as a segmented switch (2026-11-13). */}
+      <div className={styles.segmented} role="radiogroup" aria-label={t("Compare")}>
+        <label data-on={mode === 'period'}><input type="radio" name="mode" value="period" checked={mode === 'period'} onChange={() => setMode('period')} />{t("The same channels across two periods")}</label>
+        <label data-on={mode === 'channels'}><input type="radio" name="mode" value="channels" checked={mode === 'channels'} onChange={() => setMode('channels')} />{t("Two groups of channels in one period")}</label>
+      </div>
       {mode === 'channels' && <fieldset className={styles.inline}><legend className="ui-visually-hidden">{t("One period (UTC)")}</legend>{rangePicker('start', 'start', 'end', 'end', t("One period (UTC)"))}</fieldset>}
       <Button type="submit" variant="primary" size="sm" className={styles.submit}>{t("Compare")}</Button>
     </div>
     {mode === 'period' ? <>
-      <div className={styles.sides}>
-        <fieldset className={styles.side}><legend>{t("Period A (UTC)")}</legend>{rangePicker('aStart', 'aStart', 'aEnd', 'aEnd', t("Period A (UTC)"), true)}</fieldset>
-        <fieldset className={styles.side}><legend>{t("Period B (UTC)")}</legend>{rangePicker('bStart', 'bStart', 'bEnd', 'bEnd', t("Period B (UTC)"))}</fieldset>
+      <div className={styles.periodRow}>
+        <div className={styles.periodSide}><span className={styles.periodLabel}>{t("Period A (UTC)")}</span>{rangePicker('aStart', 'aStart', 'aEnd', 'aEnd', t("Period A (UTC)"), true)}</div>
+        <span className={styles.vs} aria-hidden="true">vs</span>
+        <div className={styles.periodSide}><span className={styles.periodLabel}>{t("Period B (UTC)")}</span>{rangePicker('bStart', 'bStart', 'bEnd', 'bEnd', t("Period B (UTC)"))}</div>
+        {/* Channels fold into one button; with none ticked every channel counts. */}
+        <details className={styles.channelPop}>
+          <summary className="ui-filter-button">{t("Channels (none selected means all)")} · {periodChannels.length ? `${periodChannels.length} / ${channels.length}` : `${channels.length}`}</summary>
+          <div className={styles.channelPanel}>{channelChoices('channel', periodChannels, setPeriodChannels)}</div>
+        </details>
       </div>
-      <fieldset className={styles.side}><legend>{t("Channels (none selected means all)")}</legend>{channelChoices('channel', periodChannels, setPeriodChannels)}</fieldset>
     </> : <div className={styles.sides}>
       <fieldset className={styles.side}><legend>{t("Group A")}</legend>{channelChoices('groupA', groupA, setGroupA)}</fieldset>
       <fieldset className={styles.side}><legend>{t("Group B")}</legend>{channelChoices('groupB', groupB, setGroupB)}</fieldset>
