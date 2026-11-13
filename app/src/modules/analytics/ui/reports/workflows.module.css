@@ -90,3 +90,7 @@
 .history > details { margin-left: var(--space-4); }
 .otherMetrics { margin-top: .8rem; }
 .otherMetrics > summary { min-height: 44px; display: flex; align-items: center; color: var(--ink-soft); font-weight: 650; cursor: pointer; }
+/* Compare (2026-11-13): coloured change and left-aligned metric names. */
+.up { color: var(--success); font-size: var(--text-md); font-style: normal; font-weight: 700; }
+.down { color: var(--danger); font-size: var(--text-md); font-style: normal; font-weight: 700; }
+.tableWrap th:first-child, .tableWrap td:first-child, .tableWrap tbody th { text-align: left; }
