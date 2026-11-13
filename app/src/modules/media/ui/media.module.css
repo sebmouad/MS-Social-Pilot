@@ -130,3 +130,24 @@
 .tileActions { justify-content: space-between; }
 @media (max-width: 38rem) { .tileBody { padding: var(--space-2) var(--space-3); } .tileActions { padding: 0 var(--space-3) var(--space-3); } .tileBody .meta { display: -webkit-box; overflow: hidden; -webkit-line-clamp: 2; -webkit-box-orient: vertical; } }
 @media (max-width: 38rem) { .tileActions :global(.ui-button--quiet) { display: none; } .tileActions :global(.ui-button--primary) { flex: 1 1 auto; } }
+
+/* Media library like Meta Business Suite (2026-11-13): one toolbar row, a slim storage line, and a dense grid of
+   square pictures; name and details sit on the picture, actions appear on hover or keyboard focus. */
+.filters { align-items: center; }
+.field { gap: 0; }
+.field label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.filters > :global(.ui-button--primary) { margin-left: auto; }
+.usage { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; padding: 8px 12px; border-radius: var(--radius-md); }
+.usage strong { font-size: var(--text-sm); }
+.usage .meter { flex: 0 1 220px; }
+.grid { grid-template-columns: repeat(auto-fill, minmax(168px, 1fr)); gap: 10px; }
+.tile { position: relative; display: block; border-radius: var(--radius-md); box-shadow: none; }
+.tile .preview { aspect-ratio: 1 / 1; width: 100%; }
+.badge { top: 8px; bottom: auto; left: 8px; padding: 1px 8px; font-size: 11px; }
+.tileBody { position: absolute; inset: auto 0 0 0; padding: 28px 10px 8px; background: linear-gradient(to top, rgb(0 0 0 / 78%), rgb(0 0 0 / 0)); pointer-events: none; }
+.tileBody .name { color: #fff; font-size: var(--text-sm); }
+.tileBody .meta { color: rgb(255 255 255 / 78%); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tileActions { position: absolute; top: 8px; right: 8px; padding: 0; opacity: 0; transition: opacity var(--ease-fast); }
+.tileActions :global(.ui-button--quiet) { display: none; }
+.tile:hover .tileActions, .tile:focus-within .tileActions { opacity: 1; }
+@media (hover: none) { .tileActions { opacity: 1; } }

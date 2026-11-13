@@ -44,7 +44,7 @@ export function PostCell({ post, locale = 'en', showOrigin = true }: { post: Row
     <MediaThumb url={thumbUrl(first)} alt={first?.altText?.trim() || ''} count={media.length} video={first?.kind === 'video'} locale={locale} />
     <div className={styles.cellText}>
       <span className={styles.message}>{postContentSummary(post.message, post.media, post.link, copy) || copy.noText}</span>
-      {media.length || (showOrigin && post.origin) ? <span className={styles.cellMeta}>{media.length ? <span className={styles.sub}>{media.length} {copy.mediaCount}</span> : null}{showOrigin && post.origin ? <OriginBadge origin={post.origin} /> : null}</span> : null}
+      {media.length || (showOrigin && post.origin) ? <span className={styles.cellMeta}>{media.length ? <span className={styles.sub}>{media.length} {copy.mediaCount}</span> : null}{showOrigin && post.origin ? <OriginBadge origin={post.origin} compact /> : null}</span> : null}
     </div>
   </div>;
 }

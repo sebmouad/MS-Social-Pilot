@@ -300,3 +300,8 @@
 .threadHead > .audience { padding: 0; border: 0; background: none; color: var(--ink-faint); font-size: 12px; line-height: 1.4; }
 .entry { padding: 12px 16px; }
 .entry p { font-size: 15px; line-height: 1.55; }
+
+/* One toolbar row like Meta Business Suite's inbox: filter, search and saved views side by side (2026-11-13). */
+.filterTools { flex-wrap: wrap; }
+.filterTools > form { flex: 0 1 520px !important; }
+@media (max-width: 760px) { .filterTools > form { flex: 1 1 100% !important; } }
