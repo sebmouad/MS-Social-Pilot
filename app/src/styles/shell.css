@@ -313,3 +313,23 @@
 .shell-channel-reset:hover { text-decoration: underline; }
 .shell[data-rail="true"] .shell-channel-switch { justify-content: center; padding: 6px; min-height: 44px; }
 .shell[data-rail="true"] .shell-channel-switch__avatars > :not(:first-child), .shell[data-rail="true"] .shell-channel-switch__text, .shell[data-rail="true"] .shell-channel-switch__chevron, .shell[data-rail="true"] .shell-channel-reset { display: none; }
+
+/* Channel picker (switcher dialog): search, All channels, pinned selection, scrolling list, sticky footer. */
+.ui-picker { display: grid; grid-template-rows: auto auto minmax(0, 1fr) auto; gap: 10px; min-height: 0; height: min(72vh, 680px); }
+.ui-picker__search { margin: 0; }
+.ui-picker__all { display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 4px 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); color: var(--ink); font: inherit; font-weight: 650; text-align: left; cursor: pointer; }
+.ui-picker__all.is-on { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+.ui-picker__scroll { min-height: 0; overflow-y: auto; overscroll-behavior: contain; margin: 0 -6px; padding: 0 6px; }
+.ui-picker__group { position: sticky; top: 0; z-index: 1; margin: 8px 0 4px; padding: 4px 2px; background: var(--surface-raised, var(--surface)); color: var(--ink-faint); font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+.ui-picker__list { display: grid; gap: 1px; margin: 0; padding: 0; list-style: none; }
+.ui-picker__row { display: flex; align-items: center; gap: 8px; padding: 0 6px; border-radius: 8px; }
+.ui-picker__row:hover { background: var(--surface-hover); }
+.ui-picker__row.is-on { background: var(--accent-soft); }
+.ui-picker__check { flex: 0 0 auto; width: 16px; height: 16px; accent-color: var(--accent); cursor: pointer; }
+.ui-picker__name { display: flex; flex: 1 1 auto; align-items: center; gap: 10px; min-width: 0; min-height: 40px; padding: 4px 2px; border: 0; background: none; color: var(--ink); font: inherit; text-align: left; cursor: pointer; }
+.ui-picker__label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ui-picker__health { margin-left: auto; color: var(--warning); font-size: var(--text-xs); font-weight: 650; white-space: nowrap; }
+.ui-picker__empty { margin: 16px 0; color: var(--ink-soft); text-align: center; }
+.ui-picker__foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding-top: 10px; border-top: 1px solid var(--line-subtle); }
+.ui-picker__actions { display: flex; gap: 6px; }
+.ui-picker__manage { color: var(--accent); font-size: var(--text-sm); font-weight: 650; }

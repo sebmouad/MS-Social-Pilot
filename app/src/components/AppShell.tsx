@@ -11,7 +11,8 @@ import { HubGlyph, ModuleGlyph } from "./icons";
 import { CommandPalette } from "./CommandPalette";
 import { ToastProvider } from "./Toast";
 import { ShellCopyProvider } from "./ShellCopy";
-import { ChannelScopeList, type ScopeChannel } from "./ChannelScopeList";
+import type { ScopeChannel } from "./ChannelScopeList";
+import { ChannelPicker } from "./ChannelPicker";
 import { BottomBar, type BottomBarItem } from "./BottomBar";
 import { LinkTabs } from "./Tabs";
 import { Menu, type MenuItem } from "./Menu";
@@ -180,7 +181,10 @@ export function AppShell({ children, activeModule, enabledModules, enabledFeatur
   const scope = urlScope.source === "url" ? urlScope.ids : [...initialScope];
   const dropped = urlScope.source === "url" ? urlScope.dropped : initialScopeDropped;
   const scopeLabel = scope.length === 0 ? copy.allChannels : scope.length === 1 ? channels.find(channel => channel.id === scope[0])?.name ?? copy.allChannels : fill(copy.channelCount, { count: scope.length });
-  const showScope = !installationMode && channels.length > 0;
+  // Only screens whose figures or lists follow the channel choice show the switcher (2026-11-13): Home, the Content
+  // lists, Inbox and Insights. Create, Library, feeds, Ads (ad accounts), Settings and the rest have no use for it.
+  const scopedScreen = /^\/(home$|inbox(\/|$)|insights(\/|$)|content$|content\/(calendar|queue|approvals)$)/.test(pathname ?? "");
+  const showScope = !installationMode && channels.length > 0 && scopedScreen;
   const applyScope = useCallback((ids: string[]) => {
     if (workspaceId) writeCookie(`${policy.scopeCookiePrefix}${workspaceId}`, ids.join(","), policy.scopeCookieDays);
     setNavigating(true);
@@ -434,7 +438,7 @@ export function AppShell({ children, activeModule, enabledModules, enabledFeatur
       </div>
       {bottomItems.length > 0 && <BottomBar label={copy.bottomBar} items={bottomItems} create={primaryAction ? { href: primaryAction.href, label: copy.createPost } : undefined} />}
       {scopeOpen && showScope && <Drawer open title={copy.scopeSheetTitle} variant={scopeSheet ? "sheet" : "drawer"} side="start" closeLabel={copy.close} onClose={() => setScopeOpen(false)}>
-        <ChannelScopeList channels={channels as ScopeChannel[]} selectedIds={scope} onSelect={(id, additive) => { onSelectChannel(id, additive); if (!additive) setScopeOpen(false); }} onReset={() => { applyScope([]); setScopeOpen(false); }} collapsedCount={policy.channelListMax} searchThreshold={policy.channelSearchThreshold} manageHref={enabledFeatures.includes("settings/connections") ? "/settings/channels" : undefined} busy={navigating} scopeActive={scopeActive} />
+        <ChannelPicker channels={channels as ScopeChannel[]} selectedIds={scope} busy={navigating} manageHref={enabledFeatures.includes("settings/connections") ? "/settings/channels" : undefined} onApply={ids => { setScopeOpen(false); applyScope(ids); }} />
       </Drawer>}
       <KeyboardShortcutsModal open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
     </div>
