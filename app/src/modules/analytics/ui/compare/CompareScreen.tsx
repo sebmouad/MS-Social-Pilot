@@ -52,6 +52,11 @@ export default async function ComparePage({ searchParams }: { searchParams: Prom
   const { workspace: copy } = await analyticsCopy();
   const locale = /^\s*fr\b/i.test((await headers()).get('accept-language') ?? '') ? 'fr' : 'en';
   const t = workspaceText(copy, locale);
+  // « Oct 17 – Nov 13, 2026 », like the period pickers (2026-11-13).
+  const range = (start: string, end: string) => {
+    const day = (iso: string, year: boolean) => /^\d{4}-\d{2}-\d{2}$/.test(iso) ? new Intl.DateTimeFormat(locale, { month: 'short', day: 'numeric', ...(year ? { year: 'numeric' } : {}), timeZone: 'UTC' }).format(new Date(`${iso}T12:00:00Z`)) : iso;
+    return `${day(start, start.slice(0, 4) !== end.slice(0, 4))} – ${day(end, true)}`;
+  };
   const formatValue = (value: number | null | undefined, unit: string, displayTotal?: string) => formatAnalyticsValue(value, unit, displayTotal, locale, copy);
   const searched = await searchParams;
   // Compare · Page benchmark (owner directive 2026-11-09). The tab is not a comparison filter, so the strict search schema never sees it.
@@ -92,8 +97,8 @@ export default async function ComparePage({ searchParams }: { searchParams: Prom
     start: first(params.start), end: first(params.end), channel: list(params.channel), groupA: list(params.groupA), groupB: list(params.groupB),
   }} />;
   const basis = data && (data.mode === 'period'
-    ? `A ${data.periods.a.start} – ${data.periods.a.end} · B ${data.periods.b.start} – ${data.periods.b.end} · ${data.selected.a.channelIds.length} ${t('channels')}`
-    : `${t('Group A')}: ${data.selected.a.channelIds.length} · ${t('Group B')}: ${data.selected.b.channelIds.length} · ${data.periods.a.start} – ${data.periods.a.end}`);
+    ? `${range(data.periods.a.start, data.periods.a.end)} vs ${range(data.periods.b.start, data.periods.b.end)} · ${data.selected.a.channelIds.length} ${t('channels')}`
+    : `${t('Group A')}: ${data.selected.a.channelIds.length} · ${t('Group B')}: ${data.selected.b.channelIds.length} · ${range(data.periods.a.start, data.periods.a.end)}`);
   return <PageFrame module="analytics" scopedAccess><div className={styles.root}>
     <PageHeader module="analytics" title={t('Compare periods or channels')} description={basis ?? undefined} info={<InfoTip name={t('Compare periods or channels')} blocks={[{ text: t("Differences are shown only where both sides measure the same thing with the same coverage. Reach and breakdowns are never subtracted, and missing data is unknown, not zero.") }]} />} actions={kindSwitch ?? undefined} tabs={tabs} />
     {view === 'compare' ? <>
@@ -114,7 +119,7 @@ export default async function ComparePage({ searchParams }: { searchParams: Prom
             <td className={styles.num}>{m.b ? formatValue(m.b.total, m.unit, m.b.displayTotal) : t('Unknown')}<br /><small>{m.b ? `${m.b.coverage}/${m.b.available} ${m.resourceKind === 'ad-account' ? t('ad accounts') : t('channels')}` : t('no data')}</small></td>
             <td className={styles.num}>{m.delta === null ? '–' : `${m.delta > 0 ? '+' : ''}${formatValue(m.delta, m.unit)}${m.percent === null ? '' : ` (${m.percent > 0 ? '+' : ''}${m.percent.toFixed(1)}%)`}`}</td>
             <td><strong>{t(LABEL[m.status] as keyof WorkspaceCopy)}</strong><br /><small>{m.reason}</small></td></tr>;
-          const table = (rows: typeof data.metrics, label: string) => <div className={styles.tableWrap} tabIndex={0} role="region" aria-label={label}><table><caption>{t("A is")}{" "}{data.mode === 'period' ? `${data.periods.a.start} to ${data.periods.a.end}` : t('group A')}{t("; B is")}{" "}{data.mode === 'period' ? `${data.periods.b.start} to ${data.periods.b.end}` : t('group B')}</caption><thead><tr><th scope="col">{t("Metric")}</th><th scope="col" className={styles.num}>{data.mode === 'period' ? t("Period A (UTC)") : t("Group A")}</th><th scope="col" className={styles.num}>{data.mode === 'period' ? t("Period B (UTC)") : t("Group B")}</th><th scope="col" className={styles.num}>{t("Difference (A minus B)")}</th><th scope="col">{t("Basis")}</th></tr></thead>
+          const table = (rows: typeof data.metrics, label: string) => <div className={styles.tableWrap} tabIndex={0} role="region" aria-label={label}><table><caption>{data.mode === 'period' ? `${t("Period A (UTC)")}: ${range(data.periods.a.start, data.periods.a.end)} · ${t("Period B (UTC)")}: ${range(data.periods.b.start, data.periods.b.end)}` : `${t("Group A")} · ${t("Group B")} · ${range(data.periods.a.start, data.periods.a.end)}`}</caption><thead><tr><th scope="col">{t("Metric")}</th><th scope="col" className={styles.num}>{data.mode === 'period' ? t("Period A (UTC)") : t("Group A")}</th><th scope="col" className={styles.num}>{data.mode === 'period' ? t("Period B (UTC)") : t("Group B")}</th><th scope="col" className={styles.num}>{t("Difference (A minus B)")}</th><th scope="col">{t("Basis")}</th></tr></thead>
           <tbody>{rows.map(metricRow)}</tbody></table></div>;
           const compared = data.metrics.filter(m => m.status === 'comparable');
           const others = data.metrics.filter(m => m.status !== 'comparable');

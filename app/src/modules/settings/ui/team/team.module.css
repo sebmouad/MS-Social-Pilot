@@ -72,3 +72,5 @@
 .teamBar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
 /* In the add window the channel choices use two columns where there is room. */
 .addForm fieldset > div, .addForm [class*="scope"] { min-width: 0; }
+.addForm .scopeList { grid-template-columns: repeat(2, minmax(0, 1fr)); max-height: 280px; overflow-y: auto; }
+@media (max-width: 520px) { .addForm .scopeList { grid-template-columns: minmax(0, 1fr); } }
