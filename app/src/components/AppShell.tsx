@@ -1,7 +1,7 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
-import { IconChevronsLeft, IconChevronsRight, IconCheck, IconChevronDown, IconHelp, IconKeyboard, IconLogout, IconMenu2, IconMoon, IconPlus, IconSettings, IconShieldLock, IconSun, IconUserCircle, IconX } from "@tabler/icons-react";
+import { IconChevronsLeft, IconChevronsRight, IconCheck, IconChevronDown, IconHelp, IconKeyboard, IconLogout, IconMenu2, IconMoon, IconPlus, IconSelector, IconSettings, IconShieldLock, IconSun, IconUserCircle, IconX } from "@tabler/icons-react";
 import { MODULES, areaForPath, areaPages, pageForPath, type AreaId, type ModuleId } from "@/lib/product";
 import { HUB_ORDER, hubForPath, hubPages, type HubId } from "@/lib/hubs";
 import { nextChannelScope, parseChannelScope, withChannelScope } from "@/lib/channel-scope";
@@ -83,6 +83,7 @@ export function AppShell({ children, activeModule, enabledModules, enabledFeatur
 
   const [menuOpen, setMenuOpen] = useState(false);
   const [scopeOpen, setScopeOpen] = useState(false);
+  const [scopeSheet, setScopeSheet] = useState(true);
   const [collapsed, setCollapsed] = useState(initialCollapsed);
   const [compactViewport, setCompactViewport] = useState(false);
   const [switching, setSwitching] = useState(false);
@@ -321,10 +322,18 @@ export function AppShell({ children, activeModule, enabledModules, enabledFeatur
     });
 
   const scopeActive = !settingsActive && activeArea !== "tasks" && activeArea !== "agency";
+  // Channel switcher (2026-11-13), like Meta Business Suite's account switcher: one button with the current choice
+  // that opens the searchable channel picker, instead of a long list in the sidebar.
+  const scopeChannels = (scope.length ? channels.filter(channel => scope.includes(channel.id)) : channels) as ScopeChannel[];
   const sidebarScope = showScope && <section className="shell-channels" aria-label={copy.channels}>
     <h2 className="shell-section-label">{copy.channels}</h2>
-    <ChannelScopeList channels={channels as ScopeChannel[]} selectedIds={scope} onSelect={onSelectChannel} onReset={() => applyScope([])} collapsedCount={policy.channelsCollapsedCount} searchThreshold={policy.channelSearchThreshold}
-      manageHref={enabledFeatures.includes("settings/connections") ? "/settings/channels" : undefined} compact={rail} busy={navigating} scopeActive={scopeActive} />
+    <button type="button" className={`shell-channel-switch${scope.length ? " is-filtered" : ""}`} aria-haspopup="dialog" aria-expanded={scopeOpen} title={rail ? scopeLabel : undefined}
+      onClick={() => { setScopeSheet(window.matchMedia("(max-width: 760px)").matches); setScopeOpen(true); }}>
+      <span className="shell-channel-switch__avatars" aria-hidden="true">{scopeChannels.slice(0, 3).map(channel => <Avatar key={channel.id} name={channel.name} src={channel.pictureUrl} size="sm" decorative />)}</span>
+      <span className="shell-channel-switch__text"><span className="shell-channel-switch__label">{scopeLabel}</span><span className="shell-channel-switch__sub">{scope.length ? fill(copy.channelCount, { count: scope.length }) + ` / ${channels.length}` : fill(copy.channelCount, { count: channels.length })}</span></span>
+      <IconSelector size={16} stroke={1.9} aria-hidden="true" className="shell-channel-switch__chevron" />
+    </button>
+    {scope.length ? <button type="button" className="shell-channel-reset" onClick={() => applyScope([])}>{copy.allChannels}</button> : null}
   </section>;
 
   const currentWorkspace = workspaces.find(entry => entry.id === workspaceId);
@@ -380,7 +389,7 @@ export function AppShell({ children, activeModule, enabledModules, enabledFeatur
         <header className="shell-topbar">
           <div className="shell-topbar__start">
             <button ref={menuToggleRef} className="shell-menu-toggle" type="button" aria-expanded={menuOpen} aria-controls="shell-sidebar" aria-label={copy.openMenu} onClick={() => menuOpen ? closeMenu() : setMenuOpen(true)}><IconMenu2 size={20} stroke={1.9} aria-hidden="true" /></button>
-            {showScope && <button type="button" className="shell-scope-chip" aria-haspopup="dialog" aria-expanded={scopeOpen} onClick={() => setScopeOpen(true)}><span className="shell-scope-chip__label">{scopeLabel}</span><IconChevronDown size={15} stroke={2} aria-hidden="true" /></button>}
+            {showScope && <button type="button" className="shell-scope-chip" aria-haspopup="dialog" aria-expanded={scopeOpen} onClick={() => { setScopeSheet(true); setScopeOpen(true); }}><span className="shell-scope-chip__label">{scopeLabel}</span><IconChevronDown size={15} stroke={2} aria-hidden="true" /></button>}
             {installationMode && <span className="shell-root-badge"><ModuleGlyph id="root" size={15} /><span>{copy.rootBadge}</span></span>}
           </div>
           <div className="shell-topbar__tools">
@@ -424,8 +433,8 @@ export function AppShell({ children, activeModule, enabledModules, enabledFeatur
         </main>
       </div>
       {bottomItems.length > 0 && <BottomBar label={copy.bottomBar} items={bottomItems} create={primaryAction ? { href: primaryAction.href, label: copy.createPost } : undefined} />}
-      {scopeOpen && showScope && <Drawer open title={copy.scopeSheetTitle} variant="sheet" closeLabel={copy.close} onClose={() => setScopeOpen(false)}>
-        <ChannelScopeList channels={channels as ScopeChannel[]} selectedIds={scope} onSelect={onSelectChannel} onReset={() => applyScope([])} collapsedCount={policy.channelsCollapsedCount} searchThreshold={policy.channelSearchThreshold} manageHref={enabledFeatures.includes("settings/connections") ? "/settings/channels" : undefined} busy={navigating} scopeActive={scopeActive} />
+      {scopeOpen && showScope && <Drawer open title={copy.scopeSheetTitle} variant={scopeSheet ? "sheet" : "drawer"} side="start" closeLabel={copy.close} onClose={() => setScopeOpen(false)}>
+        <ChannelScopeList channels={channels as ScopeChannel[]} selectedIds={scope} onSelect={(id, additive) => { onSelectChannel(id, additive); if (!additive) setScopeOpen(false); }} onReset={() => { applyScope([]); setScopeOpen(false); }} collapsedCount={policy.channelListMax} searchThreshold={policy.channelSearchThreshold} manageHref={enabledFeatures.includes("settings/connections") ? "/settings/channels" : undefined} busy={navigating} scopeActive={scopeActive} />
       </Drawer>}
       <KeyboardShortcutsModal open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
     </div>

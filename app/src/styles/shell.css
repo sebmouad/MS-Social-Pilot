@@ -296,3 +296,20 @@
 .shell-channels .ui-scope__item { min-height: 32px; }
 /* The workspace switcher speaks for itself, as Meta's account switcher does: its label stays for screen readers only. */
 .shell-workspace-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* Channel switcher (Meta-style account switcher). */
+.shell-channel-switch { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 52px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); color: var(--ink); font: inherit; text-align: left; cursor: pointer; transition: border-color var(--ease-fast), background var(--ease-fast); }
+.shell-channel-switch:hover { border-color: var(--line-strong); background: var(--surface-hover); }
+.shell-channel-switch:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.shell-channel-switch.is-filtered { border-color: var(--accent); background: var(--accent-soft); }
+.shell-channel-switch__avatars { display: flex; flex: 0 0 auto; }
+.shell-channel-switch__avatars > * { margin-left: -10px; border-radius: 999px; box-shadow: 0 0 0 2px var(--rail-bg); }
+.shell-channel-switch__avatars > :first-child { margin-left: 0; }
+.shell-channel-switch__text { display: grid; flex: 1 1 auto; min-width: 0; }
+.shell-channel-switch__label { overflow: hidden; font-size: var(--text-md); font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+.shell-channel-switch__sub { color: var(--ink-soft); font-size: var(--text-xs); }
+.shell-channel-switch__chevron { flex: 0 0 auto; color: var(--ink-soft); }
+.shell-channel-reset { justify-self: start; margin-top: 4px; padding: 2px 4px; border: 0; background: none; color: var(--accent); font: inherit; font-size: var(--text-xs); font-weight: 650; cursor: pointer; }
+.shell-channel-reset:hover { text-decoration: underline; }
+.shell[data-rail="true"] .shell-channel-switch { justify-content: center; padding: 6px; min-height: 44px; }
+.shell[data-rail="true"] .shell-channel-switch__avatars > :not(:first-child), .shell[data-rail="true"] .shell-channel-switch__text, .shell[data-rail="true"] .shell-channel-switch__chevron, .shell[data-rail="true"] .shell-channel-reset { display: none; }
