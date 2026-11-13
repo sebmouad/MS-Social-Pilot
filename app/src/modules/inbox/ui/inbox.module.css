@@ -302,6 +302,6 @@
 .entry p { font-size: 15px; line-height: 1.55; }
 
 /* One toolbar row like Meta Business Suite's inbox: filter, search and saved views side by side (2026-11-13). */
-.filterTools { flex-wrap: wrap; }
+.filterTools { flex: 1 1 auto; flex-wrap: wrap; }
 .filterTools > form { flex: 0 1 520px !important; }
 @media (max-width: 760px) { .filterTools > form { flex: 1 1 100% !important; } }
