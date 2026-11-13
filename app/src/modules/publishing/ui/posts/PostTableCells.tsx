@@ -44,8 +44,7 @@ export function PostCell({ post, locale = 'en', showOrigin = true }: { post: Row
     <MediaThumb url={thumbUrl(first)} alt={first?.altText?.trim() || ''} count={media.length} video={first?.kind === 'video'} locale={locale} />
     <div className={styles.cellText}>
       <span className={styles.message}>{postContentSummary(post.message, post.media, post.link, copy) || copy.noText}</span>
-      {media.length ? <span className={styles.sub}>{media.length} {copy.mediaCount}</span> : null}
-      {showOrigin && post.origin ? <OriginBadge origin={post.origin} /> : null}
+      {media.length || (showOrigin && post.origin) ? <span className={styles.cellMeta}>{media.length ? <span className={styles.sub}>{media.length} {copy.mediaCount}</span> : null}{showOrigin && post.origin ? <OriginBadge origin={post.origin} /> : null}</span> : null}
     </div>
   </div>;
 }
@@ -131,8 +130,16 @@ export function StatusCell({ post, locale = 'en' }: { post: Row; locale?: KitLoc
   const done = post.targets.filter(row => row.status === 'published').length;
   return <div className={styles.statusCell}>
     <StatusChip status={post.status} locale={locale} />
-    {scheduled ? <ScheduleBadge mode={remote ? 'remote' : 'application'} locale={locale} platformName={remote ? remotePlatformName(post) : undefined} /> : null}
+    {scheduled && remote ? <ScheduleBadge mode="remote" locale={locale} platformName={remotePlatformName(post)} /> : null}
     {post.targets.length > 1 && (failed || done) ? <span className={styles.sub}>{done}/{post.targets.length}</span> : null}
     {failed ? <AttentionHint locale={locale} /> : null}
   </div>;
+}
+
+/** One figure per column, as in Meta Business Suite's post list; an em dash before the first measure. */
+export function MetricCell({ reach, metric, locale = 'en' }: { reach?: PostPerformanceMetrics | null; metric: 'reach' | 'likes' | 'comments' | 'shares'; locale?: KitLocale }) {
+  const measured = reach && (reach.measured > 0 || (reach.reach ?? 0) > 0 || reach.likes > 0 || reach.comments > 0 || reach.shares > 0);
+  if (!measured) return <span className={styles.emptyMetric}>—</span>;
+  const value = metric === 'reach' ? (reach.reach || reach.value || reach.views || 0) : reach[metric] ?? 0;
+  return <span className={styles.metricValue}>{value.toLocaleString(locale)}</span>;
 }

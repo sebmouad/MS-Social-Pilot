@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { IconAlertTriangle, IconArrowUpRight, IconCalendarEvent, IconClockHour4, IconEye, IconHeart, IconInbox, IconLink, IconPlugConnected, IconPlus, IconSparkles, IconSpeakerphone, IconUsers } from '@tabler/icons-react';
+import { IconAlertTriangle, IconChartBar, IconArrowUpRight, IconCalendarEvent, IconClockHour4, IconEye, IconHeart, IconInbox, IconLink, IconPlugConnected, IconPlus, IconSparkles, IconSpeakerphone, IconUsers } from '@tabler/icons-react';
 import { InfoTip } from '@/components/InfoTip';
 import { ListRow } from '@/components/ListRow';
 import { HomeRetry } from './HomeRetry';
@@ -203,6 +203,18 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
           </>}
         </Body>
       </Card>}
+
+      {overview.recent && overview.recent.state === 'ready' ? <Card module="publishing" icon={<IconChartBar size={20} />} title={locale.startsWith('fr') ? 'Publications récentes' : 'Recent posts'} t={t} span="span8" id="home-recent">
+        <div className={styles.recentHead} aria-hidden="true"><span /><span>{locale.startsWith('fr') ? 'Portée' : 'Reach'}</span><span>{locale.startsWith('fr') ? 'Réactions' : 'Reactions'}</span><span>{locale.startsWith('fr') ? 'Commentaires' : 'Comments'}</span></div>
+        <div className={styles.list}>{overview.recent.data.items.map(item => <a key={item.id} className={styles.recentRow} href={`/content?status=published&post=${encodeURIComponent(item.id)}`}>
+          <PostThumb thumb={item.thumbnail} size="md" />
+          <span className={styles.recentText}><strong>{item.text || '—'}</strong><span><time dateTime={item.publishedAt}>{timeFormat.format(new Date(item.publishedAt))}</time> · {item.channels.join(', ')}</span></span>
+          <span className={styles.recentFigure}>{item.reach === null ? '—' : number.format(item.reach)}</span>
+          <span className={`${styles.recentFigure} ${styles.recentMore}`}>{item.reach === null ? '—' : number.format(item.reactions)}</span>
+          <span className={`${styles.recentFigure} ${styles.recentMore}`}>{item.reach === null ? '—' : number.format(item.comments)}</span>
+        </a>)}</div>
+        <TileLink href="/insights/posts" label={locale.startsWith('fr') ? 'Toutes les publications' : 'All posts'} />
+      </Card> : null}
 
       </div>
       <div className={styles.rail}>

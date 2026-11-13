@@ -86,3 +86,9 @@
 .split .panel { width: min(880px, calc(100% - 32px)); max-height: min(92dvh, 940px); }
 @media (max-width: 640px) { .split .panel { width: 100vw; max-height: calc(100dvh - 28px - env(safe-area-inset-top)); } }
 @media (min-width: 761px) { .panelBody { grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); align-items: start; } .panelBody > :first-child { grid-row: 1 / span 6; } }
+
+/* Meta-style post list (2026-11-13): one meta line (media · origin), one figure per results column. */
+.cellMeta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; }
+.cellMeta > * { margin: 0; }
+.metricValue { color: var(--ink); font-size: var(--text-md); font-weight: 650; font-variant-numeric: tabular-nums; }
+.when { white-space: nowrap; color: var(--ink-soft); font-variant-numeric: tabular-nums; }

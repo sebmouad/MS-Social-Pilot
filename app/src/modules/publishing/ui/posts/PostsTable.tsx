@@ -16,7 +16,7 @@ import { BulkPostActions } from './BulkPostActions';
 import { OriginBadge } from '../origins/OriginBadge';
 import { PostRowActions } from './PostActions';
 import type { PostOriginView } from '../origins/post-origin';
-import { COMMENT_WORDS, ChannelsCell, LIKE_WORDS, PostCell, REACH_WORDS, ReachCell, StatusCell, countLabel, postThumbUrl } from './PostTableCells';
+import { COMMENT_WORDS, ChannelsCell, LIKE_WORDS, PostCell, REACH_WORDS, MetricCell, StatusCell, countLabel, postThumbUrl } from './PostTableCells';
 import styles from './posts-table.module.css';
 
 type ManageProps = ComponentProps<typeof PostRowActions>;
@@ -62,8 +62,14 @@ export function PostsTable({ rows, caption, locale = 'en', timeZone = 'UTC', sel
     { key: 'post', label: copy.columnPost, render: row => <><button type="button" className={styles.rowOpen} aria-haspopup="true" aria-expanded={openId === row.id} aria-label={fillContent(content.postsOpenRow, { text: label(row).slice(0, 80) })} onClick={event => { event.stopPropagation(); show(openId === row.id ? null : row.id); }}><PostCell post={row} locale={locale} showOrigin={false} /></button>{row.origin ? <span className={styles.rowOrigin}><OriginBadge origin={row.origin} /></span> : null}</> },
     { key: 'channels', label: copy.columnChannels, render: row => <ChannelsCell post={row} locale={locale} /> },
     { key: 'status', label: copy.columnStatus, render: row => <StatusCell post={row} locale={locale} /> },
-    { key: 'reach', label: copy.columnReach, align: 'end', render: row => <ReachCell reach={row.reach} locale={locale} /> },
-    { key: 'scheduled', label: copy.columnWhen, render: row => row.whenLabel },
+    { key: 'scheduled', label: copy.columnWhen, render: row => <span className={styles.when}>{row.whenLabel}</span> },
+    // Results as separate columns (Meta Business Suite): only once at least one post on the page has been measured.
+    ...(rows.some(row => row.reach && (row.reach.measured > 0 || row.reach.likes > 0)) ? ([
+      { key: 'reach', label: copy.columnReach, align: 'end', render: (row: PostsTableRow) => <MetricCell reach={row.reach} metric="reach" locale={locale} /> },
+      { key: 'likes', label: locale === 'fr' ? 'Réactions' : 'Reactions', align: 'end', render: (row: PostsTableRow) => <MetricCell reach={row.reach} metric="likes" locale={locale} /> },
+      { key: 'comments', label: locale === 'fr' ? 'Commentaires' : 'Comments', align: 'end', render: (row: PostsTableRow) => <MetricCell reach={row.reach} metric="comments" locale={locale} /> },
+      { key: 'shares', label: locale === 'fr' ? 'Partages' : 'Shares', align: 'end', render: (row: PostsTableRow) => <MetricCell reach={row.reach} metric="shares" locale={locale} /> },
+    ] as TableColumn<PostsTableRow>[]) : []),
   ];
   if (!rows.length) return <>{empty}</>;
   return <>

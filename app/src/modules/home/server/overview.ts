@@ -14,6 +14,7 @@ import { readChannelMeasures, readChannelPostHistory } from '@/modules/analytics
 import { readInboxList } from '@/modules/inbox/server/read';
 import { readAdsDailyRows } from '@/modules/ads/server/report-read';
 import { readPublishingPostPage } from '@/modules/publishing/server/read';
+import { loadPostReach } from '@/modules/publishing/server/post-reach';
 import { pendingApprovalCount } from '@/modules/publishing/server/approvals-badge';
 import { shellChannels } from '@/modules/shell/server/channels';
 import { engagementHeatmap, lastDays, periodTotals, scheduleMode, snippet, spendByCurrency, sumKnown, type HeatmapCell, type Known, type ScheduleMode } from './overview-pure';
@@ -46,6 +47,7 @@ export type HomeOverview = {
   }> | null;
   bestTimes: Section<{ cells: HeatmapCell[]; measuredPosts: number }> | null;
   upcoming: Section<{ total: number; items: Array<{ id: string; text: string; scheduledAt: string; channels: string[]; mode: ScheduleMode; thumbnail: PostThumbnail | null }> }> | null;
+  recent: Section<{ items: Array<{ id: string; text: string; publishedAt: string; channels: string[]; thumbnail: PostThumbnail | null; reach: number | null; reactions: number; comments: number; shares: number }> }> | null;
   inbox: Section<{ open: number; recent: Array<{ key: string; author: string; preview: string; time: string; channel: string; unread: number }> }> | null;
   ads: Section<{ start: string; end: string; spend: Array<{ currency: string | null; total: number; firstDay: string; lastDay: string; recordedDays: number; daily: TrendPoint[] }> }> | null;
   attention: Section<HomeAttention> | null;
@@ -194,6 +196,21 @@ export async function readHomeOverview(actor: HomeActor, now = new Date(), optio
     return { state: 'ready', data: { total: page.total, items } };
   });
 
+  // Recent posts with their results, as on Meta Business Suite's home.
+  const recent = !allowed('publishing/posts') ? null : settled<Data<'recent'>>(async () => {
+    const page = await readPublishingPostPage({ userId: actor.userId, workspaceId: actor.workspaceId, ...(channelScope ? { allowedTargetIds: channelScope } : {}) }, { status: 'published' });
+    if (!page.total) return { state: 'empty' };
+    const posts = page.posts.slice(0, Number(config['home.upcomingLimit']));
+    const reach = await loadPostReach(actor.workspaceId, posts.map(post => post.id)).catch(() => new Map());
+    const text = Number(config['home.snippetCharacters']);
+    return { state: 'ready', data: { items: posts.map(post => {
+      const metrics = reach.get(post.id);
+      const measured = metrics && (metrics.measured > 0 || metrics.likes > 0 || (metrics.reach ?? 0) > 0);
+      return { id: post.id, text: snippet(post.message, text), publishedAt: (post.publishedAt ?? post.createdAt).toISOString(), channels: post.targets.map(target => target.target.name), thumbnail: postThumbnail(post.media),
+        reach: measured ? (metrics.reach || metrics.value || metrics.views || 0) : null, reactions: metrics?.likes ?? 0, comments: metrics?.comments ?? 0, shares: metrics?.shares ?? 0 };
+    }) } };
+  });
+
   const inbox = !allowed('inbox/conversations') ? null : settled<Data<'inbox'>>(async () => {
     const recentLimit = Number(config['home.recentInboxLimit']);
     const previewLength = Number(config['home.recentInboxPreviewCharacters']);
@@ -257,6 +274,6 @@ export async function readHomeOverview(actor: HomeActor, now = new Date(), optio
   });
 
   // Each card still isolates its own failure, while independent stored-data reads overlap.
-  const [audienceData, performanceData, bestTimesData, upcomingData, inboxData, adsData, attentionData] = await Promise.all([audience, performance, bestTimes, upcoming, inbox, ads, attention]);
-  return { generatedAt: now.toISOString(), lookbackDays, timeZone, channelCount: channels.length, audience: audienceData, performance: performanceData, bestTimes: bestTimesData, upcoming: upcomingData, inbox: inboxData, ads: adsData, attention: attentionData };
+  const [audienceData, performanceData, bestTimesData, upcomingData, recentData, inboxData, adsData, attentionData] = await Promise.all([audience, performance, bestTimes, upcoming, recent, inbox, ads, attention]);
+  return { generatedAt: now.toISOString(), lookbackDays, timeZone, channelCount: channels.length, audience: audienceData, performance: performanceData, bestTimes: bestTimesData, upcoming: upcomingData, recent: recentData, inbox: inboxData, ads: adsData, attention: attentionData };
 }
