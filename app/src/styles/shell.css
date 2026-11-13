@@ -294,3 +294,5 @@
 .shell-hub { min-height: 36px; padding: 6px 10px; }
 .shell-hubs + .shell-channels, .shell-hubs + * { padding-top: 10px; }
 .shell-channels .ui-scope__item { min-height: 32px; }
+/* The workspace switcher speaks for itself, as Meta's account switcher does: its label stays for screen readers only. */
+.shell-workspace-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
