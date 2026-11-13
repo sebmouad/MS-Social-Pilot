@@ -28,8 +28,8 @@ export const workspaceCopyDefaults = {
     "fr": "canaux renseignés"
   },
   "Difference (A minus B)": {
-    "en": "Difference (A minus B)",
-    "fr": "Différence (A moins B)"
+    "en": "Change",
+    "fr": "Évolution"
   },
   "Metrics": {
     "en": "Metrics",
