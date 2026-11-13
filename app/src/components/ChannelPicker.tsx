@@ -51,7 +51,7 @@ export function ChannelPicker({ channels, selectedIds, onApply, manageHref, busy
     </button>
     <div className="ui-picker__scroll">
       {pinned.length ? <><p className="ui-picker__group">{fr ? "Sélectionnés" : "Selected"}</p><ul className="ui-picker__list">{pinned.map(row)}</ul></> : null}
-      {rest.length ? <>{pinned.length || needle ? <p className="ui-picker__group">{needle ? fill(fr ? "{count} résultat(s)" : "{count} result(s)", { count: rest.length }) : fr ? "Tous les canaux" : "All channels"}</p> : null}<ul className="ui-picker__list">{rest.map(row)}</ul></> : null}
+      {rest.length ? <>{pinned.length || needle ? <p className="ui-picker__group">{needle ? rest.length === 1 ? (fr ? "1 résultat" : "1 result") : fill(fr ? "{count} résultats" : "{count} results", { count: rest.length }) : fr ? "Tous les canaux" : "All channels"}</p> : null}<ul className="ui-picker__list">{rest.map(row)}</ul></> : null}
       {matches.length === 0 ? <p className="ui-picker__empty" role="status">{copy.noChannelMatch}</p> : null}
     </div>
     <div className="ui-picker__foot">
@@ -59,7 +59,7 @@ export function ChannelPicker({ channels, selectedIds, onApply, manageHref, busy
       <span className="ui-picker__actions">
         {draft.size ? <button type="button" className="ui-button ui-button--quiet ui-button--sm" disabled={busy} onClick={() => setDraft(new Set())}>{fr ? "Tout décocher" : "Clear"}</button> : null}
         <button type="button" className="ui-button ui-button--primary ui-button--sm" disabled={busy || !changed} onClick={() => onApply([...draft])}>
-          {draft.size === 0 ? copy.allChannels : fill(fr ? "Afficher {count} canal(aux)" : "Show {count} channel(s)", { count: draft.size })}
+          {draft.size === 0 ? copy.allChannels : draft.size === 1 ? (fr ? "Afficher 1 canal" : "Show 1 channel") : fill(fr ? "Afficher {count} canaux" : "Show {count} channels", { count: draft.size })}
         </button>
       </span>
     </div>

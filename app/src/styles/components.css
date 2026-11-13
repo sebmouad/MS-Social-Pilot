@@ -617,3 +617,11 @@ th[aria-sort="ascending"], th[aria-sort="descending"] { color: var(--ink); }
 .ui-dialog--detail > .ui-dialog__header { flex: 0 0 auto; align-items: center; padding: 14px 16px 14px 24px; }
 .ui-dialog--detail > .ui-dialog__body { flex: 1 1 auto; min-height: 0; overflow: auto; overscroll-behavior: contain; }
 .ui-dialog--detail > .ui-dialog__actions { flex: 0 0 auto; padding: 14px 24px; }
+
+/* « More » menu for less-used header tools (no script needed). */
+.ui-more-menu { position: relative; }
+.ui-more-menu > summary { list-style: none; cursor: pointer; }
+.ui-more-menu > summary::-webkit-details-marker { display: none; }
+.ui-more-menu__panel { position: absolute; z-index: 40; top: calc(100% + 6px); right: 0; display: grid; min-width: 220px; padding: 6px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-raised, var(--surface)); box-shadow: var(--shadow-pop, 0 12px 32px rgb(0 0 0 / 30%)); }
+.ui-more-menu__panel a { display: flex; align-items: center; gap: 10px; min-height: 36px; padding: 6px 10px; border-radius: var(--radius-sm); color: var(--ink); font-size: var(--text-sm); font-weight: 600; text-decoration: none; }
+.ui-more-menu__panel a:hover, .ui-more-menu__panel a:focus-visible { background: var(--surface-hover); }

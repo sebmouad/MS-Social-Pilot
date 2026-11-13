@@ -1,4 +1,4 @@
-import { IconChartBar, IconPlugConnected, IconDownload, IconPin } from '@tabler/icons-react';
+import { IconChartBar, IconPlugConnected, IconDownload, IconPin, IconDots, IconNote } from '@tabler/icons-react';
 import { EmptyState } from '@/components/EmptyState';
 import { PageFrame } from '@/server/PageFrame';
 import { requireViewer } from '@/server/context';
@@ -106,9 +106,15 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
     <InsightsHeader runtime={runtime} title={copy.overviewTitle} info={copy.overviewInfo} period={period}
       actions={<>
         <SyncNowButton locale={locale} />
-        {may('analytics/pins') && snapshot && channelIds.length > 0 && <a className="ui-button ui-button--quiet ui-button--md" href="/insights/pins"><IconPin size={16} stroke={1.9} aria-hidden="true" /> {copy.pinsManage}</a>}
-        {notesLink && <a className="ui-button ui-button--quiet ui-button--md" href={notesLink.href}>{notesLink.label}</a>}
         {canExport && reportQuery && <a className="ui-button ui-button--secondary ui-button--md" href={`/api/reports/export?${reportQuery}`}><IconDownload size={16} stroke={1.9} aria-hidden="true" /> {copy.downloadReport}</a>}
+        {/* Less-used tools fold into « More », as Meta keeps its header to the period and export (2026-11-13). */}
+        {(may('analytics/pins') && snapshot && channelIds.length > 0) || notesLink ? <details className="ui-more-menu">
+          <summary className="ui-button ui-button--quiet ui-button--md" aria-label={locale === 'fr' ? 'Plus d’actions' : 'More actions'}><IconDots size={18} stroke={1.9} aria-hidden="true" /></summary>
+          <div className="ui-more-menu__panel" role="menu">
+            {may('analytics/pins') && snapshot && channelIds.length > 0 && <a role="menuitem" href="/insights/pins"><IconPin size={16} stroke={1.9} aria-hidden="true" /> {copy.pinsManage}</a>}
+            {notesLink && <a role="menuitem" href={notesLink.href}><IconNote size={16} stroke={1.9} aria-hidden="true" /> {notesLink.label}</a>}
+          </div>
+        </details> : null}
       </>} />
     {failure && <EmptyState tone="error" title={copy.loadFailedTitle} action={<a href={retry}>{copy.retry}</a>}>{failure}</EmptyState>}
     {snapshot && !snapshot.options.channels.length && <EmptyState icon={<IconPlugConnected />} title={copy.noChannelsTitle} action={canConnect ? <a className="ui-button ui-button--primary ui-button--md" href="/settings/channels">{copy.noChannelsAction}</a> : undefined}>{copy.noChannelsBody}</EmptyState>}

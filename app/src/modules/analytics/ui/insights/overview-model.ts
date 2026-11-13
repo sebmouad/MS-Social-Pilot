@@ -134,7 +134,11 @@ export function headlineTiles(snapshot: Pick<AnalyticsSnapshot, 'allMetrics' | '
 export function chartMetrics(snapshot: Pick<AnalyticsSnapshot, 'allMetrics' | 'previousPoints' | 'comparisons'>, headline: ReadonlyArray<{ key: string }>, policy: InsightsPolicy, context: Context & { exploreHref: (key: string) => string }): ChartMetric[] {
   const plottable = snapshot.allMetrics.filter(metric => metric.resourceKind === 'channel' && metric.kind !== 'breakdown' && metric.points.length > 1);
   const first = headline.map(item => plottable.find(metric => metric.key === item.key)).filter((metric): metric is MetricView => Boolean(metric));
-  const rest = plottable.filter(metric => !first.includes(metric)).sort((a, b) => b.points.length - a.points.length);
+  const others = plottable.filter(metric => !first.includes(metric)).sort((a, b) => b.points.length - a.points.length);
+  // Plain measures first, as Meta's Results chart does: rolling windows and per-channel variants (« Media views ·
+  // last 28 days », « … · Latest per channel ») stay in Explore unless nothing plainer exists (2026-11-13).
+  const plain = others.filter(metric => !metric.label.includes(' · '));
+  const rest = first.length + plain.length >= 2 ? plain : others;
   return [...first, ...rest].slice(0, policy.chartMetricsMax).map(metric => {
     const tile = metricTile(metric.key, metric.label, metric, snapshot.comparisons[metric.key], context);
     return {
