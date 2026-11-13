@@ -288,3 +288,9 @@
 .shell-channels > :first-child { text-transform: uppercase; letter-spacing: .06em; font-size: 11px; opacity: .75; }
 .shell-create { border-radius: 10px; font-weight: 700; box-shadow: 0 1px 2px rgb(0 0 0 / 20%); }
 .shell-sidebar__foot { border-top: 1px solid var(--line-subtle); padding-top: 10px; }
+/* Fit hubs, five channels and their links on a 900 px-high screen without scrolling. */
+.shell-sidebar { gap: 10px; }
+.shell-sidebar__scroll { gap: 10px; }
+.shell-hub { min-height: 36px; padding: 6px 10px; }
+.shell-hubs + .shell-channels, .shell-hubs + * { padding-top: 10px; }
+.shell-channels .ui-scope__item { min-height: 32px; }
