@@ -625,3 +625,5 @@ th[aria-sort="ascending"], th[aria-sort="descending"] { color: var(--ink); }
 .ui-more-menu__panel { position: absolute; z-index: 40; top: calc(100% + 6px); right: 0; display: grid; min-width: 220px; padding: 6px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-raised, var(--surface)); box-shadow: var(--shadow-pop, 0 12px 32px rgb(0 0 0 / 30%)); }
 .ui-more-menu__panel a { display: flex; align-items: center; gap: 10px; min-height: 36px; padding: 6px 10px; border-radius: var(--radius-sm); color: var(--ink); font-size: var(--text-sm); font-weight: 600; text-decoration: none; }
 .ui-more-menu__panel a:hover, .ui-more-menu__panel a:focus-visible { background: var(--surface-hover); }
+/* Dialog header buttons never wrap their label (« Cancel » broke over two lines in narrow dialogs). */
+.ui-dialog__header button, .ui-dialog__header .ui-button { flex: 0 0 auto; white-space: nowrap; }

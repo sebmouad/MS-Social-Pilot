@@ -177,7 +177,7 @@ export function InvitationControls({ invitations, actorRole, available, locale =
   }
 
   return <section className={styles.invitations} aria-labelledby="team-invitations-heading">
-    <div className={styles.heading}><div><h2 id="team-invitations-heading">{t.heading}</h2><p>{t.intro}</p></div></div>
+    <div className={styles.heading}><p id="team-invitations-heading">{t.intro}</p></div>
 
     {canManage && !available && <p className={styles.unavailable} role="status">{t.unavailable}</p>}
     {canManage && available && <form method="post" noValidate className={styles.form} onSubmit={startInvite}>

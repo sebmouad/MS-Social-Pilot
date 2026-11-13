@@ -70,3 +70,5 @@
   .team *, .team *::before, .team *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; }
 }
 .teamBar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+/* In the add window the channel choices use two columns where there is room. */
+.addForm fieldset > div, .addForm [class*="scope"] { min-width: 0; }
