@@ -294,6 +294,7 @@ export function AppShell({ children, activeModule, enabledModules, enabledFeatur
     ...(theme ? MODES.map(mode => ({ key: `mode-${mode.id}`, label: `${copy.theme} · ${theme.copy[mode.id]}`, icon: theme.mode === mode.id ? <IconCheck size={17} stroke={2} /> : <span style={{ width: 17 }} />, disabled: theme.busy, onSelect: () => { void theme.setMode(mode.id).catch(() => undefined); } })) : []),
     ...([["en", copy.languageEnglish], ["fr", copy.languageFrench]] as [Language, string][]).map(([id, name]) => ({ key: `language-${id}`, label: `${copy.language} · ${name}`, icon: currentLanguage === id ? <IconCheck size={17} stroke={2} /> : <span style={{ width: 17 }} />, onSelect: () => chooseLanguage(id) })),
     { key: "help", label: copy.help, icon: <IconHelp size={17} stroke={1.75} />, onSelect: go("/help") },
+    { key: "shortcuts", label: currentLanguage === "fr" ? "Raccourcis clavier" : "Keyboard shortcuts", icon: <IconKeyboard size={17} stroke={1.75} />, onSelect: () => setShortcutsOpen(true) },
     ...(rootAccess && !installationMode ? [{ key: "root", label: copy.root, icon: <IconShieldLock size={17} stroke={1.75} />, onSelect: go("/root") }] : []),
     { key: "signout", label: signingOut ? copy.signingOut : copy.signOut, icon: <IconLogout size={17} stroke={1.75} />, disabled: signingOut, onSelect: () => { void signOut(); } },
   ];
@@ -397,16 +398,10 @@ export function AppShell({ children, activeModule, enabledModules, enabledFeatur
             {installationMode && <span className="shell-root-badge"><ModuleGlyph id="root" size={15} /><span>{copy.rootBadge}</span></span>}
           </div>
           <div className="shell-topbar__tools">
-            <button
-              type="button"
-              className="ui-icon-button"
-              onClick={() => setShortcutsOpen(true)}
-              aria-label="Keyboard Shortcuts (?)"
-              title="Keyboard Shortcuts (?)"
-              style={{ width: "32px", height: "32px", borderRadius: "var(--radius-sm)" }}
-            >
-              <IconKeyboard size={17} stroke={1.8} aria-hidden="true" />
-            </button>
+            {/* Help in the top bar, as Meta does; keyboard shortcuts moved to the account menu (2026-11-13). */}
+            <a href="/help" className="ui-icon-button" aria-label={copy.help} title={copy.help} style={{ width: "32px", height: "32px", borderRadius: "var(--radius-sm)", display: "inline-grid", placeItems: "center" }}>
+              <IconHelp size={17} stroke={1.8} aria-hidden="true" />
+            </a>
             {theme && (
               <button
                 type="button"

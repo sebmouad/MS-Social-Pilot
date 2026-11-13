@@ -101,6 +101,11 @@ export default async function AnalyticsExplorerPage({ searchParams, locale = 'en
     {data && <div className="insights-explore" data-detail={data.detail && !autoSelected ? 'true' : 'false'} data-auto={autoSelected ? 'true' : undefined}>
       <nav className="insights-explore__list" aria-label={ui.exploreList}>
         <h2>{ui.exploreList} <small>{data.metrics.total}</small></h2>
+        {/* Search sits on the list itself (2026-11-13): with ~80 metrics, finding one beats paging through four lists. */}
+        <form method="get" action="/insights/explore" role="search" className="insights-explore__search">
+          {[...new URLSearchParams(query)].filter(([key]) => !['search', 'page', 'metric', 'pointPage', 'rowPage'].includes(key)).map(([key, value], index) => <input key={`${key}:${index}`} type="hidden" name={key} value={value} />)}
+          <input className="ui-input" type="search" name="search" defaultValue={search} maxLength={data.searchMaxCharacters} placeholder={ui.searchMetricsPlaceholder} aria-label={ui.searchMetrics} />
+        </form>
         {data.metrics.items.length
           ? <ul>{data.metrics.items.map(metric => <li key={metric.key}>
             <a href={metricHref(query, metric.key)} aria-current={data.detail?.metric.key === metric.key ? 'true' : undefined} data-unavailable={metric.coverage > 0 ? undefined : 'true'}>
