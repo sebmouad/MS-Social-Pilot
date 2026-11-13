@@ -89,6 +89,6 @@
 
 /* Meta-style post list (2026-11-13): one meta line (media · origin), one figure per results column. */
 .cellMeta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; }
-.cellMeta > * { margin: 0; }
+.cellMeta > * { margin: 0; display: inline-flex; width: auto; }
 .metricValue { color: var(--ink); font-size: var(--text-md); font-weight: 650; font-variant-numeric: tabular-nums; }
 .when { white-space: nowrap; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
