@@ -358,7 +358,11 @@ export function AppShell({ children, activeModule, enabledModules, enabledFeatur
           <nav className="shell-hubs" aria-label={copy.mainNavigation} onKeyDown={onHubKey}>
             {installationMode
               ? <><a href="/home" className="shell-hub"><span className="shell-hub__glyph"><ModuleGlyph id="home" size={17} /></span><span className="shell-hub__label">{copy.backToApp}</span></a><a href="/root" className="shell-hub is-active" aria-current="page"><span className="shell-hub__glyph"><ModuleGlyph id="root" size={17} /></span><span className="shell-hub__label">{copy.root}</span></a></>
-              : hubs.map(hubLink)}
+              : <>
+                {/* Home first, like Meta Business Suite's sidebar (2026-11-13). */}
+                <a href="/home" className={`shell-hub${pathname === "/home" ? " is-active" : ""}`} aria-current={pathname === "/home" ? "page" : undefined} title={rail ? copy.areas.home : undefined}><span className="shell-hub__glyph"><ModuleGlyph id="home" size={17} /></span><span className="shell-hub__label">{copy.areas.home}</span></a>
+                {hubs.map(hubLink)}
+              </>}
           </nav>
           {installationMode ? <div className="shell-root-nav">{rootNav}</div> : sidebarScope}
         </div>

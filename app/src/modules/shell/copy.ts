@@ -8,7 +8,7 @@ const en = {
   hubTabsLabel: '{hub} sections',
   moreTabs: 'More',
   areas: { home: 'Home', content: 'Content', inbox: 'Inbox', insights: 'Insights', ads: 'Ads', tasks: 'Tasks', agency: 'Agency', settings: 'Settings' },
-  hubs: { create: 'Create', plan: 'Plan', engage: 'Engage', measure: 'Measure', grow: 'Grow' },
+  hubs: { create: 'Create', plan: 'Content', engage: 'Inbox', measure: 'Insights', grow: 'Ads' },
   pageTitles: {
     'home/overview': 'Overview', 'publishing/posts': 'Posts', 'publishing/calendar': 'Calendar', 'publishing/queue': 'Queue', 'publishing/approvals': 'Approvals',
     'publishing/media': 'Library', 'publishing/feeds': 'Content feeds', 'studio/ai-studio': 'AI studio', 'publishing/collaboration': 'Organize', 'publishing/labels': 'Labels', 'publishing/templates': 'Templates',
@@ -83,7 +83,7 @@ const fr = {
   hubTabsLabel: 'Sections : {hub}',
   moreTabs: 'Plus',
   areas: { home: 'Accueil', content: 'Contenu', inbox: 'Messages', insights: 'Statistiques', ads: 'Publicités', tasks: 'Tâches', agency: 'Agence', settings: 'Réglages' },
-  hubs: { create: 'Création', plan: 'Planification', engage: 'Échanges', measure: 'Mesure', grow: 'Croissance' },
+  hubs: { create: 'Créer', plan: 'Contenu', engage: 'Boîte de réception', measure: 'Statistiques', grow: 'Publicités' },
   pageTitles: {
     'home/overview': 'Aperçu', 'publishing/posts': 'Publications', 'publishing/calendar': 'Calendrier', 'publishing/queue': 'File d’attente', 'publishing/approvals': 'Approbations',
     'publishing/media': 'Bibliothèque', 'publishing/feeds': 'Flux de contenu', 'studio/ai-studio': 'Studio IA', 'publishing/collaboration': 'Organisation', 'publishing/labels': 'Étiquettes', 'publishing/templates': 'Modèles',
@@ -199,7 +199,7 @@ export function fill(template: string, values: Record<string, string | number>):
 
 /** Shell behaviour that Root can tune: list lengths, tab overflow and cookie lifetimes. Root edits it under `home.shellPolicy`. */
 export const SHELL_POLICY = {
-  channelsCollapsedCount: 8,
+  channelsCollapsedCount: 5,
   channelSearchThreshold: 15,
   channelListMax: 200,
   maxVisibleTabs: 7,

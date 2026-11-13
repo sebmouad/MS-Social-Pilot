@@ -275,3 +275,16 @@
 
 /* Scroll cue: fade the right edge of a tab strip while more tabs are hidden past it. */
 .shell-tabs .ui-tabs__list[data-more="end"], .shell-settings__list[data-more="end"] { -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 40px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 40px), transparent); }
+
+/* Sidebar in the manner of Meta Business Suite (2026-11-13): roomier items with larger glyphs, a clear active
+   state (tinted pill, accent glyph and label), quieter section labels and a hairline between groups. */
+.shell-hubs { gap: 3px; }
+.shell-hub { min-height: 40px; padding: 8px 10px; gap: 12px; border-radius: 10px; font-weight: 550; }
+.shell-hub__glyph { display: inline-grid; place-items: center; width: 22px; height: 22px; }
+.shell-hub__glyph svg { width: 19px; height: 19px; }
+.shell-hub.is-active { background: var(--accent-soft); color: var(--accent); font-weight: 700; }
+.shell-hub.is-active .shell-hub__label { color: var(--accent); }
+.shell-hubs + .shell-channels, .shell-hubs + * { padding-top: 14px; border-top: 1px solid var(--line-subtle); }
+.shell-channels > :first-child { text-transform: uppercase; letter-spacing: .06em; font-size: 11px; opacity: .75; }
+.shell-create { border-radius: 10px; font-weight: 700; box-shadow: 0 1px 2px rgb(0 0 0 / 20%); }
+.shell-sidebar__foot { border-top: 1px solid var(--line-subtle); padding-top: 10px; }
