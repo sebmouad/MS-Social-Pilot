@@ -140,6 +140,7 @@ export const FACEBOOK_METRIC_LABEL_DEFAULTS = {
   page_total_actions: { en: 'Actions on the Page', fr: 'Actions sur la Page' },
   content_monetization_earnings_approximate: { en: 'Estimated earnings', fr: 'Revenus estimés' },
   page_monetization_approximate_earnings: { en: 'Estimated earnings', fr: 'Revenus estimés' },
+  monetization_approximate_earnings: { en: 'Estimated earnings', fr: 'Revenus estimés' },
   page_video_view_time: { en: 'Video watch time', fr: 'Temps de visionnage' },
   page_video_repeat_views: { en: 'Repeat video views', fr: 'Vues vidéo répétées' },
   page_video_views_autoplayed: { en: 'Video views (autoplay)', fr: 'Vues vidéo (lecture auto)' },
