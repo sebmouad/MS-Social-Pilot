@@ -330,7 +330,7 @@ export function AppShell({ children, activeModule, enabledModules, enabledFeatur
     <button type="button" className={`shell-channel-switch${scope.length ? " is-filtered" : ""}`} aria-haspopup="dialog" aria-expanded={scopeOpen} title={rail ? scopeLabel : undefined}
       onClick={() => { setScopeSheet(window.matchMedia("(max-width: 760px)").matches); setScopeOpen(true); }}>
       <span className="shell-channel-switch__avatars" aria-hidden="true">{scopeChannels.slice(0, 3).map(channel => <Avatar key={channel.id} name={channel.name} src={channel.pictureUrl} size="sm" decorative />)}</span>
-      <span className="shell-channel-switch__text"><span className="shell-channel-switch__label">{scopeLabel}</span><span className="shell-channel-switch__sub">{scope.length ? fill(copy.channelCount, { count: scope.length }) + ` / ${channels.length}` : fill(copy.channelCount, { count: channels.length })}</span></span>
+      <span className="shell-channel-switch__text"><span className="shell-channel-switch__label">{scopeLabel}</span><span className="shell-channel-switch__sub">{scope.length ? `${scope.length} / ${channels.length}` : fill(copy.channelCount, { count: channels.length })}</span></span>
       <IconSelector size={16} stroke={1.9} aria-hidden="true" className="shell-channel-switch__chevron" />
     </button>
     {scope.length ? <button type="button" className="shell-channel-reset" onClick={() => applyScope([])}>{copy.allChannels}</button> : null}
