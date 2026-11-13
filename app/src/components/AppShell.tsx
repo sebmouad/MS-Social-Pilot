@@ -1,7 +1,7 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
-import { IconChevronsLeft, IconChevronsRight, IconCheck, IconChevronDown, IconHelp, IconKeyboard, IconLogout, IconMenu2, IconMoon, IconPlus, IconSelector, IconSettings, IconShieldLock, IconSun, IconUserCircle, IconX } from "@tabler/icons-react";
+import { IconChevronsLeft, IconChevronsRight, IconCheck, IconChevronDown, IconHelp, IconKeyboard, IconLogout, IconMenu2, IconMoon, IconPlus, IconSelector, IconSettings, IconBuildingStore, IconPlugConnected, IconUsers, IconShare, IconApps, IconDatabase, IconHistory, IconShieldLock, IconSun, IconUserCircle, IconX } from "@tabler/icons-react";
 import { MODULES, areaForPath, areaPages, pageForPath, type AreaId, type ModuleId } from "@/lib/product";
 import { HUB_ORDER, hubForPath, hubPages, type HubId } from "@/lib/hubs";
 import { nextChannelScope, parseChannelScope, withChannelScope } from "@/lib/channel-scope";
@@ -76,6 +76,17 @@ function writeCookie(name: string, value: string, days: number) {
 export function badgeText(count: number): string {
   return count > 99 ? "99+" : String(count);
 }
+
+const SETTINGS_GROUPS = [
+  { id: "workspace", en: "Workspace", fr: "Espace de travail" },
+  { id: "you", en: "You", fr: "Vous" },
+  { id: "data", en: "Data", fr: "Données" },
+] as const;
+const SETTINGS_GROUP_OF: Record<string, string> = { "settings/account": "you", "settings/data": "data", "settings/history": "data" };
+const SETTINGS_ICON: Record<string, typeof IconSettings> = {
+  "settings/workspace": IconBuildingStore, "settings/connections": IconPlugConnected, "settings/team": IconUsers, "settings/sharing": IconShare,
+  "settings/mcp": IconApps, "settings/account": IconUserCircle, "settings/data": IconDatabase, "settings/history": IconHistory,
+};
 
 export function AppShell({ children, activeModule, enabledModules, enabledFeatures, writableFeatures = [], rootAccess, userName, workspaceName, workspaceId, workspaces = [], rootNav, installationMode = false, paletteCopy, copy, policy, channels = [], initialScope = [], initialScopeDropped = 0, optionalAreas = [], tabCounts = {}, hubCounts = {}, initialCollapsed = false }: AppShellProps) {
   const pathname = usePathname();
@@ -424,7 +435,15 @@ export function AppShell({ children, activeModule, enabledModules, enabledFeatur
             ? <div className="shell-settings">
               {/* Settings sections are an in-content list (left on desktop, a scrolling strip on phones), not hub tabs. */}
               <nav className="shell-settings__list" aria-label={fill(copy.areaTabsLabel, { area: copy.areas.settings })}>
-                <ul>{settingsTabs.map(tab => <li key={tab.id}><a href={tab.href} aria-current={tab.id === activeSettingsId ? "page" : undefined}>{tab.label}</a></li>)}</ul>
+                {/* Grouped with icons, like Meta's business settings (2026-11-13); phones keep one scrolling strip. */}
+                {SETTINGS_GROUPS.map(group => {
+                  const items = settingsTabs.filter(tab => (SETTINGS_GROUP_OF[tab.id] ?? "workspace") === group.id);
+                  if (!items.length) return null;
+                  return <div key={group.id} className="shell-settings__group">
+                    <p className="shell-settings__heading">{currentLanguage === "fr" ? group.fr : group.en}</p>
+                    <ul>{items.map(tab => { const Icon = SETTINGS_ICON[tab.id] ?? IconSettings; return <li key={tab.id}><a href={tab.href} aria-current={tab.id === activeSettingsId ? "page" : undefined}><Icon size={17} stroke={1.8} aria-hidden="true" />{tab.label}</a></li>; })}</ul>
+                  </div>;
+                })}
               </nav>
               <div className="shell-settings__body">{children}</div>
             </div>

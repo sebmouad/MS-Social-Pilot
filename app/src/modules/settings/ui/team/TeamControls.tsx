@@ -108,7 +108,7 @@ export function TeamControls({ members, targets, actorId, actorRole, total = mem
       if (!mounted.current) return;
       const text = expected === 'added' ? t.added : expected === 'updated' ? t.updated : t.removed;
       setFeedback({ text, error: false }); toast.notify({ title: text });
-      setEditReview(false); setAddReview(false); setEditing(null); setRemoving(null);
+      setEditReview(false); setAddReview(false); setAddOpen(false); setEditing(null); setRemoving(null);
       router.refresh(); return null;
     } catch (error) {
       if (!mounted.current || (error instanceof DOMException && error.name === 'AbortError')) return;
@@ -122,6 +122,7 @@ export function TeamControls({ members, targets, actorId, actorRole, total = mem
     }
   }
 
+  const [addOpen, setAddOpen] = useState(false);
   function startAdd(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const errors: Record<string, string> = {};
@@ -157,8 +158,10 @@ export function TeamControls({ members, targets, actorId, actorRole, total = mem
   const removedUnavailableCount = showUnavailableGrantControls ? Math.max(0, originalUnavailableIds.length - retainedUnavailableCount) : 0;
 
   return <div className={styles.team}>
-    {canManage && <form method="post" className={styles.addForm} noValidate onSubmit={startAdd}>
-      <div className={styles.addIntro}><div><h3>{t.addTitle}</h3><p>{t.addHint}</p></div><span className={styles.count}>{fill(t.totalCount, { count: total })}</span></div>
+    {/* People first, as in Meta's business settings: the list, with « Add member » opening the form in a window (2026-11-13). */}
+    <div className={styles.teamBar}><span className={styles.count}>{fill(t.totalCount, { count: total })}</span>{canManage && <Button variant="primary" onClick={() => { setFeedback(null); setAddOpen(true); }} disabled={busy}>+ {t.addTitle}</Button>}</div>
+    {canManage && <Dialog closeLabel={t.cancel} open={addOpen && !addReview} title={t.addTitle} description={t.addHint} onClose={() => { if (!busy) setAddOpen(false); }} busy={busy}>
+    <form method="post" className={styles.addForm} noValidate onSubmit={startAdd}>
       <div className={styles.addFields}>
         <label className={styles.field} htmlFor="team-member-email">{t.emailAddress}
           <input id="team-member-email" name="email" type="email" autoComplete="email" value={email} maxLength={320} disabled={busy} aria-invalid={validation.errors.email ? true : undefined} aria-describedby={validation.errors.email ? 'team-member-email-error' : 'team-member-email-help'} onChange={event => { setEmail(event.currentTarget.value); validation.clear('email'); }} />
@@ -168,7 +171,7 @@ export function TeamControls({ members, targets, actorId, actorRole, total = mem
       </div>
       {managerRole(role) ? <p className={styles.scopeNote}>{t.managersAll}</p> : targetChoices(scope, next => { setScope(next); }, busy)}
       <div className={styles.addActions}><Button variant="primary" type="submit" disabled={busy}>{t.reviewAccess}</Button></div>
-    </form>}
+    </form></Dialog>}
 
     {feedback && !feedback.error && <p ref={feedbackRef} tabIndex={-1} className={styles.success} role="status">{feedback.text}</p>}
 

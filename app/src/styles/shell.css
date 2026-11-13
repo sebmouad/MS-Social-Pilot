@@ -333,3 +333,16 @@
 .ui-picker__foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding-top: 10px; border-top: 1px solid var(--line-subtle); }
 .ui-picker__actions { display: flex; gap: 6px; }
 .ui-picker__manage { color: var(--accent); font-size: var(--text-sm); font-weight: 650; }
+
+/* Settings section list grouped with icons (2026-11-13). */
+.shell-settings__group + .shell-settings__group { margin-top: 14px; }
+.shell-settings__heading { margin: 0 0 4px; padding: 0 10px; color: var(--ink-faint); font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+.shell-settings__list a { display: flex !important; align-items: center; gap: 10px; }
+.shell-settings__list a svg { flex: 0 0 auto; opacity: .8; }
+.shell-settings__list a[aria-current="page"] svg { opacity: 1; color: var(--accent); }
+@media (max-width: 760px) {
+  .shell-settings__list { display: flex; overflow-x: auto; }
+  .shell-settings__group { display: contents; }
+  .shell-settings__heading { display: none; }
+  .shell-settings__list ul { display: flex; }
+}
