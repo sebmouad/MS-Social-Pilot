@@ -111,7 +111,9 @@ Ads › Manage › History. Nothing is changed without the person's action.
   and data-use checkup done; only the screencast is missing.
 - Done 2026-11-14: Data deletion URL `https://social.newsgeet.com/data-deletion` (public instructions page; the signed
   callback `…/api/platforms/facebook/data-deletion` also answers); contact email changed to contact@newsgeet.com.
-- To do — **verify contact@newsgeet.com** (click the link in Meta's email; « Resend » on App settings › Basic).
+- Done 2026-11-14: App Domains set to `social.newsgeet.com` and `newsgeet.com`.
+- Optional — contact@newsgeet.com still shows unverified. It does not block submission (requirements: can submit;
+  compliance: compliant). If wanted: look for Meta's email (spam too), or switch the address away and back to resend.
 - During the review window two-step sign-in is « off » in Root (so the reviewer can sign in); set it back to
   « admins » after approval.
 
