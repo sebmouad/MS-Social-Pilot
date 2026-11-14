@@ -17,7 +17,10 @@ record('01-pages_show_list', 'pages_show_list', async r => {
   await r.caption('The chosen Pages are the channels offered when writing a post');
   await r.click(page.getByRole('link', { name: 'Create post' }).first());
   await page.waitForLoadState('networkidle'); await r.pause(1500);
-  await r.box(page.getByRole('button', { name: /Cuisine Pleine d’Envie.*Facebook/ }).first()); await r.pause(3500); await r.unbox();
+  // Many channels: « Post to » opens a searchable list of the Pages listed by pages_show_list.
+  await r.click(page.getByRole('button', { name: /Choose channels/ })); await r.pause(1500);
+  await r.box(page.locator('label').filter({ hasText: 'Cuisine Pleine d’Envie' }).first()); await r.pause(3500); await r.unbox();
+  await r.click(page.getByRole('button', { name: 'Done' })); await r.pause(1000);
   await r.caption('pages_show_list is used only to list the person’s Pages so they can pick where to publish and what to measure');
   await r.pause(3500);
 }).catch(e => { console.error(e); process.exit(1); });

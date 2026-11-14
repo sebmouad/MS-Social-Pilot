@@ -2,7 +2,7 @@ const { record } = require('./lib');
 record('07-pages_manage_engagement', 'pages_manage_engagement', async r => {
   const { page } = r;
   await r.caption('A visitor commented on one of the person’s Page posts');
-  await r.click(page.getByRole('link', { name: 'Engage', exact: true }).first()); await page.waitForLoadState('networkidle'); await r.pause(1200);
+  await r.click(page.getByRole('link', { name: 'Inbox', exact: true }).first()); await page.waitForLoadState('networkidle'); await r.pause(1200);
   await r.click(page.getByRole('link', { name: /Comments/ }).first()); await page.waitForLoadState('networkidle'); await r.pause(1200);
   const row = page.locator('main li, main [role=listitem]').filter({ hasText: /Hummm/ }).first();
   await r.click(row); await r.pause(2000);

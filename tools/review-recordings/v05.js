@@ -2,7 +2,7 @@ const { record } = require('./lib');
 record('05-pages_read_user_content', 'pages_read_user_content', async r => {
   const { page } = r;
   await r.caption('Inbox collects the comments visitors leave on the person’s Page posts');
-  await r.click(page.getByRole('link', { name: 'Engage', exact: true }).first()); await page.waitForLoadState('networkidle'); await r.pause(2000);
+  await r.click(page.getByRole('link', { name: 'Inbox', exact: true }).first()); await page.waitForLoadState('networkidle'); await r.pause(2000);
   await r.click(page.getByRole('link', { name: /Comments/ }).first()); await page.waitForLoadState('networkidle'); await r.pause(1500);
   const row = page.locator('main li, main [role=listitem]').filter({ hasText: /Hummm/ }).first();
   await r.box(row); await r.pause(2500); await r.unbox();
