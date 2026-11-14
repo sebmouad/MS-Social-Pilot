@@ -78,7 +78,7 @@ export function AgentsScreen({ agents, runs = [], hasMore = false, pageSize, cop
      <label className="ui-field">{t.name}<input ref={nameInput} name="name" autoComplete="off" className="ui-input" value={name} disabled={pending} onChange={e => setName(e.target.value)} required /></label>
      <label className="ui-field">{t.instructions}<AutoTextarea name="instructions" className="ui-input" value={instructions} disabled={pending} onChange={e => setInstructions(e.target.value)} required /></label>
      <label className="ui-field">{t.voice}<AutoTextarea name="voice" className="ui-input" value={voice} disabled={pending} onChange={e => setVoice(e.target.value)} /></label>
-     <div className={styles.actions}><Button type="submit" disabled={pending}>{pending ? t.busy : t.save}</Button>{editing ? <Button disabled={pending} onClick={clearEditor}>{t.cancel}</Button> : null}</div>
+     <div className={styles.actions}><Button type="submit" variant="primary" disabled={pending}>{pending ? t.busy : t.save}</Button>{editing ? <Button disabled={pending} onClick={clearEditor}>{t.cancel}</Button> : null}</div>
     </form>
    </section>
    {items.length ? <section className={`ui-panel ${styles.panel}`}><h2><IconSparkles size={20} aria-hidden="true" /> {t.draft}</h2>

@@ -1,11 +1,11 @@
 export const mcpCopy = {
   en: {
-    title: 'MCP API keys', description: 'Manage scoped credentials for MCP clients.', issueDescription: 'Issue workspace-scoped bearer keys for {workspace}.',
+    title: 'MCP API keys', description: 'Manage scoped credentials for MCP clients.', issueDescription: 'Let AI assistants such as Claude read and prepare work in {workspace}, within your own permissions.',
     newKey: 'New key', advanced: 'Choose feature by feature',
     presets: 'Quick permissions', presetRead: 'Read everything', presetReadWrite: 'Read and write everything', presetPublisher: 'Publisher (read all, write posts)', presetAds: 'Ads manager (read all, write ads)', presetClear: 'Clear', summary: '{read} readable · {write} writable', moduleAll: 'Select all', moduleAllLabel: 'Read every {module} feature',
     lifetimeRange: 'Enter a whole number of days from 1 to {max}.', lifetimeHint: 'Up to {max} days.',
     restricted: 'Access restricted', managersOnly: 'Only workspace owners and admins can manage MCP API keys.',
-    createPanel: 'Create a key', createDetail: 'The full token appears once and is stored only as a hash.',
+    createPanel: 'Keys for AI assistants', createDetail: 'Connect Claude or another MCP assistant to this workspace. Each token appears once and is stored only as a hash.',
     footnote: 'Bearer keys are fixed to this workspace and inherit your current permissions, further limited by their selected channels and ad accounts. Keep the token in a secret store. Key lifetime and request limits follow your workspace policy.',
     nameRequired: 'Enter a name for this key.', featureRequired: 'Select at least one readable feature.',
     createFailed: 'Could not create key.', created: 'Key created. Copy it now; it will not be shown again.',
@@ -28,12 +28,12 @@ export const mcpCopy = {
     never: 'Never', statusRevoked: 'Revoked', statusExpired: 'Expired', statusActive: 'Active', revoke: 'Revoke', revokeKey: 'Revoke {name}', none: 'No MCP API keys have been issued.',
   },
   fr: {
-    title: 'Clés d’API MCP', description: 'Gérez les identifiants à portée limitée des clients MCP.', issueDescription: 'Émettez des clés porteur limitées à l’espace {workspace}.',
+    title: 'Clés d’API MCP', description: 'Gérez les identifiants à portée limitée des clients MCP.', issueDescription: 'Laissez des assistants IA comme Claude consulter et préparer du travail dans {workspace}, dans la limite de vos permissions.',
     newKey: 'Nouvelle clé', advanced: 'Choisir fonction par fonction',
     presets: 'Permissions rapides', presetRead: 'Tout en lecture', presetReadWrite: 'Tout en lecture et écriture', presetPublisher: 'Publication (tout lire, écrire les publications)', presetAds: 'Publicités (tout lire, écrire les publicités)', presetClear: 'Effacer', summary: '{read} en lecture · {write} en écriture', moduleAll: 'Tout sélectionner', moduleAllLabel: 'Lire toutes les fonctionnalités {module}',
     lifetimeRange: 'Saisissez un nombre entier de jours entre 1 et {max}.', lifetimeHint: 'Jusqu’à {max} jours.',
     restricted: 'Accès restreint', managersOnly: 'Seuls les propriétaires et administrateurs de l’espace peuvent gérer les clés d’API MCP.',
-    createPanel: 'Créer une clé', createDetail: 'Le jeton complet n’apparaît qu’une fois et n’est stocké que sous forme de hachage.',
+    createPanel: 'Clés pour assistants IA', createDetail: 'Connectez Claude ou un autre assistant MCP à cet espace. Chaque jeton n’apparaît qu’une fois et n’est stocké que sous forme de hachage.',
     footnote: 'Les clés porteur sont liées à cet espace et héritent de vos permissions actuelles, limitées en plus par les canaux et comptes publicitaires sélectionnés. Conservez le jeton dans un coffre de secrets. La durée de vie des clés et les limites de requêtes suivent la politique de votre espace.',
     nameRequired: 'Saisissez un nom pour cette clé.', featureRequired: 'Sélectionnez au moins une fonctionnalité en lecture.',
     createFailed: 'Impossible de créer la clé.', created: 'Clé créée. Copiez-la maintenant ; elle ne sera plus affichée.',
