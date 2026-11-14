@@ -5,26 +5,31 @@ https://social.newsgeet.com. Data controller: ANASSO TRAVAUX (56 Hay Ghizlan Ain
 contact@newsgeet.com. Reviewer test account: `meta-review@newsgeet.com` (password only in the submission form),
 signed into its own empty workspace « Meta Review's workspace ».
 
-Last updated 2026-11-14.
+Last updated 2026-11-14 (evening).
+
+The current submission requests 8 permissions: pages_show_list, business_management, pages_read_engagement,
+read_insights, pages_read_user_content, pages_manage_posts, pages_manage_engagement, ads_read (videos 01–07 and 14).
+Meta's checklist (App Review › requirements): can submit, privacy policy and business verification pass, compliance
+« compliant »; the only open step for each of the 8 is its screencast.
 
 ## 1. Status per permission
 
 | # | Permission | Status | Video | Needs from the owner |
 |---|---|---|---|---|
-| 01 | pages_show_list | Approved 2026-10-24; video re-recorded on the new design | `01-pages_show_list.mp4` | — |
-| 02 | business_management | Approved 2026-10-24; video re-recorded | `02-business_management.mp4` | — |
-| 03 | pages_read_engagement | Ready | `03-pages_read_engagement.mp4` | — |
-| 04 | read_insights | Ready | `04-read_insights.mp4` | — |
-| 05 | pages_read_user_content | Ready | `05-pages_read_user_content.mp4` | — |
-| 06 | pages_manage_posts | Recorded 2026-11-11 (old menu names); new script ready | `06-pages_manage_posts.mp4` | Allow or run `node v06.js` (publishes one post) |
-| 07 | pages_manage_engagement | Recorded 2026-11-11 (old menu names); new script ready | `07-pages_manage_engagement.mp4` | Allow or run `node v07.js` (one public reply, hide, show) |
+| 01 | pages_show_list | Approved 2026-10-24; re-recorded 2026-11-14 evening on the current screens | `01-pages_show_list.mp4` | — |
+| 02 | business_management | Approved 2026-10-24; re-recorded 2026-11-14 evening | `02-business_management.mp4` | — |
+| 03 | pages_read_engagement | Ready (re-recorded 2026-11-14: opens a post with real figures, 962 reactions, and sorts Post explorer by reactions) | `03-pages_read_engagement.mp4` | — |
+| 04 | read_insights | Ready (re-recorded 2026-11-14) | `04-read_insights.mp4` | — |
+| 05 | pages_read_user_content | Ready (re-recorded 2026-11-14) | `05-pages_read_user_content.mp4` | — |
+| 06 | pages_manage_posts | Must be re-recorded (old menu names); script checked step by step on 2026-11-14 | `06-pages_manage_posts.mp4` | Allow or run `node v06.js` (publishes one post) |
+| 07 | pages_manage_engagement | Must be re-recorded (old menu names); script checked step by step on 2026-11-14 | `07-pages_manage_engagement.mp4` | Allow or run `node v07.js` (one public reply, hide, show) |
 | 08 | pages_messaging | To record | — | Send a fresh Messenger message to one Page (24-hour reply window) |
 | 09 | pages_manage_metadata | To record | — | Reconnect Facebook so the webhook subscription covers all Pages, then leave a comment |
 | 10 | instagram_basic | To record | — | Link an Instagram professional account to a Page, then Reconnect |
 | 11 | instagram_content_publish | To record | — | Same as 10 |
 | 12 | instagram_manage_comments | To record | — | Same as 10, plus one visitor comment on Instagram |
 | 13 | instagram_manage_insights | To record | — | Same as 10 |
-| 14 | ads_read | Ready | `14-ads_read.mp4` | — |
+| 14 | ads_read | Ready (re-recorded 2026-11-14) | `14-ads_read.mp4` | — |
 | 15 | ads_management | Script ready (`v15.js`: campaign 01 off then on) | — | Allow or run `node v15.js` (blocked by the session's safety check) |
 
 Every video: 1920×1080, English captions naming the permission, a red box and dot on each click, starting on the
