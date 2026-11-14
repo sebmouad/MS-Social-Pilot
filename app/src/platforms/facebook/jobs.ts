@@ -425,36 +425,42 @@ export async function syncAdsAnalytics(now = new Date(), retryLimit = 0, retryBa
           ]);
           return { insights, objects };
         }, retryLimit, retryBackoff);
-        // One-time history (2026-11-14): each run also reads one older 90-day block until `meta.adsBackfillDays`
-        // is covered or the account has no older spend. A failed block is logged and tried again next run.
+        return main;
+      });
+
+      // One-time history (2026-11-14) in its own provider window, after the regular read: each sync reads one older
+      // block until `meta.adsBackfillDays` is covered or the account has no older rows. A block cut short is retried.
+      const olderAds = await withProviderWindow(async signal => {
         let backfill: PageBackfill | undefined;
-        try {
-          const depthDays = Number(await runtimeConfig('meta.adsBackfillDays'));
-          const saved = (await prisma.$queryRaw<Array<{ cursor: PageBackfill }>>`SELECT cursor FROM facebook_ads_backfill WHERE "adAccountId" = ${account.id} AND "workspaceId" = ${account.workspaceId}`)[0]?.cursor;
-          if (depthDays > 0 && !saved?.complete) {
-            const windowDays = await readLookbackDays('meta.adsAnalyticsLookbackDays');
-            const limit = new Date(until.getTime() - (depthDays - 1) * DAY_MS);
-            const blockEnd = saved ? new Date(saved.oldest) : new Date(until.getTime() - (windowDays - 1) * DAY_MS);
-            const blockStart = new Date(Math.max(limit.getTime(), blockEnd.getTime() - BACKFILL_BLOCK_DAYS * DAY_MS));
-            if (blockStart.getTime() >= blockEnd.getTime()) backfill = { oldest: blockEnd.toISOString(), complete: true };
-            else {
-              const binding = await currentAdsBinding(account, now);
-              if (binding) {
-                signal.throwIfAborted();
-                const engine = await configuredFacebookEngine({ signal });
-                // The block ends the day before the newer window starts, so no day is read twice.
-                const older = await engine.getAdInsights(binding.token, account.actId, blockStart, new Date(blockEnd.getTime() - DAY_MS));
-                main.insights.push(...older);
-                backfill = { oldest: blockStart.toISOString(), complete: blockStart.getTime() <= limit.getTime() || older.length === 0 };
-              }
+        const extra: typeof rows.insights = [];
+        const depthDays = Number(await runtimeConfig('meta.adsBackfillDays'));
+        const saved = (await prisma.$queryRaw<Array<{ cursor: PageBackfill }>>`SELECT cursor FROM facebook_ads_backfill WHERE "adAccountId" = ${account.id} AND "workspaceId" = ${account.workspaceId}`)[0]?.cursor;
+        if (depthDays > 0 && !saved?.complete) {
+          const windowDays = await readLookbackDays('meta.adsAnalyticsLookbackDays');
+          const limit = new Date(until.getTime() - (depthDays - 1) * DAY_MS);
+          const blockEnd = saved ? new Date(saved.oldest) : new Date(until.getTime() - (windowDays - 1) * DAY_MS);
+          const blockStart = new Date(Math.max(limit.getTime(), blockEnd.getTime() - BACKFILL_BLOCK_DAYS * DAY_MS));
+          if (blockStart.getTime() >= blockEnd.getTime()) backfill = { oldest: blockEnd.toISOString(), complete: true };
+          else {
+            const binding = await currentAdsBinding(account, now);
+            if (binding) {
+              signal.throwIfAborted();
+              const engine = await configuredFacebookEngine({ signal });
+              // The block ends the day before the newer window starts, so no day is read twice.
+              const older = await engine.getAdInsights(binding.token, account.actId, blockStart, new Date(blockEnd.getTime() - DAY_MS));
+              extra.push(...older);
+              backfill = { oldest: blockStart.toISOString(), complete: blockStart.getTime() <= limit.getTime() || older.length === 0 };
             }
           }
-        } catch (backfillError) {
-          if (jobAbortSignal()?.aborted) throw backfillError;
-          await logItemFailure('adsBackfill', account.id, backfillError);
         }
-        return { ...main, ...(backfill ? { backfill } : {}) };
+        return { extra, backfill };
+      }).catch(async error => {
+        if (jobAbortSignal()?.aborted) throw error;
+        if (!(error instanceof Error && error.name === 'AbortError')) await logItemFailure('adsBackfill', account.id, error);
+        return null;
       });
+      if (olderAds?.extra.length) rows.insights.push(...olderAds.extra);
+      const adsBackfill = olderAds?.backfill;
       await withWorkspaceOperation(account.workspaceId, async () => {
         const outcome = await withSelectedResourceOperation(account.workspaceId, { kind: 'adAccount', id: account.id }, async (tx, signal) => {
           let persistedCount = 0;
@@ -489,7 +495,7 @@ export async function syncAdsAnalytics(now = new Date(), retryLimit = 0, retryBa
           }
           signal.throwIfAborted();
           await tx.adAccount.updateMany({ where: { id: account.id, workspaceId: account.workspaceId, actId: account.actId, enabled: true }, data: { lastSyncedAt: now } });
-          if (rows.backfill) await tx.$executeRaw`INSERT INTO facebook_ads_backfill ("adAccountId", "workspaceId", cursor, "updatedAt") VALUES (${account.id}, ${account.workspaceId}, ${JSON.stringify(rows.backfill)}::jsonb, ${now}) ON CONFLICT ("adAccountId") DO UPDATE SET cursor = EXCLUDED.cursor, "updatedAt" = EXCLUDED."updatedAt"`;
+          if (adsBackfill) await tx.$executeRaw`INSERT INTO facebook_ads_backfill ("adAccountId", "workspaceId", cursor, "updatedAt") VALUES (${account.id}, ${account.workspaceId}, ${JSON.stringify(adsBackfill)}::jsonb, ${now}) ON CONFLICT ("adAccountId") DO UPDATE SET cursor = EXCLUDED.cursor, "updatedAt" = EXCLUDED."updatedAt"`;
           signal.throwIfAborted();
           await assertFacebookJobAccess(account.workspaceId, jobFeatures.ads);
           if (!await currentAdsBinding(account, now)) throw new OperationError('forbidden', 'Facebook job access changed before Ads persistence completed.');
