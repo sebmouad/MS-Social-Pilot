@@ -109,9 +109,9 @@ Ads › Manage › History. Nothing is changed without the person's action.
   (only `https://social.newsgeet.com/api/connections/facebook/callback` left); App Review can be submitted
   (privacy policy and business verification pass). In the review draft, every requested permission has its use case
   and data-use checkup done; only the screencast is missing.
-- To do — App settings › Basic: **Data deletion URL** `https://social.newsgeet.com/api/platforms/facebook/data-deletion`
-  (currently empty).
-- To do — **verify the contact email** (currently unverified), or set contact@newsgeet.com and verify it.
+- Done 2026-11-14: Data deletion URL `https://social.newsgeet.com/data-deletion` (public instructions page; the signed
+  callback `…/api/platforms/facebook/data-deletion` also answers); contact email changed to contact@newsgeet.com.
+- To do — **verify contact@newsgeet.com** (click the link in Meta's email; « Resend » on App settings › Basic).
 - During the review window two-step sign-in is « off » in Root (so the reviewer can sign in); set it back to
   « admins » after approval.
 
