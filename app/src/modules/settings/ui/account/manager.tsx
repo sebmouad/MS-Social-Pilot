@@ -127,7 +127,7 @@ export function AccountManager({ initialName, email, passwordPolicy, canWrite, n
         { key: 'actions', label: t.signOut, render: session => canWrite && !session.current && <button type="button" className="ui-button ui-button--quiet" disabled={busy} onClick={() => setPendingSession(session.id)}>{t.signOut}</button> },
       ]} />
     </section>}
-    {part === 'security' && nextOffset !== null && <button type="button" disabled={busy} onClick={() => void moreSessions()}>{confirmationCopy.more}</button>}
+    {part === 'security' && nextOffset !== null && <button type="button" className="ui-button ui-button--secondary ui-button--sm" disabled={busy} onClick={() => void moreSessions()}>{confirmationCopy.more}</button>}
     {notice && <p role="status" className={styles['settings-note']}>{notice}</p>}
   </>;
 }
