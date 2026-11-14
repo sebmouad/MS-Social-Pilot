@@ -7,11 +7,10 @@ signed into its own empty workspace « Meta Review's workspace ».
 
 Last updated 2026-11-14 (night): submitted for review.
 
-The current submission requests 8 permissions: pages_show_list, business_management, pages_read_engagement,
-read_insights, pages_read_user_content, pages_manage_posts, pages_manage_engagement, ads_read (videos 01–07 and 14).
-Submitted 2026-11-14; Meta status « Examen en cours » (most requests answered within 20 days). New requests:
-pages_read_engagement, read_insights, pages_read_user_content, pages_manage_posts, pages_manage_engagement, ads_read
-(videos 03–07 and 14 attached). Renewals with certification only: pages_show_list, business_management, public_profile.
+The current submission covers 9 permissions: 6 new requests with videos (pages_read_engagement, read_insights,
+pages_read_user_content, pages_manage_posts, pages_manage_engagement, ads_read: videos 03–07 and 14) and 3 renewals
+with certification only (pages_show_list, business_management, public_profile).
+Submitted 2026-11-14; Meta status « Examen en cours » (most requests answered within 20 days).
 
 ## 1. Status per permission
 
