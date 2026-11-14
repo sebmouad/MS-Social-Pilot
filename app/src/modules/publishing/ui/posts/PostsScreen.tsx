@@ -113,6 +113,9 @@ export default async function PostsPage({ searchParams }: { searchParams: Promis
     ...authority(post),
     whenLabel: formatDate(post.scheduledAt ?? post.publishedAt, timeZone, true, locale, copy),
     firstCommentDueLabels: firstCommentDueLabels(post, timeZone),
+    // Published posts cannot be edited here: their (often recipe-long) first comment is shortened for the list and
+    // its preview; the post page shows it in full (2026-11-14). Drafts and planned posts keep it whole for editing.
+    ...(post.status === 'published' && post.firstComment && post.firstComment.length > 600 ? { firstComment: `${post.firstComment.slice(0, 600).trimEnd()}…` } : {}),
     reach: reach.get(post.id) ?? {
       value: null,
       measured: 0,
