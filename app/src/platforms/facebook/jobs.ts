@@ -187,7 +187,13 @@ type PageFetch = {
   /** Cursor the history read resumed from; the write phase only commits if it is unchanged. */
   startCursor: HistoryProgress | undefined;
   failedMetrics: number;
+  /** One-time history read (2026-11-14): the next cursor to save once the block's figures are stored. */
+  backfill?: PageBackfill;
 };
+/** How far back the one-time Page history read has reached; `complete` once the configured depth is covered. */
+type PageBackfill = { oldest: string; complete: boolean };
+/** Facebook answers Page insights for at most about 93 days per request; blocks stay under that. */
+const BACKFILL_BLOCK_DAYS = 90;
 
 /** Current Page binding, or null when selection, connection, grant or token no longer allows the read. */
 async function currentPageBinding(target: PageTarget, now: Date): Promise<{ token: string } | null> {
@@ -195,6 +201,10 @@ async function currentPageBinding(target: PageTarget, now: Date): Promise<{ toke
   const scopes = await configuredScopes('meta.pageInsightReadScopes');
   if (!fresh?.socialAccount || !usable(fresh.socialAccount, target.workspaceId, currentTime(now)) || !granted(fresh.socialAccount.scopes, scopes) || !fresh.accessToken && !fresh.socialAccount.accessToken) return null;
   return { token: decryptSecret(fresh.accessToken ?? fresh.socialAccount.accessToken) };
+}
+async function readPageBackfill(db: Pick<typeof prisma, '$queryRaw'>, target: PageTarget): Promise<PageBackfill | undefined> {
+  const rows = await db.$queryRaw<Array<{ cursor: PageBackfill }>>`SELECT cursor FROM facebook_sync_cursors WHERE "workspaceId" = ${target.workspaceId} AND "targetId" = ${target.id} AND kind = 'page_backfill' AND "providerId" = ${target.providerId}`;
+  return rows[0]?.cursor;
 }
 async function readHistoryCursor(db: Pick<typeof prisma, '$queryRaw'>, target: PageTarget): Promise<HistoryProgress | undefined> {
   const rows = await db.$queryRaw<Array<{ cursor: HistoryProgress }>>`SELECT cursor FROM facebook_sync_cursors WHERE "workspaceId" = ${target.workspaceId} AND "targetId" = ${target.id} AND kind = 'post_history' AND "providerId" = ${target.providerId}`;
@@ -216,6 +226,37 @@ async function fetchPageAnalytics(target: PageTarget, now: Date, today: Date, re
     }, retryLimit, retryBackoff);
     let failedMetrics = observations.failedMetrics?.length ? 1 : 0;
     if (observations.failedMetrics?.length) await logItemFailure('pageInsights', target.id, observations.failedMetrics.map(item => `${item.metric}: ${item.message}`).join('; '));
+    // One-time history (2026-11-14): a newly linked Page used to show only the last 7 days and fill in day by day.
+    // Each run also reads one older block (90 days) until `meta.pageBackfillDays` is covered or Facebook has no
+    // older figures. Only daily-style series are kept from these blocks; range totals stay with the normal window.
+    let backfill: PageBackfill | undefined;
+    try {
+      const depthDays = Number(await runtimeConfig('meta.pageBackfillDays'));
+      const saved = await readPageBackfill(prisma, target);
+      if (depthDays > 0 && !saved?.complete) {
+        const windowDays = await readLookbackDays('meta.pageAnalyticsLookbackDays');
+        const limit = new Date(today.getTime() - (depthDays - 1) * DAY_MS);
+        const blockEnd = saved ? new Date(saved.oldest) : new Date(today.getTime() - (windowDays - 1) * DAY_MS);
+        const blockStart = new Date(Math.max(limit.getTime(), blockEnd.getTime() - BACKFILL_BLOCK_DAYS * DAY_MS));
+        if (blockStart.getTime() >= blockEnd.getTime()) backfill = { oldest: blockEnd.toISOString(), complete: true };
+        else {
+          const binding = await currentPageBinding(target, now);
+          if (binding) {
+            signal.throwIfAborted();
+            const engine = await configuredFacebookEngine({ signal });
+            const older = await engine.getPageInsightObservations(binding.token, target.providerId, blockStart, blockEnd);
+            const kept = older.filter(item => item.endTime && !item.period.startsWith('total_over_range') && item.period !== 'lifetime');
+            observations.push(...kept);
+            // Nothing numeric that far back means the Page (or Facebook's retention) ends here.
+            const reachedEnd = blockStart.getTime() <= limit.getTime() || !kept.some(item => item.numeric !== null && item.numeric !== 0);
+            backfill = { oldest: blockStart.toISOString(), complete: reachedEnd };
+          }
+        }
+      }
+    } catch (backfillError) {
+      if (jobAbortSignal()?.aborted) throw backfillError;
+      await logItemFailure('pageBackfill', target.id, backfillError);
+    }
     const historyBinding = await currentPageBinding(target, now);
     if (!historyBinding) throw new OperationError('forbidden', 'History access unavailable.');
     const startCursor = await readHistoryCursor(prisma, target);
@@ -235,7 +276,7 @@ async function fetchPageAnalytics(target: PageTarget, now: Date, today: Date, re
       failedMetrics++;
       await logItemFailure('postHistory', target.id, history.failures.join('; '));
     }
-    return { observations, history, startCursor, failedMetrics };
+    return { observations, history, startCursor, failedMetrics, ...(backfill ? { backfill } : {}) };
   });
 }
 
@@ -301,6 +342,14 @@ export async function syncPageAnalytics(now = new Date(), retryLimit = 0, retryB
             });
             persistedCount++;
           }
+          if (fetched.backfill) {
+            // Older days just arrived: drop this Page's precomputed roll-ups and the runs that vouched for them, so
+            // reads fall back to the stored days and the next roll-up run rebuilds them including the history.
+            await tx.$executeRaw`DELETE FROM analytics_rollup_daily WHERE "targetId" = ${target.id}`;
+            await tx.$executeRaw`DELETE FROM analytics_rollup_weekly WHERE "targetId" = ${target.id}`;
+            await tx.$executeRaw`DELETE FROM analytics_rollup_runs WHERE "workspaceId" = ${target.workspaceId} AND "targetIds" @> ${JSON.stringify([target.id])}::jsonb`;
+          }
+          if (fetched.backfill) await tx.$executeRaw`INSERT INTO facebook_sync_cursors ("workspaceId", "targetId", "providerId", kind, cursor, "updatedAt") VALUES (${target.workspaceId}, ${target.id}, ${target.providerId}, 'page_backfill', ${JSON.stringify(fetched.backfill)}::jsonb, ${now}) ON CONFLICT ("workspaceId", "targetId", kind) DO UPDATE SET cursor = EXCLUDED.cursor, "providerId" = EXCLUDED."providerId", "updatedAt" = EXCLUDED."updatedAt"`;
           signal.throwIfAborted();
           await assertFacebookJobAccess(target.workspaceId, jobFeatures.analytics);
           if (!await currentPageBinding(target, now)) throw new OperationError('forbidden', 'Facebook job access changed before analytics persistence completed.');
@@ -345,20 +394,51 @@ export async function syncAdsAnalytics(now = new Date(), retryLimit = 0, retryBa
     try {
       await admitWorkspace(account.workspaceId);
       // Provider read first, with no transaction or lock held.
-      const rows = await withProviderWindow(signal => withRetries(async () => {
-        await assertFacebookJobAccess(account.workspaceId, jobFeatures.ads);
-        const binding = await currentAdsBinding(account, now);
-        if (!binding) throw new OperationError('forbidden', 'Facebook job access is no longer available.');
-        signal.throwIfAborted();
-        const engine = await configuredFacebookEngine({ signal });
-        const lookbackDays = await readLookbackDays('meta.adsAnalyticsLookbackDays');
-        const since = new Date(until.getTime() - (lookbackDays - 1) * DAY_MS);
-        const [insights, objects] = await Promise.all([
-          engine.getAdInsights(binding.token, account.actId, since, until),
-          configuredDiscoverFacebookAdObjects(binding.token, account.actId, account.id, now, signal),
-        ]);
-        return { insights, objects };
-      }, retryLimit, retryBackoff));
+      const rows = await withProviderWindow(async signal => {
+        const main = await withRetries(async () => {
+          await assertFacebookJobAccess(account.workspaceId, jobFeatures.ads);
+          const binding = await currentAdsBinding(account, now);
+          if (!binding) throw new OperationError('forbidden', 'Facebook job access is no longer available.');
+          signal.throwIfAborted();
+          const engine = await configuredFacebookEngine({ signal });
+          const lookbackDays = await readLookbackDays('meta.adsAnalyticsLookbackDays');
+          const since = new Date(until.getTime() - (lookbackDays - 1) * DAY_MS);
+          const [insights, objects] = await Promise.all([
+            engine.getAdInsights(binding.token, account.actId, since, until),
+            configuredDiscoverFacebookAdObjects(binding.token, account.actId, account.id, now, signal),
+          ]);
+          return { insights, objects };
+        }, retryLimit, retryBackoff);
+        // One-time history (2026-11-14): each run also reads one older 90-day block until `meta.adsBackfillDays`
+        // is covered or the account has no older spend. A failed block is logged and tried again next run.
+        let backfill: PageBackfill | undefined;
+        try {
+          const depthDays = Number(await runtimeConfig('meta.adsBackfillDays'));
+          const saved = (await prisma.$queryRaw<Array<{ cursor: PageBackfill }>>`SELECT cursor FROM facebook_ads_backfill WHERE "adAccountId" = ${account.id} AND "workspaceId" = ${account.workspaceId}`)[0]?.cursor;
+          if (depthDays > 0 && !saved?.complete) {
+            const windowDays = await readLookbackDays('meta.adsAnalyticsLookbackDays');
+            const limit = new Date(until.getTime() - (depthDays - 1) * DAY_MS);
+            const blockEnd = saved ? new Date(saved.oldest) : new Date(until.getTime() - (windowDays - 1) * DAY_MS);
+            const blockStart = new Date(Math.max(limit.getTime(), blockEnd.getTime() - BACKFILL_BLOCK_DAYS * DAY_MS));
+            if (blockStart.getTime() >= blockEnd.getTime()) backfill = { oldest: blockEnd.toISOString(), complete: true };
+            else {
+              const binding = await currentAdsBinding(account, now);
+              if (binding) {
+                signal.throwIfAborted();
+                const engine = await configuredFacebookEngine({ signal });
+                // The block ends the day before the newer window starts, so no day is read twice.
+                const older = await engine.getAdInsights(binding.token, account.actId, blockStart, new Date(blockEnd.getTime() - DAY_MS));
+                main.insights.push(...older);
+                backfill = { oldest: blockStart.toISOString(), complete: blockStart.getTime() <= limit.getTime() || older.length === 0 };
+              }
+            }
+          }
+        } catch (backfillError) {
+          if (jobAbortSignal()?.aborted) throw backfillError;
+          await logItemFailure('adsBackfill', account.id, backfillError);
+        }
+        return { ...main, ...(backfill ? { backfill } : {}) };
+      });
       await withWorkspaceOperation(account.workspaceId, async () => {
         const outcome = await withSelectedResourceOperation(account.workspaceId, { kind: 'adAccount', id: account.id }, async (tx, signal) => {
           let persistedCount = 0;
@@ -393,6 +473,7 @@ export async function syncAdsAnalytics(now = new Date(), retryLimit = 0, retryBa
           }
           signal.throwIfAborted();
           await tx.adAccount.updateMany({ where: { id: account.id, workspaceId: account.workspaceId, actId: account.actId, enabled: true }, data: { lastSyncedAt: now } });
+          if (rows.backfill) await tx.$executeRaw`INSERT INTO facebook_ads_backfill ("adAccountId", "workspaceId", cursor, "updatedAt") VALUES (${account.id}, ${account.workspaceId}, ${JSON.stringify(rows.backfill)}::jsonb, ${now}) ON CONFLICT ("adAccountId") DO UPDATE SET cursor = EXCLUDED.cursor, "updatedAt" = EXCLUDED."updatedAt"`;
           signal.throwIfAborted();
           await assertFacebookJobAccess(account.workspaceId, jobFeatures.ads);
           if (!await currentAdsBinding(account, now)) throw new OperationError('forbidden', 'Facebook job access changed before Ads persistence completed.');
