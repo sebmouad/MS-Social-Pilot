@@ -16,16 +16,16 @@ Last updated 2026-11-14.
 | 03 | pages_read_engagement | Ready | `03-pages_read_engagement.mp4` | — |
 | 04 | read_insights | Ready | `04-read_insights.mp4` | — |
 | 05 | pages_read_user_content | Ready | `05-pages_read_user_content.mp4` | — |
-| 06 | pages_manage_posts | Recorded 2026-11-11 (old menu names) | `06-pages_manage_posts.mp4` | OK to publish one more real post to re-record |
-| 07 | pages_manage_engagement | Recorded 2026-11-11 (old menu names) | `07-pages_manage_engagement.mp4` | OK to post one more public reply to re-record |
+| 06 | pages_manage_posts | Recorded 2026-11-11 (old menu names); new script ready | `06-pages_manage_posts.mp4` | Allow or run `node v06.js` (publishes one post) |
+| 07 | pages_manage_engagement | Recorded 2026-11-11 (old menu names); new script ready | `07-pages_manage_engagement.mp4` | Allow or run `node v07.js` (one public reply, hide, show) |
 | 08 | pages_messaging | To record | — | Send a fresh Messenger message to one Page (24-hour reply window) |
 | 09 | pages_manage_metadata | To record | — | Reconnect Facebook so the webhook subscription covers all Pages, then leave a comment |
 | 10 | instagram_basic | To record | — | Link an Instagram professional account to a Page, then Reconnect |
 | 11 | instagram_content_publish | To record | — | Same as 10 |
 | 12 | instagram_manage_comments | To record | — | Same as 10, plus one visitor comment on Instagram |
 | 13 | instagram_manage_insights | To record | — | Same as 10 |
-| 14 | ads_read | To record | — | — (read-only; can be recorded any time) |
-| 15 | ads_management | To record | — | Choose the real change: turn a campaign off and on (recommended), create then delete a paused campaign, or rename and restore |
+| 14 | ads_read | Ready | `14-ads_read.mp4` | — |
+| 15 | ads_management | Script ready (`v15.js`: campaign 01 off then on) | — | Allow or run `node v15.js` (blocked by the session's safety check) |
 
 Every video: 1920×1080, English captions naming the permission, a red box and dot on each click, starting on the
 app's sign-in page. The owner records the Facebook Login / permission grant (Facebook's own screens) once and it is
@@ -104,12 +104,14 @@ In Ads › Manage the person turns a campaign, ad set or ad on or off, changes a
 campaign that starts paused. Each change is previewed and confirmed by the person before it is sent, and is listed in
 Ads › Manage › History. Nothing is changed without the person's action.
 
-## 3. Meta dashboard tasks (owner)
-- App settings › Basic: Data deletion URL `https://social.newsgeet.com/api/platforms/facebook/data-deletion`;
-  privacy policy `https://social.newsgeet.com/privacy-policy`; terms `https://social.newsgeet.com/terms`.
-- Verify the contact email; display name « MS Social Pilot ».
-- Facebook Login for Business › Settings › Valid OAuth Redirect URIs: keep
-  `https://social.newsgeet.com/api/connections/facebook/callback`, remove `https://social.newsgeet.com/api/facebook/callback`.
+## 3. Meta dashboard tasks (owner) — checked 2026-11-14 through the Meta developer tools
+- Done: display name « MS Social Pilot »; privacy policy and terms URLs; deauthorize callback; OAuth redirect URIs
+  (only `https://social.newsgeet.com/api/connections/facebook/callback` left); App Review can be submitted
+  (privacy policy and business verification pass). In the review draft, every requested permission has its use case
+  and data-use checkup done; only the screencast is missing.
+- To do — App settings › Basic: **Data deletion URL** `https://social.newsgeet.com/api/platforms/facebook/data-deletion`
+  (currently empty).
+- To do — **verify the contact email** (currently unverified), or set contact@newsgeet.com and verify it.
 - During the review window two-step sign-in is « off » in Root (so the reviewer can sign in); set it back to
   « admins » after approval.
 
