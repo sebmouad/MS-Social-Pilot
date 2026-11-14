@@ -638,3 +638,8 @@ th[aria-sort="ascending"], th[aria-sort="descending"] { color: var(--ink); }
 .studio-links__grid a svg { color: var(--accent); }
 .studio-links__grid p { margin: 0; color: var(--ink-soft); font-size: var(--text-sm); }
 .ads-extra-filters__apply { margin-left: auto; }
+
+/* Inbox: expired Messenger conversations notice (2026-11-14). */
+.inbox-expired { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; flex: 1 1 100%; padding: 8px 12px; border: 1px solid color-mix(in srgb, var(--warning) 45%, var(--line)); border-radius: var(--radius-md); background: color-mix(in srgb, var(--warning) 10%, var(--surface)); color: var(--ink); font-size: var(--text-sm); }
+.inbox-expired svg { color: var(--warning); }
+.inbox-expired .ui-button { margin-left: auto; }

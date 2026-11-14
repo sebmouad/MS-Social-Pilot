@@ -1,3 +1,5 @@
+import { ResolveExpired } from './ResolveExpired';
+import { readExpiredConversationIds } from '../server/expired';
 import { AutoOpenFirst } from './AutoOpenFirst';
 import { createHash } from 'node:crypto';
 import { loadInboxCustomerCopy } from '@/modules/inbox/server/customer-copy';
@@ -296,10 +298,14 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
 
   const tabs = <LinkTabs label={extra.screen.tabsLabel} moreLabel={shell.moreTabs} activeId="conversations"
     items={[{ id: 'conversations', href: '/inbox', label: extra.screen.tabConversations }, { id: 'rules', href: '/inbox/rules', label: extra.screen.tabRules }]} />;
+  // Open Messenger conversations past the reply window (2026-11-14): offered for one-click resolving above the list.
+  const expired = activeKind === 'message' && listPage ? await readExpiredConversationIds(actor, scope.ids).catch(() => [] as string[]) : [];
+  const bulkBatch = Number(await runtimeConfig('inbox.bulkMaxItems').catch(() => 25)) || 25;
   const filterRow = <div className={styles.filterTools}>
     <InboxFilterRow action={inboxHref()} filters={filters} scope={scope.param} locale={locale} thread={requestedThread} limit={listPage?.limit} maxLimit={listPage?.limits.listPageSize}
       searchMaxCharacters={listPage?.limits.searchMaxCharacters} resetHref={resetHref} disabledLimit={!listPage} quick={quickApplied} activeCount={chips.length} />
     <InboxSavedViews locale={locale} currentQuery={new URLSearchParams(Object.entries(baseLocation).flatMap(([key, value]) => value === undefined ? [] : [[key, value]])).toString()} />
+    <ResolveExpired ids={expired} batch={bulkBatch} locale={locale === 'fr' ? 'fr' : 'en'} />
     <UrlFilterChips chips={chips} resetHref={resetHref} labels={{ active: copy.activeFilters, remove: copy.removeFilter, reset: copy.resetFilters }} />
   </div>;
 
