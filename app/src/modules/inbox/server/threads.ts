@@ -20,5 +20,8 @@ export function commentNeedsReply(replies: ThreadMessage[], channelAccountId: st
 export type ReplyRule = { allowed: boolean; headline: string; detail?: string };
 
 export function formatInboxTime(date: Date, timeZone: string, withZone = false, locale: 'en' | 'fr' = 'en'): string {
-  return new Intl.DateTimeFormat(locale === 'fr' ? 'fr-FR' : 'en-US', { timeZone, month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', ...(withZone ? { timeZoneName: 'short' as const } : {}) }).format(date);
+  // The year shows when it is not this year (2026-11-14): « Nov 26 » for a message from last year read as next week.
+  const year = (value: Date) => new Intl.DateTimeFormat('en-US', { timeZone, year: 'numeric' }).format(value);
+  const otherYear = year(date) !== year(new Date());
+  return new Intl.DateTimeFormat(locale === 'fr' ? 'fr-FR' : 'en-US', { timeZone, month: 'short', day: 'numeric', ...(otherYear ? { year: 'numeric' } : {}), hour: 'numeric', minute: '2-digit', ...(withZone ? { timeZoneName: 'short' as const } : {}) }).format(date);
 }
