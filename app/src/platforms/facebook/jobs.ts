@@ -226,6 +226,26 @@ async function fetchPageAnalytics(target: PageTarget, now: Date, today: Date, re
     }, retryLimit, retryBackoff);
     let failedMetrics = observations.failedMetrics?.length ? 1 : 0;
     if (observations.failedMetrics?.length) await logItemFailure('pageInsights', target.id, observations.failedMetrics.map(item => `${item.metric}: ${item.message}`).join('; '));
+    const historyBinding = await currentPageBinding(target, now);
+    if (!historyBinding) throw new OperationError('forbidden', 'History access unavailable.');
+    const startCursor = await readHistoryCursor(prisma, target);
+    // Post history is best-effort: a provider refusal is counted and logged, Page insights still persist.
+    let history: PostHistory | null = null;
+    try {
+      const historyEngine = await configuredFacebookEngine({ signal });
+      history = await historyEngine.getPostHistory(historyBinding.token, target.providerId, now, startCursor);
+    } catch (historyError) {
+      // Worker shutdown still aborts the target; a spent provider window only forfeits history.
+      // Observations already fetched persist below instead of being discarded with the abort.
+      if (jobAbortSignal()?.aborted) throw historyError;
+      failedMetrics++;
+      await logItemFailure('postHistory', target.id, historyError);
+    }
+    if (history?.failures.length) {
+      failedMetrics++;
+      await logItemFailure('postHistory', target.id, history.failures.join('; '));
+    }
+    // Runs after post history so posts keep their share of the provider window; a block cut short resumes next sync.
     // One-time history (2026-11-14): a newly linked Page used to show only the last 7 days and fill in day by day.
     // Each run also reads one older block (90 days) until `meta.pageBackfillDays` is covered or Facebook has no
     // older figures. Only daily-style series are kept from these blocks; range totals stay with the normal window.
@@ -256,25 +276,6 @@ async function fetchPageAnalytics(target: PageTarget, now: Date, today: Date, re
     } catch (backfillError) {
       if (jobAbortSignal()?.aborted) throw backfillError;
       await logItemFailure('pageBackfill', target.id, backfillError);
-    }
-    const historyBinding = await currentPageBinding(target, now);
-    if (!historyBinding) throw new OperationError('forbidden', 'History access unavailable.');
-    const startCursor = await readHistoryCursor(prisma, target);
-    // Post history is best-effort: a provider refusal is counted and logged, Page insights still persist.
-    let history: PostHistory | null = null;
-    try {
-      const historyEngine = await configuredFacebookEngine({ signal });
-      history = await historyEngine.getPostHistory(historyBinding.token, target.providerId, now, startCursor);
-    } catch (historyError) {
-      // Worker shutdown still aborts the target; a spent provider window only forfeits history.
-      // Observations already fetched persist below instead of being discarded with the abort.
-      if (jobAbortSignal()?.aborted) throw historyError;
-      failedMetrics++;
-      await logItemFailure('postHistory', target.id, historyError);
-    }
-    if (history?.failures.length) {
-      failedMetrics++;
-      await logItemFailure('postHistory', target.id, history.failures.join('; '));
     }
     return { observations, history, startCursor, failedMetrics, ...(backfill ? { backfill } : {}) };
   });
