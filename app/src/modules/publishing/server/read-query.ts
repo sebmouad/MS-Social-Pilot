@@ -21,11 +21,16 @@ function parseStatus(value: unknown, errorText: PublishingErrorText = defaultPub
   return value as PostStatus;
 }
 
+/** Most channel ids one comma-separated channel scope may name. */
+const CHANNEL_SCOPE_MAX_IDS = 500;
 async function parseChannel(value: unknown): Promise<string | undefined> {
   const errorText = await loadPublishingErrorText();
   if (value === undefined || value === '') return undefined;
   const max = await runtimeConfig('publishing.identifierMaxCharacters');
-  if (typeof value !== 'string' || value !== value.trim() || value.length > max || /[\u0000-\u001f\u007f]/.test(value)) invalid(errorText('read_2'), errorText);
+  // The sidebar's channel scope sends several channel ids joined by commas (`a,b,c`): the length limit applies to each id.
+  const ids = typeof value === 'string' ? value.split(',') : [];
+  if (typeof value !== 'string' || value !== value.trim() || /[\u0000-\u001f\u007f]/.test(value)
+    || ids.length > CHANNEL_SCOPE_MAX_IDS || ids.some(id => id.trim().length > max)) invalid(errorText('read_2'), errorText);
   return value;
 }
 

@@ -39,7 +39,7 @@ placed at the start of each video before upload. Recorder: `tools/review-recordi
 ## 2. Texts for the submission form
 ### pages_show_list — 01-pages_show_list.mp4
 MS Social Pilot lets a person manage the Facebook Pages they run. After Facebook Login we list the Pages the person
-manages (Settings › Channels and the "Choose channels" window) so they can pick which Pages this workspace uses. The
+manages (Settings › Channels and the "Choose channels and ad accounts" window) so they can pick which Pages this workspace uses. The
 chosen Pages are then offered as destinations in the post composer and in Insights. We only list the person's own Pages.
 
 ### business_management — 02-business_management.mp4
@@ -69,7 +69,7 @@ Facebook. We also use it to delete a post the person asks us to delete. We only 
 
 ### pages_manage_engagement — 07-pages_manage_engagement.mp4
 In the Inbox the person answers visitors' comments on their Page: a public reply as the Page, and Hide / Show again to
-moderate a comment. The video replies "Merci ! 😊" to a real comment, hides it, then shows it again. We act only when
+moderate a comment. The video replies "Merci beaucoup ! 😊" to a real comment, hides it, then shows it again. We act only when
 the person presses the button.
 
 
