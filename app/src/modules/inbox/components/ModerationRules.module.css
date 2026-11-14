@@ -2,7 +2,7 @@
 .panel{display:grid;gap:.75rem;padding:1rem;border:1px solid var(--line);border-radius:var(--radius-lg);background:var(--surface)}
 .panel h2{font-size:1.05rem;margin:0}
 .row{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap}
-.form{display:grid;gap:.75rem}
+.form{display:grid;gap:.9rem;max-width:44rem;padding-top:.25rem}
 .form label{display:grid;gap:.3rem;font-weight:600}
 .form input[type=text],.form input[type=number],.form select,.form textarea{font:inherit;font-weight:400;border:1px solid var(--line-strong);border-radius:var(--radius-sm);padding:.55rem;background:var(--surface);color:var(--ink);max-width:100%}
 .form textarea{min-height:5rem;resize:vertical}
@@ -12,6 +12,8 @@
 .item{display:grid;gap:.35rem;padding:.75rem;border-radius:var(--radius-sm);background:var(--surface-muted);overflow-wrap:anywhere}
 .error{color:var(--danger)}
 .success{color:var(--ink)}
-.channels{display:grid;gap:.3rem;max-height:12rem;overflow:auto}
+/* No scroll box: more than 8 channels use the searchable picker, whose list must not be clipped. */
+.channels{display:grid;gap:.4rem;margin:0;padding:.75rem;border:1px solid var(--line);border-radius:var(--radius-md)}
+.channels legend{padding:0 .3rem;font-weight:600}
 .head{display:flex;align-items:center;justify-content:space-between;gap:.75rem;flex-wrap:wrap}
 .head h2{margin:0}
