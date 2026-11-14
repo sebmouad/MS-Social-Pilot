@@ -193,7 +193,7 @@ type PageFetch = {
 /** How far back the one-time Page history read has reached; `complete` once the configured depth is covered. */
 type PageBackfill = { oldest: string; complete: boolean };
 /** Facebook answers Page insights for at most about 93 days per request; blocks stay under that. */
-const BACKFILL_BLOCK_DAYS = 90;
+const BACKFILL_BLOCK_DAYS = 60;
 
 /** Current Page binding, or null when selection, connection, grant or token no longer allows the read. */
 async function currentPageBinding(target: PageTarget, now: Date): Promise<{ token: string } | null> {
@@ -213,6 +213,20 @@ async function readHistoryCursor(db: Pick<typeof prisma, '$queryRaw'>, target: P
 
 /** Read Page insights and post history from Facebook with no transaction or lock held. */
 async function fetchPageAnalytics(target: PageTarget, now: Date, today: Date, retryLimit: number, retryBackoff?: RetryBackoff): Promise<PageFetch> {
+  const fetched = await fetchRecentPageAnalytics(target, now, today, retryLimit, retryBackoff);
+  // The one-time history block gets its own provider window (2026-11-14): sharing the Page's window either starved
+  // post history or left the block cut short every time, so it never advanced. A block cut short is simply tried
+  // again next sync and is not logged as an error.
+  const older = await withProviderWindow(signal => readPageBackfillBlock(target, now, today, signal)).catch(async error => {
+    if (jobAbortSignal()?.aborted) throw error;
+    if (!(error instanceof Error && error.name === 'AbortError')) await logItemFailure('pageBackfill', target.id, error);
+    return null;
+  });
+  if (older?.observations.length) fetched.observations.push(...older.observations);
+  return { ...fetched, ...(older?.backfill ? { backfill: older.backfill } : {}) };
+}
+
+async function fetchRecentPageAnalytics(target: PageTarget, now: Date, today: Date, retryLimit: number, retryBackoff?: RetryBackoff): Promise<PageFetch> {
   return withProviderWindow(async signal => {
     const observations = await withRetries(async () => {
       await assertFacebookJobAccess(target.workspaceId, jobFeatures.analytics);
@@ -245,12 +259,18 @@ async function fetchPageAnalytics(target: PageTarget, now: Date, today: Date, re
       failedMetrics++;
       await logItemFailure('postHistory', target.id, history.failures.join('; '));
     }
-    // Runs after post history so posts keep their share of the provider window; a block cut short resumes next sync.
-    // One-time history (2026-11-14): a newly linked Page used to show only the last 7 days and fill in day by day.
-    // Each run also reads one older block (90 days) until `meta.pageBackfillDays` is covered or Facebook has no
-    // older figures. Only daily-style series are kept from these blocks; range totals stay with the normal window.
-    let backfill: PageBackfill | undefined;
-    try {
+    return { observations, history, startCursor, failedMetrics };
+  });
+}
+
+
+/** One older block of a Page's daily figures, from where the last block stopped back to `meta.pageBackfillDays`. */
+async function readPageBackfillBlock(target: PageTarget, now: Date, today: Date, signal: AbortSignal): Promise<{ observations: PageFetch['observations']; backfill?: PageBackfill } | null> {
+  let backfill: PageBackfill | undefined;
+  const observations = [] as unknown as PageFetch['observations'];
+  // A newly linked Page used to show only its last 7 days and fill in day by day. Each sync reads one older block
+  // (BACKFILL_BLOCK_DAYS) until `meta.pageBackfillDays` is covered or Facebook has no older figures. Only daily-style
+  // series are kept; range totals stay with the normal window.
       const depthDays = Number(await runtimeConfig('meta.pageBackfillDays'));
       const saved = await readPageBackfill(prisma, target);
       if (depthDays > 0 && !saved?.complete) {
@@ -273,12 +293,7 @@ async function fetchPageAnalytics(target: PageTarget, now: Date, today: Date, re
           }
         }
       }
-    } catch (backfillError) {
-      if (jobAbortSignal()?.aborted) throw backfillError;
-      await logItemFailure('pageBackfill', target.id, backfillError);
-    }
-    return { observations, history, startCursor, failedMetrics, ...(backfill ? { backfill } : {}) };
-  });
+  return { observations, ...(backfill ? { backfill } : {}) };
 }
 
 /** Refresh current daily Page snapshots for enabled connections in their own workspace. */
