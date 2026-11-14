@@ -64,12 +64,18 @@ async function PostCollaborationPageContent({ params, searchParams }: { params: 
     return <>
       <PageHeader module="publishing" title={copy.postTitle} info={<InfoTip name={copy.postTitle}>{content.copy.postDetailInfo}</InfoTip>}
         breadcrumbs={<a href="/content">{content.copy.postDetailBack}</a>} />
+      {/* Two columns on wide screens (2026-11-14), like Meta's post insights: the post and its results on the left,
+          labels, notes, history and repeat settings beside them, instead of one 3,000 px column. */}
+      <div className={styles.layout}>
+      <div className={styles.main}>
       {post ? <section aria-label={copy.postTitle} className={styles.summary}>
         <PostPreview post={post as PostPreviewPost} authorName={post.authorId === viewer.user.id ? viewer.user.name : memberName} timeZone={timeZone} locale={locale} variant="card" metrics={postMetrics ?? undefined} />
         {/* The preview already lists each destination with its status; offer the recovery action instead of repeating them. */}
         {canPublish ? <div className={styles.destinations}><RetryFailedDestinations postId={post.id} count={retryableDestinationCount(post)} /></div> : null}
       </section> : null}
       {post ? <PostPerformanceCard postId={post.id} initialMetrics={postMetrics} locale={locale} timeZone={timeZone} /> : null}
+      </div>
+      <aside className={styles.side}>
       {(notes.page > 1 || notes.hasMore || versions.page > 1 || versions.hasMore) && <nav aria-label={copy.postNav} className={styles.paging}>
         {(notes.page > 1 || notes.hasMore) && <span>{fillComposerCopy(copy.notesPage, { page: notes.page })}</span>}
         {notes.page > 1 && <a href={pageUrl(notes.page - 1, versions.page)}>{copy.newerNotes}</a>}
@@ -84,6 +90,8 @@ async function PostCollaborationPageContent({ params, searchParams }: { params: 
         versions={versions.versions.map(v => ({ id: v.id, authorName: v.authorName, createdAt: v.createdAt.toISOString(), createdLabel: stamp(v.createdAt), message: v.message, scheduledAt: v.scheduledAt?.toISOString() ?? null }))}
         restore={caps.versionRestore} canRestoreNow={canWrite && versions.restorable}
         recycle={recycle ? { enabled: recycle.enabled, everyDays: recycle.everyDays, limit: recycle.limit, count: recycle.count, nextAt: recycle.nextAt?.toISOString() ?? null, nextLabel: recycle.nextAt ? zoned(recycle.nextAt) : null, variants: recycle.variants, isRepeat: recycle.isRepeat, maxIntervalDays: recycle.limits.maxIntervalDays, maxRepeats: recycle.limits.maxRepeats, defaultIntervalDays: recycle.limits.defaultIntervalDays, maxVariants: recycle.limits.maxVariants } : null} />
+      </aside>
+      </div>
     </>;
   } catch (error) {
     if (error instanceof OperationError && error.code === 'not_found') notFound();

@@ -88,6 +88,8 @@ async function record(name, perm, script, options = {}) {
     await script({ caption: t => caption(page, perm, t), click: (l, h) => click(page, l, h), type: (l, t, d) => type(page, l, t, d), go: p => go(page, p), pause: ms => pause(page, ms), box: l => box(page, l), unbox: () => unbox(page), scroll: (dy, s) => scroll(page, dy, s), page });
     await pause(page, 1500);
   } finally {
+    // Sign the recording session out so each run does not leave a signed-in session in Account › Security.
+    await ctx.request.post(U + '/api/auth/sign-out', { headers: { Origin: U } }).catch(() => {});
     const video = page.video(); await ctx.close(); await b.close();
     const webm = await video.path();
     const out = `${__dirname}/${name}.mp4`;

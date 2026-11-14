@@ -59,3 +59,6 @@
   .dialog footer { flex-direction: column-reverse; }
   .dialog footer > * { width: 100%; }
 }
+/* Channel mutes in columns (2026-11-14); the limit note spans the row. */
+.mutes { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px 16px; }
+.mutes small { grid-column: 1 / -1; }
