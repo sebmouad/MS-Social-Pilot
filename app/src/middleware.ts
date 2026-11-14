@@ -20,7 +20,9 @@ export async function middleware(request: NextRequest) {
   if (request.method === 'GET' || request.method === 'HEAD') {
     // Moved customer routes (declared by module manifests) redirect permanently, keeping the query string.
     const target = resolveRedirect(request.nextUrl.pathname, request.nextUrl.search);
-    return target ? NextResponse.redirect(new URL(target, request.url), 308) : next(request);
+    // A relative Location (2026-11-14): behind the reverse proxy `request.url` is the internal localhost:3100 address,
+    // so an absolute redirect sent browsers to a host they cannot reach.
+    return target ? new NextResponse(null, { status: 308, headers: { location: target } }) : next(request);
   }
   if (!isWriteMethod(request.method)) return next(request);
   try {
