@@ -15,6 +15,7 @@ import { confirmation } from '../server/validation';
 import { calendarAction } from './actions';
 import { CALENDAR_EXTRAS_SCREENS } from '../manifest';
 import styles from './calendar-extras.module.css';
+const CALENDAR_AREAS = AREAS.filter(area => area !== 'notes');
 export const paths = Object.fromEntries(AREAS.map(area => [area, CALENDAR_EXTRAS_SCREENS[area].href])) as Record<Area, string>;
 const icons = { dates: IconCalendarEvent, seasons: IconSun, feeds: IconRss, notes: IconNotes, trends: IconTrendingUp };
 type Row = KeyDate | Season | Note | Feed;
@@ -25,7 +26,8 @@ export type WorkspaceProps = {
 export function CalendarTools(props: Pick<WorkspaceProps, 'area' | 'copy' | 'from' | 'to' | 'targetId' | 'channels' | 'showAll'>) {
  const { area, copy: c } = props;
  return <>
-  <LinkTabs label={c.dates} moreLabel={c.dates} maxVisible={AREAS.length} activeId={area} items={AREAS.map(a => { const Icon = icons[a]; return { id: a, href: paths[a], label: c[a], icon: <Icon size={18} /> }; })} />
+  {/* Calendar pages share one strip; Chart notes belongs to Insights, so it is not one of these tabs (2026-11-14). */}
+  {area !== 'notes' && <LinkTabs label={c.dates} moreLabel={c.dates} maxVisible={CALENDAR_AREAS.length} activeId={area} items={CALENDAR_AREAS.map(a => { const Icon = icons[a]; return { id: a, href: paths[a], label: c[a], icon: <Icon size={18} /> }; })} />}
   {/* Subscriptions are personal links, not dated entries: a period or channel filter would change nothing. */}
   {area !== 'feeds' && <form className={styles.filters} action={paths[area]}>
    <label className="ui-field"><span>{c.from}</span><input className="ui-input" type="date" name="from" defaultValue={props.from} autoComplete="off" /></label>

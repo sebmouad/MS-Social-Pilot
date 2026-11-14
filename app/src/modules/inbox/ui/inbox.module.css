@@ -305,3 +305,9 @@
 .filterTools { flex: 1 1 auto; flex-wrap: wrap; }
 .filterTools > form { flex: 0 1 520px !important; }
 @media (max-width: 760px) { .filterTools > form { flex: 1 1 100% !important; } }
+
+/* Phones: the « Last synced » line moves out of the header so Sync now and Saved replies share one row. */
+@media (max-width: 560px) {
+  .sync { max-width: none; }
+  .syncTime, .syncedAt { display: none; }
+}
