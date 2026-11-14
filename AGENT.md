@@ -328,3 +328,14 @@ ads_management (owner asked to rework Ads like Meta Ads Manager first). The subm
 - Inbox: `AutoOpenFirst` opens the first item needing a reply on ≥1024px when no thread is chosen.
 - Approvals is a fixed 4-column board; Queue times show as a week of chips; Help is visible to signed-in members.
 - Still open: Queue page ~1.1 MB (per-post hidden details are server-rendered; load them on demand).
+
+### 7.1g Images and history (2026-11-14)
+- Uploads: `lib/image-upload.ts` `uploadable()` redraws WebP/AVIF/HEIC and photos over the size limit as JPEG
+  (≤ 2048 px) on attach (composer `PostAttachments`, Library `MediaLibrary`). `meta.allowedImageMimeTypes` default
+  now includes GIF (Facebook shows it as a still photo).
+- One-time history: `syncPageAnalytics` / `syncAdsAnalytics` each read one older block (`BACKFILL_BLOCK_DAYS` = 60)
+  per sync in a separate provider window, until `meta.pageBackfillDays` (730) / `meta.adsBackfillDays` (365).
+  Progress: `facebook_sync_cursors` kind `page_backfill`; `facebook_ads_backfill` (migration 0013). A Page block
+  drops that Page's roll-ups and covering runs so the next roll-up run rebuilds them. Window aborts are not logged.
+- Composer channels: > 8 channels use `ChannelSelect` (« Post to » chips + searchable checklist). Sidebar channel
+  filter is `ChannelPicker` behind one switcher, shown only on Home, Content lists, Inbox and Insights.
