@@ -14,7 +14,7 @@
 }
 /* Side column tables (version history): no repeated caption, text wraps instead of being cut. */
 .side caption { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
-.side table { table-layout: fixed; width: 100%; }
+.side table { table-layout: fixed; width: 100% !important; min-width: 0 !important; }
 .side th, .side td { white-space: normal; overflow-wrap: anywhere; vertical-align: top; }
 .side th:first-child, .side td:first-child { width: 32%; }
 .side th:nth-child(2), .side td:nth-child(2) { width: 24%; }
