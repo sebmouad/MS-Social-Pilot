@@ -13,3 +13,5 @@
 .error{color:var(--danger)}
 .success{color:var(--ink)}
 .channels{display:grid;gap:.3rem;max-height:12rem;overflow:auto}
+.head{display:flex;align-items:center;justify-content:space-between;gap:.75rem;flex-wrap:wrap}
+.head h2{margin:0}

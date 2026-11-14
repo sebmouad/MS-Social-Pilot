@@ -7,6 +7,7 @@ import { EmptyState } from '@/components/EmptyState';
 import { IconHistory, IconShieldCheck } from '@tabler/icons-react';
 import { useConfirm } from '@/components/useConfirm';
 import { MODERATION_ACTIONS, MODERATION_MATCHES, moderationConfirmation, moderationRuleProblem, moderationText, type ModerationLocale, type ModerationRuleInput } from '../moderation';
+import { ChannelSelect } from '@/modules/publishing/ui/compose/ChannelSelect';
 import styles from './ModerationRules.module.css';
 
 type Rule = ModerationRuleInput & { id: string };
@@ -70,9 +71,9 @@ export function ModerationRules({ canWrite, locale = 'en' }: { canWrite: boolean
   const channelName = (id: string) => data?.channels.find(channel => channel.id === id)?.name ?? id;
   return <div className={styles.root}>
     <section className={styles.panel} aria-labelledby="moderation-rules-heading">
-      <div className={styles.row}><h2 id="moderation-rules-heading">{t('title')}</h2>
-        {canWrite && data && !draft && <><Button size="sm" disabled={busy} onClick={() => startEdit(null)}>{t('addRule')}</Button>
-          <Button size="sm" variant="quiet" disabled={busy || !data.rules.some(rule => rule.enabled)} onClick={async () => { const confirmation = moderationConfirmation.run(null); const result = await act({ action: 'rules.run', channelId: null, confirmation }, confirmation); if (result) setNotice(t('runDone', { examined: result.examined, acted: result.acted })); }}>{t('run')}</Button></>}
+      <div className={styles.head}><h2 id="moderation-rules-heading">{t('title')}</h2>
+        {canWrite && data && !draft && <span className={styles.row}><Button size="sm" variant="quiet" disabled={busy || !data.rules.some(rule => rule.enabled)} onClick={async () => { const confirmation = moderationConfirmation.run(null); const result = await act({ action: 'rules.run', channelId: null, confirmation }, confirmation); if (result) setNotice(t('runDone', { examined: result.examined, acted: result.acted })); }}>{t('run')}</Button>
+          <Button size="sm" variant="primary" disabled={busy} onClick={() => startEdit(null)}>{t('addRule')}</Button></span>}
       </div>
       <p className={styles.hint}>{t('intro')}</p>
       {!data && !error && <p className={styles.meta} role="status">…</p>}
@@ -95,7 +96,12 @@ export function ModerationRules({ canWrite, locale = 'en' }: { canWrite: boolean
           <label className={styles.check}><input type="checkbox" checked={draft.oncePerUser} onChange={e => setDraft({ ...draft, oncePerUser: e.target.checked })} />{t('oncePerUser')}</label></>}
         <fieldset className={styles.channels}><legend>{t('channels')}</legend>
           {data.canTargetAllChannels && <label className={styles.check}><input type="checkbox" checked={draft.targetIds.length === 0} onChange={e => setDraft({ ...draft, targetIds: e.target.checked ? [] : data.channels.slice(0, 1).map(channel => channel.id) })} />{t('allChannels')}</label>}
-          {(draft.targetIds.length > 0 || !data.canTargetAllChannels) && data.channels.map(channel => <label key={channel.id} className={styles.check}><input type="checkbox" checked={draft.targetIds.includes(channel.id)} onChange={e => setDraft({ ...draft, targetIds: e.target.checked ? [...draft.targetIds, channel.id] : draft.targetIds.filter(id => id !== channel.id) })} />{channel.name}</label>)}
+          {(draft.targetIds.length > 0 || !data.canTargetAllChannels) && (data.channels.length > 8
+            // Many channels: the composer's searchable picker instead of one checkbox per channel.
+            ? <ChannelSelect channels={data.channels} selected={draft.targetIds} locale={locale} disabled={busy}
+              onToggle={id => setDraft({ ...draft, targetIds: draft.targetIds.includes(id) ? draft.targetIds.filter(item => item !== id) : [...draft.targetIds, id] })}
+              onSetAll={ids => setDraft({ ...draft, targetIds: ids })} />
+            : data.channels.map(channel => <label key={channel.id} className={styles.check}><input type="checkbox" checked={draft.targetIds.includes(channel.id)} onChange={e => setDraft({ ...draft, targetIds: e.target.checked ? [...draft.targetIds, channel.id] : draft.targetIds.filter(id => id !== channel.id) })} />{channel.name}</label>))}
         </fieldset>
         <label>{t('dailyCap')}<input type="number" min={1} max={500} value={draft.dailyCap} onChange={e => setDraft({ ...draft, dailyCap: Math.max(1, Math.min(500, Number(e.target.value) || 1)) })} /><span className={styles.hint}>{t('dailyCapHint')}</span></label>
         <div className={styles.row}><Button type="submit" disabled={busy || !draft.name.trim() || (!data.canTargetAllChannels && draft.targetIds.length === 0)}>{t('saveRule')}</Button><Button variant="quiet" disabled={busy} onClick={() => { setDraft(null); setEditing(null); }}>{t('cancel')}</Button></div>

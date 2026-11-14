@@ -1,8 +1,8 @@
 .manager{display:grid;grid-template-columns:minmax(0,1fr);gap:1rem;min-width:0;width:100%}
-.form{display:grid;grid-template-columns:minmax(0,1fr);gap:1rem;max-width:44rem;min-width:0;width:100%}.field{min-width:0;display:grid;gap:.4rem;font-size:.9rem;font-weight:650}
+.form{display:grid;grid-template-columns:minmax(0,1fr);gap:1rem;max-width:44rem;min-width:0;width:100%}.field{min-width:0;display:grid;align-content:start;gap:.4rem;font-size:.9rem;font-weight:650}
 .field>input,.field>textarea,.field>select{width:100%;max-width:100%;min-width:0;box-sizing:border-box;min-height:2.6rem;padding:.55rem .7rem;border:1px solid var(--line-strong);border-radius:8px;background:var(--surface);color:var(--ink);font:inherit}
 .field small{color:var(--ink-soft);font-size:.8rem;font-weight:400;overflow-wrap:anywhere}
-.row{display:flex;flex-wrap:wrap;gap:1rem}.row>*{flex:1 1 10rem;min-width:0}
+.row{display:flex;flex-wrap:wrap;gap:1rem;align-items:flex-start}.row>*{flex:1 1 10rem;min-width:0}
 .check{display:flex;align-items:flex-start;gap:.55rem}.check input{margin-top:.2rem;accent-color:var(--accent)}
 .channels{display:grid;gap:.4rem;max-height:12rem;overflow:auto;padding:.5rem;border:1px solid var(--line-strong);border-radius:8px}
 .message{margin:0;color:var(--ink-soft);font-size:.85rem}.error{margin:0;color:var(--danger);font-size:.85rem}

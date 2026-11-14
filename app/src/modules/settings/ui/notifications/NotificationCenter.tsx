@@ -12,6 +12,7 @@ import { RouteNotice } from '@/components/RouteNotice';
 import type { NotificationPage, NotificationPreferenceView, NotificationRow } from '@/modules/settings/notifications/server';
 import { fill } from '@/modules/settings/ui/shell-copy';
 
+import { ChannelSelect } from '@/modules/publishing/ui/compose/ChannelSelect';
 import styles from './notifications.module.css';
 
 type Notice = { message: string; error: boolean; key: number } | null;
@@ -161,9 +162,12 @@ export function NotificationCenter({ initialPreferences, initialPage, locale = i
         <p>{t.emailAlertsHint}</p>
         <Switch label={t.onMention} checked={prefsDraft.onNoteMention} onChange={checked => { const next = { ...prefsDraft, onNoteMention: checked }; setPrefsDraft(next); setPrefsChanged(true); void savePreferences(next); }} disabled={!preferences || busy} />
         <Switch label={t.onQueueEmpty} checked={prefsDraft.onQueueEmpty} onChange={checked => { const next = { ...prefsDraft, onQueueEmpty: checked }; setPrefsDraft(next); setPrefsChanged(true); void savePreferences(next); }} disabled={!preferences || busy} />
-        {preferences && preferences.channels.length > 0 && <fieldset className={styles.mutes}>
+        {/* Mutes only matter while empty-queue emails are on; many channels get the searchable picker. */}
+        {preferences && preferences.channels.length > 0 && prefsDraft.onQueueEmpty && <fieldset className={styles.mutes}>
           <legend>{t.muteLegend}</legend>
-          {preferences.channels.map(channel => <label key={channel.id} className={styles.check}><input type="checkbox" checked={muteDraft.includes(channel.id)} onChange={event => { const checked = event.currentTarget.checked; setMuteDraft(current => checked ? [...current, channel.id] : current.filter(id => id !== channel.id)); setPrefsChanged(true); }} disabled={busy} /><span>{channel.name}</span></label>)}
+          {preferences.channels.length > 8 ? <ChannelSelect channels={preferences.channels} selected={muteDraft} locale={locale} disabled={busy}
+            onToggle={id => { setMuteDraft(current => current.includes(id) ? current.filter(item => item !== id) : [...current, id]); setPrefsChanged(true); }}
+            onSetAll={ids => { setMuteDraft(ids.slice(0, preferences.maxMutes)); setPrefsChanged(true); }} /> : preferences.channels.map(channel => <label key={channel.id} className={styles.check}><input type="checkbox" checked={muteDraft.includes(channel.id)} onChange={event => { const checked = event.currentTarget.checked; setMuteDraft(current => checked ? [...current, channel.id] : current.filter(id => id !== channel.id)); setPrefsChanged(true); }} disabled={busy} /><span>{channel.name}</span></label>)}
           <small>{preferences.maxMutes === 1 ? t.muteLimitOne : fill(t.muteLimitMany, { max: preferences.maxMutes })}</small>
         </fieldset>}
         {preferences && preferences.channels.length === 0 && <p className={styles.hint}>{t.noMuteChannels}</p>}
