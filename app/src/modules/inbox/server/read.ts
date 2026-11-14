@@ -48,13 +48,17 @@ type QuickBranch = 'message' | 'comment' | 'review';
  * A filter that cannot be judged for a kind (no unread count on comments, no stored sentiment on messages or
  * reviews) matches nothing there: unknown is not a match. "Unanswered" mirrors the needs-reply rule shown on items.
  */
-export function quickConditions(quick: readonly InboxQuickFilter[], mentionPrefix: string, branch: QuickBranch): Prisma.Sql {
+/**
+ * `replyWindowHours`: when given, « unanswered » messages are only those still inside Messenger's reply window
+ * (2026-11-14): a conversation nobody can answer any more is not waiting for an answer.
+ */
+export function quickConditions(quick: readonly InboxQuickFilter[], mentionPrefix: string, branch: QuickBranch, replyWindowHours?: number): Prisma.Sql {
   const parts = quick.map(filter => {
     if (branch === 'review') return Prisma.sql`AND false`;
     if (branch === 'message') {
       switch (filter) {
         case 'unread': return Prisma.sql`AND c."unreadCount" > 0`;
-        case 'unanswered': return Prisma.sql`AND c."resolvedAt" IS NULL AND COALESCE((SELECT (m."sentById" IS NULL AND (m."fromId" IS NULL OR m."fromId" <> t."providerId")) FROM conversation_messages m WHERE m."conversationId" = c.id ORDER BY m."createdTime" DESC, m.id DESC LIMIT 1), false)`;
+        case 'unanswered': return Prisma.sql`AND c."resolvedAt" IS NULL AND COALESCE((SELECT (m."sentById" IS NULL AND (m."fromId" IS NULL OR m."fromId" <> t."providerId")${replyWindowHours ? Prisma.sql` AND m."createdTime" >= NOW() - make_interval(hours => ${replyWindowHours}::int)` : Prisma.empty}) FROM conversation_messages m WHERE m."conversationId" = c.id ORDER BY m."createdTime" DESC, m.id DESC LIMIT 1), false)`;
         case 'negative': return Prisma.sql`AND false`;
         case 'mentions': return Prisma.sql`AND EXISTS (SELECT 1 FROM conversation_messages m WHERE m."conversationId" = c.id AND strpos(lower(COALESCE(m.message, '')), lower(${mentionPrefix}::text || t.name)) > 0)`;
       }
@@ -90,7 +94,8 @@ export async function readInboxList(actor: InboxReadActor, input: unknown = {}, 
   if (!channelIds.length) return { ...base, items: [], total: 0, totals: { message: 0, comment: 0, review: 0 }, unread: { message: 0, comment: 0, review: 0 }, olderCursor: null, newerCursor: null, lastSynced: null, syncIncomplete: false };
   const status = (alias: 'c' | 'pc' | 'r') => state === 'all' ? Prisma.empty : state === 'open' ? Prisma.sql`AND ${Prisma.raw(alias)}."resolvedAt" IS NULL` : Prisma.sql`AND ${Prisma.raw(alias)}."resolvedAt" IS NOT NULL`;
   const pattern = literalSearch(q);
-  const narrow = (branch: QuickBranch) => quickConditions(quick, mentionPrefix, branch);
+  const replyWindowHours = Number(await runtimeConfig('inbox.messengerReplyWindowHours').catch(() => 0)) || undefined;
+  const narrow = (branch: QuickBranch) => quickConditions(quick, mentionPrefix, branch, replyWindowHours);
   // Shared by the message branch and the unread sum so both read the same matches.
   const messageSearch = q ? Prisma.sql`AND (c.snippet ILIKE ${pattern} ESCAPE ${'\\'} OR EXISTS (SELECT 1 FROM conversation_messages m WHERE m."conversationId" = c.id AND (m.message ILIKE ${pattern} ESCAPE ${'\\'} OR m."fromName" ILIKE ${pattern} ESCAPE ${'\\'})))` : Prisma.empty;
   const activity = (gate: typeof kind) => Prisma.sql`
@@ -159,11 +164,12 @@ export function storedSentiment(value: string | null): InboxSentiment | null {
 }
 
 async function hydrateItems(workspaceId: string, keys: Key[], channelIds: string[]): Promise<InboxListItem[]> {
+  const replyWindowHours = Number(await runtimeConfig('inbox.messengerReplyWindowHours').catch(() => 0)) || undefined;
   const conversationIds = keys.filter(key => key.kind === 'message').map(key => key.id);
   const commentIds = keys.filter(key => key.kind === 'comment').map(key => key.id);
   const reviewIds = keys.filter(key => key.kind === 'review').map(key => key.id);
   const [conversations, comments, reviews] = await Promise.all([
-    conversationIds.length ? prisma.conversation.findMany({ where: { id: { in: conversationIds }, target: { workspaceId } }, select: { id: true, snippet: true, unreadCount: true, updatedTime: true, resolvedAt: true, target: { select: targetSelect }, messages: { orderBy: [{ createdTime: 'desc' }, { id: 'desc' }], take: 20, select: { fromName: true, fromId: true, sentById: true, message: true } } } }) : [],
+    conversationIds.length ? prisma.conversation.findMany({ where: { id: { in: conversationIds }, target: { workspaceId } }, select: { id: true, snippet: true, unreadCount: true, updatedTime: true, resolvedAt: true, target: { select: targetSelect }, messages: { orderBy: [{ createdTime: 'desc' }, { id: 'desc' }], take: 20, select: { fromName: true, fromId: true, sentById: true, message: true, createdTime: true } } } }) : [],
     commentIds.length ? prisma.postComment.findMany({ where: { id: { in: commentIds }, postTarget: { target: { workspaceId }, post: { workspaceId } } }, select: { id: true, message: true, fromName: true, createdTime: true, resolvedAt: true, isHidden: true, sentiment: true, postTarget: { select: { remoteUrl: true, target: { select: targetSelect }, post: { select: { id: true, message: true, media: true } } } } } }) : [],
     reviewIds.length ? readReviews(workspaceId, reviewIds) : [],
   ]);
@@ -182,7 +188,7 @@ async function hydrateItems(workspaceId: string, keys: Key[], channelIds: string
     // A conversation is named after the visitor (2026-11-14): when the Page wrote last (a reaction, an attachment),
     // naming it after the newest message showed hundreds of conversations « by » the Page itself.
     const visitor = item.messages.find(message => !message.sentById && message.fromId !== item.target.providerId && message.fromName);
-    mapped.set(`message:${item.id}`, { key: `message:${item.id}`, kind: 'message', id: item.id, metadata: conversationMetadata.get(item.id), author: visitor?.fromName || (newest?.sentById ? item.target.name : newest?.fromName) || 'Conversation', preview: newest?.message || item.snippet || 'No message text available.', time: item.updatedTime, target: { id: item.target.id, name: item.target.name, provider: item.target.socialAccount?.provider ?? null }, unread: item.unreadCount, needsReply: conversationNeedsReply(newest, item.target.providerId, Boolean(item.resolvedAt)), resolved: Boolean(item.resolvedAt), hidden: false, context: null, postId: null, rating: null, recommendation: null, sentiment: null });
+    mapped.set(`message:${item.id}`, { key: `message:${item.id}`, kind: 'message', id: item.id, metadata: conversationMetadata.get(item.id), author: visitor?.fromName || (newest?.sentById ? item.target.name : newest?.fromName) || 'Conversation', preview: newest?.message || item.snippet || 'No message text available.', time: item.updatedTime, target: { id: item.target.id, name: item.target.name, provider: item.target.socialAccount?.provider ?? null }, unread: item.unreadCount, needsReply: conversationNeedsReply(newest, item.target.providerId, Boolean(item.resolvedAt)) && (!replyWindowHours || !newest?.createdTime || newest.createdTime.getTime() >= Date.now() - replyWindowHours * 3_600_000), resolved: Boolean(item.resolvedAt), hidden: false, context: null, postId: null, rating: null, recommendation: null, sentiment: null });
   }
   for (const item of reviews) mapped.set(`review:${item.id}`, { key: `review:${item.id}`, kind: 'review', id: item.id, author: item.reviewerName || 'Visitor', preview: item.reviewText ?? '', time: item.createdTime, rating: item.rating, recommendation: recommendationOf(item.recommendationType), target: { id: item.target.id, name: item.target.name, provider: item.target.socialAccount?.provider ?? null }, unread: 0, needsReply: false, resolved: Boolean(item.resolvedAt), hidden: false, context: null, postId: null, sentiment: null });
   for (const item of comments) mapped.set(`comment:${item.id}`, { key: `comment:${item.id}`, kind: 'comment', id: item.id, metadata: commentMetadata.get(item.id), author: item.fromName || 'Visitor', preview: item.message, time: item.createdTime, target: { id: item.postTarget.target.id, name: item.postTarget.target.name, provider: item.postTarget.target.socialAccount?.provider ?? null }, unread: 0, needsReply: !item.resolvedAt && !item.isHidden && !answeredIds.has(item.id), resolved: Boolean(item.resolvedAt), hidden: item.isHidden, context: item.postTarget.post.message, postId: item.postTarget.post.id, postThumbnail: postThumbnail(item.postTarget.post.media), postUrl: safeWebUrl(item.postTarget.remoteUrl), rating: null, recommendation: null, sentiment: storedSentiment(item.sentiment) });
