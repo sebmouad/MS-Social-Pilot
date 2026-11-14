@@ -1,4 +1,5 @@
 'use client';
+import { ChannelSelect } from './ChannelSelect';
 import { IconAlertTriangle, IconCalendarEvent, IconCheck, IconChevronDown, IconInfoCircle, IconPlus, IconSparkles, IconTemplate, IconX } from '@tabler/icons-react';
 import { BestTimeSuggestions } from './BestTimeSuggestions';
 import { LinkPreviewCard } from './LinkPreviewCard';
@@ -533,7 +534,12 @@ function PostComposerContent({ recentPosts = [], copyCatalog = composerCatalogDe
       <section className={styles.section} aria-labelledby={`${titleId}-channels`}>
         <div className={styles.sectionHead}><h2 id={`${titleId}-channels`}>{cc.createChannels}</h2><InfoTip name={cc.createChannels}>{cc.createChannelsInfo}</InfoTip><span className={styles.sectionMeta}>{fillContent(cc.createChannelsSelected, { count: selected.length })}</span>{postable.length > 1 && <Button type="button" variant="quiet" size="sm" disabled={busy} onClick={() => setSelectedTargets(postable.every(target => selectedTargets.includes(target.id)) ? [] : postable.map(target => target.id))}>{postable.every(target => selectedTargets.includes(target.id)) ? cc.createChannelsClear : cc.createChannelsAll}</Button>}</div>
         {profiles && postable.length > 1 && <GroupShortcut groups={profiles.groups} allowedIds={postable.map(target => target.id)} onSelect={setSelectedTargets} locale={aiLocale} disabled={busy} />}
-        {postable.length || blocked.length ? <div className={styles.chips} role="group" aria-labelledby={`${titleId}-channels`}>
+        {/* Many channels: a compact « Post to » field with a searchable list (2026-11-14); a few keep the chips. */}
+        {postable.length > 8 ? <ChannelSelect channels={postable.map(target => ({ id: target.id, name: channelName(target), pictureUrl: target.pictureUrl, platformName: target.platformName }))} selected={selectedTargets} onToggle={toggleTarget} onSetAll={setSelectedTargets} disabled={busy} locale={aiLocale === 'fr' ? 'fr' : 'en'} labelledBy={`${titleId}-channels`} /> : null}
+        {postable.length > 8 && blocked.length ? <div className={styles.chips}>{blocked.map(target => <span key={target.id} className={styles.chipBlocked} title={fillContent(cc.createChannelBlocked, { name: channelName(target) })}>
+            <Avatar name={channelName(target)} src={target.pictureUrl} size={24} /><span className={styles.chipName}>{channelName(target)}</span><a href={policy.reconnectHref}>{cc.createReconnect}</a>
+          </span>)}</div> : null}
+        {postable.length > 8 ? null : postable.length || blocked.length ? <div className={styles.chips} role="group" aria-labelledby={`${titleId}-channels`}>
           {postable.map(target => { const on = selectedTargets.includes(target.id); return <button key={target.id} type="button" className={styles.chip} aria-pressed={on} disabled={busy} onClick={() => toggleTarget(target.id)}>
             <Avatar name={channelName(target)} src={target.pictureUrl} size={24} /><span className={styles.chipName}>{channelName(target)}</span>{target.platformName ? <span className={styles.chipPlatform}>{target.platformName}</span> : null}{on && <IconCheck size={15} stroke={2.4} aria-hidden="true" />}
           </button>; })}
