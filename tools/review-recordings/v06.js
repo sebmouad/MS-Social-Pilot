@@ -1,11 +1,13 @@
 const { record } = require('./lib');
-const TEXT = 'Des gaufres salées au jambon et au fromage, dorées dehors et fondantes dedans : un dîner prêt en 20 minutes que toute la famille adore. Vous les servez avec une salade ou une soupe ? 🧇 #Gaufres #RecetteFacile';
+const TEXT = 'Ce soir, on se fait plaisir avec un plat simple et généreux, prêt en 30 minutes et parfait pour toute la famille. Vous le servez avec quoi ? 🍽️ #RecetteFacile #FaitMaison';
 record('06-pages_manage_posts', 'pages_manage_posts', async r => {
   const { page } = r;
   await r.caption('The person writes a post for one of their Pages');
   await r.click(page.getByRole('link', { name: 'Create post' }).first()); await page.waitForLoadState('networkidle'); await r.pause(1200);
   await r.caption('1. Choose the Page');
-  await r.click(page.getByRole('button', { name: /Cuisine Pleine d’Envie.*Facebook/ }).first());
+  await r.click(page.getByRole('button', { name: /Choose channels/ })); await r.pause(1200);
+  await r.click(page.locator('label').filter({ hasText: 'Cuisine Pleine d’Envie' }).first());
+  await r.click(page.getByRole('button', { name: 'Done' }));
   await r.caption('2. Write the text');
   await r.type(page.getByPlaceholder('What do you want to share?'), TEXT, 18);
   await r.caption('3. Add a photo from the library');
@@ -26,7 +28,7 @@ record('06-pages_manage_posts', 'pages_manage_posts', async r => {
   await r.pause(2500);
   await r.caption('In Posts, the new post is listed as Published, with a link to it on Facebook');
   await r.go('/content?status=published'); await r.pause(2000);
-  const row = page.locator('main tbody tr').filter({ hasText: /gaufres salées au jambon/ }).first();
+  const row = page.locator('main tbody tr').filter({ hasText: /on se fait plaisir avec un plat simple/ }).first();
   await r.box(row); await r.pause(2500);
   await r.click(row); await r.pause(2500);
   const link = page.locator('dialog[open]').last().getByRole('link', { name: /View on Facebook/ });

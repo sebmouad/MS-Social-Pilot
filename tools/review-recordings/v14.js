@@ -1,0 +1,23 @@
+const { record } = require('./lib');
+record('14-ads_read', 'ads_read', async r => {
+  const { page } = r;
+  await r.caption('Ads shows the results of the ad accounts the person chose for this workspace');
+  await r.click(page.getByRole('link', { name: 'Ads', exact: true }).first()); await page.waitForLoadState('networkidle'); await r.pause(2000);
+  await r.box(page.locator('main').getByText('Daily spend', { exact: false }).first()); await r.pause(2500);
+  await r.box(page.locator('main tbody tr').filter({ hasText: 'Top Recettes' }).first()); await r.pause(3000); await r.unbox();
+  await r.caption('Manage lists every campaign with its delivery and results, read with ads_read');
+  await r.click(page.getByRole('link', { name: 'Manage', exact: true }).first()); await page.waitForLoadState('networkidle'); await r.pause(2000);
+  await r.box(page.locator('.am-table thead')); await r.pause(2500);
+  await r.box(page.locator('.am-table tfoot')); await r.pause(2500); await r.unbox();
+  await r.caption('Opening a campaign shows its ad sets, then its ads');
+  await r.click(page.locator('.am-table tbody tr a').first()); await page.waitForLoadState('networkidle'); await r.pause(2000);
+  await r.click(page.locator('.am-table tbody tr a').first()); await page.waitForLoadState('networkidle'); await r.pause(2000);
+  await r.box(page.locator('.am-table tbody tr').first()); await r.pause(2500); await r.unbox();
+  await r.caption('Each item’s window shows its performance figures and daily results');
+  await page.locator('.am-table tbody tr').first().hover();
+  await r.click(page.locator('.am-table tbody tr').first().getByRole('button', { name: /Edit/ }).first()); await r.pause(3000);
+  await r.box(page.locator('dialog[open]').last().locator('.am-edit__section').first()); await r.pause(4000); await r.unbox();
+  await page.keyboard.press('Escape'); await r.pause(800);
+  await r.caption('ads_read is used only to show the person’s own ad results in the app and in the reports they download');
+  await r.pause(3500);
+}).catch(e => { console.error(e); process.exit(1); });
