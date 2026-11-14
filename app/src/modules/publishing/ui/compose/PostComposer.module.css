@@ -215,3 +215,11 @@
 }
 /* A group whose visible parts are all conditional (scheduling choices) must not draw an empty box. */
 .group:not(:has(> :not(legend):not(input[type="hidden"]))) { display: none; }
+
+/* « Write with AI » fold (2026-11-14). */
+.aiFold { flex: 0 0 auto; }
+.aiFold[open] { flex: 1 1 100%; order: 10; display: grid; gap: 8px; }
+.aiFold > summary { list-style: none; cursor: pointer; min-height: 32px; font-size: 12px; }
+.aiFold > summary::-webkit-details-marker { display: none; }
+.aiFold[open] > summary { border-color: var(--accent); color: var(--accent); }
+.aiFold[open] > summary { justify-self: start; }

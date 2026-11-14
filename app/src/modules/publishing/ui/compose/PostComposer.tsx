@@ -554,7 +554,11 @@ function PostComposerContent({ recentPosts = [], copyCatalog = composerCatalogDe
         <div className={styles.sectionHead}><h2 id={`${titleId}-text`}>{cc.createText}</h2></div>
         <AutoTextarea id="composer-message" name="message" disabled={saved} value={message} onChange={event => setMessage(event.currentTarget.value)} maxLength={imageRules.maxMessageCharacters} rows={6} placeholder={cc.createTextPlaceholder} aria-labelledby={`${titleId}-text`} aria-describedby="composer-message-count" />
         <div className={styles.textTools}>
-          <AiAssist status={aiStatus} locale={aiLocale} text={message} disabled={pending || saved} onUse={(suggestion, kind) => setMessage(current => (kind === 'hashtags' ? `${current.trimEnd()}${current.trim() ? '\n\n' : ''}${suggestion}` : suggestion).slice(0, imageRules.maxMessageCharacters))} />
+          {/* AI help folds behind one button, as Meta keeps its composer to the text (2026-11-14). */}
+          <details className={styles.aiFold}>
+            <summary className={styles.addRow}><IconSparkles size={14} aria-hidden="true" /><span>{aiLocale === 'fr' ? 'Écrire avec l’IA' : 'Write with AI'}</span></summary
+            ><AiAssist status={aiStatus} locale={aiLocale} text={message} disabled={pending || saved} onUse={(suggestion, kind) => setMessage(current => (kind === 'hashtags' ? `${current.trimEnd()}${current.trim() ? '\n\n' : ''}${suggestion}` : suggestion).slice(0, imageRules.maxMessageCharacters))} />
+          </details>
           <button type="button" className={styles.addRow} style={{ minHeight: '32px', fontSize: '12px' }} onClick={analyzeHook}>
             <IconSparkles size={14} aria-hidden="true" />
             <span>{cc.createHookScore}</span>
