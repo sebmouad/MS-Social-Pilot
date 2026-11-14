@@ -3,7 +3,7 @@ import { accountSessionActor } from './account-session';
 import { requireViewer } from '@/server/context';
 import { requestOrigin } from '@/server/request-origin';
 import { OperationError, operationFailure } from '@/lib/operation-error';
-import { readAccount, updateAccountProfile, changeAccountPassword, listAccountSessions, revokeAccountSession } from './account';
+import { readAccount, updateAccountProfile, changeAccountPassword, listAccountSessions, revokeAccountSession, revokeOtherAccountSessions } from './account';
 
 import { labelInstants, workspaceInstantFormatter } from '@/server/instant-labels';
 import { readAccountSecurity, changeAccountSecurity } from './account-security';
@@ -32,10 +32,10 @@ export async function accountHttp(request: Request, action: 'export' | 'read' | 
       const params = new URL(request.url).searchParams;
       if ([...params.keys()].some(key => key !== 'offset') || params.getAll('offset').length > 1 || (params.has('offset') && !/^\d+$/.test(params.get('offset')!))) throw new OperationError('invalid_request', 'Choose a valid session page.');
       const page = await listAccountSessions(actor, params.has('offset') ? { offset: Number(params.get('offset')) } : {});
-      return reply({ ...page, sessions: page.sessions.map(session => labelInstants(session, { expiresAt: 'dateTime' }, instants!)) });
+      return reply({ ...page, sessions: page.sessions.map(session => labelInstants(session, { expiresAt: 'dateTime', createdAt: 'dateTime' }, instants!)) });
     }
     const input = await request.json();
-    return reply(action === 'profile' ? await updateAccountProfile(actor, input) : action === 'password' ? await changeAccountPassword(actor, input) : await revokeAccountSession(actor, input));
+    return reply(action === 'profile' ? await updateAccountProfile(actor, input) : action === 'password' ? await changeAccountPassword(actor, input) : (input as { others?: unknown } | null)?.others === true ? await revokeOtherAccountSessions(actor, input) : await revokeAccountSession(actor, input));
   } catch (error) {
     const digest = (error as { digest?: unknown } | null)?.digest;
     const safe = operationFailure(typeof digest === 'string' && digest.startsWith('NEXT_REDIRECT') ? new OperationError('unauthorized', 'Sign in to continue.') : error instanceof SyntaxError ? new OperationError('invalid_request', 'Invalid JSON.') : error, 'Account settings could not be updated.');

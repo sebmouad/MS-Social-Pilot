@@ -10,13 +10,14 @@ import { FieldError, useFormValidation } from '@/components/FormValidation';
 import styles from '@/modules/settings/ui/settings.module.css';
 import { fill } from './copy';
 
-type Session = { id: string; expiresAt: string; current: boolean; labels?: { expiresAt?: string } };
+type Session = { id: string; expiresAt: string; createdAt?: string; device?: string | null; current: boolean; labels?: { expiresAt?: string; createdAt?: string } };
 
 export function AccountManager({ initialName, email, passwordPolicy, canWrite, nameMaxLength, confirmationCopy, sessionRevision = 0, locale = 'en', part = 'profile' }: { part?: 'profile' | 'security'; sessionRevision?: number; canWrite: boolean; nameMaxLength: number; confirmationCopy: AccountConfirmationCopy; initialName: string; email: string; passwordPolicy: { minLength: number; maxBytes: number }; locale?: 'en' | 'fr' }) {
   const toast = useToast();
   const t = useSettingsCopy('account', locale);
   const [confirm, confirmationDialog] = useConfirm(confirmationCopy);
   const [pendingSession, setPendingSession] = useState<string | null>(null);
+  const [pendingOthers, setPendingOthers] = useState(false);
   const [name, setName] = useState(initialName);
   const [nextOffset, setNextOffset] = useState<number | null>(null);
   const [sessions, setSessions] = useState<Session[]>([]);
@@ -90,7 +91,20 @@ export function AccountManager({ initialName, email, passwordPolicy, canWrite, n
     finally { setBusy(false); }
   }
 
+  async function revokeOthers() {
+    if (!canWrite) return t.revokeFailed;
+    setBusy(true); setNotice('');
+    try {
+      const response = await fetch('/api/settings/account/sessions', { method: 'DELETE', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ others: true, confirmation: 'REVOKE OTHER ACCOUNT SESSIONS' }) });
+      const result = await response.json(); if (!response.ok) throw new Error(result.error ?? t.revokeFailed);
+      setSessions(current => current.filter(session => session.current)); setNextOffset(null); toast.notify({ title: t.othersSignedOut }); return null;
+    } catch { return t.revokeFailed; }
+    finally { setBusy(false); }
+  }
+  const others = sessions.filter(session => !session.current).length;
+
   return <>{confirmationDialog}
+    {pendingOthers && <ConfirmDialog open title={t.signOutOthers} objectName={t.sessions} consequence={t.othersConsequence} confirmLabel={t.signOutOthers} cancelLabel={confirmationCopy.cancel} failureLabel={t.revokeFailed} danger onClose={() => setPendingOthers(false)} onConfirm={revokeOthers} />}
     {pendingSession && <ConfirmDialog open title={t.signOut} objectName={t.otherSession} consequence={confirmationCopy.session} confirmLabel={t.signOut} cancelLabel={confirmationCopy.cancel} failureLabel={t.revokeFailed} onClose={() => setPendingSession(null)} onConfirm={async () => (await revokeSession(pendingSession)) ?? null} />}
     {part === 'profile' && <section className={styles['settings-panel']}><div className={styles['settings-panel__heading']}><div><h2>{t.profile}</h2><p>{t.profileDetail}</p></div></div>
       <form method="post" noValidate className={styles['mcp-key-form']} onSubmit={saveName}>
@@ -105,9 +119,10 @@ export function AccountManager({ initialName, email, passwordPolicy, canWrite, n
         <label>{t.newPassword}<input name="newPassword" type="password" autoComplete="new-password" minLength={passwordPolicy.minLength} maxLength={passwordPolicy.maxBytes} required value={newPassword} onChange={event => { setNewPassword(event.currentTarget.value); passwordValidation.clear('newPassword'); }} disabled={busy} {...passwordValidation.fieldProps('newPassword')} /><FieldError {...passwordValidation.errorProps('newPassword')} /></label>
       </div><p className={styles['settings-note']}>{fill(t.passwordRule, { min: passwordPolicy.minLength, max: passwordPolicy.maxBytes })}</p><button type="submit" disabled={busy}>{t.changePassword}</button></form>
     </section>}
-    {part === 'security' && <section className={styles['settings-panel']}><div className={styles['settings-panel__heading']}><div><h2>{t.sessions}</h2><p>{t.sessionsDetail}</p></div></div>
+    {part === 'security' && <section className={styles['settings-panel']}><div className={styles['settings-panel__heading']}><div><h2>{t.sessions}</h2><p>{t.sessionsDetail}</p></div>{canWrite && others > 0 ? <button type="button" className="ui-button ui-button--secondary ui-button--sm" disabled={busy} onClick={() => setPendingOthers(true)}>{t.signOutOthers}</button> : null}</div>
       <DataTable caption={t.sessions} rows={sessions} rowKey={session => session.id} emptyMessage={t.noSessions} emptyIcon={<IconDevices />} columns={[
-        { key: 'session', label: t.session, render: session => <Badge tone={session.current ? 'module' : 'neutral'}>{session.current ? t.currentSession : t.otherSession}</Badge> },
+        { key: 'session', label: t.session, render: session => <span className={styles['session-cell']}><strong>{session.device ?? t.otherSession}</strong>{session.current ? <Badge tone="module">{t.currentSession}</Badge> : null}</span> },
+        { key: 'signedIn', label: t.signedIn, render: session => session.labels?.createdAt ?? '' },
         { key: 'expires', label: t.expires, render: session => session.labels?.expiresAt ?? '' },
         { key: 'actions', label: t.signOut, render: session => canWrite && !session.current && <button type="button" className="ui-button ui-button--quiet" disabled={busy} onClick={() => setPendingSession(session.id)}>{t.signOut}</button> },
       ]} />

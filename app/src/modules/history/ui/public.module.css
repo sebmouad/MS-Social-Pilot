@@ -23,7 +23,11 @@
 .updated { color: var(--ink-soft); font-size: .9rem; }
 .faq { display: grid; gap: var(--space-2); max-width: 46rem; }
 .faq details { border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface); }
-.faq summary { cursor: pointer; padding: var(--space-4); font-weight: 650; list-style-position: outside; }
+.faq summary { cursor: pointer; padding: var(--space-4); font-weight: 650; list-style: none; display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
+.faq summary::-webkit-details-marker { display: none; }
+.faq summary::after { content: ""; flex: none; width: 8px; height: 8px; border-right: 2px solid var(--ink-soft); border-bottom: 2px solid var(--ink-soft); transform: rotate(45deg) translateY(-2px); transition: transform .15s ease; }
+.faq details[open] summary::after { transform: rotate(-135deg) translateY(-2px); }
+.faq summary:hover { color: var(--accent); }
 .faq details[open] summary { border-bottom: 1px solid var(--line); }
 .faq .answer { padding: var(--space-4); }
 .plans { display: grid; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); gap: var(--space-4); margin: 0; padding: 0; list-style: none; }

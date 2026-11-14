@@ -61,7 +61,7 @@ async function SiteFrame({ content, operator, locale, current, children }: { con
   const link = (page: Page, label: string) => <a key={page} href={PATHS[page]} aria-current={current === page ? 'page' : undefined}>{label}</a>;
   return <div className={styles.shell} lang={locale}>
     <header className={styles.header}><div className={styles.bar}>
-      <a className={styles.brand} href="/"><span className={styles.mark} aria-hidden="true">{Array.from(operator.productName)[0] ?? 'S'}</span>{operator.productName}</a>
+      <a className={styles.brand} href="/"><span className={styles.mark} aria-hidden="true"><svg viewBox="0 0 32 32" width="22" height="22"><path d="M5 23.5 12.2 8l4 9 3.2-5.3L27 23.5" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"/><circle cx="23.5" cy="8.5" r="2.5" fill="currentColor"/></svg></span>{operator.productName}</a>
       <nav className={styles.nav} aria-label={nav.label}>
         {sitePublic && <>{link('help', nav.help)}{link('pricing', nav.pricing)}{link('changelog', nav.changelog)}{link('status', nav.status)}</>}
         <a href="/sign-in">{nav.signIn}</a>

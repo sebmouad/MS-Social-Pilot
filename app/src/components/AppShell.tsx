@@ -175,7 +175,8 @@ export function AppShell({ children, activeModule, enabledModules, enabledFeatur
     }
     return () => { for (const strip of strips) strip.removeEventListener("scroll", onScroll); };
   }, [pathname]);
-  const activeHubPages = activeHub ? hubPages(activeHub, enabledFeatures, effectiveOptionalAreas) : [];
+  // Agency has no hub: its pages (Workspaces · Clients) are its own tabs, opened from the workspace menu.
+  const activeHubPages = activeHub ? hubPages(activeHub, enabledFeatures, effectiveOptionalAreas) : activeArea === "agency" ? areaPages("agency", enabledFeatures) : [];
   const tabs = activeHubPages.map(page => ({ id: page.id, href: page.href, label: pageLabel(page), ...(tabCounts[page.id] ? { count: tabCounts[page.id] } : {}) }));
   const settingsTabs = settingsActive ? settingsPages.map(page => ({ id: page.id, href: page.href, label: pageLabel(page) })) : [];
   // Sections that are not tabs themselves (Library sections, post details) keep their parent tab current: the longest tab route that prefixes the path.
@@ -360,6 +361,9 @@ export function AppShell({ children, activeModule, enabledModules, enabledFeatur
       : <Avatar name={entry.name} size="sm" decorative />,
     onSelect: () => { void switchWorkspace(entry.id); },
   }));
+  // « All workspaces » (Agency) sits under the workspace list, like Meta's « See all business portfolios ».
+  const agencyPage = effectiveOptionalAreas.includes("agency") ? areaPages("agency", enabledFeatures)[0] : undefined;
+  if (agencyPage) workspaceItems.push({ key: "agency", label: copy.allWorkspaces, icon: <IconBuildingStore size={16} stroke={1.8} aria-hidden="true" />, onSelect: () => { window.location.assign(agencyPage.href); } });
 
   return <ShellCopyProvider copy={copy}><ToastProvider>
     <div className="shell" data-area={installationMode ? "root" : activeArea} data-module={installationMode ? "root" : activeModule} data-rail={rail ? "true" : undefined} data-menu={menuOpen ? "open" : undefined}>
@@ -371,7 +375,7 @@ export function AppShell({ children, activeModule, enabledModules, enabledFeatur
         </div>
         <div className="shell-workspace">
           <p className="shell-workspace-label" id="shell-workspace-label">{installationMode ? copy.privateInstallation : copy.workspace}</p>
-          {!installationMode && workspaces.length > 1
+          {!installationMode && (workspaces.length > 1 || agencyPage)
             ? <Menu label={`${copy.workspace}: ${currentWorkspace?.name ?? workspaceName}`} align="start" className="shell-workspace__menu" items={workspaceItems}
               trigger={<><Avatar name={currentWorkspace?.name ?? workspaceName} size="sm" decorative /><span className="shell-workspace__name">{currentWorkspace?.name ?? workspaceName}</span><IconChevronDown size={15} stroke={2} aria-hidden="true" className="shell-workspace__chevron" /></>} />
             : <p className="shell-workspace-name"><Avatar name={workspaceName} size="sm" decorative /><span className="shell-workspace__name">{workspaceName}</span></p>}
@@ -429,7 +433,7 @@ export function AppShell({ children, activeModule, enabledModules, enabledFeatur
           </div>
         </header>
         <main id="main-content" className="shell-content" tabIndex={-1}>
-          {tabs.length > 1 && !settingsActive && <LinkTabs items={tabs} activeId={activeTabId} label={fill(copy.hubTabsLabel, { hub: activeHub ? copy.hubs[activeHub] : "" })} maxVisible={policy.maxVisibleTabs} moreLabel={copy.moreTabs} className="shell-tabs" />}
+          {tabs.length > 1 && !settingsActive && <LinkTabs items={tabs} activeId={activeTabId} label={fill(copy.hubTabsLabel, { hub: activeHub ? copy.hubs[activeHub] : activeArea === "agency" ? copy.areas.agency : "" })} maxVisible={policy.maxVisibleTabs} moreLabel={copy.moreTabs} className="shell-tabs" />}
           {!installationMode && dropped > 0 && <p className="shell-notice" role="status">{dropped === 1 ? copy.scopeDroppedOne : fill(copy.scopeDroppedMany, { count: dropped })}</p>}
           {settingsActive && !installationMode && settingsTabs.length > 1
             ? <div className="shell-settings">

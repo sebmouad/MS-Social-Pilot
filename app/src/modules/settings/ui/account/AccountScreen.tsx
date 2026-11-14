@@ -45,7 +45,7 @@ async function AccountTab({ part, tab }: { part: 'profile' | 'security'; tab: Se
   ];
   // The heading names the open tab, like the Appearance and Notifications tabs beside it.
   const sections = await readSectionsCopy(locale);
-  return <PageFrame module="settings" scopedAccess><SettingsPage copy={uiCopy} active="settings/account" tab={tab} title={part === 'security' ? sections.tabs.accountSecurity : t.title} description={part === 'security' ? t.sessionsDetail : t.description} locale={locale}>
+  return <PageFrame module="settings" scopedAccess><SettingsPage copy={uiCopy} active="settings/account" tab={tab} title={part === 'security' ? sections.tabs.accountSecurity : t.title} description={part === 'security' ? t.securityDetail : t.description} locale={locale}>
     <AccountSettings part={part} canWrite={canAccessFeature(viewer.permissions, 'settings/account', 'write')} nameMaxLength={nameMaxLength} confirmationCopy={confirmationCopy} locale={locale} initialName={account.name} email={account.email} passwordPolicy={passwordPolicy} />
     {part === 'profile' && <SettingsPanel title={t.contextTitle}>
       <dl className={styles['settings-account-grid']}>{values.map(item => <div className={styles['settings-account-item']} key={item.label}><dt>{item.label}</dt><dd>{item.value}</dd></div>)}</dl>

@@ -13,7 +13,19 @@ const invalid = () => new OperationError('invalid_request', 'Enter valid account
 export const accountConfirmations = {
   profile: 'UPDATE ACCOUNT PROFILE', password: 'CHANGE ACCOUNT PASSWORD',
   session: (id: string) => `REVOKE ACCOUNT SESSION ${id}`,
+  otherSessions: 'REVOKE OTHER ACCOUNT SESSIONS',
 };
+
+/** « Chrome on macOS » from a stored user agent; null when nothing was stored (sessions opened before 2026-11-14). */
+export function describeUserAgent(agent: string | null | undefined): string | null {
+  if (!agent) return null;
+  const browser = /Edg\//.test(agent) ? 'Edge' : /OPR\/|Opera/.test(agent) ? 'Opera' : /Firefox\//.test(agent) ? 'Firefox'
+    : /Chrome\/|CriOS/.test(agent) ? 'Chrome' : /Safari\//.test(agent) ? 'Safari' : null;
+  const system = /iPhone|iPad|iPod/.test(agent) ? 'iOS' : /Android/.test(agent) ? 'Android' : /Mac OS X|Macintosh/.test(agent) ? 'macOS'
+    : /Windows/.test(agent) ? 'Windows' : /CrOS/.test(agent) ? 'ChromeOS' : /Linux/.test(agent) ? 'Linux' : null;
+  if (/HeadlessChrome|Playwright|bot|curl|node-fetch|undici/i.test(agent)) return system ? `Automated browser · ${system}` : 'Automated browser';
+  return browser && system ? `${browser} · ${system}` : browser ?? system;
+}
 export async function authorizeAccountSession(actor: AccountActor, write = false, feature = 'settings/account') {
   if (actor.apiKeyId || !actor.sessionTokenHash) throw new OperationError('forbidden', 'Use a signed-in browser session to manage your account.');
   const [session, permissions, entitlements] = await Promise.all([
@@ -66,8 +78,20 @@ export async function listAccountSessions(actor: AccountActor, input: unknown = 
   const offset = parsed.data.offset ?? 0;
   const configured = await runtimeConfig('settings.accountSessionPageSize');
   const limit = maxItems === undefined ? configured : Math.min(configured, z.number().int().positive().parse(maxItems));
-  const rows = await prisma.session.findMany({ where: { userId: actor.userId, pending: null, expiresAt: { gt: new Date() } }, orderBy: [{ expiresAt: 'desc' }, { id: 'asc' }], skip: offset, take: limit + 1, select: { id: true, expiresAt: true, tokenHash: true } });
-  return { sessions: rows.slice(0, limit).map(({ id, expiresAt, tokenHash }) => ({ id, expiresAt, current: tokenHash === actor.sessionTokenHash })), nextOffset: rows.length > limit ? offset + limit : null };
+  const rows = await prisma.session.findMany({ where: { userId: actor.userId, pending: null, expiresAt: { gt: new Date() } }, orderBy: [{ expiresAt: 'desc' }, { id: 'asc' }], skip: offset, take: limit + 1, select: { id: true, expiresAt: true, tokenHash: true, createdAt: true, userAgent: true } });
+  return { sessions: rows.slice(0, limit).map(({ id, expiresAt, tokenHash, createdAt, userAgent }) => ({ id, expiresAt, createdAt, device: describeUserAgent(userAgent), current: tokenHash === actor.sessionTokenHash })), nextOffset: rows.length > limit ? offset + limit : null };
+}
+/** Signs out every other session of this person at once (the current browser stays signed in). */
+export async function revokeOtherAccountSessions(actor: AccountActor, input: unknown) {
+  await authorize(actor, true);
+  const parsed = z.object({ others: z.literal(true), confirmation: z.literal(accountConfirmations.otherSessions) }).strict().safeParse(input);
+  if (!parsed.success) throw invalid();
+  const count = await prisma.$transaction(async tx => {
+    const changed = await tx.session.deleteMany({ where: { userId: actor.userId, tokenHash: { not: actor.sessionTokenHash } } });
+    await auditAccountMutation(tx, actor.userId, 'account.other_sessions_revoked', { count: changed.count });
+    return changed.count;
+  });
+  return { ok: true, count };
 }
 export async function revokeAccountSession(actor: AccountActor, input: unknown) {
   await authorize(actor, true);

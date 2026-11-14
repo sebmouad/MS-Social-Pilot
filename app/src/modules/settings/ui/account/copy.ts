@@ -21,7 +21,7 @@ export const accountCopy = {
     passwordFailed: 'Could not change password.', passwordChanged: 'Password changed. Other active sessions were signed out.',
     sessions: 'Active sessions', sessionsDetail: 'Sign out sessions you no longer recognize. This browser is marked as current.',
     session: 'Session', expires: 'Expires', currentSession: 'This browser · current', otherSession: 'Signed-in session',
-    signOut: 'Sign out', noSessions: 'No active sessions found.', sessionsFailed: 'Could not load sessions.',
+    signOut: 'Sign out', signOutOthers: 'Sign out all other sessions', othersSignedOut: 'Other sessions signed out.', othersConsequence: 'Every other browser and device signed in to your account is signed out. This browser stays signed in.', signedIn: 'Signed in', securityDetail: 'Password, signed-in sessions, two-step verification and passkeys.', noSessions: 'No active sessions found.', sessionsFailed: 'Could not load sessions.',
     revokeFailed: 'Could not revoke session.', sessionRevoked: 'Session signed out.',
   },
   fr: {
@@ -46,7 +46,7 @@ export const accountCopy = {
     passwordFailed: 'Impossible de changer le mot de passe.', passwordChanged: 'Mot de passe modifié. Les autres sessions actives ont été déconnectées.',
     sessions: 'Sessions actives', sessionsDetail: 'Déconnectez les sessions que vous ne reconnaissez pas. Ce navigateur est marqué comme session actuelle.',
     session: 'Session', expires: 'Expire le', currentSession: 'Ce navigateur · actuelle', otherSession: 'Session connectée',
-    signOut: 'Se déconnecter', noSessions: 'Aucune session active.', sessionsFailed: 'Impossible de charger les sessions.',
+    signOut: 'Se déconnecter', signOutOthers: 'Déconnecter toutes les autres sessions', othersSignedOut: 'Autres sessions déconnectées.', othersConsequence: 'Tous les autres navigateurs et appareils connectés à votre compte sont déconnectés. Ce navigateur reste connecté.', signedIn: 'Connexion', securityDetail: 'Mot de passe, sessions connectées, validation en deux étapes et clés d’accès.', noSessions: 'Aucune session active.', sessionsFailed: 'Impossible de charger les sessions.',
     revokeFailed: 'Impossible de déconnecter la session.', sessionRevoked: 'Session déconnectée.',
   },
 } as const;

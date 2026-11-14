@@ -8,7 +8,8 @@
  *   plus the team task board once the workspace uses it.
  * - Engage: the inbox.
  * - Measure: insights.
- * - Grow: ads plus agency client workspaces once the workspace uses them.
+ * - Grow: ads. Agency (all workspaces) is reached from the workspace menu, like Meta's business-portfolio list,
+ *   and shows its own tabs without a hub (2026-11-14).
  */
 import { areaPages, pageForPath, type ModuleId, type ProductPage } from './product';
 import type { AreaId } from '@/modules/types';
@@ -24,14 +25,13 @@ export function hubForPage(page: ProductPage): HubId | undefined {
     case 'inbox': return 'engage';
     case 'insights': return 'measure';
     case 'ads': return 'grow';
-    case 'agency': return 'grow';
     default: return undefined;
   }
 }
 
 /**
- * Pages the hub shows as tabs, in the same order as their areas. Tasks and Agency
- * join their hub only when the workspace uses them (`optionalAreas`, as before).
+ * Pages the hub shows as tabs, in the same order as their areas. Tasks joins its hub
+ * only when the workspace uses it (`optionalAreas`, as before).
  */
 export function hubPages(hub: HubId, enabledFeatures: readonly string[], optionalAreas: readonly AreaId[] = []): ProductPage[] {
   const optional = new Set<AreaId>(optionalAreas);
@@ -40,13 +40,13 @@ export function hubPages(hub: HubId, enabledFeatures: readonly string[], optiona
     case 'plan': return [...areaPages('content', enabledFeatures).filter(page => page.module !== 'studio'), ...(optional.has('tasks') ? areaPages('tasks', enabledFeatures) : [])];
     case 'engage': return areaPages('inbox', enabledFeatures);
     case 'measure': return areaPages('insights', enabledFeatures);
-    case 'grow': return [...areaPages('ads', enabledFeatures), ...(optional.has('agency') ? areaPages('agency', enabledFeatures) : [])];
+    case 'grow': return areaPages('ads', enabledFeatures);
   }
 }
 
 /** Module fallback for routes without a page (the /create composer lives under Publishing). */
 const HUB_BY_MODULE: Partial<Record<ModuleId, HubId>> = {
-  publishing: 'create', studio: 'create', inbox: 'engage', analytics: 'measure', ads: 'grow', tasks: 'plan', agency: 'grow',
+  publishing: 'create', studio: 'create', inbox: 'engage', analytics: 'measure', ads: 'grow', tasks: 'plan',
 };
 
 /** Hub of a pathname; the Home landing and Settings return undefined. */

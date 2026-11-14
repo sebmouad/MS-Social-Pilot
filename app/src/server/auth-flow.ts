@@ -1,4 +1,4 @@
-import { cookies } from 'next/headers';
+import { cookies, headers } from 'next/headers';
 import { createHash, randomBytes, scryptSync } from 'node:crypto';
 import { verifyPassword, hashSessionToken, SESSION_COOKIE } from './auth';
 import { prisma } from './data';
@@ -60,7 +60,9 @@ export async function signIn(email: string, password: string): Promise<'signed-i
     : hasPasskey || needsTwoStepEnrollment(policy, user.isInstanceOwner, privilegedMembership ? [privilegedMembership.role] : []) ? 'enroll' : null;
   const token = randomBytes(32).toString('base64url');
   const expiresAt = new Date(Date.now() + (next ? pendingMinutes * 60 * 1000 : sessionDays * 24 * 60 * 60 * 1000));
-  await prisma.session.create({ data: { id: randomBytes(18).toString('base64url'), userId: user.id, tokenHash: hashToken(token), expiresAt, pending: next, challenge: null } });
+  // The browser is kept so Settings › Security can name each session (« Chrome on macOS ») instead of a bare row.
+  const userAgent = (await headers()).get('user-agent')?.slice(0, 400) || null;
+  await prisma.session.create({ data: { id: randomBytes(18).toString('base64url'), userId: user.id, tokenHash: hashToken(token), expiresAt, pending: next, challenge: null, userAgent } });
   const store = await cookies();
   store.set(SESSION_COOKIE, token, { ...cookieOptions, maxAge: next ? pendingMinutes * 60 : sessionDays * 24 * 60 * 60 });
   return next ?? 'signed-in';
