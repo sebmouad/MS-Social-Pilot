@@ -223,3 +223,5 @@
 .aiFold > summary::-webkit-details-marker { display: none; }
 .aiFold[open] > summary { border-color: var(--accent); color: var(--accent); }
 .aiFold[open] > summary { justify-self: start; }
+.textTools { justify-content: flex-start; }
+.textTools > :last-child { margin-left: auto; }
