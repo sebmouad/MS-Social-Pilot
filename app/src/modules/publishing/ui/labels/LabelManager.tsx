@@ -80,7 +80,7 @@ export function LabelManager({ catalog = labelCopyDefaults, initialLabels, color
     {notice && !dialog && <RouteNotice error={notice.error} focusKey={`label-notice:${notice.key}`}>{notice.text}</RouteNotice>}
     <form action="/content/library/labels" method="get" className={styles.search} role="search">
       <label htmlFor="label-search">{t.search}</label><input id="label-search" name="q" defaultValue={query} maxLength={maxSearchCharacters} placeholder={t.name} />
-      <Button type="submit" variant="secondary">{t.searchButton}</Button>{query && <a href="/content/library/labels">{t.clear}</a>}
+      <Button type="submit" variant="quiet">{t.searchButton}</Button>{query && <a href="/content/library/labels">{t.clear}</a>}
       {canWrite && <Button type="button" variant="primary" onClick={() => begin()}>{t.newLabel}</Button>}
     </form>
     <DataTable caption={t.caption} rows={labels} rowKey={label => label.id}
@@ -98,7 +98,7 @@ export function LabelManager({ catalog = labelCopyDefaults, initialLabels, color
       emptyIcon={<IconTag />} emptyMessage={query ? t.noMatch : t.empty}
       emptyAction={query ? <a className="ui-button ui-button--secondary" href="/content/library/labels">{t.clearSearch}</a> : canWrite ? <Button variant="primary" onClick={() => begin()}>{t.newLabel}</Button> : undefined} />
     {canWrite && !canChange && <p className={styles.note}>{t.limitedNote}</p>}
-    <nav className={styles.pagination} aria-label={t.pages}>{page > 1 && <a href={href(page - 1)}>{t.previous}</a>}<span>{t.page(page)}</span>{hasMore && <a href={href(page + 1)}>{t.next}</a>}</nav>
+    {page > 1 || hasMore ? <nav className={styles.pagination} aria-label={t.pages}>{page > 1 && <a href={href(page - 1)}>{t.previous}</a>}<span>{t.page(page)}</span>{hasMore && <a href={href(page + 1)}>{t.next}</a>}</nav> : null}
     <Dialog open={dialog} title={editing ? t.editTitle : t.newTitle} description={t.dialogDescription} onClose={close} busy={busy} actions={<><Button data-dialog-cancel disabled={busy} onClick={close}>{t.cancel}</Button><Button type="submit" form="label-form" variant="primary" disabled={busy}>{busy ? t.saving : editing ? t.saveChanges : t.createLabel}</Button></>}>
       {notice?.error && <RouteNotice error focusKey={`label-edit-error:${notice.key}`}>{notice.text}</RouteNotice>}
       <form id="label-form" className={styles.form} onSubmit={event => void save(event)} noValidate>
