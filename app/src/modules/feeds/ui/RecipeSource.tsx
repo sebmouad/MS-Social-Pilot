@@ -122,6 +122,8 @@ export function RecipeSource({ initial, locale, canWrite, copy = recipeCopy }: {
     ? t('unfilledWhy', { scanned: summary.scanned ?? 0, candidates: summary.candidates, shared: summary.rejected.shared, caption: summary.rejected.caption, image: summary.rejected.image + summary.rejected.link, recipe: summary.rejected.recipe }) : null;
   const statusKey: RecipeCopyKey = !source ? 'statusNew' : source.enabled ? 'statusActive' : 'statusPaused';
 
+  // Twelve planned posts first; the rest on request (the page grew by one row per channel and posting time).
+  const [showAllPlans, setShowAllPlans] = useState(false);
   return <section className={styles.root} aria-labelledby="recipe-heading">
     <h2 id="recipe-heading" className={styles.sectionTitle}>{t('title')}</h2>
     <p className={styles.help}>{t('intro')}</p>
@@ -214,10 +216,10 @@ export function RecipeSource({ initial, locale, canWrite, copy = recipeCopy }: {
     </form>}
 
     <h3 className={styles.sectionTitle}>{t('plansHeading')}</h3>
-    {view.plans.items.length ? <div className={styles.tableWrap}><table className={styles.table}><caption className="sr-only">{t('plansHeading')}</caption>
+    {view.plans.items.length ? <div className={styles.tableWrap}><table className={styles.table}><caption className="ui-visually-hidden">{t('plansHeading')}</caption>
       <thead><tr><th scope="col">{t('colTime')}</th><th scope="col">{t('colChannel')}</th><th scope="col">{t('colRecipe')}</th><th scope="col">{t('colState')}</th></tr></thead>
-      <tbody>{view.plans.items.map(p => <tr key={p.id}><th scope="row">{view.labels?.slots[p.id] ?? ''}</th><td>{p.targetName}</td><td>{p.title}</td><td>{stateText(p)}{reasonText(p.reason) && <span className={styles.meta}>{reasonText(p.reason)}</span>}</td></tr>)}</tbody>
-    </table></div> : <p className={styles.empty}>{t('plansEmpty')}</p>}
+      <tbody>{(showAllPlans ? view.plans.items : view.plans.items.slice(0, 12)).map(p => <tr key={p.id}><th scope="row">{view.labels?.slots[p.id] ?? ''}</th><td>{p.targetName}</td><td>{p.title}</td><td>{stateText(p)}{reasonText(p.reason) && <span className={styles.meta}>{reasonText(p.reason)}</span>}</td></tr>)}</tbody>
+    </table>{view.plans.items.length > 12 ? <button type="button" className={styles.showAll} onClick={() => setShowAllPlans(v => !v)}>{showAllPlans ? t('plansFewer') : t('plansMore', { count: view.plans.items.length - 12 })}</button> : null}</div> : <p className={styles.empty}>{t('plansEmpty')}</p>}
     <nav className={styles.pagination} aria-label={t('plansHeading')}>
       {view.plans.page > 1 ? <Button size="sm" disabled={busy} onClick={() => void goPage(view.plans.page - 1)}>{t('previous')}</Button> : <span />}
       <span>{t('pageLabel', { page: view.plans.page })}</span>
