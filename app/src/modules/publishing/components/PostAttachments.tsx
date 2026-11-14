@@ -375,7 +375,7 @@ export function PostAttachments({ controller, disabled = false, onPickLibrary, a
       type="file"
       id={`${controller.idPrefix}-local-image`}
       multiple
-      accept={[...controller.allowedMimeTypes, 'image/webp', 'image/avif', 'image/gif', 'image/heic', 'image/heif'].join(',')}
+      accept={[...new Set([...controller.allowedMimeTypes, 'image/webp', 'image/avif', 'image/gif', 'image/heic', 'image/heif'])].join(',')}
       data-testid="local-image-input"
       aria-label={c.chooseImage}
       disabled={disabled || controller.uploading}
