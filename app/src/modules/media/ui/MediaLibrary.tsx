@@ -1,5 +1,6 @@
 'use client';
 
+import { uploadable } from '@/lib/image-upload';
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/Button';
@@ -87,7 +88,9 @@ export function MediaLibrary({ items, usage, page, hasMore, filters, canWrite, w
     say(body.converted === true ? t('importedConverted') : t('imported')); router.refresh();
   }, t('importUnknown'));
   const performUpload = (file: File) => run(async () => {
-    const form = new FormData(); form.set('imageFile', file);
+    // WebP/AVIF/HEIC and very large photos become a JPEG first: the media store keeps JPEG, PNG and GIF (2026-11-14).
+    const ready = await uploadable(file, ['image/jpeg', 'image/png', 'image/gif'], 8 * 1048576);
+    const form = new FormData(); form.set('imageFile', ready);
     const response = await fetch('/api/media', { method: 'POST', body: form });
     const body = await response.json().catch(() => null);
     if (!response.ok || !body || typeof body.id !== 'string') throw new Error(response.status === 400 || response.status === 413 ? errorText(body) : t('uploadFailed'));
@@ -125,7 +128,7 @@ export function MediaLibrary({ items, usage, page, hasMore, filters, canWrite, w
       {filtered && <a href={PATH}>{t('clear')}</a>}
       {canWrite && <>
         <Button type="button" variant="primary" disabled={busy} onClick={() => fileInput.current?.click()}>{busy ? t('uploading') : t('upload')}</Button>
-        <input ref={fileInput} type="file" accept="image/png,image/jpeg,image/gif,image/webp" hidden aria-label={t('upload')} onChange={e => { const file = e.target.files?.[0]; e.target.value = ''; if (file) void performUpload(file); }} />
+        <input ref={fileInput} type="file" accept="image/png,image/jpeg,image/gif,image/webp,image/avif,image/heic,image/heif" hidden aria-label={t('upload')} onChange={e => { const file = e.target.files?.[0]; e.target.value = ''; if (file) void performUpload(file); }} />
         <Button type="button" variant="secondary" onClick={() => { setNotice(null); setConfirmation(''); setImporting(true); }}>{t('import')}</Button>
       </>}
     </form>

@@ -94,3 +94,6 @@
 .up { color: var(--success); font-size: var(--text-md); font-style: normal; font-weight: 700; }
 .down { color: var(--danger); font-size: var(--text-md); font-style: normal; font-weight: 700; }
 .tableWrap th:first-child, .tableWrap td:first-child, .tableWrap tbody th { text-align: left; }
+/* Inside the Reports tabs the tab already names the list; the panel keeps its description only. */
+:global([role="tabpanel"]) .panelHeading h2 { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+:global([role="tabpanel"]) .panelHeading svg { display: none; }

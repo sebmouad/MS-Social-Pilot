@@ -1,5 +1,6 @@
 'use client';
 
+import { uploadable } from '@/lib/image-upload';
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { IconLink, IconPhoto, IconUpload } from '@tabler/icons-react';
@@ -10,6 +11,7 @@ import styles from './PostAttachments.module.css';
 import { useAttachmentCopy } from '../ui/compose/CopyProvider';
 import { fillComposerCopy } from '../composer-catalog';
 import { AltTextSuggest } from '@/modules/studio/components/AltTextSuggest';
+
 
 export type PostMediaKind = 'image' | 'video';
 export type PostMediaItem = { kind: PostMediaKind; url: string; altText?: string };
@@ -180,12 +182,19 @@ export function usePostAttachments(options: PostAttachmentOptions): PostAttachme
       setError(c.oneType);
       return;
     }
-    const additions = files.map(file => ({ clientId: newId(), kind: 'image' as const, source: 'upload' as const, url: '', altText: '', file }));
-    const updated = [...current, ...additions];
-    itemsRef.current = updated;
-    setItems(updated);
-    setError('');
-  }, [options.allowedKinds, options.allowedMimeTypes, options.allowMixedKinds, options.maxMedia, c]);
+    // WebP, AVIF, HEIC (where the browser reads it) and oversized photos become a JPEG the channel accepts before they
+    // join the post (2026-11-14): they used to look « ready to upload » and then fail at save with a vague message.
+    void Promise.all(files.map(file => uploadable(file, options.allowedMimeTypes, options.maxUploadBytes))).then(prepared => {
+      const additions = prepared.map(file => {
+        const ok = options.allowedMimeTypes.includes(file.type) && file.size > 0 && file.size <= options.maxUploadBytes;
+        return { clientId: newId(), kind: 'image' as const, source: 'upload' as const, url: '', altText: '', file, ...(ok ? {} : { error: fillComposerCopy(c.uploadSize, { max: Math.ceil(options.maxUploadBytes / 1048576) }), errorField: 'attachment' as const }) };
+      });
+      const updated = [...itemsRef.current, ...additions];
+      itemsRef.current = updated;
+      setItems(updated);
+      setError('');
+    });
+  }, [options.allowedKinds, options.allowedMimeTypes, options.allowMixedKinds, options.maxMedia, options.maxUploadBytes, c]);
   const addLocalImage = useCallback((file: File) => addLocalImages([file]), [addLocalImages]);
 
   const removeItem = useCallback((clientId: string) => {
@@ -366,7 +375,7 @@ export function PostAttachments({ controller, disabled = false, onPickLibrary, a
       type="file"
       id={`${controller.idPrefix}-local-image`}
       multiple
-      accept={controller.allowedMimeTypes.join(',')}
+      accept={[...controller.allowedMimeTypes, 'image/webp', 'image/avif', 'image/gif', 'image/heic', 'image/heif'].join(',')}
       data-testid="local-image-input"
       aria-label={c.chooseImage}
       disabled={disabled || controller.uploading}

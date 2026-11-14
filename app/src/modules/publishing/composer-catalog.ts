@@ -1612,8 +1612,8 @@ export const composerCatalogDefaults = {
     "fr": "Les descriptions d’image doivent contenir au plus {max} caractères."
   },
   "attachments_uploadSize": {
-    "en": "Choose an allowed image up to {max} MB.",
-    "fr": "Choisissez une image compatible de {max} Mo maximum."
+    "en": "This image can’t be used. Choose a JPEG, PNG or WebP photo up to {max} MB.",
+    "fr": "Cette image ne peut pas être utilisée. Choisissez une photo JPEG, PNG ou WebP de {max} Mo maximum."
   },
   "attachments_moveUpLabel": {
     "en": "Move attachment {n} up",
