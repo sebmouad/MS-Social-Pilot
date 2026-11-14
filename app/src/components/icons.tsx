@@ -21,7 +21,7 @@ export const PAGE_ICONS: Record<string, TablerIcon> = {
   '/content/library/fields': IconColumns3, '/content/library/labels': IconTag, '/content/library/templates': IconTemplate,
   '/inbox': IconMessageCircle,
   '/insights': IconChartBar, '/insights/explore': IconChartPie, '/insights/audience': IconUsersGroup, '/insights/compare': IconScale,
-  '/ads/analysis': IconChartPie, '/insights/posts': IconChartDots3, '/insights/tests': IconFlask, '/insights/goals': IconTarget,
+  '/ads/analysis': IconChartPie, '/insights/posts': IconChartDots3, '/content/tests': IconFlask, '/insights/goals': IconTarget,
   '/insights/pins': IconPin, '/insights/reports': IconFileAnalytics,
   '/ads': IconAd2, '/ads/compare': IconScale, '/ads/manage': IconAffiliate, '/ads/campaigns': IconBolt,
   '/tasks': IconCheckbox, '/agency': IconBuildingStore, '/agency/clients': IconAddressBook,

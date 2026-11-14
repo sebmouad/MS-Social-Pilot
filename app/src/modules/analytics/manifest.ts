@@ -23,13 +23,13 @@ export const analyticsManifest = {
     { from: '/analytics/reports', to: '/insights/reports' },
     { from: '/analytics/notes', to: '/insights/notes' },
   ],
-  /** `tabOrder` fixes the Insights tabs; the Analysis page joins the Ads area through its page-level `area`. */
+  /** `tabOrder` fixes the Insights tabs (2026-11-14: Overview, Posts, Audience, Compare, Explore, Reports — most used first); the Analysis page joins the Ads area through its page-level `area`. */
   pages: [
     { id: 'analytics/overview', title: 'Overview', href: '/insights', tabOrder: 10, description: 'Explore channel audience, performance and post metrics.' },
-    { id: 'analytics/explorer', title: 'Explore', href: '/insights/explore', tabOrder: 20, description: 'Inspect every available stored metric, source and resource.' },
+    { id: 'analytics/explorer', title: 'Explore', href: '/insights/explore', tabOrder: 50, description: 'Inspect every available stored metric, source and resource.' },
     { id: 'analytics/demographics', title: 'Audience', href: '/insights/audience', tabOrder: 30, description: 'Understand available audience breakdowns and coverage.' },
-    { id: 'analytics/posts', title: 'Posts', href: '/insights/posts', tabOrder: 40, description: 'Explore and export stored per-post measures.' },
-    { id: 'analytics/compare', title: 'Compare', href: '/insights/compare', tabOrder: 50, description: 'Compare periods and selected resource groups with honest metric semantics.' },
+    { id: 'analytics/posts', title: 'Posts', href: '/insights/posts', tabOrder: 20, description: 'Explore and export stored per-post measures.' },
+    { id: 'analytics/compare', title: 'Compare', href: '/insights/compare', tabOrder: 40, description: 'Compare periods and selected resource groups with honest metric semantics.' },
     // Ad-object analysis is the Analysis tab of the Ads area (Accounts · Campaigns · Manage · Analysis · Compare).
     { id: 'analytics/ads', title: 'Ads analysis', href: '/ads/analysis', area: 'ads', navigation: false, palette: false, description: 'Explore paid campaign, ad set and ad performance separately from channel analytics.' },
     { id: 'analytics/reports', title: 'Reports', href: '/insights/reports', tabOrder: 70, description: 'Prepare reports, reuse templates and manage scheduled delivery.' },
