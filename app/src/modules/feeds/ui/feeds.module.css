@@ -69,3 +69,21 @@
   .pagination { flex-wrap: wrap; }
   .pagination a { display: inline-flex; align-items: center; min-height: 2.75rem; padding-inline: .25rem; }
 }
+
+/* Recipe settings in folded groups (2026-11-14). */
+.group { border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface); }
+.group + .group { margin-top: 8px; }
+.group > summary { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; padding: 12px 16px; cursor: pointer; list-style: none; }
+.group > summary::-webkit-details-marker { display: none; }
+.group > summary::after { content: '›'; margin-left: auto; color: var(--ink-faint); font-size: 18px; transition: transform var(--ease-fast); }
+.group[open] > summary::after { transform: rotate(90deg); }
+.group > summary strong { color: var(--ink); font-size: var(--text-md); }
+.group > summary span { overflow: hidden; color: var(--ink-soft); font-size: var(--text-sm); text-overflow: ellipsis; white-space: nowrap; max-width: 60ch; }
+.group[open] > summary { border-bottom: 1px solid var(--line-subtle); }
+.groupBody { display: grid; gap: 12px; max-width: 720px; padding: 14px 16px 16px; }
+.slotChips { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.slotChip { display: inline-flex; align-items: center; gap: 2px; padding: 2px 4px 2px 8px; border: 1px solid var(--line-strong); border-radius: 999px; background: var(--surface-muted); }
+.slotChip input { width: 7.5rem; border: 0; background: none; color: var(--ink); font: inherit; font-weight: 650; }
+.slotChip button { width: 24px; height: 24px; border: 0; border-radius: 999px; background: none; color: var(--ink-soft); font-size: 16px; cursor: pointer; }
+.slotChip button:hover:not(:disabled) { background: var(--surface-hover); color: var(--ink); }
+.slotChip button:disabled { opacity: .35; cursor: not-allowed; }

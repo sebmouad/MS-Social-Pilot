@@ -162,7 +162,8 @@ export function RecipeSource({ initial, locale, canWrite, copy = recipeCopy }: {
     {!preview && source && <p className={styles.help}>{t('previewNone')}</p>}
 
     {canWrite && <form className={styles.form} onSubmit={submit} noValidate aria-label={t('sourceHeading')}>
-      <h3 className={styles.sectionTitle}>{t('sourceHeading')}</h3>
+      {/* Settings in folded groups, each summarised on one line (2026-11-14): the page was 5,500 px of always-open form. */}
+      <details className={styles.group} open={!view.source || undefined}><summary><strong>{t('sourceHeading')}</strong><span>{draft.siteUrl || '—'} · {draft.allTargets ? t('allChannels') : `${draft.targetIds.length} ${t('channels').toLowerCase()}`}</span></summary><div className={styles.groupBody}>
       <label>{t('name')}<input disabled={busy} required maxLength={view.limits.maxNameCharacters} value={draft.name} onChange={e => setDraft(d => ({ ...d, name: e.target.value }))} /></label>
       <label>{t('siteUrl')}<input disabled={busy} required inputMode="url" placeholder="https://" value={draft.siteUrl} onChange={e => setDraft(d => ({ ...d, siteUrl: e.target.value }))} /><span>{t('siteUrlHint')}</span></label>
       <label>{t('credential')}<input disabled={busy} type="password" autoComplete="off" placeholder={view.source?.hasCredential ? t('credentialSaved') : 'username:xxxx xxxx xxxx xxxx'} value={draft.credential} onChange={e => setDraft(d => ({ ...d, credential: e.target.value }))} /><span>{t('credentialHint')}</span></label>
@@ -171,31 +172,35 @@ export function RecipeSource({ initial, locale, canWrite, copy = recipeCopy }: {
         <label><input type="radio" name="recipe-scope" checked={!draft.allTargets} onChange={() => setDraft(d => ({ ...d, allTargets: false }))} />{t('chooseChannels')}</label>
         {!draft.allTargets && (view.pages.length ? view.pages.map(p => <label key={p.id}><input type="checkbox" checked={draft.targetIds.includes(p.id)} onChange={() => toggle(p.id)} />{p.name}</label>) : <span className={styles.help}>{t('noChannels')}</span>)}
       </fieldset>
+      </div></details>
 
-      <h3 className={styles.sectionTitle}>{t('timingHeading')}</h3>
+      <details className={styles.group}><summary><strong>{t('timingHeading')}</strong><span>{draft.config.slots.join(' · ')} · {draft.config.timezone}</span></summary><div className={styles.groupBody}>
       <fieldset className={styles.checks} disabled={busy}><legend>{t('slots')}</legend>
-        {draft.config.slots.map((slot, index) => <div key={index} className={styles.slotRow}>
+        <div className={styles.slotChips}>{draft.config.slots.map((slot, index) => <span key={index} className={styles.slotChip}>
           <input type="time" aria-label={t('slots')} value={slot} onChange={e => setConfig({ slots: draft.config.slots.map((s, i) => i === index ? e.target.value : s) })} />
-          <Button size="sm" type="button" disabled={draft.config.slots.length < 2} onClick={() => setConfig({ slots: draft.config.slots.filter((_, i) => i !== index) })}>{t('removeSlot', { time: slot })}</Button>
-        </div>)}
-        <Button size="sm" type="button" onClick={() => setConfig({ slots: [...draft.config.slots, '12:00'] })}>{t('addSlot')}</Button>
+          <button type="button" aria-label={t('removeSlot', { time: slot })} disabled={draft.config.slots.length < 2} onClick={() => setConfig({ slots: draft.config.slots.filter((_, i) => i !== index) })}>×</button>
+        </span>)}
+        <Button size="sm" type="button" variant="quiet" onClick={() => setConfig({ slots: [...draft.config.slots, '12:00'] })}>+ {t('addSlot')}</Button></div>
       </fieldset>
       <label>{t('timezone')}<input disabled={busy} value={draft.config.timezone} onChange={e => setConfig({ timezone: e.target.value })} /><span>{t('timezoneHint')}</span></label>
       <label>{t('horizon')}<input disabled={busy} type="number" min={1} max={14} step={1} value={draft.config.horizonDays} onChange={e => setConfig({ horizonDays: Math.trunc(Number(e.target.value)) || 1 })} /></label>
       <label className={styles.inline}><input type="checkbox" disabled={busy} checked={draft.config.distinctAcrossPages} onChange={e => setConfig({ distinctAcrossPages: e.target.checked })} /> {t('distinct')}</label>
       <span className={styles.help}>{t('distinctHint')}</span>
       <label>{t('cooldown')}<input disabled={busy} type="number" min={0} step={1} value={draft.config.cooldownDays} onChange={e => setConfig({ cooldownDays: Math.max(0, Math.trunc(Number(e.target.value)) || 0) })} /></label>
+      </div></details>
 
-      <h3 className={styles.sectionTitle}>{t('selectionHeading')}</h3>
+      <details className={styles.group}><summary><strong>{t('selectionHeading')}</strong><span>{draft.config.order === 'oldest' ? t('orderOldest') : t('orderNewest')}</span></summary><div className={styles.groupBody}>
       <label className={styles.inline}><input type="checkbox" disabled={busy} checked={draft.config.skipShared} onChange={e => setConfig({ skipShared: e.target.checked })} /> {t('skipShared')}</label>
       <label>{t('order')}<select disabled={busy} value={draft.config.order} onChange={e => setConfig({ order: e.target.value === 'oldest' ? 'oldest' : 'newest' })}><option value="newest">{t('orderNewest')}</option><option value="oldest">{t('orderOldest')}</option></select></label>
       <label>{t('maxAge')}<input disabled={busy} type="number" min={0} step={1} value={draft.config.maxAgeDays} onChange={e => setConfig({ maxAgeDays: Math.max(0, Math.trunc(Number(e.target.value)) || 0) })} /></label>
+      </div></details>
 
-      <h3 className={styles.sectionTitle}>{t('commentHeading')}</h3>
+      <details className={styles.group}><summary><strong>{t('commentHeading')}</strong><span>{draft.config.firstCommentDelayMinutes ? `+${draft.config.firstCommentDelayMinutes} min` : '—'}</span></summary><div className={styles.groupBody}>
       <label>{t('template')}<textarea disabled={busy} rows={9} maxLength={view.limits.maxTemplateCharacters} value={draft.config.firstCommentTemplate} onChange={e => setConfig({ firstCommentTemplate: e.target.value })} /><span>{t('templateHint')}</span></label>
       <label>{t('delay')}<input disabled={busy} type="number" min={0} step={1} value={draft.config.firstCommentDelayMinutes} onChange={e => setConfig({ firstCommentDelayMinutes: Math.max(0, Math.trunc(Number(e.target.value)) || 0) })} /></label>
+      </div></details>
 
-      <details open={!draft.config.mapping.captionMetaKey || undefined}><summary>{t('mappingHeading')}</summary><div className={styles.form}>
+      <details className={styles.group} open={!draft.config.mapping.captionMetaKey || undefined}><summary><strong>{t('mappingHeading')}</strong></summary><div className={styles.form}>
         <p className="small-note">{t('mappingHint')}</p>
         <div><Button type="button" variant="secondary" size="sm" disabled={busy} onClick={() => setMapping({ captionMetaKey: '', imageMetaKey: '', recipeMetaKey: '' })}>{t('usePostItself')}</Button></div>
         {([['captionKey', 'captionMetaKey'], ['imageKey', 'imageMetaKey'], ['recipeKey', 'recipeMetaKey'], ['skipKey', 'skipMetaKey'], ['attachedKey', 'attachedFileMetaKey'], ['postType', 'postType'], ['postStatus', 'postStatus']] as const).map(([label, field]) =>
