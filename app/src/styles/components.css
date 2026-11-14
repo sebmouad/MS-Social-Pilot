@@ -627,3 +627,14 @@ th[aria-sort="ascending"], th[aria-sort="descending"] { color: var(--ink); }
 .ui-more-menu__panel a:hover, .ui-more-menu__panel a:focus-visible { background: var(--surface-hover); }
 /* Dialog header buttons never wrap their label (« Cancel » broke over two lines in narrow dialogs). */
 .ui-dialog__header button, .ui-dialog__header .ui-button { flex: 0 0 auto; white-space: nowrap; }
+
+/* AI studio « Plan with AI »: two link cards instead of a bullet list (2026-11-14). */
+.studio-links h2 { margin: 0 0 12px; font-size: var(--text-lg); }
+.studio-links__grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; margin: 0; padding: 0; list-style: none; }
+.studio-links__grid li { position: relative; display: grid; gap: 4px; padding: 14px 16px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface); transition: border-color var(--ease-fast), background var(--ease-fast); }
+.studio-links__grid li:hover { border-color: var(--accent); background: var(--accent-soft); }
+.studio-links__grid a { display: inline-flex; align-items: center; gap: 8px; color: var(--ink); font-weight: 700; text-decoration: none; }
+.studio-links__grid a::after { content: ''; position: absolute; inset: 0; }
+.studio-links__grid a svg { color: var(--accent); }
+.studio-links__grid p { margin: 0; color: var(--ink-soft); font-size: var(--text-sm); }
+.ads-extra-filters__apply { margin-left: auto; }

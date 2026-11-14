@@ -10,9 +10,9 @@ export type StudioLinksCopy = Pick<ToolsCopy, 'planTitle' | 'planRecipe' | 'plan
  */
 export function StudioLinks({ copy: t }: { copy: StudioLinksCopy }) {
   return (
-    <section className="ui-panel" aria-label={t.planTitle}>
+    <section className="ui-panel studio-links" aria-label={t.planTitle}>
       <h2>{t.planTitle}</h2>
-      <ul>
+      <ul className="studio-links__grid">
         <li>
           <Link href="/content/feeds"><IconRss size={16} aria-hidden="true" /> {t.planRecipe}</Link>
           <p>{t.planRecipeHint}</p>

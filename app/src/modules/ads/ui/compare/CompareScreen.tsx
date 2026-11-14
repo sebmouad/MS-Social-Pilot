@@ -1,3 +1,4 @@
+import { AutoSubmitForm } from '@/components/AutoSubmitForm';
 import { LinkTabs } from '@/components/Tabs';
 import { localizeAdsMessage } from '@/modules/ads/copy';
 import { loadAdsCopy } from '@/modules/ads/server/copy';
@@ -88,12 +89,13 @@ async function AdsComparePage({ searchParams }: { searchParams: Promise<Params> 
     : <><AdsFiltersSidebar catalogs={catalogs} locale={locale} accounts={accounts} input={params} action="/ads/compare" policy={policy} /><PageHeader module="ads" title={t('title')} actions={kindSwitch} /></>;
   const hidden = (['period', 'since', 'until', 'account'] as const).map(key => first(params[key]) ? <input key={key} type="hidden" name={key} value={first(params[key])} /> : null);
   const sortLabels: Record<string, string> = { spend: t('col.spend'), impressions: t('col.impressions'), clicks: t('col.clicks'), ctr: t('col.ctr'), cpc: t('col.cpc'), cpm: t('col.cpm'), name: t('col.name') };
-  const sidebar = <><form noValidate method="get" action="/ads/compare" className="ads-extra-filters" aria-label={t('optionsLabel')}>{hidden}
+  const sidebar = <><AutoSubmitForm noValidate method="get" action="/ads/compare" className="ads-extra-filters" aria-label={t('optionsLabel')}>{hidden}
     <label>{t('compareLabel')}<select name="compare" defaultValue={first(params.compare) ?? 'previous'}><option value="previous">{t('comparePrevious')}</option><option value="accounts">{t('compareAccounts')}</option></select></label>
     <label>{t('show')}<select name="level" defaultValue={first(params.level) ?? 'campaign'}>{(['campaign', 'adset', 'ad'] as const).map(level => <option key={level} value={level}>{t(`level.${level}`)}</option>)}</select></label>
     <label>{t('sortBy')}<select name="sort" defaultValue={first(params.sort) ?? 'spend'}>{Object.entries(sortLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
     <label>{t('order')}<select name="direction" defaultValue={first(params.direction) ?? 'desc'}><option value="desc">{t('highest')}</option><option value="asc">{t('lowest')}</option></select></label>
-    <Button type="submit" variant="secondary" size="sm">{t('apply')}</Button></form></>;
+    {/* Choices apply on change (2026-11-14); the button stays for keyboard users who prefer to confirm. */}
+    <Button type="submit" variant="quiet" size="sm" className="ads-extra-filters__apply">{t('apply')}</Button></AutoSubmitForm></>;
   let result: AdsComparisonResult;
   let values: Record<string, string | undefined>;
   try {
