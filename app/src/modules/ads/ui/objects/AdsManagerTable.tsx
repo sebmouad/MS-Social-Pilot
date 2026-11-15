@@ -45,6 +45,9 @@ type Copy = { [K in keyof typeof COPY.en]: string };
 const fill = (text: string, values: Record<string, string | number>) => text.replace(/\{(\w+)\}/g, (all, key: string) => key in values ? String(values[key]) : all);
 
 /** Delivery as Meta Ads Manager shows it: a dot and a word, with « not delivering » when an active item has stopped spending. */
+/** Click rate in the page language: « 21.43% », « 21,43 % ». */
+const percent = (value: number, locale: 'en' | 'fr') => new Intl.NumberFormat(locale, { style: 'percent', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value / 100);
+
 function delivery(row: ManagerRow, status: string | null, t: Copy) {
   const value = (status ?? '').toLowerCase();
   if (value === 'active') {
@@ -206,7 +209,7 @@ export function AdsManagerTable({ level, rows, locale, money, number, drillHref,
           <td className="is-num">{totalSpend}</td>
           <td className="is-num">{fmt.format(totalImpressions)}</td>
           <td className="is-num">{fmt.format(totalClicks)}</td>
-          <td className="is-num">{totalImpressions ? `${(totalClicks / totalImpressions * 100).toFixed(2)}%` : '—'}</td>
+          <td className="is-num">{totalImpressions ? percent(totalClicks / totalImpressions * 100, locale) : '—'}</td>
           <td className="is-num">{currencies.length <= 1 && totalClicks ? new Intl.NumberFormat(locale, { style: 'currency', currency: currencies[0] ?? 'USD' }).format(sum('spend') / totalClicks) : '—'}</td>
           <td className="is-num">{currencies.length <= 1 && totalImpressions ? new Intl.NumberFormat(locale, { style: 'currency', currency: currencies[0] ?? 'USD' }).format(sum('spend') / totalImpressions * 1000) : '—'}</td>
           <td />
@@ -238,7 +241,7 @@ function Row({ row, level, locale, t, money, number, drill, edit, canManage, che
     <td className="is-num">{money[row.key]}</td>
     <td className="is-num">{number[`${row.key}:impressions`]}</td>
     <td className="is-num">{number[`${row.key}:clicks`]}</td>
-    <td className="is-num">{row.ctr === null ? '—' : `${row.ctr.toFixed(2)}%`}</td>
+    <td className="is-num">{row.ctr === null ? '—' : percent(row.ctr, locale)}</td>
     <td className="is-num">{number[`${row.key}:cpc`]}</td>
     <td className="is-num">{number[`${row.key}:cpm`]}</td>
     <td>{day(row.lastDeliveryDate)}</td>

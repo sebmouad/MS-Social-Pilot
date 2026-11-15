@@ -3,7 +3,8 @@ import { useAdsMessage } from '@/modules/ads/ui/AdsCopyProvider';
 import { useAdsText } from '@/modules/ads/ui/AdsCopyProvider';
 import { useId, useState } from 'react';
 import { isAdsReportDay, type AdsFilterErrors } from '@/modules/ads/report-filters';
-import type { AdsReportPolicy } from '@/modules/ads/report-policy';
+import { adsPresetLabel, type AdsReportPolicy } from '@/modules/ads/report-policy';
+import { useAdsCatalogs } from '@/modules/ads/ui/AdsCopyProvider';
 import { FilterPanel, FilterChips } from '@/components/FilterPanel';
 import { Button } from '@/components/Button';
 
@@ -13,6 +14,7 @@ export function AdsFilterForm({ accounts, values, errors = {}, action, policy }:
 }) {
   const localize = useAdsMessage();
   const t = useAdsText();
+  const { locale } = useAdsCatalogs();
   const id = useId().replace(/:/g, '');
   const [period, setPeriod] = useState(values.period);
   const field = (key: keyof AdsFilterValues) => ({ 'aria-invalid': errors[key] ? true : undefined, 'aria-describedby': errors[key] ? `${id}-${key}-error` : undefined });
@@ -21,7 +23,7 @@ export function AdsFilterForm({ accounts, values, errors = {}, action, policy }:
   const unknownPeriod = !policy.presets.some(item => item.id === period) && !custom;
   const unknownAccount = values.account !== 'all' && !accounts.some(account => account.id === values.account);
   return <form noValidate action={action} method="get" className="ads-sidebar-filter">
-    <FilterPanel title={t('text080')} activeCount={Object.values(values).filter(Boolean).length} onReset={() => window.location.assign(action)} summary={<FilterChips filters={Object.entries(values).filter(([, value]) => value && value !== 'all').map(([key, value]) => ({ key, label: ({ period: t('text081'), since: t('text256'), until: t('text257'), account: t('text193') } as Record<string, string>)[key]!, value: key === 'account' ? accounts.find(account => account.id === value)?.name ?? value : key === 'period' ? policy.presets.find(preset => preset.id === value)?.label ?? value : value }))} onRemove={key => {
+    <FilterPanel title={t('text080')} activeCount={Object.values(values).filter(Boolean).length} onReset={() => window.location.assign(action)} summary={<FilterChips filters={Object.entries(values).filter(([, value]) => value && value !== 'all').map(([key, value]) => ({ key, label: ({ period: t('text081'), since: t('text256'), until: t('text257'), account: t('text193') } as Record<string, string>)[key]!, value: key === 'account' ? accounts.find(account => account.id === value)?.name ?? value : key === 'period' ? (() => { const preset = policy.presets.find(item => item.id === value); return preset ? adsPresetLabel(preset, locale) : value; })() : value }))} onRemove={key => {
       const params = new URLSearchParams(values);
       params.delete(key);
       if (key === 'since' || key === 'until' || key === 'period') { params.delete('since'); params.delete('until'); params.delete('period'); }
@@ -30,7 +32,7 @@ export function AdsFilterForm({ accounts, values, errors = {}, action, policy }:
 
     <div className="ads-filter-field"><label className="ui-field"><span>{t('text081')}</span><select className="ui-input" name="period" value={period} onChange={event => setPeriod(event.target.value)} {...field('period')}>
       {unknownPeriod ? <option value={period}>{t('text082')}</option> : null}
-      {policy.presets.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}<option value="custom">{t('text083')}</option>
+      {policy.presets.map(item => <option key={item.id} value={item.id}>{adsPresetLabel(item, locale)}</option>)}<option value="custom">{t('text083')}</option>
     </select></label>{error('period')}</div>
     {(['since', 'until'] as const).map(key => <div className="ads-filter-field" key={key}><label className="ui-field"><span>{key === 'since' ? t('text256') : t('text257')}</span>
       <input className="ui-input" type={values[key] && !isAdsReportDay(values[key]) ? 'text' : 'date'} maxLength={values[key] && !isAdsReportDay(values[key]) ? policy.maxFilterCharacters : undefined} name={key} defaultValue={values[key]} disabled={!custom} required={custom} {...field(key)} />

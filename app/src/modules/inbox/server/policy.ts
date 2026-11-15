@@ -7,6 +7,8 @@ export interface InboxReplyPolicyRequest {
   channelRemoteId: string;
   lastInbound: { fromId: string | null; createdTime: Date } | null;
   timeZone: string;
+  /** Page language for the wording (2026-11-15); English when absent. */
+  locale?: 'en' | 'fr';
 }
 
 /** Presentation metadata only. Mutations must recheck current authorization and policy. */

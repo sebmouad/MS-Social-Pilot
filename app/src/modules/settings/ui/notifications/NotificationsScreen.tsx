@@ -1,3 +1,4 @@
+import { settingsLocale } from '../locale';
 import { readSettingsUiCopy } from '@/modules/settings/ui/copy-server';
 import type { Metadata } from 'next';
 import Link from 'next/link';
@@ -20,8 +21,9 @@ export default async function NotificationsPage() {
     readNotificationPreferences(actor).catch(() => null),
     listNotifications(actor, { page: 1 }).catch(() => null),
   ]);
-  // The saved personal locale drives this screen, matching NotificationCenter.
-  const locale = preferences?.locale ?? 'en';
+  // The screen follows the app's language like every other page (2026-11-15); the saved personal locale only
+  // chooses the language of the emails themselves.
+  const locale = await settingsLocale();
   const instants = await workspaceInstantFormatter(viewer.workspaceId, locale);
   const uiCopy = await readSettingsUiCopy();
   const t = uiCopy.notifications[locale];

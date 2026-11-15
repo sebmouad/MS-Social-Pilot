@@ -233,7 +233,7 @@ export const feedsCopy = {
     createPostsAction: 'Créer des publications…',
     close: 'Fermer',
     recipeStatusTitle: 'Automatisation des recettes',
-    recipeStatusActive: 'Active',
+    recipeStatusActive: 'En cours',
     recipeStatusPaused: 'En pause',
     recipeStatusUnavailable: 'Indisponible',
     recipeStatusLastRun: 'Dernière vérification',

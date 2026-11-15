@@ -139,7 +139,7 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
       canManageInbox(actor, thread.target.id),
       canManageInboxWorkflow(actor, thread.target.id),
       thread.target.provider ? inboxCapabilities(thread.target.provider) : Promise.resolve({ reply: false, hide: false, remove: false, reviews: false, replyToReviews: false, privateReply: false }),
-      thread.kind === 'review' ? Promise.resolve({ allowed: false, headline: '', detail: undefined }) : inboxReplyPolicy(thread.target.provider, { kind: thread.kind, channelRemoteId: thread.target.providerId, lastInbound: thread.lastInbound, timeZone }),
+      thread.kind === 'review' ? Promise.resolve({ allowed: false, headline: '', detail: undefined }) : inboxReplyPolicy(thread.target.provider, { kind: thread.kind, channelRemoteId: thread.target.providerId, lastInbound: thread.lastInbound, timeZone, locale }),
       aiStatus(actor).then(status => status.available, () => false),
     ]);
     // Stored facts only; if they cannot be read the panel says so and the conversation itself stays usable.
