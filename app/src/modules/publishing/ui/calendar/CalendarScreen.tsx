@@ -46,28 +46,32 @@ const utcNoon = (key: string) => new Date(`${key}T12:00:00Z`);
 
 export default async function CalendarPage({ searchParams }: { searchParams: Promise<Params> }) {
   const viewer = await requireViewer({ feature: "publishing/calendar", channelScoped: true });
-  const locale = await pageLocale();
-  const { catalog, copy: localizedCopy } = await loadPublishingCopy();
+  // Independent reads start together (2026-11-15): one after another they made the Calendar take about 1.5 s.
+  const params = await searchParams;
+  const timeZone = viewer.membership.workspace.timezone;
+  const [locale, { catalog, copy: localizedCopy }, reschedulePolicy, defaultScheduleTimeValue, heatmap, scope, content, weekStartsOn] = await Promise.all([
+    pageLocale(), loadPublishingCopy(), configOrDefault('shared.reschedulePolicy', reschedulePolicySchema), runtimeConfig('publishing.defaultScheduleTime'),
+    // Best-times overlay from stored post history; absent when Analytics is unavailable to this viewer.
+    readBestTimeHeatmap({ userId: viewer.user.id, workspaceId: viewer.workspaceId, ...(viewer.permissions.pageScope.all ? {} : { allowedChannelIds: viewer.permissions.pageScope.ids }) }, timeZone),
+    // The sidebar's channel scope: one channel is read by the service; several are narrowed to "any of them" after the authorized read.
+    pageChannelScope(viewer, params as Record<string, string | undefined>).catch(() => null),
+    loadContent(),
+    loadWorkspaceOperations(viewer.workspaceId).then(value => value.weekStartsOn, () => 0),
+  ]);
+  const defaultScheduleTime = defaultScheduleTimeValue as string;
+  const originOptionsRead = originFilterOptions(viewer.workspaceId, locale).catch(() => []);
+  const extraCalendarsRead = calendarExtrasLinks(locale, ['dates', 'seasons', 'trends', 'feeds']).catch(() => []);
   const copy = localizedCopy[locale];
   const formatUtc = (key: string, options: Intl.DateTimeFormatOptions) => new Intl.DateTimeFormat(locale === "fr" ? "fr-FR" : "en-US", { ...options, timeZone: "UTC" }).format(utcNoon(key));
-  const reschedulePolicy = (await configOrDefault('shared.reschedulePolicy', reschedulePolicySchema));
   const movePolicy = { ...reschedulePolicy, locale: locale === "fr" ? "fr-FR" as const : "en-US" as const };
-  const defaultScheduleTime = await runtimeConfig('publishing.defaultScheduleTime') as string;
-  const timeZone = viewer.membership.workspace.timezone;
-  // Best-times overlay from stored post history; absent when Analytics is unavailable to this viewer.
-  const heatmap = await readBestTimeHeatmap({ userId: viewer.user.id, workspaceId: viewer.workspaceId, ...(viewer.permissions.pageScope.all ? {} : { allowedChannelIds: viewer.permissions.pageScope.ids }) }, timeZone);
-  const params = await searchParams;
   const now = new Date();
   const today = workspaceDateKey(now, timeZone);
   const view = params.view === "week" ? "week" : params.view === "list" ? "list" : "month";
   const month = params.month && /^[1-9]\d{3}-(0[1-9]|1[0-2])$/.test(params.month) ? params.month : undefined;
   const anchor = isDateKey(params.date) ? params.date : month ? (month === today.slice(0, 7) ? today : `${month}-01`) : today;
 
-  // The sidebar's channel scope: one channel is read by the service; several are narrowed to "any of them" after the authorized read.
-  const scope = await pageChannelScope(viewer, params as Record<string, string | undefined>).catch(() => null);
   const scopeIds = scope?.ids ?? [];
   const channelId = scopeIds.length === 1 ? scopeIds[0] : undefined;
-  const content = await loadContent();
   const originKind = parseOriginFilter(params.origin);
   const status = (STATUSES as readonly string[]).includes(params.status ?? "") ? params.status as (typeof STATUSES)[number] : undefined;
 
@@ -75,7 +79,6 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
   const selected = calendarMonth(anchor.slice(0, 7), now, timeZone);
   const firstOfMonth = `${selected.key}-01`;
   const daysInMonth = new Date(Date.UTC(selected.year, selected.month, 0)).getUTCDate();
-  const weekStartsOn = await loadWorkspaceOperations(viewer.workspaceId).then(value => value.weekStartsOn, () => 0);
   const weekLike = view === "week" || view === "list";
   const gridStart = weekLike ? weekStartKey(anchor, weekStartsOn) : weekStartKey(firstOfMonth, weekStartsOn);
   const count = weekLike ? 7 : Math.ceil((weekOffsetOfKey(firstOfMonth, weekStartsOn) + daysInMonth) / 7) * 7;
@@ -85,7 +88,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
   const to = new Date(utcNoon(keys[keys.length - 1]!).getTime() + 2 * DAY);
   const { posts: visiblePosts, channels, channelUnavailable } = await readPublishingCalendar({ userId: viewer.user.id, workspaceId: viewer.workspaceId }, { from, to, channelId, status });
 
-  const origins = await loadPostOrigins(viewer.workspaceId, visiblePosts.map(post => post.id), locale);
+  const [origins, milestones] = await Promise.all([loadPostOrigins(viewer.workspaceId, visiblePosts.map(post => post.id), locale), loadBoardMilestones({ userId: viewer.user.id, workspaceId: viewer.workspaceId, locale }, keys, channelId)]);
   // The origin and multi-channel filters narrow the already authorized read; they never widen it.
   const inScope = scopeIds.length > 1 ? visiblePosts.filter(post => post.targets.some(({ target }) => scopeIds.includes(target.id))) : visiblePosts;
   const posts = originKind ? inScope.filter(post => origins.get(post.id)?.kind === originKind) : inScope;
@@ -115,7 +118,6 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
       },
     }]);
   }
-  const milestones = await loadBoardMilestones({ userId: viewer.user.id, workspaceId: viewer.workspaceId, locale }, keys, channelId);
   // Free queue times: the weekly queue times of the channels in view that no post already uses, from today on. A lookup failure only hides the pills.
   let freeSlots = new Map<string, string[]>();
   try {
@@ -156,8 +158,8 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
 
   const filterQuery = `${params.channel ? `&channel=${encodeURIComponent(params.channel)}` : ""}${status ? `&status=${status}` : ""}${originKind ? `&origin=${encodeURIComponent(originKind)}` : ""}`;
   const href = (nextView: string, date: string) => `/content/calendar?view=${nextView}&date=${date}${filterQuery}`;
-  const originOptions = await originFilterOptions(viewer.workspaceId, locale).catch(() => []);
-  const extraCalendars = await calendarExtrasLinks(locale, ['dates', 'seasons', 'trends', 'feeds']).catch(() => []);
+  const originOptions = await originOptionsRead;
+  const extraCalendars = await extraCalendarsRead;
   const without = (omit: "status" | "origin") => `/content/calendar?view=${view}&date=${anchor}${params.channel ? `&channel=${encodeURIComponent(params.channel)}` : ""}${status && omit !== "status" ? `&status=${status}` : ""}${originKind && omit !== "origin" ? `&origin=${encodeURIComponent(originKind)}` : ""}`;
   const chips = [
     ...(status ? [{ key: "status", label: copy.status, value: statusLabel(status, locale), removeHref: without("status") }] : []),
