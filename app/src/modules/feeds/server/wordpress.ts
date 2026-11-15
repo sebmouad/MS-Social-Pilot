@@ -13,7 +13,7 @@ import { feedsError } from './messages';
 import { commentFor, configOf, writeCandidate, defaultPlannerPorts, openDatabase, planSource, recipeSummaryRecord, scanCandidates, supplyLedgerView, type PlannerPorts } from './wordpress-planner';
 import { loadWordpressSettings, patchLimits, type WordpressSettings } from './wordpress-settings';
 import { computePoolHealth, forgetPoolHealth, poolHealthWithin, type PoolHealth } from './wordpress-pool';
-import { cancelPlannedPosts, replaceRecipeSlot, retryRecipeSlots } from './wordpress-recovery';
+import { cancelPlannedPosts, changeRecipeSlot, retryRecipeSlots, type SlotAction } from './wordpress-recovery';
 import { countPlans, selectPlans, selectSource, type LedgerRow, type SourceRow } from './wordpress-store';
 
 /**
@@ -224,13 +224,20 @@ export async function retryRecipeSlotsNow(actor: FeedActor, input: unknown, deps
   } finally { await db.close(); }
 }
 
+const slotActionSchema = z.object({
+  planId: z.string().min(1).max(200), confirmation: z.string(),
+  action: z.enum(['replace', 'leave_empty', 'fill', 'choose', 'exclude']).default('replace'),
+  wpPostId: z.string().regex(/^[A-Za-z0-9_-]{1,100}$/).optional(),
+}).strict().refine(v => (v.action === 'choose') === (v.wpPostId !== undefined), { message: 'Choose a recipe.' });
+
 /**
- * Give one upcoming planned post a different recipe, as the signed-in member (2026-11-15). Refused (conflict) when the
- * post can no longer be cancelled: publishing, published or edited by someone.
+ * Change one upcoming planned slot, as the signed-in member (2026-11-15): another recipe, a recipe they choose, leave
+ * the time empty (and fill it again), or never post its recipe again (saved in the source settings, then replaced).
+ * Refused (conflict) when the post can no longer be cancelled: publishing, published or edited by someone.
  */
-export async function replaceRecipeSlotNow(actor: FeedActor, input: unknown, deps: RecipeDeps = {}) {
+export async function changeRecipeSlotNow(actor: FeedActor, input: unknown, deps: RecipeDeps = {}) {
   const s = await loadWordpressSettings();
-  const data = await parse(z.object({ planId: z.string().min(1).max(200), confirmation: z.string() }).strict(), input);
+  const data = await parse(slotActionSchema, input);
   if (data.confirmation !== replaceRecipeSlotConfirmation(data.planId)) throw await bad();
   const { auth, source } = await authorizedSource(actor);
   if (!s.enabled) throw new OperationError('unavailable', 'Recipe planning is not available right now.');
@@ -240,22 +247,51 @@ export async function replaceRecipeSlotNow(actor: FeedActor, input: unknown, dep
   const raw = rows[0];
   if (!raw) throw await notFound();
   const row: LedgerRow = { ...raw, skipped: Array.isArray(raw.skipped) ? raw.skipped.filter((v): v is string => typeof v === 'string') : [] };
+  if (data.action === 'exclude') {
+    // Saved first, so the replacement and every later plan already leave this recipe out.
+    const config = (source.config && typeof source.config === 'object' ? source.config : {}) as Record<string, unknown>;
+    const current = Array.isArray(config.excluded) ? config.excluded.filter((item): item is { id: string; title: string } => Boolean(item) && typeof (item as { id?: unknown }).id === 'string') : [];
+    const excluded = [...new Map([...current, { id: row.wpPostId, title: row.title.slice(0, 300) }].map(item => [item.id, item])).values()].slice(-2000);
+    await protect(prisma.$executeRaw`UPDATE wordpress_recipe_sources SET config = jsonb_set(COALESCE(config, '{}'::jsonb), '{excluded}', ${JSON.stringify(excluded)}::jsonb), "updatedAt" = NOW() WHERE id = ${source.id} AND "workspaceId" = ${actor.workspaceId}`);
+    source.config = { ...config, excluded };
+  }
+  const action: SlotAction = data.action === 'choose' ? { kind: 'choose', wpPostId: data.wpPostId! } : { kind: data.action };
   const ports = { ...defaultPlannerPorts(), ...deps };
   const db = await openDatabase(ports, s, source);
   if (!db) throw new OperationError('unavailable', 'The recipe library could not be reached. Try again later.');
   try {
-    const outcome = await replaceRecipeSlot({ settings: s, ports, db, now: ports.now() }, source, auth, row,
-      async postId => { const { deletePostDurably } = await import('@/modules/publishing/server/deletion'); await deletePostDurably({ userId: actor.userId, workspaceId: actor.workspaceId, ...(auth.actor.allowedTargetIds === undefined ? {} : { allowedTargetIds: auth.actor.allowedTargetIds }) }, postId, false); },
-      async skipped => { await prisma.$executeRaw`UPDATE wordpress_recipe_plans SET skipped = ${JSON.stringify(skipped)}::jsonb WHERE id = ${row.id} AND "workspaceId" = ${actor.workspaceId}`; });
-    if (!outcome.replaced) throw new OperationError('conflict', 'This post can no longer be replaced: it is publishing, published or was edited. Open it to change it.');
+    const outcome = await changeRecipeSlot({ settings: s, ports, db, now: ports.now() }, source, auth, row, action,
+      async (postId: string) => { const { deletePostDurably } = await import('@/modules/publishing/server/deletion'); await deletePostDurably({ userId: actor.userId, workspaceId: actor.workspaceId, ...(auth.actor.allowedTargetIds === undefined ? {} : { allowedTargetIds: auth.actor.allowedTargetIds }) }, postId, false); },
+      async (fields: { skipped?: string[]; reason?: string | null }) => {
+        if (fields.skipped) await prisma.$executeRaw`UPDATE wordpress_recipe_plans SET skipped = ${JSON.stringify(fields.skipped)}::jsonb WHERE id = ${row.id} AND "workspaceId" = ${actor.workspaceId}`;
+        if (fields.reason !== undefined) await prisma.$executeRaw`UPDATE wordpress_recipe_plans SET reason = ${fields.reason}, "updatedAt" = NOW() WHERE id = ${row.id} AND "workspaceId" = ${actor.workspaceId} AND state = 'failed'`;
+      });
+    if (!outcome.replaced) throw new OperationError('conflict', 'This time can no longer be changed: its post is publishing, published or was edited. Open it to change it.');
     forgetPoolHealth(source.id);
-    await audit(prisma as unknown as Tx, actor.workspaceId, actor, 'feeds.recipe_slot_replaced', { sourceId: source.id, planId: row.id, previous: row.wpPostId, ...outcome }).catch(() => undefined);
-    return { sourceId: source.id, ...outcome };
+    await audit(prisma as unknown as Tx, actor.workspaceId, actor, 'feeds.recipe_slot_changed', { sourceId: source.id, planId: row.id, action: data.action, previous: row.wpPostId, ...(data.wpPostId ? { chosen: data.wpPostId } : {}), ...outcome }).catch(() => undefined);
+    return { sourceId: source.id, action: data.action, ...outcome };
   } catch (error) {
     if (error instanceof OperationError) throw error;
     throw new OperationError('upstream_failure', 'Planning could not be completed. Check the planned posts before trying again.');
   } finally { await db.close(); }
 }
+
+/** Recipes a member can choose for a slot: the next eligible ones in the source's order, without excluded recipes (2026-11-15). */
+export async function listRecipeChoices(actor: FeedActor, deps: RecipeDeps = {}) {
+  const s = await loadWordpressSettings();
+  const { source } = await authorizedSource(actor);
+  const ports = { ...defaultPlannerPorts(), ...deps };
+  const db = await openDatabase(ports, s, source);
+  if (!db) throw new OperationError('unavailable', 'The recipe library could not be reached. Try again later.');
+  try {
+    const config = configOf(s, source);
+    const excluded = new Set((config.excluded ?? []).map(item => item.id));
+    const writer = await ports.writer.available(source.workspaceId).catch(() => false);
+    const scan = await scanCandidates(db, s, source, config, ports.now(), found => found.filter(c => !excluded.has(c.wpPostId)).length >= RECIPE_CHOICES, writer);
+    return { items: scan.candidates.filter(c => !excluded.has(c.wpPostId)).slice(0, RECIPE_CHOICES).map(c => ({ wpPostId: c.wpPostId, title: c.title, permalink: c.permalink, publishedAt: c.publishedAt?.toISOString() ?? null })) };
+  } finally { await db.close(); }
+}
+const RECIPE_CHOICES = 80;
 
 /* ----- preview and run ----- */
 

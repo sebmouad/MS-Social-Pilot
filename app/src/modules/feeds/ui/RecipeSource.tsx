@@ -3,7 +3,7 @@
 import { useRef, useState } from 'react';
 import { Button } from '@/components/Button';
 import { Dialog } from '@/components/Dialog';
-import { ConfirmDialog } from '@/components';
+import { ConfirmDialog, Menu } from '@/components';
 import { RouteNotice } from '@/components/RouteNotice';
 import { recipeCopy, recipeText, type RecipeCopyCatalog, type RecipeCopyKey, type RecipeLocale } from '../copy-recipes';
 import { configPatch, replaceRecipeSlotConfirmation } from '../wordpress/recipe';
@@ -16,6 +16,10 @@ export type RecipeConfig = {
   distinctAcrossPages: boolean; cooldownDays: number; firstCommentTemplate: string; firstCommentDelayMinutes: number;
   /** 0 = Sunday … 6 = Saturday; every day when absent. */
   weekdays?: number[];
+  /** Channels with their own posting times. */
+  channelSlots?: Record<string, string[]>;
+  /** Recipes never posted. */
+  excluded?: Array<{ id: string; title: string }>;
 };
 export type RecipeSourceData = {
   id: string; name: string; siteUrl: string; hasCredential: boolean; enabled: boolean; allTargets: boolean; targetIds: string[]; config: RecipeConfig;
@@ -73,9 +77,26 @@ export function RecipeSource({ initial, locale, canWrite, copy = recipeCopy }: {
   const days = draft.config.weekdays ?? [0, 1, 2, 3, 4, 5, 6];
   const dayName = (day: number) => new Intl.DateTimeFormat(locale, { weekday: 'short', timeZone: 'UTC' }).format(new Date(Date.UTC(2026, 10, 15 + day)));
   const daysSummary = days.length === 7 ? t('everyDay') : WEEK_ORDER.filter(d => days.includes(d)).map(dayName).join(', ');
+  const setChannelTimes = (pageId: string, times: string[] | null) => setDraft(d => {
+    const next = { ...(d.config.channelSlots ?? {}) };
+    if (times) next[pageId] = times; else delete next[pageId];
+    return { ...d, config: { ...d.config, channelSlots: next } };
+  });
   const setMapping = (patch: Partial<Mapping>) => setDraft(d => ({ ...d, config: { ...d.config, mapping: { ...d.config.mapping, ...patch } } }));
 
-  const [replacing, setReplacing] = useState<RecipePlan | null>(null);
+  // One planned time being changed (2026-11-15): which action, and for « choose » the recipe list.
+  type SlotKind = 'replace' | 'leave_empty' | 'fill' | 'exclude';
+  const [slotChange, setSlotChange] = useState<{ plan: RecipePlan; kind: SlotKind } | null>(null);
+  const [choosing, setChoosing] = useState<RecipePlan | null>(null);
+  const [choices, setChoices] = useState<Array<{ wpPostId: string; title: string; publishedAt: string | null }> | null>(null);
+  const [choiceQuery, setChoiceQuery] = useState('');
+  async function changeSlot(plan: RecipePlan, body: Record<string, unknown>) {
+    return call('/api/feeds/wordpress/replace', 'POST', { planId: plan.id, confirmation: replaceRecipeSlotConfirmation(plan.id), ...body });
+  }
+  function openChooser(plan: RecipePlan) {
+    setChoosing(plan); setChoices(null); setChoiceQuery('');
+    void call('/api/feeds/wordpress/choices', 'GET').then(body => setChoices(Array.isArray(body?.items) ? body.items : []), () => setChoices([]));
+  }
   async function call(url: string, method: string, payload?: unknown) {
     const response = await fetch(url, { method, headers: { 'content-type': 'application/json' }, ...(payload === undefined ? {} : { body: JSON.stringify(payload) }) });
     const body = await response.json().catch(() => null);
@@ -120,7 +141,7 @@ export function RecipeSource({ initial, locale, canWrite, copy = recipeCopy }: {
   const loadPreview = () => run(async () => { const body = await call('/api/feeds/wordpress/preview', 'POST', {}); if (!body || !Array.isArray(body.items)) throw new Error(t('unknownError')); setPreview(body as Preview); });
   const goPage = (page: number) => run(async () => { const body = await call(`/api/feeds/wordpress?page=${page}`, 'GET'); if (body && 'plans' in body) setView(v => ({ ...v, plans: body.plans, counts: body.counts })); });
   const toggle = (id: string) => setDraft(d => ({ ...d, targetIds: d.targetIds.includes(id) ? d.targetIds.filter(x => x !== id) : [...d.targetIds, id] }));
-  const stateText = (p: RecipePlan) => t(p.state === 'planned' ? 'statePlanned' : p.state === 'claimed' ? 'stateClaimed' : p.state === 'uncertain' ? 'stateUncertain' : 'stateFailed');
+  const stateText = (p: RecipePlan) => p.reason === 'left_empty' ? t('stateLeftEmpty') : t(p.state === 'planned' ? 'statePlanned' : p.state === 'claimed' ? 'stateClaimed' : p.state === 'uncertain' ? 'stateUncertain' : 'stateFailed');
   const reasonText = (reason: string | null) => { const key = reason ? `reason${reason.charAt(0).toUpperCase()}${reason.slice(1)}` : ''; return key in copy[locale] ? t(key as RecipeCopyKey) : ''; };
   const reviewTitle = review ? t(REVIEW_COPY[review].title) : '';
   const reviewText = review ? t(review === 'pause' && cancelPosts ? 'pauseCancelDescription' : REVIEW_COPY[review].text) : '';
@@ -211,6 +232,23 @@ export function RecipeSource({ initial, locale, canWrite, copy = recipeCopy }: {
           disabled={on && days.length === 1} onClick={() => setConfig({ weekdays: on ? days.filter(d => d !== day) : [...days, day].sort() })}>{dayName(day)}</button>; })}</div>
         <span className={styles.help}>{t('weekdaysHint')}</span>
       </fieldset>
+      {/* Times per channel (2026-11-15): a channel listed here posts at its own times instead of the shared ones. */}
+      <fieldset className={styles.dayPicker} disabled={busy}><legend>{t('channelTimes')}</legend>
+        <span className={styles.help}>{t('channelTimesHint')}</span>
+        {Object.entries(draft.config.channelSlots ?? {}).map(([pageId, times]) => <div key={pageId} className={styles.channelTimes}>
+          <strong>{view.pages.find(page => page.id === pageId)?.name ?? pageId}</strong>
+          <div className={styles.slotChips}>{times.map((slot, index) => <span key={index} className={styles.slotChip}>
+            <input type="time" aria-label={t('slots')} value={slot} onChange={e => setChannelTimes(pageId, times.map((v, i) => i === index ? e.target.value : v))} />
+            <button type="button" aria-label={t('removeSlot', { time: slot })} disabled={times.length < 2} onClick={() => setChannelTimes(pageId, times.filter((_, i) => i !== index))}>×</button>
+          </span>)}
+            <Button size="sm" type="button" variant="quiet" onClick={() => setChannelTimes(pageId, [...times, '12:00'])}>+ {t('addSlot')}</Button>
+            <Button size="sm" type="button" variant="quiet" onClick={() => setChannelTimes(pageId, null)}>{t('channelTimesRemove')}</Button></div>
+        </div>)}
+        {view.pages.some(page => !draft.config.channelSlots?.[page.id]) && <select className={styles.channelAdd} value="" onChange={e => { if (e.target.value) setChannelTimes(e.target.value, [...draft.config.slots]); }}>
+          <option value="">{t('channelTimesAdd')}</option>
+          {view.pages.filter(page => !draft.config.channelSlots?.[page.id]).map(page => <option key={page.id} value={page.id}>{page.name}</option>)}
+        </select>}
+      </fieldset>
       <label>{t('timezone')}<input disabled={busy} value={draft.config.timezone} onChange={e => setConfig({ timezone: e.target.value })} /><span>{t('timezoneHint')}</span></label>
       <label>{t('horizon')}<input disabled={busy} type="number" min={1} max={14} step={1} value={draft.config.horizonDays} onChange={e => setConfig({ horizonDays: Math.trunc(Number(e.target.value)) || 1 })} /></label>
       <label className={styles.inline}><input type="checkbox" disabled={busy} checked={draft.config.distinctAcrossPages} onChange={e => setConfig({ distinctAcrossPages: e.target.checked })} /> {t('distinct')}</label>
@@ -222,6 +260,12 @@ export function RecipeSource({ initial, locale, canWrite, copy = recipeCopy }: {
       <label className={styles.inline}><input type="checkbox" disabled={busy} checked={draft.config.skipShared} onChange={e => setConfig({ skipShared: e.target.checked })} /> {t('skipShared')}</label>
       <label>{t('order')}<select disabled={busy} value={draft.config.order} onChange={e => setConfig({ order: e.target.value === 'oldest' ? 'oldest' : 'newest' })}><option value="newest">{t('orderNewest')}</option><option value="oldest">{t('orderOldest')}</option></select></label>
       <label>{t('maxAge')}<input disabled={busy} type="number" min={0} step={1} value={draft.config.maxAgeDays} onChange={e => setConfig({ maxAgeDays: Math.max(0, Math.trunc(Number(e.target.value)) || 0) })} /></label>
+      {/* Recipes never posted (2026-11-15); allowing one again takes effect when the settings are saved. */}
+      <div className={styles.dayPicker}><strong>{t('excludedHeading')}</strong>
+        {draft.config.excluded?.length ? <ul className={styles.excludedList}>{draft.config.excluded.map(item => <li key={item.id}><span>{item.title || item.id}</span>
+          <Button size="sm" type="button" variant="quiet" disabled={busy} onClick={() => setConfig({ excluded: draft.config.excluded!.filter(other => other.id !== item.id) })}>{t('excludedAllow')}</Button></li>)}</ul>
+          : <span className={styles.help}>{t('excludedEmpty')}</span>}
+      </div>
       </div></details>
 
       <details className={styles.group}><summary><strong>{t('commentHeading')}</strong><span>{draft.config.firstCommentDelayMinutes ? `+${draft.config.firstCommentDelayMinutes} min` : '—'}</span></summary><div className={styles.groupBody}>
@@ -246,10 +290,17 @@ export function RecipeSource({ initial, locale, canWrite, copy = recipeCopy }: {
     {view.plans.items.length ? <div className={styles.tableWrap}><table className={styles.table}><caption className="ui-visually-hidden">{t('plansHeading')}</caption>
       <thead><tr><th scope="col">{t('colTime')}</th><th scope="col">{t('colChannel')}</th><th scope="col">{t('colRecipe')}</th><th scope="col">{t('colState')}</th>{canWrite ? <th scope="col"><span className="ui-visually-hidden">{t('colActions')}</span></th> : null}</tr></thead>
       <tbody>{(showAllPlans ? view.plans.items : view.plans.items.slice(0, 12)).map(p => <tr key={p.id}><th scope="row">{view.labels?.slots[p.id] ?? ''}</th><td>{p.targetName}</td><td>{p.title}</td><td>{stateText(p)}{reasonText(p.reason) && <span className={styles.meta}>{reasonText(p.reason)}</span>}</td>
-        {canWrite ? <td className={styles.planActions}>{p.state === 'planned' && p.postId && Date.parse(p.slotAt) > Date.now() ? <>
-          {/* Control over each planned post (2026-11-15): open it to edit, or give its time another recipe. */}
+        {canWrite ? <td className={styles.planActions}>{Date.parse(p.slotAt) <= Date.now() ? null : p.reason === 'left_empty'
+          ? <Button size="sm" variant="quiet" disabled={busy} onClick={() => setSlotChange({ plan: p, kind: 'fill' })}>{t('planFill')}</Button>
+          : p.state === 'planned' && p.postId ? <>
+          {/* Control over each planned post (2026-11-15): open it, another recipe, choose one, leave the time empty, never post it again. */}
           <a className="ui-button ui-button--quiet ui-button--sm" href={`/content/post/${encodeURIComponent(p.postId)}`}>{t('planOpen')}</a>
-          <Button size="sm" variant="quiet" disabled={busy} onClick={() => setReplacing(p)}>{t('planReplace')}</Button>
+          <Button size="sm" variant="quiet" disabled={busy} onClick={() => setSlotChange({ plan: p, kind: 'replace' })}>{t('planReplace')}</Button>
+          <Menu label={t('planMore')} items={[
+            { key: 'choose', label: t('planChoose'), disabled: busy, onSelect: () => openChooser(p) },
+            { key: 'leave', label: t('planLeaveEmpty'), disabled: busy, onSelect: () => setSlotChange({ plan: p, kind: 'leave_empty' }) },
+            { key: 'exclude', label: t('planExclude'), danger: true, disabled: busy, onSelect: () => setSlotChange({ plan: p, kind: 'exclude' }) },
+          ]} />
         </> : null}</td> : null}</tr>)}</tbody>
     </table>{view.plans.items.length > 12 ? <button type="button" className={styles.showAll} onClick={() => setShowAllPlans(v => !v)}>{showAllPlans ? t('plansFewer') : t('plansMore', { count: view.plans.items.length - 12 })}</button> : null}</div> : <p className={styles.empty}>{t('plansEmpty')}</p>}
     <nav className={styles.pagination} aria-label={t('plansHeading')}>
@@ -258,17 +309,38 @@ export function RecipeSource({ initial, locale, canWrite, copy = recipeCopy }: {
       {view.plans.hasMore ? <Button size="sm" disabled={busy} onClick={() => void goPage(view.plans.page + 1)}>{t('next')}</Button> : <span />}
     </nav>
 
-    {replacing && <ConfirmDialog open title={t('replaceTitle')} objectName={replacing.title}
-      consequence={t('replaceConsequence', { title: replacing.title, channel: replacing.targetName, time: view.labels?.slots[replacing.id] ?? '' })}
-      confirmLabel={t('replaceConfirm')} cancelLabel={t('cancel')} failureLabel={t('replaceFailed')} onClose={() => setReplacing(null)}
-      onConfirm={async () => {
-        try {
-          const body = await call('/api/feeds/wordpress/replace', 'POST', { planId: replacing.id, confirmation: replaceRecipeSlotConfirmation(replacing.id) });
-          say(body && body.planned > 0 ? t('replaceDone') : t('replaceUnfilled'), false);
-          await goPage(view.plans.page);
-          return null;
-        } catch (error) { return error instanceof Error ? error.message : t('replaceFailed'); }
-      }} />}
+    {slotChange && (() => {
+      const { plan, kind } = slotChange;
+      const words = { title: plan.title, channel: plan.targetName, time: view.labels?.slots[plan.id] ?? '' };
+      const copyFor = { replace: ['replaceTitle', 'replaceConsequence', 'replaceConfirm'], leave_empty: ['leaveTitle', 'leaveConsequence', 'leaveConfirm'], exclude: ['excludeTitle', 'excludeConsequence', 'excludeConfirm'], fill: ['planFill', 'planFill', 'planFill'] } as const;
+      const [title, consequence, confirmLabel] = copyFor[kind];
+      return <ConfirmDialog open title={t(title)} objectName={plan.title} consequence={kind === 'fill' ? (view.labels?.slots[plan.id] ?? '') : t(consequence, words)}
+        confirmLabel={t(confirmLabel)} cancelLabel={t('cancel')} failureLabel={t('replaceFailed')} danger={kind !== 'fill'} onClose={() => setSlotChange(null)}
+        onConfirm={async () => {
+          try {
+            const body = await changeSlot(plan, { action: kind });
+            say(kind === 'leave_empty' ? t('leaveDone') : kind === 'exclude' ? t('excludeDone') : body && body.planned > 0 ? t(kind === 'fill' ? 'fillDone' : 'replaceDone') : t(kind === 'fill' ? 'fillUnfilled' : 'replaceUnfilled'), false);
+            if (kind === 'exclude') await reload(); else await goPage(view.plans.page);
+            return null;
+          } catch (error) { return error instanceof Error ? error.message : t('replaceFailed'); }
+        }} />;
+    })()}
+    {choosing && <Dialog open title={t('chooseTitle')} description={t('chooseHint')} onClose={() => !busy && setChoosing(null)} busy={busy}
+      actions={<Button data-dialog-cancel disabled={busy} onClick={() => setChoosing(null)}>{t('cancel')}</Button>}>
+      <label className={styles.chooseSearch}><span className="ui-visually-hidden">{t('chooseSearch')}</span><input type="search" placeholder={t('chooseSearch')} value={choiceQuery} onChange={e => setChoiceQuery(e.target.value)} autoFocus /></label>
+      {choices === null ? <p className={styles.help} role="status">{t('chooseLoading')}</p> : (() => {
+        const needle = choiceQuery.trim().toLocaleLowerCase();
+        const shown = choices.filter(c => !needle || c.title.toLocaleLowerCase().includes(needle));
+        return shown.length ? <ul className={styles.chooseList}>{shown.map(c => <li key={c.wpPostId}><span>{c.title}</span>
+          <Button size="sm" disabled={busy} onClick={() => void run(async () => {
+            try {
+              const body = await changeSlot(choosing, { action: 'choose', wpPostId: c.wpPostId });
+              say(body && body.planned > 0 ? t('chooseDone') : t('chooseFailed'), !(body && body.planned > 0));
+            } catch (error) { say(error instanceof Error ? error.message : t('chooseFailed'), true); }
+            setChoosing(null);
+          }).then(() => goPage(view.plans.page))}>{t('chooseUse')}</Button></li>)}</ul> : <p className={styles.help}>{t('chooseEmpty')}</p>;
+      })()}
+    </Dialog>}
     <Dialog open={Boolean(review)} title={reviewTitle} description={reviewText} onClose={() => !busy && setReview(null)} busy={busy}
       actions={<><Button data-dialog-cancel disabled={busy} onClick={() => setReview(null)}>{t('cancel')}</Button><Button variant="primary" disabled={busy || !review || confirmation !== phrase} onClick={() => void perform()}>{reviewAction}</Button></>}>
       {notice?.error && <RouteNotice error focusKey={`recipe-review-error:${notice.key}`}>{notice.text}</RouteNotice>}

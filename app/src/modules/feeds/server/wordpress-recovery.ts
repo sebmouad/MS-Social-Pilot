@@ -1,6 +1,6 @@
 import type { WpDb } from '../wordpress/db';
 import type { FeedAuthorization } from './access';
-import { planSource, slotKey, type PlannerPorts } from './wordpress-planner';
+import { LEFT_EMPTY, planSource, slotKey, type PlannerPorts } from './wordpress-planner';
 import type { WordpressSettings } from './wordpress-settings';
 import type { LedgerRow, SourceRow } from './wordpress-store';
 
@@ -86,21 +86,35 @@ export async function cancelPlannedPosts(ctx: { settings: WordpressSettings; por
 }
 
 export const REPLACED = 'replaced';
+/** What a member can do to one planned slot (2026-11-15). */
+export type SlotAction = { kind: 'replace' } | { kind: 'leave_empty' } | { kind: 'fill' } | { kind: 'choose'; wpPostId: string } | { kind: 'exclude' };
 export type ReplaceOutcome = { replaced: boolean; planned: number; unfilled: number };
 
 /**
- * Give one upcoming slot a different recipe (2026-11-15). Its post goes through Publishing's own cancel (a platform-held
- * copy is removed first), the cancelled draft is deleted, the slot remembers the recipe it had so it is not chosen
- * again, and only that slot is planned. A post Publishing will not cancel (publishing, published or edited) stays as it is.
+ * Change one upcoming slot. Its post (when it has one) goes through Publishing's own cancel (a platform-held copy is
+ * removed first) and the cancelled draft is deleted; a post Publishing will not cancel (publishing, published or edited)
+ * leaves everything as it was. Then: replace/exclude plan another recipe (the old one is not chosen again for this time),
+ * choose plans exactly the member's recipe, leave_empty keeps the time empty until fill plans it again.
  */
-export async function replaceRecipeSlot(ctx: { settings: WordpressSettings; ports: PlannerPorts; db: WpDb; now: Date }, source: SourceRow, auth: FeedAuthorization, row: LedgerRow,
-  deleteDraft: (postId: string) => Promise<void>, rememberSkipped: (skipped: string[]) => Promise<void>): Promise<ReplaceOutcome> {
+export async function changeRecipeSlot(ctx: { settings: WordpressSettings; ports: PlannerPorts; db: WpDb; now: Date }, source: SourceRow, auth: FeedAuthorization, row: LedgerRow, action: SlotAction,
+  deleteDraft: (postId: string) => Promise<void>, setSlot: (fields: { skipped?: string[]; reason?: string | null }) => Promise<void>): Promise<ReplaceOutcome> {
   const { settings, ports, now } = ctx;
-  if (!inScope(auth, row) || row.state !== 'planned' || !row.postId || row.slotAt.getTime() <= now.getTime()) return { replaced: false, planned: 0, unfilled: 0 };
-  try { await ports.cancelPost(auth.actor, row.postId); } catch { return { replaced: false, planned: 0, unfilled: 0 }; }
-  await deleteDraft(row.postId).catch(() => undefined);
-  if (!await ports.store.settleIf(source.workspaceId, row.id, 'planned', { state: 'failed', reason: REPLACED, expectedPostId: row.postId })) return { replaced: false, planned: 0, unfilled: 0 };
-  await rememberSkipped([...new Set([...row.skipped, row.wpPostId])]);
-  const planned = await planSource({ settings, ports, db: ctx.db, budget: { left: settings.runBudget }, now, retry: new Set([slotKey(row.targetId, row.slotAt)]) }, source, auth);
+  const none = { replaced: false, planned: 0, unfilled: 0 };
+  if (!inScope(auth, row) || row.slotAt.getTime() <= now.getTime()) return none;
+  if (action.kind === 'fill') {
+    if (row.reason !== LEFT_EMPTY) return none;
+    await setSlot({ reason: CANCELLED });
+  } else if (row.state === 'planned' && row.postId) {
+    try { await ports.cancelPost(auth.actor, row.postId); } catch { return none; }
+    await deleteDraft(row.postId).catch(() => undefined);
+    if (!await ports.store.settleIf(source.workspaceId, row.id, 'planned', { state: 'failed', reason: action.kind === 'leave_empty' ? LEFT_EMPTY : REPLACED, expectedPostId: row.postId })) return none;
+  } else if (row.state === 'failed') {
+    if (action.kind === 'leave_empty') await setSlot({ reason: LEFT_EMPTY });
+  } else return none;
+  if (action.kind === 'leave_empty') return { replaced: true, planned: 0, unfilled: 0 };
+  if (action.kind === 'replace' || action.kind === 'exclude') await setSlot({ skipped: [...new Set([...row.skipped, row.wpPostId])] });
+  const key = slotKey(row.targetId, row.slotAt);
+  const planned = await planSource({ settings, ports, db: ctx.db, budget: { left: settings.runBudget }, now, retry: new Set([key]),
+    ...(action.kind === 'choose' ? { force: new Map([[key, action.wpPostId]]) } : {}) }, source, auth);
   return { replaced: true, planned: planned.planned, unfilled: planned.unfilled };
 }

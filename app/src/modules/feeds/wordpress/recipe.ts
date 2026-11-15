@@ -11,6 +11,10 @@ export type PlanConfig = {
   firstCommentTemplate: string; firstCommentDelayMinutes: number;
   /** Days posts go out, 0 = Sunday … 6 = Saturday (2026-11-15); every day when absent. */
   weekdays?: number[];
+  /** Channels with their own posting times instead of `slots` (2026-11-15), keyed by channel id. */
+  channelSlots?: Record<string, string[]>;
+  /** Recipes never to post (2026-11-15): WordPress post id and the title shown in the list. */
+  excluded?: Array<{ id: string; title: string }>;
 };
 
 const key = z.string().regex(META_KEY);
@@ -25,6 +29,10 @@ export const planConfigPatchSchema = (limits: { template: number; horizon: { min
   order: z.enum(['newest', 'oldest']), maxAgeDays: z.number().int().min(limits.age.min).max(limits.age.max), skipShared: z.boolean(),
   slots: z.array(z.string().regex(SLOT_TIME)).min(1).max(SLOTS_MAX), timezone: zone,
   weekdays: z.array(z.number().int().min(0).max(6)).min(1).max(7).transform(days => [...new Set(days)].sort()),
+  channelSlots: z.record(z.string().regex(/^[A-Za-z0-9_-]{1,100}$/), z.array(z.string().regex(SLOT_TIME)).min(1).max(SLOTS_MAX).transform(normalizeSlotsList))
+    .refine(map => Object.keys(map).length <= 500, 'Too many channels.'),
+  excluded: z.array(z.object({ id: z.string().regex(/^[A-Za-z0-9_-]{1,100}$/), title: z.string().max(300) }).strict()).max(2000)
+    .transform(list => [...new Map(list.map(item => [item.id, item])).values()]),
   horizonDays: z.number().int().min(limits.horizon.min).max(limits.horizon.max), distinctAcrossPages: z.boolean(),
   cooldownDays: z.number().int().min(limits.cooldown.min).max(limits.cooldown.max),
   firstCommentTemplate: z.string().min(1).max(limits.template), firstCommentDelayMinutes: z.number().int().min(limits.delay.min).max(limits.delay.max),
@@ -54,6 +62,7 @@ export function configPatch(config: PlanConfig, defaults: PlanConfig): Record<st
   return patch;
 }
 export const normalizeSlots =(slots: readonly string[]): string[] => [...new Set(slots)].sort();
+function normalizeSlotsList(slots: string[]): string[] { return [...new Set(slots)].sort(); }
 
 /* ----- recipe parsing ----- */
 

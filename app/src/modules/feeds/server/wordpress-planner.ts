@@ -187,7 +187,11 @@ export type Ctx = {
   retry?: ReadonlySet<string>;
   /** Wall-clock end (epoch ms) for a run a member waits on; slots left then stay empty for the next run. */
   deadline?: number;
+  /** A member's own choice of recipe for a slot (slotKey → WordPress post id), 2026-11-15. */
+  force?: ReadonlyMap<string, string>;
 };
+/** Reason on a slot a member chose to leave empty: never filled again until they fill it themselves (2026-11-15). */
+export const LEFT_EMPTY = 'left_empty';
 const DEFINITIVE = new Set(['invalid_request', 'forbidden', 'unauthorized', 'unavailable', 'conflict', 'not_found']);
 const AUTHORITY = new Set(['forbidden', 'unauthorized', 'unavailable']);
 const safeName = (slug: string) => `${slug.replace(/[^A-Za-z0-9-]/g, '').slice(0, 80) || 'recipe'}-fb.jpg`;
@@ -215,15 +219,22 @@ export async function planSource(ctx: Ctx, source: SourceRow, auth: FeedAuthoriz
   const staggered = (slotAt: Date, targetId: string) => new Date(slotAt.getTime() + (pageOrder.get(targetId) ?? 0) * (Number.isFinite(settings.pageStaggerMinutes) ? settings.pageStaggerMinutes : 0) * 60_000);
   if (!pages.length) return { ...out, reason: 'no_pages' };
 
-  const slots = slotInstants({ now, slots: config.slots, timezone: config.timezone, horizonDays: config.horizonDays, leadMinutes: settings.minLeadMinutes, ...(config.weekdays ? { weekdays: config.weekdays } : {}) });
-  out.slots = slots.length;
+  // Each channel posts at its own times when it has some (2026-11-15), otherwise at the shared times.
+  const timing = (times: readonly string[]) => slotInstants({ now, slots: times, timezone: config.timezone, horizonDays: config.horizonDays, leadMinutes: settings.minLeadMinutes, ...(config.weekdays ? { weekdays: config.weekdays } : {}) });
+  const shared = timing(config.slots);
+  const pairs: Array<{ slotAt: Date; page: { id: string; name: string } }> = [];
+  for (const page of pages) for (const slotAt of (config.channelSlots?.[page.id]?.length ? timing(config.channelSlots[page.id]!) : shared)) pairs.push({ slotAt, page });
+  pairs.sort((a, b) => a.slotAt.getTime() - b.slotAt.getTime() || (pageOrder.get(a.page.id) ?? 0) - (pageOrder.get(b.page.id) ?? 0));
+  out.slots = new Set(pairs.map(pair => pair.slotAt.getTime())).size;
   const view = await supplyLedgerView(settings, ports, source, now);
 
   const needs: SlotNeed[] = []; const reviving = new Map<string, LedgerRow>();
-  for (const slotAt of slots) for (const page of pages) {
+  for (const { slotAt, page } of pairs) {
     const key = slotKey(page.id, slotAt);
     if (ctx.retry && !ctx.retry.has(key)) continue;
     const row = view.byKey.get(key);
+    // A slot a member left empty stays empty, even for « Plan failed times again ».
+    if (row?.reason === LEFT_EMPTY) continue;
     if (row && !(row.state === 'failed' && (ctx.retry !== undefined || row.skipped.length < settings.maxSlotAttempts))) continue;
     needs.push({ targetId: page.id, slotAt, ...(row ? { avoid: new Set(row.skipped) } : {}) });
     if (row) reviving.set(slotKey(page.id, slotAt), row);
@@ -232,14 +243,30 @@ export async function planSource(ctx: Ctx, source: SourceRow, auth: FeedAuthoriz
   if (!todo.length) return { ...out, reason: needs.length ? 'budget' : 'complete' };
 
   const writer = await ports.writer.available(source.workspaceId).catch(() => false);
-  const scan = await scanCandidates(ctx.db, settings, source, config, now, found => !settings.reuse.enabled && allocateRecipes({ needs: todo, candidates: found, blocked: view.blocked, taken: view.taken, reused: view.reused, distinct: config.distinctAcrossPages }).unfilled === 0, writer);
+  // Recipes a member excluded are never candidates; a forced slot takes exactly the recipe chosen for it (2026-11-15).
+  const excluded = new Set((config.excluded ?? []).map(item => item.id));
+  const usable = (found: Candidate[]) => excluded.size ? found.filter(c => !excluded.has(c.wpPostId)) : found;
+  const forcedIds = ctx.force ? [...new Set(todo.flatMap(need => ctx.force!.get(slotKey(need.targetId, need.slotAt)) ?? []))] : [];
+  const autoTodo = ctx.force ? todo.filter(need => !ctx.force!.has(slotKey(need.targetId, need.slotAt))) : todo;
+  const scan = await scanCandidates(ctx.db, settings, source, config, now, found => forcedIds.length
+    ? forcedIds.every(id => found.some(c => c.wpPostId === id))
+    : !settings.reuse.enabled && allocateRecipes({ needs: autoTodo, candidates: usable(found), blocked: view.blocked, taken: view.taken, reused: view.reused, distinct: config.distinctAcrossPages }).unfilled === 0, writer);
+  scan.candidates = usable(scan.candidates);
   out.scanned = scan.scanned; out.candidates = scan.candidates.length; out.rejected = scan.rejected;
   // Every post came back without the caption field itself: credentials or the REST exposure of that field failed, not the content.
   const readable = scan.scanned - scan.rejected.shared;
   if (readable > 0 && scan.rejected.captionFieldMissing === readable) out.reason = 'caption_field_missing';
   else if (readable > 0 && !writer && !config.mapping.recipeMetaKey && scan.rejected.recipe === readable) out.reason = 'needs_ai';
-  const { assignments, unfilled } = allocateRecipes({ needs: todo, candidates: scan.candidates, allowReuse: scan.exhausted, blocked: view.blocked, taken: view.taken, reused: view.reused, distinct: config.distinctAcrossPages });
-  out.unfilled = unfilled + (needs.length - todo.length);
+  const forced: Array<{ targetId: string; slotAt: Date; candidate: Candidate }> = [];
+  for (const need of todo) {
+    const id = ctx.force?.get(slotKey(need.targetId, need.slotAt));
+    if (!id) continue;
+    const candidate = scan.candidates.find(c => c.wpPostId === id);
+    if (candidate) forced.push({ targetId: need.targetId, slotAt: need.slotAt, candidate });
+  }
+  const automatic = allocateRecipes({ needs: autoTodo, candidates: scan.candidates, allowReuse: scan.exhausted, blocked: view.blocked, taken: view.taken, reused: view.reused, distinct: config.distinctAcrossPages });
+  const assignments = [...forced, ...automatic.assignments];
+  out.unfilled = automatic.unfilled + (todo.length - autoTodo.length - forced.length) + (needs.length - todo.length);
 
   for (const [index, { targetId, slotAt, candidate: c }] of assignments.entries()) {
     if (ctx.budget.left <= 0) break;
