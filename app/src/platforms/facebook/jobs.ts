@@ -227,45 +227,47 @@ async function fetchPageAnalytics(target: PageTarget, now: Date, today: Date, re
 }
 
 async function fetchRecentPageAnalytics(target: PageTarget, now: Date, today: Date, retryLimit: number, retryBackoff?: RetryBackoff): Promise<PageFetch> {
-  return withProviderWindow(async signal => {
-    const observations = await withRetries(async () => {
-      await assertFacebookJobAccess(target.workspaceId, jobFeatures.analytics);
-      const binding = await currentPageBinding(target, now);
-      if (!binding) throw new OperationError('forbidden', 'Facebook job access is no longer available.');
-      signal.throwIfAborted();
-      const engine = await configuredFacebookEngine({ signal });
-      const lookbackDays = await readLookbackDays('meta.pageAnalyticsLookbackDays');
-      const since = new Date(today.getTime() - (lookbackDays - 1) * DAY_MS);
-      return engine.getPageInsightObservations(binding.token, target.providerId, since, now);
-    }, retryLimit, retryBackoff);
-    let failedMetrics = observations.failedMetrics?.length ? 1 : 0;
-    if (observations.failedMetrics?.length) await logItemFailure('pageInsights', target.id, observations.failedMetrics.map(item => `${item.metric}: ${item.message}`).join('; '));
-    const historyBinding = await currentPageBinding(target, now);
-    if (!historyBinding) throw new OperationError('forbidden', 'History access unavailable.');
-    const startCursor = await readHistoryCursor(prisma, target);
-    // Post history is best-effort: a provider refusal is counted and logged, Page insights still persist.
-    let history: PostHistory | null = null;
-    try {
+  // Page figures and post history each get their own provider window (2026-11-15): sharing one, a slow history read
+  // left the figures without time (or the reverse), and the whole Page failed for that run.
+  const observations = await withProviderWindow(signal => withRetries(async () => {
+    await assertFacebookJobAccess(target.workspaceId, jobFeatures.analytics);
+    const binding = await currentPageBinding(target, now);
+    if (!binding) throw new OperationError('forbidden', 'Facebook job access is no longer available.');
+    signal.throwIfAborted();
+    const engine = await configuredFacebookEngine({ signal });
+    const lookbackDays = await readLookbackDays('meta.pageAnalyticsLookbackDays');
+    const since = new Date(today.getTime() - (lookbackDays - 1) * DAY_MS);
+    return engine.getPageInsightObservations(binding.token, target.providerId, since, now);
+  }, retryLimit, retryBackoff));
+  let failedMetrics = observations.failedMetrics?.length ? 1 : 0;
+  if (observations.failedMetrics?.length) await logItemFailure('pageInsights', target.id, observations.failedMetrics.map(item => `${item.metric}: ${item.message}`).join('; '));
+  const historyBinding = await currentPageBinding(target, now);
+  if (!historyBinding) throw new OperationError('forbidden', 'History access unavailable.');
+  const startCursor = await readHistoryCursor(prisma, target);
+  // Post history is best-effort: a provider refusal is counted and logged, Page insights still persist.
+  let history: PostHistory | null = null;
+  try {
+    history = await withProviderWindow(async signal => {
       const historyEngine = await configuredFacebookEngine({ signal });
-      history = await historyEngine.getPostHistory(historyBinding.token, target.providerId, now, startCursor);
-    } catch (historyError) {
-      // Worker shutdown still aborts the target; a spent provider window only forfeits history.
-      // Observations already fetched persist below instead of being discarded with the abort.
-      if (jobAbortSignal()?.aborted) throw historyError;
-      failedMetrics++;
-      await logItemFailure('postHistory', target.id, historyError);
-    }
-    if (history?.failures.length) {
-      failedMetrics++;
-      await logItemFailure('postHistory', target.id, history.failures.join('; '));
-    }
-    // A read cut short by the provider window keeps the posts it finished; only one that kept nothing is a failure.
-    if (history?.cutShort && history.posts.length === 0) {
-      failedMetrics++;
-      await logItemFailure('postHistory', target.id, 'Post history ran out of time before any post was read.');
-    }
-    return { observations, history, startCursor, failedMetrics };
-  });
+      return historyEngine.getPostHistory(historyBinding.token, target.providerId, now, startCursor);
+    });
+  } catch (historyError) {
+    // Worker shutdown still aborts the target; a spent provider window only forfeits history.
+    // Observations already fetched persist below instead of being discarded with the abort.
+    if (jobAbortSignal()?.aborted) throw historyError;
+    failedMetrics++;
+    await logItemFailure('postHistory', target.id, historyError);
+  }
+  if (history?.failures.length) {
+    failedMetrics++;
+    await logItemFailure('postHistory', target.id, history.failures.join('; '));
+  }
+  // A read cut short by the provider window keeps the posts it finished; only one that kept nothing is a failure.
+  if (history?.cutShort && history.posts.length === 0) {
+    failedMetrics++;
+    await logItemFailure('postHistory', target.id, 'Post history ran out of time before any post was read.');
+  }
+  return { observations, history, startCursor, failedMetrics };
 }
 
 
