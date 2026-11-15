@@ -45,7 +45,7 @@ export function InboxFilterRow({ action, filters, scope, locale, thread, limit, 
       </FilterSection>
       <FilterSection label={copy.status}>
         <Select name="status" aria-label={copy.status} value={state} onChange={value => { setState(value); apply(); }}
-          options={[{ value: 'open', label: copy.open }, { value: 'resolved', label: copy.resolved }, { value: 'all', label: copy.all }]} />
+          options={[{ value: 'open', label: copy.open }, { value: 'all', label: copy.all }]} />
       </FilterSection>
       <FilterSection label={copy.hiddenComments}>
         <Select name="hidden" aria-label={copy.hiddenComments} value={hidden} onChange={value => { setHidden(value); apply(); }}

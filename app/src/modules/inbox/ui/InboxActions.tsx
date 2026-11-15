@@ -225,12 +225,7 @@ export function ThreadToolbar({ id, kind, resolved, hidden, canResolve, canHide,
       const tag = (e.target as HTMLElement)?.tagName?.toLowerCase();
       if (tag === 'input' || tag === 'textarea' || (e.target as HTMLElement)?.isContentEditable) return;
       if (e.metaKey || e.ctrlKey || e.altKey) return;
-      if (e.key === 'e' || e.key === 'E') {
-        if (!reply && canResolve && busy === null) {
-          e.preventDefault();
-          void run('resolve', { action: 'resolve', id, kind, resolved: !resolved }, resolved ? copy.reopened : copy.resolvedDone, { action: 'resolve', id, kind, resolved }, resolved ? copy.resolvedDone : copy.reopened);
-        }
-      } else if (e.key === 'r' || e.key === 'R') {
+      if (e.key === 'r' || e.key === 'R') {
         const textarea = document.querySelector<HTMLTextAreaElement>('textarea#reply-body, textarea[name="body"], textarea[name="reply"]');
         if (textarea) {
           e.preventDefault();
@@ -245,12 +240,6 @@ export function ThreadToolbar({ id, kind, resolved, hidden, canResolve, canHide,
   if (!canResolve) return <p className={styles.readOnly}>{copy.readOnly}</p>;
   return <div className={styles.toolbar}>
     <div className={styles.toolbarButtons}>
-      {!reply && <Button size="sm" variant="secondary" data-inbox-resolve disabled={busy !== null} onClick={() => void run('resolve', { action: 'resolve', id, kind, resolved: !resolved }, resolved ? copy.reopened : copy.resolvedDone, { action: 'resolve', id, kind, resolved }, resolved ? copy.resolvedDone : copy.reopened)}>
-        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-          <span>{resolved ? copy.reopen : copy.markResolved}</span>
-          <kbd className="ui-kbd" style={{ fontSize: '10px', height: '17px', minWidth: '17px', padding: '0 4px', opacity: 0.85 }}>E</kbd>
-        </span>
-      </Button>}
       {kind === 'comment' && canHide && <Button size="sm" variant="secondary" disabled={busy !== null} onClick={() => void run('hide', { action: 'moderate', id, hidden: !hidden }, hidden ? copy.visibleDone(cap) : copy.hiddenDone(cap), { action: 'moderate', id, hidden }, hidden ? copy.hiddenDone(cap) : copy.visibleDone(cap))}>{hidden ? copy.unhide(noun) : copy.hide(noun)}</Button>}
       {kind === 'comment' && canDelete && <Button size="sm" variant="quiet" disabled={busy !== null} onClick={() => void openDeleteDialog()}>{copy.delete(noun)}</Button>}
     </div>

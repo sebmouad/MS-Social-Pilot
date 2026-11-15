@@ -49,7 +49,6 @@ export function ContactDetails({ details, locale, timeZone, catalog }: { details
     <section aria-label={copy.labels}>
       <h4>{copy.labels}</h4>
       <div className={styles.labels}>
-        {state.resolved ? <InboxTag icon="resolved" tone="ok">{list.resolvedTag}</InboxTag> : <InboxTag icon="needsReply" tone="warn">{list.openTag}</InboxTag>}
         {state.hidden ? <InboxTag icon="hidden">{list.hidden}</InboxTag> : null}
         {state.unread > 0 ? <InboxTag icon="unread" tone="warn">{copy.unreadLabel(state.unread)}</InboxTag> : null}
         <InboxTag icon="message">{state.assignee ? copy.assignedTo(state.assignee.name || copy.teammate) : copy.unassigned}</InboxTag>

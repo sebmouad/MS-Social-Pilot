@@ -11,7 +11,7 @@ const TYPING = /^(input|textarea|select)$/i;
 
 /**
  * Helpdesk keys without a mouse: j/k move between conversations, x selects the focused one, r jumps to the
- * reply box, e resolves or reopens, / searches and ? lists them all. Ignored while typing, with modifier keys, or
+ * reply box, / searches and ? lists them all. Ignored while typing, with modifier keys, or
  * when a dialog is open. Every key only focuses or clicks a control that already exists on the page, so
  * permissions and confirmations stay in the shared actions. The same keys are listed in the guide this button opens.
  */
@@ -53,11 +53,6 @@ export function InboxShortcuts({ locale = 'en' }: { locale?: InboxLocale }) {
         if (!reply) return;
         event.preventDefault();
         reply.focus();
-      } else if (key === 'e') {
-        const resolve = document.querySelector<HTMLButtonElement>('button[data-inbox-resolve]:not(:disabled)');
-        if (!resolve) return;
-        event.preventDefault();
-        resolve.click();
       }
     }
     document.addEventListener('keydown', onKey);
@@ -65,7 +60,7 @@ export function InboxShortcuts({ locale = 'en' }: { locale?: InboxLocale }) {
   }, []);
   const rows: Array<[string, Array<[string, string]>]> = [
     [copy.groups.move, [['j', copy.keys.next], ['k', copy.keys.previous], ['/', copy.keys.search]]],
-    [copy.groups.act, [['r', copy.keys.reply], ['e', copy.keys.resolve], ['?', copy.keys.help]]],
+    [copy.groups.act, [['r', copy.keys.reply], ['?', copy.keys.help]]],
     [copy.groups.select, [['x', copy.keys.select], ['escape', copy.keys.clear]]],
   ];
   return <>

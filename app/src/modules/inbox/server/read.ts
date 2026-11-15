@@ -92,9 +92,13 @@ export async function readInboxList(actor: InboxReadActor, input: unknown = {}, 
   const filters = { channelId: channelId ?? null, kind, state, hidden, q };
   const base = { ...(quick.length ? { quick } : {}), filters, channels: access.channels, timeZone: access.timeZone, limits, limit: take, cursor: parsed.data.cursor ?? null };
   if (!channelIds.length) return { ...base, items: [], total: 0, totals: { message: 0, comment: 0, review: 0 }, unread: { message: 0, comment: 0, review: 0 }, olderCursor: null, newerCursor: null, lastSynced: null, syncIncomplete: false };
-  const status = (alias: 'c' | 'pc' | 'r') => state === 'all' ? Prisma.empty : state === 'open' ? Prisma.sql`AND ${Prisma.raw(alias)}."resolvedAt" IS NULL` : Prisma.sql`AND ${Prisma.raw(alias)}."resolvedAt" IS NOT NULL`;
   const pattern = literalSearch(q);
   const replyWindowHours = Number(await runtimeConfig('inbox.messengerReplyWindowHours').catch(() => 0)) || undefined;
+  // « open » is the « To reply » view (2026-11-15): replying is what clears an item, nobody marks it resolved.
+  // Reviews cannot be answered from the app, so the view keeps them all. « resolved » is kept for older links.
+  const status = (alias: 'c' | 'pc' | 'r') => state === 'all' ? Prisma.empty
+    : state === 'resolved' ? Prisma.sql`AND ${Prisma.raw(alias)}."resolvedAt" IS NOT NULL`
+      : alias === 'r' ? Prisma.empty : quickConditions(['unanswered'], '', alias === 'c' ? 'message' : 'comment', replyWindowHours);
   const narrow = (branch: QuickBranch) => quickConditions(quick, mentionPrefix, branch, replyWindowHours);
   // Shared by the message branch and the unread sum so both read the same matches.
   const messageSearch = q ? Prisma.sql`AND (c.snippet ILIKE ${pattern} ESCAPE ${'\\'} OR EXISTS (SELECT 1 FROM conversation_messages m WHERE m."conversationId" = c.id AND (m.message ILIKE ${pattern} ESCAPE ${'\\'} OR m."fromName" ILIKE ${pattern} ESCAPE ${'\\'})))` : Prisma.empty;

@@ -37,7 +37,8 @@ export function BulkBar({ locale, maxItems }: { locale: InboxLocale; maxItems: n
   const [assignError, setAssignError] = useState('');
   const chosen = [...selection.items.values()];
   const all = (test: (item: SelectableItem) => boolean) => chosen.length > 0 && chosen.every(test);
-  const resolveAction: BulkAction | null = all(item => item.can.resolve) ? (all(item => !item.resolved) ? 'resolve' : all(item => item.resolved) ? 'reopen' : null) : null;
+  // Replying is what clears an item (2026-11-15): there is no resolve step to offer in bulk.
+  const resolveAction: BulkAction | null = null;
   const hideAction: BulkAction | null = all(item => item.kind === 'comment' && item.can.hide) ? (all(item => !item.hidden) ? 'hide' : all(item => item.hidden) ? 'unhide' : null) : null;
   const canDelete = all(item => item.kind === 'comment' && item.can.remove);
   const canAssign = all(item => item.can.assign);

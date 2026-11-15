@@ -1,5 +1,3 @@
-import { ResolveExpired } from './ResolveExpired';
-import { readExpiredConversationIds } from '../server/expired';
 import { AutoOpenFirst } from './AutoOpenFirst';
 import { createHash } from 'node:crypto';
 import { loadInboxCustomerCopy } from '@/modules/inbox/server/customer-copy';
@@ -185,7 +183,7 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
         <ChannelBadge name={thread.target.name} platformName={badge.platformName} mark={badge.mark} />
         <InboxTag icon={thread.kind === 'message' ? 'message' : thread.kind === 'review' ? 'review' : 'comment'} tone={inboxKindTone(thread.kind)}>{thread.kind === 'message' ? copy.message : thread.kind === 'review' ? reviewLabel(locale, 'review') : copy.comment}</InboxTag>
         {thread.kind === 'review' ? <InboxTag icon="review">{reviewSummary(locale, thread, reviews)}</InboxTag> : null}
-        {thread.resolved ? <InboxTag icon="resolved" tone="ok">{copy.resolvedTag}</InboxTag> : <InboxTag icon="needsReply" tone="warn">{copy.openTag}</InboxTag>}
+        {listPage?.items.find(item => item.key === `${thread.kind}:${thread.id}`)?.needsReply ? <InboxTag icon="needsReply" tone="warn">{copy.needsReply}</InboxTag> : null}
         {thread.hidden ? <InboxTag icon="hidden">{copy.hidden}</InboxTag> : null}
       </div>
     </header>;
@@ -255,8 +253,13 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
     const next = quickApplied.includes(filter) ? quickApplied.filter(item => item !== filter) : [...quickApplied, filter];
     return inboxHref({ ...Object.fromEntries(Object.entries(baseLocation).filter(([key]) => key !== 'quick' && key !== 'cursor')), ...(next.length ? { quick: next.join(',') } : {}), ...(requestedThread ? { thread: requestedThread } : {}) });
   };
+  // « To reply » and « All » (2026-11-15): replying is what clears an item; nobody has to mark it resolved.
+  const stateHref = (state: 'open' | 'all') => inboxHref({ ...Object.fromEntries(Object.entries(baseLocation).filter(([key]) => key !== 'status' && key !== 'cursor')), ...(state === 'all' ? { status: 'all' } : {}), ...(requestedThread ? { thread: requestedThread } : {}) });
   const quickRow = listPage ? <div className={styles.quickRow} role="group" aria-label={extra.screen.quickRow}>
-    {INBOX_QUICK_FILTERS.map(filter => <a key={filter} href={quickHref(filter)} className={styles.quickChip} aria-current={quickApplied.includes(filter) ? 'true' : undefined} title={extra.quick.hint[filter]}>{extra.quick[filter]}</a>)}
+    <a href={stateHref('open')} className={styles.quickChip} aria-current={filters.state === 'open' ? 'true' : undefined}>{copy.open}</a>
+    <a href={stateHref('all')} className={styles.quickChip} aria-current={filters.state !== 'open' ? 'true' : undefined}>{copy.all}</a>
+    <span className={styles.quickDivider} aria-hidden="true" />
+    {INBOX_QUICK_FILTERS.filter(filter => filter !== 'unanswered').map(filter => <a key={filter} href={quickHref(filter)} className={styles.quickChip} aria-current={quickApplied.includes(filter) ? 'true' : undefined} title={extra.quick.hint[filter]}>{extra.quick[filter]}</a>)}
   </div> : null;
 
   // Messages, comments and reviews open as separate lists. Switching keeps the channel scope and every other filter; only the kind, cursor and open thread change.
@@ -274,7 +277,7 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
   </nav> : null;
   const stateLabel = filters.state === 'resolved' ? copy.resolved : filters.state === 'all' ? copy.allActivity : copy.open;
   const listTitle = `${kindLabel(activeKind)} · ${stateLabel}`;
-  const resolvedHref = inboxHref({ ...Object.fromEntries(Object.entries(baseLocation).filter(([key]) => key !== 'status' && key !== 'cursor' && key !== 'thread' && key !== 'historyCursor')), status: 'resolved', ...(requestedThread ? { thread: requestedThread } : {}) });
+  const resolvedHref = inboxHref({ ...Object.fromEntries(Object.entries(baseLocation).filter(([key]) => key !== 'status' && key !== 'cursor' && key !== 'thread' && key !== 'historyCursor')), status: 'all', ...(requestedThread ? { thread: requestedThread } : {}) });
   const noMatchBody = activeKind === 'comment' ? copy.noMatchBodyComment : activeKind === 'review' ? copy.noMatchBodyReview : copy.noMatchBodyMessage;
   const noOpenTitle = activeKind === 'comment' ? copy.noOpenCommentsTitle : activeKind === 'review' ? copy.noOpenReviewsTitle : copy.noOpenMessagesTitle;
   const noOpenBody = activeKind === 'comment' ? copy.noOpenCommentsBody : activeKind === 'review' ? copy.noOpenReviewsBody : copy.noOpenMessagesBody;
@@ -298,14 +301,10 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
 
   const tabs = <LinkTabs label={extra.screen.tabsLabel} moreLabel={shell.moreTabs} activeId="conversations"
     items={[{ id: 'conversations', href: '/inbox', label: extra.screen.tabConversations }, { id: 'rules', href: '/inbox/rules', label: extra.screen.tabRules }]} />;
-  // Open Messenger conversations past the reply window (2026-11-14): offered for one-click resolving above the list.
-  const expired = activeKind === 'message' && listPage ? await readExpiredConversationIds(actor, scope.ids).catch(() => [] as string[]) : [];
-  const bulkBatch = Number(await runtimeConfig('inbox.bulkMaxItems').catch(() => 25)) || 25;
   const filterRow = <div className={styles.filterTools}>
     <InboxFilterRow action={inboxHref()} filters={filters} scope={scope.param} locale={locale} thread={requestedThread} limit={listPage?.limit} maxLimit={listPage?.limits.listPageSize}
       searchMaxCharacters={listPage?.limits.searchMaxCharacters} resetHref={resetHref} disabledLimit={!listPage} quick={quickApplied} activeCount={chips.length} />
     <InboxSavedViews locale={locale} currentQuery={new URLSearchParams(Object.entries(baseLocation).flatMap(([key, value]) => value === undefined ? [] : [[key, value]])).toString()} />
-    <ResolveExpired ids={expired} batch={bulkBatch} locale={locale === 'fr' ? 'fr' : 'en'} />
     <UrlFilterChips chips={chips} resetHref={resetHref} labels={{ active: copy.activeFilters, remove: copy.removeFilter, reset: copy.resetFilters }} />
   </div>;
 
@@ -338,7 +337,7 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
       </section>
       {threadView ?? <section className={`${styles.threadPane} ${styles.pick}`} aria-label={copy.openConversation}><EmptyState icon={<IconMessages size={26} />} title={copy.selectTitle}>{copy.selectBody}</EmptyState></section>}
       {!requestedThread && !threadOutcome.error && listPage.items.length ? (() => {
-        const first = listPage.items.find(item => item.needsReply && !item.resolved) ?? listPage.items[0]!;
+        const first = listPage.items.find(item => item.needsReply) ?? listPage.items[0]!;
         return <AutoOpenFirst href={inboxHref({ ...baseLocation, ...(listPage.cursor ? { cursor: listPage.cursor } : {}), thread: first.key })} />;
       })() : null}
     </div> : null}

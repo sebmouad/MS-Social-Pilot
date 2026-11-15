@@ -66,7 +66,6 @@ export function inboxListRows(page: InboxListPage, abilities: Awaited<ReturnType
         {item.sentiment ? <InboxTag icon={item.sentiment} tone={SENTIMENT_TONE[item.sentiment]} title={copy.sentimentHint}>{copy.sentiment[item.sentiment]}</InboxTag> : null}
         {item.unread > 0 ? <InboxTag icon="unread" tone="warn">{copy.nUnread(item.unread)}</InboxTag> : null}
         {item.needsReply ? <InboxTag icon="needsReply" tone="warn">{copy.needsReply}</InboxTag> : null}
-        {item.resolved ? <InboxTag icon="resolved" tone="ok">{copy.resolvedTag}</InboxTag> : null}
         {item.hidden ? <InboxTag icon="hidden">{copy.hidden}</InboxTag> : null}
       </div>
       </div>
