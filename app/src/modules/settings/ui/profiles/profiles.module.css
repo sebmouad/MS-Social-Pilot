@@ -9,3 +9,5 @@
 /* Channel checklist in columns (2026-11-14): a long single column for 10+ channels. */
 .stack fieldset { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 6px 16px; padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--radius-md); }
 .stack fieldset legend { padding: 0 6px; font-weight: 650; }
+.feedback:empty { margin: 0; }
+.stack fieldset > div { grid-column: 1 / -1; }

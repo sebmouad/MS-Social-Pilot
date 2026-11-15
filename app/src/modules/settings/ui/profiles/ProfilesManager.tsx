@@ -6,6 +6,7 @@ import { Button } from '@/components/Button';
 import { useConfirm } from '@/components/useConfirm';
 import { saveGroupConfirmation, setLabelsConfirmation, deleteGroupConfirmation, type ProfileDirectory, type ChannelGroup } from '../../channel-profiles/contracts';
 import { profileConfirmationCopy, type ProfileConfirmationCopy } from '../../channel-profiles/copy';
+import { ChannelSelect } from '@/modules/publishing/ui/compose/ChannelSelect';
 import styles from './profiles.module.css';
 export function ProfilesManager({ initial, locale, canManage, confirmationCopy }: { initial: ProfileDirectory; locale: 'en' | 'fr'; canManage: boolean; confirmationCopy?: ProfileConfirmationCopy }) {
   const toast = useToast();
@@ -28,12 +29,16 @@ export function ProfilesManager({ initial, locale, canManage, confirmationCopy }
   }
   return <div className={styles.stack} aria-busy={busy}>{saveDialog}
     {removing && <ConfirmDialog open title={c.remove} objectName={removing.name} consequence={c.consequence.replace('{name}', removing.name)} confirmLabel={c.remove} cancelLabel={c.cancel} failureLabel={c.failure} onClose={() => setRemoving(null)} onConfirm={async () => (await change({ action: 'deleteGroup', id: removing.id, confirmation: deleteGroupConfirmation(removing.id) }, () => { if (editing?.id === removing.id) reset(); })) ?? null} />}
-    <p id="profile-feedback" tabIndex={-1} ref={feedback} role={error ? 'alert' : 'status'}>{message}</p>
+    <p id="profile-feedback" className={styles.feedback} tabIndex={-1} ref={feedback} role={error ? 'alert' : 'status'}>{message}</p>
     {!data.channels.length && <p>{c.noChannels}</p>}
     {data.groups.length ? <ul className={styles.groups}>{data.groups.map(group => <li key={group.id}><strong>{group.name}</strong><p>{group.channelIds.map(id => data.channels.find(channel => channel.id === id)?.name ?? c.unavailable).join(', ')}</p>{canManage && <div className={styles.actions}><Button disabled={busy} onClick={() => { setEditing(group); setName(group.name); setSelected(group.channelIds); nameInput.current?.focus(); }}>{c.edit}</Button><Button disabled={busy} variant="danger" onClick={() => setRemoving(group)}>{c.remove}</Button></div>}</li>)}</ul> : <p>{c.empty}</p>}
     {canManage && data.channels.length > 0 && <form noValidate className={styles.stack} onSubmit={async event => { event.preventDefault(); if (!name.trim() || !selected.length) { setError(true); setMessage(c.invalid); nameInput.current?.focus(); return; } if (await confirmSave(confirmation.saveGroup.replace('{name}', name.trim()).replace('{count}', String(selected.length)))) await change({ action: 'saveGroup', ...(editing ? { id: editing.id } : {}), name, channelIds: selected, confirmation: saveGroupConfirmation({ id: editing?.id, name }) }, reset); }}>
       <label className="ui-field">{c.name}<input className="ui-input" ref={nameInput} aria-invalid={message === c.invalid || undefined} aria-describedby={message === c.invalid ? 'profile-feedback' : undefined} value={name} disabled={busy} onChange={event => setName(event.target.value)} /></label>
-      <fieldset disabled={busy}><legend>{c.channels}</legend>{data.channels.map(channel => <label className={styles.check} key={channel.id}><input type="checkbox" checked={selected.includes(channel.id)} onChange={event => setSelected(current => event.target.checked ? [...current, channel.id] : current.filter(id => id !== channel.id))} />{channel.name}</label>)}</fieldset>
+      <fieldset disabled={busy}><legend>{c.channels}</legend>{data.channels.length > 8
+        // Many channels: the composer's searchable picker instead of one checkbox per channel (2026-11-15).
+        ? <ChannelSelect channels={data.channels} selected={selected} locale={locale} disabled={busy}
+          onToggle={id => setSelected(current => current.includes(id) ? current.filter(item => item !== id) : [...current, id])} onSetAll={ids => setSelected(ids)} />
+        : data.channels.map(channel => <label className={styles.check} key={channel.id}><input type="checkbox" checked={selected.includes(channel.id)} onChange={event => setSelected(current => event.target.checked ? [...current, channel.id] : current.filter(id => id !== channel.id))} />{channel.name}</label>)}</fieldset>
       <div className={styles.actions}><Button type="submit" variant="primary" disabled={busy}>{editing ? c.save : c.create}</Button>{editing && <Button disabled={busy} onClick={reset}>{c.cancel}</Button>}</div>
     </form>}
     <h2>{c.labels}</h2><p id="profile-label-hint">{c.labelHint}</p>
