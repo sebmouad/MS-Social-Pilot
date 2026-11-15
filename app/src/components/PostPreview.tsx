@@ -90,6 +90,9 @@ const MEDIA_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0
 
 function webUrl(value: string | null | undefined): string | null {
   if (!value) return null;
+  // The app serves Page pictures and media from its own paths (/api/channels/…/picture): same-origin, so allowed.
+  // A protocol-relative `//host` address is another site and still goes through the checks below.
+  if (value.startsWith('/') && !value.startsWith('//') && !value.startsWith('/\\')) return value;
   try {
     const url = new URL(value);
     if ((url.protocol !== 'https:' && url.protocol !== 'http:') || url.username || url.password) return null;
