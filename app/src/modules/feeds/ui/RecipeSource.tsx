@@ -3,9 +3,10 @@
 import { useRef, useState } from 'react';
 import { Button } from '@/components/Button';
 import { Dialog } from '@/components/Dialog';
+import { ConfirmDialog } from '@/components';
 import { RouteNotice } from '@/components/RouteNotice';
 import { recipeCopy, recipeText, type RecipeCopyCatalog, type RecipeCopyKey, type RecipeLocale } from '../copy-recipes';
-import { configPatch } from '../wordpress/recipe';
+import { configPatch, replaceRecipeSlotConfirmation } from '../wordpress/recipe';
 import styles from './feeds.module.css';
 import { RecipeSupplyWarning } from './RecipeSupplyWarning';
 
@@ -13,6 +14,8 @@ type Mapping = { captionMetaKey: string; imageMetaKey: string; recipeMetaKey: st
 export type RecipeConfig = {
   mapping: Mapping; order: 'newest' | 'oldest'; maxAgeDays: number; skipShared: boolean; slots: string[]; timezone: string; horizonDays: number;
   distinctAcrossPages: boolean; cooldownDays: number; firstCommentTemplate: string; firstCommentDelayMinutes: number;
+  /** 0 = Sunday … 6 = Saturday; every day when absent. */
+  weekdays?: number[];
 };
 export type RecipeSourceData = {
   id: string; name: string; siteUrl: string; hasCredential: boolean; enabled: boolean; allTargets: boolean; targetIds: string[]; config: RecipeConfig;
@@ -45,6 +48,8 @@ const initialDraft = (view: RecipeView): Draft => view.source
   ? { name: view.source.name, siteUrl: view.source.siteUrl, credential: '', allTargets: view.source.allTargets, targetIds: view.source.targetIds, config: structuredClone(view.source.config) }
   : { name: '', siteUrl: view.defaults.siteUrl, credential: '', allTargets: true, targetIds: [], config: defaultConfig(view.defaults) };
 
+const WEEK_ORDER = [1, 2, 3, 4, 5, 6, 0] as const;
+
 export function RecipeSource({ initial, locale, canWrite, copy = recipeCopy }: { initial: RecipeView; locale: RecipeLocale; canWrite: boolean; copy?: RecipeCopyCatalog }) {
   const t = (key: RecipeCopyKey, values: Record<string, string | number> = {}) => recipeText(locale, key, values, copy);
   // A large library is scanned up to a limit: its figures are minimums (shown with « + »).
@@ -64,8 +69,13 @@ export function RecipeSource({ initial, locale, canWrite, copy = recipeCopy }: {
   const phrase = review === 'save' ? `SAVE RECIPE SOURCE ${draft.name.trim()}` : review === 'pause' ? (cancelPosts ? PAUSE_CANCEL_PHRASE : PAUSE_PHRASE) : review === 'resume' ? 'RESUME RECIPE SOURCE' : review === 'retry' ? 'RETRY RECIPE SLOTS' : 'RUN RECIPE PLANNER';
   const confirmParts = copy[locale].typeToConfirm.split('{phrase}');
   const setConfig = (patch: Partial<RecipeConfig>) => setDraft(d => ({ ...d, config: { ...d.config, ...patch } }));
+  // Posting days, Monday first; names in the page language.
+  const days = draft.config.weekdays ?? [0, 1, 2, 3, 4, 5, 6];
+  const dayName = (day: number) => new Intl.DateTimeFormat(locale, { weekday: 'short', timeZone: 'UTC' }).format(new Date(Date.UTC(2026, 10, 15 + day)));
+  const daysSummary = days.length === 7 ? t('everyDay') : WEEK_ORDER.filter(d => days.includes(d)).map(dayName).join(', ');
   const setMapping = (patch: Partial<Mapping>) => setDraft(d => ({ ...d, config: { ...d.config, mapping: { ...d.config.mapping, ...patch } } }));
 
+  const [replacing, setReplacing] = useState<RecipePlan | null>(null);
   async function call(url: string, method: string, payload?: unknown) {
     const response = await fetch(url, { method, headers: { 'content-type': 'application/json' }, ...(payload === undefined ? {} : { body: JSON.stringify(payload) }) });
     const body = await response.json().catch(() => null);
@@ -187,13 +197,19 @@ export function RecipeSource({ initial, locale, canWrite, copy = recipeCopy }: {
       </fieldset>
       </div></details>
 
-      <details className={styles.group}><summary><strong>{t('timingHeading')}</strong><span>{draft.config.slots.join(' · ')} · {draft.config.timezone}</span></summary><div className={styles.groupBody}>
+      <details className={styles.group}><summary><strong>{t('timingHeading')}</strong><span>{draft.config.slots.join(' · ')} · {daysSummary} · {draft.config.timezone}</span></summary><div className={styles.groupBody}>
       <fieldset className={styles.checks} disabled={busy}><legend>{t('slots')}</legend>
         <div className={styles.slotChips}>{draft.config.slots.map((slot, index) => <span key={index} className={styles.slotChip}>
           <input type="time" aria-label={t('slots')} value={slot} onChange={e => setConfig({ slots: draft.config.slots.map((s, i) => i === index ? e.target.value : s) })} />
           <button type="button" aria-label={t('removeSlot', { time: slot })} disabled={draft.config.slots.length < 2} onClick={() => setConfig({ slots: draft.config.slots.filter((_, i) => i !== index) })}>×</button>
         </span>)}
         <Button size="sm" type="button" variant="quiet" onClick={() => setConfig({ slots: [...draft.config.slots, '12:00'] })}>+ {t('addSlot')}</Button></div>
+      </fieldset>
+      {/* Posting days (2026-11-15): planned only on the days kept, at least one. */}
+      <fieldset className={styles.dayPicker} disabled={busy}><legend>{t('weekdays')}</legend>
+        <div className={styles.dayChips}>{WEEK_ORDER.map(day => { const on = days.includes(day); return <button key={day} type="button" aria-pressed={on} className={styles.dayChip}
+          disabled={on && days.length === 1} onClick={() => setConfig({ weekdays: on ? days.filter(d => d !== day) : [...days, day].sort() })}>{dayName(day)}</button>; })}</div>
+        <span className={styles.help}>{t('weekdaysHint')}</span>
       </fieldset>
       <label>{t('timezone')}<input disabled={busy} value={draft.config.timezone} onChange={e => setConfig({ timezone: e.target.value })} /><span>{t('timezoneHint')}</span></label>
       <label>{t('horizon')}<input disabled={busy} type="number" min={1} max={14} step={1} value={draft.config.horizonDays} onChange={e => setConfig({ horizonDays: Math.trunc(Number(e.target.value)) || 1 })} /></label>
@@ -228,8 +244,13 @@ export function RecipeSource({ initial, locale, canWrite, copy = recipeCopy }: {
 
     <h3 className={styles.sectionTitle}>{t('plansHeading')}</h3>
     {view.plans.items.length ? <div className={styles.tableWrap}><table className={styles.table}><caption className="ui-visually-hidden">{t('plansHeading')}</caption>
-      <thead><tr><th scope="col">{t('colTime')}</th><th scope="col">{t('colChannel')}</th><th scope="col">{t('colRecipe')}</th><th scope="col">{t('colState')}</th></tr></thead>
-      <tbody>{(showAllPlans ? view.plans.items : view.plans.items.slice(0, 12)).map(p => <tr key={p.id}><th scope="row">{view.labels?.slots[p.id] ?? ''}</th><td>{p.targetName}</td><td>{p.title}</td><td>{stateText(p)}{reasonText(p.reason) && <span className={styles.meta}>{reasonText(p.reason)}</span>}</td></tr>)}</tbody>
+      <thead><tr><th scope="col">{t('colTime')}</th><th scope="col">{t('colChannel')}</th><th scope="col">{t('colRecipe')}</th><th scope="col">{t('colState')}</th>{canWrite ? <th scope="col"><span className="ui-visually-hidden">{t('colActions')}</span></th> : null}</tr></thead>
+      <tbody>{(showAllPlans ? view.plans.items : view.plans.items.slice(0, 12)).map(p => <tr key={p.id}><th scope="row">{view.labels?.slots[p.id] ?? ''}</th><td>{p.targetName}</td><td>{p.title}</td><td>{stateText(p)}{reasonText(p.reason) && <span className={styles.meta}>{reasonText(p.reason)}</span>}</td>
+        {canWrite ? <td className={styles.planActions}>{p.state === 'planned' && p.postId && Date.parse(p.slotAt) > Date.now() ? <>
+          {/* Control over each planned post (2026-11-15): open it to edit, or give its time another recipe. */}
+          <a className="ui-button ui-button--quiet ui-button--sm" href={`/content/post/${encodeURIComponent(p.postId)}`}>{t('planOpen')}</a>
+          <Button size="sm" variant="quiet" disabled={busy} onClick={() => setReplacing(p)}>{t('planReplace')}</Button>
+        </> : null}</td> : null}</tr>)}</tbody>
     </table>{view.plans.items.length > 12 ? <button type="button" className={styles.showAll} onClick={() => setShowAllPlans(v => !v)}>{showAllPlans ? t('plansFewer') : t('plansMore', { count: view.plans.items.length - 12 })}</button> : null}</div> : <p className={styles.empty}>{t('plansEmpty')}</p>}
     <nav className={styles.pagination} aria-label={t('plansHeading')}>
       {view.plans.page > 1 ? <Button size="sm" disabled={busy} onClick={() => void goPage(view.plans.page - 1)}>{t('previous')}</Button> : <span />}
@@ -237,6 +258,17 @@ export function RecipeSource({ initial, locale, canWrite, copy = recipeCopy }: {
       {view.plans.hasMore ? <Button size="sm" disabled={busy} onClick={() => void goPage(view.plans.page + 1)}>{t('next')}</Button> : <span />}
     </nav>
 
+    {replacing && <ConfirmDialog open title={t('replaceTitle')} objectName={replacing.title}
+      consequence={t('replaceConsequence', { title: replacing.title, channel: replacing.targetName, time: view.labels?.slots[replacing.id] ?? '' })}
+      confirmLabel={t('replaceConfirm')} cancelLabel={t('cancel')} failureLabel={t('replaceFailed')} onClose={() => setReplacing(null)}
+      onConfirm={async () => {
+        try {
+          const body = await call('/api/feeds/wordpress/replace', 'POST', { planId: replacing.id, confirmation: replaceRecipeSlotConfirmation(replacing.id) });
+          say(body && body.planned > 0 ? t('replaceDone') : t('replaceUnfilled'), false);
+          await goPage(view.plans.page);
+          return null;
+        } catch (error) { return error instanceof Error ? error.message : t('replaceFailed'); }
+      }} />}
     <Dialog open={Boolean(review)} title={reviewTitle} description={reviewText} onClose={() => !busy && setReview(null)} busy={busy}
       actions={<><Button data-dialog-cancel disabled={busy} onClick={() => setReview(null)}>{t('cancel')}</Button><Button variant="primary" disabled={busy || !review || confirmation !== phrase} onClick={() => void perform()}>{reviewAction}</Button></>}>
       {notice?.error && <RouteNotice error focusKey={`recipe-review-error:${notice.key}`}>{notice.text}</RouteNotice>}

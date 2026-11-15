@@ -94,3 +94,12 @@
 .group + .group { margin-top: 0; }
 .poolSame { margin: 8px 0; font-weight: 650; }
 .poolDetails > summary { cursor: pointer; color: var(--accent); font-weight: 600; font-size: var(--text-sm); margin-bottom: 8px; }
+.planActions { white-space: nowrap; text-align: right; }
+.planActions > * + * { margin-left: 4px; }
+/* Posting days (2026-11-15). */
+.dayPicker { display: grid; gap: 8px; margin: 0; padding: 0; border: 0; min-width: 0; }
+.dayPicker legend { padding: 0; margin-bottom: 6px; font-weight: 650; }
+.dayChips { display: flex; flex-wrap: wrap; gap: 6px; }
+.dayChip { min-width: 52px; min-height: 36px; padding: 0 12px; border: 1px solid var(--line-strong); border-radius: 999px; background: var(--surface); color: var(--ink-soft); font: inherit; font-weight: 650; cursor: pointer; }
+.dayChip[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); color: var(--ink); }
+.dayChip:disabled { cursor: not-allowed; }

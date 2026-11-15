@@ -6,14 +6,14 @@ import { prisma } from '@/server/data';
 import { checkUrlShape } from '@/modules/publishing/server/media/network/net-guard';
 import { encryptSecret } from '@/server/secret-crypto';
 import { WORDPRESS_BOUNDS } from '../wordpress/config';
-import { pauseAndCancelRecipeSourceConfirmation, pauseRecipeSourceConfirmation, planConfigPatchSchema, resumeRecipeSourceConfirmation, retryRecipeSlotsConfirmation, runRecipePlannerConfirmation, saveRecipeSourceConfirmation, type PlanConfig } from '../wordpress/recipe';
+import { pauseAndCancelRecipeSourceConfirmation, pauseRecipeSourceConfirmation, planConfigPatchSchema, resumeRecipeSourceConfirmation, retryRecipeSlotsConfirmation, replaceRecipeSlotConfirmation, runRecipePlannerConfirmation, saveRecipeSourceConfirmation, type PlanConfig } from '../wordpress/recipe';
 import { authorizeFeedWrite, authorizeFeeds, type FeedActor, type FeedAuthorization } from './access';
 import { audit, bad, lockActor, protect, type Tx } from './core';
 import { feedsError } from './messages';
 import { commentFor, configOf, writeCandidate, defaultPlannerPorts, openDatabase, planSource, recipeSummaryRecord, scanCandidates, supplyLedgerView, type PlannerPorts } from './wordpress-planner';
 import { loadWordpressSettings, patchLimits, type WordpressSettings } from './wordpress-settings';
 import { computePoolHealth, forgetPoolHealth, poolHealthWithin, type PoolHealth } from './wordpress-pool';
-import { cancelPlannedPosts, retryRecipeSlots } from './wordpress-recovery';
+import { cancelPlannedPosts, replaceRecipeSlot, retryRecipeSlots } from './wordpress-recovery';
 import { countPlans, selectPlans, selectSource, type LedgerRow, type SourceRow } from './wordpress-store';
 
 /**
@@ -217,6 +217,39 @@ export async function retryRecipeSlotsNow(actor: FeedActor, input: unknown, deps
     const outcome = await retryRecipeSlots({ settings: s, ports, db, now: ports.now() }, source, auth);
     forgetPoolHealth(source.id);
     await audit(prisma as unknown as Tx, actor.workspaceId, actor, 'feeds.recipe_slots_retried', { sourceId: source.id, ...outcome }).catch(() => undefined);
+    return { sourceId: source.id, ...outcome };
+  } catch (error) {
+    if (error instanceof OperationError) throw error;
+    throw new OperationError('upstream_failure', 'Planning could not be completed. Check the planned posts before trying again.');
+  } finally { await db.close(); }
+}
+
+/**
+ * Give one upcoming planned post a different recipe, as the signed-in member (2026-11-15). Refused (conflict) when the
+ * post can no longer be cancelled: publishing, published or edited by someone.
+ */
+export async function replaceRecipeSlotNow(actor: FeedActor, input: unknown, deps: RecipeDeps = {}) {
+  const s = await loadWordpressSettings();
+  const data = await parse(z.object({ planId: z.string().min(1).max(200), confirmation: z.string() }).strict(), input);
+  if (data.confirmation !== replaceRecipeSlotConfirmation(data.planId)) throw await bad();
+  const { auth, source } = await authorizedSource(actor);
+  if (!s.enabled) throw new OperationError('unavailable', 'Recipe planning is not available right now.');
+  if (!source.enabled) throw new OperationError('conflict', 'This recipe source is paused. Resume it to plan posts.');
+  const rows = await protect(prisma.$queryRaw<Array<LedgerRow & { skipped: unknown }>>`SELECT id, "sourceId", "targetId", "wpPostId", "slotAt", state, "postId", title, permalink, reason, skipped, "claimedAt"
+    FROM wordpress_recipe_plans WHERE "workspaceId" = ${actor.workspaceId} AND "sourceId" = ${source.id} AND id = ${data.planId}`);
+  const raw = rows[0];
+  if (!raw) throw await notFound();
+  const row: LedgerRow = { ...raw, skipped: Array.isArray(raw.skipped) ? raw.skipped.filter((v): v is string => typeof v === 'string') : [] };
+  const ports = { ...defaultPlannerPorts(), ...deps };
+  const db = await openDatabase(ports, s, source);
+  if (!db) throw new OperationError('unavailable', 'The recipe library could not be reached. Try again later.');
+  try {
+    const outcome = await replaceRecipeSlot({ settings: s, ports, db, now: ports.now() }, source, auth, row,
+      async postId => { const { deletePostDurably } = await import('@/modules/publishing/server/deletion'); await deletePostDurably({ userId: actor.userId, workspaceId: actor.workspaceId, ...(auth.actor.allowedTargetIds === undefined ? {} : { allowedTargetIds: auth.actor.allowedTargetIds }) }, postId, false); },
+      async skipped => { await prisma.$executeRaw`UPDATE wordpress_recipe_plans SET skipped = ${JSON.stringify(skipped)}::jsonb WHERE id = ${row.id} AND "workspaceId" = ${actor.workspaceId}`; });
+    if (!outcome.replaced) throw new OperationError('conflict', 'This post can no longer be replaced: it is publishing, published or was edited. Open it to change it.');
+    forgetPoolHealth(source.id);
+    await audit(prisma as unknown as Tx, actor.workspaceId, actor, 'feeds.recipe_slot_replaced', { sourceId: source.id, planId: row.id, previous: row.wpPostId, ...outcome }).catch(() => undefined);
     return { sourceId: source.id, ...outcome };
   } catch (error) {
     if (error instanceof OperationError) throw error;

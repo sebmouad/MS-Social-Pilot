@@ -44,7 +44,7 @@ export async function loadWordpressSettings(): Promise<WordpressSettings> {
     defaults: {
       mapping: { captionMetaKey: String(w('captionMetaKey')), imageMetaKey: String(w('imageMetaKey')), recipeMetaKey: String(w('recipeMetaKey')), skipMetaKey: String(w('skipMetaKey')), attachedFileMetaKey: String(w('attachedFileMetaKey')), postType: String(w('postType')), postStatus: String(w('postStatus')) },
       order: w('order') === 'oldest' ? 'oldest' : 'newest', maxAgeDays: n(w('maxAgeDays')), skipShared: w('skipShared') === true, slots: (w('slots') as string[]), timezone: String(w('timezone')),
-      horizonDays: n(w('horizonDays')), distinctAcrossPages: w('distinctAcrossPages') === true, cooldownDays: n(w('repostCooldownDays')),
+      horizonDays: n(w('horizonDays')), distinctAcrossPages: w('distinctAcrossPages') === true, cooldownDays: n(w('repostCooldownDays')), weekdays: [0, 1, 2, 3, 4, 5, 6],
       firstCommentTemplate: String(w('firstCommentTemplate')), firstCommentDelayMinutes: n(w('firstCommentDelayMinutes')),
     },
     minLeadMinutes: n(w('minLeadMinutes')), pageStaggerMinutes: n(w('pageStaggerMinutes')), targetTypes: w('targetTypes') as string[], runBudget: n(w('runBudget')), maxSourcesPerRun: n(w('maxSourcesPerRun')), claimLeaseSeconds: n(w('claimLeaseSeconds')), maxSlotAttempts: n(w('maxSlotAttempts')),

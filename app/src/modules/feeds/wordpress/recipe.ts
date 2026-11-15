@@ -9,6 +9,8 @@ export type PlanConfig = {
   mapping: Mapping; order: 'newest' | 'oldest'; maxAgeDays: number; skipShared: boolean;
   slots: string[]; timezone: string; horizonDays: number; distinctAcrossPages: boolean; cooldownDays: number;
   firstCommentTemplate: string; firstCommentDelayMinutes: number;
+  /** Days posts go out, 0 = Sunday … 6 = Saturday (2026-11-15); every day when absent. */
+  weekdays?: number[];
 };
 
 const key = z.string().regex(META_KEY);
@@ -22,6 +24,7 @@ export const planConfigPatchSchema = (limits: { template: number; horizon: { min
   }).partial().strict(),
   order: z.enum(['newest', 'oldest']), maxAgeDays: z.number().int().min(limits.age.min).max(limits.age.max), skipShared: z.boolean(),
   slots: z.array(z.string().regex(SLOT_TIME)).min(1).max(SLOTS_MAX), timezone: zone,
+  weekdays: z.array(z.number().int().min(0).max(6)).min(1).max(7).transform(days => [...new Set(days)].sort()),
   horizonDays: z.number().int().min(limits.horizon.min).max(limits.horizon.max), distinctAcrossPages: z.boolean(),
   cooldownDays: z.number().int().min(limits.cooldown.min).max(limits.cooldown.max),
   firstCommentTemplate: z.string().min(1).max(limits.template), firstCommentDelayMinutes: z.number().int().min(limits.delay.min).max(limits.delay.max),
@@ -187,13 +190,15 @@ function shiftTime(time: string, minutes: number): string | null {
  * zone rules: a time inside a spring-forward gap moves to the first minute that exists; an ambiguous autumn
  * time uses its first occurrence.
  */
-export function slotInstants(input: { now: Date; slots: readonly string[]; timezone: string; horizonDays: number; leadMinutes: number }): Date[] {
+export function slotInstants(input: { now: Date; slots: readonly string[]; timezone: string; horizonDays: number; leadMinutes: number; weekdays?: readonly number[] }): Date[] {
   const earliest = input.now.getTime() + input.leadMinutes * 60_000;
   const latest = input.now.getTime() + input.horizonDays * MS_DAY;
   const today = instantToWall(input.now, input.timezone).date;
   const found = new Set<number>();
   for (let day = 0; day <= input.horizonDays + 1; day += 1) {
     const date = addDaysToKey(today, day);
+    // Days left out of the posting days get no slot (the weekday of a local date does not depend on the zone).
+    if (input.weekdays && input.weekdays.length < 7 && !input.weekdays.includes(new Date(`${date}T12:00:00Z`).getUTCDay())) continue;
     for (const slot of normalizeSlots(input.slots)) {
       let result = wallTimeToInstant(date, slot, input.timezone);
       for (let shift = 1; !result.ok && result.reason === 'skipped' && shift <= MAX_GAP_SHIFT_MINUTES; shift += 1) {
@@ -251,4 +256,6 @@ export const runRecipePlannerConfirmation = 'RUN RECIPE PLANNER';
 export const pauseRecipeSourceConfirmation = 'PAUSE RECIPE SOURCE';
 export const resumeRecipeSourceConfirmation = 'RESUME RECIPE SOURCE';
 export const retryRecipeSlotsConfirmation = 'RETRY RECIPE SLOTS';
+/** Confirmation for giving one planned slot a different recipe. */
+export const replaceRecipeSlotConfirmation = (planId: string) => `REPLACE RECIPE ${planId}`;
 export const pauseAndCancelRecipeSourceConfirmation = 'PAUSE RECIPE SOURCE AND CANCEL SCHEDULED POSTS';

@@ -215,7 +215,7 @@ export async function planSource(ctx: Ctx, source: SourceRow, auth: FeedAuthoriz
   const staggered = (slotAt: Date, targetId: string) => new Date(slotAt.getTime() + (pageOrder.get(targetId) ?? 0) * (Number.isFinite(settings.pageStaggerMinutes) ? settings.pageStaggerMinutes : 0) * 60_000);
   if (!pages.length) return { ...out, reason: 'no_pages' };
 
-  const slots = slotInstants({ now, slots: config.slots, timezone: config.timezone, horizonDays: config.horizonDays, leadMinutes: settings.minLeadMinutes });
+  const slots = slotInstants({ now, slots: config.slots, timezone: config.timezone, horizonDays: config.horizonDays, leadMinutes: settings.minLeadMinutes, ...(config.weekdays ? { weekdays: config.weekdays } : {}) });
   out.slots = slots.length;
   const view = await supplyLedgerView(settings, ports, source, now);
 
