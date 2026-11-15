@@ -255,7 +255,9 @@ export function createFacebookAdsOps(loadTransport: () => Promise<FacebookAdsTra
     async listCreatives(context: AdsOpsContext, page: { limit: number; after?: string }) {
       const transport = await loadTransport();
       const payload = await transport.get(`${encodeURIComponent(context.accountId)}/adcreatives`, context.credential.accessToken, {
-        fields: 'id,name,status,title,body,thumbnail_url', limit: String(page.limit), ...(page.after ? { after: page.after } : {}),
+        // Graph renders creative thumbnails at 64×64 unless asked; the cards are about 220 px wide (440 on a sharp
+        // screen), so ask for 600×600 to keep them crisp (2026-11-15).
+        fields: 'id,name,status,title,body,thumbnail_url', thumbnail_width: '600', thumbnail_height: '600', limit: String(page.limit), ...(page.after ? { after: page.after } : {}),
       });
       const data = Array.isArray(payload.data) ? payload.data : [];
       const items: AdsCreativeSummary[] = [];
