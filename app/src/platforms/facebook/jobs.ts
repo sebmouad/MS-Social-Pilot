@@ -351,9 +351,14 @@ export async function syncPageAnalytics(now = new Date(), retryLimit = 0, retryB
               if (ownFirstComment.has(post.remoteId) && typeof post.insights.comments === 'number' && post.insights.comments > 0) post.insights = { ...post.insights, comments: post.insights.comments - 1 };
               await tx.$executeRaw`INSERT INTO external_posts (id, "targetId", "remoteId", message, permalink, "statusType", "pictureUrl", "createdTime", insights, "insightsSyncedAt", "fetchedAt")
                 VALUES (${`fb_${randomUUID()}`}, ${target.id}, ${post.remoteId}, ${post.message}, ${post.permalink}, ${post.statusType}, ${post.pictureUrl}, ${post.createdTime}, ${JSON.stringify(post.insights)}::jsonb, ${now}, ${now})
-                ON CONFLICT ("targetId", "remoteId") DO UPDATE SET message = EXCLUDED.message, permalink = EXCLUDED.permalink, "statusType" = EXCLUDED."statusType", "pictureUrl" = EXCLUDED."pictureUrl", insights = EXCLUDED.insights, "insightsSyncedAt" = EXCLUDED."insightsSyncedAt", "fetchedAt" = EXCLUDED."fetchedAt"`;
+                ON CONFLICT ("targetId", "remoteId") DO UPDATE SET message = EXCLUDED.message, permalink = EXCLUDED.permalink, "statusType" = EXCLUDED."statusType", "pictureUrl" = EXCLUDED."pictureUrl", "createdTime" = EXCLUDED."createdTime", insights = EXCLUDED.insights, "insightsSyncedAt" = EXCLUDED."insightsSyncedAt", "fetchedAt" = EXCLUDED."fetchedAt"`;
               persistedCount++;
             }
+            // Facebook's own time wins: a held post goes live on Facebook's schedule (on a 5-minute mark), not always the minute asked for.
+            if (history.posts.length) await tx.$executeRaw`UPDATE post_targets pt SET "publishedAt" = ep."createdTime"
+              FROM external_posts ep WHERE pt."targetId" = ${target.id} AND pt.status = 'published' AND ep."targetId" = pt."targetId" AND ep."remoteId" = pt."remotePostId"
+                AND ep."remoteId" = ANY(${history.posts.map(post => post.remoteId)}::text[]) AND ep."createdTime" IS NOT NULL
+                AND pt."publishedAt" IS DISTINCT FROM ep."createdTime" AND abs(extract(epoch FROM ep."createdTime" - COALESCE(pt."publishedAt", ep."createdTime"))) < 86400`;
             await tx.$executeRaw`INSERT INTO facebook_sync_cursors ("workspaceId", "targetId", "providerId", kind, cursor, "updatedAt") VALUES (${target.workspaceId}, ${target.id}, ${target.providerId}, 'post_history', ${JSON.stringify(history.progress)}::jsonb, ${now}) ON CONFLICT ("workspaceId", "targetId", kind) DO UPDATE SET "providerId" = EXCLUDED."providerId", cursor = EXCLUDED.cursor, "updatedAt" = EXCLUDED."updatedAt"`;
           }
           for (const { metric, period, endTime, value, numeric } of fetched.observations) {

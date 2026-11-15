@@ -41,6 +41,7 @@ export async function syncPostMetrics(workspaceId: string, postId: string): Prom
           targetId: true,
           remotePostId: true,
           remoteUrl: true,
+          publishedAt: true,
           target: {
             select: {
               id: true,
@@ -154,7 +155,7 @@ export async function syncPostMetrics(workspaceId: string, postId: string): Prom
         // 4. Upsert to external_posts
         await prisma.$executeRaw`
           INSERT INTO external_posts (id, "targetId", "remoteId", message, permalink, "statusType", "createdTime", insights, "insightsSyncedAt", "fetchedAt")
-          VALUES (${`fb_${randomUUID()}`}, ${pt.targetId}, ${pt.remotePostId}, ${post.message ?? ''}, ${permalink}, 'status', ${now}, ${JSON.stringify(insightsMap)}::jsonb, ${now}, ${now})
+          VALUES (${`fb_${randomUUID()}`}, ${pt.targetId}, ${pt.remotePostId}, ${post.message ?? ''}, ${permalink}, 'status', ${pt.publishedAt ?? now}, ${JSON.stringify(insightsMap)}::jsonb, ${now}, ${now})
           ON CONFLICT ("targetId", "remoteId") DO UPDATE SET
             permalink = COALESCE(EXCLUDED.permalink, external_posts.permalink),
             insights = EXCLUDED.insights,

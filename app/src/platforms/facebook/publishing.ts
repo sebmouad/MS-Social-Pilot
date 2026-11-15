@@ -505,7 +505,7 @@ export function createFacebookEngine(rawConfig: FacebookConfig, fetchImpl: Faceb
         if (typeof story !== 'string' || !story.startsWith(`${targetId}_`) || !/^[A-Za-z0-9_:-]+$/.test(story)) return unknown();
         // A held photo already has its feed post, with is_published=false until the scheduled time; only that post says it is live.
         let storyResponse: unknown;
-        try { storyResponse = await request(encodeURIComponent(story), { token, params: { fields: 'id,is_published,scheduled_publish_time' } }); }
+        try { storyResponse = await request(encodeURIComponent(story), { token, params: { fields: 'id,is_published,scheduled_publish_time,created_time' } }); }
         catch (error) {
           if (error instanceof FacebookApiError && error.code === 100 && error.subcode === 33) return unknown();
           throw error;
@@ -514,7 +514,9 @@ export function createFacebookEngine(rawConfig: FacebookConfig, fetchImpl: Faceb
         if (post.id !== story || typeof post.is_published !== 'boolean') return unknown();
         const storySeconds = typeof post.scheduled_publish_time === 'number' && Number.isSafeInteger(post.scheduled_publish_time) ? post.scheduled_publish_time : null;
         // Report the feed post id once live, which comments and post insights read. The photo's created_time is when it was scheduled, not published.
-        if (post.is_published) return { state: 'published', remoteId: story, targetId, publishedAt: storySeconds !== null && storySeconds * 1000 <= Date.now() ? new Date(storySeconds * 1000) : null };
+        // The feed post's created_time is when Facebook actually put it live, which can be a few minutes after the time asked for.
+        const live = Object.hasOwn(post, 'created_time') ? date(post.created_time) : null;
+        if (post.is_published) return { state: 'published', remoteId: story, targetId, publishedAt: live && live.getTime() <= Date.now() ? live : storySeconds !== null && storySeconds * 1000 <= Date.now() ? new Date(storySeconds * 1000) : null };
         if (storySeconds !== null && storySeconds * 1000 > Date.now()) return { state: 'scheduled', remoteId, targetId, publishedAt: new Date(storySeconds * 1000) };
         return unknown();
       }

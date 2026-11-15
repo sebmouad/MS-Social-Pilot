@@ -112,7 +112,7 @@ export default async function PostsPage({ searchParams }: { searchParams: Promis
     media: post.media as Array<{ kind: string; url: string; altText?: string }>,
     authorName: post.authorId === viewer.user.id ? viewer.user.name : copy.approvalsMember,
     ...authority(post),
-    whenLabel: formatDate(post.scheduledAt ?? post.publishedAt, timeZone, true, locale, copy),
+    whenLabel: formatDate(whenOf(post), timeZone, true, locale, copy),
     firstCommentDueLabels: firstCommentDueLabels(post, timeZone),
     // Published posts cannot be edited here: their (often recipe-long) first comment is shortened for the list and
     // its preview; the post page shows it in full (2026-11-14). Drafts and planned posts keep it whole for editing.
@@ -207,6 +207,13 @@ function safeOperationError(error: unknown, copy: typeof defaultCopy.en) {
 }
 
 /** First-comment due times per destination, formatted here so the browser never applies its own time-zone data. */
+/** Once live, a post shows when Facebook actually published it (its earliest channel), not the time that was asked for. */
+function whenOf(post: { status: string; scheduledAt: Date | null; publishedAt: Date | null; targets: Array<{ publishedAt?: Date | string | null }> }): Date | null {
+  if (!['published', 'partially_failed'].includes(post.status)) return post.scheduledAt ?? post.publishedAt;
+  const live = post.targets.map(target => target.publishedAt ? new Date(target.publishedAt).getTime() : NaN).filter(Number.isFinite);
+  return live.length ? new Date(Math.min(...live)) : post.publishedAt ?? post.scheduledAt;
+}
+
 function firstCommentDueLabels(post: { firstCommentDelayMinutes?: number | null; targets: Array<{ id: string; publishedAt?: Date | string | null }> }, timeZone: string) {
   const delay = post.firstCommentDelayMinutes ?? 0;
   const labels: Record<string, string> = {};
