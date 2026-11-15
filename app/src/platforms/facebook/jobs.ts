@@ -259,6 +259,11 @@ async function fetchRecentPageAnalytics(target: PageTarget, now: Date, today: Da
       failedMetrics++;
       await logItemFailure('postHistory', target.id, history.failures.join('; '));
     }
+    // A read cut short by the provider window keeps the posts it finished; only one that kept nothing is a failure.
+    if (history?.cutShort && history.posts.length === 0) {
+      failedMetrics++;
+      await logItemFailure('postHistory', target.id, 'Post history ran out of time before any post was read.');
+    }
     return { observations, history, startCursor, failedMetrics };
   });
 }

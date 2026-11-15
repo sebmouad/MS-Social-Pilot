@@ -95,11 +95,18 @@ export function createFacebookPostHistory(config: FacebookConfig, policyInput: z
     const posts: Array<{ remoteId: string; message: string | null; permalink: string | null; statusType: string | null; pictureUrl: string | null; createdTime: Date; insights: Record<string, unknown> }> = [];
     const failures: string[] = [];
     const seen = new Set<string>();
+    let cutShort = false;
     for (let i = 0; i < policy.pageBudget; i++) {
+      // A spent provider window used to discard every batch already read, so a large Page restarted from the same
+      // cursor each sync and never got further (2026-11-15). Batches finished before the abort are kept: `progress`
+      // only moves after a whole batch, so the next sync continues exactly where this one stopped.
+      if (signal?.aborted && i > 0) { cutShort = true; break; }
       const identity = progress.after ?? '';
       if (seen.has(identity)) throw new Error('Repeated history cursor.');
       seen.add(identity);
-      const batch = await page(`${encodeURIComponent(pageId)}/${policy.edge}`, token, { fields: [...new Set(['id', 'created_time', ...(policy.edge === 'feed' ? ['from'] : []), ...policy.fields])].join(','), limit: String(config.pageSize), since: String(Math.floor(Date.parse(progress.since) / 1000)), until: String(Math.floor(Date.parse(progress.until) / 1000)), ...(progress.after ? { after: progress.after } : {}) });
+      let batch: Awaited<ReturnType<typeof page>>;
+      try { batch = await page(`${encodeURIComponent(pageId)}/${policy.edge}`, token, { fields: [...new Set(['id', 'created_time', ...(policy.edge === 'feed' ? ['from'] : []), ...policy.fields])].join(','), limit: String(config.pageSize), since: String(Math.floor(Date.parse(progress.since) / 1000)), until: String(Math.floor(Date.parse(progress.until) / 1000)), ...(progress.after ? { after: progress.after } : {}) }); }
+      catch (error) { if (signal?.aborted && i > 0) { cutShort = true; break; } throw error; }
       const due: Array<{ post: Record<string, unknown>; createdTime: Date }> = [];
       for (const raw of batch.rows) {
         const post = obj(raw); const createdTime = new Date(String(post.created_time));
@@ -109,7 +116,22 @@ export function createFacebookPostHistory(config: FacebookConfig, policyInput: z
         if (policy.edge === 'feed' && obj(post.from).id !== pageId) continue;
         due.push({ post, createdTime });
       }
-      const enriched = await mapPool(due, HISTORY_POST_LANES, async ({ post, createdTime }) => {
+      // Posts finished before the window ran out are kept even inside an unfinished batch; the cursor stays on that
+      // batch, so the next sync reads it again and then moves on.
+      const enriched = await enrich(due);
+      for (const entry of enriched) if (entry) posts.push(entry);
+      if (signal?.aborted) { cutShort = true; break; }
+      progress.after = batch.after; progress.complete = !batch.after;
+      if (progress.complete) break;
+    }
+    return { posts, progress, failures: [...new Set(failures)], cutShort };
+
+    function enrich(due: Array<{ post: Record<string, unknown>; createdTime: Date }>) { return mapPool(due, HISTORY_POST_LANES, async item => {
+      try { return await enrichOne(item); }
+      catch (error) { if (signal?.aborted) return null; throw error; }
+    }); }
+
+    async function enrichOne({ post, createdTime }: { post: Record<string, unknown>; createdTime: Date }) {
         const insights: Record<string, unknown> = {};
         const postFailures: string[] = [];
         for (const [key, value] of [['shares', obj(post.shares).count], ['comments', obj(obj(post.comments).summary).total_count]] as const) { const n = number(value); if (n !== null) insights[key] = n; }
@@ -167,11 +189,6 @@ export function createFacebookPostHistory(config: FacebookConfig, policyInput: z
         insights.collectionFailures = [...new Set(postFailures)];
         const text = (key: string) => typeof post[key] === 'string' ? post[key] as string : null;
         return { remoteId: post.id as string, message: text('message'), permalink: text('permalink_url'), statusType: text('status_type'), pictureUrl: text('full_picture'), createdTime, insights };
-      });
-      for (const entry of enriched) posts.push(entry);
-      progress.after = batch.after; progress.complete = !batch.after;
-      if (progress.complete) break;
     }
-    return { posts, progress, failures: [...new Set(failures)] };
   } };
 }
