@@ -29,3 +29,15 @@
   .form { grid-area: form; grid-template-columns: minmax(0, 1fr) auto; align-items: end; padding-top: 0; border-top: 0; }
   .fields { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
+
+/* All channels in one table (2026-11-15): goal names once, a row per channel, one Save. */
+.tableWrap { display: grid; gap: var(--space-3); min-width: 0; }
+.table { width: 100%; border-collapse: collapse; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface); font-size: var(--text-sm); }
+.table th, .table td { padding: 8px 12px; border-bottom: 1px solid var(--line-subtle); text-align: left; vertical-align: top; }
+.table thead th { color: var(--ink-soft); font-size: var(--text-xs); font-weight: 650; }
+.table tbody tr[data-changed] { background: var(--accent-soft); }
+.rowName { font-weight: 650; }
+.table input { width: 100%; min-width: 90px; min-height: var(--control-h-sm); padding: 0 var(--space-2); border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface); color: var(--ink); font: inherit; }
+.cellProgress { display: grid; gap: 2px; margin-top: 6px; }
+.cellProgress small { color: var(--ink-faint); font-size: var(--text-xs); font-variant-numeric: tabular-nums; }
+@media (max-width: 760px) { .tableWrap { overflow-x: auto; } .table { min-width: 640px; } }

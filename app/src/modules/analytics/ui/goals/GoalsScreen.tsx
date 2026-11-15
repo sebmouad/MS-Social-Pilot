@@ -7,9 +7,8 @@ import { operationFailure } from '@/lib/operation-error';
 import { readGoals } from '@/modules/analytics/goals/server/goals';
 import { goalMetricText, goalPaceText, goalsLocale, goalsText, type GoalsCopyKey } from '@/modules/analytics/goals/copy';
 import workflow from '@/modules/analytics/ui/reports/workflows.module.css';
-import styles from './goals.module.css';
 import { InfoTip } from '@/components';
-import { GoalEditor } from './GoalEditor';
+import { GoalsTable, type GoalRow } from './GoalsTable';
 
 export default async function GoalsPage() {
   const viewer = await requireViewer({ feature: 'analytics/goals', channelScoped: true });
@@ -25,15 +24,17 @@ export default async function GoalsPage() {
     <PageHeader module="analytics" title={t('title')} info={info} />
     {failure && <section className={workflow.panel} role="alert"><h2>{t('loadFailedTitle')}</h2><p>{failure}</p><a href="/insights/goals">{t('retry')}</a></section>}
     {data && !data.channels.length && <section className={workflow.panel}><h2>{t('noChannelsTitle')}</h2><p>{t('noChannels')}</p><a href="/settings/channels">{t('manageConnections')}</a></section>}
-    {data && data.channels.length > 0 && <div className={styles.grid}>{data.channels.map(channel => <section key={channel.channelId} className={styles.card} aria-labelledby={`goal-${channel.channelId}`}>
-      <h2 id={`goal-${channel.channelId}`}>{channel.channelName}</h2>
-      {channel.goals.length ? <ul className={styles.progress} aria-label={t('progress')}>
-        {channel.goals.map(g => { const label = goalMetricText(locale, g.metric, copy); return <li key={g.metric}><strong>{label}</strong><span>{g.actual === null ? t('noData') : number.format(g.actual)} / {number.format(g.target)} · {g.percent}%</span>
-          <div className={styles.bar} role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.min(100, g.percent)} aria-label={`${label} ${g.percent}%`}><i style={{ width: `${Math.min(100, Math.max(0, g.percent))}%` }} /></div>
-          <small>{t('pace')}{locale === 'fr' ? '\u202f: ' : ': '}{goalPaceText(locale, g.pace, copy)}</small></li>; })}
-      </ul> : <p className={styles.empty}>{data.canManage ? t('none') : t('noneReadOnly')}</p>}
-      {data.canManage && <GoalEditor copy={copy} locale={locale} channelId={channel.channelId} channelName={channel.channelName}
-        metrics={channel.trackable.map(metric => ({ metric, label: goalMetricText(locale, metric, copy), value: channel.goals.find(g => g.metric === metric)?.target ?? null }))} />}
-    </section>)}</div>}
+    {data && data.channels.length > 0 && (() => {
+      // One table for every channel (2026-11-15); a channel that cannot track a goal shows « — » in that column.
+      const metricIds = [...new Set(data.channels.flatMap(channel => channel.trackable))];
+      const metrics = metricIds.map(metric => ({ metric, label: goalMetricText(locale, metric, copy) }));
+      const rows: GoalRow[] = data.channels.map(channel => ({
+        channelId: channel.channelId, channelName: channel.channelName,
+        targets: Object.fromEntries(channel.trackable.map(metric => [metric, channel.goals.find(g => g.metric === metric)?.target ?? null])),
+        progress: channel.goals.map(g => ({ metric: g.metric, label: goalMetricText(locale, g.metric, copy), percent: g.percent, pace: goalPaceText(locale, g.pace, copy),
+          text: `${g.actual === null ? t('noData') : number.format(g.actual)} / ${number.format(g.target)} · ${g.percent}%` })),
+      }));
+      return <GoalsTable locale={locale} rows={rows} metrics={metrics} copy={copy} canManage={data.canManage} />;
+    })()}
   </div></PageFrame>;
 }
