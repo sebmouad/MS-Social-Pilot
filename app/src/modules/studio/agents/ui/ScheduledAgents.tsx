@@ -10,6 +10,7 @@ import { EmptyState } from '@/components/EmptyState';
 import { useConfirm } from '@/components/useConfirm';
 import type { AgentCopy } from '../copy';
 import { agentRunTone } from './status-tone';
+import { ChannelSelect } from '@/modules/publishing/ui/compose/ChannelSelect';
 import styles from './agents.module.css';
 import { formatStableDateTime } from '@/components/LocalTime';
 
@@ -18,6 +19,10 @@ const CREATE = 'CREATE SCHEDULED AGENT';
 const tierLabel = (t: AgentCopy, tier: AutopilotTier) => tier === 'manual' ? t.autopilotManual : tier === 'assisted' ? t.autopilotAssisted : t.autopilotSupervised;
 
 export function ScheduledAgents({ agents, channels, maxDrafts, briefMax, history: initialHistory, policy: initialPolicy, canManageTier, copy: t, locale, execute }: { agents: ScheduledAgent[]; channels: ScheduledChannel[]; maxDrafts: number; briefMax: number; history: ScheduledRun[]; policy: ResolvedAutopilotPolicy | null; canManageTier: boolean; copy: AgentCopy; locale: 'en' | 'fr'; execute: (input: unknown) => Promise<ScheduledResult> }) {
+  const channelChoice = (selected: string[], set: (ids: string[]) => void, emptyLabel: string) => !channels.length ? <p>{emptyLabel}</p>
+    : channels.length > 8 ? <ChannelSelect channels={channels.map(c => ({ id: c.id, name: c.name }))} selected={selected} locale={locale} disabled={pending}
+      onToggle={id => set(selected.includes(id) ? selected.filter(item => item !== id) : [...selected, id])} onSetAll={set} />
+    : channels.map(c => <label key={c.id} className={styles.check}><input type="checkbox" checked={selected.includes(c.id)} disabled={pending} onChange={() => set(selected.includes(c.id) ? selected.filter(item => item !== c.id) : [...selected, c.id])} /> {c.name}</label>);
  const [pending, start] = useTransition();
  const [items, setItems] = useState(agents);
  const [history, setHistory] = useState(initialHistory);
@@ -97,14 +102,17 @@ export function ScheduledAgents({ agents, channels, maxDrafts, briefMax, history
    <p role="status">{t.autopilotTier}: <strong>{tierLabel(t, policy.tier)}</strong></p>
    {canManageTier ? <form className={styles.form} onSubmit={e => { e.preventDefault(); changeTier(); }}>
     <fieldset><legend>{t.autopilotTier}</legend>
-     {(['manual', 'assisted', 'supervised_auto'] as const).map(option => <label key={option} className="ui-field"><input type="radio" name="tier" value={option} checked={tier === option} disabled={pending} onChange={() => setTier(option)} /> {tierLabel(t, option)} <small>{option === 'manual' ? t.autopilotManualHint : option === 'assisted' ? t.autopilotAssistedHint : t.autopilotSupervisedHint}</small></label>)}
+     {(['manual', 'assisted', 'supervised_auto'] as const).map(option => <label key={option} className={styles.choice} data-on={tier === option || undefined}><input type="radio" name="tier" value={option} checked={tier === option} disabled={pending} onChange={() => setTier(option)} /><span><strong>{tierLabel(t, option)}</strong><small>{option === 'manual' ? t.autopilotManualHint : option === 'assisted' ? t.autopilotAssistedHint : t.autopilotSupervisedHint}</small></span></label>)}
     </fieldset>
     <fieldset><legend>{t.autopilotGuardrails}</legend>
+     <div className={styles.row3}>
      <label className="ui-field">{t.autopilotMaxSends}<input name="maxSends" type="number" min={0} max={200} className="ui-input" value={maxSends} disabled={pending} onChange={e => setMaxSends(e.target.value)} required /></label>
      <label className="ui-field">{t.autopilotQuietStart}<input name="quietStart" type="number" min={0} max={23} className="ui-input" value={quietStart} disabled={pending} onChange={e => setQuietStart(e.target.value)} required /></label>
      <label className="ui-field">{t.autopilotQuietEnd}<input name="quietEnd" type="number" min={0} max={23} className="ui-input" value={quietEnd} disabled={pending} onChange={e => setQuietEnd(e.target.value)} required /></label>
-     <fieldset><legend>{t.autopilotScope}</legend>{channels.length ? channels.map(c => <label key={c.id} className="ui-field"><input type="checkbox" checked={scope.includes(c.id)} disabled={pending} onChange={() => toggle(scope, c.id, setScope)} /> {c.name}</label>) : <p>{t.autopilotScopeAll}</p>}</fieldset>
-     <fieldset><legend>{t.autopilotDraftsOnly}</legend>{channels.length ? channels.map(c => <label key={c.id} className="ui-field"><input type="checkbox" checked={draftsOnly.includes(c.id)} disabled={pending} onChange={() => toggle(draftsOnly, c.id, setDraftsOnly)} /> {c.name}</label>) : <p>{t.autopilotDraftsOnlyNone}</p>}</fieldset>
+     </div>
+     {/* Many channels: the searchable picker instead of two long checkbox lists (2026-11-15). */}
+     <fieldset><legend>{t.autopilotScope}</legend>{channelChoice(scope, setScope, t.autopilotScopeAll)}</fieldset>
+     <fieldset><legend>{t.autopilotDraftsOnly}</legend>{channelChoice(draftsOnly, setDraftsOnly, t.autopilotDraftsOnlyNone)}</fieldset>
     </fieldset>
     <div className={styles.actions}><Button type="submit" disabled={pending}>{pending ? t.busy : t.autopilotChange}</Button></div>
    </form> : null}
@@ -126,7 +134,7 @@ export function ScheduledAgents({ agents, channels, maxDrafts, briefMax, history
    <label className="ui-field">{t.brief}<AutoTextarea name="brief" className="ui-input" value={brief} maxLength={briefMax} disabled={pending} onChange={e => setBrief(e.target.value)} required /></label>
    <label className="ui-field">{t.weekday}<select name="weekday" className="ui-input" value={weekday} disabled={pending} onChange={e => setWeekday(e.target.value)}>{[0, 1, 2, 3, 4, 5, 6].map(day => <option key={day} value={day}>{dayName(day)}</option>)}</select></label>
    <label className="ui-field">{t.draftsPerWeek}<input name="count" type="number" min={1} max={maxDrafts} className="ui-input" value={count} disabled={pending} onChange={e => setCount(e.target.value)} required /></label>
-   <label className="ui-field"><input name="enabled" type="checkbox" checked={enabled} disabled={pending} onChange={e => setEnabled(e.target.checked)} /> {t.active}</label>
+   <label className={styles.check}><input name="enabled" type="checkbox" checked={enabled} disabled={pending} onChange={e => setEnabled(e.target.checked)} /> {t.active}</label>
    <div className={styles.actions}><Button type="submit" disabled={pending}>{pending ? t.busy : t.saveScheduled}</Button>{editing ? <Button disabled={pending} onClick={clearEditor}>{t.cancel}</Button> : null}</div>
   </form> : <p>{t.scheduledEmpty}</p>}
   <h2>{t.scheduledHistory}</h2>
@@ -135,7 +143,7 @@ export function ScheduledAgents({ agents, channels, maxDrafts, briefMax, history
     const ok = run.code === null;
     const tierName = run.tier === 'manual' || run.tier === 'assisted' || run.tier === 'supervised_auto' ? tierLabel(t, run.tier) : null;
     return <li key={`${run.agentId}-${run.at}-${index}`}><div className={styles.identity}><strong>{agent?.targetName ?? agent?.targetId ?? t.unknownAgent}</strong><p><Badge tone={agentRunTone(ok ? 'completed' : 'failed')}>{ok ? t.completed : t.failedRun}</Badge>{ok ? ` · ${t.historyDrafts.replace('{count}', String(run.drafts ?? 0))}${tierName ? ` · ${tierName}` : ''}${typeof run.scheduled === 'number' && run.scheduled > 0 ? ` · ${t.autopilotSends.replace('{count}', String(run.scheduled))}` : ''}` : ''}</p></div><time dateTime={run.at}>{formatStableDateTime(new Date(run.at), { locale: locale, dateStyle: 'medium', timeStyle: 'short', timeZone: 'UTC' })} {t.timeZone}</time></li>;
-  })}</ol> : <EmptyState icon={<IconCalendarWeek size={22} />} title={t.noHistory} />}
+  })}</ol> : <EmptyState icon={<IconCalendarWeek size={22} />} title={t.noRuns ?? t.noHistory} />}
   {confirmation}{removal}
  </section>;
 }

@@ -47,6 +47,8 @@ const initialDraft = (view: RecipeView): Draft => view.source
 
 export function RecipeSource({ initial, locale, canWrite, copy = recipeCopy }: { initial: RecipeView; locale: RecipeLocale; canWrite: boolean; copy?: RecipeCopyCatalog }) {
   const t = (key: RecipeCopyKey, values: Record<string, string | number> = {}) => recipeText(locale, key, values, copy);
+  // A large library is scanned up to a limit: its figures are minimums (shown with « + »).
+  const count = (value: number) => new Intl.NumberFormat(locale).format(value);
   const [view, setView] = useState(initial);
   const [draft, setDraft] = useState(() => initialDraft(initial));
   const [review, setReview] = useState<Review | null>(null);
@@ -144,10 +146,19 @@ export function RecipeSource({ initial, locale, canWrite, copy = recipeCopy }: {
         <RecipeSupplyWarning pool={view.pool} locale={locale} copy={copy} />
         {view.reuse && <p className={styles.help}>{t(view.reuse.enabled ? 'poolReuseEnabled' : 'poolReuseDisabled', { days: view.reuse.cooldownDays })}</p>}
         <p className={styles.help}>{t('poolIntro')} {!view.pool.complete && t('poolPartial')} {t('poolAsOf', { when: view.labels?.poolAsOf ?? '' })}</p>
-        <div className={styles.tableWrap}><table className={styles.table}><caption className="sr-only">{t('poolHeading')}</caption>
+        {(() => {
+          // Every channel usually draws on the same library: identical rows become one line, the table folds below (2026-11-15).
+          const pages = view.pool.pages; const first = pages[0]; const plus = view.pool.complete ? '' : '+';
+          const same = pages.length > 1 && first && pages.every(p => p.eligible === first.eligible && p.daysLeft === first.daysLeft && p.low === first.low);
+          const table = <><div className={styles.tableWrap}><table className={styles.table}><caption className="sr-only">{t('poolHeading')}</caption>
           <thead><tr><th scope="col">{t('colChannel')}</th><th scope="col">{t('colEligible')}</th><th scope="col">{t('colDays')}</th></tr></thead>
-          <tbody>{view.pool.pages.map(p => <tr key={p.targetId}><th scope="row">{p.targetName}</th><td>{p.eligible}</td><td>{p.daysLeft === null ? t('daysUnlimited') : p.daysLeft}{p.low && <span className={styles.meta}>{t('poolRowLow')}</span>}</td></tr>)}</tbody>
-        </table></div>
+          <tbody>{view.pool.pages.map(p => <tr key={p.targetId}><th scope="row">{p.targetName}</th><td>{count(p.eligible)}{plus}</td><td>{p.daysLeft === null ? t('daysUnlimited') : <>{count(p.daysLeft)}{plus}</>}{p.low && <span className={styles.meta}>{t('poolRowLow')}</span>}</td></tr>)}</tbody>
+        </table></div></>;
+          return same && first ? <><p className={styles.poolSame}>{first.daysLeft === null
+            ? t('poolSameUnlimited', { channels: pages.length, recipes: `${count(first.eligible)}${plus}` })
+            : t('poolSame', { channels: pages.length, recipes: `${count(first.eligible)}${plus}`, days: `${count(first.daysLeft)}${plus}` })}</p>
+            <details className={styles.poolDetails}><summary>{t('poolEachChannel')}</summary>{table}</details></> : table;
+        })()}
       </> : <p className={styles.help}>{t('poolUnknown')}</p>}
     </div>}
 

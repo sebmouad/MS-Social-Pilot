@@ -15,3 +15,15 @@
 @media (max-width: 900px) { .workspace { grid-template-columns: minmax(0, 1fr); } }
 @media (max-width: 600px) { .list li { flex-direction: column; } .panel { padding: 1rem; } }
 .root > p[role='status']:empty { display: none; }
+/* Autopilot form (2026-11-15): tier choices as cards, guardrail numbers in a row, checkboxes beside their label. */
+.form fieldset { display: grid; gap: 10px; margin: 0; padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--radius-md); min-width: 0; }
+.form fieldset legend { padding: 0 6px; font-weight: 650; }
+.choice { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--radius-md); cursor: pointer; }
+.choice[data-on] { border-color: var(--accent); background: var(--accent-soft); }
+.choice input { margin-top: 3px; flex: none; }
+.choice span { display: grid; gap: 2px; }
+.choice small { color: var(--ink-soft); font-size: var(--text-sm); line-height: 1.4; }
+.row3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.check { display: flex; align-items: center; gap: 8px; font-weight: 500; }
+.check input { flex: none; width: 17px; height: 17px; }
+@media (max-width: 760px) { .row3 { grid-template-columns: minmax(0, 1fr); } }

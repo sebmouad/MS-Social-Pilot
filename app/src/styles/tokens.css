@@ -832,7 +832,8 @@ h1, h2, h3 { text-wrap: balance; scroll-margin-top: 88px; }
 .ui-button[aria-busy=true] { cursor: progress; opacity: .75; }
 .ui-button[aria-busy=true]::after { content: ''; width: 12px; height: 12px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: route-spin .8s linear infinite; }
 .ui-button__icon { display: inline-flex; }
-.ui-visually-hidden { position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+/* `sr-only` is used by several modules; it was never defined, so their screen-reader text showed on screen (2026-11-15). */
+.ui-visually-hidden, .sr-only { position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 /* Tables ignore width/overflow, so a hidden chart-data table would widen the page; block display clips it and keeps table roles in current browsers. */
 table.ui-visually-hidden { display: block; }
 .ui-table-wrap { overflow: auto; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface); box-shadow: var(--card-lift); border-color: var(--line); }
