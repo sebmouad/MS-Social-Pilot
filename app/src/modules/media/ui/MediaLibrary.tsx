@@ -17,6 +17,16 @@ export type Asset = { id: string; kind: 'image' | 'video'; mimeType: string; nam
 type Usage = { usedBytes: number; quotaBytes: number; assetCount: number; approximate: boolean };
 const size = (n: number) => n >= 1073741824 ? `${(n / 1073741824).toFixed(1)} GB` : n >= 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`;
 
+/** Names the app made up (« Uploaded image 1a2b3c4d ») or bare hash/uuid file names say nothing to a person (2026-11-15). */
+function generatedName(name: string) {
+  return /^Uploaded image [0-9a-f]{6,}$/i.test(name) || /^[0-9a-f-]{16,}(\.[a-z0-9]{2,5})?$/i.test(name);
+}
+/** « image/jpeg » → « JPEG ». */
+function formatLabel(mimeType: string) {
+  const sub = mimeType.split('/')[1] ?? mimeType;
+  return (sub === 'quicktime' ? 'MOV' : sub.replace(/^x-/, '')).toUpperCase();
+}
+
 export function MediaLibrary({ items, usage, page, hasMore, filters, canWrite, workspaceWide, usageMayBeIncomplete, maxSearch, maxName, locale = 'en', copy }: {
   items: Asset[]; usage: Usage; page: number; hasMore: boolean; filters: { kind: string; usage: string; q: string };
   canWrite: boolean; workspaceWide: boolean; usageMayBeIncomplete: boolean; maxSearch: number; maxName: number; locale?: MediaLocale; copy?: MediaCopyCatalog;
@@ -141,8 +151,8 @@ export function MediaLibrary({ items, usage, page, hasMore, filters, canWrite, w
         <button type="button" className={`${styles.preview} ${styles.previewButton}`} aria-label={`${t('details')}: ${a.name}`} onClick={() => setDetailId(a.id)}>{a.kind === 'image' && a.source === 'stored-image' ? <img className={styles.tileImage} src={`/api/media/${encodeURIComponent(a.id)}?w=320`} alt="" loading="lazy" /> : <span className={styles.tileKind}>{a.kind === 'video' ? t('video') : t('image')}</span>}
           <span className={`${styles.badge}${a.inUse ? ` ${styles.badgeUsed}` : ''}`}>{a.inUse ? usedLabel(a.holderCount) : t('unused')}</span></button>
         <div className={styles.tileBody}>
-          <span className={styles.name}>{a.name}</span>
-          <span className={styles.meta}>{a.mimeType} · {size(a.size)} · {t('added', { date: day(a.createdAt) })}</span>
+          <span className={styles.name} title={a.name}>{generatedName(a.name) ? `${a.kind === 'video' ? t('video') : t('image')} · ${day(a.createdAt)}` : a.name}</span>
+          <span className={styles.meta}>{formatLabel(a.mimeType)} · {size(a.size)}{generatedName(a.name) ? '' : ` · ${t('added', { date: day(a.createdAt) })}`}</span>
         </div>
         <div className={styles.tileActions}>
           <a className="ui-button ui-button--primary ui-button--sm" href={`/create?media=${encodeURIComponent(`media:${a.id}`)}`}>{t('createPost')}</a>
