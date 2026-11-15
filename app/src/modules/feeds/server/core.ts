@@ -14,10 +14,10 @@ import { AUTHOR_ROLES, authorizeFeeds, type FeedActor, type FeedAuthorization } 
 export type Tx = Prisma.TransactionClient;
 export type FeedRow = {
   id: string; name: string; url: string; kind: string; enabled: boolean; messageTemplate: string; hashtags: string; targetIds: unknown;
-  autoApprove: boolean; spreadMinutes: number; pollErrorCount: number;
+  autoApprove: boolean; spreadMinutes: number; pollErrorCount: number; aiCaptions: boolean;
   lastPolledAt: Date | null; lastError: string | null; lastEtag: string | null; lastModified: string | null; ingestFrom: Date; createdAt: Date; updatedAt: Date;
 };
-export const FEED_COLUMNS = `id, name, url, kind, enabled, "messageTemplate", hashtags, "targetIds", "autoApprove", "spreadMinutes", "pollErrorCount", "lastPolledAt", "lastError", "lastEtag", "lastModified", "ingestFrom", "createdAt", "updatedAt"`;
+export const FEED_COLUMNS = `id, name, url, kind, enabled, "messageTemplate", hashtags, "targetIds", "autoApprove", "spreadMinutes", "pollErrorCount", "aiCaptions", "lastPolledAt", "lastError", "lastEtag", "lastModified", "ingestFrom", "createdAt", "updatedAt"`;
 
 export const bad = (text = 'Choose valid feed details and confirm the exact action.') => feedsError('invalid_request', text);
 export const unavailable = () => feedsError('unavailable', 'Content feeds are temporarily unavailable. Refresh and try again.');
@@ -80,5 +80,5 @@ export const idsOf = (value: unknown): string[] => Array.isArray(value) ? value.
 export const within = (auth: FeedAuthorization, ids: readonly string[]) => auth.actor.allowedTargetIds === undefined || (ids.length > 0 && ids.every(id => auth.actor.allowedTargetIds!.includes(id)));
 export function toRecord(row: FeedRow): FeedRecord {
   const handling: FeedHandling = row.autoApprove ? 'schedule' : 'review';
-  return { id: row.id, name: row.name, url: row.url, kind: row.kind === 'wordpress' ? 'wordpress' : 'rss', enabled: row.enabled, messageTemplate: row.messageTemplate, hashtags: row.hashtags, targetIds: idsOf(row.targetIds), handling, spreadMinutes: Number(row.spreadMinutes) || 0, failureCount: Number(row.pollErrorCount) || 0, lastPolledAt: row.lastPolledAt, lastError: row.lastError, createdAt: row.createdAt, updatedAt: row.updatedAt };
+  return { id: row.id, name: row.name, url: row.url, kind: row.kind === 'wordpress' ? 'wordpress' : 'rss', enabled: row.enabled, messageTemplate: row.messageTemplate, hashtags: row.hashtags, targetIds: idsOf(row.targetIds), handling, spreadMinutes: Number(row.spreadMinutes) || 0, aiCaptions: row.aiCaptions === true, failureCount: Number(row.pollErrorCount) || 0, lastPolledAt: row.lastPolledAt, lastError: row.lastError, createdAt: row.createdAt, updatedAt: row.updatedAt };
 }

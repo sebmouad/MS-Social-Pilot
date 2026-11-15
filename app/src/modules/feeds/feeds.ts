@@ -21,6 +21,8 @@ export const feedInputSchema = (limits: { maxName: number; maxUrl: number; maxMe
   hashtags: clean(limits.maxHashtags).default(''),
   handling: z.enum(FEED_HANDLING).default('review'),
   spreadMinutes: z.number().int().min(0).max(limits.maxSpread).default(0),
+  /** Write each post's caption with AI (2026-11-15); the template is the fallback. */
+  aiCaptions: z.boolean().default(false),
   targetIds: z.array(feedIdSchema(limits.maxIdentifier)).max(limits.maxTargets).default([]),
 }).strict();
 export const FEED_INPUT_SCHEMA = feedInputSchema({ maxName: FEEDS_BOUNDS.nameMaxCharacters.max, maxUrl: FEEDS_BOUNDS.urlMaxCharacters.max, maxMessage: FEEDS_BOUNDS.messageMaxCharacters.max, maxHashtags: FEEDS_BOUNDS.hashtagsMaxCharacters.max, maxTargets: FEEDS_BOUNDS.maxTargets.max, maxIdentifier: FEEDS_BOUNDS.identifierMaxCharacters.max, maxSpread: FEEDS_BOUNDS.maxSpreadMinutes.max });
@@ -140,7 +142,7 @@ export function renderMessage(template: string, entry: FeedEntry, options: { has
 }
 
 export type FeedRecord = {
-  id: string; name: string; url: string; kind: FeedKind; enabled: boolean; messageTemplate: string; hashtags: string; targetIds: string[]; handling: FeedHandling; spreadMinutes: number; failureCount: number;
+  id: string; name: string; url: string; kind: FeedKind; enabled: boolean; messageTemplate: string; hashtags: string; targetIds: string[]; handling: FeedHandling; spreadMinutes: number; aiCaptions: boolean; failureCount: number;
   lastPolledAt: Date | null; lastError: string | null; createdAt: Date; updatedAt: Date;
 };
 export type CheckedEntry = { guid: string; title: string | null; link: string | null; publishedAt: Date | null; message: string; isNew: boolean; eligible: boolean };

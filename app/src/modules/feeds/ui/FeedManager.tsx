@@ -6,15 +6,16 @@ import { Button } from '@/components/Button';
 import { Dialog } from '@/components/Dialog';
 import { RouteNotice } from '@/components/RouteNotice';
 import { feedsCopy, feedsText, type FeedsCopyCatalog, type FeedsCopyKey, type FeedsLocale } from '../copy';
+import { ChannelSelect } from '@/modules/publishing/ui/compose/ChannelSelect';
 import styles from './feeds.module.css';
 import { formatStableDateTime } from '@/components/LocalTime';
 
 type Handling = 'review' | 'schedule';
-export type Feed = { id: string; name: string; url: string; kind: 'rss' | 'wordpress'; enabled: boolean; messageTemplate: string; hashtags: string; targetIds: string[]; handling: Handling; spreadMinutes: number; failureCount: number; lastPolledAt: string | null; lastError: string | null; createdAt: string; updatedAt: string };
+export type Feed = { id: string; name: string; url: string; kind: 'rss' | 'wordpress'; enabled: boolean; messageTemplate: string; hashtags: string; targetIds: string[]; handling: Handling; spreadMinutes: number; aiCaptions?: boolean; failureCount: number; lastPolledAt: string | null; lastError: string | null; createdAt: string; updatedAt: string };
 type Limits = { maxNameCharacters: number; maxMessageCharacters: number; maxTargets: number; maxSpreadMinutes: number };
 type Checked = { feedId: string; notModified: boolean; draftsCreated: number; postsCreated: number; held: number; reviewerNotificationsQueued?: number; backlog: boolean; destinations: number; entries: Array<{ guid: string; title: string | null; link: string | null; message: string; isNew: boolean; eligible: boolean }> };
 type Review = { kind: 'save' | 'delete' | 'drafts' | 'posts'; feed?: Feed };
-const blank = { name: '', url: '', kind: 'rss' as 'rss' | 'wordpress', enabled: true, messageTemplate: '{title}\n\n{link}', hashtags: '', targetIds: [] as string[], handling: 'review' as Handling, spreadMinutes: 0 };
+const blank = { name: '', url: '', kind: 'rss' as 'rss' | 'wordpress', enabled: true, messageTemplate: '{title}\n\n{link}', hashtags: '', targetIds: [] as string[], handling: 'review' as Handling, spreadMinutes: 0, aiCaptions: false };
 const host = (url: string) => { try { return new URL(url).hostname; } catch { return url; } };
 const validFeed = (v: unknown): v is Feed => !!v && typeof v === 'object' && typeof (v as Feed).id === 'string' && typeof (v as Feed).name === 'string' && Array.isArray((v as Feed).targetIds);
 /** A literal sample so the author sees what the text produces; the server renders the real thing. */
@@ -22,7 +23,7 @@ const sample = (template: string, hashtags: string, t: (key: FeedsCopyKey) => st
   .replace(/\{\{?\s*title\s*\}?\}/gi, t('sampleTitle')).replace(/\{\{?\s*(excerpt|description)\s*\}?\}/gi, t('sampleExcerpt'))
   .replace(/\{\{?\s*link\s*\}?\}/gi, 'https://example.com/article').replace(/\{\{?\s*hashtags\s*\}?\}/gi, hashtags.trim()).replace(/\n{3,}/g, '\n\n').trim();
 
-export function FeedManager({ initialFeeds, channels, page, hasMore, canWrite = true, limits, locale, automaticMinutes, copy = feedsCopy }: { initialFeeds: Feed[]; channels: Array<{ id: string; name: string }>; page: number; hasMore: boolean; canWrite?: boolean; limits: Limits; locale: FeedsLocale; automaticMinutes: number | null; copy?: FeedsCopyCatalog }) {
+export function FeedManager({ initialFeeds, channels, page, hasMore, canWrite = true, limits, locale, automaticMinutes, copy = feedsCopy, aiAvailable = false }: { aiAvailable?: boolean; initialFeeds: Feed[]; channels: Array<{ id: string; name: string }>; page: number; hasMore: boolean; canWrite?: boolean; limits: Limits; locale: FeedsLocale; automaticMinutes: number | null; copy?: FeedsCopyCatalog }) {
   const t = (key: FeedsCopyKey, values: Record<string, string | number> = {}) => feedsText(locale, key, values, copy);
   const [feeds, setFeeds] = useState(initialFeeds);
   const [draft, setDraft] = useState(blank);
@@ -43,7 +44,7 @@ export function FeedManager({ initialFeeds, channels, page, hasMore, canWrite = 
   const confirmParts = copy[locale].typeToConfirm.split('{phrase}');
   const handlingText = (h: Handling) => t(h === 'schedule' ? 'handlingSchedule' : 'handlingReview');
 
-  function begin(feed?: Feed) { setEditing(feed ?? null); setDraft(feed ? { name: feed.name, url: feed.url, kind: feed.kind, enabled: feed.enabled, messageTemplate: feed.messageTemplate, hashtags: feed.hashtags, targetIds: feed.targetIds, handling: feed.handling, spreadMinutes: feed.spreadMinutes } : blank); setNotice(null); setFormOpen(true); }
+  function begin(feed?: Feed) { setEditing(feed ?? null); setDraft(feed ? { name: feed.name, url: feed.url, kind: feed.kind, enabled: feed.enabled, messageTemplate: feed.messageTemplate, hashtags: feed.hashtags, targetIds: feed.targetIds, handling: feed.handling, spreadMinutes: feed.spreadMinutes, aiCaptions: feed.aiCaptions === true } : blank); setNotice(null); setFormOpen(true); }
   async function call(url: string, method: string, payload: unknown) {
     const response = await fetch(url, { method, headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload) });
     const body = await response.json().catch(() => null);
@@ -91,7 +92,7 @@ export function FeedManager({ initialFeeds, channels, page, hasMore, canWrite = 
     {feeds.length ? <div className={styles.tableWrap}><table className={styles.table}><caption className="sr-only">{t('title')}</caption><thead><tr><th scope="col">{t('colFeed')}</th><th scope="col">{t('colChannels')}</th><th scope="col">{t('colHandling')}</th><th scope="col">{t('colChecked')}</th>{canWrite && <th scope="col">{t('colActions')}</th>}</tr></thead><tbody>
       {feeds.map(feed => <tr key={feed.id}><th scope="row"><span className={styles.name}>{feed.name}</span><span className={styles.meta}>{host(feed.url)} · {t(feed.kind === 'wordpress' ? 'kindWordpress' : 'kindRss')}{feed.enabled ? '' : ` · ${t('off')}`}</span></th>
         <td>{feed.targetIds.length ? feed.targetIds.map(id => names.get(id) ?? t('channel')).join(', ') : t('noChannels')}</td>
-        <td>{handlingText(feed.handling)}<span className={styles.meta}>{feed.spreadMinutes > 0 ? t('spreadEvery', { minutes: feed.spreadMinutes }) : t('spreadNone')}</span></td>
+        <td>{handlingText(feed.handling)}<span className={styles.meta}>{feed.spreadMinutes > 0 ? t('spreadEvery', { minutes: feed.spreadMinutes }) : t('spreadNone')}</span>{feed.aiCaptions ? <span className={styles.meta}>{t('aiCaptionsBadge')}</span> : null}</td>
         <td>{when(feed.lastPolledAt)}{feed.failureCount > 0 && <span className={styles.meta}>{t('failures', { count: feed.failureCount })}</span>}{feed.lastError && <span className={styles.meta}>{feed.lastError}</span>}</td>
         {canWrite && <td><div className={styles.actions}><Button size="sm" disabled={busy || !feed.enabled} onClick={() => void performCheck(feed, 'preview')}>{t('checkNow')}</Button><Button size="sm" disabled={busy} onClick={() => begin(feed)}>{t('edit')}</Button><Button size="sm" variant="danger" disabled={busy} onClick={() => { setConfirmation(''); setReview({ kind: 'delete', feed }); }}>{t('delete')}</Button></div></td>}</tr>)}
     </tbody></table></div> : <p className={styles.empty}>{t('empty')}</p>}
@@ -105,8 +106,11 @@ export function FeedManager({ initialFeeds, channels, page, hasMore, canWrite = 
         <label>{t(draft.kind === 'wordpress' ? 'urlWordpress' : 'urlRss')}<input disabled={busy} required inputMode="url" placeholder="https://example.com/feed" value={draft.url} onChange={e => setDraft(d => ({ ...d, url: e.target.value }))} /><span>{t(draft.kind === 'wordpress' ? 'kindWordpressHint' : 'kindRssHint')}</span></label>
         <label>{t('template')}<textarea disabled={busy} required rows={4} maxLength={limits.maxMessageCharacters} value={draft.messageTemplate} onChange={e => setDraft(d => ({ ...d, messageTemplate: e.target.value }))} /><span>{t('templateHint')}</span></label>
         <label>{t('hashtags')}<input disabled={busy} value={draft.hashtags} onChange={e => setDraft(d => ({ ...d, hashtags: e.target.value }))} /><span>{t('hashtagsHint')}</span></label>
-        <div><strong>{t('preview')}</strong><p className={styles.reviewPreview}>{preview || t('previewEmpty')}</p></div>
-        <fieldset className={styles.checks} disabled={busy}><legend>{t('channels')}</legend>{channels.length ? channels.map(c => <label key={c.id}><input type="checkbox" checked={draft.targetIds.includes(c.id)} onChange={() => toggle(c.id)} />{c.name}</label>) : <span className={styles.help}>{t('noChannelsAvailable')}</span>}</fieldset>
+        {/* AI captions (2026-11-15): offered only when AI is set up for the workspace. */}
+        {(aiAvailable || draft.aiCaptions) && <label className={styles.inline}><input type="checkbox" checked={draft.aiCaptions} disabled={busy} onChange={e => setDraft(d => ({ ...d, aiCaptions: e.target.checked }))} /> <span>{t('aiCaptions')}<span className={styles.meta}>{t('aiCaptionsHint')}</span></span></label>}
+        <div><strong>{t('preview')}</strong>{draft.aiCaptions ? <p className={styles.meta}>{t('aiCaptionsPreview')}</p> : null}<p className={styles.reviewPreview}>{preview || t('previewEmpty')}</p></div>
+        <fieldset className={styles.checks} disabled={busy}><legend>{t('channels')}</legend>{channels.length > 8 ? <ChannelSelect channels={channels} selected={draft.targetIds} locale={locale} disabled={busy} onToggle={toggle} onSetAll={ids => setDraft(d => ({ ...d, targetIds: ids }))} />
+          : channels.length ? channels.map(c => <label key={c.id}><input type="checkbox" checked={draft.targetIds.includes(c.id)} onChange={() => toggle(c.id)} />{c.name}</label>) : <span className={styles.help}>{t('noChannelsAvailable')}</span>}</fieldset>
         <label>{t('handling')}<select disabled={busy} value={draft.handling} onChange={e => setDraft(d => ({ ...d, handling: e.target.value as Handling }))}><option value="review">{t('handlingReviewOption')}</option><option value="schedule">{t('handlingScheduleOption')}</option></select><span>{t('handlingHint')}</span></label>
         <label>{t('spread')}<input disabled={busy} type="number" inputMode="numeric" min={0} max={limits.maxSpreadMinutes} step={1} value={draft.spreadMinutes} onChange={e => setDraft(d => ({ ...d, spreadMinutes: Math.max(0, Math.min(limits.maxSpreadMinutes, Math.trunc(Number(e.target.value)) || 0)) }))} /><span>{t('spreadHint')}</span></label>
         <label className={styles.inline}><input type="checkbox" checked={draft.enabled} disabled={busy} onChange={e => setDraft(d => ({ ...d, enabled: e.target.checked }))} /> {t('enabled')}</label>

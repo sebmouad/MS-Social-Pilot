@@ -36,16 +36,17 @@ export default async function FeedsScreen({ searchParams }: { searchParams: Prom
     upcomingLimit: upcomingLimit as number, failureWindowDays: failureWindowDays as number, allowedTargetIds: scope,
   })).catch(() => null) : null;
   try {
-    const [result, channels, automatic] = await Promise.all([
+    const [result, channels, automatic, aiAvailable] = await Promise.all([
       readFeeds(actor, params.page ? { page: Number(params.page) } : {}),
       prisma.target.findMany({ where: { workspaceId: viewer.workspaceId, enabled: true, canPublish: true, ...(scope ? { id: { in: [...scope] } } : {}) }, select: { id: true, name: true }, orderBy: [{ name: 'asc' }, { id: 'asc' }], take: 500 }),
       automaticCheckingStatus(),
+      import('@/modules/studio/server/ai').then(ai => ai.articleWritingAvailable(viewer.workspaceId)).catch(() => false),
     ]);
     return <>
       {heading}
       {recipeStatus ? <RecipeStatusCard status={recipeStatus} locale={locale} copy={copy} /> : null}
       <FeedManager initialFeeds={result.feeds.map(f => ({ ...f, lastPolledAt: f.lastPolledAt?.toISOString() ?? null, createdAt: f.createdAt.toISOString(), updatedAt: f.updatedAt.toISOString() }))}
-        channels={channels.map(c => ({ id: c.id, name: c.name }))} page={result.page} hasMore={result.hasMore} canWrite={canWrite} limits={result.limits} locale={locale} automaticMinutes={automatic.intervalMinutes} copy={copy} />
+        channels={channels.map(c => ({ id: c.id, name: c.name }))} page={result.page} hasMore={result.hasMore} canWrite={canWrite} limits={result.limits} locale={locale} automaticMinutes={automatic.intervalMinutes} copy={copy} aiAvailable={aiAvailable} />
       {recipes && (recipes.source || canWrite) && <RecipeSource initial={withRecipeLabels(recipes, locale) as unknown as RecipeView} locale={locale} canWrite={canWrite} copy={recipeCopy} />}
       <p className={styles.privacy}>{t('footnote')}</p>
     </>;

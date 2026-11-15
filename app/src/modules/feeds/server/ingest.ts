@@ -137,8 +137,11 @@ export async function ingestFeed(actor: FeedActor, feed: FeedRow, workspaceId: s
     throw await feedsError('conflict', 'Choose at least one channel for this feed before it creates posts.');
   }
 
+  // AI captions (2026-11-15) are written before the transaction opens; any item AI cannot write keeps its template text.
+  const written = feed.aiCaptions ? await writeAiCaptions(actor, feed, items, entries, l) : items;
+
   try {
-    const created = await createPosts(actor, feed, workspaceId, items, targetIds, l, options);
+    const created = await createPosts(actor, feed, workspaceId, written, targetIds, l, options);
     await recordPoll(workspaceId, feed, settle(), options);
     return { ...base, ...created };
   } catch (error) {
@@ -148,6 +151,29 @@ export async function ingestFeed(actor: FeedActor, feed: FeedRow, workspaceId: s
     if (turnedOff) await audit(prisma as unknown as Tx, workspaceId, null, 'feeds.disabled_after_failures', { feedId: feed.id }).catch(() => undefined);
     throw error;
   }
+}
+
+/**
+ * Caption each new article with AI: the AI text, then the article link and the feed's hashtags. Same authorization,
+ * hourly limit and budget as the composer. AI being off, over budget or failing leaves that item's template text.
+ */
+async function writeAiCaptions(actor: FeedActor, feed: FeedRow, items: CheckedEntry[], entries: FeedEntry[], l: FeedLimits): Promise<CheckedEntry[]> {
+  const { articleWritingAvailable, writeFromArticle } = await import('@/modules/studio/server/ai');
+  if (!await articleWritingAvailable(actor.workspaceId).catch(() => false)) return items;
+  const byGuid = new Map(entries.map(entry => [entry.guid, entry]));
+  const out: CheckedEntry[] = [];
+  for (const item of items) {
+    const entry = byGuid.get(item.guid);
+    try {
+      const description = (entry?.description ?? '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+      const article = await writeFromArticle(actor, { title: item.title ?? '', excerpt: description.slice(0, 2000), text: description });
+      const caption = article.caption.trim();
+      if (!caption) { out.push(item); continue; }
+      const message = [caption, item.link ?? '', feed.hashtags.trim()].filter(Boolean).join('\n\n').slice(0, l.maxMessage);
+      out.push({ ...item, message });
+    } catch { out.push(item); }
+  }
+  return out;
 }
 
 async function createPosts(actor: FeedActor, feed: FeedRow, workspaceId: string, items: CheckedEntry[], targetIds: string[], l: FeedLimits, options: IngestOptions) {
