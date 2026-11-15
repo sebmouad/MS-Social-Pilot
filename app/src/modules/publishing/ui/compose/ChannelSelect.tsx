@@ -4,6 +4,9 @@ import { IconPlus, IconSearch, IconX } from '@tabler/icons-react';
 import { Avatar } from '@/modules/publishing/ui/kit/kit';
 import styles from './channel-select.module.css';
 
+/** Screens that only know a channel's id still show its photo: the app serves it at a fixed address (404 → initials). */
+const pictureOf = (channel: { id: string; pictureUrl?: string | null }) => channel.pictureUrl === undefined ? `/api/channels/${encodeURIComponent(channel.id)}/picture` : channel.pictureUrl;
+
 export type SelectableChannel = { id: string; name: string; pictureUrl?: string | null; platformName?: string | null };
 
 /**
@@ -37,7 +40,7 @@ export function ChannelSelect({ channels, selected, onToggle, onSetAll, disabled
   return <div className={styles.root} ref={root}>
     <div className={styles.field} role="group" aria-labelledby={labelledBy}>
       {chosen.map(channel => <span key={channel.id} className={styles.chip}>
-        <Avatar name={channel.name} src={channel.pictureUrl} size={20} /><span className={styles.chipName}>{channel.name}</span>
+        <Avatar name={channel.name} src={pictureOf(channel)} size={20} /><span className={styles.chipName}>{channel.name}</span>
         <button type="button" disabled={disabled} aria-label={fr ? `Retirer ${channel.name}` : `Remove ${channel.name}`} onClick={() => onToggle(channel.id)}><IconX size={13} stroke={2.2} aria-hidden="true" /></button>
       </span>)}
       <button type="button" className={styles.add} disabled={disabled} aria-expanded={open} aria-haspopup="true" onClick={() => setOpen(value => !value)}>
@@ -54,7 +57,7 @@ export function ChannelSelect({ channels, selected, onToggle, onSetAll, disabled
         {matches.map(channel => { const on = selected.includes(channel.id); return <li key={channel.id}>
           <label className={styles.row} data-on={on || undefined}>
             <input type="checkbox" checked={on} disabled={disabled} onChange={() => onToggle(channel.id)} />
-            <Avatar name={channel.name} src={channel.pictureUrl} size={24} />
+            <Avatar name={channel.name} src={pictureOf(channel)} size={24} />
             <span className={styles.rowName}>{channel.name}</span>
             {channel.platformName ? <span className={styles.rowPlatform}>{channel.platformName}</span> : null}
           </label>
