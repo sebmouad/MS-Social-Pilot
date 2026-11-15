@@ -3,7 +3,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createFacebookPostHistory } from '@/platforms/facebook/post-history';
-import { fakeGraph, facebookConfig } from './fake-graph';
+import { fakeGraph, facebookConfig, type Sent } from './fake-graph';
 
 const now = new Date('2026-11-15T12:00:00Z');
 const policy = { lookbackDays: 30, pageBudget: 3, edge: 'published_posts' as const, fields: ['id', 'created_time', 'message'], metrics: [], reactionTypes: [] };
@@ -18,8 +18,8 @@ const batches: Record<string, { data: unknown[]; paging?: unknown }> = {
 function graphAbortingAt(postId: string | null) {
   const controller = new AbortController();
   const graph = fakeGraph([
-    { path: /^\/page1\/published_posts$/, reply: sent => batches[sent.query.after ?? ''] },
-    { path: /^\/p\d\/insights$/, reply: sent => { if (postId && sent.path === `/${postId}/insights`) controller.abort(); return { data: [] }; } },
+    { path: /^\/page1\/published_posts$/, reply: (sent: Sent) => batches[sent.query.after ?? ''] },
+    { path: /^\/p\d\/insights$/, reply: (sent: Sent) => { if (postId && sent.path === `/${postId}/insights`) controller.abort(); return { data: [] }; } },
   ]);
   return { history: createFacebookPostHistory(facebookConfig, policy, graph.fetch, controller.signal) };
 }

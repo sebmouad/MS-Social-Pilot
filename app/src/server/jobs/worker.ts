@@ -87,7 +87,9 @@ export function createWorker(deps: WorkerDependencies, owner: string, options: {
       log(`[${job.name}] ${summary}`);
     } catch (error) {
       outcome = 'failed';
-      await (deps.recordError ?? recordError)({ source: 'worker', error, location: job.name });
+      // A job cut off by shutdown (a deploy restarts the worker) fails for that reason alone, often as a module that can
+      // no longer load: it stays in the worker log and run history, not in Root › Errors as an application error.
+      if (!stopping) await (deps.recordError ?? recordError)({ source: 'worker', error, location: job.name });
       errorText = (error instanceof Error ? error.message : String(error)).slice(0, errorLimit);
       log(`[${job.name}] failed: ${errorText}`);
     } finally {
