@@ -137,6 +137,7 @@ const french: Record<string, string> = {
   "Delivery": "Envoi",
   "status unavailable": "statut indisponible",
   "Download prepared": "Téléchargement préparé",
+  "{0} failed attempts": "{0} tentatives échouées",
   "No recipient details": "Aucun détail sur les destinataires",
   "No runs on this page": "Aucune exécution sur cette page",
   "No report runs yet": "Aucune exécution pour le moment",

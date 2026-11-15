@@ -205,6 +205,13 @@ export function ReportsManager({ templates, templateOptions, schedules, runs, ca
   const runPager = runsPage > 1 || runsHasMore;
   const runStatus = (run: RunRow) => run.status === 'completed' ? (run.kind === 'manual' ? t("Prepared") : t("Completed")) : ({ claimed: t("Starting"), generating: t("Preparing"), delivering: t("Sending"), partial: t("Partly sent"), failed: t("Failed"), uncertain: t("Delivery not confirmed"), skipped: t("Skipped") } as Record<string, string>)[run.status] ?? t("Status unavailable");
 
+  // Retries of one report fail the same way: consecutive failed runs for the same channel, period and kind are one row (2026-11-15).
+  const historyRows = runs.reduce<Array<(typeof runs)[number] & { attempts: number }>>((rows, run) => {
+    const last = rows[rows.length - 1];
+    if (last && run.status === 'failed' && last.status === 'failed' && last.kind === run.kind && last.channelId === run.channelId
+      && last.periodStart === run.periodStart && last.periodEnd === run.periodEnd) { last.attempts += 1; return rows; }
+    rows.push({ ...run, attempts: 1 }); return rows;
+  }, []);
   return <div className={styles.root}>
     <div className={styles.sidebarActions}>
       {canManage && <Button variant="primary" onClick={() => openTemplate()}>{t("New template")}</Button>}
@@ -225,8 +232,8 @@ export function ReportsManager({ templates, templateOptions, schedules, runs, ca
     <Tabs label={t("Saved reports and schedules")} items={[
       { id: 'history', label: t("Report history"), count: runs.length, content: <><section className={styles.panel} aria-labelledby="run-h"><div className={styles.panelHeading}><div><h2 id="run-h"><IconHistory aria-hidden="true" /> {t("Report history")}</h2><p>{t("Preparation and email outcomes, by channel and reporting period.")}</p></div></div>
       {!canGenerate && <p className={styles.info} role="status">{t("Report preparation and history are temporarily unavailable. Existing templates and schedules remain available.")}</p>}
-      {runs.length ? <DataTable caption={t("Report history")} rows={runs} rowKey={run => run.id} columns={[
-        { key: 'result', label: t("Result"), render: run => <><Badge tone={run.status === 'completed' ? 'success' : run.status === 'failed' ? 'danger' : ['partial', 'uncertain'].includes(run.status) ? 'warning' : 'neutral'}>{runStatus(run)}</Badge><span className={styles.secondaryLine}>{run.kind === 'manual' ? t("Download") : t("Scheduled email")}</span></> },
+      {runs.length ? <DataTable caption={t("Report history")} rows={historyRows} rowKey={run => run.id} columns={[
+        { key: 'result', label: t("Result"), render: run => <><Badge tone={run.status === 'completed' ? 'success' : run.status === 'failed' ? 'danger' : ['partial', 'uncertain'].includes(run.status) ? 'warning' : 'neutral'}>{runStatus(run)}</Badge><span className={styles.secondaryLine}>{run.kind === 'manual' ? t("Download") : t("Scheduled email")}{run.attempts > 1 ? ` · ${t("{0} failed attempts", run.attempts)}` : ''}</span></> },
         { key: 'period', label: t("Channel and period"), render: run => <>{channels.find(channel => channel.id === run.channelId)?.name ?? t("Channel unavailable")}<span className={styles.secondaryLine}>{run.periodStart} {t("to")} {run.periodEnd}</span></> },
         { key: 'started', label: t("Started"), render: run => <>{run.startedLabel ?? formatInZone(run.startedAt, timeZone, locale, t('Time unavailable'))}<span className={styles.secondaryLine}>{timeZone}</span></> },
         { key: 'rows', label: t("Rows"), align: 'end', render: run => <>{run.rowCount === null ? '—' : run.rowCount}{run.truncated ? t(" · shortened") : ''}{run.note && <span className={styles.secondaryLine}>{run.note}</span>}</> },
