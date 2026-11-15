@@ -3,7 +3,8 @@ import { AI_BOUNDS, AI_DEFAULTS } from './config';
 
 export const TONES = ['friendly', 'professional', 'playful', 'urgent', 'informative'] as const;
 export type Tone = (typeof TONES)[number];
-export const AI_KINDS = ['caption', 'improve', 'translate', 'hashtags'] as const;
+/** Composer assist actions; shorten, expand and emojis added 2026-11-15. */
+export const AI_KINDS = ['caption', 'improve', 'shorten', 'expand', 'emojis', 'translate', 'hashtags'] as const;
 /** Networks the AI Studio multiplier writes for; `repurpose` is requested there only, never offered in composer assist. */
 export const REPURPOSE_NETWORKS = ['facebook', 'instagram', 'threads', 'linkedin', 'tiktok'] as const;
 export type AiKind = (typeof AI_KINDS)[number] | 'repurpose' | 'reply';
@@ -75,6 +76,9 @@ export function buildPrompt(request: AiRequest, maxHashtags: number, context: Ai
   const task = {
     caption: `Write one social media post${tone} about the material, in the same language as the material: a first line under 125 characters that makes people stop scrolling, then a short description, then one easy question that invites comments. No links in the text, and no engagement bait (never ask people to like, share or tag someone).`,
     improve: `Rewrite the material${tone}: clearer and more engaging, same meaning and language.`,
+    shorten: `Shorten the material${tone} to about half its length, keeping the key point, any question to the reader, links and hashtags, in the same language.`,
+    expand: `Expand the material${tone} with one or two more sentences of useful detail that is already implied by it, in the same language. Do not add facts, prices, dates or claims that are not in the material.`,
+    emojis: `Add a few fitting emojis to the material (at most one per sentence), changing nothing else: same words, language, links and hashtags.`,
     translate: `Translate the material into ${request.language}${tone}, keeping hashtags and links unchanged.`,
     hashtags: `Suggest up to ${maxHashtags} relevant hashtags for the material, separated by spaces, each starting with #.`,
     reply: `Write one short reply${tone} from the brand to the message in the material. Answer only what is asked, in the same language as the message.`,
