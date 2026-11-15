@@ -28,7 +28,45 @@ export async function discoverFacebookAdObjects(transport: FacebookAdsTransport,
       seen.add(cursor); after = cursor;
     }
   }
+  // Ad pictures are a separate, best-effort read (2026-11-15): a refusal or an odd answer leaves the ads without a
+  // picture and never fails the sync that the figures depend on.
+  if (items.some(item => item.level === 'ad')) {
+    const pictures = await readAdPictures(transport, token, remoteAccountId, policy, signal).catch(error => { signal?.throwIfAborted(); void error; return new Map<string, string>(); });
+    for (const item of items) if (item.level === 'ad') item.thumbnailUrl = pictures.get(item.objectId) ?? null;
+  }
   return items;
+}
+
+/** Field sets tried in order: a 240×240 rendering first (Graph's default is 64×64), then the plain thumbnail. */
+const AD_PICTURE_FIELDS = ['id,creative.thumbnail_width(240).thumbnail_height(240){thumbnail_url}', 'id,creative{thumbnail_url}'] as const;
+
+async function readAdPictures(transport: FacebookAdsTransport, token: string, remoteAccountId: string, policy: { pageSize: number; maxPages: number }, signal?: AbortSignal): Promise<Map<string, string>> {
+  let lastError: unknown = null;
+  for (const fields of AD_PICTURE_FIELDS) {
+    try {
+      const pictures = new Map<string, string>();
+      let after: string | undefined;
+      for (let page = 0; page < policy.maxPages; page++) {
+        const payload = await transport.get(`${encodeURIComponent(remoteAccountId)}/ads`, token, { fields, limit: String(policy.pageSize), ...(after ? { after } : {}) }, signal);
+        if (!Array.isArray(payload.data)) throw new Error('Invalid ad picture response');
+        for (const raw of payload.data) {
+          const row = raw && typeof raw === 'object' ? raw as Record<string, unknown> : {};
+          const creative = row.creative && typeof row.creative === 'object' ? row.creative as Record<string, unknown> : {};
+          const url = creative.thumbnail_url;
+          if (typeof row.id === 'string' && typeof url === 'string' && url.startsWith('https://') && url.length <= 2000) pictures.set(row.id, url);
+        }
+        const paging = payload.paging as { next?: unknown; cursors?: { after?: unknown } } | undefined;
+        const cursor = paging?.cursors?.after;
+        if (!paging?.next || typeof cursor !== 'string' || !cursor || cursor === after) break;
+        after = cursor;
+      }
+      return pictures;
+    } catch (error) {
+      signal?.throwIfAborted();
+      lastError = error;
+    }
+  }
+  throw lastError;
 }
 export async function configuredDiscoverFacebookAdObjects(token: string, remoteAccountId: string, adAccountId: string, now: Date, signal?: AbortSignal) {
   const [transport, pageSize, maxPages] = await Promise.all([configuredFacebookAdsTransport(), runtimeConfig('meta.pageSize'), runtimeConfig('meta.maxPages')]);

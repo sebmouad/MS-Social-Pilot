@@ -227,7 +227,7 @@ async function AdsObjectsPage({ searchParams }: { searchParams: Promise<Params> 
       sort={{ key: sortKey, direction: sortDirection }} sortHref={sortHref} createButton={create}
       rows={directory.items.map(row => ({ key: `${row.accountId}:${row.objectId}`, accountId: row.accountId, accountName: accountName.get(row.accountId) ?? row.accountName, objectId: row.objectId, name: row.name, status: row.status, currency: row.currency,
         spend: row.spend, impressions: row.impressions, clicks: row.clicks, ctr: row.ctr, cpc: row.cpc, cpm: row.cpm, lastDeliveryDate: row.lastDeliveryDate, lastFetchedAt: row.lastFetchedAt,
-        parentId: row.parentId, parentName: row.parentId ? parentNames.get(`${row.accountId}:${row.parentId}`) ?? null : null }))}
+        parentId: row.parentId, parentName: row.parentId ? parentNames.get(`${row.accountId}:${row.parentId}`) ?? null : null, thumbnailUrl: 'thumbnailUrl' in row ? row.thumbnailUrl ?? null : null }))}
       money={Object.fromEntries(directory.items.map(row => [`${row.accountId}:${row.objectId}`, formatMoney(locale, row.currency, row.spend, t('text094'))]))}
       number={Object.fromEntries(directory.items.flatMap(row => {
         const key = `${row.accountId}:${row.objectId}`;

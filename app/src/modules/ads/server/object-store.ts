@@ -2,13 +2,15 @@ import { Prisma } from '../../../../generated/client';
 import { prisma } from '@/server/data';
 import type { AdsObjectType, AdsNeutralOperation } from '../management/types';
 
-export type StoredAdObject = { adAccountId: string; level: AdsObjectType; objectId: string; name: string | null; parentId: string | null; status: string | null; fetchedAt: Date };
+/** `thumbnailUrl`: the ad's creative picture (ads only). Undefined keeps the stored one; Facebook's addresses expire, so each sync stores a fresh one. */
+export type StoredAdObject = { adAccountId: string; level: AdsObjectType; objectId: string; name: string | null; parentId: string | null; status: string | null; fetchedAt: Date; thumbnailUrl?: string | null };
 type Store = Pick<typeof prisma, '$executeRaw' | '$queryRaw'>;
 export async function saveAdObject(db: Store, item: StoredAdObject) {
-  await db.$executeRaw`INSERT INTO ads_objects ("adAccountId", level, "objectId", name, "parentId", status, "fetchedAt")
-    VALUES (${item.adAccountId}, ${item.level}, ${item.objectId}, ${item.name}, ${item.parentId}, ${item.status}, ${item.fetchedAt})
+  await db.$executeRaw`INSERT INTO ads_objects ("adAccountId", level, "objectId", name, "parentId", status, "fetchedAt", "thumbnailUrl")
+    VALUES (${item.adAccountId}, ${item.level}, ${item.objectId}, ${item.name}, ${item.parentId}, ${item.status}, ${item.fetchedAt}, ${item.thumbnailUrl ?? null})
     ON CONFLICT ("adAccountId", level, "objectId") DO UPDATE SET name = EXCLUDED.name,
-    "parentId" = EXCLUDED."parentId", status = EXCLUDED.status, "fetchedAt" = EXCLUDED."fetchedAt"
+    "parentId" = EXCLUDED."parentId", status = EXCLUDED.status, "fetchedAt" = EXCLUDED."fetchedAt",
+    "thumbnailUrl" = COALESCE(EXCLUDED."thumbnailUrl", ads_objects."thumbnailUrl")
     WHERE ads_objects."fetchedAt" <= EXCLUDED."fetchedAt"`;
 }
 /** Call only with account ids from the service's current authorized account query. */

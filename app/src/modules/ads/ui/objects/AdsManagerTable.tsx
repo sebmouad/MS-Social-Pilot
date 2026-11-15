@@ -11,6 +11,8 @@ export type ManagerRow = {
   key: string; accountId: string; accountName: string; objectId: string; name: string; status: string | null; currency: string | null;
   spend: number; impressions: number; clicks: number; ctr: number | null; cpc: number | null; cpm: number | null;
   lastDeliveryDate: string | null; lastFetchedAt: string | null; parentId: string | null; parentName: string | null;
+  /** The ad's creative picture (ads only), as in Meta's Ads Manager. */
+  thumbnailUrl?: string | null;
 };
 
 const COPY = {
@@ -223,11 +225,15 @@ function Row({ row, level, locale, t, money, number, drill, edit, canManage, che
   return <tr className={checked ? 'is-selected' : undefined}>
     <td className="am-col-check"><input type="checkbox" aria-label={fill(t.selectRow, { name })} checked={checked} disabled={!canManage || busy} onChange={onCheck} /></td>
     <td className="am-col-switch"><DeliverySwitch row={row} level={level} locale={locale} t={t} canManage={canManage} /></td>
-    <td className="am-col-name">
+    <td className="am-col-name"><div className={level === 'ad' ? 'am-with-thumb' : undefined}>
+      {/* Ads show their creative picture beside the name, as in Meta's Ads Manager (2026-11-15). */}
+      {level === 'ad' ? <span className="am-thumb" aria-hidden="true">{row.thumbnailUrl ? <img src={row.thumbnailUrl} alt="" loading="lazy" referrerPolicy="no-referrer" onError={event => { event.currentTarget.remove(); }} /> : null}<IconPhoto size={16} stroke={1.6} /></span> : null}
+      <div className="am-name-block">
       <div className="am-name">{drill ? <a href={drill}>{name}<IconChevronRight size={14} aria-hidden="true" /></a> : <span>{name}</span>}</div>
       <div className="am-slot"><div className="am-sub">{row.parentName ? fill(t.in, { parent: row.parentName }) : row.accountName}</div>
       <div className="am-actions">{edit}{drill ? <a href={drill}>{level === 'campaign' ? t.viewAdsets : t.viewAds}</a> : null}</div></div>
-    </td>
+      </div>
+    </div></td>
     <td><span className={`am-dot am-dot--${state.tone}`} aria-hidden="true" />{state.label}{state.tone === 'warn' && row.lastDeliveryDate ? <div className="am-sub">{fill(t.noDelivery, { date: day(row.lastDeliveryDate) })}</div> : null}</td>
     <td className="is-num">{money[row.key]}</td>
     <td className="is-num">{number[`${row.key}:impressions`]}</td>
