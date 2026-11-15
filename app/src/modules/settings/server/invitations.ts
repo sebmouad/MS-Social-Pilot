@@ -137,7 +137,7 @@ export async function invitationAvailability(): Promise<boolean> {
   } catch { return false; }
 }
 
-export async function listTeamInvitations(actor: TeamActor): Promise<{ invitations: Array<{ id: string; email: string; role: TeamRole; expiresAt: Date; acceptedAt: Date | null; createdAt: Date; status: InvitationStatus }>; available: boolean }> {
+export async function listTeamInvitations(actor: TeamActor): Promise<{ invitations: Array<{ id: string; email: string; role: TeamRole; expiresAt: Date; acceptedAt: Date | null; createdAt: Date; status: InvitationStatus }>; available: boolean; unavailableReason: 'disabled' | 'mail' | 'origin' | null }> {
   const bounds = await invitationLimits(); await authorize(actor, false);
   return protect(transaction(actor.workspaceId, bounds, async tx => {
     await lockAndRecheckActor(tx, actor, false);
@@ -147,7 +147,9 @@ export async function listTeamInvitations(actor: TeamActor): Promise<{ invitatio
     return { invitations: rows.map(row => {
       if (!role(row.role)) throw unavailable();
       return { id: row.id, email: row.email, role: row.role, expiresAt: row.expiresAt, acceptedAt: row.acceptedAt, createdAt: row.createdAt, status: invitationStatus(row) };
-    }), available: bounds.enabled && ready && validPublicOrigin(origin) };
+    }), available: bounds.enabled && ready && validPublicOrigin(origin),
+      // Why invitations are off, so the page can say what to fix (2026-11-15): switched off, no outgoing email, or no public address.
+      unavailableReason: !bounds.enabled ? 'disabled' as const : !ready ? 'mail' as const : !validPublicOrigin(origin) ? 'origin' as const : null };
   }));
 }
 

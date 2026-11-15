@@ -38,7 +38,7 @@ export default async function TeamPage() {
       {directoryError ? <div className={styles['settings-empty']} role="alert"><p>{directoryError}</p><a href="/settings/team">{t.refreshDirectory}</a></div> : directory && <TeamControls key={viewer.workspaceId} locale={locale} members={directory.members} targets={directory.targets} actorId={directory.actorId} actorRole={directory.actorRole} total={directory.total} hasMore={directory.hasMore} defaultRole={directory.defaults.role} defaultAllPages={directory.defaults.allPages} />}
     </SettingsPanel>
     {invitations && (invitations.available || invitations.invitations.length > 0) && <SettingsPanel title={t.invitationsPanel} detail={t.invitationsDetail}>
-      <InvitationControls key={viewer.workspaceId} locale={locale} invitations={invitations.invitations.map(item => ({ ...item, expiresAt: item.expiresAt.toISOString(), acceptedAt: item.acceptedAt?.toISOString() ?? null, createdAt: item.createdAt.toISOString() }))} actorRole={viewer.membership.role} available={invitations.available} />
+      <InvitationControls key={viewer.workspaceId} locale={locale} invitations={invitations.invitations.map(item => ({ ...item, expiresAt: item.expiresAt.toISOString(), acceptedAt: item.acceptedAt?.toISOString() ?? null, createdAt: item.createdAt.toISOString() }))} actorRole={viewer.membership.role} available={invitations.available} unavailableReason={invitations.unavailableReason} canFix={Boolean(viewer.user.isInstanceOwner)} />
     </SettingsPanel>}
     {invitationError && <p role="alert" className={styles['settings-note']}>{invitationError}</p>}
     <p className={styles['settings-note']}>{t.footnote}</p>

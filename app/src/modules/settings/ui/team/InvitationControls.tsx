@@ -21,10 +21,12 @@ const confirmationForInvite = (email: string) => `INVITE MEMBER ${email.trim().t
 const confirmationForRevoke = (id: string) => `REVOKE INVITATION ${id}`;
 const managerRole = (role: string) => role === 'owner' || role === 'admin';
 
-export function InvitationControls({ invitations, actorRole, available, locale = 'en' }: {
+export function InvitationControls({ invitations, actorRole, available, unavailableReason = null, canFix = false, locale = 'en' }: {
   invitations: Invitation[];
   actorRole: string;
   available: boolean;
+  /** Why invitations are off (2026-11-15); the installation owner also gets a link to fix it. */
+  unavailableReason?: 'disabled' | 'mail' | 'origin' | null; canFix?: boolean;
   locale?: 'en' | 'fr';
 }) {
   const toast = useToast();
@@ -179,7 +181,7 @@ export function InvitationControls({ invitations, actorRole, available, locale =
   return <section className={styles.invitations} aria-labelledby="team-invitations-heading">
     <div className={styles.heading}><p id="team-invitations-heading">{t.intro}</p></div>
 
-    {canManage && !available && <p className={styles.unavailable} role="status">{t.unavailable}</p>}
+    {canManage && !available && <p className={styles.unavailable} role="status">{unavailableReason === 'disabled' ? t.unavailableDisabled : unavailableReason === 'mail' ? t.unavailableMail : unavailableReason === 'origin' ? t.unavailableOrigin : t.unavailable}{canFix && unavailableReason ? <> <a href="/root/config">{t.unavailableFix}</a></> : null}</p>}
     {canManage && available && <form method="post" noValidate className={styles.form} onSubmit={startInvite}>
       <div className={styles.fields}>
         <label className={styles.field} htmlFor="team-invitation-email">{t.emailAddress}
