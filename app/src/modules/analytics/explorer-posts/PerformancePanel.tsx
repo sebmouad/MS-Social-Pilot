@@ -1,3 +1,4 @@
+import { clipText } from '@/lib/clip-text';
 import type { Digest, GroupRow, PostSummary, Totals } from './performance';
 import local from './screen.module.css';
 
@@ -53,7 +54,7 @@ export function PerformancePanel({ digest, before, complete, locale, section }: 
     <h3>{title}</h3>
     <div className="ui-table-wrap"><table className="ui-table ui-table--compact">
       <thead><tr><th scope="col">{t.reach}</th><th scope="col">{t.per100}</th><th scope="col">{t.channel}</th><th scope="col">{t.post}</th></tr></thead>
-      <tbody>{items.map(item => <tr key={item.postId}><td>{num(item.reach, locale)}</td><td>{item.reach ? num(Math.round(10000 * (item.engagement ?? 0) / item.reach) / 100, locale) : '—'}</td><td>{item.channel}<div className="small-note">{new Date(item.publishedAt).toLocaleString(locale, { dateStyle: 'medium', timeStyle: 'short' })} · {item.madeHere ? t.madeHere : t.elsewhere}</div></td><td>{item.text.slice(0, 140) || '—'}{item.url && <> <a href={item.url} target="_blank" rel="noopener noreferrer">{t.open}</a></>}</td></tr>)}</tbody>
+      <tbody>{items.map(item => <tr key={item.postId}><td>{num(item.reach, locale)}</td><td>{item.reach ? num(Math.round(10000 * (item.engagement ?? 0) / item.reach) / 100, locale) : '—'}</td><td>{item.channel}<div className="small-note">{new Date(item.publishedAt).toLocaleString(locale, { dateStyle: 'medium', timeStyle: 'short' })} · {item.madeHere ? t.madeHere : t.elsewhere}</div></td><td>{clipText(item.text, 140, '') || '—'}{item.url && <> <a href={item.url} target="_blank" rel="noopener noreferrer">{t.open}</a></>}</td></tr>)}</tbody>
     </table></div>
   </div>;
   return <section aria-labelledby="what-works" className={local.content}>

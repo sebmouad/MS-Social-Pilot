@@ -1,3 +1,4 @@
+import { clipText } from '@/lib/clip-text';
 import { ChannelBadge } from '@/components';
 import { channelBadgeInfo } from '@/lib/channel-badge';
 import { inboxHref, type InboxLocation } from '../query';
@@ -50,7 +51,7 @@ export function inboxListRows(page: InboxListPage, abilities: Awaited<ReturnType
     const selected = selectedThread === item.key;
     const selectable = selectables.get(item.key);
     const attachment = firstAttachment(item.metadata);
-    const body = item.preview.trim() ? (item.preview.length > previewMaxCharacters ? `${item.preview.slice(0, previewMaxCharacters)}…` : item.preview) : attachment ? copy.attachment[attachment.kind] : item.kind === 'comment' ? copy.commentNoText : item.kind === 'review' ? reviewLabel(locale, 'noText') : item.preview;
+    const body = item.preview.trim() ? (clipText(item.preview, previewMaxCharacters)) : attachment ? copy.attachment[attachment.kind] : item.kind === 'comment' ? copy.commentNoText : item.kind === 'review' ? reviewLabel(locale, 'noText') : item.preview;
     const thumbnail = attachment?.url && attachment.kind !== 'link' && attachment.kind !== 'other' ? attachment.url : null;
     const content = <li key={item.key} className={hasSelection ? r3.row : undefined}>{hasSelection ? <span className={r3.rowSelect}>{selectable ? <SelectBox item={selectable} label={extra.bulk.selectItem(item.author)} /> : null}</span> : null}<a className={styles.item} href={inboxHref({ ...baseLocation, ...(page.cursor ? { cursor: page.cursor } : {}), thread: item.key })} aria-current={selected ? 'true' : undefined} data-attention={item.needsReply || item.unread > 0 || undefined} data-group={item.kind} data-inbox-item>
       <PersonAvatar name={item.author} size={38} />

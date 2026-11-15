@@ -1,3 +1,4 @@
+import { clipText } from '@/lib/clip-text';
 import { readBestTimeHeatmap } from '@/modules/home/server/best-times';
 import { configOrDefault } from '@/server/config/config-or-default';
 import { reschedulePolicySchema } from '@/lib/config/reschedule-policy';
@@ -111,7 +112,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
     const movable = canEditCalendar && post.targets.length > 0 && isWaitingToReschedule(post)
       && (MANAGERS.has(viewer.membership.role) || post.authorId === viewer.user.id);
     byDay.set(key, [...(byDay.get(key) ?? []), {
-      id: post.id, text: postContentSummary(post.message, post.media, post.link, copy).slice(0, 240), status: post.status, whenIso: when.toISOString(), channels: channelsOfPost, movable,
+      id: post.id, text: clipText(postContentSummary(post.message, post.media, post.link, copy), 240, ''), status: post.status, whenIso: when.toISOString(), channels: channelsOfPost, movable,
       authorName: post.authorId === viewer.user.id ? viewer.user.name : copy.approvalsMember,
       origin: origins.get(post.id),
       clockLabel: formatPostPreviewTime(when, timeZone, locale),

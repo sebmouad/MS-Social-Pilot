@@ -1,4 +1,5 @@
 "use client";
+import { clipText } from '@/lib/clip-text';
 import { weekdayOfKey } from "@/lib/calendar-dates";
 import { synchronousPolicy } from '@/lib/config/synchronous-policy';
 
@@ -109,13 +110,13 @@ export function CalendarBoard({ view, days, timeZone, nowIso, canCreate, filterQ
       <div className={styles.postBody}>
         {post.preview && postThumbnail(post.preview.media) ? <PostThumb thumb={postThumbnail(post.preview.media)} size="sm" /> : null}
         {compact && post.preview
-          ? <button type="button" className={`${styles.postText} ${styles.postTextButton}`} title={post.text} aria-haspopup="dialog" aria-label={fillCopy(copy.viewPostLabel, {text:post.text.slice(0,60) || copy.noText})} onClick={() => setPreviewPost(post)}>{post.text || copy.calendarNoText}</button>
+          ? <button type="button" className={`${styles.postText} ${styles.postTextButton}`} title={post.text} aria-haspopup="dialog" aria-label={fillCopy(copy.viewPostLabel, {text:clipText(post.text, 60, '') || copy.noText})} onClick={() => setPreviewPost(post)}>{post.text || copy.calendarNoText}</button>
           : <p className={styles.postText} title={post.text}>{post.text || copy.calendarNoText}</p>}
       </div>
       {post.origin && !compact ? <OriginBadge origin={post.origin} compact /> : null}
       <div className={styles.postChannels}>{post.channels.length ? post.channels.slice(0, 4).map(channel => <ChannelBadge key={channel.id} name={channel.name} platformName={channel.platformName} mark={channel.mark} compact />) : <span className={styles.muted}>{copy.calendarNoChannels}</span>}{post.channels.length > 4 && <span className={styles.muted}>+{post.channels.length - 4}</span>}</div>
-      {post.movable && <button type="button" className={styles.moveButton} aria-haspopup="dialog" onClick={() => startMove(post)}>{copy.move}<span className="ui-visually-hidden">{fillCopy(copy.movePostLabel, {text: post.text.slice(0, 40) || copy.noText, time: timeOf(post)})}</span></button>}
-      {post.preview && !compact && <button type="button" className={styles.viewButton} aria-haspopup="dialog" aria-label={fillCopy(copy.viewPostLabel, {text:post.text.slice(0,60) || copy.noText})} onClick={() => setPreviewPost(post)}>{copy.viewPost}</button>}
+      {post.movable && <button type="button" className={styles.moveButton} aria-haspopup="dialog" onClick={() => startMove(post)}>{copy.move}<span className="ui-visually-hidden">{fillCopy(copy.movePostLabel, {text: clipText(post.text, 40, '') || copy.noText, time: timeOf(post)})}</span></button>}
+      {post.preview && !compact && <button type="button" className={styles.viewButton} aria-haspopup="dialog" aria-label={fillCopy(copy.viewPostLabel, {text:clipText(post.text, 60, '') || copy.noText})} onClick={() => setPreviewPost(post)}>{copy.viewPost}</button>}
     </div>;
   };
 
@@ -348,7 +349,7 @@ function MoveDialog({ move, timeZone, nowMs, guardrails, onChange, onConfirm }: 
     const options = move.post.moveOptions ?? moveCandidates(move.post.whenIso, timeZone, nowMs, { ...synchronousPolicy("shared.reschedulePolicy"), locale: locale === "fr" ? "fr-FR" : "en-US" });
     return <Dialog open busy={move.busy} title={copy.moveScheduled} description={fillCopy(copy.currentlyScheduled, {time:current})} onClose={close}
       actions={<Button variant="secondary" onClick={close}>{copy.cancel}</Button>}>
-      <p className={styles.dialogPost}>{move.post.text.slice(0, 160) || copy.calendarNoText}</p>
+      <p className={styles.dialogPost}>{clipText(move.post.text, 160, '') || copy.calendarNoText}</p>
       <ul className={styles.moveOptions}>{options.map(option => <li key={option.id}>
         <button type="button" className="ui-button ui-button--secondary ui-button--md" disabled={Boolean(option.unavailable)} onClick={() => onChange({ ...move, step: "confirm", date: option.date, time: option.time, error: "" })}>{option.label}</button>
         {option.unavailable && <span className={styles.muted}>{option.unavailable === "past" ? copy.alreadyPassed : copy.clocksChange}</span>}
@@ -365,7 +366,7 @@ function MoveDialog({ move, timeZone, nowMs, guardrails, onChange, onConfirm }: 
 
   return <Dialog open busy={move.busy} title={copy.confirmNewTime} description={copy.moveDescription} onClose={close}
     actions={<><Button variant="quiet" disabled={move.busy} onClick={() => onChange({ ...move, step: "choose", error: "" })}>{copy.chooseAnotherTime}</Button><Button variant="primary" disabled={move.busy || Boolean(problem)} onClick={onConfirm}>{move.busy ? copy.moving : copy.movePost}</Button></>}>
-    <p className={styles.dialogPost}>{move.post.text.slice(0, 160) || copy.calendarNoText}</p>
+    <p className={styles.dialogPost}>{clipText(move.post.text, 160, '') || copy.calendarNoText}</p>
     <dl className={styles.times}><div><dt>{copy.now}</dt><dd>{current}</dd></div><div><dt>{copy.newTime}</dt><dd>{preview ?? copy.invalidTime}</dd></div></dl>
     <p className={styles.muted}>{fillCopy(copy.timesIn, {zone:timeZone.replaceAll("_", " ")})}</p>
     {quiet && guardrails && <p className={styles.dialogWarning} role="status"><IconAlertTriangle size={15} aria-hidden="true" /><span>{fillContent(content.calendarQuietHours, { start: hourLabelOf(guardrails.quietStartHour), end: hourLabelOf(guardrails.quietEndHour) })}</span></p>}

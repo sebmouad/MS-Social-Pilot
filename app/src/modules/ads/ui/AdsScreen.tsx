@@ -1,3 +1,4 @@
+import { clipText } from '@/lib/clip-text';
 import { loadAdsCopy } from '@/modules/ads/server/copy';
 import { SyncNowButton } from '@/modules/analytics/ui/SyncNowButton';
 import { customerText } from '@/modules/ads/copy';
@@ -84,7 +85,7 @@ async function AdsPage({ searchParams }: { searchParams: Promise<AdsSearchParams
         {boost ? <aside className="ads-boost" aria-label={t('boostTitle')}>
           <div>
             <strong>{t('boostTitle')}</strong>
-            <p>{t('boostBody', { text: boost.text.length > 90 ? `${boost.text.slice(0, 89)}…` : boost.text, channel: boost.channelName, value: new Intl.NumberFormat(locale).format(boost.value), label: boost.rankLabel, ratio: new Intl.NumberFormat(locale, { maximumFractionDigits: 1 }).format(boost.ratio) })}</p>
+            <p>{t('boostBody', { text: clipText(boost.text, 89), channel: boost.channelName, value: new Intl.NumberFormat(locale).format(boost.value), label: boost.rankLabel, ratio: new Intl.NumberFormat(locale, { maximumFractionDigits: 1 }).format(boost.ratio) })}</p>
           </div>
           <div className="ads-boost__actions">
             {boost.url ? <a className="ui-button ui-button--secondary ui-button--sm" href={boost.url} target="_blank" rel="noreferrer">{t('boostOpenPost')}</a> : null}

@@ -1,4 +1,5 @@
 'use client';
+import { clipText } from '@/lib/clip-text';
 
 import { useState } from 'react';
 import { Button } from '@/components/Button';
@@ -61,7 +62,7 @@ const MODES: Array<{ id: Mode; title: string; hint: string }> = [
     </section>}
     {posts.length ? <div className={styles.tableWrap}><table className={styles.table}><caption className="sr-only">{c.posts_and_their_labels}</caption>
       <thead><tr>{canWrite && <th scope="col">{c.select}</th>}<th scope="col">{c.post}</th><th scope="col">{c.status}</th><th scope="col">{c.labels}</th></tr></thead>
-      <tbody>{posts.map(p => <tr key={p.id}>{canWrite && <td><input type="checkbox" aria-label={fillComposerCopy(c.selectPost, { title: p.message.slice(0, 40) || c.untitled })} checked={selected.has(p.id)} onChange={() => setSelected(s => toggle(s, p.id))} /></td>}
+      <tbody>{posts.map(p => <tr key={p.id}>{canWrite && <td><input type="checkbox" aria-label={fillComposerCopy(c.selectPost, { title: clipText(p.message, 40, '') || c.untitled })} checked={selected.has(p.id)} onChange={() => setSelected(s => toggle(s, p.id))} /></td>}
         <th scope="row"><a className={styles.msg} href={`/content/post/${encodeURIComponent(p.id)}`}>{p.message || c.untitled_post}</a></th>
         <td>{({ draft: c.status_draft, scheduled: c.status_scheduled, pending_approval: c.status_pending_approval, published: c.status_published, failed: c.status_failed, publishing: c.status_publishing, rejected: c.status_rejected } as Record<string, string>)[p.status] ?? p.status.replaceAll('_', ' ')}</td>
         <td>{p.labels.length ? <span className={styles.chips}>{p.labels.map(l => <span key={l.id} className={styles.chip}>{l.name}</span>)}</span> : <span className={styles.meta}>{c.no_labels}</span>}</td></tr>)}</tbody></table></div>

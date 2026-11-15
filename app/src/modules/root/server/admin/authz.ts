@@ -1,3 +1,4 @@
+import { clipText } from '@/lib/clip-text';
 import type { Prisma } from '../../../../../generated/client';
 import { OperationError } from '@/lib/operation-error';
 
@@ -27,7 +28,7 @@ const SECRET = /(bearer\s+[A-Za-z0-9._~+/=-]{8,}|(?:access_token|refresh_token|i
 export function redact(text: string | null | undefined, max: number): string | null {
   if (text == null) return null;
   const clean = text.replace(SECRET, '[redacted]').replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, '');
-  return clean.length > max ? `${clean.slice(0, max)}…` : clean;
+  return clipText(clean, max);
 }
 
 /** Lock current actor and affected accounts in the same order as account access controls. */

@@ -88,6 +88,9 @@ type Props = {
 type MediaItem = { kind: string; url: string; altText?: string };
 const MEDIA_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
+/** A split point that never falls inside an emoji's surrogate pair (a split one breaks hydration, 2026-11-15). */
+const safeCut = (text: string, at: number) => at > 0 && /[\uD800-\uDBFF]/.test(text.charAt(at - 1)) ? at - 1 : at;
+
 function webUrl(value: string | null | undefined): string | null {
   if (!value) return null;
   // The app serves Page pictures and media from its own paths (/api/channels/…/picture): same-origin, so allowed.
@@ -147,7 +150,7 @@ export function PostPreview({ post, authorName, authorAvatarUrl, timeZone, varia
   const hasFailure = post.status !== 'failed' && post.targets.some(item => item.status === 'failed');
   // Per-channel rendering: the channel folds long text, shapes media and may hide the caption or refuse a first comment.
   const foldAt = rendering && rendering.caption !== false ? rendering.textFoldChars ?? null : null;
-  const folded = foldAt && post.message.length > foldAt ? { head: post.message.slice(0, foldAt), tail: post.message.slice(foldAt) } : null;
+  const folded = foldAt && post.message.length > foldAt ? { head: post.message.slice(0, safeCut(post.message, foldAt)), tail: post.message.slice(safeCut(post.message, foldAt)) } : null;
   const showCaption = !rendering || rendering.caption !== false;
   const commentUnsupported = rendering?.firstComment === 'unsupported' && Boolean(post.firstComment?.trim());
   const commentEmptySlot = rendering?.emptyFirstCommentSlot === true && rendering?.firstComment !== 'unsupported' && !post.firstComment?.trim();
