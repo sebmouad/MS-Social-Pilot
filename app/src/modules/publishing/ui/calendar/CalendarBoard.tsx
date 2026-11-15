@@ -276,6 +276,7 @@ export function CalendarBoard({ view, days, timeZone, nowIso, canCreate, filterQ
           return <div key={dropKey} role="group" aria-label={`${day.longLabel}, ${hourLabel(hour, locale)}`} className={styles.slot} data-past={slotEnded || undefined} data-quiet={(showQuiet && quietHour(hour) && !slotEnded) || undefined} data-heat={heatLevel} data-over={over === dropKey || undefined} {...dropProps(dropKey, day.key, time, day.isPast || slotEnded)}>
             {heatLevel === 'peak' && <span className={styles.heatTag}>{content.calendarBestTimesPeak}</span>}
             {slotPosts.map(post => postCard(post, true))}
+            {day.slotMore?.[time] ? <a className={styles.more} href={`/content/calendar?view=list&date=${day.key}${filterQuery}`}>+{day.slotMore[time]}{copy.more}</a> : null}
             {canCreate && !slotEnded && day.freeSlots?.filter(free => Number(free.slice(0, 2)) === hour).map(free => freePill(day, free))}
             {canCreate && !slotEnded && <a className={styles.slotAdd} href={newPostHref(day.key, time)} aria-label={fillCopy(copy.newPostLabel, {day:day.longLabel,time:hourLabel(hour, locale)})}><span aria-hidden="true">+</span></a>}
           </div>;

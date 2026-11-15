@@ -44,6 +44,9 @@ const DAY = 24 * 60 * 60 * 1000;
 const utcNoon = (key: string) => new Date(`${key}T12:00:00Z`);
 
 
+/** Posts shown per hour in the week view before « +N more ». */
+const WEEK_SLOT_POSTS = 3;
+
 export default async function CalendarPage({ searchParams }: { searchParams: Promise<Params> }) {
   const viewer = await requireViewer({ feature: "publishing/calendar", channelScoped: true });
   // Independent reads start together (2026-11-15): one after another they made the Calendar take about 1.5 s.
@@ -95,6 +98,10 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
   const canEditCalendar = canAccessFeature(viewer.permissions, "publishing/calendar", "write");
   const canCreate = canAccessFeature(viewer.permissions, "publishing/posts", "write");
   const byDay = new Map<string, BoardPost[]>();
+  // Previews and move choices are built only for the posts a view shows (2026-11-15): building them for every post of a
+  // busy week (about 570) took most of the page time and sent 2 MB.
+  const heavy = new Map<string, () => Pick<BoardPost, 'moveOptions' | 'preview'>>();
+  const enrich = (post: BoardPost): BoardPost => ({ ...post, ...heavy.get(post.id)?.() });
   for (const post of posts) {
     const when = postCalendarDate(post);
     if (!when) continue;
@@ -109,14 +116,16 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
       origin: origins.get(post.id),
       clockLabel: formatPostPreviewTime(when, timeZone, locale),
       wallTime,
-      moveOptions: movable ? moveCandidates(when.toISOString(), timeZone, now.getTime(), movePolicy) : undefined,
-      preview: {
-        id: post.id, authorId: post.authorId, message: post.message, firstComment: post.firstComment, link: post.link, media: post.media,
-        status: post.status, scheduledAt: post.scheduledAt, publishedAt: post.publishedAt, createdAt: post.createdAt,
-        displayTime: formatPostPreviewTime(post.publishedAt ?? post.scheduledAt ?? post.createdAt, timeZone, locale),
-        targets: post.targets.map(({ id, status, remotePostId, remoteUrl, firstCommentId, firstCommentAt, firstCommentError, target }) => ({ id, status, remotePostId, remoteUrl, firstCommentId, firstCommentAt, firstCommentError, target: { id: target.id, type: target.type, name: target.name, pictureUrl: target.pictureUrl, platformName: (target as { platformName?: string | null }).platformName ?? null } })),
-      },
     }]);
+    heavy.set(post.id, () => ({
+        moveOptions: movable ? moveCandidates(when.toISOString(), timeZone, now.getTime(), movePolicy) : undefined,
+        preview: {
+          id: post.id, authorId: post.authorId, message: post.message, firstComment: post.firstComment, link: post.link, media: post.media,
+          status: post.status, scheduledAt: post.scheduledAt, publishedAt: post.publishedAt, createdAt: post.createdAt,
+          displayTime: formatPostPreviewTime(post.publishedAt ?? post.scheduledAt ?? post.createdAt, timeZone, locale),
+          targets: post.targets.map(({ id, status, remotePostId, remoteUrl, firstCommentId, firstCommentAt, firstCommentError, target }) => ({ id, status, remotePostId, remoteUrl, firstCommentId, firstCommentAt, firstCommentError, target: { id: target.id, type: target.type, name: target.name, pictureUrl: target.pictureUrl, platformName: (target as { platformName?: string | null }).platformName ?? null } })),
+        },
+    }));
   }
   // Free queue times: the weekly queue times of the channels in view that no post already uses, from today on. A lookup failure only hides the pills.
   let freeSlots = new Map<string, string[]>();
@@ -152,7 +161,18 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
         published: all.filter(post => post.status === "published" || post.status === "partially_failed").length,
         failed: all.filter(post => post.status === "failed").length,
       } : undefined;
-      return { posts: shown, moreCount: all.length - shown.length, ...(summary ? { summary } : {}) };
+      if (view === "week") {
+        // At most WEEK_SLOT_POSTS posts per hour; the rest are counted and reached through « +N more » (the List view).
+        const perHour = new Map<string, number>(); const slotMore: Record<string, number> = {};
+        const kept = all.filter(post => {
+          const hour = (post.wallTime?.time ?? '00:00').slice(0, 2);
+          const seen = perHour.get(hour) ?? 0; perHour.set(hour, seen + 1);
+          if (seen < WEEK_SLOT_POSTS) return true;
+          slotMore[`${hour}:00`] = (slotMore[`${hour}:00`] ?? 0) + 1; return false;
+        });
+        return { posts: kept.map(enrich), moreCount: 0, ...(Object.keys(slotMore).length ? { slotMore } : {}) };
+      }
+      return { posts: shown.map(enrich), moreCount: all.length - shown.length, ...(summary ? { summary } : {}) };
     })(),
   }));
 
