@@ -68,8 +68,12 @@ export async function poolHealthWithin(key: string, ttlSeconds: number, now: Dat
   for (const [cachedKey, entry] of cache) if (now.getTime() - entry.at >= Math.max(ttlSeconds * 1000, STALE_LIMIT_MS)) cache.delete(cachedKey);
   const hit = cache.get(key);
   if (hit && ttlSeconds > 0 && now.getTime() - hit.at < ttlSeconds * 1000) return hit.health;
+  // A scan already running for an earlier visit is not waited for again (2026-11-15): each visit used to pay the full
+  // wait while one long scan (about a minute after a restart emptied the cache) was still going.
+  const running = inflight.has(key);
   const pending = scan(key, ttlSeconds, compute);
   if (hit) return hit.health;
+  if (running) return null;
   let timer: ReturnType<typeof setTimeout> | undefined;
   const deadline = new Promise<null>(resolve => { timer = setTimeout(() => resolve(null), waitMs); });
   try { return await Promise.race([pending, deadline]); } catch { return null; } finally { clearTimeout(timer); }

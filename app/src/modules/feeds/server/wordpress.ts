@@ -69,7 +69,8 @@ async function selectablePages(workspaceId: string, s: WordpressSettings, auth: 
 
 /** Pool health for the source's channels the viewer may see; null when the library cannot be read right now. */
 /** How long a screen waits for a first library scan before showing the page without its figures. */
-const POOL_WAIT_MS = 2500;
+/** How long the Feeds page waits for a first recipe count before showing « Still counting » (was 2.5 s). */
+const POOL_WAIT_MS = 800;
 
 async function readPool(s: WordpressSettings, source: SourceRow, ports: PlannerPorts, auth: FeedAuthorization): Promise<PoolHealth | null> {
   try {
