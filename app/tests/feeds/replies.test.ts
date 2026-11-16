@@ -33,3 +33,16 @@ test('reply drafts: each waiting comment gets one draft; an AI refusal stops the
   const off = await draftRecipeReplies({ sourceId: 's', actor: { userId: 'u', workspaceId: 'w' }, pilot: { ...AUTOPILOT_DEFAULTS, replies: { enabled: false, tone: 'friendly' } }, now: new Date() }, ports);
   assert.equal(off, 0);
 });
+
+test('reply drafts: recent drafts are listed so new ones do not repeat them', async () => {
+  const systems: string[] = [];
+  const ports: ReplyPorts = {
+    async waiting() { return [comment, { ...comment, id: 'c2' }]; },
+    async recent() { return ['Avec plaisir, merci à vous ! 😊']; },
+    async write(_a, system) { systems.push(system); return systems.length === 1 ? 'Merci Julie, ravie que ça vous plaise !' : 'Bonne dégustation à vous !'; },
+    async save() {},
+  };
+  await draftRecipeReplies({ sourceId: 's', actor: { userId: 'u', workspaceId: 'w' }, pilot: AUTOPILOT_DEFAULTS, now: new Date() }, ports);
+  assert.match(systems[0]!, /Avec plaisir, merci à vous/);
+  assert.match(systems[1]!, /Merci Julie, ravie/, 'a draft written in this run is avoided by the next one');
+});

@@ -11,6 +11,8 @@ export type ReplyPorts = {
   waiting(sourceId: string, since: Date, limit: number): Promise<DraftCandidate[]>;
   write(actor: FeedActor, system: string, prompt: string): Promise<string>;
   save(commentId: string, draft: string): Promise<void>;
+  /** Drafts written lately for this source, newest first, so new ones do not repeat them. */
+  recent?(sourceId: string, limit: number): Promise<string[]>;
 };
 export const DRAFTS_PER_RUN = 8;
 
@@ -20,13 +22,15 @@ const TONES: Record<AutopilotSettings['replies']['tone'], string> = {
   expert: 'helpful and precise, like a cook giving a tip',
 };
 
-export function replyPrompt(c: DraftCandidate, tone: AutopilotSettings['replies']['tone']): { system: string; prompt: string } {
+export function replyPrompt(c: DraftCandidate, tone: AutopilotSettings['replies']['tone'], avoid: readonly string[] = []): { system: string; prompt: string } {
   const system = [
     `You reply as the French Facebook page « ${c.channel} » to a comment under its recipe post.`,
     `Tone: ${TONES[tone]}. Write in French, one or two short sentences. At most one emoji.`,
     'Answer the actual comment. Use only the recipe below for facts; if the answer is not in it, say so kindly and suggest something simple and safe.',
     c.permalink ? `If they ask for the recipe or the link, give this link: ${c.permalink}` : 'Do not include any link.',
     'Use the person’s first name only if it reads naturally. Never invent a promise, a price or a medical claim. Answer with the reply only.',
+    // Replies on a public Page must not read as copies of each other (2026-11-16).
+    ...(avoid.length ? ['Vary your wording: do not reuse the opening or the sentence of these recent replies:', ...avoid.slice(0, 8).map(text => `- ${text.slice(0, 160)}`)] : []),
   ].join('\n');
   const prompt = [`Comment from ${c.fromName || 'a visitor'}: ${c.message.slice(0, 800)}`, `Recipe: ${c.title}`, c.recipe ? c.recipe.slice(0, 1500) : ''].filter(Boolean).join('\n');
   return { system, prompt };
@@ -45,12 +49,14 @@ export function cleanReply(raw: string, permalink: string | null, max = 1000): s
 export async function draftRecipeReplies(input: { sourceId: string; actor: FeedActor; pilot: AutopilotSettings; now: Date }, ports: ReplyPorts = prismaReplyPorts): Promise<number> {
   if (!input.pilot.replies.enabled) return 0;
   const waiting = await ports.waiting(input.sourceId, new Date(input.now.getTime() - 3 * 86_400_000), DRAFTS_PER_RUN);
+  if (!waiting.length) return 0;
+  const avoid = await ports.recent?.(input.sourceId, 8).catch(() => []) ?? [];
   let drafted = 0;
   for (const c of waiting) {
     try {
-      const { system, prompt } = replyPrompt(c, input.pilot.replies.tone);
+      const { system, prompt } = replyPrompt(c, input.pilot.replies.tone, avoid);
       const draft = cleanReply(await ports.write(input.actor, system, prompt), c.permalink);
-      if (draft) { await ports.save(c.id, draft); drafted++; }
+      if (draft) { await ports.save(c.id, draft); avoid.unshift(draft); drafted++; }
     } catch { break; /* over the AI limit or unavailable: the next run continues */ }
   }
   return drafted;
@@ -72,6 +78,12 @@ export const prismaReplyPorts: ReplyPorts = {
   async write(actor, system, prompt) {
     const { autopilotComplete } = await import('@/modules/studio/server/ai');
     return autopilotComplete({ userId: actor.userId, workspaceId: actor.workspaceId }, 'autopilot.reply', system, prompt, { maxTokens: 300 });
+  },
+  async recent(sourceId, limit) {
+    const rows = await prisma.$queryRaw<Array<{ aiDraft: string }>>`SELECT pc."aiDraft" FROM post_comments pc JOIN post_targets pt ON pt.id = pc."postTargetId"
+      JOIN wordpress_recipe_plans l ON l."postId" = pt."postId" AND l."targetId" = pt."targetId" AND l."sourceId" = ${sourceId}
+      WHERE pc."aiDraft" IS NOT NULL ORDER BY pc."aiDraftAt" DESC NULLS LAST LIMIT ${limit}`;
+    return rows.map(row => row.aiDraft);
   },
   async save(commentId, draft) {
     await prisma.$executeRaw`UPDATE post_comments SET "aiDraft" = ${draft}, "aiDraftAt" = NOW() WHERE id = ${commentId} AND "aiDraft" IS NULL`;
