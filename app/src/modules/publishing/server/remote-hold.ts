@@ -21,10 +21,21 @@ const targetSelect = { id: true, name: true, type: true, providerId: true, canPu
 export async function heldDestinations(workspaceId: string, postId: string) {
   return prisma.postTarget.findMany({
     where: { postId, status: 'scheduled_remote', remotePostId: { not: null }, post: { workspaceId } },
-    select: { id: true, targetId: true, formatId: true, remotePostId: true, post: { select: { format: true } }, target: { select: targetSelect } },
+    select: { id: true, targetId: true, formatId: true, remotePostId: true, post: { select: { format: true, media: true } }, target: { select: targetSelect } },
   });
 }
 type Held = Awaited<ReturnType<typeof heldDestinations>>[number];
+
+/**
+ * What the held post carries, as the status reader needs it (2026-11-16): a held photo is stored under its photo id,
+ * which only the photo reader understands. Without it every held photo read as « not held », and cancelling or
+ * moving it was refused.
+ */
+export function heldContentKind(media: unknown): 'text' | 'image' | 'video' {
+  const items = Array.isArray(media) ? media : [];
+  const has = (kind: string) => items.some(item => item && typeof item === 'object' && (item as { kind?: unknown }).kind === kind);
+  return has('video') ? 'video' : has('image') ? 'image' : 'text';
+}
 
 const unavailable = (what: string, errorText: PublishingErrorText = defaultPublishingErrorText) => new PublishingOperationError('conflict', 'value0CheckThePlatformRefreshThePostStatusThen', {value0: what}, errorText);
 
@@ -80,7 +91,7 @@ export async function cancelHeldDestinations(actor: PublishingActor, signal: Abo
     const deleter = readPublishingCredential(item.target, adapter, 'remoteDelete');
     if (!adapter.getRemoteStatus || !adapter.deleteRemote || !reader || !deleter) throw unavailable(`${item.target.name} needs to be reconnected.`, errorText);
     const targetRef = { id: item.target.providerId, name: '', kind: item.target.type };
-    const status = await adapter.getRemoteStatus({ credential: reader, target: targetRef, remoteId: item.remotePostId!, formatId, signal }).catch(() => null);
+    const status = await adapter.getRemoteStatus({ credential: reader, target: targetRef, remoteId: item.remotePostId!, formatId, contentKind: heldContentKind(item.post.media), signal }).catch(() => null);
     if (!status || status.state !== 'scheduled') {
       throw unavailable(status?.state === 'published' ? `${item.target.name} has already published this post, so the schedule cannot be cancelled.` : `The platform did not confirm that it is still holding the post for ${item.target.name}.`, errorText);
     }

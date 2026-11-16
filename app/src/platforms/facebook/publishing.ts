@@ -535,10 +535,18 @@ export function createFacebookEngine(rawConfig: FacebookConfig, fetchImpl: Faceb
     async rescheduleScheduledPost(token, remoteId, scheduledUnix) {
       if (typeof remoteId !== 'string' || !/^[A-Za-z0-9_:-]{1,128}$/.test(remoteId)) throw new FacebookApiError('A Facebook post id is required to change its schedule.', 0);
       if (!Number.isSafeInteger(scheduledUnix) || scheduledUnix <= 0) throw new FacebookApiError('Facebook received an invalid schedule time.', 0);
+      // A held photo is stored by its photo id; its schedule lives on the feed post it carries (page_story_id), 2026-11-16.
+      let postId = remoteId;
+      if (!remoteId.includes('_')) {
+        const photo = object(await request(encodeURIComponent(remoteId), { token, params: { fields: 'id,page_story_id' } }));
+        const story = photo.page_story_id;
+        if (photo.id !== remoteId || typeof story !== 'string' || !/^[A-Za-z0-9_:-]{1,128}$/.test(story)) throw new FacebookApiError('Facebook no longer holds this post, so its schedule cannot be changed.', 400, 100);
+        postId = story;
+      }
       // Read first: only an object Facebook still reports as unpublished may be moved. An already-live post is never rewritten.
-      const held = object(await request(encodeURIComponent(remoteId), { token, params: { fields: 'id,is_published,scheduled_publish_time' } }));
-      if (held.id !== remoteId || held.is_published !== false) throw new FacebookApiError('Facebook no longer holds this post, so its schedule cannot be changed.', 400, 100);
-      const result = object(await request(encodeURIComponent(remoteId), { method: 'POST', token, body: { scheduled_publish_time: String(scheduledUnix) } }));
+      const held = object(await request(encodeURIComponent(postId), { token, params: { fields: 'id,is_published,scheduled_publish_time' } }));
+      if (held.id !== postId || held.is_published !== false) throw new FacebookApiError('Facebook no longer holds this post, so its schedule cannot be changed.', 400, 100);
+      const result = object(await request(encodeURIComponent(postId), { method: 'POST', token, body: { scheduled_publish_time: String(scheduledUnix) } }));
       if (result.success !== true) throw new FacebookApiError('Facebook did not confirm the new schedule.', 200);
     },
     async deletePhoto(token, remoteId, onDispatch, onConfirmed) {
