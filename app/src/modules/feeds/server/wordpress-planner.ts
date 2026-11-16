@@ -322,6 +322,13 @@ export async function planSource(ctx: Ctx, source: SourceRow, auth: FeedAuthoriz
     if (mine.paused) continue;
     for (const slotAt of slotInstants({ now, slots: mine.slots, timezone: config.timezone, horizonDays: config.horizonDays, leadMinutes: settings.minLeadMinutes, ...(mine.weekdays ? { weekdays: mine.weekdays } : {}) })) pairs.push({ slotAt, page });
   }
+  // A slot a member retries or chooses a recipe for is planned at its own time, even when the channel's times changed
+  // since it was first planned (2026-11-16: « Another recipe » on an older time left it empty).
+  for (const key of new Set([...(ctx.retry ?? []), ...(ctx.force?.keys() ?? [])])) {
+    const [targetId, ms] = key.split('|'); const page = pages.find(item => item.id === targetId);
+    const at = new Date(Number(ms));
+    if (page && !of(page.id).paused && at.getTime() > now.getTime() && !pairs.some(pair => pair.page.id === page.id && pair.slotAt.getTime() === at.getTime())) pairs.push({ slotAt: at, page });
+  }
   // A slot whose post failed keeps its identity and gets a replacement published shortly (self-healing).
   for (const key of ctx.makeup?.keys() ?? []) {
     const [targetId, ms] = key.split('|'); const page = pages.find(item => item.id === targetId);

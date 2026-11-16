@@ -249,3 +249,15 @@ test('autopilot: each caption is told the openings already written, so channels 
   assert.doesNotMatch(systems[0]!, /recent openings/);
   assert.match(systems[1]!, /Ouverture numéro 1/);
 });
+
+test('planner: « Another recipe » on a slot from older times is planned at that time, not left empty', async () => {
+  const first = harness();
+  await planSource({ settings: settings(), ports: first.ports, db: first.db as never, budget: { left: 50 }, now }, source(), auth);
+  const slot = first.ledger.find(row => row.targetId === 'pageA')!;
+  const h = harness([...first.ledger.filter(row => row.id !== slot.id), { ...slot, state: 'failed', postId: null, reason: 'replaced', skipped: [slot.wpPostId] }]);
+  // The channel's times changed since: its learned times no longer include this slot.
+  const changed = source({ autopilot: { ...AUTOPILOT_DEFAULTS, learnedTimes: { pageA: ['09:05', '19:05'] } } });
+  const out = await planSource({ settings: settings(), ports: h.ports, db: h.db as never, budget: { left: 50 }, now, retry: new Set([slotKey(slot.targetId, slot.slotAt)]) }, changed, auth);
+  assert.equal(out.planned, 1);
+  assert.ok(h.created.some(p => p.targetId === 'pageA' && p.scheduledAt.getTime() === slot.slotAt.getTime()));
+});
