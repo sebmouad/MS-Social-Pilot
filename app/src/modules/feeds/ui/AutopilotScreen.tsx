@@ -51,7 +51,7 @@ export default async function AutopilotScreen() {
             <span className={styles.badge} data-tone={channel.paused ? 'warn' : channel.autoTimes ? 'accent' : undefined}>{channel.paused ? t('paused') : channel.autoTimes ? t('autoTimes') : t('sharedTimes')}</span></div>
           <span className={styles.times}>{channel.times.join(' · ')}</span>
           {channel.next ? <p className={styles.next}><span>{t('next')} {channel.next.time}</span> {channel.next.title}{typeof channel.next.score === 'number' ? <span className={styles.score} data-band={channel.next.score >= 70 ? 'high' : channel.next.score >= 45 ? 'mid' : 'low'}>{channel.next.score}</span> : null}</p> : <p className={styles.muted}>{t('noNext')}</p>}
-          <p className={styles.meta}>{t('reachToday', { reach: number(channel.reachToday) })} · {t('postsToday', { count: channel.postsToday })}{channel.failedWeek ? <> · <span className={styles.warn}>{t('failedWeek', { count: channel.failedWeek })}</span></> : null}</p>
+          <p className={styles.meta}>{t('reachToday', { reach: number(channel.reachToday) })} · {channel.postsToday === 1 ? t('postsTodayOne') : t('postsToday', { count: channel.postsToday })}{channel.failedWeek ? <> · <span className={styles.warn}>{channel.failedWeek === 1 ? t('failedWeekOne') : t('failedWeek', { count: channel.failedWeek })}</span></> : null}</p>
         </li>)}</ul>
       </section>
 
