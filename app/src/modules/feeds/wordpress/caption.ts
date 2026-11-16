@@ -7,11 +7,11 @@ import type { AutopilotSettings } from './autopilot';
 export const HOOK_STYLES = ['question', 'benefit', 'story', 'curiosity', 'promise'] as const;
 export type HookStyle = typeof HOOK_STYLES[number];
 const STYLE_TEXT: Record<HookStyle, string> = {
-  question: 'Open with a question the reader answers yes to (« Envie d’un gratin qui fond sous la cuillère ? »).',
-  benefit: 'Open with the concrete benefit: time, ease or result (« 20 minutes, 5 ingrédients, zéro stress. »).',
-  story: 'Open with a short, warm scene from family life (« Le dimanche, chez nous, c’est elle qu’on réclame. »).',
-  curiosity: 'Open with a curiosity hook: a secret, a tip, a surprise (« Le secret d’un cannelé bien croustillant ? »).',
-  promise: 'Open with a confident promise about the result (« Vous allez la refaire chaque semaine. »).',
+  question: 'Open with a short question the reader answers yes to.',
+  benefit: 'Open with the concrete benefit: time, ease or result.',
+  story: 'Open with a short, warm scene from family life.',
+  curiosity: 'Open with a curiosity hook: a secret, a tip, a surprise.',
+  promise: 'Open with a confident promise about the result.',
 };
 export const VOICES = {
   warm: 'warm and family, like a friend sharing a favourite dish',
@@ -57,7 +57,7 @@ export function bestStyle(results: ReadonlyArray<{ style?: string | null; relati
   return { style: (ranked[0]?.[0] as HookStyle | undefined) ?? null, stats };
 }
 
-export function captionPrompt(input: { channel: string; voice: Voice; style: HookStyle; question: boolean; emoji: AutopilotSettings['captions']['emoji']; title: string; caption: string; ingredients: readonly string[] }): { system: string; prompt: string } {
+export function captionPrompt(input: { channel: string; voice: Voice; style: HookStyle; question: boolean; emoji: AutopilotSettings['captions']['emoji']; title: string; caption: string; ingredients: readonly string[]; avoid?: readonly string[] }): { system: string; prompt: string } {
   const emoji = input.emoji === 'none' ? 'Use no emoji.' : input.emoji === 'few' ? 'Use one or two emojis.' : 'Use several fitting emojis to make it lively, without overdoing it.';
   const system = [
     `You write the Facebook caption of one recipe for the French page « ${input.channel} ».`,
@@ -68,6 +68,8 @@ export function captionPrompt(input: { channel: string; voice: Voice; style: Hoo
     input.question ? 'End with one short question that invites people to comment.' : 'Do not end with a question.',
     'No link, no hashtag, no price. Never invent an ingredient or a step that is not in the recipe. Do not mention that you are an AI.',
     'Answer with the caption only.',
+    // Channels must not read alike (2026-11-16): openings written lately are listed so this one differs.
+    ...(input.avoid?.length ? ['Your first words must differ from these recent openings (do not start with the same word):', ...input.avoid.slice(0, 10).map(text => `- ${text.slice(0, 90)}`)] : []),
   ].join('\n');
   const prompt = [`Recipe: ${input.title}`, input.caption ? `About it: ${input.caption.slice(0, 600)}` : '', input.ingredients.length ? `Ingredients: ${input.ingredients.slice(0, 10).join(', ').slice(0, 500)}` : ''].filter(Boolean).join('\n');
   return { system, prompt };

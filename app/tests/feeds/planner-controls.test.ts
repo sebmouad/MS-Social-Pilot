@@ -7,6 +7,7 @@ import { planSource, slotKey, LEFT_EMPTY, type PlannerPorts } from '@/modules/fe
 import type { WordpressSettings } from '@/modules/feeds/server/wordpress-settings';
 import type { LedgerRow, SourceRow, ClaimInput, Settlement } from '@/modules/feeds/server/wordpress-store';
 import type { FeedAuthorization } from '@/modules/feeds/server/access';
+import { AUTOPILOT_DEFAULTS } from '@/modules/feeds/wordpress/autopilot';
 import type { ScoringPorts, Rating, Outcome } from '@/modules/feeds/server/wordpress-scoring';
 
 const now = new Date('2026-11-16T06:00:00Z'); // Monday, 07:00 in Paris
@@ -228,4 +229,23 @@ test('planner: a placeholder caption (« p3 ») is never posted', async () => {
   assert.ok(h.created.length > 0);
   assert.ok(h.created.every(p => p.message !== 'p3'));
   assert.ok(!h.ledger.some(row => row.wpPostId === 't1'), 'without AI to write it, the recipe is skipped');
+});
+
+test('autopilot: a channel at its learned times publishes exactly then, without the old offset between Pages', async () => {
+  const h = harness();
+  const s2 = settings(); s2.pageStaggerMinutes = 9;
+  const pilot = { ...AUTOPILOT_DEFAULTS, learnedTimes: { pageB: ['11:05', '17:05'] } };
+  await planSource({ settings: s2, ports: h.ports, db: h.db as never, budget: { left: 50 }, now }, source({ autopilot: pilot }), auth);
+  const b = h.created.filter(p => p.targetId === 'pageB').map(p => paris(p.scheduledAt));
+  assert.deepEqual([...new Set(b)].sort(), ['11:05', '17:05']);
+});
+
+test('autopilot: each caption is told the openings already written, so channels never open alike', async () => {
+  const systems: string[] = [];
+  let n = 0;
+  const h = harness([], { captions: async system => { systems.push(system); n++; return `Ouverture numéro ${n} pour cette belle recette 😋\nEt vous ?`; } });
+  await planSource({ settings: settings(), ports: h.ports, db: h.db as never, budget: { left: 50 }, now }, source(), auth);
+  assert.ok(systems.length >= 2);
+  assert.doesNotMatch(systems[0]!, /recent openings/);
+  assert.match(systems[1]!, /Ouverture numéro 1/);
 });

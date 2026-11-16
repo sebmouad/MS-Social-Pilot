@@ -35,7 +35,7 @@ export type PlannerPorts = {
   /** Autopilot scoring (2026-11-16); without it recipes go out in the source's order. */
   scoring?: import('./wordpress-scoring').ScoringPorts;
   /** Autopilot captions (2026-11-16): one AI request for a channel's caption; without it the recipe's own caption is used. */
-  captions?: { write(actor: FeedActor, system: string, prompt: string): Promise<string> };
+  captions?: { write(actor: FeedActor, system: string, prompt: string): Promise<string>; recent?(sourceId: string, limit: number): Promise<string[]> };
 };
 export type PlannedPostInput = { message: string; firstComment: string; targetIds: string[]; scheduledAt: Date; media: Array<{ kind: 'image'; url: string; altText: string }>; firstCommentDelayMinutes: number };
 
@@ -73,7 +73,13 @@ export function defaultPlannerPorts(net: FetchDeps = defaultFetchDeps()): Planne
     },
     now: () => new Date(),
     scoring: prismaScoringPorts,
-    captions: { async write(actor, system, prompt) { const { autopilotComplete } = await import('@/modules/studio/server/ai'); return autopilotComplete({ userId: actor.userId, workspaceId: actor.workspaceId }, 'autopilot.caption', system, prompt, { maxTokens: 600 }); } },
+    captions: {
+      async write(actor, system, prompt) { const { autopilotComplete } = await import('@/modules/studio/server/ai'); return autopilotComplete({ userId: actor.userId, workspaceId: actor.workspaceId }, 'autopilot.caption', system, prompt, { maxTokens: 600 }); },
+      async recent(sourceId, limit) {
+        const rows = await prisma.$queryRaw<Array<{ message: string }>>`SELECT p.message FROM wordpress_recipe_plans l JOIN posts p ON p.id = l."postId" WHERE l."sourceId" = ${sourceId} AND l.style IS NOT NULL ORDER BY l."claimedAt" DESC LIMIT ${limit}`;
+        return rows.map(row => row.message.split('\n')[0]!.slice(0, 90));
+      },
+    },
   };
 }
 
@@ -301,7 +307,10 @@ export async function planSource(ctx: Ctx, source: SourceRow, auth: FeedAuthoriz
   }
   out.pages = pages.length;
   const pageOrder = new Map(pages.map((page, index) => [page.id, index]));
-  const staggered = (slotAt: Date, targetId: string) => new Date(slotAt.getTime() + (pageOrder.get(targetId) ?? 0) * (Number.isFinite(settings.pageStaggerMinutes) ? settings.pageStaggerMinutes : 0) * 60_000);
+  // A channel posting at its own times (its own or learned, each on its own 5-minute mark) is not offset again (2026-11-16).
+  const learned = autopilotOf(config.autopilot);
+  const ownTimes = (targetId: string) => Boolean(config.channels?.[targetId]?.slots?.length) || (learned.bestTimes.enabled && Boolean(learned.learnedTimes?.[targetId]?.length));
+  const staggered = (slotAt: Date, targetId: string) => ownTimes(targetId) ? slotAt : new Date(slotAt.getTime() + (pageOrder.get(targetId) ?? 0) * (Number.isFinite(settings.pageStaggerMinutes) ? settings.pageStaggerMinutes : 0) * 60_000);
   if (!pages.length) return { ...out, reason: 'no_pages' };
 
   // Each channel posts with its own settings where it has them (2026-11-15): times, days, order, first comment, or paused.
@@ -363,6 +372,8 @@ export async function planSource(ctx: Ctx, source: SourceRow, auth: FeedAuthoriz
   const taken = new Set(view.taken);
   const assignments: Array<{ targetId: string; slotAt: Date; candidate: Candidate }> = [];
   const chosenScores = new Map<string, { score: number; kind: string }>();
+  // First lines of captions written in this run, newest first, so channels never open alike.
+  const openings: string[] = learned.captions.enabled && ports.captions?.recent ? await ports.captions.recent(source.id, 10).catch(() => []) : [];
   let readable = 0; let captionMissing = 0; let recipeMissing = 0; let unfilled = 0;
   out.candidates = 0; out.rejected = { shared: 0, caption: 0, image: 0, link: 0, recipe: 0, captionFieldMissing: 0 };
   // Autopilot choosing (2026-11-16): scores, best hours first, variety, past winners. Off without scoring ports.
@@ -427,10 +438,11 @@ export async function planSource(ctx: Ctx, source: SourceRow, auth: FeedAuthoriz
     let style: HookStyle | null = null;
     const key = slotKey(targetId, slotAt);
     if (pilot.captions.enabled && writer && ports.captions) {
+      const avoid = openings.slice(0, 10);
       const pick = styleFor(key, prep?.preferredStyle ?? null, pilot.hooks.enabled ? pilot.hooks.share : 0);
       const { system, prompt } = captionPrompt({ channel: pages.find(page => page.id === targetId)?.name ?? '', voice: voiceFor(pilot.captions.voice, pageOrder.get(targetId) ?? 0), style: pick.style, question: pilot.captions.question, emoji: pilot.captions.emoji,
-        title: c.title, caption: written.caption, ingredients: c.recipe.ingredients.filter(line => !line.heading).map(line => line.text) });
-      try { const clean = cleanCaption(await ports.captions.write(auth.actor, system, prompt), settings.textMax); if (clean) { written = { ...written, caption: clean }; style = pick.style; } }
+        title: c.title, caption: written.caption, ingredients: c.recipe.ingredients.filter(line => !line.heading).map(line => line.text), avoid });
+      try { const clean = cleanCaption(await ports.captions.write(auth.actor, system, prompt), settings.textMax); if (clean) { written = { ...written, caption: clean }; style = pick.style; openings.unshift(clean.split('\n')[0]!.slice(0, 90)); } }
       catch { /* over the AI limit or unavailable: the recipe's own caption goes out */ }
     }
     if (pilot.comment.enabled) written = { ...written, firstComment: withCta(written.firstComment, ctaFor(pilot.comment.cta, key), settings.commentMax) };
