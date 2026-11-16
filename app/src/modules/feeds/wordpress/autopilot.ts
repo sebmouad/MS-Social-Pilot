@@ -86,15 +86,29 @@ export const autopilotSchema = z.object({
   digest: z.object({ enabled: z.boolean(), day: z.enum(['mon', 'fri', 'sun']) }).strict().optional(),
   replies: z.object({ enabled: z.boolean(), tone: z.enum(['friendly', 'short', 'expert']) }).strict().optional(),
   approvedDays: z.array(z.string().regex(/^\d{4}-\d{2}-\d{2}$/)).max(60).optional(),
-  hourValues: z.record(z.string().max(100), z.record(z.string().max(2), z.number().min(0).max(100))).optional()
+  hourValues: z.record(z.string().max(100), z.record(z.string().max(2), z.number().min(0).max(1_000_000))).optional()
     .refine(map => !map || Object.keys(map).length <= 500, 'Too many channels.'),
   lastLearnedAt: z.string().max(40).optional(), learnVersion: z.number().int().min(0).max(1000).optional(),
   log: z.array(logEntry).max(AUTOPILOT_LOG_MAX).optional(),
 }).strict();
 
 /** Stored settings over the approved defaults: a section saved before it existed takes its default. */
+/** The stored autopilot, section by section: a section that no longer validates takes its default alone. */
+export function salvageAutopilot(value: unknown): Record<string, unknown> {
+  const source = value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
+  const out: Record<string, unknown> = {};
+  for (const [key, field] of Object.entries(autopilotSchema.shape)) {
+    if (!(key in source)) continue;
+    const one = (field as z.ZodTypeAny).safeParse(source[key]);
+    if (one.success && one.data !== undefined) out[key] = one.data;
+    else if (key === 'log' && Array.isArray(source.log)) out.log = source.log.filter(entry => logEntry.safeParse(entry).success).slice(0, AUTOPILOT_LOG_MAX);
+  }
+  return out;
+}
+
 export function autopilotOf(value: unknown): AutopilotSettings {
-  const parsed = autopilotSchema.safeParse(value);
+  const whole = autopilotSchema.safeParse(value);
+  const parsed = whole.success ? whole : autopilotSchema.safeParse(salvageAutopilot(value));
   if (!parsed.success) return structuredClone(AUTOPILOT_DEFAULTS);
   const d = structuredClone(AUTOPILOT_DEFAULTS);
   const p = parsed.data;

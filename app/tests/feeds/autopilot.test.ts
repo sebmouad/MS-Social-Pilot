@@ -69,3 +69,20 @@ test('learned times: a channel posts at its learned times, its own times win, an
   const off = { ...base, autopilot: { ...AUTOPILOT_DEFAULTS, bestTimes: { ...AUTOPILOT_DEFAULTS.bestTimes, enabled: false }, learnedTimes: { a: ['12:05'] } } } as typeof base;
   assert.deepEqual(channelConfig(off, 'a').slots, ['11:00', '17:00']);
 });
+
+test('settings: one bad field never discards the rest of the saved configuration', async () => {
+  const { resolveConfig } = await import('@/modules/feeds/wordpress/recipe');
+  const limits = { template: 5000, horizon: { min: 1, max: 14 }, cooldown: { min: 0, max: 3650 }, age: { min: 0, max: 36500 }, delay: { min: 0, max: 1440 } };
+  const defaults = { mapping: { captionMetaKey: '', imageMetaKey: '', recipeMetaKey: '', skipMetaKey: '', attachedFileMetaKey: '_wp_attached_file', postType: 'post', postStatus: 'publish' }, order: 'newest', maxAgeDays: 0, skipShared: false, slots: ['07:00'], timezone: 'Europe/Paris', horizonDays: 2, distinctAcrossPages: true, cooldownDays: 30, firstCommentTemplate: 'x', firstCommentDelayMinutes: 0 } as Parameters<typeof resolveConfig>[0];
+  const stored = { slots: ['11:00', '20:00'], excluded: [{ id: '5', title: 'Five' }], channels: { a: { paused: true } },
+    autopilot: { ...AUTOPILOT_DEFAULTS, hourValues: { a: { '12': -5 } }, log: [{ at: '2026-11-16T01:45:00.000Z', kind: 'times', channelName: 'A', from: ['11:00'], to: ['11:05'] }, { kind: 'bogus' }], learnedTimes: { a: ['11:05'] } },
+    bogus: true };
+  const config = resolveConfig(defaults, stored, limits);
+  assert.deepEqual(config.slots, ['11:00', '20:00']);
+  assert.deepEqual(config.excluded, [{ id: '5', title: 'Five' }]);
+  assert.equal(config.channels?.a?.paused, true);
+  const pilot = autopilotOf(config.autopilot);
+  assert.equal(pilot.log?.length, 1);
+  assert.deepEqual(pilot.learnedTimes, { a: ['11:05'] });
+  assert.equal(pilot.hourValues, undefined);
+});

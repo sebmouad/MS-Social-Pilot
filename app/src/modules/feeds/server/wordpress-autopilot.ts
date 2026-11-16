@@ -59,7 +59,7 @@ export async function learnBestTimes(settings: WordpressSettings, source: Source
   for (const page of pages) for (const [hour, values] of relativeByHour(scored(page.id), config.timezone)) pooled.set(hour, [...(pooled.get(hour) ?? []), ...values]);
   const hourValues: Record<string, Record<string, number>> = {};
   for (const [index, page] of pages.entries()) {
-    hourValues[page.id] = Object.fromEntries(hourStats(scored(page.id), config.timezone, best.window, pooled).map(stat => [String(stat.hour), Math.round(stat.value * 100) / 100]));
+    hourValues[page.id] = Object.fromEntries(hourStats(scored(page.id), config.timezone, best.window, pooled).map(stat => [String(stat.hour), Number.isFinite(stat.value) ? Math.min(1000, Math.round(stat.value * 100) / 100) : 1]));
     const own = channels[page.id];
     if (own?.paused || (own?.slots?.length && !own.autoTimes) || config.channelSlots?.[page.id]?.length) continue;
     const current = channelConfig(config, page.id).slots;

@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { addDaysToKey, instantToWall, wallTimeToInstant } from '@/lib/calendar-dates';
 import { META_KEY, SLOT_TIME, SLOTS_MAX } from './config';
 import { decodeWordpressText } from './text';
-import { autopilotOf, autopilotSchema } from './autopilot';
+import { autopilotOf, autopilotSchema, salvageAutopilot } from './autopilot';
 
 /** Pure logic of the WordPress recipe source: field mapping, recipe parsing, comment rendering, slots and allocation. */
 export type Mapping = { captionMetaKey: string; imageMetaKey: string; recipeMetaKey: string; skipMetaKey: string; attachedFileMetaKey: string; postType: string; postStatus: string };
@@ -69,10 +69,28 @@ export const planConfigPatchSchema = (limits: { template: number; horizon: { min
 }).partial().strict();
 export type PlanConfigPatch = z.infer<ReturnType<typeof planConfigPatchSchema>>;
 
+/**
+ * The saved patch, field by field (2026-11-16): a field that no longer validates falls back to its default alone.
+ * A single bad value (a new limit, an old shape) never discards the rest: times, channels, exclusions, autopilot.
+ */
+export function salvagePatch(patch: unknown, limits: Parameters<typeof planConfigPatchSchema>[0]): PlanConfigPatch {
+  const schema = planConfigPatchSchema(limits);
+  const source = patch && typeof patch === 'object' && !Array.isArray(patch) ? patch as Record<string, unknown> : {};
+  const whole = schema.safeParse(source);
+  if (whole.success) return whole.data;
+  const out: Record<string, unknown> = {};
+  for (const [key, field] of Object.entries(schema.shape)) {
+    if (!(key in source)) continue;
+    const one = (field as import('zod').ZodTypeAny).safeParse(source[key]);
+    if (one.success && one.data !== undefined) out[key] = one.data;
+    else if (key === 'autopilot') out[key] = salvageAutopilot(source[key]);
+  }
+  return out as PlanConfigPatch;
+}
+
 /** Defaults come from Root; the saved patch overrides field by field. */
 export function resolveConfig(defaults: PlanConfig, patch: unknown, limits: Parameters<typeof planConfigPatchSchema>[0]): PlanConfig {
-  const parsed = planConfigPatchSchema(limits).safeParse(patch && typeof patch === 'object' ? patch : {});
-  const p: PlanConfigPatch = parsed.success ? parsed.data : {};
+  const p = salvagePatch(patch, limits);
   return {
     ...defaults, ...Object.fromEntries(Object.entries(p).filter(([k, v]) => v !== undefined && k !== 'mapping')),
     mapping: { ...defaults.mapping, ...Object.fromEntries(Object.entries(p.mapping ?? {}).filter(([, v]) => v !== undefined)) },
