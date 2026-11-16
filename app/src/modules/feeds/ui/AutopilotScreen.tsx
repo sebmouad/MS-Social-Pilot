@@ -7,7 +7,7 @@ import { MetricCard } from '@/components/MetricCard';
 import { requireViewer } from '@/server/context';
 import { FEEDS_FEATURE_ID } from '../manifest';
 import { feedsLocale } from '../copy';
-import { autopilotText, type AutopilotCopyKey } from '../copy-autopilot';
+import { autopilotCopy, autopilotText, type AutopilotCopyKey } from '../copy-autopilot';
 import { readCockpit, approveDayConfirmation } from '../server/wordpress-cockpit';
 import { AutopilotBoard } from './AutopilotBoard';
 import styles from './autopilot.module.css';
@@ -89,6 +89,20 @@ export default async function AutopilotScreen() {
           </div>
         </div>
       </section>
+
+      {view.ai ? <section id="ai" aria-labelledby="ap-ai" className={styles.section}>
+        <h2 id="ap-ai">{t('aiHeading')}{view.ai.model ? <span className={styles.muted}>{t('aiModel', { model: view.ai.model })}</span> : null}</h2>
+        <div className={styles.metrics}>
+          <MetricCard module="publishing" label={t('aiRequests')} value={number(view.ai.requests)} />
+          <MetricCard module="publishing" label={t('aiTokens')} value={number(view.ai.inputTokens + view.ai.outputTokens)} hint={t('aiInOut', { input: number(view.ai.inputTokens), output: number(view.ai.outputTokens) })} />
+          <MetricCard module="publishing" label={t('aiCost')} value={view.ai.costUsd !== null ? new Intl.NumberFormat(locale, { style: 'currency', currency: 'USD', maximumFractionDigits: 2 }).format(view.ai.costUsd) : t('none')} hint={view.ai.costUsd === null ? t('aiUnpriced') : undefined} />
+          <MetricCard module="publishing" label={t('aiPeak')} value={view.ai.hourlyLimit ? t('aiPeakValue', { count: view.ai.peakHour, limit: view.ai.hourlyLimit }) : number(view.ai.peakHour)} hint={t('aiPeakHint')} />
+        </div>
+        <div className={styles.tableWrap}><table className={styles.table}>
+          <thead><tr><th scope="col">{t('colUse')}</th><th scope="col">{t('colRequests')}</th><th scope="col">{t('aiTokens')}</th></tr></thead>
+          <tbody>{view.ai.byKind.map(row => <tr key={row.kind}><th scope="row">{(`use_${row.kind}` in autopilotCopy[locale]) ? t(`use_${row.kind}` as AutopilotCopyKey) : row.kind}</th><td>{number(row.requests)}</td><td>{number(row.inputTokens + row.outputTokens)}</td></tr>)}</tbody>
+        </table></div>
+      </section> : null}
     </div>
   </>;
 }

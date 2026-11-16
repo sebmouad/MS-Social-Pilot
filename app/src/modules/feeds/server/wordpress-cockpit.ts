@@ -27,7 +27,10 @@ export type CockpitView = {
   enabled: boolean; sourceName: string; timeZone: string; pilot: AutopilotSettings; canWrite: boolean;
   channels: CockpitChannel[]; tomorrow: { date: string; posts: CockpitPost[]; approved: boolean; averageScore: number | null; flagged: number };
   report: WeeklyReport;
+  ai: AiUse | null;
 };
+/** AI use this month (2026-11-16): requests and estimated tokens by use, cost when the model is priced, and the busiest hour against the hourly limit. */
+export type AiUse = { requests: number; inputTokens: number; outputTokens: number; costUsd: number | null; unpriced: number; byKind: Array<{ kind: string; requests: number; inputTokens: number; outputTokens: number }>; peakHour: number; hourlyLimit: number | null; model: string | null };
 
 const reachOf = (insights: unknown): number => {
   if (!insights || typeof insights !== 'object') return 0;
@@ -88,6 +91,7 @@ export async function readCockpit(actor: FeedActor, now = new Date()): Promise<C
     enabled: source.enabled, sourceName: source.name, timeZone: tz, pilot, canWrite: auth.role === 'owner' || auth.role === 'admin' || auth.role === 'editor',
     channels, tomorrow: { date: tomorrow, posts: boardPosts, approved: (pilot.approvedDays ?? []).includes(tomorrow), averageScore: scores.length ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : null, flagged: boardPosts.filter(post => post.flagged).length },
     report: await weeklyReport(source, pages, pilot, tz, now),
+    ai: await aiUse(actor.workspaceId, now).catch(() => null),
   };
 }
 
@@ -168,4 +172,26 @@ export async function notifyAutopilot(settings: WordpressSettings, source: Sourc
     if (result.inserted) sent.push(send.kind);
   }
   return sent;
+}
+
+export async function aiUse(workspaceId: string, now: Date): Promise<AiUse> {
+  const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+  const [kinds, peak, model] = await Promise.all([
+    prisma.$queryRaw<Array<{ kind: string | null; requests: bigint; input: bigint | null; output: bigint | null; cost: number | null; unpriced: bigint }>>`SELECT detail->>'kind' AS kind, COUNT(*)::bigint AS requests,
+      SUM((detail->>'inputTokens')::bigint)::bigint AS input, SUM((detail->>'outputTokens')::bigint)::bigint AS output,
+      SUM((detail->>'costUsd')::numeric)::float8 AS cost, COUNT(*) FILTER (WHERE detail->>'costUsd' IS NULL)::bigint AS unpriced
+      FROM activity_logs WHERE "workspaceId" = ${workspaceId} AND action = 'ai.completed' AND "createdAt" >= ${start} GROUP BY 1 ORDER BY 2 DESC`,
+    prisma.$queryRaw<Array<{ count: bigint }>>`SELECT COUNT(*)::bigint AS count FROM activity_logs WHERE "workspaceId" = ${workspaceId} AND action = 'ai.requested' AND "createdAt" >= ${start} GROUP BY date_trunc('hour', "createdAt") ORDER BY 1 DESC LIMIT 1`,
+    prisma.$queryRaw<Array<{ model: string | null }>>`SELECT detail->>'model' AS model FROM activity_logs WHERE "workspaceId" = ${workspaceId} AND action = 'ai.completed' ORDER BY "createdAt" DESC LIMIT 1`,
+  ]);
+  const { runtimeConfig } = await import('@/server/config/store');
+  const limit = Number(await runtimeConfig('ai.hourlyRequestsPerWorkspace').catch(() => NaN));
+  const n = (v: bigint | number | null) => Number(v ?? 0);
+  const priced = kinds.some(k => k.cost !== null && n(k.requests) > n(k.unpriced));
+  return {
+    requests: kinds.reduce((s, k) => s + n(k.requests), 0), inputTokens: kinds.reduce((s, k) => s + n(k.input), 0), outputTokens: kinds.reduce((s, k) => s + n(k.output), 0),
+    costUsd: priced ? Math.round(kinds.reduce((s, k) => s + (k.cost ?? 0), 0) * 100) / 100 : null, unpriced: kinds.reduce((s, k) => s + n(k.unpriced), 0),
+    byKind: kinds.map(k => ({ kind: k.kind ?? 'other', requests: n(k.requests), inputTokens: n(k.input), outputTokens: n(k.output) })),
+    peakHour: n(peak[0]?.count ?? 0), hourlyLimit: Number.isFinite(limit) && limit > 0 ? limit : null, model: model[0]?.model ?? null,
+  };
 }

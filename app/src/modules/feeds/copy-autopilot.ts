@@ -20,6 +20,11 @@ export const autopilotCopy = {
     learnedHeading: 'What the autopilot did', learnedEmpty: 'No automatic change this week.', stylesHeading: 'Hook styles', stylesEmpty: 'Not enough posts yet to compare hook styles.',
     colStyle: 'Style', colAverage: 'Result vs usual', preferred: 'Default', style_question: 'Question', style_benefit: 'Benefit', style_story: 'Story', style_curiosity: 'Curiosity', style_promise: 'Promise',
     kind_dessert: 'Dessert', kind_main: 'Main dish', kind_starter: 'Starter', kind_drink: 'Drink', kind_aperitif: 'Apéritif', kind_bread: 'Bread', kind_side: 'Side dish', kind_breakfast: 'Breakfast', kind_sauce: 'Sauce',
+    aiHeading: 'AI this month', aiRequests: 'AI requests', aiTokens: 'Estimated tokens', aiCost: 'Estimated cost', aiPeak: 'Busiest hour',
+    aiPeakValue: '{count} of {limit} allowed', aiUnpriced: 'Unknown: the model has no price yet', aiModel: 'Model {model}', aiInOut: '{input} in · {output} out',
+    aiPeakHint: 'When the hourly limit is reached, the autopilot uses the recipe\u2019s own caption until the next hour.', colUse: 'Use', colRequests: 'Requests',
+    use_article: 'Recipe writing from the article', 'use_autopilot.caption': 'Caption per channel', 'use_autopilot.rate': 'Recipe ratings', 'use_autopilot.photo': 'Photo ratings', 'use_autopilot.reply': 'Comment reply drafts',
+    use_reply: 'Inbox reply suggestions', use_sentiment: 'Comment sentiment', use_alt_text: 'Image descriptions', use_caption: 'Composer captions', use_other: 'Other',
     timesChanged: '{channel}: times {from} → {to}', noAccess: 'Set up the recipe source on the Content feeds page to use the autopilot.', loadFailed: 'The autopilot could not be loaded. Refresh to try again.',
   },
   fr: {
@@ -42,6 +47,11 @@ export const autopilotCopy = {
     learnedHeading: 'Ce que le pilote a fait', learnedEmpty: 'Aucun changement automatique cette semaine.', stylesHeading: 'Styles d’accroche', stylesEmpty: 'Pas encore assez de publications pour comparer les styles d’accroche.',
     colStyle: 'Style', colAverage: 'Résultat par rapport à l’habitude', preferred: 'Par défaut', style_question: 'Question', style_benefit: 'Bénéfice', style_story: 'Histoire', style_curiosity: 'Curiosité', style_promise: 'Promesse',
     kind_dessert: 'Dessert', kind_main: 'Plat', kind_starter: 'Entrée', kind_drink: 'Boisson', kind_aperitif: 'Apéritif', kind_bread: 'Pain', kind_side: 'Accompagnement', kind_breakfast: 'Petit-déjeuner', kind_sauce: 'Sauce',
+    aiHeading: 'L\u2019IA ce mois-ci', aiRequests: 'Requêtes IA', aiTokens: 'Jetons estimés', aiCost: 'Coût estimé', aiPeak: 'Heure la plus chargée',
+    aiPeakValue: '{count} sur {limit} autorisées', aiUnpriced: 'Inconnu : le modèle n\u2019a pas encore de prix', aiModel: 'Modèle {model}', aiInOut: '{input} en entrée · {output} en sortie',
+    aiPeakHint: 'Quand la limite horaire est atteinte, le pilote utilise la légende de la recette jusqu\u2019à l\u2019heure suivante.', colUse: 'Usage', colRequests: 'Requêtes',
+    use_article: 'Rédaction des recettes depuis l\u2019article', 'use_autopilot.caption': 'Légende par canal', 'use_autopilot.rate': 'Notes des recettes', 'use_autopilot.photo': 'Notes des photos', 'use_autopilot.reply': 'Brouillons de réponse',
+    use_reply: 'Suggestions de réponse (boîte de réception)', use_sentiment: 'Ton des commentaires', use_alt_text: 'Descriptions d\u2019images', use_caption: 'Légendes du compositeur', use_other: 'Autre',
     timesChanged: '{channel} : horaires {from} → {to}', noAccess: 'Configurez la source de recettes sur la page Flux de contenu pour utiliser le pilote.', loadFailed: 'Le pilote n’a pas pu être chargé. Actualisez pour réessayer.',
   },
 } as const;
