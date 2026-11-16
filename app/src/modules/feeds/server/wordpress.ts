@@ -14,6 +14,8 @@ import { commentFor, configOf, writeCandidate, defaultPlannerPorts, openDatabase
 import { loadWordpressSettings, patchLimits, type WordpressSettings } from './wordpress-settings';
 import { computePoolHealth, forgetPoolHealth, poolHealthWithin, type PoolHealth } from './wordpress-pool';
 import { cancelPlannedPosts, changeRecipeSlot, retryRecipeSlots, type SlotAction } from './wordpress-recovery';
+import { autopilotOf } from '../wordpress/autopilot';
+import { ctaFor, withCta } from '../wordpress/caption';
 import { countPlans, selectPlans, selectSource, type LedgerRow, type SourceRow } from './wordpress-store';
 
 /**
@@ -331,9 +333,12 @@ export async function previewRecipeSource(actor: FeedActor, input: unknown = {},
     for (const c of fresh(scan.candidates, scan.exhausted).slice(0, s.previewCount)) {
       // AI writes the same way at planning time; a preview it cannot write shows the post's own text and says so.
       const written = await writeCandidate(ports, actor, s, config, c).catch(() => null);
-      items.push({ wpPostId: c.wpPostId, title: c.title, permalink: c.permalink, imageUrl: c.imageUrl, caption: written?.caption ?? c.caption, firstComment: written?.firstComment ?? commentFor(s, config, c), publishedAt: c.publishedAt?.toISOString() ?? null, ...(c.write ? { writtenByAi: Boolean(written) } : {}) });
+      // The autopilot puts its call to action on top of the first comment, as at planning time (2026-11-16).
+      const pilot = autopilotOf(config.autopilot);
+      const comment = written?.firstComment ?? commentFor(s, config, c);
+      items.push({ wpPostId: c.wpPostId, title: c.title, permalink: c.permalink, imageUrl: c.imageUrl, caption: written?.caption ?? c.caption, firstComment: pilot.comment.enabled ? withCta(comment, ctaFor(pilot.comment.cta, c.wpPostId), s.commentMax) : comment, publishedAt: c.publishedAt?.toISOString() ?? null, ...(c.write ? { writtenByAi: Boolean(written) } : {}) });
     }
-    return { items, scanned: scan.scanned, exhausted: scan.exhausted, rejected: scan.rejected };
+    return { items, scanned: scan.scanned, exhausted: scan.exhausted, rejected: scan.rejected, captionsPerChannel: autopilotOf(config.autopilot).captions.enabled && writer };
   } catch (error) {
     if (error instanceof OperationError) throw error;
     throw await feedsError('upstream_failure', 'The recipe library could not be read. Try again later.');

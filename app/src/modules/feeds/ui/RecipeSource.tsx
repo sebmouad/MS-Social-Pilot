@@ -42,7 +42,7 @@ export type RecipeView = {
   labels?: { lastRun: string | null; poolAsOf: string | null; slots: Record<string, string> };
 };
 export type RecipePool = { asOf: string; complete: boolean; warnDays: number; low: boolean; pages: Array<{ targetId: string; targetName: string; eligible: number; daysLeft: number | null; low: boolean }> };
-type Preview = { items: Array<{ wpPostId: string; title: string; permalink: string; imageUrl: string; caption: string; firstComment: string; writtenByAi?: boolean }> };
+type Preview = { items: Array<{ wpPostId: string; title: string; permalink: string; imageUrl: string; caption: string; firstComment: string; writtenByAi?: boolean }>; captionsPerChannel?: boolean };
 type Review = 'save' | 'pause' | 'resume' | 'run' | 'retry';
 const PAUSE_PHRASE = 'PAUSE RECIPE SOURCE';
 const PAUSE_CANCEL_PHRASE = 'PAUSE RECIPE SOURCE AND CANCEL SCHEDULED POSTS';
@@ -198,6 +198,7 @@ export function RecipeSource({ initial, locale, canWrite, copy = recipeCopy }: {
     </div>}
 
     {preview && <div aria-live="polite"><h3 className={styles.sectionTitle}>{t('previewTitle')}</h3>
+      {preview.captionsPerChannel ? <p className={styles.help}>{t('previewPerChannel')}</p> : null}
       {preview.items.length ? <ul className={styles.recipes}>{preview.items.map(item => <li key={item.wpPostId} className={styles.recipe}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img className={styles.thumb} src={item.imageUrl} alt={t('previewImage', { title: item.title })} loading="lazy" width={160} height={160} />
