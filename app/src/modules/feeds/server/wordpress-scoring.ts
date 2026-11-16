@@ -6,7 +6,7 @@ import type { FeedActor } from './access';
 /** AI ratings of one recipe; a missing rating is null. */
 export type Rating = { kind: RecipeKind | null; hook: number | null; photo: number | null };
 /** One published recipe post and how it did relative to its channel's usual (1 = usual). */
-export type Outcome = { targetId: string; wpPostId: string; title: string; slotAt: Date; relative: number };
+export type Outcome = { targetId: string; wpPostId: string; title: string; slotAt: Date; relative: number; style?: string | null };
 
 /** What scoring reads and writes; the planner works without it (tests, AI off). */
 export type ScoringPorts = {
@@ -94,7 +94,7 @@ export const prismaScoringPorts: ScoringPorts = {
     }
   },
   async outcomes(sourceId, since) {
-    const rows = await prisma.$queryRaw<Array<{ targetId: string; wpPostId: string; title: string | null; slotAt: Date; insights: unknown }>>`SELECT l."targetId", l."wpPostId", l.title, l."slotAt", ep.insights
+    const rows = await prisma.$queryRaw<Array<{ targetId: string; wpPostId: string; title: string | null; slotAt: Date; insights: unknown; style: string | null }>>`SELECT l."targetId", l."wpPostId", l.title, l."slotAt", l.style, ep.insights
       FROM wordpress_recipe_plans l
       JOIN post_targets pt ON pt."postId" = l."postId" AND pt."targetId" = l."targetId" AND pt.status::text = 'published'
       JOIN external_posts ep ON ep."targetId" = pt."targetId" AND ep."remoteId" = pt."remotePostId"
@@ -106,7 +106,7 @@ export const prismaScoringPorts: ScoringPorts = {
       const mid = Math.floor(values.length / 2);
       medians.set(targetId, values.length % 2 ? values[mid]! : (values[mid - 1]! + values[mid]!) / 2);
     }
-    return scored.map(row => ({ targetId: row.targetId, wpPostId: row.wpPostId, title: row.title, slotAt: row.slotAt, relative: row.score / (medians.get(row.targetId) || 1) }));
+    return scored.map(row => ({ targetId: row.targetId, wpPostId: row.wpPostId, title: row.title, slotAt: row.slotAt, style: row.style, relative: row.score / (medians.get(row.targetId) || 1) }));
   },
   async weather(latitude, longitude, timeZone) {
     const key = `${latitude.toFixed(2)}|${longitude.toFixed(2)}|${timeZone}`;

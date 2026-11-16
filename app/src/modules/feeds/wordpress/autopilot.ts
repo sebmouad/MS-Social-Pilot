@@ -15,6 +15,10 @@ export type AutopilotSettings = {
   evergreen: { enabled: boolean; cooldownDays: number; share: number };
   radar: { enabled: boolean; factor: number; pages: number; mode: 'auto' | 'approve'; boost: boolean };
   breathe: { enabled: boolean; factor: number; maxDelayMinutes: number };
+  /** Phase 3 (2026-11-16). */
+  captions: { enabled: boolean; voice: 'per-page' | 'warm' | 'short' | 'chef'; question: boolean; emoji: 'none' | 'few' | 'more' };
+  hooks: { enabled: boolean; share: number };
+  comment: { enabled: boolean; cta: 'rotate' | 'save' | 'tag' | 'none'; delayMinutes: number };
   /** Each channel's hours as last learned (hour → value, 1 = usual): best recipes go to the strongest. */
   hourValues?: Record<string, Record<string, number>>;
   /** Recipe slots the radar already acted on. */
@@ -35,6 +39,9 @@ export const AUTOPILOT_DEFAULTS: AutopilotSettings = {
   evergreen: { enabled: true, cooldownDays: 60, share: 20 },
   radar: { enabled: true, factor: 3, pages: 5, mode: 'auto', boost: false },
   breathe: { enabled: true, factor: 3, maxDelayMinutes: 60 },
+  captions: { enabled: true, voice: 'per-page', question: true, emoji: 'more' },
+  hooks: { enabled: true, share: 20 },
+  comment: { enabled: true, cta: 'rotate', delayMinutes: 2 },
 };
 export const AUTOPILOT_LOG_MAX = 60;
 /** Times are relearned at most this often. */
@@ -60,6 +67,9 @@ export const autopilotSchema = z.object({
   radar: z.object({ enabled: z.boolean(), factor: z.number().min(1.5).max(20), pages: z.number().int().min(1).max(50), mode: z.enum(['auto', 'approve']), boost: z.boolean() }).strict().optional(),
   breathe: z.object({ enabled: z.boolean(), factor: z.number().min(1.5).max(20), maxDelayMinutes: z.number().int().min(10).max(240) }).strict().optional(),
   radarHandled: z.array(z.string().max(100)).max(300).optional(),
+  captions: z.object({ enabled: z.boolean(), voice: z.enum(['per-page', 'warm', 'short', 'chef']), question: z.boolean(), emoji: z.enum(['none', 'few', 'more']) }).strict().optional(),
+  hooks: z.object({ enabled: z.boolean(), share: z.number().int().min(0).max(50) }).strict().optional(),
+  comment: z.object({ enabled: z.boolean(), cta: z.enum(['rotate', 'save', 'tag', 'none']), delayMinutes: z.number().int().min(0).max(60) }).strict().optional(),
   hourValues: z.record(z.string().max(100), z.record(z.string().max(2), z.number().min(0).max(100))).optional()
     .refine(map => !map || Object.keys(map).length <= 500, 'Too many channels.'),
   lastLearnedAt: z.string().max(40).optional(), learnVersion: z.number().int().min(0).max(1000).optional(),

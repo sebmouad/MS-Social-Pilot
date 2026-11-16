@@ -19,7 +19,7 @@ export function AutopilotPanel({ value, timeZone, pages, busy, onChange, t }: {
   const when = (iso: string) => { const at = new Date(iso); if (Number.isNaN(at.getTime())) return ''; const wall = instantToWall(at, timeZone); return `${wall.date.slice(8, 10)}/${wall.date.slice(5, 7)} ${wall.time}`; };
   const channel = (id?: string, name?: string) => name || pages.find(page => page.id === id)?.name || t('autopilotAChannel');
   const hours = Array.from({ length: 25 }, (_, hour) => hour);
-  const on = [best.enabled, heal.replaceFailed, heal.pauseBroken, pilot.score.enabled, pilot.variety.enabled, pilot.evergreen.enabled, pilot.radar.enabled, pilot.breathe.enabled].filter(Boolean).length;
+  const on = [best.enabled, heal.replaceFailed, heal.pauseBroken, pilot.score.enabled, pilot.variety.enabled, pilot.evergreen.enabled, pilot.radar.enabled, pilot.breathe.enabled, pilot.captions.enabled, pilot.hooks.enabled, pilot.comment.enabled].filter(Boolean).length;
 
   return <details className={styles.group} open>
     <summary><strong>{t('autopilotHeading')}</strong><span>{on ? t('autopilotOn', { count: on }) : t('autopilotOff')}</span></summary>
@@ -55,6 +55,23 @@ export function AutopilotPanel({ value, timeZone, pages, busy, onChange, t }: {
         <div className={styles.checkRow}>{(['holidays', 'season', 'weekday', 'weather'] as const).map(rule => <label key={rule} className={styles.inline}><input type="checkbox" checked={pilot.moments.rules.includes(rule)}
           onChange={e => set({ moments: { ...pilot.moments, rules: e.target.checked ? [...pilot.moments.rules, rule] : pilot.moments.rules.filter(r => r !== rule) } })} /> {t(`autopilotRule_${rule}`)}</label>)}</div>
         <label className={styles.inline}><input type="checkbox" checked={pilot.score.show} onChange={e => set({ score: { ...pilot.score, show: e.target.checked } })} /> {t('autopilotShowScore')}</label>
+      </fieldset>
+      <fieldset className={styles.checks} disabled={busy}><legend>{t('autopilotWriting')}</legend>
+        <label className={styles.inline}><input type="checkbox" checked={pilot.captions.enabled} onChange={e => set({ captions: { ...pilot.captions, enabled: e.target.checked } })} /> {t('autopilotCaptionsOn')}</label>
+        <div className={styles.autoRow}>
+          <label>{t('autopilotVoice')}<select value={pilot.captions.voice} onChange={e => set({ captions: { ...pilot.captions, voice: e.target.value as AutopilotSettings['captions']['voice'] } })}>
+            {(['per-page', 'warm', 'short', 'chef'] as const).map(v => <option key={v} value={v}>{t(`autopilotVoice_${v}`)}</option>)}</select></label>
+          <label>{t('autopilotEmoji')}<select value={pilot.captions.emoji} onChange={e => set({ captions: { ...pilot.captions, emoji: e.target.value as AutopilotSettings['captions']['emoji'] } })}>
+            {(['none', 'few', 'more'] as const).map(v => <option key={v} value={v}>{t(`autopilotEmoji_${v}`)}</option>)}</select></label>
+          <label>{t('autopilotHookTests')}<select value={pilot.hooks.enabled ? pilot.hooks.share : 0} onChange={e => { const v = Number(e.target.value); set({ hooks: { enabled: v > 0, share: v || pilot.hooks.share } }); }}>
+            {[0, 10, 20].map(v => <option key={v} value={v}>{v ? t('autopilotOfPosts', { share: v }) : t('autopilotVarietyOff')}</option>)}</select></label>
+          <label>{t('autopilotCta')}<select value={pilot.comment.enabled ? pilot.comment.cta : 'none'} onChange={e => { const v = e.target.value as AutopilotSettings['comment']['cta']; set({ comment: { ...pilot.comment, enabled: v !== 'none', cta: v } }); }}>
+            {(['rotate', 'save', 'tag', 'none'] as const).map(v => <option key={v} value={v}>{t(`autopilotCta_${v}`)}</option>)}</select></label>
+          <label>{t('autopilotCommentDelay')}<select value={pilot.comment.delayMinutes} onChange={e => set({ comment: { ...pilot.comment, delayMinutes: Number(e.target.value) } })}>
+            {[0, 2, 10].map(v => <option key={v} value={v}>{v ? `${v} min` : t('autopilotRightAway')}</option>)}</select></label>
+        </div>
+        <label className={styles.inline}><input type="checkbox" checked={pilot.captions.question} onChange={e => set({ captions: { ...pilot.captions, question: e.target.checked } })} /> {t('autopilotQuestion')}</label>
+        <span className={styles.help}>{t('autopilotWritingHint')}</span>
       </fieldset>
       <fieldset className={styles.checks} disabled={busy}><legend>{t('autopilotRadar')}</legend>
         <label className={styles.inline}><input type="checkbox" checked={pilot.radar.enabled} onChange={e => set({ radar: { ...pilot.radar, enabled: e.target.checked } })} /> {t('autopilotRadarOn')}</label>

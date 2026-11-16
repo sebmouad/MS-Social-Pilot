@@ -7,6 +7,7 @@ import { autopilotOf, type AutopilotSettings } from '../wordpress/autopilot';
 import { prismaScoringPorts, dishHistory, type ScoringPorts } from './wordpress-scoring';
 import { makePicker } from './wordpress-pick';
 import { guessKind, type RecipeKind } from '../wordpress/score';
+import { bestStyle, captionPrompt, cleanCaption, ctaFor, styleFor, voiceFor, withCta, type HookStyle } from '../wordpress/caption';
 import { instantToWall } from '@/lib/calendar-dates';
 import { allocateRecipes, channelConfig, recipeTitleKey, buildImageUrl, buildPermalink, reportedPermalink, parseRecipe, renderComment, resolveConfig, slotInstants, type PlanConfig, type Recipe, type SlotNeed } from '../wordpress/recipe';
 import { openWordpressDb, type DbSettings, type WpDb, type WpCandidateRow } from '../wordpress/db';
@@ -33,6 +34,8 @@ export type PlannerPorts = {
   now(): Date;
   /** Autopilot scoring (2026-11-16); without it recipes go out in the source's order. */
   scoring?: import('./wordpress-scoring').ScoringPorts;
+  /** Autopilot captions (2026-11-16): one AI request for a channel's caption; without it the recipe's own caption is used. */
+  captions?: { write(actor: FeedActor, system: string, prompt: string): Promise<string> };
 };
 export type PlannedPostInput = { message: string; firstComment: string; targetIds: string[]; scheduledAt: Date; media: Array<{ kind: 'image'; url: string; altText: string }>; firstCommentDelayMinutes: number };
 
@@ -70,6 +73,7 @@ export function defaultPlannerPorts(net: FetchDeps = defaultFetchDeps()): Planne
     },
     now: () => new Date(),
     scoring: prismaScoringPorts,
+    captions: { async write(actor, system, prompt) { const { autopilotComplete } = await import('@/modules/studio/server/ai'); return autopilotComplete({ userId: actor.userId, workspaceId: actor.workspaceId }, 'autopilot.caption', system, prompt, { maxTokens: 600 }); } },
   };
 }
 
@@ -249,8 +253,9 @@ async function prepareChoosing(ctx: Ctx, source: SourceRow, config: PlanConfig, 
     if (last !== undefined && last < cutoff) { blocked.get(page.id)?.delete(w.wpPostId); blocked.get(page.id)?.delete(recipeTitleKey(w.title)); }
   }
   const winnerQuota = Math.floor(needCount * pilot.evergreen.share / 100);
+  const preferredStyle = bestStyle(outcomes).style;
   return {
-    winners, blocked,
+    winners, blocked, preferredStyle,
     async picker(candidates: Candidate[]) {
       const ids = candidates.map(c => c.wpPostId);
       let ratings = await scoring.ratings(source.id, ids).catch(() => new Map());
@@ -413,13 +418,24 @@ export async function planSource(ctx: Ctx, source: SourceRow, auth: FeedAuthoriz
       if (AUTHORITY.has(code)) return { ...out, reason: code };
       continue;
     }
+    // Autopilot (2026-11-16): the channel's own caption in its voice and a hook style, and a call to action on the comment.
+    let style: HookStyle | null = null;
+    const key = slotKey(targetId, slotAt);
+    if (pilot.captions.enabled && writer && ports.captions) {
+      const pick = styleFor(key, prep?.preferredStyle ?? null, pilot.hooks.enabled ? pilot.hooks.share : 0);
+      const { system, prompt } = captionPrompt({ channel: pages.find(page => page.id === targetId)?.name ?? '', voice: voiceFor(pilot.captions.voice, pageOrder.get(targetId) ?? 0), style: pick.style, question: pilot.captions.question, emoji: pilot.captions.emoji,
+        title: c.title, caption: written.caption, ingredients: c.recipe.ingredients.filter(line => !line.heading).map(line => line.text) });
+      try { const clean = cleanCaption(await ports.captions.write(auth.actor, system, prompt), settings.textMax); if (clean) { written = { ...written, caption: clean }; style = pick.style; } }
+      catch { /* over the AI limit or unavailable: the recipe's own caption goes out */ }
+    }
+    if (pilot.comment.enabled) written = { ...written, firstComment: withCta(written.firstComment, ctaFor(pilot.comment.cta, key), settings.commentMax) };
     let postId: string;
     try {
       const image = await prepareRecipeImage(ports.image, { actor: { userId: auth.actor.userId, workspaceId: source.workspaceId }, url: c.imageUrl, fileName: safeName(c.slug), settings: settings.image });
       const post = await ports.createPost(auth.actor, {
         // The slot keeps its identity (ledger key); only the publish time is offset per Page, so Pages never post in lockstep.
         message: written.caption, firstComment: written.firstComment, targetIds: [targetId], scheduledAt: ctx.makeup?.get(slotKey(targetId, slotAt)) ?? staggered(slotAt, targetId),
-        media: [{ kind: 'image', url: `media:${image.mediaId}`, altText: c.title.slice(0, settings.altMax) }], firstCommentDelayMinutes: of(targetId).firstCommentDelayMinutes,
+        media: [{ kind: 'image', url: `media:${image.mediaId}`, altText: c.title.slice(0, settings.altMax) }], firstCommentDelayMinutes: pilot.comment.enabled ? pilot.comment.delayMinutes : of(targetId).firstCommentDelayMinutes,
       });
       postId = post.id;
     } catch (error) {
@@ -436,7 +452,7 @@ export async function planSource(ctx: Ctx, source: SourceRow, auth: FeedAuthoriz
       }
       continue;
     }
-    try { await ports.store.settle(source.workspaceId, claimId, { state: 'planned', postId }); out.planned += 1; }
+    try { await ports.store.settle(source.workspaceId, claimId, { state: 'planned', postId, ...(style ? { style } : {}) }); out.planned += 1; }
     catch { out.uncertain += 1; /* the claim stays; it turns uncertain when its lease ends */ }
   }
   return out;

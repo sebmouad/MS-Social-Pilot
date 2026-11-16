@@ -34,10 +34,10 @@ function settings(): WordpressSettings {
 }
 
 /** In-memory ledger and publishing; returns the ports and what they recorded. */
-function harness(seed: LedgerRow[] = [], opts: { list?: typeof recipes; scoring?: ScoringPorts; at?: Date } = {}) {
+function harness(seed: LedgerRow[] = [], opts: { list?: typeof recipes; scoring?: ScoringPorts; at?: Date; captions?: (system: string, prompt: string) => Promise<string> } = {}) {
   const list = opts.list ?? recipes; const clock = opts.at ?? now;
   const ledger: LedgerRow[] = [...seed];
-  const created: Array<{ targetId: string; scheduledAt: Date; message: string; firstComment?: string }> = [];
+  const created: Array<{ targetId: string; scheduledAt: Date; message: string; firstComment?: string; delay?: number }> = [];
   const store = {
     async enabledSources() { return []; },
     async pages() { return pages; },
@@ -57,13 +57,14 @@ function harness(seed: LedgerRow[] = [], opts: { list?: typeof recipes; scoring?
   const ports = {
     async openDb() { throw new Error('unused'); },
     async validateTarget() {},
-    async createPost(_actor: unknown, input: { targetIds: string[]; scheduledAt: Date; message: string; firstComment?: string }) { created.push({ targetId: input.targetIds[0]!, scheduledAt: input.scheduledAt, message: input.message, firstComment: input.firstComment }); return { id: `post${created.length}` }; },
+    async createPost(_actor: unknown, input: { targetIds: string[]; scheduledAt: Date; message: string; firstComment?: string; firstCommentDelayMinutes?: number }) { created.push({ targetId: input.targetIds[0]!, scheduledAt: input.scheduledAt, message: input.message, firstComment: input.firstComment, delay: input.firstCommentDelayMinutes }); return { id: `post${created.length}` }; },
     async cancelPost() {}, async postForSlot() { return null; },
     image: { async download() { return Buffer.from('x'); }, async inspect() {}, async convert() { return Buffer.from('jpeg'); }, async store() { return { id: 'media1' }; } },
     async qualify() { return null; }, store,
-    writer: { async available() { return false; }, async write() { throw new Error('unused'); } },
+    writer: { async available() { return Boolean(opts.captions); }, async write() { throw new Error('unused'); } },
     now: () => clock,
     ...(opts.scoring ? { scoring: opts.scoring } : {}),
+    ...(opts.captions ? { captions: { write: (_actor: unknown, system: string, prompt: string) => opts.captions!(system, prompt) } } : {}),
   } as unknown as PlannerPorts;
   const db = {
     async candidates(q: { offset: number; limit: number; order?: string; include?: readonly string[] }) { const rows = (q.include ? list.filter(r => q.include!.includes(r.id)) : q.order === 'oldest' ? [...list].reverse() : list).slice(q.offset, q.offset + q.limit); return { rows, fetched: rows.length, requested: q.limit }; },
@@ -134,8 +135,9 @@ test('planner: each channel uses its own times, recipe order and first comment, 
   const recipeOf = (targetId: string) => h.ledger.filter(row => row.targetId === targetId).map(row => row.wpPostId);
   assert.ok(recipeOf('pageB').every(id => Number(id.slice(1)) > 25), 'oldest first on page B');
   assert.ok(recipeOf('pageA').every(id => Number(id.slice(1)) <= 5), 'newest first on page A');
-  assert.ok(b.every(p => p.firstComment?.startsWith('Page B: ')));
-  assert.ok(a.every(p => p.firstComment?.startsWith('Recipe: ')));
+  assert.ok(b.every(p => p.firstComment?.includes('Page B: ') && !p.firstComment.includes('Recipe: ')));
+  assert.ok(a.every(p => p.firstComment?.includes('Recipe: ')));
+  assert.ok([...a, ...b].every(p => /^(📌|👥|💬|❤️)/u.test(p.firstComment ?? '')), 'a call to action opens each first comment');
   assert.equal(new Set([...recipeOf('pageA'), ...recipeOf('pageB')]).size, a.length + b.length);
 });
 
@@ -200,4 +202,21 @@ test('autopilot: past winners come back after the cooldown, within their share',
   const fresh = h.ledger.filter(row => row.claimedAt === now);
   const back = fresh.filter(row => row.wpPostId === 'r29');
   assert.ok(back.length <= Math.floor(fresh.length * 0.2), `winners ${back.length} of ${fresh.length}`);
+});
+
+test('autopilot: every channel gets its own AI caption in its voice, and the comment waits 2 minutes', async () => {
+  const prompts: string[] = [];
+  const h = harness([], { captions: async (system, prompt) => { prompts.push(system); const page = /« (.*?) »/.exec(system)?.[1]; return `Envie de ${prompt.split('\n')[0]!.slice(8)} ? ${page} 😋 Et vous, vous la faites comment ?`; } });
+  await planSource({ settings: settings(), ports: h.ports, db: h.db as never, budget: { left: 50 }, now }, source(), auth);
+  assert.ok(h.created.length > 0);
+  assert.ok(h.created.every(p => p.message.startsWith('Envie de')), 'AI captions are used');
+  assert.ok(h.created.filter(p => p.targetId === 'pageA').every(p => p.message.includes('Page A')));
+  assert.ok(h.created.every(p => p.delay === 2));
+  assert.ok(new Set(prompts.map(p => /Voice: (.*)/.exec(p)?.[1])).size >= 2, 'the two channels have different voices');
+});
+
+test('autopilot: when AI refuses, the recipe keeps its own caption', async () => {
+  const h = harness([], { captions: async () => { throw new Error('hourly limit'); } });
+  await planSource({ settings: settings(), ports: h.ports, db: h.db as never, budget: { left: 50 }, now }, source(), auth);
+  assert.ok(h.created.length > 0 && h.created.every(p => p.message.startsWith('Caption ')));
 });
