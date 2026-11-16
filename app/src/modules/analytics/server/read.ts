@@ -182,6 +182,11 @@ async function loadSnapshot(actor: AnalyticsReadActor, rawInput: unknown, constr
 
   // Discovery already contains the requested measures for explicit channel selections (and ad-only workspaces).
   // Reuse only an exact returned scope; validation above still rejects dropped or unavailable IDs.
+  // The current and comparison periods are read in parallel: both depend only on the validated selection (2026-11-16).
+  const comparisonLoad = period.comparison
+    ? loadAnalytics(actor.workspaceId, selectedChannelIds, period.comparison.range, access.allowedChannelIds, selectedAdIds, access.allowedProviders, { accountIds: [] })
+    : Promise.resolve(null);
+  comparisonLoad.catch(() => undefined);
   const currentData = sameIds(initial.selectedTargets.map(item => item.id), selectedChannelIds) && sameIds(initial.selectedAdIds, selectedAdIds)
     ? initial
     : await loadAnalytics(actor.workspaceId, selectedChannelIds, period.range, access.allowedChannelIds, selectedAdIds, access.allowedProviders, { accountIds: [] });
@@ -191,9 +196,7 @@ async function loadSnapshot(actor: AnalyticsReadActor, rawInput: unknown, constr
   const [copy, locale] = await Promise.all([metricCopy(), analyticsLanguage()]);
   const view = buildAnalytics(currentData.metrics.filter(metric => metric.resourceKind !== 'ad-account'), currentData.audienceEntries, currentData.audienceSelected, copy, locale);
   const allMetrics = orderOverviewMetrics(view.metrics, await configOrDefault('analytics.overviewOrder', overviewOrderSchema));
-  const comparisonData = period.comparison
-    ? await loadAnalytics(actor.workspaceId, selectedChannelIds, period.comparison.range, access.allowedChannelIds, selectedAdIds, access.allowedProviders, { accountIds: [] })
-    : null;
+  const comparisonData = await comparisonLoad;
   if (comparisonData && (!sameIds(comparisonData.selectedTargets.map(item => item.id), selectedChannelIds) || !sameIds(comparisonData.selectedAdIds, selectedAdIds))) throw forbiddenResource();
   if (comparisonData) assertUniqueMetricKeys(comparisonData.metrics);
   const comparisonMetrics = comparisonData ? buildAnalytics(comparisonData.metrics.filter(metric => metric.resourceKind !== 'ad-account'), comparisonData.audienceEntries, comparisonData.audienceSelected, copy, locale).metrics : [];
