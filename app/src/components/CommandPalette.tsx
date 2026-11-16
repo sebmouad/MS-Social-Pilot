@@ -63,6 +63,7 @@ export function CommandPalette({ copy: t }: { copy: CommandCopy }) {
       { kind: 'action', key: 'qa-ai', title: 'Open Content Multiplier & AI Studio', sub: 'Studio', href: '/content/ai-studio' },
       { kind: 'action', key: 'qa-media', title: 'Open Media Assets Library', sub: 'Media', href: '/content/library' },
       { kind: 'action', key: 'qa-recipe', title: 'Run WordPress Recipe Planner', sub: 'Automation', href: '/content/feeds' },
+      { kind: 'action', key: 'qa-autopilot', title: 'Autopilot: tomorrow\u2019s plan and weekly report', sub: 'Automation', href: '/content/autopilot' },
       { kind: 'action', key: 'qa-insights', title: 'View Analytics & Performance', sub: 'Analytics', href: '/insights' },
       { kind: 'action', key: 'qa-ads', title: 'Manage Meta Ads', sub: 'Campaigns', href: '/ads/manage' },
       { kind: 'action', key: 'qa-review', title: 'Client Review & Approval Rooms', sub: 'Sharing', href: '/settings/sharing' },

@@ -19,6 +19,12 @@ export type AutopilotSettings = {
   captions: { enabled: boolean; voice: 'per-page' | 'warm' | 'short' | 'chef'; question: boolean; emoji: 'none' | 'few' | 'more' };
   hooks: { enabled: boolean; share: number };
   comment: { enabled: boolean; cta: 'rotate' | 'save' | 'tag' | 'none'; delayMinutes: number };
+  /** Phase 4 (2026-11-16). */
+  review: { enabled: boolean; hour: number; notify: boolean };
+  digest: { enabled: boolean; day: 'mon' | 'fri' | 'sun' };
+  replies: { enabled: boolean; tone: 'friendly' | 'short' | 'expert' };
+  /** Days whose plan a member approved on the board (YYYY-MM-DD), newest first. */
+  approvedDays?: string[];
   /** Each channel's hours as last learned (hour → value, 1 = usual): best recipes go to the strongest. */
   hourValues?: Record<string, Record<string, number>>;
   /** Recipe slots the radar already acted on. */
@@ -42,6 +48,9 @@ export const AUTOPILOT_DEFAULTS: AutopilotSettings = {
   captions: { enabled: true, voice: 'per-page', question: true, emoji: 'more' },
   hooks: { enabled: true, share: 20 },
   comment: { enabled: true, cta: 'rotate', delayMinutes: 2 },
+  review: { enabled: true, hour: 20, notify: true },
+  digest: { enabled: true, day: 'mon' },
+  replies: { enabled: true, tone: 'friendly' },
 };
 export const AUTOPILOT_LOG_MAX = 60;
 /** Times are relearned at most this often. */
@@ -70,6 +79,10 @@ export const autopilotSchema = z.object({
   captions: z.object({ enabled: z.boolean(), voice: z.enum(['per-page', 'warm', 'short', 'chef']), question: z.boolean(), emoji: z.enum(['none', 'few', 'more']) }).strict().optional(),
   hooks: z.object({ enabled: z.boolean(), share: z.number().int().min(0).max(50) }).strict().optional(),
   comment: z.object({ enabled: z.boolean(), cta: z.enum(['rotate', 'save', 'tag', 'none']), delayMinutes: z.number().int().min(0).max(60) }).strict().optional(),
+  review: z.object({ enabled: z.boolean(), hour: z.number().int().min(0).max(23), notify: z.boolean() }).strict().optional(),
+  digest: z.object({ enabled: z.boolean(), day: z.enum(['mon', 'fri', 'sun']) }).strict().optional(),
+  replies: z.object({ enabled: z.boolean(), tone: z.enum(['friendly', 'short', 'expert']) }).strict().optional(),
+  approvedDays: z.array(z.string().regex(/^\d{4}-\d{2}-\d{2}$/)).max(60).optional(),
   hourValues: z.record(z.string().max(100), z.record(z.string().max(2), z.number().min(0).max(100))).optional()
     .refine(map => !map || Object.keys(map).length <= 500, 'Too many channels.'),
   lastLearnedAt: z.string().max(40).optional(), learnVersion: z.number().int().min(0).max(1000).optional(),

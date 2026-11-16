@@ -572,6 +572,10 @@ export async function runRecipePlanning(overrides: Partial<PlannerPorts> & { aut
         } catch { /* the radar never stops planning */ }
       }
       await autopilot.logAutopilot(settings, source, entries, overrides.autopilot, handled).catch(() => undefined);
+      // Evening « plan ready » and the weekly report (2026-11-16); sent once each.
+      if (!overrides.autopilot) await import('./wordpress-cockpit').then(cockpit => cockpit.notifyAutopilot(settings, source, now)).catch(() => undefined);
+      // Reply drafts for new comments on recipe posts (2026-11-16): stored for the Inbox, never sent.
+      if (!overrides.autopilot && pilot.replies.enabled && await ports.writer.available(source.workspaceId).catch(() => false)) await import('./wordpress-replies').then(replies => replies.draftRecipeReplies({ sourceId: source.id, actor: auth.actor, pilot, now })).catch(() => undefined);
       totals(summary, outcome);
       await ports.store.recordRun(source.workspaceId, source.id, { at: now, error: outcome.reason === 'caption_field_missing' ? captionFieldMessage(outcome.scanned, configOf(settings, source).mapping.captionMetaKey, sourceCredential(source)) : outcome.reason === 'needs_ai' ? NEEDS_AI_MESSAGE : outcome.reason && !['complete', 'budget'].includes(outcome.reason) ? `Planning stopped: ${outcome.reason}` : null, summary: recipeSummaryRecord(outcome, now) });
     } catch {

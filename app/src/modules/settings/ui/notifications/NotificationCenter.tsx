@@ -34,6 +34,8 @@ export function notificationHref(item: Pick<NotificationRow, 'kind' | 'postId' |
   if (item.kind === 'connection_expired' || item.kind === 'token_expiring') return '/settings/channels';
   if (item.kind === 'metric_alert' || item.kind === 'report_delivered') return '/insights/reports';
   if (item.kind === 'triage_assigned') return '/tasks';
+  if (item.kind === 'autopilot_board') return '/content/autopilot#tomorrow';
+  if (item.kind === 'autopilot_report') return '/content/autopilot#report';
   const targetId = id(item.targetId);
   if (!targetId) return null;
   if (item.kind === 'queue_empty') return `/content?channel=${targetId}`;
@@ -44,7 +46,8 @@ export function notificationHref(item: Pick<NotificationRow, 'kind' | 'postId' |
 export function notificationEventTone(kind: NotificationRow['kind']): 'brand' | 'warning' | 'success' | 'neutral' {
   if (kind === 'note_mention' || kind === 'inbox_note_mention') return 'brand';
   if (kind === 'metric_alert') return 'warning';
-  if (kind === 'report_delivered') return 'success';
+  if (kind === 'report_delivered' || kind === 'autopilot_report') return 'success';
+  if (kind === 'autopilot_board') return 'brand';
   return 'neutral';
 }
 
@@ -53,7 +56,7 @@ export function NotificationCenter({ initialPreferences, initialPage, locale = i
   const retryFeedback = useRef<() => void>(() => {});
   const labels = useSettingsCopy('notificationLabels', locale);
   const t = useSettingsCopy('notifications', locale);
-  const eventName = (kind: NotificationRow['kind']) => kind === 'note_mention' || kind === 'inbox_note_mention' ? t.eventMention : kind === 'metric_alert' ? t.eventMetricAlert : kind === 'report_delivered' ? t.eventReport : kind === 'triage_assigned' ? t.eventTriage : t.eventMix;
+  const eventName = (kind: NotificationRow['kind']) => kind === 'note_mention' || kind === 'inbox_note_mention' ? t.eventMention : kind === 'metric_alert' ? t.eventMetricAlert : kind === 'report_delivered' ? t.eventReport : kind === 'triage_assigned' ? t.eventTriage : kind === 'autopilot_board' ? t.eventAutopilotBoard : kind === 'autopilot_report' ? t.eventAutopilotReport : t.eventMix;
   const emailOutcome = (state: NotificationRow['emailState']) => {
     switch (state) {
       case 'sent': return t.emailSent;

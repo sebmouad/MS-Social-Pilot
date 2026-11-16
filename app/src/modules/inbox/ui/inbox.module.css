@@ -312,3 +312,6 @@
   .sync { max-width: none; }
   .syncTime, .syncedAt { display: none; }
 }
+
+/* Autopilot reply suggestion (2026-11-16) */
+.suggested { margin: 0 0 6px; padding: 8px 10px; border-radius: var(--radius-md, 8px); background: var(--accent-soft); color: var(--ink); font-size: 13px; }

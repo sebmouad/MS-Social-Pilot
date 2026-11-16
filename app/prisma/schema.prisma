@@ -619,6 +619,8 @@ model PostComment {
   remoteId             String
   parentRemoteId       String?
   message              String
+  aiDraft              String?
+  aiDraftAt            DateTime?
   fromName             String?
   fromId               String?
   likeCount            Int        @default(0)

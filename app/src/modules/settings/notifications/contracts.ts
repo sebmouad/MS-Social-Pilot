@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 export type NotificationActor = { userId: string; workspaceId: string };
-export const NOTIFICATION_EVENTS = ['note_mention', 'inbox_note_mention', 'mix_dry', 'publish_failure', 'connection_expired', 'token_expiring', 'approval_request', 'approval_decision', 'inbox_digest', 'queue_empty', 'draft_updated', 'moderation_alert', 'negative_spike', 'metric_alert', 'report_delivered', 'triage_assigned'] as const;
+export const NOTIFICATION_EVENTS = ['note_mention', 'inbox_note_mention', 'mix_dry', 'publish_failure', 'connection_expired', 'token_expiring', 'approval_request', 'approval_decision', 'inbox_digest', 'queue_empty', 'draft_updated', 'moderation_alert', 'negative_spike', 'metric_alert', 'report_delivered', 'triage_assigned', 'autopilot_board', 'autopilot_report'] as const;
 export type NotificationEvent = (typeof NOTIFICATION_EVENTS)[number];
 export type NotificationMute = { targetId: string; event: 'queueEmpty' };
 

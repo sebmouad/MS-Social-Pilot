@@ -1,0 +1,50 @@
+/** Copy of the autopilot cockpit (2026-11-16), English and French. */
+export const autopilotCopy = {
+  en: {
+    title: 'Autopilot', description: 'Every channel at a glance, tomorrow’s plan to approve, and what the autopilot learned this week.',
+    settings: 'Autopilot settings', on: 'On', off: 'Paused', channels: '{count} channels', nextAt: 'Next post {time}',
+    sourcePaused: 'The recipe source is paused: nothing new is planned until it is resumed.',
+    channelsHeading: 'Channels', paused: 'Paused', autoTimes: 'Times by autopilot', ownTimes: 'Own times', sharedTimes: 'Shared times',
+    next: 'Next', noNext: 'Nothing planned in the next three days', reachToday: '{reach} reached today', postsToday: '{count} posts today', failedWeek: '{count} failed this week',
+    tomorrowHeading: 'Tomorrow, {date}', tomorrowSummary: '{count} posts on {channels} channels', averageScore: 'average score {score}', flagged: '{count} to check',
+    approveAll: 'Approve all', approved: 'Approved', approveTitle: 'Approve tomorrow’s plan', approveObject: 'Tomorrow, {date}', approveConsequence: 'The posts go out as planned. You can still change any of them until it is published.',
+    approveDone: 'Plan approved.', approveFailed: 'The plan could not be approved. Try again.', cancel: 'Cancel',
+    showFlagged: 'Only the posts to check', showAll: 'All posts', emptyTomorrow: 'Nothing is planned for tomorrow yet. The autopilot plans two days ahead; check back later.',
+    another: 'Another recipe', leaveEmpty: 'Leave empty', open: 'Open', leftEmpty: 'Left empty',
+    anotherTitle: 'Give this time another recipe', anotherConsequence: 'The scheduled post for « {title} » on {channel} is cancelled and another recipe takes its place.',
+    emptyTitle: 'Leave this time empty', emptyConsequence: 'The scheduled post for « {title} » on {channel} is cancelled and nothing replaces it.',
+    changed: 'Done.', changeFailed: 'This time could not be changed: its post may be publishing or edited. Open it to check.',
+    scoreLabel: 'Score {score}', flaggedHint: 'Low score: worth a look',
+    reportHeading: 'This week', reportRange: 'Last 7 days', published: 'Posts published', reached: 'People reached', bestRecipe: 'Best recipe', bestHour: 'Best hour',
+    vsPrevious: 'vs the 7 days before', none: '—', perChannel: 'Per channel', colChannel: 'Channel', colPosts: 'Posts', colReach: 'Reached', colBest: 'Best recipe',
+    learnedHeading: 'What the autopilot did', learnedEmpty: 'No automatic change this week.', stylesHeading: 'Hook styles', stylesEmpty: 'Not enough posts yet to compare hook styles.',
+    colStyle: 'Style', colAverage: 'Result vs usual', preferred: 'Default', style_question: 'Question', style_benefit: 'Benefit', style_story: 'Story', style_curiosity: 'Curiosity', style_promise: 'Promise',
+    timesChanged: '{channel}: times {from} → {to}', noAccess: 'Set up the recipe source on the Content feeds page to use the autopilot.', loadFailed: 'The autopilot could not be loaded. Refresh to try again.',
+  },
+  fr: {
+    title: 'Pilote automatique', description: 'Tous les canaux d’un coup d’œil, le planning de demain à approuver et ce que le pilote a appris cette semaine.',
+    settings: 'Réglages du pilote', on: 'Activé', off: 'En pause', channels: '{count} canaux', nextAt: 'Prochaine publication {time}',
+    sourcePaused: 'La source de recettes est en pause : rien de nouveau n’est planifié avant sa reprise.',
+    channelsHeading: 'Canaux', paused: 'En pause', autoTimes: 'Horaires du pilote', ownTimes: 'Horaires propres', sharedTimes: 'Horaires communs',
+    next: 'Prochaine', noNext: 'Rien de planifié dans les trois jours', reachToday: '{reach} personnes touchées aujourd’hui', postsToday: '{count} publications aujourd’hui', failedWeek: '{count} échecs cette semaine',
+    tomorrowHeading: 'Demain, {date}', tomorrowSummary: '{count} publications sur {channels} canaux', averageScore: 'score moyen {score}', flagged: '{count} à vérifier',
+    approveAll: 'Tout approuver', approved: 'Approuvé', approveTitle: 'Approuver le planning de demain', approveObject: 'Demain, {date}', approveConsequence: 'Les publications partent comme prévu. Vous pouvez encore modifier chacune jusqu’à sa publication.',
+    approveDone: 'Planning approuvé.', approveFailed: 'Le planning n’a pas pu être approuvé. Réessayez.', cancel: 'Annuler',
+    showFlagged: 'Seulement celles à vérifier', showAll: 'Toutes les publications', emptyTomorrow: 'Rien n’est encore planifié pour demain. Le pilote planifie deux jours à l’avance ; revenez plus tard.',
+    another: 'Autre recette', leaveEmpty: 'Laisser vide', open: 'Ouvrir', leftEmpty: 'Laissé vide',
+    anotherTitle: 'Donner une autre recette à cet horaire', anotherConsequence: 'La publication programmée « {title} » sur {channel} est annulée et une autre recette la remplace.',
+    emptyTitle: 'Laisser cet horaire vide', emptyConsequence: 'La publication programmée « {title} » sur {channel} est annulée et rien ne la remplace.',
+    changed: 'C’est fait.', changeFailed: 'Cet horaire n’a pas pu être modifié : sa publication est peut-être en cours ou modifiée. Ouvrez-la pour vérifier.',
+    scoreLabel: 'Score {score}', flaggedHint: 'Score faible : à regarder',
+    reportHeading: 'Cette semaine', reportRange: '7 derniers jours', published: 'Publications', reached: 'Personnes touchées', bestRecipe: 'Meilleure recette', bestHour: 'Meilleure heure',
+    vsPrevious: 'par rapport aux 7 jours précédents', none: '—', perChannel: 'Par canal', colChannel: 'Canal', colPosts: 'Publications', colReach: 'Touchées', colBest: 'Meilleure recette',
+    learnedHeading: 'Ce que le pilote a fait', learnedEmpty: 'Aucun changement automatique cette semaine.', stylesHeading: 'Styles d’accroche', stylesEmpty: 'Pas encore assez de publications pour comparer les styles d’accroche.',
+    colStyle: 'Style', colAverage: 'Résultat par rapport à l’habitude', preferred: 'Par défaut', style_question: 'Question', style_benefit: 'Bénéfice', style_story: 'Histoire', style_curiosity: 'Curiosité', style_promise: 'Promesse',
+    timesChanged: '{channel} : horaires {from} → {to}', noAccess: 'Configurez la source de recettes sur la page Flux de contenu pour utiliser le pilote.', loadFailed: 'Le pilote n’a pas pu être chargé. Actualisez pour réessayer.',
+  },
+} as const;
+export type AutopilotCopyKey = keyof typeof autopilotCopy.en;
+export type AutopilotLocale = keyof typeof autopilotCopy;
+export function autopilotText(locale: AutopilotLocale, key: AutopilotCopyKey, values: Record<string, string | number> = {}): string {
+  return (autopilotCopy[locale][key] as string).replace(/\{(\w+)\}/g, (whole, name: string) => name in values ? String(values[name]) : whole);
+}

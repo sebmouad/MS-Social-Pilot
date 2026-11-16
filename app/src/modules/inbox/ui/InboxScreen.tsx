@@ -1,3 +1,4 @@
+import { prisma } from '@/server/data';
 import { AutoOpenFirst } from './AutoOpenFirst';
 import { createHash } from 'node:crypto';
 import { loadInboxCustomerCopy } from '@/modules/inbox/server/customer-copy';
@@ -175,6 +176,9 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
       {history.cursor ? <a href={inboxHref(historyBase)}>{copy.latest}</a> : <span aria-disabled="true">{copy.latest}</span>}
       {history.newerCursor ? <a href={inboxHref({ ...historyBase, historyCursor: history.newerCursor })}>{copy.newer}</a> : <span aria-disabled="true">{copy.newer}</span>}
     </nav>;
+    // A reply the autopilot drafted, while the comment still has no answer from the page (2026-11-16).
+    const suggestedReply = thread.kind === 'comment' && !thread.entries.some(entry => entry.fromChannel)
+      ? await prisma.postComment.findFirst({ where: { id: thread.id, postTarget: { targetId: thread.target.id, target: { workspaceId: actor.workspaceId } } }, select: { aiDraft: true } }).then(row => row?.aiDraft ?? null).catch(() => null) : null;
     const head = <header className={styles.threadHead}>
       <PersonAvatar name={first?.author ?? thread.entries[0]?.author ?? copy.aVisitor} size={44} />
       <h2>{thread.kind === 'message' ? copy.conversationWith(first?.author ?? copy.aVisitor) : thread.kind === 'review' ? reviewLabel(locale, 'reviewBy', { name: thread.entries[0]?.author ?? copy.aVisitor }) : copy.commentBy(thread.entries[0]?.author ?? copy.aVisitor)}</h2>
@@ -219,7 +223,7 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
       <div className={styles.replyDock}>
         {thread.kind === 'review'
           ? (canWrite && capabilities.replyToReviews ? <ReplyBox key={thread.id} id={thread.id} kind="review" locale={locale} allowed headline="" /> : <p>{reviewLabel(locale, 'replyUnavailable')}</p>)
-          : <ThreadTools kind={thread.kind} id={thread.id} canWrite={canWrite} canReply={capabilities.reply} allowed={rule.allowed} headline={rule.headline} detail={rule.detail} locale={locale} source={[...thread.entries].reverse().find(entry => !entry.fromChannel)?.text} aiAvailable={aiAvailable} />}
+          : <ThreadTools kind={thread.kind} id={thread.id} canWrite={canWrite} canReply={capabilities.reply} allowed={rule.allowed} headline={rule.headline} detail={rule.detail} locale={locale} source={[...thread.entries].reverse().find(entry => !entry.fromChannel)?.text} aiAvailable={aiAvailable} suggested={suggestedReply} />}
       </div>
     </>;
     threadView = <section className={styles.threadPane} aria-label={thread.kind === 'message' ? copy.openConversation : thread.kind === 'review' ? reviewLabel(locale, 'openReview') : copy.openComment}>
