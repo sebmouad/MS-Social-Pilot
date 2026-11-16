@@ -119,6 +119,10 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
 
   const threadPage = threadOutcome.page;
   const thread: OpenThread | null = threadPage?.thread ?? null;
+  // Facebook does not always share a commenter's name; the stored « Visitor » shows in the page language (2026-11-16).
+  const named = (name: string) => name === 'Visitor' ? (locale === 'fr' ? 'Visiteur' : 'Visitor') : name;
+  if (listPage) for (const item of listPage.items) (item as { author: string }).author = named(item.author);
+  if (thread) for (const entry of thread.entries) (entry as { author: string }).author = named(entry.author);
   const timeZone = listPage?.timeZone ?? viewer.membership.workspace.timezone;
   const filters = listPage?.filters ?? DEFAULT_FILTERS;
   const channel = filters.channelId ?? 'all';
@@ -143,6 +147,7 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
     ]);
     // Stored facts only; if they cannot be read the panel says so and the conversation itself stays usable.
     const details: InboxContactDetails | null = await readInboxContactDetails(actor, { key: `${thread.kind}:${thread.id}` }, constraints).catch(() => null);
+    if (details) (details.person as { name: string }).name = named(details.person.name);
     const badge = channelBadgeInfo(thread.target.provider);
     const first =thread.entries.find(entry => !entry.fromChannel);
     const history = threadPage!.history;
