@@ -6,7 +6,8 @@ import { Dialog } from '@/components/Dialog';
 import { ConfirmDialog, Menu } from '@/components';
 import { RouteNotice } from '@/components/RouteNotice';
 import { recipeCopy, recipeText, type RecipeCopyCatalog, type RecipeCopyKey, type RecipeLocale } from '../copy-recipes';
-import { configPatch, replaceRecipeSlotConfirmation } from '../wordpress/recipe';
+import { configPatch, replaceRecipeSlotConfirmation, type ChannelSettings as ChannelOwnSettings } from '../wordpress/recipe';
+import { ChannelSettings } from './ChannelSettings';
 import styles from './feeds.module.css';
 import { RecipeSupplyWarning } from './RecipeSupplyWarning';
 
@@ -20,6 +21,8 @@ export type RecipeConfig = {
   channelSlots?: Record<string, string[]>;
   /** Recipes never posted. */
   excluded?: Array<{ id: string; title: string }>;
+  /** Channels with their own settings. */
+  channels?: Record<string, ChannelOwnSettings>;
 };
 export type RecipeSourceData = {
   id: string; name: string; siteUrl: string; hasCredential: boolean; enabled: boolean; allTargets: boolean; targetIds: string[]; config: RecipeConfig;
@@ -77,11 +80,7 @@ export function RecipeSource({ initial, locale, canWrite, copy = recipeCopy }: {
   const days = draft.config.weekdays ?? [0, 1, 2, 3, 4, 5, 6];
   const dayName = (day: number) => new Intl.DateTimeFormat(locale, { weekday: 'short', timeZone: 'UTC' }).format(new Date(Date.UTC(2026, 10, 15 + day)));
   const daysSummary = days.length === 7 ? t('everyDay') : WEEK_ORDER.filter(d => days.includes(d)).map(dayName).join(', ');
-  const setChannelTimes = (pageId: string, times: string[] | null) => setDraft(d => {
-    const next = { ...(d.config.channelSlots ?? {}) };
-    if (times) next[pageId] = times; else delete next[pageId];
-    return { ...d, config: { ...d.config, channelSlots: next } };
-  });
+  const scopePages = draft.allTargets ? view.pages : view.pages.filter(page => draft.targetIds.includes(page.id));
   const setMapping = (patch: Partial<Mapping>) => setDraft(d => ({ ...d, config: { ...d.config, mapping: { ...d.config.mapping, ...patch } } }));
 
   // One planned time being changed (2026-11-15): which action, and for « choose » the recipe list.
@@ -218,6 +217,9 @@ export function RecipeSource({ initial, locale, canWrite, copy = recipeCopy }: {
       </fieldset>
       </div></details>
 
+      <ChannelSettings pages={scopePages} config={draft.config} busy={busy} maxTemplate={view.limits.maxTemplateCharacters} t={t} dayName={dayName}
+        onChange={(channels, channelSlots) => setConfig({ channels, channelSlots: Object.keys(channelSlots).length ? channelSlots : undefined })} />
+
       <details className={styles.group}><summary><strong>{t('timingHeading')}</strong><span>{draft.config.slots.join(' · ')} · {daysSummary} · {draft.config.timezone}</span></summary><div className={styles.groupBody}>
       <fieldset className={styles.checks} disabled={busy}><legend>{t('slots')}</legend>
         <div className={styles.slotChips}>{draft.config.slots.map((slot, index) => <span key={index} className={styles.slotChip}>
@@ -231,23 +233,6 @@ export function RecipeSource({ initial, locale, canWrite, copy = recipeCopy }: {
         <div className={styles.dayChips}>{WEEK_ORDER.map(day => { const on = days.includes(day); return <button key={day} type="button" aria-pressed={on} className={styles.dayChip}
           disabled={on && days.length === 1} onClick={() => setConfig({ weekdays: on ? days.filter(d => d !== day) : [...days, day].sort() })}>{dayName(day)}</button>; })}</div>
         <span className={styles.help}>{t('weekdaysHint')}</span>
-      </fieldset>
-      {/* Times per channel (2026-11-15): a channel listed here posts at its own times instead of the shared ones. */}
-      <fieldset className={styles.dayPicker} disabled={busy}><legend>{t('channelTimes')}</legend>
-        <span className={styles.help}>{t('channelTimesHint')}</span>
-        {Object.entries(draft.config.channelSlots ?? {}).map(([pageId, times]) => <div key={pageId} className={styles.channelTimes}>
-          <strong>{view.pages.find(page => page.id === pageId)?.name ?? pageId}</strong>
-          <div className={styles.slotChips}>{times.map((slot, index) => <span key={index} className={styles.slotChip}>
-            <input type="time" aria-label={t('slots')} value={slot} onChange={e => setChannelTimes(pageId, times.map((v, i) => i === index ? e.target.value : v))} />
-            <button type="button" aria-label={t('removeSlot', { time: slot })} disabled={times.length < 2} onClick={() => setChannelTimes(pageId, times.filter((_, i) => i !== index))}>×</button>
-          </span>)}
-            <Button size="sm" type="button" variant="quiet" onClick={() => setChannelTimes(pageId, [...times, '12:00'])}>+ {t('addSlot')}</Button>
-            <Button size="sm" type="button" variant="quiet" onClick={() => setChannelTimes(pageId, null)}>{t('channelTimesRemove')}</Button></div>
-        </div>)}
-        {view.pages.some(page => !draft.config.channelSlots?.[page.id]) && <select className={styles.channelAdd} value="" onChange={e => { if (e.target.value) setChannelTimes(e.target.value, [...draft.config.slots]); }}>
-          <option value="">{t('channelTimesAdd')}</option>
-          {view.pages.filter(page => !draft.config.channelSlots?.[page.id]).map(page => <option key={page.id} value={page.id}>{page.name}</option>)}
-        </select>}
       </fieldset>
       <label>{t('timezone')}<input disabled={busy} value={draft.config.timezone} onChange={e => setConfig({ timezone: e.target.value })} /><span>{t('timezoneHint')}</span></label>
       <label>{t('horizon')}<input disabled={busy} type="number" min={1} max={14} step={1} value={draft.config.horizonDays} onChange={e => setConfig({ horizonDays: Math.trunc(Number(e.target.value)) || 1 })} /></label>

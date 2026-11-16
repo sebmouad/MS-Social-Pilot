@@ -3,7 +3,7 @@ import { prisma } from '@/server/data';
 import { decryptSecret } from '@/server/secret-crypto';
 import { defaultFetchDeps, type FetchDeps } from '@/modules/publishing/server/media/network/net-guard';
 import type { ArticleInput, ArticleWriting } from '@/modules/studio/ai';
-import { allocateRecipes, recipeTitleKey, buildImageUrl, buildPermalink, reportedPermalink, parseRecipe, renderComment, resolveConfig, slotInstants, type PlanConfig, type Recipe, type SlotNeed } from '../wordpress/recipe';
+import { allocateRecipes, channelConfig, recipeTitleKey, buildImageUrl, buildPermalink, reportedPermalink, parseRecipe, renderComment, resolveConfig, slotInstants, type PlanConfig, type Recipe, type SlotNeed } from '../wordpress/recipe';
 import { openWordpressDb, type DbSettings, type WpDb } from '../wordpress/db';
 import { defaultImagePorts, prepareRecipeImage, RecipeImageError, type ImagePorts } from '../wordpress/image';
 import { qualifyingOwner, type FeedActor, type FeedAuthorization } from './access';
@@ -219,11 +219,15 @@ export async function planSource(ctx: Ctx, source: SourceRow, auth: FeedAuthoriz
   const staggered = (slotAt: Date, targetId: string) => new Date(slotAt.getTime() + (pageOrder.get(targetId) ?? 0) * (Number.isFinite(settings.pageStaggerMinutes) ? settings.pageStaggerMinutes : 0) * 60_000);
   if (!pages.length) return { ...out, reason: 'no_pages' };
 
-  // Each channel posts at its own times when it has some (2026-11-15), otherwise at the shared times.
-  const timing = (times: readonly string[]) => slotInstants({ now, slots: times, timezone: config.timezone, horizonDays: config.horizonDays, leadMinutes: settings.minLeadMinutes, ...(config.weekdays ? { weekdays: config.weekdays } : {}) });
-  const shared = timing(config.slots);
+  // Each channel posts with its own settings where it has them (2026-11-15): times, days, order, first comment, or paused.
+  const own = new Map(pages.map(page => [page.id, channelConfig(config, page.id)]));
+  const of = (targetId: string) => own.get(targetId) ?? channelConfig(config, targetId);
   const pairs: Array<{ slotAt: Date; page: { id: string; name: string } }> = [];
-  for (const page of pages) for (const slotAt of (config.channelSlots?.[page.id]?.length ? timing(config.channelSlots[page.id]!) : shared)) pairs.push({ slotAt, page });
+  for (const page of pages) {
+    const mine = of(page.id);
+    if (mine.paused) continue;
+    for (const slotAt of slotInstants({ now, slots: mine.slots, timezone: config.timezone, horizonDays: config.horizonDays, leadMinutes: settings.minLeadMinutes, ...(mine.weekdays ? { weekdays: mine.weekdays } : {}) })) pairs.push({ slotAt, page });
+  }
   pairs.sort((a, b) => a.slotAt.getTime() - b.slotAt.getTime() || (pageOrder.get(a.page.id) ?? 0) - (pageOrder.get(b.page.id) ?? 0));
   out.slots = new Set(pairs.map(pair => pair.slotAt.getTime())).size;
   const view = await supplyLedgerView(settings, ports, source, now);
@@ -246,27 +250,40 @@ export async function planSource(ctx: Ctx, source: SourceRow, auth: FeedAuthoriz
   // Recipes a member excluded are never candidates; a forced slot takes exactly the recipe chosen for it (2026-11-15).
   const excluded = new Set((config.excluded ?? []).map(item => item.id));
   const usable = (found: Candidate[]) => excluded.size ? found.filter(c => !excluded.has(c.wpPostId)) : found;
-  const forcedIds = ctx.force ? [...new Set(todo.flatMap(need => ctx.force!.get(slotKey(need.targetId, need.slotAt)) ?? []))] : [];
-  const autoTodo = ctx.force ? todo.filter(need => !ctx.force!.has(slotKey(need.targetId, need.slotAt))) : todo;
-  const scan = await scanCandidates(ctx.db, settings, source, config, now, found => forcedIds.length
-    ? forcedIds.every(id => found.some(c => c.wpPostId === id))
-    : !settings.reuse.enabled && allocateRecipes({ needs: autoTodo, candidates: usable(found), blocked: view.blocked, taken: view.taken, reused: view.reused, distinct: config.distinctAcrossPages }).unfilled === 0, writer);
-  scan.candidates = usable(scan.candidates);
-  out.scanned = scan.scanned; out.candidates = scan.candidates.length; out.rejected = scan.rejected;
-  // Every post came back without the caption field itself: credentials or the REST exposure of that field failed, not the content.
-  const readable = scan.scanned - scan.rejected.shared;
-  if (readable > 0 && scan.rejected.captionFieldMissing === readable) out.reason = 'caption_field_missing';
-  else if (readable > 0 && !writer && !config.mapping.recipeMetaKey && scan.rejected.recipe === readable) out.reason = 'needs_ai';
-  const forced: Array<{ targetId: string; slotAt: Date; candidate: Candidate }> = [];
-  for (const need of todo) {
-    const id = ctx.force?.get(slotKey(need.targetId, need.slotAt));
-    if (!id) continue;
-    const candidate = scan.candidates.find(c => c.wpPostId === id);
-    if (candidate) forced.push({ targetId: need.targetId, slotAt: need.slotAt, candidate });
+  // Channels reading the library in a different order get their own scan; recipes picked for one group are taken for the next.
+  const groups = new Map<'newest' | 'oldest', SlotNeed[]>();
+  for (const need of todo) { const order = of(need.targetId).order; groups.set(order, [...(groups.get(order) ?? []), need]); }
+  const taken = new Set(view.taken);
+  const assignments: Array<{ targetId: string; slotAt: Date; candidate: Candidate }> = [];
+  let readable = 0; let captionMissing = 0; let recipeMissing = 0; let unfilled = 0;
+  out.candidates = 0; out.rejected = { shared: 0, caption: 0, image: 0, link: 0, recipe: 0, captionFieldMissing: 0 };
+  for (const [order, group] of groups) {
+    const groupConfig = { ...config, order };
+    const forcedIds = ctx.force ? [...new Set(group.flatMap(need => ctx.force!.get(slotKey(need.targetId, need.slotAt)) ?? []))] : [];
+    const autoTodo = ctx.force ? group.filter(need => !ctx.force!.has(slotKey(need.targetId, need.slotAt))) : group;
+    const scan = await scanCandidates(ctx.db, settings, source, groupConfig, now, found => forcedIds.length
+      ? forcedIds.every(id => found.some(c => c.wpPostId === id))
+      : !settings.reuse.enabled && allocateRecipes({ needs: autoTodo, candidates: usable(found), blocked: view.blocked, taken, reused: view.reused, distinct: config.distinctAcrossPages }).unfilled === 0, writer);
+    scan.candidates = usable(scan.candidates);
+    out.scanned += scan.scanned; out.candidates += scan.candidates.length;
+    for (const key of Object.keys(out.rejected) as Array<keyof ScanRejections>) out.rejected[key] = (out.rejected[key] ?? 0) + (scan.rejected[key] ?? 0);
+    readable += scan.scanned - scan.rejected.shared; captionMissing += scan.rejected.captionFieldMissing ?? 0; recipeMissing += scan.rejected.recipe;
+    const groupForced: Array<{ targetId: string; slotAt: Date; candidate: Candidate }> = [];
+    for (const need of group) {
+      const id = ctx.force?.get(slotKey(need.targetId, need.slotAt));
+      if (!id) continue;
+      const candidate = scan.candidates.find(c => c.wpPostId === id);
+      if (candidate) groupForced.push({ targetId: need.targetId, slotAt: need.slotAt, candidate });
+    }
+    const automatic = allocateRecipes({ needs: autoTodo, candidates: scan.candidates, allowReuse: scan.exhausted, blocked: view.blocked, taken, reused: view.reused, distinct: config.distinctAcrossPages });
+    for (const { candidate } of [...groupForced, ...automatic.assignments]) { taken.add(candidate.wpPostId); if (candidate.title) taken.add(recipeTitleKey(candidate.title)); }
+    assignments.push(...groupForced, ...automatic.assignments);
+    unfilled += automatic.unfilled + (group.length - autoTodo.length - groupForced.length);
   }
-  const automatic = allocateRecipes({ needs: autoTodo, candidates: scan.candidates, allowReuse: scan.exhausted, blocked: view.blocked, taken: view.taken, reused: view.reused, distinct: config.distinctAcrossPages });
-  const assignments = [...forced, ...automatic.assignments];
-  out.unfilled = automatic.unfilled + (todo.length - autoTodo.length - forced.length) + (needs.length - todo.length);
+  // Every post came back without the caption field itself: credentials or the REST exposure of that field failed, not the content.
+  if (readable > 0 && captionMissing === readable) out.reason = 'caption_field_missing';
+  else if (readable > 0 && !writer && !config.mapping.recipeMetaKey && recipeMissing === readable) out.reason = 'needs_ai';
+  out.unfilled = unfilled + (needs.length - todo.length);
 
   for (const [index, { targetId, slotAt, candidate: c }] of assignments.entries()) {
     if (ctx.budget.left <= 0) break;
@@ -277,7 +294,7 @@ export async function planSource(ctx: Ctx, source: SourceRow, auth: FeedAuthoriz
     if (!claimId) continue;
     ctx.budget.left -= 1;
     let written: { caption: string; firstComment: string };
-    try { written = await writeCandidate(ports, auth.actor, settings, config, c); }
+    try { written = await writeCandidate(ports, auth.actor, settings, of(targetId), c); }
     catch (error) {
       // Nothing was created: the slot fails and is planned again, without this post when it has nothing to write from.
       const code = error instanceof OperationError ? error.code : 'unknown';
@@ -292,7 +309,7 @@ export async function planSource(ctx: Ctx, source: SourceRow, auth: FeedAuthoriz
       const post = await ports.createPost(auth.actor, {
         // The slot keeps its identity (ledger key); only the publish time is offset per Page, so Pages never post in lockstep.
         message: written.caption, firstComment: written.firstComment, targetIds: [targetId], scheduledAt: staggered(slotAt, targetId),
-        media: [{ kind: 'image', url: `media:${image.mediaId}`, altText: c.title.slice(0, settings.altMax) }], firstCommentDelayMinutes: config.firstCommentDelayMinutes,
+        media: [{ kind: 'image', url: `media:${image.mediaId}`, altText: c.title.slice(0, settings.altMax) }], firstCommentDelayMinutes: of(targetId).firstCommentDelayMinutes,
       });
       postId = post.id;
     } catch (error) {

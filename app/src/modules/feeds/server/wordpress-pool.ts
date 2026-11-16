@@ -1,4 +1,5 @@
 import type { WpDb } from '../wordpress/db';
+import { channelConfig } from '../wordpress/recipe';
 import { supplyLedgerView, scanCandidates, configOf, type PlannerPorts } from './wordpress-planner';
 import type { SourceRow } from './wordpress-store';
 import type { WordpressSettings } from './wordpress-settings';
@@ -24,11 +25,14 @@ export async function computePoolHealth(input: { settings: WordpressSettings; po
   const view = await supplyLedgerView(settings, ports, source, now);
   const scan = await scanCandidates(db, settings, source, config, now, () => false, await ports.writer.available(source.workspaceId).catch(() => false));
   const slotsPerDay = config.slots.length;
-  const consumers = config.distinctAcrossPages ? Math.max(1, pages.length) : 1;
+  // Posts a day on each channel at its own times and days (2026-11-15); a paused channel uses none.
+  const perDay = new Map(pages.map(page => { const own = channelConfig(config, page.id); return [page.id, own.paused ? 0 : own.slots.length * (own.weekdays?.length ?? 7) / 7]; }));
+  const allPerDay = [...perDay.values()].reduce((sum, value) => sum + value, 0);
   const rows: PoolPage[] = pages.map(page => {
     const blocked = view.blocked.get(page.id);
     const eligible = scan.candidates.filter(c => !blocked?.has(c.wpPostId) && (scan.exhausted || !view.reused.get(page.id)?.has(c.wpPostId)) && !(config.distinctAcrossPages && view.taken.has(c.wpPostId))).length;
-    const daysLeft = !slotsPerDay ? null : Math.floor(eligible / (slotsPerDay * consumers));
+    const demand = config.distinctAcrossPages ? allPerDay : perDay.get(page.id) ?? 0;
+    const daysLeft = !perDay.get(page.id) || !demand ? null : Math.floor(eligible / demand);
     return { targetId: page.id, targetName: page.name, eligible, daysLeft, low: scan.exhausted && daysLeft !== null && daysLeft < settings.poolWarnDays };
   });
   return { asOf: now.toISOString(), scanned: scan.scanned, candidates: scan.candidates.length, complete: scan.exhausted, slotsPerDay, warnDays: settings.poolWarnDays, reuse: { enabled: settings.reuse.enabled, cooldownDays: Math.max(settings.reuse.cooldownDays, config.cooldownDays) }, low: rows.some(r => r.low), pages: rows };

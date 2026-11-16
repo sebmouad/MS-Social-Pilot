@@ -35,7 +35,7 @@ function settings(): WordpressSettings {
 /** In-memory ledger and publishing; returns the ports and what they recorded. */
 function harness(seed: LedgerRow[] = []) {
   const ledger: LedgerRow[] = [...seed];
-  const created: Array<{ targetId: string; scheduledAt: Date; message: string }> = [];
+  const created: Array<{ targetId: string; scheduledAt: Date; message: string; firstComment?: string }> = [];
   const store = {
     async enabledSources() { return []; },
     async pages() { return pages; },
@@ -55,7 +55,7 @@ function harness(seed: LedgerRow[] = []) {
   const ports = {
     async openDb() { throw new Error('unused'); },
     async validateTarget() {},
-    async createPost(_actor: unknown, input: { targetIds: string[]; scheduledAt: Date; message: string }) { created.push({ targetId: input.targetIds[0]!, scheduledAt: input.scheduledAt, message: input.message }); return { id: `post${created.length}` }; },
+    async createPost(_actor: unknown, input: { targetIds: string[]; scheduledAt: Date; message: string; firstComment?: string }) { created.push({ targetId: input.targetIds[0]!, scheduledAt: input.scheduledAt, message: input.message, firstComment: input.firstComment }); return { id: `post${created.length}` }; },
     async cancelPost() {}, async postForSlot() { return null; },
     image: { async download() { return Buffer.from('x'); }, async inspect() {}, async convert() { return Buffer.from('jpeg'); }, async store() { return { id: 'media1' }; } },
     async qualify() { return null; }, store,
@@ -63,7 +63,7 @@ function harness(seed: LedgerRow[] = []) {
     now: () => now,
   } as unknown as PlannerPorts;
   const db = {
-    async candidates(q: { offset: number; limit: number }) { const rows = recipes.slice(q.offset, q.offset + q.limit); return { rows, fetched: rows.length, requested: q.limit }; },
+    async candidates(q: { offset: number; limit: number; order?: string }) { const rows = (q.order === 'oldest' ? [...recipes].reverse() : recipes).slice(q.offset, q.offset + q.limit); return { rows, fetched: rows.length, requested: q.limit }; },
     async attachments(ids: readonly string[]) { return new Map(ids.map(id => [id, `2026/11/${id}.jpg`])); },
     async ping() {}, async close() {},
   };
@@ -112,4 +112,26 @@ test('planner: a chosen recipe is used for its time, even when it was planned el
   assert.equal(out.planned, 1);
   const row = h.ledger.find(r => r.targetId === slot.targetId && r.slotAt.getTime() === slot.slotAt.getTime())!;
   assert.equal(row.wpPostId, taken);
+});
+
+test('planner: a paused channel gets nothing, the others are planned as usual', async () => {
+  const h = harness();
+  await planSource({ settings: settings(), ports: h.ports, db: h.db as never, budget: { left: 50 }, now }, source({ channels: { pageB: { paused: true } } }), auth);
+  assert.ok(h.created.some(p => p.targetId === 'pageA'));
+  assert.ok(!h.created.some(p => p.targetId === 'pageB'));
+});
+
+test('planner: each channel uses its own times, recipe order and first comment, and recipes stay different across channels', async () => {
+  const h = harness();
+  const config = { channels: { pageB: { slots: ['08:15'], order: 'oldest', firstCommentTemplate: 'Page B: {link}' } } };
+  await planSource({ settings: settings(), ports: h.ports, db: h.db as never, budget: { left: 50 }, now }, source(config), auth);
+  const a = h.created.filter(p => p.targetId === 'pageA'); const b = h.created.filter(p => p.targetId === 'pageB');
+  assert.deepEqual([...new Set(b.map(p => paris(p.scheduledAt)))], ['08:15']);
+  assert.deepEqual([...new Set(a.map(p => paris(p.scheduledAt)))].sort(), ['11:00', '17:00']);
+  const recipeOf = (targetId: string) => h.ledger.filter(row => row.targetId === targetId).map(row => row.wpPostId);
+  assert.ok(recipeOf('pageB').every(id => Number(id.slice(1)) > 25), 'oldest first on page B');
+  assert.ok(recipeOf('pageA').every(id => Number(id.slice(1)) <= 5), 'newest first on page A');
+  assert.ok(b.every(p => p.firstComment?.startsWith('Page B: ')));
+  assert.ok(a.every(p => p.firstComment?.startsWith('Recipe: ')));
+  assert.equal(new Set([...recipeOf('pageA'), ...recipeOf('pageB')]).size, a.length + b.length);
 });

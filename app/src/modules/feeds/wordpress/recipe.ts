@@ -15,7 +15,22 @@ export type PlanConfig = {
   channelSlots?: Record<string, string[]>;
   /** Recipes never to post (2026-11-15): WordPress post id and the title shown in the list. */
   excluded?: Array<{ id: string; title: string }>;
+  /** Channels with their own settings (2026-11-15), keyed by channel id: each field set replaces the shared one for that channel. */
+  channels?: Record<string, ChannelSettings>;
 };
+/** What one channel can set for itself; `paused` stops planning on it without touching the others. */
+export type ChannelSettings = { slots?: string[]; weekdays?: number[]; order?: 'newest' | 'oldest'; firstCommentTemplate?: string; firstCommentDelayMinutes?: number; paused?: boolean };
+
+/** The settings one channel posts with: its own where it has them, the shared ones otherwise. */
+export function channelConfig(config: PlanConfig, channelId: string): PlanConfig & { paused: boolean } {
+  const own = config.channels?.[channelId] ?? {};
+  const slots = own.slots?.length ? own.slots : config.channelSlots?.[channelId]?.length ? config.channelSlots[channelId]! : config.slots;
+  return {
+    ...config, slots: normalizeSlots(slots), order: own.order ?? config.order,
+    firstCommentTemplate: own.firstCommentTemplate ?? config.firstCommentTemplate, firstCommentDelayMinutes: own.firstCommentDelayMinutes ?? config.firstCommentDelayMinutes,
+    ...(own.weekdays?.length ? { weekdays: own.weekdays } : {}), paused: own.paused === true,
+  };
+}
 
 const key = z.string().regex(META_KEY);
 const token = z.string().regex(/^[A-Za-z0-9_-]{1,20}$/);
@@ -33,6 +48,12 @@ export const planConfigPatchSchema = (limits: { template: number; horizon: { min
     .refine(map => Object.keys(map).length <= 500, 'Too many channels.'),
   excluded: z.array(z.object({ id: z.string().regex(/^[A-Za-z0-9_-]{1,100}$/), title: z.string().max(300) }).strict()).max(2000)
     .transform(list => [...new Map(list.map(item => [item.id, item])).values()]),
+  channels: z.record(z.string().regex(/^[A-Za-z0-9_-]{1,100}$/), z.object({
+    slots: z.array(z.string().regex(SLOT_TIME)).min(1).max(SLOTS_MAX).transform(normalizeSlotsList),
+    weekdays: z.array(z.number().int().min(0).max(6)).min(1).max(7).transform(days => [...new Set(days)].sort()),
+    order: z.enum(['newest', 'oldest']), firstCommentTemplate: z.string().min(1).max(limits.template),
+    firstCommentDelayMinutes: z.number().int().min(limits.delay.min).max(limits.delay.max), paused: z.boolean(),
+  }).partial().strict()).refine(map => Object.keys(map).length <= 500, 'Too many channels.'),
   horizonDays: z.number().int().min(limits.horizon.min).max(limits.horizon.max), distinctAcrossPages: z.boolean(),
   cooldownDays: z.number().int().min(limits.cooldown.min).max(limits.cooldown.max),
   firstCommentTemplate: z.string().min(1).max(limits.template), firstCommentDelayMinutes: z.number().int().min(limits.delay.min).max(limits.delay.max),
