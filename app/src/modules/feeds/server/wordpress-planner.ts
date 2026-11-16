@@ -490,7 +490,7 @@ export async function openDatabase(ports: PlannerPorts, settings: WordpressSetti
  * whose current plan and grants allow the feature (the workspace-owner worker policy); one source's failure never
  * stops the others, and a per-run budget bounds the posts created.
  */
-export async function runRecipePlanning(overrides: Partial<PlannerPorts> & { autopilot?: import('./wordpress-autopilot').AutopilotPorts } = {}, loaded?: WordpressSettings): Promise<RecipePlanSummary> {
+export async function runRecipePlanning(overrides: Partial<PlannerPorts> & { autopilot?: import('./wordpress-autopilot').AutopilotPorts; radar?: import('./wordpress-radar').RadarPorts } = {}, loaded?: WordpressSettings): Promise<RecipePlanSummary> {
   let settings: WordpressSettings;
   try { settings = loaded ?? await loadWordpressSettings(); } catch { return emptySummary('misconfigured'); }
   if (!settings.enabled) return emptySummary('disabled');
@@ -537,7 +537,25 @@ export async function runRecipePlanning(overrides: Partial<PlannerPorts> & { aut
         const recent = (pilot.log ?? []).some(entry => entry.kind === 'healing' && entry.channelName === name && now.getTime() - Date.parse(entry.at) < 86_400_000);
         if (!recent) entries.push({ at: now.toISOString(), kind: 'healing', channelName: name.slice(0, 200), text: 'This channel cannot publish right now (its connection or permissions). Its recipes are on hold; the other channels carry on.' });
       }
-      await autopilot.logAutopilot(settings, source, entries, overrides.autopilot).catch(() => undefined);
+      // Viral radar and breathing room for hot posts (2026-11-16).
+      let handled: string[] = [];
+      if (pilot.radar.enabled || pilot.breathe.enabled) {
+        try {
+          const { runRadar, prismaRadarPorts } = await import('./wordpress-radar');
+          const radarPorts = overrides.radar ?? prismaRadarPorts(async (planId, wpPostId) => {
+            const { changeRecipeSlotNow } = await import('./wordpress');
+            const { replaceRecipeSlotConfirmation } = await import('../wordpress/recipe');
+            await changeRecipeSlotNow(auth.actor, { planId, confirmation: replaceRecipeSlotConfirmation(planId), action: 'choose', wpPostId });
+            return true;
+          });
+          const channels = await ports.store.pages(source, settings.targetTypes, settings.maxTargets);
+          const radarView = await supplyLedgerView(settings, ports, source, now);
+          const radar = await runRadar({ pilot: autopilotOf(configOf(settings, source).autopilot), sourceId: source.id, workspaceId: source.workspaceId, actor: auth.actor, now, handled: new Set(pilot.radarHandled ?? []),
+            names: new Map(channels.map(page => [page.id, page.name])), blocked: (targetId, wpPostId) => radarView.blocked.get(targetId)?.has(wpPostId) ?? false }, radarPorts);
+          entries.push(...radar.entries); handled = radar.handled;
+        } catch { /* the radar never stops planning */ }
+      }
+      await autopilot.logAutopilot(settings, source, entries, overrides.autopilot, handled).catch(() => undefined);
       totals(summary, outcome);
       await ports.store.recordRun(source.workspaceId, source.id, { at: now, error: outcome.reason === 'caption_field_missing' ? captionFieldMessage(outcome.scanned, configOf(settings, source).mapping.captionMetaKey, sourceCredential(source)) : outcome.reason === 'needs_ai' ? NEEDS_AI_MESSAGE : outcome.reason && !['complete', 'budget'].includes(outcome.reason) ? `Planning stopped: ${outcome.reason}` : null, summary: recipeSummaryRecord(outcome, now) });
     } catch {

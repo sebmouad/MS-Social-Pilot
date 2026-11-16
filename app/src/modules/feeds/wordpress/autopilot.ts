@@ -4,7 +4,7 @@ import { z } from 'zod';
  * Recipe autopilot (2026-11-16, docs/autopilot-plan.md): settings and the pure learning logic.
  * Best times: each channel's posting times move to the hours its own audience responds to most.
  */
-export type AutopilotLogEntry = { at: string; kind: 'times' | 'healing' | 'supply'; channelId?: string; channelName?: string; from?: string[]; to?: string[]; text?: string };
+export type AutopilotLogEntry = { at: string; kind: 'times' | 'healing' | 'supply' | 'radar'; channelId?: string; channelName?: string; from?: string[]; to?: string[]; text?: string };
 export type AutopilotSettings = {
   bestTimes: { enabled: boolean; apply: 'auto' | 'approve'; gapMinutes: number; window: [number, number]; learnDays: number };
   healing: { replaceFailed: boolean; pauseBroken: boolean; warnDays: number };
@@ -17,6 +17,8 @@ export type AutopilotSettings = {
   breathe: { enabled: boolean; factor: number; maxDelayMinutes: number };
   /** Each channel's hours as last learned (hour → value, 1 = usual): best recipes go to the strongest. */
   hourValues?: Record<string, Record<string, number>>;
+  /** Recipe slots the radar already acted on. */
+  radarHandled?: string[];
   lastLearnedAt?: string;
   /** The learning method the times were last chosen with; a newer method relearns at once. */
   learnVersion?: number;
@@ -41,7 +43,7 @@ export const LEARN_EVERY_DAYS = 7;
 export const LEARN_VERSION = 3;
 
 const logEntry = z.object({
-  at: z.string().max(40), kind: z.enum(['times', 'healing', 'supply']), channelId: z.string().max(100).optional(), channelName: z.string().max(200).optional(),
+  at: z.string().max(40), kind: z.enum(['times', 'healing', 'supply', 'radar']), channelId: z.string().max(100).optional(), channelName: z.string().max(200).optional(),
   from: z.array(z.string().max(5)).max(24).optional(), to: z.array(z.string().max(5)).max(24).optional(), text: z.string().max(500).optional(),
 }).strict();
 export const autopilotSchema = z.object({
@@ -57,6 +59,7 @@ export const autopilotSchema = z.object({
   evergreen: z.object({ enabled: z.boolean(), cooldownDays: z.number().int().min(7).max(730), share: z.number().int().min(0).max(50) }).strict().optional(),
   radar: z.object({ enabled: z.boolean(), factor: z.number().min(1.5).max(20), pages: z.number().int().min(1).max(50), mode: z.enum(['auto', 'approve']), boost: z.boolean() }).strict().optional(),
   breathe: z.object({ enabled: z.boolean(), factor: z.number().min(1.5).max(20), maxDelayMinutes: z.number().int().min(10).max(240) }).strict().optional(),
+  radarHandled: z.array(z.string().max(100)).max(300).optional(),
   hourValues: z.record(z.string().max(100), z.record(z.string().max(2), z.number().min(0).max(100))).optional()
     .refine(map => !map || Object.keys(map).length <= 500, 'Too many channels.'),
   lastLearnedAt: z.string().max(40).optional(), learnVersion: z.number().int().min(0).max(1000).optional(),

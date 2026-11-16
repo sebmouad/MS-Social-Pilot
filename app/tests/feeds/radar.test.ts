@@ -1,0 +1,51 @@
+// Viral radar and breathing room for hot posts (2026-11-16).
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { isHot, similarChannels, breatheTime, runRadar, type RadarPorts } from '@/modules/feeds/server/wordpress-radar';
+import { AUTOPILOT_DEFAULTS } from '@/modules/feeds/wordpress/autopilot';
+
+const now = new Date('2026-11-17T16:00:00Z');
+
+test('hot: three times the usual reach, with credit for a young post', () => {
+  assert.equal(isHot({ reach: 3000, median: 1000, ageMinutes: 240, factor: 3 }), true);
+  assert.equal(isHot({ reach: 2000, median: 1000, ageMinutes: 240, factor: 3 }), false);
+  assert.equal(isHot({ reach: 1100, median: 1000, ageMinutes: 60, factor: 3 }), true); // 1 h old: 35% of the usual already ×3
+  assert.equal(isHot({ reach: 500, median: 0, ageMinutes: 60, factor: 3 }), false);
+});
+
+test('similar channels: closest usual reach first, never the hot one', () => {
+  const medians = new Map([['hot', 1000], ['a', 950], ['b', 5000], ['c', 1200], ['d', 100]]);
+  assert.deepEqual(similarChannels('hot', medians, 2), ['a', 'c']);
+});
+
+test('breathing room: an hour later on a 5-minute mark, never past the post after it', () => {
+  const next = new Date('2026-11-17T16:20:00Z');
+  assert.equal(breatheTime(next, null, 60)?.toISOString(), '2026-11-17T17:20:00.000Z');
+  assert.equal(breatheTime(next, new Date('2026-11-17T17:10:00Z'), 60)?.toISOString(), '2026-11-17T16:40:00.000Z');
+  assert.equal(breatheTime(next, new Date('2026-11-17T16:45:00Z'), 60), null);
+});
+
+test('radar: a hot post delays the next one and spreads to the most similar channels, once', async () => {
+  const moved: Array<{ postId: string; at: string }> = []; const chosen: Array<{ planId: string; wpPostId: string }> = [];
+  const ports: RadarPorts = {
+    async recent() { return [{ planId: 'plan1', targetId: 'hot', wpPostId: 'w1', title: 'Cannelés', postId: 'post1', publishedAt: new Date(now.getTime() - 90 * 60_000) }]; },
+    async reach() { return 4000; },
+    async medians() { return new Map([['hot', 1000], ['a', 900], ['b', 1100], ['c', 8000]]); },
+    async nextPosts() { return [{ postId: 'next1', scheduledAt: new Date(now.getTime() + 30 * 60_000) }]; },
+    async reschedule(_actor, postId, at) { moved.push({ postId, at: at.toISOString() }); },
+    async upcoming() { return [
+      { planId: 'sa1', targetId: 'a', wpPostId: 'x1', slotAt: new Date(now.getTime() + 20 * 3_600_000), score: 70 },
+      { planId: 'sa2', targetId: 'a', wpPostId: 'x2', slotAt: new Date(now.getTime() + 30 * 3_600_000), score: 40 },
+      { planId: 'sb1', targetId: 'b', wpPostId: 'x3', slotAt: new Date(now.getTime() + 10 * 3_600_000), score: 55 },
+    ]; },
+    async choose(planId, wpPostId) { chosen.push({ planId, wpPostId }); return true; },
+  };
+  const pilot = { ...AUTOPILOT_DEFAULTS, radar: { ...AUTOPILOT_DEFAULTS.radar, pages: 2 } };
+  const input = { pilot, sourceId: 's', workspaceId: 'w', actor: { userId: 'u', workspaceId: 'w' }, now, handled: new Set<string>(), names: new Map([['hot', 'Hot'], ['a', 'A'], ['b', 'B'], ['c', 'C']]), blocked: () => false };
+  const out = await runRadar(input, ports);
+  assert.deepEqual(out.handled, ['plan1']);
+  assert.equal(moved[0]?.postId, 'next1');
+  assert.deepEqual(chosen, [{ planId: 'sb1', wpPostId: 'w1' }, { planId: 'sa2', wpPostId: 'w1' }]); // B is closest, then A's weakest slot
+  const again = await runRadar({ ...input, handled: new Set(['plan1']) }, ports);
+  assert.equal(again.entries.length, 0);
+});
