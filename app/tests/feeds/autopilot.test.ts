@@ -20,11 +20,19 @@ test('best times: the strongest hours win, at least the gap apart, on the channe
   assert.ok(hours.every((h, i) => i === 0 || h - hours[i - 1]! >= 1));
 });
 
-test('best times: at most one hour never tried, so the autopilot explores without gambling the schedule', () => {
+test('best times: a proven hour above usual is never traded for an untried one', () => {
   const observations = history({ 11: [100, 100, 100], 15: [100, 100, 100], 17: [100, 100, 100], 20: [100, 100, 100] });
   const times = learnTimes({ observations, current: ['11:00', '15:00', '17:00', '20:00'], timeZone: tz, window: [6, 23], gapMinutes: 60, channelIndex: 0 });
-  const tried = new Set([11, 15, 17, 20]);
-  assert.equal(times.filter(t => !tried.has(Number(t.slice(0, 2)))).length, 1);
+  assert.deepEqual(times, ['11:00', '15:00', '17:00', '20:00']);
+});
+
+test('best times: a weak hour is swapped for the untried hour other Pages found strong, never an early-morning guess', () => {
+  const observations = history({ 11: [300, 300, 300], 15: [40, 50, 45], 17: [300, 300, 300], 20: [300, 300, 300] });
+  const pooled = new Map([[19, [2.5, 2.2, 2.8, 2.4]]]);
+  const times = learnTimes({ observations, current: ['11:00', '15:00', '17:00', '20:00'], timeZone: tz, window: [6, 23], gapMinutes: 60, channelIndex: 0, pooled });
+  assert.deepEqual(times, ['11:00', '17:00', '19:00', '20:00']);
+  const blind = learnTimes({ observations, current: ['11:00', '15:00', '17:00', '20:00'], timeZone: tz, window: [6, 23], gapMinutes: 60, channelIndex: 0 });
+  assert.ok(blind.every(t => Number(t.slice(0, 2)) >= 9), blind.join());
 });
 
 test('best times: too little history keeps the current times', () => {

@@ -9,6 +9,8 @@ export type AutopilotSettings = {
   bestTimes: { enabled: boolean; apply: 'auto' | 'approve'; gapMinutes: number; window: [number, number]; learnDays: number };
   healing: { replaceFailed: boolean; pauseBroken: boolean; warnDays: number };
   lastLearnedAt?: string;
+  /** The learning method the times were last chosen with; a newer method relearns at once. */
+  learnVersion?: number;
   log?: AutopilotLogEntry[];
 };
 
@@ -20,6 +22,8 @@ export const AUTOPILOT_DEFAULTS: AutopilotSettings = {
 export const AUTOPILOT_LOG_MAX = 60;
 /** Times are relearned at most this often. */
 export const LEARN_EVERY_DAYS = 7;
+/** Raised when the learning method improves: times chosen by an older method are relearned at the next run. */
+export const LEARN_VERSION = 2;
 
 const logEntry = z.object({
   at: z.string().max(40), kind: z.enum(['times', 'healing', 'supply']), channelId: z.string().max(100).optional(), channelName: z.string().max(200).optional(),
@@ -32,7 +36,7 @@ export const autopilotSchema = z.object({
     learnDays: z.number().int().min(7).max(90),
   }).strict(),
   healing: z.object({ replaceFailed: z.boolean(), pauseBroken: z.boolean(), warnDays: z.number().int().min(1).max(60) }).strict(),
-  lastLearnedAt: z.string().max(40).optional(),
+  lastLearnedAt: z.string().max(40).optional(), learnVersion: z.number().int().min(0).max(1000).optional(),
   log: z.array(logEntry).max(AUTOPILOT_LOG_MAX).optional(),
 }).strict();
 
@@ -49,42 +53,68 @@ const hourIn = (at: Date, timeZone: string) => Number(new Intl.DateTimeFormat('e
 const median = (values: number[]) => { const s = [...values].sort((a, b) => a - b); const m = Math.floor(s.length / 2); return s.length ? (s.length % 2 ? s[m]! : (s[m - 1]! + s[m]!) / 2) : 0; };
 
 /**
- * How each hour of the window performs for one channel, relative to the channel's own median (1 = usual).
- * Few posts pull an hour towards 1 (prior of `prior` usual posts); an hour never tried gets a small bonus so
- * the autopilot keeps exploring instead of freezing on the hours it happened to post at.
+ * What a recipe audience usually does by hour before any data says otherwise (1 = usual): lunch and evening are
+ * strong, early morning and late night weak. Only used for hours no channel has tried yet.
  */
-export function hourStats(observations: readonly Observation[], timeZone: string, window: readonly [number, number], prior = 3, explore = 0.12): HourStat[] {
+export function foodPrior(hour: number): number {
+  if (hour >= 11 && hour <= 13) return 1.0;
+  if (hour >= 17 && hour <= 21) return 1.05;
+  if (hour >= 14 && hour <= 16) return 0.95;
+  if (hour >= 9 && hour <= 10) return 0.9;
+  if (hour <= 8) return 0.7;
+  return 0.8;
+}
+
+/** Each post's score relative to its channel's median, by local hour. */
+export function relativeByHour(observations: readonly Observation[], timeZone: string): Map<number, number[]> {
   const valid = observations.filter(o => Number.isFinite(o.score) && o.score >= 0);
   const mid = median(valid.map(o => o.score)) || 1;
   const byHour = new Map<number, number[]>();
   for (const o of valid) { const h = hourIn(o.at, timeZone); byHour.set(h, [...(byHour.get(h) ?? []), o.score / mid]); }
+  return byHour;
+}
+
+/**
+ * How each hour of the window performs for one channel (1 = its usual). An hour's own posts are pulled towards what
+ * all channels saw at that hour (`pooled`), and an hour nobody tried towards the recipe-audience prior, so a few posts
+ * never decide alone and an untried hour is judged on evidence from the other Pages.
+ */
+export function hourStats(observations: readonly Observation[], timeZone: string, window: readonly [number, number], pooled: ReadonlyMap<number, number[]> = new Map(), prior = 3): HourStat[] {
+  const byHour = relativeByHour(observations, timeZone);
   const stats: HourStat[] = [];
   for (let hour = window[0]; hour < window[1]; hour++) {
+    const all = pooled.get(hour) ?? [];
+    const base = (all.reduce((a, b) => a + b, 0) + prior * foodPrior(hour)) / (all.length + prior);
     const values = byHour.get(hour) ?? [];
-    const value = values.length ? (values.reduce((a, b) => a + b, 0) + prior) / (values.length + prior) : 1 + explore;
-    stats.push({ hour, posts: values.length, value });
+    stats.push({ hour, posts: values.length, value: (values.reduce((a, b) => a + b, 0) + prior * base) / (values.length + prior) });
   }
   return stats;
 }
 
 /**
- * New posting times for one channel: as many as it has now, at its strongest hours, at least `gapMinutes` apart,
- * with at most one hour it has never posted at. Minutes follow the channel's position on Facebook's 5-minute marks,
- * so channels do not post in lockstep and the app shows the time Facebook will show. Too little history keeps the
- * current times.
+ * New posting times for one channel: as many as it has now, at its strongest hours, at least `gapMinutes` apart.
+ * At most one hour it never posted at, and only in place of a proven hour that does worse than the channel's usual.
+ * Minutes follow the channel's position on Facebook's 5-minute marks, so channels do not post in lockstep and the app
+ * shows the time Facebook will show. Too little history keeps the current times.
  */
-export function learnTimes(input: { observations: readonly Observation[]; current: readonly string[]; timeZone: string; window: readonly [number, number]; gapMinutes: number; channelIndex: number; minObservations?: number }): string[] {
+export function learnTimes(input: { observations: readonly Observation[]; current: readonly string[]; timeZone: string; window: readonly [number, number]; gapMinutes: number; channelIndex: number; pooled?: ReadonlyMap<number, number[]>; minObservations?: number }): string[] {
   const count = Math.max(1, input.current.length);
   if (input.observations.length < (input.minObservations ?? 8)) return [...input.current];
   const minute = (input.channelIndex * 5) % 60;
-  const ranked = hourStats(input.observations, input.timeZone, input.window).sort((a, b) => b.value - a.value || a.hour - b.hour);
-  const picked: HourStat[] = [];
-  let explored = 0;
-  for (const stat of ranked) {
-    if (picked.length >= count) break;
-    if (stat.posts === 0 && explored >= 1) continue;
-    if (picked.some(p => Math.abs(p.hour - stat.hour) * 60 < input.gapMinutes)) continue;
-    picked.push(stat); if (stat.posts === 0) explored++;
+  const stats = hourStats(input.observations, input.timeZone, input.window, input.pooled);
+  const spaced = (list: HourStat[], stat: HourStat) => !list.some(p => Math.abs(p.hour - stat.hour) * 60 < input.gapMinutes);
+  const proven: HourStat[] = [];
+  for (const stat of stats.filter(s => s.posts > 0).sort((a, b) => b.value - a.value || a.hour - b.hour)) if (proven.length < count && spaced(proven, stat)) proven.push(stat);
+  let picked = [...proven];
+  const untried = stats.filter(s => s.posts === 0).sort((a, b) => b.value - a.value || a.hour - b.hour);
+  if (picked.length < count) {
+    for (const stat of untried) if (picked.length < count && spaced(picked, stat)) picked.push(stat);
+  } else {
+    const weakest = [...picked].sort((a, b) => a.value - b.value)[0]!;
+    const rest = picked.filter(p => p !== weakest);
+    // Only a clearly weak hour (5% under usual) gives way, and only to an hour expected to do clearly better.
+    const trial = weakest.value < 0.95 ? untried.find(stat => stat.value > weakest.value + 0.1 && spaced(rest, stat)) : undefined;
+    if (trial) picked = [...rest, trial];
   }
   if (picked.length < count) return [...input.current];
   return picked.map(p => `${String(p.hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`).sort();

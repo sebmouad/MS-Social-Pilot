@@ -1,5 +1,5 @@
 import { prisma } from '@/server/data';
-import { AUTOPILOT_LOG_MAX, LEARN_EVERY_DAYS, autopilotOf, learnTimes, postScore, type AutopilotLogEntry, type AutopilotSettings, type Observation } from '../wordpress/autopilot';
+import { AUTOPILOT_LOG_MAX, LEARN_EVERY_DAYS, LEARN_VERSION, autopilotOf, learnTimes, relativeByHour, postScore, type AutopilotLogEntry, type AutopilotSettings, type Observation } from '../wordpress/autopilot';
 import { channelConfig, type ChannelSettings } from '../wordpress/recipe';
 import { configOf } from './wordpress-planner';
 import type { SourceRow } from './wordpress-store';
@@ -48,23 +48,26 @@ export async function learnBestTimes(settings: WordpressSettings, source: Source
   const autopilot = autopilotOf(config.autopilot);
   const best = autopilot.bestTimes;
   if (!best.enabled || best.apply !== 'auto' || !pages.length) return 0;
-  if (autopilot.lastLearnedAt && now.getTime() - Date.parse(autopilot.lastLearnedAt) < LEARN_EVERY_DAYS * 86_400_000) return 0;
+  if (autopilot.lastLearnedAt && autopilot.learnVersion === LEARN_VERSION && now.getTime() - Date.parse(autopilot.lastLearnedAt) < LEARN_EVERY_DAYS * 86_400_000) return 0;
   const rows = await ports.observations(pages.map(page => page.id), new Date(now.getTime() - best.learnDays * 86_400_000));
   const channels: Record<string, ChannelSettings> = { ...(config.channels ?? {}) };
   const entries: AutopilotLogEntry[] = [];
+  const scored = (targetId: string): Observation[] => rows.filter(row => row.targetId === targetId).flatMap(row => { const score = postScore(row.insights); return score === null ? [] : [{ at: new Date(row.at), score }]; });
+  // What every channel saw at each hour, each relative to its own usual: evidence for hours a channel never tried.
+  const pooled = new Map<number, number[]>();
+  for (const page of pages) for (const [hour, values] of relativeByHour(scored(page.id), config.timezone)) pooled.set(hour, [...(pooled.get(hour) ?? []), ...values]);
   for (const [index, page] of pages.entries()) {
     const own = channels[page.id];
     if (own?.paused || (own?.slots?.length && !own.autoTimes) || config.channelSlots?.[page.id]?.length) continue;
     const current = channelConfig(config, page.id).slots;
-    const observations: Observation[] = rows.filter(row => row.targetId === page.id).flatMap(row => { const score = postScore(row.insights); return score === null ? [] : [{ at: new Date(row.at), score }]; });
-    const learned = learnTimes({ observations, current, timeZone: config.timezone, window: best.window, gapMinutes: best.gapMinutes, channelIndex: index });
+    const learned = learnTimes({ observations: scored(page.id), current, timeZone: config.timezone, window: best.window, gapMinutes: best.gapMinutes, channelIndex: index, pooled });
     if (JSON.stringify(learned) === JSON.stringify(current)) continue;
     channels[page.id] = { ...own, slots: learned, autoTimes: true };
     entries.push({ at: now.toISOString(), kind: 'times', channelId: page.id, channelName: page.name.slice(0, 200), from: current, to: learned });
   }
   const next = rawConfig(source);
   next.channels = channels;
-  next.autopilot = { ...withLog(autopilot, entries), lastLearnedAt: now.toISOString() };
+  next.autopilot = { ...withLog(autopilot, entries), lastLearnedAt: now.toISOString(), learnVersion: LEARN_VERSION };
   await ports.saveConfig(source, next);
   source.config = next as SourceRow['config'];
   return entries.length;
