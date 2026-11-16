@@ -1,6 +1,7 @@
 import { currentRootActor } from '@/server/config/access';
 import { sendTestMail } from '@/server/mail';
 import { prisma } from '@/server/data';
+import { requestOrigin } from '@/server/request-origin';
 
 export const runtime = 'nodejs';
 const reply = (body: unknown, status = 200) => Response.json(body, { status, headers: { 'cache-control': 'no-store' } });
@@ -8,7 +9,7 @@ const reply = (body: unknown, status = 200) => Response.json(body, { status, hea
 /** Send a test email to the installation owner's own address (2026-11-16), and say what the mail service answered. */
 export async function POST(request: Request) {
   const origin = request.headers.get('origin');
-  if (!origin || origin !== new URL(request.url).origin && origin !== process.env.PUBLIC_ORIGIN) return reply({ error: 'Cross-origin request denied.', code: 'forbidden' }, 403);
+  if (!origin || new URL(origin).origin !== requestOrigin(request)) return reply({ error: 'Cross-origin request denied.', code: 'forbidden' }, 403);
   const actor = await currentRootActor();
   if (!actor?.isInstanceOwner) return reply({ error: 'Installation-owner access is required.', code: actor ? 'forbidden' : 'unauthorized' }, actor ? 403 : 401);
   const body = await request.json().catch(() => null) as { confirmation?: unknown } | null;
