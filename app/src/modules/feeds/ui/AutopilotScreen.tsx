@@ -30,7 +30,8 @@ export default async function AutopilotScreen() {
   const change = report.previousReach > 0 ? (report.reach - report.previousReach) / report.previousReach * 100 : null;
   const next = view.channels.flatMap(channel => channel.next ? [channel.next] : []).sort((a, b) => a.slotAt.localeCompare(b.slotAt))[0];
   const boardLabels = Object.fromEntries((['approveAll', 'approved', 'approveTitle', 'approveObject', 'approveConsequence', 'approveDone', 'approveFailed', 'cancel', 'showFlagged', 'showAll', 'emptyTomorrow', 'another', 'leaveEmpty', 'open', 'leftEmpty',
-    'anotherTitle', 'anotherConsequence', 'emptyTitle', 'emptyConsequence', 'changed', 'changeFailed', 'scoreLabel', 'flaggedHint'] as const).map(key => [key, autopilotText(locale, key)])) as Record<string, string>;
+    'anotherTitle', 'anotherConsequence', 'emptyTitle', 'emptyConsequence', 'changed', 'changeFailed', 'scoreLabel', 'flaggedHint',
+    'kind_dessert', 'kind_main', 'kind_starter', 'kind_drink', 'kind_aperitif', 'kind_bread', 'kind_side', 'kind_breakfast', 'kind_sauce'] as const).map(key => [key, autopilotText(locale, key)])) as Record<string, string>;
 
   return <>
     {heading}

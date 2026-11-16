@@ -19,6 +19,7 @@ export const autopilotCopy = {
     vsPrevious: 'vs the 7 days before', none: '—', perChannel: 'Per channel', colChannel: 'Channel', colPosts: 'Posts', colReach: 'Reached', colBest: 'Best recipe',
     learnedHeading: 'What the autopilot did', learnedEmpty: 'No automatic change this week.', stylesHeading: 'Hook styles', stylesEmpty: 'Not enough posts yet to compare hook styles.',
     colStyle: 'Style', colAverage: 'Result vs usual', preferred: 'Default', style_question: 'Question', style_benefit: 'Benefit', style_story: 'Story', style_curiosity: 'Curiosity', style_promise: 'Promise',
+    kind_dessert: 'Dessert', kind_main: 'Main dish', kind_starter: 'Starter', kind_drink: 'Drink', kind_aperitif: 'Apéritif', kind_bread: 'Bread', kind_side: 'Side dish', kind_breakfast: 'Breakfast', kind_sauce: 'Sauce',
     timesChanged: '{channel}: times {from} → {to}', noAccess: 'Set up the recipe source on the Content feeds page to use the autopilot.', loadFailed: 'The autopilot could not be loaded. Refresh to try again.',
   },
   fr: {
@@ -40,6 +41,7 @@ export const autopilotCopy = {
     vsPrevious: 'par rapport aux 7 jours précédents', none: '—', perChannel: 'Par canal', colChannel: 'Canal', colPosts: 'Publications', colReach: 'Touchées', colBest: 'Meilleure recette',
     learnedHeading: 'Ce que le pilote a fait', learnedEmpty: 'Aucun changement automatique cette semaine.', stylesHeading: 'Styles d’accroche', stylesEmpty: 'Pas encore assez de publications pour comparer les styles d’accroche.',
     colStyle: 'Style', colAverage: 'Résultat par rapport à l’habitude', preferred: 'Par défaut', style_question: 'Question', style_benefit: 'Bénéfice', style_story: 'Histoire', style_curiosity: 'Curiosité', style_promise: 'Promesse',
+    kind_dessert: 'Dessert', kind_main: 'Plat', kind_starter: 'Entrée', kind_drink: 'Boisson', kind_aperitif: 'Apéritif', kind_bread: 'Pain', kind_side: 'Accompagnement', kind_breakfast: 'Petit-déjeuner', kind_sauce: 'Sauce',
     timesChanged: '{channel} : horaires {from} → {to}', noAccess: 'Configurez la source de recettes sur la page Flux de contenu pour utiliser le pilote.', loadFailed: 'Le pilote n’a pas pu être chargé. Actualisez pour réessayer.',
   },
 } as const;

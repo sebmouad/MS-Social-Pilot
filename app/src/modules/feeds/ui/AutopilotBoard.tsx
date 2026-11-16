@@ -39,7 +39,7 @@ export function AutopilotBoard({ date, dateLabel, posts, approved, canWrite, con
       {p.image ? <img className={styles.boardThumb} src={p.image} alt="" loading="lazy" width={56} height={56} /> : <span className={styles.boardThumb} aria-hidden="true" />}
       <div className={styles.boardText}>
         <strong>{p.state === 'planned' ? p.title : labels.leftEmpty}</strong>
-        <span className={styles.meta}>{p.targetName}{p.kind ? ` · ${p.kind}` : ''}</span>
+        <span className={styles.meta}>{p.targetName}{p.kind ? ` · ${labels[`kind_${p.kind}`] ?? p.kind}` : ''}</span>
         {p.caption && p.state === 'planned' ? <span className={styles.caption}>{p.caption}</span> : null}
       </div>
       {typeof p.score === 'number' && p.state === 'planned' ? <span className={styles.score} data-band={p.score >= 70 ? 'high' : p.score >= 45 ? 'mid' : 'low'} title={p.flagged ? labels.flaggedHint : fill(labels.scoreLabel, { score: p.score })}>{p.score}</span> : <span />}
