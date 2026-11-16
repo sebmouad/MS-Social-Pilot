@@ -26,11 +26,17 @@ export type RadarPorts = {
   choose(planId: string, wpPostId: string): Promise<boolean>;
 };
 
-/** Hot: reach far above the channel's usual for the post's age. Young posts get credit for having had little time. */
+/** What a usual post of the channel has reached at this age: a quarter at once, all of it after three hours. */
+export const expectedAt = (median: number, ageMinutes: number) => median * Math.min(1, 0.25 + 0.25 * Math.max(0, ageMinutes) / 60);
+/** People a post must reach before it can count as hot, whatever the channel (2026-11-16: 110 people was called viral). */
+export const MIN_HOT_REACH = 200;
+/**
+ * Hot: `factor` times what a usual post has at this age, at least the channel's usual full reach, and at least
+ * MIN_HOT_REACH people. Young posts get credit for having had little time; small numbers never trigger anything.
+ */
 export function isHot(input: { reach: number; median: number; ageMinutes: number; factor: number }): boolean {
   if (!(input.median > 0) || !(input.reach > 0)) return false;
-  const share = Math.min(1, Math.max(0.35, input.ageMinutes / 240));
-  return input.reach >= input.factor * input.median * share;
+  return input.reach >= Math.max(MIN_HOT_REACH, input.median, input.factor * expectedAt(input.median, input.ageMinutes));
 }
 
 /** Channels most like the hot one: closest usual reach, never the hot one itself. */
@@ -65,8 +71,9 @@ export async function runRadar(input: { pilot: AutopilotSettings; sourceId: stri
     const factor = Math.min(pilot.radar.enabled ? pilot.radar.factor : Infinity, pilot.breathe.enabled ? pilot.breathe.factor : Infinity);
     if (!isHot({ reach, median, ageMinutes, factor })) continue;
     out.handled.push(post.planId);
-    const times = Math.round(reach / median * 10) / 10;
-    out.entries.push({ at: now.toISOString(), kind: 'radar', channelId: post.targetId, channelName: name(post.targetId), text: `« ${post.title.slice(0, 120)} » is taking off: ${reach} people reached, ${times}× usual.` });
+    const times = Math.round(reach / expectedAt(median, ageMinutes) * 10) / 10;
+    const hours = Math.max(1, Math.round(ageMinutes / 60));
+    out.entries.push({ at: now.toISOString(), kind: 'radar', channelId: post.targetId, channelName: name(post.targetId), text: `« ${post.title.slice(0, 120)} » is taking off: ${reach} people reached in ${hours} h, ${times}× what a post usually has by then.` });
     if (pilot.breathe.enabled && isHot({ reach, median, ageMinutes, factor: pilot.breathe.factor })) {
       const [next, following] = await ports.nextPosts(input.workspaceId, post.targetId, now, new Date(now.getTime() + pilot.breathe.maxDelayMinutes * 60_000 + 3 * 3_600_000));
       if (next && next.scheduledAt.getTime() - now.getTime() <= pilot.breathe.maxDelayMinutes * 60_000) {
@@ -79,15 +86,18 @@ export async function runRadar(input: { pilot: AutopilotSettings; sourceId: stri
     }
     if (pilot.radar.enabled && pilot.radar.mode === 'auto' && isHot({ reach, median, ageMinutes, factor: pilot.radar.factor })) {
       const slots = await ports.upcoming(input.sourceId, new Date(now.getTime() + 3 * 3_600_000), new Date(now.getTime() + 72 * 3_600_000));
-      const spread: string[] = [];
+      const spread: string[] = []; let already = 0, noSlot = 0, refused = 0;
       for (const target of similarChannels(post.targetId, medians, pilot.radar.pages * 2)) {
         if (spread.length >= pilot.radar.pages) break;
-        if (input.blocked(target, post.wpPostId) || slots.some(slot => slot.targetId === target && slot.wpPostId === post.wpPostId)) continue;
+        if (input.blocked(target, post.wpPostId) || slots.some(slot => slot.targetId === target && slot.wpPostId === post.wpPostId)) { already++; continue; }
         // The channel's weakest upcoming slot gives way; slots are spread over the days ahead, one per channel.
         const slot = slots.filter(s => s.targetId === target).sort((a, b) => (a.score ?? 50) - (b.score ?? 50) || a.slotAt.getTime() - b.slotAt.getTime())[0];
-        if (slot && await ports.choose(slot.planId, post.wpPostId).catch(() => false)) spread.push(name(target) || target);
+        if (!slot) { noSlot++; continue; }
+        if (await ports.choose(slot.planId, post.wpPostId).catch(() => false)) spread.push(name(target) || target); else refused++;
       }
-      if (spread.length) out.entries.push({ at: now.toISOString(), kind: 'radar', channelId: post.targetId, channelName: name(post.targetId), text: `Planned on ${spread.length} similar channels: ${spread.join(', ')}.` });
+      // Every outcome is said, so a radar that did nothing is never a mystery (2026-11-16).
+      const why = [already ? `${already} already had this recipe` : '', noSlot ? `${noSlot} had no free time in the next three days` : '', refused ? `${refused} could not be changed` : ''].filter(Boolean).join(', ');
+      out.entries.push({ at: now.toISOString(), kind: 'radar', channelId: post.targetId, channelName: name(post.targetId), text: spread.length ? `Planned on ${spread.length} similar channels: ${spread.join(', ')}.${why ? ` Others: ${why}.` : ''}` : `Not spread to other channels: ${why || 'no similar channel'}.` });
     }
   }
   return out;

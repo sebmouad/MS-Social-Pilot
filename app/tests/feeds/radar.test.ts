@@ -6,10 +6,11 @@ import { AUTOPILOT_DEFAULTS } from '@/modules/feeds/wordpress/autopilot';
 
 const now = new Date('2026-11-17T16:00:00Z');
 
-test('hot: three times the usual reach, with credit for a young post', () => {
+test('hot: three times what a post usually has at its age, never on small numbers', () => {
   assert.equal(isHot({ reach: 3000, median: 1000, ageMinutes: 240, factor: 3 }), true);
   assert.equal(isHot({ reach: 2000, median: 1000, ageMinutes: 240, factor: 3 }), false);
-  assert.equal(isHot({ reach: 1100, median: 1000, ageMinutes: 60, factor: 3 }), true); // 1 h old: 35% of the usual already ×3
+  assert.equal(isHot({ reach: 1600, median: 1000, ageMinutes: 60, factor: 3 }), true); // 1 h: a usual post has half its reach
+  assert.equal(isHot({ reach: 110, median: 73, ageMinutes: 60, factor: 3 }), false); // the first live false alarm
   assert.equal(isHot({ reach: 500, median: 0, ageMinutes: 60, factor: 3 }), false);
 });
 
@@ -46,6 +47,17 @@ test('radar: a hot post delays the next one and spreads to the most similar chan
   assert.deepEqual(out.handled, ['plan1']);
   assert.equal(moved[0]?.postId, 'next1');
   assert.deepEqual(chosen, [{ planId: 'sb1', wpPostId: 'w1' }, { planId: 'sa2', wpPostId: 'w1' }]); // B is closest, then A's weakest slot
+  assert.ok(out.entries.some(e => /Planned on 2 similar channels/.test(e.text ?? '')));
   const again = await runRadar({ ...input, handled: new Set(['plan1']) }, ports);
   assert.equal(again.entries.length, 0);
+});
+
+test('radar: when nothing can be spread, the log says why', async () => {
+  const ports: RadarPorts = {
+    async recent() { return [{ planId: 'p9', targetId: 'hot', wpPostId: 'w1', title: 'Gratin', postId: 'post9', publishedAt: new Date(now.getTime() - 60 * 60_000) }]; },
+    async reach() { return 5000; }, async medians() { return new Map([['hot', 1000], ['a', 900], ['b', 1100]]); },
+    async nextPosts() { return []; }, async reschedule() {}, async upcoming() { return []; }, async choose() { return true; },
+  };
+  const out = await runRadar({ pilot: AUTOPILOT_DEFAULTS, sourceId: 's', workspaceId: 'w', actor: { userId: 'u', workspaceId: 'w' }, now, handled: new Set(), names: new Map([['hot', 'Hot'], ['a', 'A'], ['b', 'B']]), blocked: id => id === 'a' }, ports);
+  assert.ok(out.entries.some(e => /Not spread to other channels: 1 already had this recipe, 1 had no free time/.test(e.text ?? '')), JSON.stringify(out.entries));
 });
