@@ -85,7 +85,8 @@ async function AdsPage({ searchParams }: { searchParams: Promise<AdsSearchParams
         {boost ? <aside className="ads-boost" aria-label={t('boostTitle')}>
           <div>
             <strong>{t('boostTitle')}</strong>
-            <p>{t('boostBody', { text: clipText(boost.text, 89), channel: boost.channelName, value: new Intl.NumberFormat(locale).format(boost.value), label: boost.rankLabel, ratio: new Intl.NumberFormat(locale, { maximumFractionDigits: 1 }).format(boost.ratio) })}</p>
+            {/* Past 20× a multiplier says nothing (a typical post near zero): the best post of the period is said instead (2026-11-16). */}
+            <p>{t(boost.ratio > 20 ? 'boostBodyTop' : 'boostBody', { text: clipText(boost.text, 89), channel: boost.channelName, value: new Intl.NumberFormat(locale).format(boost.value), label: boost.rankLabel, median: new Intl.NumberFormat(locale, { maximumFractionDigits: 1 }).format(boost.median), ratio: new Intl.NumberFormat(locale, { maximumFractionDigits: 1 }).format(boost.ratio) })}</p>
           </div>
           <div className="ads-boost__actions">
             {boost.url ? <a className="ui-button ui-button--secondary ui-button--sm" href={boost.url} target="_blank" rel="noreferrer">{t('boostOpenPost')}</a> : null}

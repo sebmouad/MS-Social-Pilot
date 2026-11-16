@@ -28,6 +28,7 @@ export const adsCustomerCopy = {
 "needsReconnectAction": {"en": "Reconnect in Settings", "fr": "Reconnecter dans les paramètres"},
 "boostTitle": {"en": "Boost suggestion", "fr": "Suggestion de promotion"},
 "noDeliverySince": {"en": "No delivery since {date}", "fr": "Aucune diffusion depuis le {date}"},
+"boostBodyTop": {"en": "“{text}” on {channel} · {label}: {value}, your best post of the last 14 days (a typical post gets {median}). A post that already does well without ads is a low-risk first ad.", "fr": "« {text} » sur {channel} · {label} : {value}, votre meilleure publication des 14 derniers jours (une publication habituelle obtient {median}). Une publication qui marche déjà sans publicité est une première publicité peu risquée."},
 "boostBody": {"en": "“{text}” on {channel} · {label}: {value}, {ratio}× your typical post in the last 14 days. A post that already does well without ads is a low-risk first ad.", "fr": "« {text} » sur {channel} · {label} : {value}, soit {ratio}× votre publication habituelle sur les 14 derniers jours. Une publication qui marche déjà sans publicité est une première publicité peu risquée."},
 "boostOpenPost": {"en": "Open post", "fr": "Voir la publication"},
 "boostCreate": {"en": "Create a campaign", "fr": "Créer une campagne"},
