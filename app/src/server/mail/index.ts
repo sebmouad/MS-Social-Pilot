@@ -44,8 +44,12 @@ function validInput(input: TransactionalMailInput, config: MailTransportConfig):
 
 function makeDefaultTransport(config: MailTransportConfig): MailTransport {
   if (config.provider === 'api') return createApiMailTransport(config) as unknown as MailTransport;
+  // The server's own mail service on loopback (2026-11-16): the connection never leaves the machine, so its self-signed
+  // certificate is not upgraded to; a remote server keeps the full certificate check and any TLS requirement.
+  const loopback = ['127.0.0.1', '::1', 'localhost'].includes(config.smtpHost.toLowerCase());
   return nodemailer.createTransport({
     host: config.smtpHost, port: config.smtpPort, secure: config.smtpSecure, requireTLS: config.smtpRequireTls,
+    ...(loopback && !config.smtpSecure && !config.smtpRequireTls ? { ignoreTLS: true } : {}),
     connectionTimeout: config.connectionTimeoutMs, socketTimeout: config.socketTimeoutMs,
     ...(config.smtpUsername ? { auth: { user: config.smtpUsername, pass: config.smtpPassword } } : {}),
   });
