@@ -309,7 +309,42 @@ async function authorizedSource(actor: FeedActor) {
 }
 
 /** `writtenByAi`: present when AI writes this post's caption or lists; false when it could not for this preview. */
-export type PreviewItem = { wpPostId: string; title: string; permalink: string; imageUrl: string; caption: string; firstComment: string; publishedAt: string | null; writtenByAi?: boolean };
+export type PreviewItem = { wpPostId: string; title: string; permalink: string; imageUrl: string; caption: string; firstComment: string; publishedAt: string | null; writtenByAi?: boolean;
+  /** Autopilot (2026-11-16): the recipe's score for tomorrow at the first shared time, its kind, and for the first recipe a channel's caption. */
+  score?: number; kind?: string; channelCaption?: { channel: string; text: string } };
+/**
+ * What the autopilot would do with the previewed recipes (2026-11-16): each one's score and kind (AI rates the ones it
+ * has not seen), and the caption it would write for the first channel. Nothing is planned or published.
+ */
+async function addAutopilotPreview(items: PreviewItem[], c: { ports: PlannerPorts; actor: FeedActor; source: SourceRow; config: ReturnType<typeof configOf>; settings: WordpressSettings; writer: boolean; now: Date }) {
+  const pilot = autopilotOf(c.config.autopilot);
+  if (!items.length) return;
+  const { scoreRecipe, guessKind } = await import('../wordpress/score');
+  if (pilot.score.enabled && c.ports.scoring) {
+    const ids = items.map(item => item.wpPostId);
+    let ratings = await c.ports.scoring.ratings(c.source.id, ids);
+    const unrated = items.filter(item => !ratings.get(item.wpPostId)?.kind);
+    if (c.writer && unrated.length) { await c.ports.scoring.rate(c.actor, c.source, unrated.map(item => ({ id: item.wpPostId, title: item.title }))).catch(() => undefined); ratings = await c.ports.scoring.ratings(c.source.id, ids); }
+    const tomorrow = new Date(c.now.getTime() + 86_400_000);
+    const hour = Number((c.config.slots[0] ?? '12:00').slice(0, 2));
+    for (const item of items) {
+      const rating = ratings.get(item.wpPostId);
+      item.score = scoreRecipe({ title: item.title, hook: rating?.hook ?? null, photo: rating?.photo ?? null, kind: rating?.kind ?? null }, { date: tomorrow, weekday: tomorrow.getUTCDay(), hour, leadDays: pilot.moments.leadDays, rules: new Set(pilot.moments.rules) }).score;
+      item.kind = rating?.kind ?? guessKind(item.title);
+    }
+  }
+  if (pilot.captions.enabled && c.writer && c.ports.captions) {
+    const pages = await c.ports.store.pages(c.source, c.settings.targetTypes, c.settings.maxTargets);
+    const first = items[0]!; const page = pages[0];
+    if (page) {
+      const { captionPrompt, cleanCaption, voiceFor } = await import('../wordpress/caption');
+      const { system, prompt } = captionPrompt({ channel: page.name, voice: voiceFor(pilot.captions.voice, 0), style: 'question', question: pilot.captions.question, emoji: pilot.captions.emoji, title: first.title, caption: first.caption, ingredients: [] });
+      const text = cleanCaption(await c.ports.captions.write(c.actor, system, prompt).catch(() => ''), c.settings.textMax);
+      if (text) first.channelCaption = { channel: page.name, text };
+    }
+  }
+}
+
 /** The next recipes exactly as they will post: image, caption and first comment. Nothing is created. */
 export async function previewRecipeSource(actor: FeedActor, input: unknown = {}, deps: RecipeDeps = {}) {
   const s = await loadWordpressSettings();
@@ -338,6 +373,7 @@ export async function previewRecipeSource(actor: FeedActor, input: unknown = {},
       const comment = written?.firstComment ?? commentFor(s, config, c);
       items.push({ wpPostId: c.wpPostId, title: c.title, permalink: c.permalink, imageUrl: c.imageUrl, caption: written?.caption ?? c.caption, firstComment: pilot.comment.enabled ? withCta(comment, ctaFor(pilot.comment.cta, c.wpPostId), s.commentMax) : comment, publishedAt: c.publishedAt?.toISOString() ?? null, ...(c.write ? { writtenByAi: Boolean(written) } : {}) });
     }
+    await addAutopilotPreview(items, { ports, actor, source, config, settings: s, writer, now }).catch(() => undefined);
     return { items, scanned: scan.scanned, exhausted: scan.exhausted, rejected: scan.rejected, captionsPerChannel: autopilotOf(config.autopilot).captions.enabled && writer };
   } catch (error) {
     if (error instanceof OperationError) throw error;
