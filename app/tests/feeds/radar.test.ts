@@ -61,3 +61,17 @@ test('radar: when nothing can be spread, the log says why', async () => {
   const out = await runRadar({ pilot: AUTOPILOT_DEFAULTS, sourceId: 's', workspaceId: 'w', actor: { userId: 'u', workspaceId: 'w' }, now, handled: new Set(), names: new Map([['hot', 'Hot'], ['a', 'A'], ['b', 'B']]), blocked: id => id === 'a' }, ports);
   assert.ok(out.entries.some(e => /Not spread to other channels: 1 already had this recipe, 1 had no free time/.test(e.text ?? '')), JSON.stringify(out.entries));
 });
+
+test('radar: channels receiving a hit post it at least three hours apart, never at the same minute', async () => {
+  const chosen: string[] = [];
+  const at = (h: number) => new Date(now.getTime() + h * 3_600_000);
+  const ports: RadarPorts = {
+    async recent() { return [{ planId: 'p1', targetId: 'hot', wpPostId: 'w1', title: 'Carbonnade', postId: 'post1', publishedAt: new Date(now.getTime() - 90 * 60_000) }]; },
+    async reach() { return 5000; }, async medians() { return new Map([['hot', 1000], ['a', 1000], ['b', 1000], ['c', 1000]]); },
+    async nextPosts() { return []; }, async reschedule() {},
+    async upcoming() { return ['a', 'b', 'c'].flatMap(t => [{ planId: `${t}-19`, targetId: t, wpPostId: 'x', slotAt: at(19), score: null }, { planId: `${t}-23`, targetId: t, wpPostId: 'x', slotAt: at(23), score: null }, { planId: `${t}-27`, targetId: t, wpPostId: 'x', slotAt: at(27), score: null }]); },
+    async choose(planId) { chosen.push(planId); return true; },
+  };
+  await runRadar({ pilot: AUTOPILOT_DEFAULTS, sourceId: 's', workspaceId: 'w', actor: { userId: 'u', workspaceId: 'w' }, now, handled: new Set(), names: new Map([['hot', 'H'], ['a', 'A'], ['b', 'B'], ['c', 'C']]), blocked: () => false }, ports);
+  assert.deepEqual(chosen.map(id => id.split('-')[1]).sort(), ['19', '23', '27']);
+});

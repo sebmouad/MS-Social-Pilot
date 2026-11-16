@@ -53,6 +53,9 @@ export function breatheTime(next: Date, following: Date | null, delayMinutes: nu
   return at > next.getTime() ? new Date(at) : null;
 }
 
+/** Least time between two channels receiving the same hit. */
+export const SPREAD_GAP_MS = 3 * 3_600_000;
+
 export type RadarOutcome = { entries: AutopilotLogEntry[]; handled: string[] };
 
 export async function runRadar(input: { timeZone?: string; pilot: AutopilotSettings; sourceId: string; workspaceId: string; actor: FeedActor; now: Date; handled: ReadonlySet<string>; names: ReadonlyMap<string, string>; blocked: (targetId: string, wpPostId: string) => boolean }, ports: RadarPorts): Promise<RadarOutcome> {
@@ -87,13 +90,18 @@ export async function runRadar(input: { timeZone?: string; pilot: AutopilotSetti
     if (pilot.radar.enabled && pilot.radar.mode === 'auto' && isHot({ reach, median, ageMinutes, factor: pilot.radar.factor })) {
       const slots = await ports.upcoming(input.sourceId, new Date(now.getTime() + 3 * 3_600_000), new Date(now.getTime() + 72 * 3_600_000));
       const spread: string[] = []; let already = 0, noSlot = 0, refused = 0;
+      const chosenTimes: number[] = [];
       for (const target of similarChannels(post.targetId, medians, pilot.radar.pages * 2)) {
         if (spread.length >= pilot.radar.pages) break;
         if (input.blocked(target, post.wpPostId) || slots.some(slot => slot.targetId === target && slot.wpPostId === post.wpPostId)) { already++; continue; }
         // The channel's weakest upcoming slot gives way; slots are spread over the days ahead, one per channel.
-        const slot = slots.filter(s => s.targetId === target).sort((a, b) => (a.score ?? 50) - (b.score ?? 50) || a.slotAt.getTime() - b.slotAt.getTime())[0];
+        // Spread over the days ahead (2026-11-16): never within three hours of another channel getting this hit, so Pages
+        // do not post the same recipe at the same minute (the first live spread put five Pages at 11:00).
+        const apart = (slot: UpcomingSlot) => chosenTimes.every(at => Math.abs(at - slot.slotAt.getTime()) >= SPREAD_GAP_MS);
+        const mine = slots.filter(s => s.targetId === target).sort((a, b) => (a.score ?? 50) - (b.score ?? 50) || a.slotAt.getTime() - b.slotAt.getTime());
+        const slot = mine.find(apart);
         if (!slot) { noSlot++; continue; }
-        if (await ports.choose(slot.planId, post.wpPostId).catch(() => false)) spread.push(name(target) || target); else refused++;
+        if (await ports.choose(slot.planId, post.wpPostId).catch(() => false)) { spread.push(name(target) || target); chosenTimes.push(slot.slotAt.getTime()); } else refused++;
       }
       // Every outcome is said, so a radar that did nothing is never a mystery (2026-11-16).
       const why = [already ? `${already} already had this recipe` : '', noSlot ? `${noSlot} had no free time in the next three days` : '', refused ? `${refused} could not be changed` : ''].filter(Boolean).join(', ');
