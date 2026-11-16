@@ -39,6 +39,8 @@ export type CandidateQuery = {
   offset: number;
   limit: number;
   now: Date;
+  /** Autopilot (2026-11-16): read exactly these posts (WordPress ids), whatever their date; order and offset are ignored. */
+  include?: readonly string[];
 };
 /** `fetched` counts posts WordPress returned before local filtering; fewer than `requested` means the library ended. */
 export type CandidatePage = { rows: WpCandidateRow[]; fetched: number; requested: number };
@@ -279,18 +281,15 @@ export async function openWordpressDb(settings: DbSettings): Promise<WpDb> {
     async candidates(q) {
       const endpoint = restEndpointForType(q.mapping.postType || 'post');
       // The REST API returns at most 100 posts per request.
-      const requested = Math.min(100, Math.max(1, q.limit));
-      const params = new URLSearchParams({
-        per_page: String(requested),
-        offset: String(Math.max(0, q.offset)),
-        orderby: 'date',
-        order: q.order === 'newest' ? 'desc' : 'asc',
-        _embed: 'wp:featuredmedia',
-      });
+      const include = (q.include ?? []).filter(id => /^\d{1,20}$/.test(id)).slice(0, 100);
+      const requested = include.length || Math.min(100, Math.max(1, q.limit));
+      const params = new URLSearchParams(include.length
+        ? { per_page: String(requested), include: include.join(','), orderby: 'include', _embed: 'wp:featuredmedia' }
+        : { per_page: String(requested), offset: String(Math.max(0, q.offset)), orderby: 'date', order: q.order === 'newest' ? 'desc' : 'asc', _embed: 'wp:featuredmedia' });
       if (q.mapping.postStatus && q.mapping.postStatus !== 'publish' && settings.apiToken) {
         params.set('status', q.mapping.postStatus);
       }
-      if (q.maxAgeDays > 0) {
+      if (q.maxAgeDays > 0 && !include.length) {
         const minDate = new Date(q.now.getTime() - q.maxAgeDays * 86_400_000);
         const existingAfter = params.get('after');
         if (!existingAfter || new Date(existingAfter) < minDate) {

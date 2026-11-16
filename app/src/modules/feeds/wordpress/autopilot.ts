@@ -8,6 +8,15 @@ export type AutopilotLogEntry = { at: string; kind: 'times' | 'healing' | 'suppl
 export type AutopilotSettings = {
   bestTimes: { enabled: boolean; apply: 'auto' | 'approve'; gapMinutes: number; window: [number, number]; learnDays: number };
   healing: { replaceFailed: boolean; pauseBroken: boolean; warnDays: number };
+  /** Phase 2 (2026-11-16). */
+  score: { enabled: boolean; weight: 'light' | 'balanced' | 'strong'; prime: 'best-hours' | 'any'; show: boolean };
+  moments: { rules: Array<'holidays' | 'season' | 'weekday' | 'weather'>; leadDays: number; latitude: number; longitude: number };
+  variety: { enabled: boolean; maxRun: number };
+  evergreen: { enabled: boolean; cooldownDays: number; share: number };
+  radar: { enabled: boolean; factor: number; pages: number; mode: 'auto' | 'approve'; boost: boolean };
+  breathe: { enabled: boolean; factor: number; maxDelayMinutes: number };
+  /** Each channel's hours as last learned (hour → value, 1 = usual): best recipes go to the strongest. */
+  hourValues?: Record<string, Record<string, number>>;
   lastLearnedAt?: string;
   /** The learning method the times were last chosen with; a newer method relearns at once. */
   learnVersion?: number;
@@ -18,12 +27,18 @@ export type AutopilotSettings = {
 export const AUTOPILOT_DEFAULTS: AutopilotSettings = {
   bestTimes: { enabled: true, apply: 'auto', gapMinutes: 60, window: [6, 23], learnDays: 14 },
   healing: { replaceFailed: true, pauseBroken: true, warnDays: 7 },
+  score: { enabled: true, weight: 'strong', prime: 'best-hours', show: true },
+  moments: { rules: ['holidays', 'season', 'weekday', 'weather'], leadDays: 14, latitude: 48.8566, longitude: 2.3522 },
+  variety: { enabled: true, maxRun: 2 },
+  evergreen: { enabled: true, cooldownDays: 60, share: 20 },
+  radar: { enabled: true, factor: 3, pages: 5, mode: 'auto', boost: false },
+  breathe: { enabled: true, factor: 3, maxDelayMinutes: 60 },
 };
 export const AUTOPILOT_LOG_MAX = 60;
 /** Times are relearned at most this often. */
 export const LEARN_EVERY_DAYS = 7;
 /** Raised when the learning method improves: times chosen by an older method are relearned at the next run. */
-export const LEARN_VERSION = 2;
+export const LEARN_VERSION = 3;
 
 const logEntry = z.object({
   at: z.string().max(40), kind: z.enum(['times', 'healing', 'supply']), channelId: z.string().max(100).optional(), channelName: z.string().max(200).optional(),
@@ -36,13 +51,25 @@ export const autopilotSchema = z.object({
     learnDays: z.number().int().min(7).max(90),
   }).strict(),
   healing: z.object({ replaceFailed: z.boolean(), pauseBroken: z.boolean(), warnDays: z.number().int().min(1).max(60) }).strict(),
+  score: z.object({ enabled: z.boolean(), weight: z.enum(['light', 'balanced', 'strong']), prime: z.enum(['best-hours', 'any']), show: z.boolean() }).strict().optional(),
+  moments: z.object({ rules: z.array(z.enum(['holidays', 'season', 'weekday', 'weather'])).max(4), leadDays: z.number().int().min(1).max(60), latitude: z.number().min(-90).max(90), longitude: z.number().min(-180).max(180) }).strict().optional(),
+  variety: z.object({ enabled: z.boolean(), maxRun: z.number().int().min(1).max(5) }).strict().optional(),
+  evergreen: z.object({ enabled: z.boolean(), cooldownDays: z.number().int().min(7).max(730), share: z.number().int().min(0).max(50) }).strict().optional(),
+  radar: z.object({ enabled: z.boolean(), factor: z.number().min(1.5).max(20), pages: z.number().int().min(1).max(50), mode: z.enum(['auto', 'approve']), boost: z.boolean() }).strict().optional(),
+  breathe: z.object({ enabled: z.boolean(), factor: z.number().min(1.5).max(20), maxDelayMinutes: z.number().int().min(10).max(240) }).strict().optional(),
+  hourValues: z.record(z.string().max(100), z.record(z.string().max(2), z.number().min(0).max(100))).optional()
+    .refine(map => !map || Object.keys(map).length <= 500, 'Too many channels.'),
   lastLearnedAt: z.string().max(40).optional(), learnVersion: z.number().int().min(0).max(1000).optional(),
   log: z.array(logEntry).max(AUTOPILOT_LOG_MAX).optional(),
 }).strict();
 
+/** Stored settings over the approved defaults: a section saved before it existed takes its default. */
 export function autopilotOf(value: unknown): AutopilotSettings {
   const parsed = autopilotSchema.safeParse(value);
-  return parsed.success ? parsed.data as AutopilotSettings : structuredClone(AUTOPILOT_DEFAULTS);
+  if (!parsed.success) return structuredClone(AUTOPILOT_DEFAULTS);
+  const d = structuredClone(AUTOPILOT_DEFAULTS);
+  const p = parsed.data;
+  return { ...d, ...Object.fromEntries(Object.entries(p).filter(([, v]) => v !== undefined)) } as AutopilotSettings;
 }
 
 /** One published post: when it went live and how well it did (people reached plus weighted engagement). */

@@ -3,10 +3,13 @@ import { prisma } from '@/server/data';
 import { decryptSecret } from '@/server/secret-crypto';
 import { defaultFetchDeps, type FetchDeps } from '@/modules/publishing/server/media/network/net-guard';
 import type { ArticleInput, ArticleWriting } from '@/modules/studio/ai';
-import { autopilotOf } from '../wordpress/autopilot';
+import { autopilotOf, type AutopilotSettings } from '../wordpress/autopilot';
+import { prismaScoringPorts, dishHistory, type ScoringPorts } from './wordpress-scoring';
+import { makePicker } from './wordpress-pick';
+import { guessKind, type RecipeKind } from '../wordpress/score';
 import { instantToWall } from '@/lib/calendar-dates';
 import { allocateRecipes, channelConfig, recipeTitleKey, buildImageUrl, buildPermalink, reportedPermalink, parseRecipe, renderComment, resolveConfig, slotInstants, type PlanConfig, type Recipe, type SlotNeed } from '../wordpress/recipe';
-import { openWordpressDb, type DbSettings, type WpDb } from '../wordpress/db';
+import { openWordpressDb, type DbSettings, type WpDb, type WpCandidateRow } from '../wordpress/db';
 import { defaultImagePorts, prepareRecipeImage, RecipeImageError, type ImagePorts } from '../wordpress/image';
 import { qualifyingOwner, type FeedActor, type FeedAuthorization } from './access';
 import { loadWordpressSettings, patchLimits, type WordpressSettings } from './wordpress-settings';
@@ -28,6 +31,8 @@ export type PlannerPorts = {
   /** AI that writes a caption and the first comment's lists from any post's own text, when the workspace has AI on. */
   writer: { available(workspaceId: string): Promise<boolean>; write(actor: FeedActor, article: ArticleInput): Promise<ArticleWriting> };
   now(): Date;
+  /** Autopilot scoring (2026-11-16); without it recipes go out in the source's order. */
+  scoring?: import('./wordpress-scoring').ScoringPorts;
 };
 export type PlannedPostInput = { message: string; firstComment: string; targetIds: string[]; scheduledAt: Date; media: Array<{ kind: 'image'; url: string; altText: string }>; firstCommentDelayMinutes: number };
 
@@ -64,6 +69,7 @@ export function defaultPlannerPorts(net: FetchDeps = defaultFetchDeps()): Planne
       async write(actor, article) { const { writeFromArticle } = await import('@/modules/studio/server/ai'); return writeFromArticle({ userId: actor.userId, workspaceId: actor.workspaceId }, article); },
     },
     now: () => new Date(),
+    scoring: prismaScoringPorts,
   };
 }
 
@@ -91,24 +97,7 @@ export async function scanCandidates(db: WpDb, settings: WordpressSettings, sour
     if (!fetched) { exhausted = true; break; }
     scanned += fetched;
     rejected.shared += fetched - rows.length;
-    const files = await db.attachments(rows.map(r => r.imageId), config.mapping.attachedFileMetaKey);
-    for (const row of rows) {
-      // New posts published during a scan shift offsets; never list one recipe twice.
-      if (candidates.some(candidate => candidate.wpPostId === row.id)) continue;
-      const file = files.get(row.imageId);
-      const imageUrl = file ? buildImageUrl(source.siteUrl, settings.uploadsPath, file) : null;
-      const permalink = reportedPermalink(source.siteUrl, row.link) ?? buildPermalink(settings.permalinkTemplate, source.siteUrl, row.slug);
-      const recipe = parseRecipe(row.recipe, row.title, settings.minutesSuffix);
-      const text = writer && row.article ? row.article : '';
-      const write = { caption: Boolean(text) && !config.mapping.captionMetaKey, recipe: Boolean(text) && !recipe && !config.mapping.recipeMetaKey };
-      if (!row.caption && !write.caption) { rejected.caption++; if (row.captionFieldPresent === false) rejected.captionFieldMissing = (rejected.captionFieldMissing ?? 0) + 1; continue; }
-      if (!imageUrl) { rejected.image++; continue; }
-      if (!permalink) { rejected.link++; continue; }
-      if (!recipe && !write.recipe) { rejected.recipe++; continue; }
-      const title = (recipe?.title || row.title).slice(0, settings.titleMax);
-      candidates.push({ wpPostId: row.id, title, slug: row.slug, caption: row.caption, imageUrl, permalink, recipe: recipe ?? emptyRecipe(title), publishedAt: row.publishedAt,
-        ...(write.caption || write.recipe ? { write: { article: { title: row.title, excerpt: row.excerpt ?? '', text }, ...write } } : {}) });
-    }
+    candidates.push(...await toCandidates(db, settings, source, config, rows, writer, rejected, candidates));
     if (enough(candidates)) break;
     if (fetched < requested) { exhausted = true; break; }
     // A whole first page without the caption field means WordPress is not exposing it (credentials or REST
@@ -118,6 +107,37 @@ export async function scanCandidates(db: WpDb, settings: WordpressSettings, sour
     if (!candidates.length && rows.length > 0 && !writer && !config.mapping.recipeMetaKey && rejected.recipe === scanned - rejected.shared) break;
   }
   return { candidates, scanned, exhausted, rejected };
+}
+
+/** Turn WordPress rows into usable candidates, counting why the others are not (shared by scans and by reads of chosen posts). */
+async function toCandidates(db: WpDb, settings: WordpressSettings, source: Pick<SourceRow, 'siteUrl'>, config: PlanConfig, rows: WpCandidateRow[], writer: boolean, rejected: ScanRejections, seen: readonly Candidate[] = []): Promise<Candidate[]> {
+  const files = await db.attachments(rows.map(r => r.imageId), config.mapping.attachedFileMetaKey);
+  const out: Candidate[] = [];
+  for (const row of rows) {
+    // New posts published during a scan shift offsets; never list one recipe twice.
+    if (seen.some(candidate => candidate.wpPostId === row.id) || out.some(candidate => candidate.wpPostId === row.id)) continue;
+    const file = files.get(row.imageId);
+    const imageUrl = file ? buildImageUrl(source.siteUrl, settings.uploadsPath, file) : null;
+    const permalink = reportedPermalink(source.siteUrl, row.link) ?? buildPermalink(settings.permalinkTemplate, source.siteUrl, row.slug);
+    const recipe = parseRecipe(row.recipe, row.title, settings.minutesSuffix);
+    const text = writer && row.article ? row.article : '';
+    const write = { caption: Boolean(text) && !config.mapping.captionMetaKey, recipe: Boolean(text) && !recipe && !config.mapping.recipeMetaKey };
+    if (!row.caption && !write.caption) { rejected.caption++; if (row.captionFieldPresent === false) rejected.captionFieldMissing = (rejected.captionFieldMissing ?? 0) + 1; continue; }
+    if (!imageUrl) { rejected.image++; continue; }
+    if (!permalink) { rejected.link++; continue; }
+    if (!recipe && !write.recipe) { rejected.recipe++; continue; }
+    const title = (recipe?.title || row.title).slice(0, settings.titleMax);
+    out.push({ wpPostId: row.id, title, slug: row.slug, caption: row.caption, imageUrl, permalink, recipe: recipe ?? emptyRecipe(title), publishedAt: row.publishedAt,
+      ...(write.caption || write.recipe ? { write: { article: { title: row.title, excerpt: row.excerpt ?? '', text }, ...write } } : {}) });
+  }
+  return out;
+}
+
+/** Autopilot (2026-11-16): read chosen recipes (past winners) by WordPress id. */
+export async function readCandidates(db: WpDb, settings: WordpressSettings, source: Pick<SourceRow, 'siteUrl'>, config: PlanConfig, ids: readonly string[], now: Date, writer = false): Promise<Candidate[]> {
+  if (!ids.length) return [];
+  const { rows } = await db.candidates({ mapping: config.mapping, order: config.order, skipShared: false, maxAgeDays: 0, offset: 0, limit: ids.length, now, include: ids });
+  return toCandidates(db, settings, source, config, rows, writer, { shared: 0, caption: 0, image: 0, link: 0, recipe: 0, captionFieldMissing: 0 });
 }
 
 export const commentFor = (settings: WordpressSettings, config: PlanConfig, c: Pick<Candidate, 'recipe' | 'permalink'>) =>
@@ -203,6 +223,57 @@ const safeName = (slug: string) => `${slug.replace(/[^A-Za-z0-9-]/g, '').slice(0
 export const configOf = (settings: WordpressSettings, source: Pick<SourceRow, 'config'>): PlanConfig => resolveConfig(settings.defaults, source.config, patchLimits(settings));
 
 /**
+ * Everything the autopilot needs to choose (2026-11-16): past results and weather once per run, the past winners that
+ * may come back, the channels' existing posts for the variety guard, and AI ratings for the recipes read.
+ */
+async function prepareChoosing(ctx: Ctx, source: SourceRow, config: PlanConfig, pilot: AutopilotSettings, scoring: ScoringPorts, view: LedgerView, pages: ReadonlyArray<{ id: string }>, needCount: number, writer: boolean, usable: (found: Candidate[]) => Candidate[], actor: FeedActor) {
+  const { settings, now } = ctx;
+  const [outcomes, weather] = await Promise.all([
+    scoring.outcomes(source.id, new Date(now.getTime() - 365 * 86_400_000)).catch(() => []),
+    pilot.moments.rules.includes('weather') ? scoring.weather(pilot.moments.latitude, pilot.moments.longitude, config.timezone).catch(() => new Map<string, number>()) : Promise.resolve(new Map<string, number>()),
+  ]);
+  const history = dishHistory(outcomes);
+  // Past winners: the best tenth of published recipes (and clearly above usual), back after the cooldown.
+  const best = new Map<string, number>();
+  for (const o of outcomes) best.set(o.wpPostId, Math.max(best.get(o.wpPostId) ?? 0, o.relative));
+  const ranked = [...best].filter(([, rel]) => rel >= 1.3).sort((a, b) => b[1] - a[1]);
+  const winnerIds = pilot.evergreen.enabled && pilot.evergreen.share > 0 ? ranked.slice(0, Math.max(1, Math.ceil(best.size / 10))).slice(0, 30).map(([id]) => id) : [];
+  const winners = winnerIds.length ? usable(await readCandidates(ctx.db, settings, source, config, winnerIds, now, writer).catch(() => [])) : [];
+  // A winner is blocked on a channel only while it was posted there within the cooldown.
+  const cutoff = now.getTime() - pilot.evergreen.cooldownDays * 86_400_000;
+  const lastOn = new Map<string, number>();
+  for (const row of view.byKey.values()) if (row.state === 'planned') { const key = `${row.targetId}|${row.wpPostId}`; lastOn.set(key, Math.max(lastOn.get(key) ?? 0, row.slotAt.getTime())); }
+  const blocked = new Map([...view.blocked].map(([page, set]) => [page, new Set(set)]));
+  for (const w of winners) for (const page of pages) {
+    const last = lastOn.get(`${page.id}|${w.wpPostId}`);
+    if (last !== undefined && last < cutoff) { blocked.get(page.id)?.delete(w.wpPostId); blocked.get(page.id)?.delete(recipeTitleKey(w.title)); }
+  }
+  const winnerQuota = Math.floor(needCount * pilot.evergreen.share / 100);
+  return {
+    winners, blocked,
+    async picker(candidates: Candidate[]) {
+      const ids = candidates.map(c => c.wpPostId);
+      let ratings = await scoring.ratings(source.id, ids).catch(() => new Map());
+      // AI rates what it has not seen (titles in a batch, then the photos of the most promising), once per recipe.
+      if (writer) {
+        const unrated = candidates.filter(c => !ratings.get(c.wpPostId)?.kind);
+        if (unrated.length) { await scoring.rate(actor, source, unrated.map(c => ({ id: c.wpPostId, title: c.title }))).catch(() => undefined); ratings = await scoring.ratings(source.id, ids).catch(() => ratings); }
+      }
+      const kindOfRow = (row: LedgerRow): RecipeKind => (row.kind as RecipeKind | null | undefined) ?? ratings.get(row.wpPostId)?.kind ?? guessKind(row.title);
+      const timeline = new Map<string, Array<{ at: number; kind: RecipeKind }>>();
+      for (const row of view.byKey.values()) if (row.state !== 'failed') timeline.set(row.targetId, [...(timeline.get(row.targetId) ?? []), { at: row.slotAt.getTime(), kind: kindOfRow(row) }]);
+      const picker = makePicker({ pilot, timeZone: config.timezone, ratings, history, weather, timeline, winners: new Set(winners.map(w => w.wpPostId)), winnerQuota, candidates });
+      if (writer) {
+        const soon = new Date(now.getTime() + 86_400_000);
+        const photoless = candidates.filter(c => ratings.get(c.wpPostId)?.photo == null).sort((a, b) => picker.scoreAt(b, soon) - picker.scoreAt(a, soon)).slice(0, 2);
+        if (photoless.length) void scoring.ratePhotos(actor, source, photoless.map(c => ({ id: c.wpPostId, imageUrl: c.imageUrl }))).catch(() => undefined);
+      }
+      return picker;
+    },
+  };
+}
+
+/**
  * Fill every unplanned slot of the horizon, one page at a time, with a different recipe, through Publishing's
  * normal scheduling service. Each slot is claimed in the ledger first (unique per source, page and time), so
  * a restart, a second worker or a retry can never plan the same slot twice.
@@ -281,16 +352,25 @@ export async function planSource(ctx: Ctx, source: SourceRow, auth: FeedAuthoriz
   for (const need of todo) { const order = of(need.targetId).order; groups.set(order, [...(groups.get(order) ?? []), need]); }
   const taken = new Set(view.taken);
   const assignments: Array<{ targetId: string; slotAt: Date; candidate: Candidate }> = [];
+  const chosenScores = new Map<string, { score: number; kind: string }>();
   let readable = 0; let captionMissing = 0; let recipeMissing = 0; let unfilled = 0;
   out.candidates = 0; out.rejected = { shared: 0, caption: 0, image: 0, link: 0, recipe: 0, captionFieldMissing: 0 };
+  // Autopilot choosing (2026-11-16): scores, best hours first, variety, past winners. Off without scoring ports.
+  const pilot = autopilotOf(config.autopilot);
+  const scoring = pilot.score.enabled ? ports.scoring : undefined;
+  const prep = scoring ? await prepareChoosing(ctx, source, config, pilot, scoring, view, pages, todo.length, writer, usable, auth.actor).catch(() => null) : null;
   for (const [order, group] of groups) {
     const groupConfig = { ...config, order };
     const forcedIds = ctx.force ? [...new Set(group.flatMap(need => ctx.force!.get(slotKey(need.targetId, need.slotAt)) ?? []))] : [];
     const autoTodo = ctx.force ? group.filter(need => !ctx.force!.has(slotKey(need.targetId, need.slotAt))) : group;
+    // With scoring, a wider choice is read: the best of the pool is planned, not just the next in line.
+    const pool = prep ? Math.min(settings.candidateMaxScan, Math.max(60, autoTodo.length * 3)) : 0;
     const scan = await scanCandidates(ctx.db, settings, source, groupConfig, now, found => forcedIds.length
       ? forcedIds.every(id => found.some(c => c.wpPostId === id))
-      : !settings.reuse.enabled && allocateRecipes({ needs: autoTodo, candidates: usable(found), blocked: view.blocked, taken, reused: view.reused, distinct: config.distinctAcrossPages }).unfilled === 0, writer);
+      : !settings.reuse.enabled && usable(found).length >= pool && allocateRecipes({ needs: autoTodo, candidates: usable(found), blocked: view.blocked, taken, reused: view.reused, distinct: config.distinctAcrossPages }).unfilled === 0, writer);
     scan.candidates = usable(scan.candidates);
+    if (prep) scan.candidates = [...scan.candidates, ...prep.winners.filter(w => !scan.candidates.some(c => c.wpPostId === w.wpPostId))];
+    const picker = prep ? await prep.picker(scan.candidates) : null;
     out.scanned += scan.scanned; out.candidates += scan.candidates.length;
     for (const key of Object.keys(out.rejected) as Array<keyof ScanRejections>) out.rejected[key] = (out.rejected[key] ?? 0) + (scan.rejected[key] ?? 0);
     readable += scan.scanned - scan.rejected.shared; captionMissing += scan.rejected.captionFieldMissing ?? 0; recipeMissing += scan.rejected.recipe;
@@ -301,7 +381,10 @@ export async function planSource(ctx: Ctx, source: SourceRow, auth: FeedAuthoriz
       const candidate = scan.candidates.find(c => c.wpPostId === id);
       if (candidate) groupForced.push({ targetId: need.targetId, slotAt: need.slotAt, candidate });
     }
-    const automatic = allocateRecipes({ needs: autoTodo, candidates: scan.candidates, allowReuse: scan.exhausted, blocked: view.blocked, taken, reused: view.reused, distinct: config.distinctAcrossPages });
+    const automatic = allocateRecipes({ needs: picker ? picker.orderNeeds(autoTodo) : autoTodo, candidates: scan.candidates, allowReuse: scan.exhausted, blocked: prep?.blocked ?? view.blocked, taken, reused: view.reused, distinct: config.distinctAcrossPages,
+      ...(picker ? { rank: picker.rank, fits: picker.fits, onAssign: picker.onAssign } : {}) });
+    if (picker) for (const f of groupForced) chosenScores.set(slotKey(f.targetId, f.slotAt), { score: picker.scoreAt(f.candidate, f.slotAt), kind: picker.kindOf(f.candidate) });
+    if (picker) for (const a of automatic.assignments) { const c = picker.chosen(a.targetId, a.slotAt); if (c) chosenScores.set(slotKey(a.targetId, a.slotAt), c); }
     for (const { candidate } of [...groupForced, ...automatic.assignments]) { taken.add(candidate.wpPostId); if (candidate.title) taken.add(recipeTitleKey(candidate.title)); }
     assignments.push(...groupForced, ...automatic.assignments);
     unfilled += automatic.unfilled + (group.length - autoTodo.length - groupForced.length);
@@ -316,7 +399,8 @@ export async function planSource(ctx: Ctx, source: SourceRow, auth: FeedAuthoriz
     if (ctx.deadline !== undefined && Date.now() >= ctx.deadline) { out.unfilled += assignments.length - index; out.reason = 'time_limit'; break; }
     const previous = reviving.get(slotKey(targetId, slotAt));
     const priorSkipped = previous?.skipped ?? [];
-    const claimId = await ports.store.claim({ workspaceId: source.workspaceId, sourceId: source.id, targetId, wpPostId: c.wpPostId, slotAt, title: c.title, permalink: c.permalink, skipped: priorSkipped });
+    const chosenScore = chosenScores.get(slotKey(targetId, slotAt));
+    const claimId = await ports.store.claim({ workspaceId: source.workspaceId, sourceId: source.id, targetId, wpPostId: c.wpPostId, slotAt, title: c.title, permalink: c.permalink, skipped: priorSkipped, ...(chosenScore ? { score: chosenScore.score, kind: chosenScore.kind } : {}) });
     if (!claimId) continue;
     ctx.budget.left -= 1;
     let written: { caption: string; firstComment: string };

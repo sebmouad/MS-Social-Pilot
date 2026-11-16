@@ -56,8 +56,8 @@ const viewOf = (s: WordpressSettings, row: SourceRow): SourceView => ({
   id: row.id, name: row.name, siteUrl: row.siteUrl, hasCredential: Boolean(row.apiCredential), enabled: row.enabled, allTargets: row.allTargets, targetIds: row.targetIds, config: configOf(s, row),
   lastRunAt: row.lastRunAt?.toISOString() ?? null, lastError: row.lastError, lastSummary: row.lastSummary,
 });
-export type PlanView = { id: string; targetId: string; targetName: string; wpPostId: string; slotAt: string; state: LedgerRow['state']; postId: string | null; title: string; permalink: string | null; reason: string | null };
-const planView = (row: LedgerRow): PlanView => ({ id: row.id, targetId: row.targetId, targetName: row.targetName ?? '', wpPostId: row.wpPostId, slotAt: row.slotAt.toISOString(), state: row.state, postId: row.postId, title: row.title, permalink: row.permalink, reason: row.reason });
+export type PlanView = { id: string; targetId: string; targetName: string; wpPostId: string; slotAt: string; state: LedgerRow['state']; postId: string | null; title: string; permalink: string | null; reason: string | null; score: number | null; kind: string | null };
+const planView = (row: LedgerRow): PlanView => ({ id: row.id, targetId: row.targetId, targetName: row.targetName ?? '', wpPostId: row.wpPostId, slotAt: row.slotAt.toISOString(), state: row.state, postId: row.postId, title: row.title, permalink: row.permalink, reason: row.reason, score: row.score ?? null, kind: row.kind ?? null });
 
 async function selectablePages(workspaceId: string, s: WordpressSettings, auth: FeedAuthorization) {
   const rows = await prisma.$queryRaw<Array<{ id: string; name: string }>>`SELECT id, name FROM targets WHERE "workspaceId" = ${workspaceId} AND enabled = true AND "canPublish" = true AND type::text = ANY(${s.targetTypes}::text[]) ORDER BY name ASC, id ASC LIMIT ${s.maxTargets}`;
@@ -146,12 +146,10 @@ export async function saveRecipeSource(actor: FeedActor, input: unknown, deps: R
     await lockActor(tx, actor, true);
     const rows = await tx.$queryRaw<Array<{ id: string; enabled: boolean; config: unknown }>>`SELECT id, enabled, config FROM wordpress_recipe_sources WHERE "workspaceId" = ${actor.workspaceId} FOR UPDATE`;
     const existing = rows[0];
-    // The autopilot's activity log and learning date are written by the planner, never by a settings form (2026-11-16).
-    const stored = existing?.config && typeof existing.config === 'object' ? (existing.config as { autopilot?: { log?: unknown; lastLearnedAt?: unknown } }).autopilot : undefined;
-    if (stored && (stored.log !== undefined || stored.lastLearnedAt !== undefined)) {
-      const mine = (config as { autopilot?: Record<string, unknown> }).autopilot;
-      if (mine) (config as { autopilot?: Record<string, unknown> }).autopilot = { ...mine, ...(stored.log !== undefined ? { log: stored.log } : {}), ...(stored.lastLearnedAt !== undefined ? { lastLearnedAt: stored.lastLearnedAt } : {}) };
-    }
+    // What the autopilot learned and logged is written by the planner, never by a settings form (2026-11-16).
+    const stored = existing?.config && typeof existing.config === 'object' ? (existing.config as { autopilot?: Record<string, unknown> }).autopilot : undefined;
+    const mine = (config as { autopilot?: Record<string, unknown> }).autopilot;
+    if (stored && mine) for (const key of ['log', 'lastLearnedAt', 'learnVersion', 'hourValues']) { if (stored[key] !== undefined) mine[key] = stored[key]; else delete mine[key]; }
     const enabled = data.enabled ?? existing?.enabled ?? false;
     const id = existing?.id ?? `wrs_${randomUUID()}`;
     if (existing) {

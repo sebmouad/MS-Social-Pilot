@@ -11,8 +11,10 @@ export type LedgerRow = {
   id: string; sourceId: string; targetId: string; wpPostId: string; slotAt: Date; state: PlanState; postId: string | null; title: string; permalink: string | null;
   publishedAt?: Date | null;
   reason: string | null; skipped: string[]; claimedAt: Date; targetName?: string;
+  /** Autopilot score (0–100) and kind the slot was filled with, when it chose (2026-11-16). */
+  score?: number | null; kind?: string | null;
 };
-export type ClaimInput = { workspaceId: string; sourceId: string; targetId: string; wpPostId: string; slotAt: Date; title: string; permalink: string | null; skipped: string[] };
+export type ClaimInput = { workspaceId: string; sourceId: string; targetId: string; wpPostId: string; slotAt: Date; title: string; permalink: string | null; skipped: string[]; score?: number | null; kind?: string | null };
 export type Settlement = { state: PlanState; postId?: string | null; reason?: string | null; skipped?: string[] };
 export type RunRecord = { at: Date; error: string | null; summary: Record<string, unknown> };
 
@@ -35,7 +37,7 @@ export interface RecipeStore {
 }
 
 const SOURCE_COLUMNS = `id, "workspaceId", name, "siteUrl", "apiCredential", enabled, "allTargets", "targetIds", config, "lastRunAt", "lastError", "lastSummary", "createdAt", "updatedAt"`;
-const LEDGER_COLUMNS = `id, "sourceId", "targetId", "wpPostId", "slotAt", state, "postId", title, permalink, reason, skipped, "claimedAt"`;
+const LEDGER_COLUMNS = `id, "sourceId", "targetId", "wpPostId", "slotAt", state, "postId", title, permalink, reason, skipped, "claimedAt", score, kind`;
 const strings = (value: unknown): string[] => Array.isArray(value) ? value.filter((v): v is string => typeof v === 'string') : [];
 type RawSource = Omit<SourceRow, 'targetIds'> & { targetIds: unknown };
 type RawLedger = Omit<LedgerRow, 'skipped'> & { skipped: unknown };
@@ -48,7 +50,7 @@ export async function selectSource(workspaceId: string): Promise<SourceRow | nul
 }
 export async function selectPlans(workspaceId: string, sourceId: string, offset: number, limit: number): Promise<LedgerRow[]> {
   const rows = await prisma.$queryRawUnsafe<Array<RawLedger & { targetName: string | null }>>(
-    `SELECT p.id, p."sourceId", p."targetId", p."wpPostId", p."slotAt", p.state, p."postId", p.title, p.permalink, p.reason, p.skipped, p."claimedAt", t.name AS "targetName"
+    `SELECT p.id, p."sourceId", p."targetId", p."wpPostId", p."slotAt", p.state, p."postId", p.title, p.permalink, p.reason, p.skipped, p."claimedAt", p.score, p.kind, t.name AS "targetName"
      FROM wordpress_recipe_plans p LEFT JOIN targets t ON t.id = p."targetId" AND t."workspaceId" = p."workspaceId"
      WHERE p."workspaceId" = $1 AND p."sourceId" = $2 ORDER BY p."slotAt" DESC, p.id ASC OFFSET $3 LIMIT $4`, workspaceId, sourceId, offset, limit);
   return rows.map(row => ({ ...toLedger(row), targetName: row.targetName ?? '' }));
@@ -83,9 +85,9 @@ export const prismaRecipeStore: RecipeStore = {
   },
   /** The unique slot key is the exactly-once claim; a failed slot may be claimed again, any other state may not. */
   async claim(input) {
-    const rows = await prisma.$queryRaw<Array<{ id: string }>>`INSERT INTO wordpress_recipe_plans (id, "workspaceId", "sourceId", "targetId", "wpPostId", "slotAt", state, title, permalink, skipped, "claimedAt", "createdAt", "updatedAt")
-      VALUES (${`wrp_${randomUUID()}`}, ${input.workspaceId}, ${input.sourceId}, ${input.targetId}, ${input.wpPostId}, ${input.slotAt}, 'claimed', ${input.title}, ${input.permalink}, ${JSON.stringify(input.skipped)}::jsonb, NOW(), NOW(), NOW())
-      ON CONFLICT ("sourceId", "targetId", "slotAt") DO UPDATE SET "wpPostId" = EXCLUDED."wpPostId", state = 'claimed', "postId" = NULL, title = EXCLUDED.title, permalink = EXCLUDED.permalink, reason = NULL, skipped = EXCLUDED.skipped, "claimedAt" = NOW(), "updatedAt" = NOW()
+    const rows = await prisma.$queryRaw<Array<{ id: string }>>`INSERT INTO wordpress_recipe_plans (id, "workspaceId", "sourceId", "targetId", "wpPostId", "slotAt", state, title, permalink, skipped, score, kind, "claimedAt", "createdAt", "updatedAt")
+      VALUES (${`wrp_${randomUUID()}`}, ${input.workspaceId}, ${input.sourceId}, ${input.targetId}, ${input.wpPostId}, ${input.slotAt}, 'claimed', ${input.title}, ${input.permalink}, ${JSON.stringify(input.skipped)}::jsonb, ${input.score ?? null}, ${input.kind ?? null}, NOW(), NOW(), NOW())
+      ON CONFLICT ("sourceId", "targetId", "slotAt") DO UPDATE SET "wpPostId" = EXCLUDED."wpPostId", state = 'claimed', "postId" = NULL, title = EXCLUDED.title, permalink = EXCLUDED.permalink, reason = NULL, skipped = EXCLUDED.skipped, score = EXCLUDED.score, kind = EXCLUDED.kind, "claimedAt" = NOW(), "updatedAt" = NOW()
       WHERE wordpress_recipe_plans.state = 'failed' RETURNING id`;
     return rows[0]?.id ?? null;
   },

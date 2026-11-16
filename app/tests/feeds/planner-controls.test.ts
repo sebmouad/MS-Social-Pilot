@@ -7,6 +7,7 @@ import { planSource, slotKey, LEFT_EMPTY, type PlannerPorts } from '@/modules/fe
 import type { WordpressSettings } from '@/modules/feeds/server/wordpress-settings';
 import type { LedgerRow, SourceRow, ClaimInput, Settlement } from '@/modules/feeds/server/wordpress-store';
 import type { FeedAuthorization } from '@/modules/feeds/server/access';
+import type { ScoringPorts, Rating, Outcome } from '@/modules/feeds/server/wordpress-scoring';
 
 const now = new Date('2026-11-16T06:00:00Z'); // Monday, 07:00 in Paris
 const pages = [{ id: 'pageA', name: 'Page A' }, { id: 'pageB', name: 'Page B' }];
@@ -33,7 +34,8 @@ function settings(): WordpressSettings {
 }
 
 /** In-memory ledger and publishing; returns the ports and what they recorded. */
-function harness(seed: LedgerRow[] = []) {
+function harness(seed: LedgerRow[] = [], opts: { list?: typeof recipes; scoring?: ScoringPorts; at?: Date } = {}) {
+  const list = opts.list ?? recipes; const clock = opts.at ?? now;
   const ledger: LedgerRow[] = [...seed];
   const created: Array<{ targetId: string; scheduledAt: Date; message: string; firstComment?: string }> = [];
   const store = {
@@ -44,7 +46,7 @@ function harness(seed: LedgerRow[] = []) {
     async claim(input: ClaimInput) {
       const existing = ledger.find(row => row.targetId === input.targetId && row.slotAt.getTime() === input.slotAt.getTime());
       if (existing && existing.state !== 'failed') return null;
-      const row: LedgerRow = { id: `plan${ledger.length + 1}`, sourceId: input.sourceId, targetId: input.targetId, wpPostId: input.wpPostId, slotAt: input.slotAt, state: 'claimed', postId: null, title: input.title, permalink: input.permalink, reason: null, skipped: input.skipped, claimedAt: now };
+      const row: LedgerRow = { id: `plan${ledger.length + 1}`, sourceId: input.sourceId, targetId: input.targetId, wpPostId: input.wpPostId, slotAt: input.slotAt, state: 'claimed', postId: null, title: input.title, permalink: input.permalink, reason: null, skipped: input.skipped, claimedAt: now, score: input.score ?? null, kind: input.kind ?? null };
       if (existing) ledger.splice(ledger.indexOf(existing), 1);
       ledger.push(row); return row.id;
     },
@@ -60,10 +62,11 @@ function harness(seed: LedgerRow[] = []) {
     image: { async download() { return Buffer.from('x'); }, async inspect() {}, async convert() { return Buffer.from('jpeg'); }, async store() { return { id: 'media1' }; } },
     async qualify() { return null; }, store,
     writer: { async available() { return false; }, async write() { throw new Error('unused'); } },
-    now: () => now,
+    now: () => clock,
+    ...(opts.scoring ? { scoring: opts.scoring } : {}),
   } as unknown as PlannerPorts;
   const db = {
-    async candidates(q: { offset: number; limit: number; order?: string }) { const rows = (q.order === 'oldest' ? [...recipes].reverse() : recipes).slice(q.offset, q.offset + q.limit); return { rows, fetched: rows.length, requested: q.limit }; },
+    async candidates(q: { offset: number; limit: number; order?: string; include?: readonly string[] }) { const rows = (q.include ? list.filter(r => q.include!.includes(r.id)) : q.order === 'oldest' ? [...list].reverse() : list).slice(q.offset, q.offset + q.limit); return { rows, fetched: rows.length, requested: q.limit }; },
     async attachments(ids: readonly string[]) { return new Map(ids.map(id => [id, `2026/11/${id}.jpg`])); },
     async ping() {}, async close() {},
   };
@@ -158,4 +161,43 @@ test('planner: a post that failed to publish is replaced by another recipe, publ
   const replaced = h.ledger.find(row => row.targetId === slot.targetId && row.slotAt.getTime() === slot.slotAt.getTime())!;
   assert.notEqual(replaced.wpPostId, slot.wpPostId);
   assert.ok(h.created.some(p => p.targetId === 'pageA' && p.scheduledAt.getTime() === soon.getTime()));
+});
+
+const fakeScoring = (ratings: Record<string, Rating> = {}, outcomes: Outcome[] = []): ScoringPorts => ({
+  async ratings(_s, ids) { return new Map(ids.filter(id => ratings[id]).map(id => [id, ratings[id]!])); },
+  async rate() {}, async ratePhotos() {},
+  async outcomes() { return outcomes; },
+  async weather() { return new Map(); },
+});
+const titled = (titles: string[]) => titles.map((title, i) => ({ ...recipes[i]!, id: `t${i + 1}`, title, slug: `t-${i + 1}`, link: `https://site.example/t-${i + 1}` }));
+
+test('autopilot: the recipe that fits the moment wins its slot, even far down the list', async () => {
+  const december = new Date('2026-12-14T06:00:00Z');
+  const list = titled([...Array.from({ length: 20 }, (_, i) => `Plat ordinaire ${i + 1}`), 'Bûche de Noël au chocolat']);
+  const h = harness([], { list, scoring: fakeScoring(), at: december });
+  await planSource({ settings: settings(), ports: h.ports, db: h.db as never, budget: { left: 50 }, now: december }, source({ autopilot: undefined }), auth);
+  assert.ok(h.ledger.some(row => row.wpPostId === 't21'), 'the Christmas log is planned');
+  const buche = h.ledger.find(row => row.wpPostId === 't21')!;
+  assert.ok((buche.score ?? 0) > 50);
+});
+
+test('autopilot: never three desserts in a row on a channel', async () => {
+  const list = titled(['Tarte tatin', 'Cookies géants', 'Brownie fondant', 'Mousse au chocolat', 'Quiche lorraine', 'Gratin dauphinois', 'Clafoutis cerises', 'Poulet rôti']);
+  const ratings = Object.fromEntries(list.map(r => [r.id, { kind: null, hook: r.title.match(/Tarte|Cookies|Brownie|Mousse|Clafoutis/) ? 10 : 2, photo: null }]));
+  const h = harness([], { list, scoring: fakeScoring(ratings) });
+  const s2 = settings(); s2.defaults.slots = ['09:00', '11:00', '13:00', '15:00', '17:00', '19:00']; s2.defaults.distinctAcrossPages = true;
+  await planSource({ settings: s2, ports: h.ports, db: h.db as never, budget: { left: 50 }, now }, source({ channels: { pageB: { paused: true } } }), auth);
+  const kinds = h.ledger.filter(row => row.targetId === 'pageA').sort((a, b) => a.slotAt.getTime() - b.slotAt.getTime()).map(row => row.kind);
+  for (let i = 2; i < kinds.length; i++) assert.ok(!(kinds[i] === 'dessert' && kinds[i - 1] === 'dessert' && kinds[i - 2] === 'dessert'), kinds.join());
+});
+
+test('autopilot: past winners come back after the cooldown, within their share', async () => {
+  const old = new Date(now.getTime() - 90 * 86_400_000);
+  const seed: LedgerRow[] = ['r29', 'r30'].map((id, i) => ({ id: `old${i}`, sourceId: 'src1', targetId: 'pageA', wpPostId: id, slotAt: old, state: 'planned', postId: `p${i}`, title: `Recipe ${id.slice(1)}`, permalink: null, reason: null, skipped: [], claimedAt: old }));
+  const outcomes: Outcome[] = [{ targetId: 'pageA', wpPostId: 'r29', title: 'Recipe 29', slotAt: old, relative: 4 }, ...Array.from({ length: 9 }, (_, i) => ({ targetId: 'pageA', wpPostId: `x${i}`, title: `Other ${i}`, slotAt: old, relative: 1 }))];
+  const h = harness(seed, { scoring: fakeScoring({}, outcomes) });
+  await planSource({ settings: settings(), ports: h.ports, db: h.db as never, budget: { left: 50 }, now }, source(), auth);
+  const fresh = h.ledger.filter(row => row.claimedAt === now);
+  const back = fresh.filter(row => row.wpPostId === 'r29');
+  assert.ok(back.length <= Math.floor(fresh.length * 0.2), `winners ${back.length} of ${fresh.length}`);
 });

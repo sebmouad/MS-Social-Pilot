@@ -261,6 +261,11 @@ export const recipeTitleKey = (title: string) => `title:${title.normalize('NFD')
 
 export function allocateRecipes<C extends { wpPostId: string; title?: string }>(input: {
   needs: readonly SlotNeed[]; candidates: readonly C[]; blocked: ReadonlyMap<string, ReadonlySet<string>>; taken: ReadonlySet<string>; distinct: boolean; allowReuse?: boolean; reused?: ReadonlyMap<string, ReadonlyMap<string, number>>;
+  /** Autopilot (2026-11-16): the order candidates are tried in for one slot (best score first). */
+  rank?: (need: SlotNeed, candidates: readonly C[]) => readonly C[];
+  /** Autopilot: a further condition (variety, winners' share), told about each assignment made. */
+  fits?: (need: SlotNeed, candidate: C) => boolean;
+  onAssign?: (need: SlotNeed, candidate: C) => void;
 }): { assignments: Array<Allocation<C>>; unfilled: number } {
   const used = new Set(input.taken);
   const perPage = new Map<string, Set<string>>();
@@ -274,13 +279,16 @@ export function allocateRecipes<C extends { wpPostId: string; title?: string }>(
     const candidates = ranked.get(need.targetId) ?? (dates?.size ? [...input.candidates].sort((a, b) => (dates.get(a.wpPostId) ?? -Infinity) - (dates.get(b.wpPostId) ?? -Infinity)) : input.candidates);
     ranked.set(need.targetId, candidates);
     const titleKey = (c: C) => c.title ? recipeTitleKey(c.title) : null;
-    const pick = candidates.find(c => { const key = titleKey(c);
-      return !(input.allowReuse === false && dates?.has(c.wpPostId)) && !page.has(c.wpPostId) && !(key && page.has(key)) && !(input.distinct && (used.has(c.wpPostId) || (key && used.has(key)))) && !need.avoid?.has(c.wpPostId); });
+    const usable = (c: C) => { const key = titleKey(c);
+      return !(input.allowReuse === false && dates?.has(c.wpPostId)) && !page.has(c.wpPostId) && !(key && page.has(key)) && !(input.distinct && (used.has(c.wpPostId) || (key && used.has(key)))) && !need.avoid?.has(c.wpPostId); };
+    const order = input.rank ? input.rank(need, candidates) : candidates;
+    const pick = order.find(c => usable(c) && (!input.fits || input.fits(need, c))) ?? (input.fits ? order.find(usable) : undefined);
     if (!pick) { unfilled += 1; continue; }
     const pickedTitle = titleKey(pick);
     page.add(pick.wpPostId); used.add(pick.wpPostId);
     if (pickedTitle) { page.add(pickedTitle); used.add(pickedTitle); }
     assignments.push({ targetId: need.targetId, slotAt: need.slotAt, candidate: pick });
+    input.onAssign?.(need, pick);
   }
   return { assignments, unfilled };
 }

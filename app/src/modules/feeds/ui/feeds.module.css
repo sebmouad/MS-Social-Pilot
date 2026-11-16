@@ -128,3 +128,7 @@
 .activity { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
 .activity li { display: grid; grid-template-columns: 92px minmax(0, 1fr); gap: 10px; font-size: 14px; padding: 6px 0; border-bottom: 1px solid var(--line); }
 .activity time { font-variant-numeric: tabular-nums; color: var(--ink-soft); }
+.scoreChip { display: inline-flex; margin-left: 8px; padding: 1px 7px; border-radius: 999px; font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; border: 1px solid var(--line-strong); color: var(--ink-soft); vertical-align: 1px; }
+.scoreChip[data-band="high"] { border-color: var(--accent); background: var(--accent-soft); color: var(--ink); }
+.scoreChip[data-band="low"] { opacity: .75; }
+.checkRow { display: flex; flex-wrap: wrap; gap: 6px 18px; }

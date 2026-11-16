@@ -1,5 +1,5 @@
 import { prisma } from '@/server/data';
-import { AUTOPILOT_LOG_MAX, LEARN_EVERY_DAYS, LEARN_VERSION, autopilotOf, learnTimes, relativeByHour, postScore, type AutopilotLogEntry, type AutopilotSettings, type Observation } from '../wordpress/autopilot';
+import { AUTOPILOT_LOG_MAX, LEARN_EVERY_DAYS, LEARN_VERSION, autopilotOf, hourStats, learnTimes, relativeByHour, postScore, type AutopilotLogEntry, type AutopilotSettings, type Observation } from '../wordpress/autopilot';
 import { channelConfig, type ChannelSettings } from '../wordpress/recipe';
 import { configOf } from './wordpress-planner';
 import type { SourceRow } from './wordpress-store';
@@ -56,7 +56,9 @@ export async function learnBestTimes(settings: WordpressSettings, source: Source
   // What every channel saw at each hour, each relative to its own usual: evidence for hours a channel never tried.
   const pooled = new Map<number, number[]>();
   for (const page of pages) for (const [hour, values] of relativeByHour(scored(page.id), config.timezone)) pooled.set(hour, [...(pooled.get(hour) ?? []), ...values]);
+  const hourValues: Record<string, Record<string, number>> = {};
   for (const [index, page] of pages.entries()) {
+    hourValues[page.id] = Object.fromEntries(hourStats(scored(page.id), config.timezone, best.window, pooled).map(stat => [String(stat.hour), Math.round(stat.value * 100) / 100]));
     const own = channels[page.id];
     if (own?.paused || (own?.slots?.length && !own.autoTimes) || config.channelSlots?.[page.id]?.length) continue;
     const current = channelConfig(config, page.id).slots;
@@ -67,7 +69,7 @@ export async function learnBestTimes(settings: WordpressSettings, source: Source
   }
   const next = rawConfig(source);
   next.channels = channels;
-  next.autopilot = { ...withLog(autopilot, entries), lastLearnedAt: now.toISOString(), learnVersion: LEARN_VERSION };
+  next.autopilot = { ...withLog(autopilot, entries), hourValues, lastLearnedAt: now.toISOString(), learnVersion: LEARN_VERSION };
   await ports.saveConfig(source, next);
   source.config = next as SourceRow['config'];
   return entries.length;

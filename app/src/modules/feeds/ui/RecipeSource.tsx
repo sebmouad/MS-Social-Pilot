@@ -9,6 +9,7 @@ import { recipeCopy, recipeText, type RecipeCopyCatalog, type RecipeCopyKey, typ
 import { configPatch, replaceRecipeSlotConfirmation, type ChannelSettings as ChannelOwnSettings } from '../wordpress/recipe';
 import { ChannelSettings } from './ChannelSettings';
 import { AutopilotPanel } from './AutopilotPanel';
+import { autopilotOf } from '../wordpress/autopilot';
 import styles from './feeds.module.css';
 import { RecipeSupplyWarning } from './RecipeSupplyWarning';
 
@@ -31,7 +32,7 @@ export type RecipeSourceData = {
   id: string; name: string; siteUrl: string; hasCredential: boolean; enabled: boolean; allTargets: boolean; targetIds: string[]; config: RecipeConfig;
   lastRunAt: string | null; lastError: string | null; lastSummary: { planned?: number; failed?: number; unfilled?: number; scanned?: number; candidates?: number; rejected?: { shared: number; caption: number; image: number; link: number; recipe: number } } | null;
 };
-export type RecipePlan = { id: string; targetId: string; targetName: string; wpPostId: string; slotAt: string; state: 'claimed' | 'planned' | 'uncertain' | 'failed'; postId: string | null; title: string; permalink: string | null; reason: string | null };
+export type RecipePlan = { id: string; targetId: string; targetName: string; wpPostId: string; slotAt: string; state: 'claimed' | 'planned' | 'uncertain' | 'failed'; postId: string | null; title: string; permalink: string | null; reason: string | null; score?: number | null; kind?: string | null };
 export type RecipeView = {
   source: RecipeSourceData | null; defaults: RecipeConfig & { siteUrl: string }; pages: Array<{ id: string; name: string }>; plans: { items: RecipePlan[]; page: number; hasMore: boolean };
   counts: Record<string, number>; available: boolean; limits: { maxNameCharacters: number; maxTemplateCharacters: number; pauseCancel?: boolean };
@@ -83,6 +84,7 @@ export function RecipeSource({ initial, locale, canWrite, copy = recipeCopy }: {
   const days = draft.config.weekdays ?? [0, 1, 2, 3, 4, 5, 6];
   const dayName = (day: number) => new Intl.DateTimeFormat(locale, { weekday: 'short', timeZone: 'UTC' }).format(new Date(Date.UTC(2026, 10, 15 + day)));
   const daysSummary = days.length === 7 ? t('everyDay') : WEEK_ORDER.filter(d => days.includes(d)).map(dayName).join(', ');
+  const showScore = autopilotOf(draft.config.autopilot).score.show;
   const scopePages = draft.allTargets ? view.pages : view.pages.filter(page => draft.targetIds.includes(page.id));
   const setMapping = (patch: Partial<Mapping>) => setDraft(d => ({ ...d, config: { ...d.config, mapping: { ...d.config.mapping, ...patch } } }));
 
@@ -279,7 +281,7 @@ export function RecipeSource({ initial, locale, canWrite, copy = recipeCopy }: {
     <h3 className={styles.sectionTitle}>{t('plansHeading')}</h3>
     {view.plans.items.length ? <div className={styles.tableWrap}><table className={styles.table}><caption className="ui-visually-hidden">{t('plansHeading')}</caption>
       <thead><tr><th scope="col">{t('colTime')}</th><th scope="col">{t('colChannel')}</th><th scope="col">{t('colRecipe')}</th><th scope="col">{t('colState')}</th>{canWrite ? <th scope="col"><span className="ui-visually-hidden">{t('colActions')}</span></th> : null}</tr></thead>
-      <tbody>{(showAllPlans ? view.plans.items : view.plans.items.slice(0, 12)).map(p => <tr key={p.id}><th scope="row">{view.labels?.slots[p.id] ?? ''}</th><td>{p.targetName}</td><td>{p.title}</td><td>{stateText(p)}{reasonText(p.reason) && <span className={styles.meta}>{reasonText(p.reason)}</span>}</td>
+      <tbody>{(showAllPlans ? view.plans.items : view.plans.items.slice(0, 12)).map(p => <tr key={p.id}><th scope="row">{view.labels?.slots[p.id] ?? ''}</th><td>{p.targetName}</td><td>{p.title}{showScore && typeof p.score === 'number' ? <span className={styles.scoreChip} data-band={p.score >= 70 ? 'high' : p.score >= 45 ? 'mid' : 'low'} title={t('scoreHint')}>{p.score}</span> : null}{p.kind ? <span className={styles.meta}>{t(`kind_${p.kind}` as RecipeCopyKey)}</span> : null}</td><td>{stateText(p)}{reasonText(p.reason) && <span className={styles.meta}>{reasonText(p.reason)}</span>}</td>
         {canWrite ? <td className={styles.planActions}>{Date.parse(p.slotAt) <= Date.now() ? null : p.reason === 'left_empty'
           ? <Button size="sm" variant="quiet" disabled={busy} onClick={() => setSlotChange({ plan: p, kind: 'fill' })}>{t('planFill')}</Button>
           : p.state === 'planned' && p.postId ? <>

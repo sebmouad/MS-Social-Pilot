@@ -958,6 +958,8 @@ model WordpressRecipePlan {
   permalink   String?
   reason      String?
   skipped     Json                  @default("[]")
+  score       Int?                  @db.SmallInt
+  kind        String?
   claimedAt   DateTime              @default(now())
   createdAt   DateTime              @default(now())
   updatedAt   DateTime              @default(now()) @updatedAt
@@ -2978,4 +2980,20 @@ enum PublishMode {
 enum StorageProvider {
   local
   s3
+}
+
+/// AI ratings of a recipe for the autopilot (2026-11-16): rated once per source and recipe.
+model RecipeRating {
+  sourceId    String
+  wpPostId    String
+  workspaceId String
+  kind        String?
+  hook        Int?      @db.SmallInt
+  photo       Int?      @db.SmallInt
+  ratedAt     DateTime  @default(now())
+  photoAt     DateTime?
+
+  @@id([sourceId, wpPostId], map: "recipe_ratings_pkey")
+  @@index([workspaceId], map: "recipe_ratings_workspace_idx")
+  @@map("recipe_ratings")
 }

@@ -210,3 +210,19 @@ export async function writeFromArticle(actor: AiActor, article: ArticleInput, de
   if (!written) throw new OperationError('upstream_failure', 'AI assist returned no usable post for this article. Try again.');
   return written;
 }
+
+/**
+ * One request for the recipe autopilot (2026-11-16): rating recipes, writing a channel's caption, drafting a reply.
+ * Same authorization, hourly limit, monthly budget and metering as every other assist; the caller parses the answer.
+ * `kind` names the use in the usage log. Nothing is saved or published here.
+ */
+export async function autopilotComplete(actor: AiActor, kind: string, system: string, prompt: string, options: { image?: AiImageInput; maxTokens?: number } & AiDeps = {}): Promise<string> {
+  await authorizeAi(actor, COMPOSER_FEATURE, 'write');
+  const [s, workspace] = await Promise.all([settings(options), workspaceContext(actor.workspaceId)]);
+  if (!s || !workspace?.enabled) throw unavailable();
+  const now = () => (options.now ?? (() => new Date()))();
+  await claim(actor, s, kind, system.length + prompt.length, now());
+  const raw = await complete({ ...s, maxTokens: Math.min(AI_BOUNDS.maxOutputTokens.max, Math.max(s.maxTokens, options.maxTokens ?? 0)) }, system, prompt, options.image);
+  await recordUsage(s.metering, actor, kind, system.length + prompt.length, raw.length, now());
+  return raw;
+}
