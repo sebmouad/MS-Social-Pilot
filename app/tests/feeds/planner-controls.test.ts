@@ -13,7 +13,7 @@ const now = new Date('2026-11-16T06:00:00Z'); // Monday, 07:00 in Paris
 const pages = [{ id: 'pageA', name: 'Page A' }, { id: 'pageB', name: 'Page B' }];
 const recipes = Array.from({ length: 30 }, (_, i) => ({
   id: `r${i + 1}`, title: `Recipe ${i + 1}`, slug: `recipe-${i + 1}`, link: `https://site.example/recipe-${i + 1}`, publishedAt: new Date(now.getTime() - i * 3600_000),
-  caption: `Caption ${i + 1}`, imageId: `img${i + 1}`, recipe: JSON.stringify({ ingredients: ['flour'], steps: ['bake'] }),
+  caption: `A tasty caption for recipe number ${i + 1}`, imageId: `img${i + 1}`, recipe: JSON.stringify({ ingredients: ['flour'], steps: ['bake'] }),
 }));
 
 function settings(): WordpressSettings {
@@ -218,5 +218,14 @@ test('autopilot: every channel gets its own AI caption in its voice, and the com
 test('autopilot: when AI refuses, the recipe keeps its own caption', async () => {
   const h = harness([], { captions: async () => { throw new Error('hourly limit'); } });
   await planSource({ settings: settings(), ports: h.ports, db: h.db as never, budget: { left: 50 }, now }, source(), auth);
-  assert.ok(h.created.length > 0 && h.created.every(p => p.message.startsWith('Caption ')));
+  assert.ok(h.created.length > 0 && h.created.every(p => p.message.startsWith('A tasty caption')));
+});
+
+test('planner: a placeholder caption (« p3 ») is never posted', async () => {
+  const list = titled(['Muffins salés au jambon et au fromage', 'Quiche lorraine', 'Gratin dauphinois']).map((r, i) => i === 0 ? { ...r, caption: 'p3' } : r);
+  const h = harness([], { list });
+  await planSource({ settings: settings(), ports: h.ports, db: h.db as never, budget: { left: 50 }, now }, source(), auth);
+  assert.ok(h.created.length > 0);
+  assert.ok(h.created.every(p => p.message !== 'p3'));
+  assert.ok(!h.ledger.some(row => row.wpPostId === 't1'), 'without AI to write it, the recipe is skipped');
 });

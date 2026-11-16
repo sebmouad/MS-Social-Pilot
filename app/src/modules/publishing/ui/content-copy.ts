@@ -125,7 +125,7 @@ export const contentCopyDefaults = {
   contentFilterViews: m('Saved views', 'Vues enregistrées'),
   contentFilterClear: m('Clear filters', 'Effacer les filtres'),
   contentSearch: m('Search posts', 'Rechercher des publications'),
-  contentSearchPlaceholder: m('Search text or first comment', 'Rechercher dans le texte ou le premier commentaire'),
+  contentSearchPlaceholder: m('Search text or first comment', 'Texte ou premier commentaire'),
   contentSearchGo: m('Search', 'Rechercher'),
   contentCountOne: m('{count} post', '{count} publication'),
   contentCount: m('{count} posts', '{count} publications'),

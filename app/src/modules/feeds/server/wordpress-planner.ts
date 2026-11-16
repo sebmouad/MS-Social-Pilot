@@ -113,6 +113,9 @@ export async function scanCandidates(db: WpDb, settings: WordpressSettings, sour
   return { candidates, scanned, exhausted, rejected };
 }
 
+/** A caption people can read: at least 25 characters and 4 words (2026-11-16). */
+export const usableCaption = (text: string) => { const t = text.trim(); return t.length >= 25 && t.split(/\s+/).filter(word => /\p{L}/u.test(word)).length >= 4; };
+
 /** Turn WordPress rows into usable candidates, counting why the others are not (shared by scans and by reads of chosen posts). */
 async function toCandidates(db: WpDb, settings: WordpressSettings, source: Pick<SourceRow, 'siteUrl'>, config: PlanConfig, rows: WpCandidateRow[], writer: boolean, rejected: ScanRejections, seen: readonly Candidate[] = []): Promise<Candidate[]> {
   const files = await db.attachments(rows.map(r => r.imageId), config.mapping.attachedFileMetaKey);
@@ -125,13 +128,15 @@ async function toCandidates(db: WpDb, settings: WordpressSettings, source: Pick<
     const permalink = reportedPermalink(source.siteUrl, row.link) ?? buildPermalink(settings.permalinkTemplate, source.siteUrl, row.slug);
     const recipe = parseRecipe(row.recipe, row.title, settings.minutesSuffix);
     const text = writer && row.article ? row.article : '';
-    const write = { caption: Boolean(text) && !config.mapping.captionMetaKey, recipe: Boolean(text) && !recipe && !config.mapping.recipeMetaKey };
-    if (!row.caption && !write.caption) { rejected.caption++; if (row.captionFieldPresent === false) rejected.captionFieldMissing = (rejected.captionFieldMissing ?? 0) + 1; continue; }
+    // A caption too short to be one (« p3 », a placeholder) counts as missing (2026-11-16): AI writes it, or the post is skipped.
+    const caption = usableCaption(row.caption) ? row.caption : '';
+    const write = { caption: Boolean(text) && (!config.mapping.captionMetaKey || !caption), recipe: Boolean(text) && !recipe && !config.mapping.recipeMetaKey };
+    if (!caption && !write.caption) { rejected.caption++; if (row.captionFieldPresent === false) rejected.captionFieldMissing = (rejected.captionFieldMissing ?? 0) + 1; continue; }
     if (!imageUrl) { rejected.image++; continue; }
     if (!permalink) { rejected.link++; continue; }
     if (!recipe && !write.recipe) { rejected.recipe++; continue; }
     const title = (recipe?.title || row.title).slice(0, settings.titleMax);
-    out.push({ wpPostId: row.id, title, slug: row.slug, caption: row.caption, imageUrl, permalink, recipe: recipe ?? emptyRecipe(title), publishedAt: row.publishedAt,
+    out.push({ wpPostId: row.id, title, slug: row.slug, caption, imageUrl, permalink, recipe: recipe ?? emptyRecipe(title), publishedAt: row.publishedAt,
       ...(write.caption || write.recipe ? { write: { article: { title: row.title, excerpt: row.excerpt ?? '', text }, ...write } } : {}) });
   }
   return out;
