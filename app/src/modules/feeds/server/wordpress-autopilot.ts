@@ -12,6 +12,11 @@ export type AutopilotPorts = {
   saveConfig(source: SourceRow, config: Record<string, unknown>): Promise<void>;
   /** Planned recipe slots since `from` whose post failed to publish. */
   failedPublications(sourceId: string, from: Date): Promise<Array<{ id: string; targetId: string; slotAt: Date; wpPostId: string; title: string; skipped: string[] }>>;
+  /** Upcoming slots left uncertain by an interrupted run (claim expired, no post saved). */
+  stranded?(sourceId: string, from: Date): Promise<Array<{ id: string; workspaceId: string; targetId: string; slotAt: Date; claimedAt: Date; title: string; permalink: string | null }>>;
+  /** A post created for that slot around its claim: the recipe's link in the first comment or its title on the picture. */
+  createdFor?(slot: { workspaceId: string; targetId: string; claimedAt: Date; title: string; permalink: string | null }): Promise<string | null>;
+  settleStranded?(workspaceId: string, id: string, outcome: { postId: string } | { released: true }): Promise<boolean>;
 };
 
 export const prismaAutopilotPorts: AutopilotPorts = {
@@ -22,6 +27,25 @@ export const prismaAutopilotPorts: AutopilotPorts = {
   },
   async saveConfig(source, config) {
     await prisma.$executeRaw`UPDATE wordpress_recipe_sources SET config = ${JSON.stringify(config)}::jsonb, "updatedAt" = NOW() WHERE id = ${source.id} AND "workspaceId" = ${source.workspaceId}`;
+  },
+  async stranded(sourceId, from) {
+    return prisma.$queryRaw<Array<{ id: string; workspaceId: string; targetId: string; slotAt: Date; claimedAt: Date; title: string; permalink: string | null }>>`SELECT id, "workspaceId", "targetId", "slotAt", "claimedAt", title, permalink FROM wordpress_recipe_plans
+      WHERE "sourceId" = ${sourceId} AND state = 'uncertain' AND reason = 'claim_expired' AND "postId" IS NULL AND "slotAt" > ${from}`;
+  },
+  async createdFor(slot) {
+    // Posts on that channel created from just before the claim until an hour after it (a run never lasts longer).
+    const rows = await prisma.$queryRaw<Array<{ id: string }>>`SELECT p.id FROM posts p JOIN post_targets pt ON pt."postId" = p.id
+      WHERE p."workspaceId" = ${slot.workspaceId} AND pt."targetId" = ${slot.targetId}
+        AND p."createdAt" >= ${new Date(slot.claimedAt.getTime() - 60_000)} AND p."createdAt" <= ${new Date(slot.claimedAt.getTime() + 3_600_000)}
+        AND ((${slot.permalink}::text IS NOT NULL AND strpos(COALESCE(p."firstComment", ''), ${slot.permalink ?? ''}) > 0) OR p.media::text LIKE ${`%${slot.title.slice(0, 100).replace(/[%_\\]/g, '')}%`})
+      ORDER BY p."createdAt" ASC LIMIT 1`;
+    return rows[0]?.id ?? null;
+  },
+  async settleStranded(workspaceId, id, outcome) {
+    const changed = 'postId' in outcome
+      ? await prisma.$executeRaw`UPDATE wordpress_recipe_plans SET state = 'planned', "postId" = ${outcome.postId}, reason = 'reconciled', "updatedAt" = NOW() WHERE id = ${id} AND "workspaceId" = ${workspaceId} AND state = 'uncertain' AND "postId" IS NULL`
+      : await prisma.$executeRaw`UPDATE wordpress_recipe_plans SET state = 'failed', reason = 'not_created', "updatedAt" = NOW() WHERE id = ${id} AND "workspaceId" = ${workspaceId} AND state = 'uncertain' AND "postId" IS NULL`;
+    return changed === 1;
   },
   async failedPublications(sourceId, from) {
     const rows = await prisma.$queryRaw<Array<{ id: string; targetId: string; slotAt: Date; wpPostId: string; title: string | null; skipped: unknown }>>`SELECT l.id, l."targetId", l."slotAt", l."wpPostId", l.title, l.skipped
@@ -86,4 +110,22 @@ export async function logAutopilot(settings: WordpressSettings, source: SourceRo
   next.autopilot = { ...withLog(current, entries), ...(handled.length ? { radarHandled: [...handled, ...(current.radarHandled ?? [])].slice(0, 300) } : {}) };
   await ports.saveConfig(source, next);
   source.config = next as SourceRow['config'];
+}
+
+/**
+ * Self-healing for interrupted runs (2026-11-16): an upcoming slot left uncertain with no saved post is settled with proof.
+ * A post created for it around the claim (the recipe's link in its first comment, or its title on the picture) settles it
+ * as planned; when none exists the slot is released and planned again. Never a blind resend.
+ */
+export async function healStranded(sourceId: string, now: Date, ports: AutopilotPorts = prismaAutopilotPorts): Promise<{ reconciled: number; released: number; titles: string[] }> {
+  const out = { reconciled: 0, released: 0, titles: [] as string[] };
+  if (!ports.stranded || !ports.createdFor || !ports.settleStranded) return out;
+  for (const slot of await ports.stranded(sourceId, now)) {
+    // Only claims older than an hour: a run still in progress is never second-guessed.
+    if (now.getTime() - slot.claimedAt.getTime() < 3_600_000) continue;
+    const postId = await ports.createdFor(slot);
+    if (postId) { if (await ports.settleStranded(slot.workspaceId, slot.id, { postId })) out.reconciled++; }
+    else if (await ports.settleStranded(slot.workspaceId, slot.id, { released: true })) { out.released++; out.titles.push(slot.title); }
+  }
+  return out;
 }

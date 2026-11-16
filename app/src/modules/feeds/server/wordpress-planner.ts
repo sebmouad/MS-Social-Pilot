@@ -561,6 +561,9 @@ export async function runRecipePlanning(overrides: Partial<PlannerPorts> & { aut
       try {
         await autopilot.learnBestTimes(settings, source, await ports.store.pages(source, settings.targetTypes, settings.maxTargets), now, overrides.autopilot);
         if (pilot.healing.replaceFailed) {
+          // Interrupted runs: settle their upcoming slots with proof, so the channel is planned again (2026-11-16).
+          const healed = await autopilot.healStranded(source.id, now, overrides.autopilot).catch(() => ({ reconciled: 0, released: 0, titles: [] as string[] }));
+          for (const title of healed.titles) entries.push({ at: now.toISOString(), kind: 'healing', text: `« ${title.slice(0, 120)} » was left unsure by an interrupted run and never created; its time is planned again.` });
           const failed = await (overrides.autopilot ?? autopilot.prismaAutopilotPorts).failedPublications(source.id, new Date(now.getTime() - 6 * 3_600_000));
           const at = new Date(now.getTime() + (settings.minLeadMinutes + 2) * 60_000);
           for (const row of failed) {

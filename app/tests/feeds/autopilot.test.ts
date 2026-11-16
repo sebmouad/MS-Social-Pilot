@@ -86,3 +86,19 @@ test('settings: one bad field never discards the rest of the saved configuration
   assert.deepEqual(pilot.learnedTimes, { a: ['11:05'] });
   assert.equal(pilot.hourValues, undefined);
 });
+
+test('self-healing: an interrupted run’s slot is reconciled when its post exists, released when it provably does not, left alone while young', async () => {
+  const { healStranded } = await import('@/modules/feeds/server/wordpress-autopilot');
+  const now = new Date('2026-11-16T12:00:00Z');
+  const slot = (id: string, claimedMinutesAgo: number) => ({ id, workspaceId: 'w', targetId: 't', slotAt: new Date('2026-11-16T14:00:00Z'), claimedAt: new Date(now.getTime() - claimedMinutesAgo * 60_000), title: `Recipe ${id}`, permalink: `https://site.example/${id}` });
+  const settled: Array<[string, unknown]> = [];
+  const ports = {
+    async observations() { return []; }, async saveConfig() {}, async failedPublications() { return []; },
+    async stranded() { return [slot('found', 180), slot('absent', 180), slot('young', 10)]; },
+    async createdFor(s: { permalink: string | null }) { return s.permalink?.endsWith('found') ? 'post1' : null; },
+    async settleStranded(_w: string, id: string, outcome: unknown) { settled.push([id, outcome]); return true; },
+  };
+  const out = await healStranded('src', now, ports);
+  assert.deepEqual(settled, [['found', { postId: 'post1' }], ['absent', { released: true }]]);
+  assert.equal(out.reconciled, 1); assert.equal(out.released, 1); assert.deepEqual(out.titles, ['Recipe absent']);
+});
