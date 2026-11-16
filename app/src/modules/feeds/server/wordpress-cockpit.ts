@@ -49,9 +49,9 @@ async function context(actor: FeedActor, write = false) {
   return { auth, settings, source, pages, config: configOf(settings, source) };
 }
 
-type PlanRow = { id: string; targetId: string; slotAt: Date; title: string; score: number | null; kind: string | null; postId: string | null; state: string; reason: string | null; message: string | null; media: unknown };
+type PlanRow = { id: string; targetId: string; slotAt: Date; scheduledAt: Date | null; title: string; score: number | null; kind: string | null; postId: string | null; state: string; reason: string | null; message: string | null; media: unknown };
 async function plansBetween(sourceId: string, from: Date, to: Date): Promise<PlanRow[]> {
-  return prisma.$queryRaw<PlanRow[]>`SELECT l.id, l."targetId", l."slotAt", l.title, l.score, l.kind, l."postId", l.state, l.reason, p.message, p.media FROM wordpress_recipe_plans l
+  return prisma.$queryRaw<PlanRow[]>`SELECT l.id, l."targetId", l."slotAt", p."scheduledAt", l.title, l.score, l.kind, l."postId", l.state, l.reason, p.message, p.media FROM wordpress_recipe_plans l
     LEFT JOIN posts p ON p.id = l."postId" AND p."workspaceId" = l."workspaceId"
     WHERE l."sourceId" = ${sourceId} AND l."slotAt" >= ${from} AND l."slotAt" < ${to} ORDER BY l."slotAt" ASC, l."targetId" ASC`;
 }
@@ -65,7 +65,7 @@ export async function readCockpit(actor: FeedActor, now = new Date()): Promise<C
   const dayStart = (date: string) => { const at = wallTimeToInstant(date, '00:00', tz); return at.ok ? at.instant : new Date(`${date}T00:00:00Z`); };
   const names = new Map(pages.map(page => [page.id, page.name]));
   const view = (row: PlanRow): CockpitPost => ({
-    planId: row.id, targetId: row.targetId, targetName: names.get(row.targetId) ?? '', slotAt: row.slotAt.toISOString(), time: instantToWall(row.slotAt, tz).time,
+    planId: row.id, targetId: row.targetId, targetName: names.get(row.targetId) ?? '', slotAt: (row.scheduledAt ?? row.slotAt).toISOString(), time: instantToWall(row.scheduledAt ?? row.slotAt, tz).time,
     title: row.title, score: row.score, kind: row.kind, postId: row.postId, caption: (row.message ?? '').slice(0, 280), image: thumb(row.media),
     flagged: row.state === 'planned' && typeof row.score === 'number' && row.score < 45, state: row.state, reason: row.reason,
   });
@@ -79,10 +79,10 @@ export async function readCockpit(actor: FeedActor, now = new Date()): Promise<C
     const own = config.channels?.[page.id];
     const next = upcoming.find(row => row.targetId === page.id && row.state === 'planned');
     const mine = todayRows.filter(row => row.targetId === page.id);
-    return { id: page.id, name: page.name, paused: own?.paused === true, pausedReason: own?.pausedReason ?? null, autoTimes: own?.autoTimes === true, times: channelConfig(config, page.id).slots,
+    return { id: page.id, name: page.name, paused: own?.paused === true, pausedReason: own?.pausedReason ?? null, autoTimes: own?.autoTimes === true || (!own?.slots?.length && Boolean(pilot.learnedTimes?.[page.id])), times: channelConfig(config, page.id).slots,
       next: next ? view(next) : null, reachToday: mine.reduce((sum, row) => sum + reachOf(row.insights), 0), postsToday: mine.length, failedWeek: Number(failed.find(row => row.targetId === page.id)?.count ?? 0) };
   });
-  const boardPosts = board.filter(row => names.has(row.targetId) && (row.state === 'planned' || row.reason === 'left_empty')).map(view);
+  const boardPosts = board.filter(row => names.has(row.targetId) && (row.state === 'planned' || row.reason === 'left_empty')).map(view).sort((a, b) => a.slotAt.localeCompare(b.slotAt) || a.targetName.localeCompare(b.targetName));
   const scores = boardPosts.flatMap(post => typeof post.score === 'number' && post.state === 'planned' ? [post.score] : []);
   return {
     enabled: source.enabled, sourceName: source.name, timeZone: tz, pilot, canWrite: auth.role === 'owner' || auth.role === 'admin' || auth.role === 'editor',

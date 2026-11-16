@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Button } from '@/components/Button';
 import { Dialog } from '@/components/Dialog';
 import { channelConfig, type ChannelSettings as Own, type PlanConfig } from '../wordpress/recipe';
+import { autopilotOf } from '../wordpress/autopilot';
 import type { RecipeCopyKey } from '../copy-recipes';
 import type { RecipeConfig } from './RecipeSource';
 import styles from './feeds.module.css';
@@ -60,7 +61,7 @@ export function ChannelSettings({ pages, config, onChange, busy, maxTemplate, t,
         const summary = paused ? t('perChannelPaused') : [r.slots.join(' · '), daysText(r.weekdays), r.order === 'oldest' ? t('orderOldest') : t('orderNewest')].filter(Boolean).join(' · ');
         return <li key={page.id} className={styles.channelRow}>
           <div><strong>{page.name}</strong><span className={styles.meta}>{summary}</span></div>
-          <span className={styles.channelBadge} data-own={mine ? 'true' : undefined} data-paused={paused ? 'true' : undefined}>{paused ? t('perChannelPaused') : channels[page.id]?.autoTimes ? t('autoTimesBadge') : mine ? t('perChannelOwn') : t('perChannelShared')}</span>
+          <span className={styles.channelBadge} data-own={mine ? 'true' : undefined} data-paused={paused ? 'true' : undefined}>{paused ? t('perChannelPaused') : (channels[page.id]?.autoTimes || (!channels[page.id]?.slots?.length && autopilotOf(config.autopilot).learnedTimes?.[page.id])) ? t('autoTimesBadge') : mine ? t('perChannelOwn') : t('perChannelShared')}</span>
           <Button size="sm" type="button" variant="secondary" disabled={busy} onClick={() => open(page)}>{t('perChannelEdit')}</Button>
         </li>;
       })}</ul> : <span className={styles.help}>{t('noChannels')}</span>}

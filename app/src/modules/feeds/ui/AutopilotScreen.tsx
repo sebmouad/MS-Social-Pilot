@@ -68,7 +68,7 @@ export default async function AutopilotScreen() {
         <div className={styles.metrics}>
           <MetricCard module="publishing" label={t('published')} value={number(report.published)} />
           <MetricCard module="publishing" label={t('reached')} value={number(report.reach)} {...(change !== null ? { delta: { label: `${change >= 0 ? '+' : ''}${change.toFixed(1)}%`, direction: change > 0.5 ? 'up' as const : change < -0.5 ? 'down' as const : 'flat' as const, comparedTo: t('vsPrevious') } } : {})} />
-          <MetricCard module="publishing" label={t('bestRecipe')} value={report.best ? report.best.title : t('none')} hint={report.best ? `${report.best.channel} · ${number(report.best.reach)}` : undefined} />
+          <MetricCard module="publishing" label={t('bestRecipe')} value={report.best ? number(report.best.reach) : t('none')} hint={report.best ? `${report.best.title} · ${report.best.channel}` : undefined} />
           <MetricCard module="publishing" label={t('bestHour')} value={report.bestHour !== null ? `${String(report.bestHour).padStart(2, '0')}:00` : t('none')} />
         </div>
         <div className={styles.tableWrap}><table className={styles.table}><caption>{t('perChannel')}</caption>

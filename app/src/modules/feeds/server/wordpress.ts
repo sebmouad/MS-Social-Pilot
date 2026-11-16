@@ -149,7 +149,7 @@ export async function saveRecipeSource(actor: FeedActor, input: unknown, deps: R
     // What the autopilot learned and logged is written by the planner, never by a settings form (2026-11-16).
     const stored = existing?.config && typeof existing.config === 'object' ? (existing.config as { autopilot?: Record<string, unknown> }).autopilot : undefined;
     const mine = (config as { autopilot?: Record<string, unknown> }).autopilot;
-    if (stored && mine) for (const key of ['log', 'lastLearnedAt', 'learnVersion', 'hourValues', 'radarHandled', 'approvedDays']) { if (stored[key] !== undefined) mine[key] = stored[key]; else delete mine[key]; }
+    if (stored && mine) for (const key of ['log', 'lastLearnedAt', 'learnVersion', 'hourValues', 'learnedTimes', 'radarHandled', 'approvedDays']) { if (stored[key] !== undefined) mine[key] = stored[key]; else delete mine[key]; }
     const enabled = data.enabled ?? existing?.enabled ?? false;
     const id = existing?.id ?? `wrs_${randomUUID()}`;
     if (existing) {

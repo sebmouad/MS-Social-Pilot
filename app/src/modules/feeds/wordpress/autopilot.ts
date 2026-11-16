@@ -27,6 +27,8 @@ export type AutopilotSettings = {
   approvedDays?: string[];
   /** Each channel's hours as last learned (hour → value, 1 = usual): best recipes go to the strongest. */
   hourValues?: Record<string, Record<string, number>>;
+  /** Times the autopilot learned per channel (planner-owned; a settings form never overwrites them). */
+  learnedTimes?: Record<string, string[]>;
   /** Recipe slots the radar already acted on. */
   radarHandled?: string[];
   lastLearnedAt?: string;
@@ -56,7 +58,7 @@ export const AUTOPILOT_LOG_MAX = 60;
 /** Times are relearned at most this often. */
 export const LEARN_EVERY_DAYS = 7;
 /** Raised when the learning method improves: times chosen by an older method are relearned at the next run. */
-export const LEARN_VERSION = 3;
+export const LEARN_VERSION = 4;
 
 const logEntry = z.object({
   at: z.string().max(40), kind: z.enum(['times', 'healing', 'supply', 'radar']), channelId: z.string().max(100).optional(), channelName: z.string().max(200).optional(),
@@ -75,6 +77,7 @@ export const autopilotSchema = z.object({
   evergreen: z.object({ enabled: z.boolean(), cooldownDays: z.number().int().min(7).max(730), share: z.number().int().min(0).max(50) }).strict().optional(),
   radar: z.object({ enabled: z.boolean(), factor: z.number().min(1.5).max(20), pages: z.number().int().min(1).max(50), mode: z.enum(['auto', 'approve']), boost: z.boolean() }).strict().optional(),
   breathe: z.object({ enabled: z.boolean(), factor: z.number().min(1.5).max(20), maxDelayMinutes: z.number().int().min(10).max(240) }).strict().optional(),
+  learnedTimes: z.record(z.string().max(100), z.array(z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/)).min(1).max(24)).optional(),
   radarHandled: z.array(z.string().max(100)).max(300).optional(),
   captions: z.object({ enabled: z.boolean(), voice: z.enum(['per-page', 'warm', 'short', 'chef']), question: z.boolean(), emoji: z.enum(['none', 'few', 'more']) }).strict().optional(),
   hooks: z.object({ enabled: z.boolean(), share: z.number().int().min(0).max(50) }).strict().optional(),

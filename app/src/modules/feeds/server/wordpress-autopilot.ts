@@ -51,6 +51,7 @@ export async function learnBestTimes(settings: WordpressSettings, source: Source
   if (autopilot.lastLearnedAt && autopilot.learnVersion === LEARN_VERSION && now.getTime() - Date.parse(autopilot.lastLearnedAt) < LEARN_EVERY_DAYS * 86_400_000) return 0;
   const rows = await ports.observations(pages.map(page => page.id), new Date(now.getTime() - best.learnDays * 86_400_000));
   const channels: Record<string, ChannelSettings> = { ...(config.channels ?? {}) };
+  const learnedTimes: Record<string, string[]> = { ...(autopilot.learnedTimes ?? {}) };
   const entries: AutopilotLogEntry[] = [];
   const scored = (targetId: string): Observation[] => rows.filter(row => row.targetId === targetId).flatMap(row => { const score = postScore(row.insights); return score === null ? [] : [{ at: new Date(row.at), score }]; });
   // What every channel saw at each hour, each relative to its own usual: evidence for hours a channel never tried.
@@ -64,12 +65,14 @@ export async function learnBestTimes(settings: WordpressSettings, source: Source
     const current = channelConfig(config, page.id).slots;
     const learned = learnTimes({ observations: scored(page.id), current, timeZone: config.timezone, window: best.window, gapMinutes: best.gapMinutes, channelIndex: index, pooled });
     if (JSON.stringify(learned) === JSON.stringify(current)) continue;
-    channels[page.id] = { ...own, slots: learned, autoTimes: true };
+    learnedTimes[page.id] = learned;
+    // Times learned earlier were kept on the channel itself; they move to the autopilot's own record.
+    if (own?.autoTimes) { const { slots: _slots, autoTimes: _auto, ...rest } = own; channels[page.id] = rest; }
     entries.push({ at: now.toISOString(), kind: 'times', channelId: page.id, channelName: page.name.slice(0, 200), from: current, to: learned });
   }
   const next = rawConfig(source);
   next.channels = channels;
-  next.autopilot = { ...withLog(autopilot, entries), hourValues, lastLearnedAt: now.toISOString(), learnVersion: LEARN_VERSION };
+  next.autopilot = { ...withLog(autopilot, entries), hourValues, learnedTimes, lastLearnedAt: now.toISOString(), learnVersion: LEARN_VERSION };
   await ports.saveConfig(source, next);
   source.config = next as SourceRow['config'];
   return entries.length;

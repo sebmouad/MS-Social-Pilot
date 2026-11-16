@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { addDaysToKey, instantToWall, wallTimeToInstant } from '@/lib/calendar-dates';
 import { META_KEY, SLOT_TIME, SLOTS_MAX } from './config';
 import { decodeWordpressText } from './text';
-import { autopilotSchema } from './autopilot';
+import { autopilotOf, autopilotSchema } from './autopilot';
 
 /** Pure logic of the WordPress recipe source: field mapping, recipe parsing, comment rendering, slots and allocation. */
 export type Mapping = { captionMetaKey: string; imageMetaKey: string; recipeMetaKey: string; skipMetaKey: string; attachedFileMetaKey: string; postType: string; postStatus: string };
@@ -29,7 +29,10 @@ export type ChannelSettings = { slots?: string[]; weekdays?: number[]; order?: '
 /** The settings one channel posts with: its own where it has them, the shared ones otherwise. */
 export function channelConfig(config: PlanConfig, channelId: string): PlanConfig & { paused: boolean } {
   const own = config.channels?.[channelId] ?? {};
-  const slots = own.slots?.length ? own.slots : config.channelSlots?.[channelId]?.length ? config.channelSlots[channelId]! : config.slots;
+  // A member's own times win; then times the autopilot learned (while best times are on); then the shared times.
+  const pilot = autopilotOf(config.autopilot);
+  const learned = pilot.bestTimes.enabled ? pilot.learnedTimes?.[channelId] : undefined;
+  const slots = own.slots?.length ? own.slots : config.channelSlots?.[channelId]?.length ? config.channelSlots[channelId]! : learned?.length ? learned : config.slots;
   return {
     ...config, slots: normalizeSlots(slots), order: own.order ?? config.order,
     firstCommentTemplate: own.firstCommentTemplate ?? config.firstCommentTemplate, firstCommentDelayMinutes: own.firstCommentDelayMinutes ?? config.firstCommentDelayMinutes,

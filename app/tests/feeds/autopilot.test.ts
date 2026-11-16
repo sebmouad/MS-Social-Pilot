@@ -59,3 +59,13 @@ test('autopilot settings: the approved choices are the defaults, and bad stored 
   assert.equal(AUTOPILOT_DEFAULTS.bestTimes.apply, 'auto');
   assert.equal(AUTOPILOT_DEFAULTS.bestTimes.gapMinutes, 60);
 });
+
+test('learned times: a channel posts at its learned times, its own times win, and switching best times off returns the shared ones', async () => {
+  const { channelConfig } = await import('@/modules/feeds/wordpress/recipe');
+  const base = { slots: ['11:00', '17:00'], autopilot: { ...AUTOPILOT_DEFAULTS, learnedTimes: { a: ['12:05', '18:05'] } } } as unknown as Parameters<typeof channelConfig>[0];
+  assert.deepEqual(channelConfig(base, 'a').slots, ['12:05', '18:05']);
+  assert.deepEqual(channelConfig(base, 'b').slots, ['11:00', '17:00']);
+  assert.deepEqual(channelConfig({ ...base, channels: { a: { slots: ['09:00'] } } } as typeof base, 'a').slots, ['09:00']);
+  const off = { ...base, autopilot: { ...AUTOPILOT_DEFAULTS, bestTimes: { ...AUTOPILOT_DEFAULTS.bestTimes, enabled: false }, learnedTimes: { a: ['12:05'] } } } as typeof base;
+  assert.deepEqual(channelConfig(off, 'a').slots, ['11:00', '17:00']);
+});
