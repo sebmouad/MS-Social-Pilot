@@ -121,6 +121,24 @@ export function createTransactionalMailService(deps: MailDependencies = dependen
   };
 }
 
+/**
+ * Root test (2026-11-16): send one message to `to` and report what the mail service answered, with its error when it
+ * refused, so an installation owner can check the mail settings. Not recorded as a workspace email.
+ */
+export async function sendTestMail(to: string, deps: MailDependencies = dependencies): Promise<{ status: 'sent' | 'unavailable' | 'failed'; detail?: string }> {
+  const config = await loadMailConfig(deps.readConfig, deps.readSecret);
+  if (!config?.enabled || !config.fromAddress || !(config.provider === 'api' ? config.apiEndpoint && config.apiKey : config.smtpHost)) return { status: 'unavailable', detail: 'Email is not enabled or its sender and server are not set.' };
+  let transport: MailTransport;
+  try { transport = deps.createTransport(config); } catch (error) { return { status: 'failed', detail: String((error as Error)?.message ?? error).slice(0, 300) }; }
+  try {
+    const info = await transport.sendMail({ from: { name: config.fromName, address: config.fromAddress }, to, subject: 'MS Social Pilot: test email',
+      text: `This is a test email from MS Social Pilot (${config.publicOrigin || 'this installation'}). If you can read it, notification emails work.\n\nCeci est un e-mail de test de MS Social Pilot. Si vous le lisez, les e-mails de notification fonctionnent.` });
+    const accepted = Array.isArray(info.accepted) && info.accepted.some((address: unknown) => String(address).toLowerCase() === to.toLowerCase());
+    return accepted ? { status: 'sent', detail: typeof info.response === 'string' ? info.response.slice(0, 300) : undefined } : { status: 'failed', detail: `Not accepted: ${String(info.response ?? '').slice(0, 300)}` };
+  } catch (error) { return { status: 'failed', detail: String((error as Error)?.message ?? error).slice(0, 300) }; }
+  finally { try { transport.close(); } catch { /* best effort */ } }
+}
+
 const service = createTransactionalMailService();
 export const mailReady = service.mailReady;
 export const publicMailOrigin = service.publicMailOrigin;
