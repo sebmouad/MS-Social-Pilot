@@ -397,6 +397,10 @@ export async function planSource(ctx: Ctx, source: SourceRow, auth: FeedAuthoriz
       ? forcedIds.every(id => found.some(c => c.wpPostId === id))
       : !settings.reuse.enabled && usable(found).length >= pool && allocateRecipes({ needs: autoTodo, candidates: usable(found), blocked: view.blocked, taken, reused: view.reused, distinct: config.distinctAcrossPages }).unfilled === 0, writer);
     scan.candidates = usable(scan.candidates);
+    // A chosen recipe beyond the scan (an older hit the radar spreads, an older recipe a member picks) is read by its id,
+    // so the slot whose post was cancelled for it never stays empty (2026-11-16).
+    const unread = forcedIds.filter(id => !scan.candidates.some(c => c.wpPostId === id));
+    if (unread.length) scan.candidates = [...scan.candidates, ...usable(await readCandidates(ctx.db, settings, source, groupConfig, unread, now, writer).catch(() => []))];
     if (prep) scan.candidates = [...scan.candidates, ...prep.winners.filter(w => !scan.candidates.some(c => c.wpPostId === w.wpPostId))];
     const picker = prep ? await prep.picker(scan.candidates) : null;
     out.scanned += scan.scanned; out.candidates += scan.candidates.length;
@@ -598,8 +602,13 @@ export async function runRecipePlanning(overrides: Partial<PlannerPorts> & { aut
           });
           const channels = await ports.store.pages(source, settings.targetTypes, settings.maxTargets);
           const radarView = await supplyLedgerView(settings, ports, source, now);
+          // A hit may go back to a channel that had it longer ago than the winners' cooldown (2026-11-16): after weeks
+          // of planning every channel had nearly every recipe, so « ever posted » blocked every spread.
+          const radarPilot = autopilotOf(configOf(settings, source).autopilot);
+          const recentOn = (targetId: string, wpPostId: string) => [...radarView.byKey.values()].some(row => row.targetId === targetId && row.wpPostId === wpPostId && row.state !== 'failed'
+            && row.slotAt.getTime() > now.getTime() - radarPilot.evergreen.cooldownDays * 86_400_000);
           const radar = await runRadar({ timeZone: configOf(settings, source).timezone, pilot: autopilotOf(configOf(settings, source).autopilot), sourceId: source.id, workspaceId: source.workspaceId, actor: auth.actor, now, handled: new Set(pilot.radarHandled ?? []),
-            names: new Map(channels.map(page => [page.id, page.name])), blocked: (targetId, wpPostId) => radarView.blocked.get(targetId)?.has(wpPostId) ?? false }, radarPorts);
+            names: new Map(channels.map(page => [page.id, page.name])), blocked: recentOn }, radarPorts);
           entries.push(...radar.entries); handled = radar.handled;
         } catch { /* the radar never stops planning */ }
       }

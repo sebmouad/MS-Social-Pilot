@@ -261,3 +261,15 @@ test('planner: « Another recipe » on a slot from older times is planned at tha
   assert.equal(out.planned, 1);
   assert.ok(h.created.some(p => p.targetId === 'pageA' && p.scheduledAt.getTime() === slot.slotAt.getTime()));
 });
+
+test('planner: a chosen recipe beyond the scan is read by its id, so its slot is never left empty', async () => {
+  const first = harness();
+  await planSource({ settings: settings(), ports: first.ports, db: first.db as never, budget: { left: 50 }, now }, source(), auth);
+  const slot = first.ledger.find(row => row.targetId === 'pageA')!;
+  const h = harness([...first.ledger.filter(row => row.id !== slot.id), { ...slot, state: 'failed', postId: null, reason: 'replaced' }]);
+  const s2 = settings(); s2.candidateMaxScan = 5; s2.candidateBatchSize = 5; // the scan stops well before recipe 30
+  const key = slotKey(slot.targetId, slot.slotAt);
+  const out = await planSource({ settings: s2, ports: h.ports, db: h.db as never, budget: { left: 50 }, now, retry: new Set([key]), force: new Map([[key, 'r30']]) }, source(), auth);
+  assert.equal(out.planned, 1);
+  assert.equal(h.ledger.find(r => r.targetId === slot.targetId && r.slotAt.getTime() === slot.slotAt.getTime())?.wpPostId, 'r30');
+});
