@@ -10,6 +10,7 @@ import { feedsLocale } from '../copy';
 import { autopilotCopy, autopilotText, type AutopilotCopyKey } from '../copy-autopilot';
 import { readCockpit, approveDayConfirmation } from '../server/wordpress-cockpit';
 import { AutopilotBoard } from './AutopilotBoard';
+import { logSentence } from '../autopilot-log';
 import styles from './autopilot.module.css';
 
 /** Autopilot cockpit (2026-11-16): channels, tomorrow's plan to approve, and the weekly report. */
@@ -79,7 +80,7 @@ export default async function AutopilotScreen() {
         <div className={styles.columns}>
           <div><h3>{t('learnedHeading')}</h3>
             {report.learned.length ? <ul className={styles.log}>{report.learned.map((entry, index) => <li key={`${entry.at}-${index}`}><time dateTime={entry.at}>{new Intl.DateTimeFormat(locale, { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', timeZone: view.timeZone }).format(new Date(entry.at))}</time>
-              <span>{entry.kind === 'times' ? t('timesChanged', { channel: entry.channelName ?? '', from: (entry.from ?? []).join(' · '), to: (entry.to ?? []).join(' · ') }) : `${entry.channelName ? `${entry.channelName} — ` : ''}${entry.text ?? ''}`}</span></li>)}</ul>
+              <span>{entry.kind === 'times' ? t('timesChanged', { channel: entry.channelName ?? '', from: (entry.from ?? []).join(' · '), to: (entry.to ?? []).join(' · ') }) : `${entry.channelName ? `${entry.channelName} — ` : ''}${logSentence(entry, locale)}`}</span></li>)}</ul>
               : <p className={styles.muted}>{t('learnedEmpty')}</p>}
           </div>
           <div><h3>{t('stylesHeading')}</h3>

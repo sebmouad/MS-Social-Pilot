@@ -4,7 +4,9 @@ import { z } from 'zod';
  * Recipe autopilot (2026-11-16, docs/autopilot-plan.md): settings and the pure learning logic.
  * Best times: each channel's posting times move to the hours its own audience responds to most.
  */
-export type AutopilotLogEntry = { at: string; kind: 'times' | 'healing' | 'supply' | 'radar'; channelId?: string; channelName?: string; from?: string[]; to?: string[]; text?: string };
+export type AutopilotLogEntry = { at: string; kind: 'times' | 'healing' | 'supply' | 'radar'; channelId?: string; channelName?: string; from?: string[]; to?: string[]; text?: string;
+  /** What happened, as a code with its values, written in the page language when shown (2026-11-16). */
+  code?: string; params?: Record<string, string | number> };
 export type AutopilotSettings = {
   bestTimes: { enabled: boolean; apply: 'auto' | 'approve'; gapMinutes: number; window: [number, number]; learnDays: number };
   healing: { replaceFailed: boolean; pauseBroken: boolean; warnDays: number };
@@ -63,6 +65,7 @@ export const LEARN_VERSION = 4;
 const logEntry = z.object({
   at: z.string().max(40), kind: z.enum(['times', 'healing', 'supply', 'radar']), channelId: z.string().max(100).optional(), channelName: z.string().max(200).optional(),
   from: z.array(z.string().max(5)).max(24).optional(), to: z.array(z.string().max(5)).max(24).optional(), text: z.string().max(500).optional(),
+  code: z.string().max(40).optional(), params: z.record(z.string().max(40), z.union([z.string().max(500), z.number()])).optional(),
 }).strict();
 export const autopilotSchema = z.object({
   bestTimes: z.object({

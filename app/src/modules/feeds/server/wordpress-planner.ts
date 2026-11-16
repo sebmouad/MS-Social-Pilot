@@ -570,20 +570,20 @@ export async function runRecipePlanning(overrides: Partial<PlannerPorts> & { aut
         if (pilot.healing.replaceFailed) {
           // Interrupted runs: settle their upcoming slots with proof, so the channel is planned again (2026-11-16).
           const healed = await autopilot.healStranded(source.id, now, overrides.autopilot).catch(() => ({ reconciled: 0, released: 0, titles: [] as string[] }));
-          for (const title of healed.titles) entries.push({ at: now.toISOString(), kind: 'healing', text: `« ${title.slice(0, 120)} » was left unsure by an interrupted run and never created; its time is planned again.` });
+          for (const title of healed.titles) entries.push({ at: now.toISOString(), kind: 'healing', text: `« ${title.slice(0, 120)} » was left unsure by an interrupted run and never created; its time is planned again.`, code: 'stranded', params: { title: title.slice(0, 120) } });
           const failed = await (overrides.autopilot ?? autopilot.prismaAutopilotPorts).failedPublications(source.id, new Date(now.getTime() - 6 * 3_600_000));
           const at = new Date(now.getTime() + (settings.minLeadMinutes + 2) * 60_000);
           for (const row of failed) {
             await ports.store.settle(source.workspaceId, row.id, { state: 'failed', reason: 'publish_failed', skipped: [...row.skipped, row.wpPostId] });
             (makeup ??= new Map()).set(slotKey(row.targetId, row.slotAt), at);
-            entries.push({ at: now.toISOString(), kind: 'healing', channelId: row.targetId, text: `« ${row.title.slice(0, 120)} » failed to publish; another recipe replaces it.` });
+            entries.push({ at: now.toISOString(), kind: 'healing', channelId: row.targetId, text: `« ${row.title.slice(0, 120)} » failed to publish; another recipe replaces it.`, code: 'publishFailed', params: { title: row.title.slice(0, 120) } });
           }
         }
       } catch { /* the autopilot never stops planning */ }
       const outcome = await planSource({ settings, ports, db, budget, now, ...(makeup ? { makeup } : {}) }, source, auth);
       if (pilot.healing.pauseBroken) for (const name of outcome.excludedNames ?? []) {
         const recent = (pilot.log ?? []).some(entry => entry.kind === 'healing' && entry.channelName === name && now.getTime() - Date.parse(entry.at) < 86_400_000);
-        if (!recent) entries.push({ at: now.toISOString(), kind: 'healing', channelName: name.slice(0, 200), text: 'This channel cannot publish right now (its connection or permissions). Its recipes are on hold; the other channels carry on.' });
+        if (!recent) entries.push({ at: now.toISOString(), kind: 'healing', channelName: name.slice(0, 200), text: 'This channel cannot publish right now (its connection or permissions). Its recipes are on hold; the other channels carry on.', code: 'channelHeld' });
       }
       // Viral radar and breathing room for hot posts (2026-11-16).
       let handled: string[] = [];
@@ -598,7 +598,7 @@ export async function runRecipePlanning(overrides: Partial<PlannerPorts> & { aut
           });
           const channels = await ports.store.pages(source, settings.targetTypes, settings.maxTargets);
           const radarView = await supplyLedgerView(settings, ports, source, now);
-          const radar = await runRadar({ pilot: autopilotOf(configOf(settings, source).autopilot), sourceId: source.id, workspaceId: source.workspaceId, actor: auth.actor, now, handled: new Set(pilot.radarHandled ?? []),
+          const radar = await runRadar({ timeZone: configOf(settings, source).timezone, pilot: autopilotOf(configOf(settings, source).autopilot), sourceId: source.id, workspaceId: source.workspaceId, actor: auth.actor, now, handled: new Set(pilot.radarHandled ?? []),
             names: new Map(channels.map(page => [page.id, page.name])), blocked: (targetId, wpPostId) => radarView.blocked.get(targetId)?.has(wpPostId) ?? false }, radarPorts);
           entries.push(...radar.entries); handled = radar.handled;
         } catch { /* the radar never stops planning */ }

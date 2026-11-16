@@ -4,13 +4,14 @@ import { instantToWall } from '@/lib/calendar-dates';
 import { autopilotOf, type AutopilotSettings } from '../wordpress/autopilot';
 import type { RecipeCopyKey } from '../copy-recipes';
 import styles from './feeds.module.css';
+import { logSentence } from '../autopilot-log';
 
 /**
  * Autopilot (2026-11-16): what it may do on its own, and everything it did. Changes are saved with the recipe
  * settings; the activity log is written by the planner only.
  */
-export function AutopilotPanel({ value, timeZone, pages, busy, onChange, t }: {
-  value: unknown; timeZone: string; pages: Array<{ id: string; name: string }>; busy: boolean;
+export function AutopilotPanel({ value, timeZone, pages, busy, onChange, t, locale = 'en' }: {
+  locale?: 'en' | 'fr'; value: unknown; timeZone: string; pages: Array<{ id: string; name: string }>; busy: boolean;
   onChange: (next: AutopilotSettings) => void; t: (key: RecipeCopyKey, values?: Record<string, string | number>) => string;
 }) {
   const pilot = autopilotOf(value);
@@ -109,7 +110,7 @@ export function AutopilotPanel({ value, timeZone, pages, busy, onChange, t }: {
           <time dateTime={entry.at}>{when(entry.at)}</time>
           <span>{entry.kind === 'times'
             ? t('autopilotTimesChanged', { channel: channel(entry.channelId, entry.channelName), from: (entry.from ?? []).join(' · '), to: (entry.to ?? []).join(' · ') })
-            : `${channel(entry.channelId, entry.channelName)} — ${entry.text ?? ''}`}</span>
+            : `${channel(entry.channelId, entry.channelName)} — ${logSentence(entry, locale)}`}</span>
         </li>)}</ul> : <span className={styles.help}>{pilot.lastLearnedAt ? t('autopilotNoChange', { when: when(pilot.lastLearnedAt) }) : t('autopilotNothingYet')}</span>}
       </div>
     </div>

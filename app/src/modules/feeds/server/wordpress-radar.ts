@@ -55,7 +55,7 @@ export function breatheTime(next: Date, following: Date | null, delayMinutes: nu
 
 export type RadarOutcome = { entries: AutopilotLogEntry[]; handled: string[] };
 
-export async function runRadar(input: { pilot: AutopilotSettings; sourceId: string; workspaceId: string; actor: FeedActor; now: Date; handled: ReadonlySet<string>; names: ReadonlyMap<string, string>; blocked: (targetId: string, wpPostId: string) => boolean }, ports: RadarPorts): Promise<RadarOutcome> {
+export async function runRadar(input: { timeZone?: string; pilot: AutopilotSettings; sourceId: string; workspaceId: string; actor: FeedActor; now: Date; handled: ReadonlySet<string>; names: ReadonlyMap<string, string>; blocked: (targetId: string, wpPostId: string) => boolean }, ports: RadarPorts): Promise<RadarOutcome> {
   const { pilot, now } = input;
   const out: RadarOutcome = { entries: [], handled: [] };
   if (!pilot.radar.enabled && !pilot.breathe.enabled) return out;
@@ -73,13 +73,13 @@ export async function runRadar(input: { pilot: AutopilotSettings; sourceId: stri
     out.handled.push(post.planId);
     const times = Math.round(reach / expectedAt(median, ageMinutes) * 10) / 10;
     const hours = Math.max(1, Math.round(ageMinutes / 60));
-    out.entries.push({ at: now.toISOString(), kind: 'radar', channelId: post.targetId, channelName: name(post.targetId), text: `« ${post.title.slice(0, 120)} » is taking off: ${reach} people reached in ${hours} h, ${times}× what a post usually has by then.` });
+    out.entries.push({ at: now.toISOString(), kind: 'radar', channelId: post.targetId, channelName: name(post.targetId), text: `« ${post.title.slice(0, 120)} » is taking off: ${reach} people reached in ${hours} h, ${times}× what a post usually has by then.`, code: 'hot', params: { title: post.title.slice(0, 120), reach, hours, times } });
     if (pilot.breathe.enabled && isHot({ reach, median, ageMinutes, factor: pilot.breathe.factor })) {
       const [next, following] = await ports.nextPosts(input.workspaceId, post.targetId, now, new Date(now.getTime() + pilot.breathe.maxDelayMinutes * 60_000 + 3 * 3_600_000));
       if (next && next.scheduledAt.getTime() - now.getTime() <= pilot.breathe.maxDelayMinutes * 60_000) {
         const at = breatheTime(next.scheduledAt, following?.scheduledAt ?? null, pilot.breathe.maxDelayMinutes);
         if (at) {
-          try { await ports.reschedule(input.actor, next.postId, at); out.entries.push({ at: now.toISOString(), kind: 'radar', channelId: post.targetId, channelName: name(post.targetId), text: `The next post waits until ${at.toISOString().slice(11, 16)} UTC so this one keeps its reach.` }); }
+          try { await ports.reschedule(input.actor, next.postId, at); out.entries.push({ at: now.toISOString(), kind: 'radar', channelId: post.targetId, channelName: name(post.targetId), text: `The next post waits until ${at.toISOString().slice(11, 16)} UTC so this one keeps its reach.`, code: 'breathe', params: { time: new Intl.DateTimeFormat('fr-FR', { hour: '2-digit', minute: '2-digit', timeZone: input.timeZone ?? 'Europe/Paris' }).format(at) } }); }
           catch { /* a post that cannot move keeps its time */ }
         }
       }
@@ -97,7 +97,8 @@ export async function runRadar(input: { pilot: AutopilotSettings; sourceId: stri
       }
       // Every outcome is said, so a radar that did nothing is never a mystery (2026-11-16).
       const why = [already ? `${already} already had this recipe` : '', noSlot ? `${noSlot} had no free time in the next three days` : '', refused ? `${refused} could not be changed` : ''].filter(Boolean).join(', ');
-      out.entries.push({ at: now.toISOString(), kind: 'radar', channelId: post.targetId, channelName: name(post.targetId), text: spread.length ? `Planned on ${spread.length} similar channels: ${spread.join(', ')}.${why ? ` Others: ${why}.` : ''}` : `Not spread to other channels: ${why || 'no similar channel'}.` });
+      out.entries.push({ at: now.toISOString(), kind: 'radar', channelId: post.targetId, channelName: name(post.targetId), text: spread.length ? `Planned on ${spread.length} similar channels: ${spread.join(', ')}.${why ? ` Others: ${why}.` : ''}` : `Not spread to other channels: ${why || 'no similar channel'}.`,
+        code: spread.length ? 'spread' : 'notSpread', params: { count: spread.length, channels: spread.join(', ').slice(0, 400), already, noSlot, refused } });
     }
   }
   return out;

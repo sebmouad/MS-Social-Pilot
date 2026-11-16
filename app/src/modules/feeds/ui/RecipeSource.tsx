@@ -224,7 +224,7 @@ export function RecipeSource({ initial, locale, canWrite, copy = recipeCopy }: {
       </fieldset>
       </div></details>
 
-      <AutopilotPanel value={draft.config.autopilot} timeZone={draft.config.timezone} pages={view.pages} busy={busy} t={t} onChange={autopilot => setConfig({ autopilot })} />
+      <AutopilotPanel locale={locale === 'fr' ? 'fr' : 'en'} value={draft.config.autopilot} timeZone={draft.config.timezone} pages={view.pages} busy={busy} t={t} onChange={autopilot => setConfig({ autopilot })} />
 
       <ChannelSettings pages={scopePages} config={draft.config} busy={busy} maxTemplate={view.limits.maxTemplateCharacters} t={t} dayName={dayName}
         onChange={(channels, channelSlots) => setConfig({ channels, channelSlots: Object.keys(channelSlots).length ? channelSlots : undefined })} />
