@@ -8,6 +8,7 @@ import { RouteNotice } from '@/components/RouteNotice';
 import { recipeCopy, recipeText, type RecipeCopyCatalog, type RecipeCopyKey, type RecipeLocale } from '../copy-recipes';
 import { configPatch, replaceRecipeSlotConfirmation, type ChannelSettings as ChannelOwnSettings } from '../wordpress/recipe';
 import { ChannelSettings } from './ChannelSettings';
+import { AutopilotPanel } from './AutopilotPanel';
 import styles from './feeds.module.css';
 import { RecipeSupplyWarning } from './RecipeSupplyWarning';
 
@@ -23,6 +24,8 @@ export type RecipeConfig = {
   excluded?: Array<{ id: string; title: string }>;
   /** Channels with their own settings. */
   channels?: Record<string, ChannelOwnSettings>;
+  /** Autopilot settings and activity. */
+  autopilot?: unknown;
 };
 export type RecipeSourceData = {
   id: string; name: string; siteUrl: string; hasCredential: boolean; enabled: boolean; allTargets: boolean; targetIds: string[]; config: RecipeConfig;
@@ -216,6 +219,8 @@ export function RecipeSource({ initial, locale, canWrite, copy = recipeCopy }: {
         {!draft.allTargets && (view.pages.length ? view.pages.map(p => <label key={p.id}><input type="checkbox" checked={draft.targetIds.includes(p.id)} onChange={() => toggle(p.id)} />{p.name}</label>) : <span className={styles.help}>{t('noChannels')}</span>)}
       </fieldset>
       </div></details>
+
+      <AutopilotPanel value={draft.config.autopilot} timeZone={draft.config.timezone} pages={view.pages} busy={busy} t={t} onChange={autopilot => setConfig({ autopilot })} />
 
       <ChannelSettings pages={scopePages} config={draft.config} busy={busy} maxTemplate={view.limits.maxTemplateCharacters} t={t} dayName={dayName}
         onChange={(channels, channelSlots) => setConfig({ channels, channelSlots: Object.keys(channelSlots).length ? channelSlots : undefined })} />

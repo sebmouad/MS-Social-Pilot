@@ -122,3 +122,9 @@
 .channelBadge[data-own="true"] { border-color: var(--accent); background: var(--accent-soft); color: var(--ink); }
 .channelBadge[data-paused="true"] { border-color: var(--warn, #b7791f); color: var(--warn, #b7791f); background: transparent; }
 @media (max-width: 560px) { .channelRow { grid-template-columns: minmax(0, 1fr) auto; } .channelRow > button { grid-column: 1 / -1; justify-self: start; } }
+
+/* Autopilot (2026-11-16) */
+.autoRow { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px 14px; }
+.activity { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.activity li { display: grid; grid-template-columns: 92px minmax(0, 1fr); gap: 10px; font-size: 14px; padding: 6px 0; border-bottom: 1px solid var(--line); }
+.activity time { font-variant-numeric: tabular-nums; color: var(--ink-soft); }

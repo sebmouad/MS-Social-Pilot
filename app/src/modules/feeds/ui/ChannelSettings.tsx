@@ -19,7 +19,7 @@ export function ChannelSettings({ pages, config, onChange, busy, maxTemplate, t,
   pages: Array<{ id: string; name: string }>; config: RecipeConfig; onChange: (channels: Record<string, Own>, channelSlots: Record<string, string[]>) => void; busy: boolean; maxTemplate: number;
   t: (key: RecipeCopyKey, values?: Record<string, string | number>) => string; dayName: (day: number) => string;
 }) {
-  const [editing, setEditing] = useState<{ id: string; name: string; value: Required<Own> } | null>(null);
+  const [editing, setEditing] = useState<{ id: string; name: string; value: Required<Omit<Own, 'pausedReason' | 'autoTimes'>> } | null>(null);
   const channels = config.channels ?? {};
   const resolved = (id: string) => channelConfig(config as unknown as PlanConfig, id);
   const own = (id: string) => Boolean(channels[id] && Object.keys(channels[id]!).length) || Boolean(config.channelSlots?.[id]?.length);
@@ -36,6 +36,10 @@ export function ChannelSettings({ pages, config, onChange, busy, maxTemplate, t,
     if (!editing) return;
     const slots = [...new Set(editing.value.slots.filter(slot => /^([01]\d|2[0-3]):[0-5]\d$/.test(slot)))].sort();
     const value: Own = { ...editing.value, slots: slots.length ? slots : [...config.slots], firstCommentTemplate: editing.value.firstCommentTemplate.trim() ? editing.value.firstCommentTemplate : config.firstCommentTemplate };
+    // Times the autopilot learned stay its to move until a member changes them; a pause reason goes with the pause.
+    const before = channels[editing.id];
+    if (before?.autoTimes && JSON.stringify(before.slots) === JSON.stringify(value.slots)) value.autoTimes = true;
+    if (before?.pausedReason && value.paused && before.paused) value.pausedReason = before.pausedReason;
     onChange({ ...channels, [editing.id]: value }, withoutLegacy(editing.id));
     setEditing(null);
   };
@@ -56,7 +60,7 @@ export function ChannelSettings({ pages, config, onChange, busy, maxTemplate, t,
         const summary = paused ? t('perChannelPaused') : [r.slots.join(' · '), daysText(r.weekdays), r.order === 'oldest' ? t('orderOldest') : t('orderNewest')].filter(Boolean).join(' · ');
         return <li key={page.id} className={styles.channelRow}>
           <div><strong>{page.name}</strong><span className={styles.meta}>{summary}</span></div>
-          <span className={styles.channelBadge} data-own={mine ? 'true' : undefined} data-paused={paused ? 'true' : undefined}>{paused ? t('perChannelPaused') : mine ? t('perChannelOwn') : t('perChannelShared')}</span>
+          <span className={styles.channelBadge} data-own={mine ? 'true' : undefined} data-paused={paused ? 'true' : undefined}>{paused ? t('perChannelPaused') : channels[page.id]?.autoTimes ? t('autoTimesBadge') : mine ? t('perChannelOwn') : t('perChannelShared')}</span>
           <Button size="sm" type="button" variant="secondary" disabled={busy} onClick={() => open(page)}>{t('perChannelEdit')}</Button>
         </li>;
       })}</ul> : <span className={styles.help}>{t('noChannels')}</span>}

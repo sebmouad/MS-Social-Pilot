@@ -3,6 +3,8 @@ import { prisma } from '@/server/data';
 import { decryptSecret } from '@/server/secret-crypto';
 import { defaultFetchDeps, type FetchDeps } from '@/modules/publishing/server/media/network/net-guard';
 import type { ArticleInput, ArticleWriting } from '@/modules/studio/ai';
+import { autopilotOf } from '../wordpress/autopilot';
+import { instantToWall } from '@/lib/calendar-dates';
 import { allocateRecipes, channelConfig, recipeTitleKey, buildImageUrl, buildPermalink, reportedPermalink, parseRecipe, renderComment, resolveConfig, slotInstants, type PlanConfig, type Recipe, type SlotNeed } from '../wordpress/recipe';
 import { openWordpressDb, type DbSettings, type WpDb } from '../wordpress/db';
 import { defaultImagePorts, prepareRecipeImage, RecipeImageError, type ImagePorts } from '../wordpress/image';
@@ -180,7 +182,7 @@ export async function supplyLedgerView(settings: WordpressSettings, ports: Plann
 
 /* ----- one source ----- */
 
-export type SourceOutcome = { sourceId: string; planned: number; failed: number; uncertain: number; unfilled: number; slots: number; pages: number; excludedPages: number; scanned: number; reason?: string; candidates?: number; rejected?: ScanRejections };
+export type SourceOutcome = { excludedNames?: string[]; sourceId: string; planned: number; failed: number; uncertain: number; unfilled: number; slots: number; pages: number; excludedPages: number; scanned: number; reason?: string; candidates?: number; rejected?: ScanRejections };
 export type Ctx = {
   settings: WordpressSettings; ports: PlannerPorts; db: WpDb; budget: { left: number }; now: Date;
   /** Manual retry: only these slots (see slotKey) are planned, and a failed slot is revived even past its attempt cap. */
@@ -189,6 +191,8 @@ export type Ctx = {
   deadline?: number;
   /** A member's own choice of recipe for a slot (slotKey → WordPress post id), 2026-11-15. */
   force?: ReadonlyMap<string, string>;
+  /** Self-healing (2026-11-16): slots whose post failed to publish (slotKey → when the replacement goes out). */
+  makeup?: ReadonlyMap<string, Date>;
 };
 /** Reason on a slot a member chose to leave empty: never filled again until they fill it themselves (2026-11-15). */
 export const LEFT_EMPTY = 'left_empty';
@@ -212,7 +216,7 @@ export async function planSource(ctx: Ctx, source: SourceRow, auth: FeedAuthoriz
   const candidatePages = await ports.store.pages(source, settings.targetTypes, settings.maxTargets);
   const pages: Array<{ id: string; name: string }> = [];
   for (const page of candidatePages) {
-    try { await ports.validateTarget(auth.actor, page.id); pages.push(page); } catch { out.excludedPages += 1; }
+    try { await ports.validateTarget(auth.actor, page.id); pages.push(page); } catch { out.excludedPages += 1; (out.excludedNames ??= []).push(page.name); }
   }
   out.pages = pages.length;
   const pageOrder = new Map(pages.map((page, index) => [page.id, index]));
@@ -228,9 +232,31 @@ export async function planSource(ctx: Ctx, source: SourceRow, auth: FeedAuthoriz
     if (mine.paused) continue;
     for (const slotAt of slotInstants({ now, slots: mine.slots, timezone: config.timezone, horizonDays: config.horizonDays, leadMinutes: settings.minLeadMinutes, ...(mine.weekdays ? { weekdays: mine.weekdays } : {}) })) pairs.push({ slotAt, page });
   }
+  // A slot whose post failed keeps its identity and gets a replacement published shortly (self-healing).
+  for (const key of ctx.makeup?.keys() ?? []) {
+    const [targetId, ms] = key.split('|'); const page = pages.find(item => item.id === targetId);
+    if (page && !of(page.id).paused) pairs.push({ slotAt: new Date(Number(ms)), page });
+  }
   pairs.sort((a, b) => a.slotAt.getTime() - b.slotAt.getTime() || (pageOrder.get(a.page.id) ?? 0) - (pageOrder.get(b.page.id) ?? 0));
-  out.slots = new Set(pairs.map(pair => pair.slotAt.getTime())).size;
   const view = await supplyLedgerView(settings, ports, source, now);
+  // Times changed (by a member or the autopilot) never double a day already planned (2026-11-16): a new time joins
+  // that day only when it is at least the autopilot gap away from its posts and the day still has room.
+  const gapMs = autopilotOf(config.autopilot).bestTimes.gapMinutes * 60_000;
+  const dayKey = (targetId: string, at: Date) => `${targetId}|${instantToWall(at, config.timezone).date}`;
+  const held = new Map<string, number[]>();
+  for (const row of view.byKey.values()) {
+    if (row.state === 'failed' && row.reason !== LEFT_EMPTY) continue;
+    const key = dayKey(row.targetId, row.slotAt); held.set(key, [...(held.get(key) ?? []), row.slotAt.getTime()]);
+  }
+  const fitting = pairs.filter(({ slotAt, page }) => {
+    if (view.byKey.has(slotKey(page.id, slotAt))) return true;
+    const key = dayKey(page.id, slotAt); const day = held.get(key);
+    if (!day?.length) return true;
+    if (day.some(at => Math.abs(at - slotAt.getTime()) < gapMs) || day.length >= of(page.id).slots.length) return false;
+    day.push(slotAt.getTime()); return true;
+  });
+  pairs.splice(0, pairs.length, ...fitting);
+  out.slots = new Set(pairs.map(pair => pair.slotAt.getTime())).size;
 
   const needs: SlotNeed[] = []; const reviving = new Map<string, LedgerRow>();
   for (const { slotAt, page } of pairs) {
@@ -308,7 +334,7 @@ export async function planSource(ctx: Ctx, source: SourceRow, auth: FeedAuthoriz
       const image = await prepareRecipeImage(ports.image, { actor: { userId: auth.actor.userId, workspaceId: source.workspaceId }, url: c.imageUrl, fileName: safeName(c.slug), settings: settings.image });
       const post = await ports.createPost(auth.actor, {
         // The slot keeps its identity (ledger key); only the publish time is offset per Page, so Pages never post in lockstep.
-        message: written.caption, firstComment: written.firstComment, targetIds: [targetId], scheduledAt: staggered(slotAt, targetId),
+        message: written.caption, firstComment: written.firstComment, targetIds: [targetId], scheduledAt: ctx.makeup?.get(slotKey(targetId, slotAt)) ?? staggered(slotAt, targetId),
         media: [{ kind: 'image', url: `media:${image.mediaId}`, altText: c.title.slice(0, settings.altMax) }], firstCommentDelayMinutes: of(targetId).firstCommentDelayMinutes,
       });
       postId = post.id;
@@ -380,7 +406,7 @@ export async function openDatabase(ports: PlannerPorts, settings: WordpressSetti
  * whose current plan and grants allow the feature (the workspace-owner worker policy); one source's failure never
  * stops the others, and a per-run budget bounds the posts created.
  */
-export async function runRecipePlanning(overrides: Partial<PlannerPorts> = {}, loaded?: WordpressSettings): Promise<RecipePlanSummary> {
+export async function runRecipePlanning(overrides: Partial<PlannerPorts> & { autopilot?: import('./wordpress-autopilot').AutopilotPorts } = {}, loaded?: WordpressSettings): Promise<RecipePlanSummary> {
   let settings: WordpressSettings;
   try { settings = loaded ?? await loadWordpressSettings(); } catch { return emptySummary('misconfigured'); }
   if (!settings.enabled) return emptySummary('disabled');
@@ -404,7 +430,30 @@ export async function runRecipePlanning(overrides: Partial<PlannerPorts> = {}, l
         totals(summary, { sourceId: source.id, planned: 0, failed: 0, uncertain: 0, unfilled: 0, slots: 0, pages: 0, excludedPages: 0, scanned: 0, reason: 'no_qualifying_owner' });
         continue;
       }
-      const outcome = await planSource({ settings, ports, db, budget, now }, source, auth);
+      // Autopilot (2026-11-16): learn each channel's best times, replace posts that failed to publish, log what it did.
+      const autopilot = await import('./wordpress-autopilot');
+      const { autopilotOf } = await import('../wordpress/autopilot');
+      const pilot = autopilotOf(configOf(settings, source).autopilot);
+      const entries: import('../wordpress/autopilot').AutopilotLogEntry[] = [];
+      let makeup: Map<string, Date> | undefined;
+      try {
+        await autopilot.learnBestTimes(settings, source, await ports.store.pages(source, settings.targetTypes, settings.maxTargets), now, overrides.autopilot);
+        if (pilot.healing.replaceFailed) {
+          const failed = await (overrides.autopilot ?? autopilot.prismaAutopilotPorts).failedPublications(source.id, new Date(now.getTime() - 6 * 3_600_000));
+          const at = new Date(now.getTime() + (settings.minLeadMinutes + 2) * 60_000);
+          for (const row of failed) {
+            await ports.store.settle(source.workspaceId, row.id, { state: 'failed', reason: 'publish_failed', skipped: [...row.skipped, row.wpPostId] });
+            (makeup ??= new Map()).set(slotKey(row.targetId, row.slotAt), at);
+            entries.push({ at: now.toISOString(), kind: 'healing', channelId: row.targetId, text: `« ${row.title.slice(0, 120)} » failed to publish; another recipe replaces it.` });
+          }
+        }
+      } catch { /* the autopilot never stops planning */ }
+      const outcome = await planSource({ settings, ports, db, budget, now, ...(makeup ? { makeup } : {}) }, source, auth);
+      if (pilot.healing.pauseBroken) for (const name of outcome.excludedNames ?? []) {
+        const recent = (pilot.log ?? []).some(entry => entry.kind === 'healing' && entry.channelName === name && now.getTime() - Date.parse(entry.at) < 86_400_000);
+        if (!recent) entries.push({ at: now.toISOString(), kind: 'healing', channelName: name.slice(0, 200), text: 'This channel cannot publish right now (its connection or permissions). Its recipes are on hold; the other channels carry on.' });
+      }
+      await autopilot.logAutopilot(settings, source, entries, overrides.autopilot).catch(() => undefined);
       totals(summary, outcome);
       await ports.store.recordRun(source.workspaceId, source.id, { at: now, error: outcome.reason === 'caption_field_missing' ? captionFieldMessage(outcome.scanned, configOf(settings, source).mapping.captionMetaKey, sourceCredential(source)) : outcome.reason === 'needs_ai' ? NEEDS_AI_MESSAGE : outcome.reason && !['complete', 'budget'].includes(outcome.reason) ? `Planning stopped: ${outcome.reason}` : null, summary: recipeSummaryRecord(outcome, now) });
     } catch {

@@ -144,8 +144,14 @@ export async function saveRecipeSource(actor: FeedActor, input: unknown, deps: R
   const config = data.config ?? {};
   return protect(transact(actor.workspaceId, s, async tx => {
     await lockActor(tx, actor, true);
-    const rows = await tx.$queryRaw<Array<{ id: string; enabled: boolean }>>`SELECT id, enabled FROM wordpress_recipe_sources WHERE "workspaceId" = ${actor.workspaceId} FOR UPDATE`;
+    const rows = await tx.$queryRaw<Array<{ id: string; enabled: boolean; config: unknown }>>`SELECT id, enabled, config FROM wordpress_recipe_sources WHERE "workspaceId" = ${actor.workspaceId} FOR UPDATE`;
     const existing = rows[0];
+    // The autopilot's activity log and learning date are written by the planner, never by a settings form (2026-11-16).
+    const stored = existing?.config && typeof existing.config === 'object' ? (existing.config as { autopilot?: { log?: unknown; lastLearnedAt?: unknown } }).autopilot : undefined;
+    if (stored && (stored.log !== undefined || stored.lastLearnedAt !== undefined)) {
+      const mine = (config as { autopilot?: Record<string, unknown> }).autopilot;
+      if (mine) (config as { autopilot?: Record<string, unknown> }).autopilot = { ...mine, ...(stored.log !== undefined ? { log: stored.log } : {}), ...(stored.lastLearnedAt !== undefined ? { lastLearnedAt: stored.lastLearnedAt } : {}) };
+    }
     const enabled = data.enabled ?? existing?.enabled ?? false;
     const id = existing?.id ?? `wrs_${randomUUID()}`;
     if (existing) {

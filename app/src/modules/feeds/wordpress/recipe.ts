@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { addDaysToKey, instantToWall, wallTimeToInstant } from '@/lib/calendar-dates';
 import { META_KEY, SLOT_TIME, SLOTS_MAX } from './config';
 import { decodeWordpressText } from './text';
+import { autopilotSchema } from './autopilot';
 
 /** Pure logic of the WordPress recipe source: field mapping, recipe parsing, comment rendering, slots and allocation. */
 export type Mapping = { captionMetaKey: string; imageMetaKey: string; recipeMetaKey: string; skipMetaKey: string; attachedFileMetaKey: string; postType: string; postStatus: string };
@@ -17,9 +18,13 @@ export type PlanConfig = {
   excluded?: Array<{ id: string; title: string }>;
   /** Channels with their own settings (2026-11-15), keyed by channel id: each field set replaces the shared one for that channel. */
   channels?: Record<string, ChannelSettings>;
+  /** Autopilot settings and its activity log (2026-11-16). */
+  autopilot?: unknown;
 };
 /** What one channel can set for itself; `paused` stops planning on it without touching the others. */
-export type ChannelSettings = { slots?: string[]; weekdays?: number[]; order?: 'newest' | 'oldest'; firstCommentTemplate?: string; firstCommentDelayMinutes?: number; paused?: boolean };
+export type ChannelSettings = { slots?: string[]; weekdays?: number[]; order?: 'newest' | 'oldest'; firstCommentTemplate?: string; firstCommentDelayMinutes?: number; paused?: boolean; pausedReason?: string;
+  /** The times were set by the autopilot's learning, which may move them again; a member's own times are kept. */
+  autoTimes?: boolean };
 
 /** The settings one channel posts with: its own where it has them, the shared ones otherwise. */
 export function channelConfig(config: PlanConfig, channelId: string): PlanConfig & { paused: boolean } {
@@ -48,11 +53,12 @@ export const planConfigPatchSchema = (limits: { template: number; horizon: { min
     .refine(map => Object.keys(map).length <= 500, 'Too many channels.'),
   excluded: z.array(z.object({ id: z.string().regex(/^[A-Za-z0-9_-]{1,100}$/), title: z.string().max(300) }).strict()).max(2000)
     .transform(list => [...new Map(list.map(item => [item.id, item])).values()]),
+  autopilot: autopilotSchema,
   channels: z.record(z.string().regex(/^[A-Za-z0-9_-]{1,100}$/), z.object({
     slots: z.array(z.string().regex(SLOT_TIME)).min(1).max(SLOTS_MAX).transform(normalizeSlotsList),
     weekdays: z.array(z.number().int().min(0).max(6)).min(1).max(7).transform(days => [...new Set(days)].sort()),
     order: z.enum(['newest', 'oldest']), firstCommentTemplate: z.string().min(1).max(limits.template),
-    firstCommentDelayMinutes: z.number().int().min(limits.delay.min).max(limits.delay.max), paused: z.boolean(),
+    firstCommentDelayMinutes: z.number().int().min(limits.delay.min).max(limits.delay.max), paused: z.boolean(), pausedReason: z.string().max(300), autoTimes: z.boolean(),
   }).partial().strict()).refine(map => Object.keys(map).length <= 500, 'Too many channels.'),
   horizonDays: z.number().int().min(limits.horizon.min).max(limits.horizon.max), distinctAcrossPages: z.boolean(),
   cooldownDays: z.number().int().min(limits.cooldown.min).max(limits.cooldown.max),

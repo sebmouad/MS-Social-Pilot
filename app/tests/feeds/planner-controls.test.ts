@@ -135,3 +135,27 @@ test('planner: each channel uses its own times, recipe order and first comment, 
   assert.ok(a.every(p => p.firstComment?.startsWith('Recipe: ')));
   assert.equal(new Set([...recipeOf('pageA'), ...recipeOf('pageB')]).size, a.length + b.length);
 });
+
+test('planner: new times never double a day that is already planned', async () => {
+  const first = harness();
+  await planSource({ settings: settings(), ports: first.ports, db: first.db as never, budget: { left: 50 }, now }, source(), auth);
+  const before = first.created.filter(p => p.targetId === 'pageA').length;
+  // Times move (a member or the autopilot): 11:00/17:00 become 11:30/17:30 on page A.
+  const h = harness([...first.ledger]);
+  await planSource({ settings: settings(), ports: h.ports, db: h.db as never, budget: { left: 50 }, now }, source({ channels: { pageA: { slots: ['11:30', '17:30'] } } }), auth);
+  assert.equal(h.created.filter(p => p.targetId === 'pageA').length, 0, 'the planned day keeps its posts and gets no extra ones');
+  assert.ok(before > 0);
+});
+
+test('planner: a post that failed to publish is replaced by another recipe, published shortly', async () => {
+  const first = harness();
+  await planSource({ settings: settings(), ports: first.ports, db: first.db as never, budget: { left: 50 }, now }, source(), auth);
+  const slot = first.ledger.find(row => row.targetId === 'pageA')!;
+  const failed = { ...slot, state: 'failed' as const, postId: null, reason: 'publish_failed', skipped: [slot.wpPostId] };
+  const h = harness([...first.ledger.filter(row => row.id !== slot.id), failed]);
+  const key = slotKey(slot.targetId, slot.slotAt); const soon = new Date(now.getTime() + 12 * 60_000);
+  await planSource({ settings: settings(), ports: h.ports, db: h.db as never, budget: { left: 50 }, now, makeup: new Map([[key, soon]]) }, source(), auth);
+  const replaced = h.ledger.find(row => row.targetId === slot.targetId && row.slotAt.getTime() === slot.slotAt.getTime())!;
+  assert.notEqual(replaced.wpPostId, slot.wpPostId);
+  assert.ok(h.created.some(p => p.targetId === 'pageA' && p.scheduledAt.getTime() === soon.getTime()));
+});
