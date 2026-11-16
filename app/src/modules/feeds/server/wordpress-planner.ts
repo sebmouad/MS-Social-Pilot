@@ -7,7 +7,7 @@ import { autopilotOf, type AutopilotSettings } from '../wordpress/autopilot';
 import { prismaScoringPorts, dishHistory, type ScoringPorts } from './wordpress-scoring';
 import { makePicker } from './wordpress-pick';
 import { guessKind, type RecipeKind } from '../wordpress/score';
-import { bestStyle, captionPrompt, cleanCaption, ctaFor, styleFor, voiceFor, withCta, type HookStyle } from '../wordpress/caption';
+import { bestStyle, captionPrompt, cleanCaption, ctaFor, opensLike, styleFor, voiceFor, withCta, type HookStyle } from '../wordpress/caption';
 import { instantToWall } from '@/lib/calendar-dates';
 import { allocateRecipes, channelConfig, recipeTitleKey, buildImageUrl, buildPermalink, reportedPermalink, parseRecipe, renderComment, resolveConfig, slotInstants, type PlanConfig, type Recipe, type SlotNeed } from '../wordpress/recipe';
 import { openWordpressDb, type DbSettings, type WpDb, type WpCandidateRow } from '../wordpress/db';
@@ -442,7 +442,12 @@ export async function planSource(ctx: Ctx, source: SourceRow, auth: FeedAuthoriz
       const pick = styleFor(key, prep?.preferredStyle ?? null, pilot.hooks.enabled ? pilot.hooks.share : 0);
       const { system, prompt } = captionPrompt({ channel: pages.find(page => page.id === targetId)?.name ?? '', voice: voiceFor(pilot.captions.voice, pageOrder.get(targetId) ?? 0), style: pick.style, question: pilot.captions.question, emoji: pilot.captions.emoji,
         title: c.title, caption: written.caption, ingredients: c.recipe.ingredients.filter(line => !line.heading).map(line => line.text), avoid });
-      try { const clean = cleanCaption(await ports.captions.write(auth.actor, system, prompt), settings.textMax); if (clean) { written = { ...written, caption: clean }; style = pick.style; openings.unshift(clean.split('\n')[0]!.slice(0, 90)); } }
+      try {
+        let clean = cleanCaption(await ports.captions.write(auth.actor, system, prompt), settings.textMax);
+        // Same first two words as a recent caption: written once more, told which words to avoid.
+        const echo = clean ? opensLike(clean, avoid) : null;
+        if (clean && echo) clean = cleanCaption(await ports.captions.write(auth.actor, `${system}\nDo not start with « ${echo} ».`, prompt).catch(() => ''), settings.textMax) ?? clean;
+        if (clean) { written = { ...written, caption: clean }; style = pick.style; openings.unshift(clean.split('\n')[0]!.slice(0, 90)); } }
       catch { /* over the AI limit or unavailable: the recipe's own caption goes out */ }
     }
     if (pilot.comment.enabled) written = { ...written, firstComment: withCta(written.firstComment, ctaFor(pilot.comment.cta, key), settings.commentMax) };

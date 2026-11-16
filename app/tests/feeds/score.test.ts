@@ -62,3 +62,9 @@ test('dish word: names the dish family', () => {
   assert.equal(dishWord('Le gratin dauphinois crémeux'), 'gratin');
   assert.equal(dishWord('Recette facile de quiche lorraine'), 'quiche');
 });
+
+test('score: « pommes de terre » are potatoes, not seasonal apples', () => {
+  const nov = ctx('2026-11-17', 12);
+  assert.ok(!scoreRecipe({ title: 'Gratin de pommes de terre au jambon' }, nov).parts.some(p => p.label === 'season'));
+  assert.ok(scoreRecipe({ title: 'Tarte aux pommes' }, nov).parts.some(p => p.label === 'season'));
+});

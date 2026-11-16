@@ -38,3 +38,10 @@ test('first comment: a rotating call to action on top, within the limit', () => 
   assert.equal(withCta('x'.repeat(1990), cta, 2000), 'x'.repeat(1990));
   assert.equal(ctaFor('none', 'slot1'), null);
 });
+
+test('openings: the same first two words as a recent caption are caught, accents and case aside', async () => {
+  const { opensLike } = await import('@/modules/feeds/wordpress/caption');
+  assert.equal(opensLike('Vous aimez les feuilletés dorés ? 😋', ['Vous aimez les plats généreux ?']), 'Vous aimez');
+  assert.equal(opensLike('ENVIE d’un gratin', ['Envie d’un gratin généreux']), 'ENVIE d’un');
+  assert.equal(opensLike('En 85 minutes, un gratin', ['Vous aimez les plats']), null);
+});

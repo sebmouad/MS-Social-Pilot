@@ -101,8 +101,10 @@ export function scoreRecipe(recipe: ScoreInput, at: ScoreContext): { score: numb
   if (typeof recipe.history === 'number' && Number.isFinite(recipe.history)) add('history', Math.max(-15, Math.min(15, (recipe.history - 1) * 20)));
   const month = at.date.getUTCMonth() + 1;
   if (at.rules.has('season')) {
-    const inSeason = SEASON.some(s => s.months.includes(month) && has(folded, s.words));
-    const outOfSeason = !inSeason && SEASON.some(s => !s.months.includes(month) && has(folded, s.words));
+    // « Pommes de terre » are potatoes, not apples: they never count as seasonal fruit (2026-11-16).
+    const produce = folded.replace(/ pommes? de terre /g, ' ');
+    const inSeason = SEASON.some(s => s.months.includes(month) && has(produce, s.words));
+    const outOfSeason = !inSeason && SEASON.some(s => !s.months.includes(month) && has(produce, s.words));
     if (inSeason) add('season', 8); else if (outOfSeason) add('season', -12);
   }
   if (at.rules.has('holidays')) {

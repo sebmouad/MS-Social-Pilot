@@ -75,6 +75,13 @@ export function captionPrompt(input: { channel: string; voice: Voice; style: Hoo
   return { system, prompt };
 }
 
+/** True when a caption starts with the same two words as one of the recent openings. */
+export function opensLike(caption: string, openings: readonly string[]): string | null {
+  const head = (text: string) => text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9’' ]+/g, ' ').trim().split(/\s+/).slice(0, 2).join(' ');
+  const mine = head(caption);
+  return mine.split(' ').length === 2 && openings.some(opening => head(opening) === mine) ? caption.trim().split(/\s+/).slice(0, 2).join(' ') : null;
+}
+
 /** The AI's caption, cleaned; null when it is unusable (empty, too long, a link). */
 export function cleanCaption(raw: string, max: number): string | null {
   let text = raw.trim().replace(/^```[a-z]*\s*|```$/g, '').trim();
