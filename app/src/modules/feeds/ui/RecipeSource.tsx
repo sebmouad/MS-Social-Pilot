@@ -198,11 +198,12 @@ export function RecipeSource({ initial, locale, canWrite, copy = recipeCopy }: {
 
     {tab === 'plan' && <>
     <h3 className={styles.sectionTitle}>{t('plansHeading')}</h3>
-    {view.plans.items.length ? <div className={styles.tableWrap}><table className={styles.table}><caption className="ui-visually-hidden">{t('plansHeading')}</caption>
+    {view.plans.items.length ? <div className={styles.tableWrap}><table className={`${styles.table} ${styles.planTable}`}><caption className="ui-visually-hidden">{t('plansHeading')}</caption>
       <thead><tr><th scope="col">{t('colTime')}</th><th scope="col">{t('colChannel')}</th><th scope="col">{t('colRecipe')}</th><th scope="col">{t('colState')}</th>{canWrite ? <th scope="col"><span className="ui-visually-hidden">{t('colActions')}</span></th> : null}</tr></thead>
-      <tbody>{(showAllPlans ? view.plans.items : view.plans.items.slice(0, 12)).map((p, index, list) => { const day = view.labels?.days?.[p.id]; const newDay = day && day !== view.labels?.days?.[list[index - 1]?.id ?? '']; return <Fragment key={p.id}>
+      <tbody>{(showAllPlans ? view.plans.items : view.plans.items.slice(0, 12)).map((p, index, list) => { const day = view.labels?.days?.[p.id]; const previous = list[index - 1]; const past = Date.parse(p.slotAt) <= Date.now(); const firstPast = past && (!previous || Date.parse(previous.slotAt) > Date.now()); const newDay = day && (firstPast || day !== view.labels?.days?.[previous?.id ?? '']); return <Fragment key={p.id}>
+        {firstPast && index > 0 ? <tr className={styles.pastRow}><th scope="colgroup" colSpan={canWrite ? 5 : 4}>{t('plansPast')}</th></tr> : null}
         {newDay ? <tr className={styles.dayRow}><th scope="colgroup" colSpan={canWrite ? 5 : 4}>{day}</th></tr> : null}
-        <tr data-state={p.reason === 'left_empty' ? 'empty' : p.state}><th scope="row" className={styles.planTime}>{day ? view.labels?.times?.[p.id] : view.labels?.slots[p.id] ?? ''}</th><td>{p.targetName}</td><td>{p.title}{showScore && typeof p.score === 'number' ? <span className={styles.scoreChip} data-band={p.score >= 70 ? 'high' : p.score >= 45 ? 'mid' : 'low'} title={t('scoreHint')}>{p.score}</span> : null}{p.kind ? <span className={styles.meta}>{t(`kind_${p.kind}` as RecipeCopyKey)}</span> : null}</td><td>{stateText(p)}{reasonText(p.reason) && <span className={styles.meta}>{reasonText(p.reason)}</span>}</td>
+        <tr data-state={p.reason === 'left_empty' ? 'empty' : p.state} data-past={past || undefined}><th scope="row" className={styles.planTime}>{day ? view.labels?.times?.[p.id] : view.labels?.slots[p.id] ?? ''}</th><td>{p.targetName}</td><td>{p.title}{showScore && typeof p.score === 'number' ? <span className={styles.scoreChip} data-band={p.score >= 70 ? 'high' : p.score >= 45 ? 'mid' : 'low'} title={t('scoreHint')}>{p.score}</span> : null}{p.kind ? <span className={styles.meta}>{t(`kind_${p.kind}` as RecipeCopyKey)}</span> : null}</td><td>{stateText(p)}{reasonText(p.reason) && <span className={styles.meta}>{reasonText(p.reason)}</span>}</td>
         {canWrite ? <td className={styles.planActions}>{Date.parse(p.slotAt) <= Date.now() ? null : p.reason === 'left_empty'
           ? <Button size="sm" variant="quiet" disabled={busy} onClick={() => setSlotChange({ plan: p, kind: 'fill' })}>{t('planFill')}</Button>
           : p.state === 'planned' && p.postId ? <>
@@ -256,7 +257,6 @@ export function RecipeSource({ initial, locale, canWrite, copy = recipeCopy }: {
           <span className={styles.meta}>{t('previewComment')}</span><p className={styles.reviewPreview}>{item.firstComment}</p></div>
       </li>)}</ul> : <p className={styles.empty}>{t('previewEmpty')}</p>}
     </div>}
-    {!preview && source && <p className={styles.help}>{t('previewNone')}</p>}
 
     </>}
 

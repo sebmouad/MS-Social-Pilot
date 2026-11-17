@@ -157,3 +157,22 @@
 .feedState[data-state="error"] { color: var(--warning); }
 .feedState[data-state="error"]::before { background: var(--warning); }
 .rowActions { display: flex; gap: 4px; align-items: center; justify-content: flex-end; white-space: nowrap; }
+/* Planned posts read as a plan (2026-11-17): passed rows quieter; on phones each row is a card, no sideways scroll. */
+.pastRow th { padding: .9rem .9rem .4rem; border-bottom: 1px solid var(--line); color: var(--ink-soft); font-size: .78rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
+.table tr[data-past] td, .table tr[data-past] th { color: var(--ink-soft); }
+@media (max-width: 47.5rem) {
+  .planTable { min-width: 0; }
+  .planTable thead { display: none; }
+  .planTable, .planTable tbody { display: block; }
+  .planTable tr { display: grid; grid-template-columns: 3.25rem minmax(0, 1fr); gap: 2px 12px; padding: 12px; border-bottom: 1px solid var(--line); }
+  .planTable tr > * { padding: 0; border: 0; }
+  .planTable tr > .planTime { grid-row: 1 / span 3; align-self: start; padding-top: 1px; }
+  .planTable tr > td { grid-column: 2; }
+  .planTable tr > td:nth-of-type(1) { color: var(--ink-soft); font-size: .82rem; }
+  .planTable tr > td:nth-of-type(3) { font-size: .82rem; }
+  .planTable tr > td.planActions { grid-column: 2; display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-start; margin: 6px 0 0 -10px; text-align: left; }
+  .planTable tr > td.planActions:empty { display: none; }
+  .planActions > * + * { margin-left: 0; }
+  .planTable tr.dayRow, .planTable tr.pastRow { display: block; padding: 0; }
+  .planTable tr.dayRow > th, .planTable tr.pastRow > th { display: block; padding: .55rem 12px; }
+}

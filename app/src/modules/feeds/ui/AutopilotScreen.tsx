@@ -34,6 +34,8 @@ export default async function AutopilotScreen() {
   const compact = (value: number) => new Intl.NumberFormat(locale, { notation: 'compact', maximumFractionDigits: 1 }).format(value);
   const dateLabel = (date: string) => new Intl.DateTimeFormat(locale, { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' }).format(new Date(`${date}T12:00:00Z`));
   const percent = (now: number, before: number) => before > 0 ? (now - before) / before * 100 : null;
+  /** A change past ten times the week before reads « ×12 » (2026-11-17): « +6 815 % » said nothing more. */
+  const trendText = (now: number, before: number) => before > 0 && now / before >= 10 ? `×${new Intl.NumberFormat(locale, { maximumFractionDigits: 0 }).format(now / before)}` : signed((now - before) / before * 100);
   const signed = (value: number) => `${value >= 0 ? '+' : ''}${new Intl.NumberFormat(locale, { maximumFractionDigits: Math.abs(value) < 10 ? 1 : 0 }).format(value)} %`;
   const report = view.report;
   const change = percent(report.reach, report.previousReach);
@@ -84,7 +86,7 @@ export default async function AutopilotScreen() {
           <div><dt>{t('statToday')}</dt><dd>{live.length}<small> / {live.length + toCome.length}</small></dd><span>{failedToday.length ? <span className={styles.warn}>{failedToday.length === 1 ? t('statFailedOne') : t('statFailed', { count: failedToday.length })}</span> : toCome.length ? t('statToCome', { count: toCome.length }) : t('statDayDone')}</span></div>
           <div><dt>{t('statReachToday')}</dt><dd>{number(reachToday)}</dd><span>{!live.length ? t('statNoneLive') : reachToday ? t('statPerPost', { reach: number(reachToday / live.length) }) : t('statNotMeasured')}</span></div>
           <div><dt>{t('statTomorrow')}</dt><dd>{planned.length}</dd><span>{!planned.length ? t('statNotPlanned') : view.tomorrow.approved ? t('approved') : view.tomorrow.flagged ? <span className={styles.warn}>{t('flagged', { count: view.tomorrow.flagged })}</span> : t('statToReview')}</span></div>
-          <div><dt>{t('statWeek')}</dt><dd>{compact(report.reach)}</dd><span>{change !== null ? <><span className={styles.delta} data-direction={change > 0.5 ? 'up' : change < -0.5 ? 'down' : 'flat'}>{signed(change)}</span> {t('vsPrevious')}</> : t('statFirstWeek')}</span></div>
+          <div><dt>{t('statWeek')}</dt><dd>{compact(report.reach)}</dd><span>{change !== null ? <><span className={styles.delta} data-direction={change > 0.5 ? 'up' : change < -0.5 ? 'down' : 'flat'}>{trendText(report.reach, report.previousReach)}</span> {t('vsPrevious')}</> : t('statFirstWeek')}</span></div>
         </dl>
       </section>
 
@@ -118,7 +120,7 @@ export default async function AutopilotScreen() {
             <span className={styles.badge} data-tone={channel.paused ? 'warn' : channel.autoTimes ? 'accent' : undefined}>{channel.paused ? t(channel.pausedReason ? 'held' : 'paused') : channel.autoTimes ? t('autoTimes') : t('sharedTimes')}</span></div>
           <div className={styles.channelReach}>
             <div><span className={styles.channelFigure}>{compact(channel.weekReach)}</span> <span className={styles.meta}>{t('reachedWeek')}</span>
-              {trend !== null ? <span className={styles.delta} data-direction={trend > 0.5 ? 'up' : trend < -0.5 ? 'down' : 'flat'}>{signed(trend)}</span> : null}</div>
+              {trend !== null ? <span className={styles.delta} data-direction={trend > 0.5 ? 'up' : trend < -0.5 ? 'down' : 'flat'}>{trendText(channel.weekReach, channel.previousReach)}</span> : null}</div>
             {channel.daily.some(value => value > 0) ? <Sparkline data={channel.daily} width={96} height={28} label={t('sparkLabel', { channel: channel.name })} /> : null}
           </div>
           <p className={styles.meta}>{channel.weekPosts === 1 ? t('postsWeekOne') : t('postsWeek', { count: channel.weekPosts })}{channel.failedWeek ? <> · <span className={styles.warn}>{channel.failedWeek === 1 ? t('failedWeekOne') : t('failedWeek', { count: channel.failedWeek })}</span></> : null}</p>

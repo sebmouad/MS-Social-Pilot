@@ -48,11 +48,12 @@ export async function selectSource(workspaceId: string): Promise<SourceRow | nul
   const rows = await prisma.$queryRawUnsafe<RawSource[]>(`SELECT ${SOURCE_COLUMNS} FROM wordpress_recipe_sources WHERE "workspaceId" = $1 LIMIT 1`, workspaceId);
   return rows[0] ? toSource(rows[0]) : null;
 }
-export async function selectPlans(workspaceId: string, sourceId: string, offset: number, limit: number): Promise<LedgerRow[]> {
+/** Read as a plan (2026-11-17): what is still to come first, soonest first, then what has passed, latest first. */
+export async function selectPlans(workspaceId: string, sourceId: string, offset: number, limit: number, now = new Date()): Promise<LedgerRow[]> {
   const rows = await prisma.$queryRawUnsafe<Array<RawLedger & { targetName: string | null }>>(
     `SELECT p.id, p."sourceId", p."targetId", p."wpPostId", p."slotAt", p.state, p."postId", p.title, p.permalink, p.reason, p.skipped, p."claimedAt", p.score, p.kind, t.name AS "targetName"
      FROM wordpress_recipe_plans p LEFT JOIN targets t ON t.id = p."targetId" AND t."workspaceId" = p."workspaceId"
-     WHERE p."workspaceId" = $1 AND p."sourceId" = $2 ORDER BY p."slotAt" DESC, p.id ASC OFFSET $3 LIMIT $4`, workspaceId, sourceId, offset, limit);
+     WHERE p."workspaceId" = $1 AND p."sourceId" = $2 ORDER BY (p."slotAt" >= $5) DESC, CASE WHEN p."slotAt" >= $5 THEN p."slotAt" END ASC, p."slotAt" DESC, p.id ASC OFFSET $3 LIMIT $4`, workspaceId, sourceId, offset, limit, now);
   return rows.map(row => ({ ...toLedger(row), targetName: row.targetName ?? '' }));
 }
 export async function countPlans(workspaceId: string, sourceId: string): Promise<Record<string, number>> {
