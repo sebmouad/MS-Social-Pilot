@@ -2,9 +2,10 @@ import type { AutopilotLogEntry } from './wordpress/autopilot';
 
 /**
  * The autopilot's activity log in the page language (2026-11-16). Entries carry a code and values; the sentence is
- * written when shown, so a French page reads French. Entries saved before codes existed keep their English text.
+ * written when shown, so a French page reads French. Entries saved before codes existed are recognised by their English
+ * sentence and written the same way (2026-11-17); any other text is shown as saved.
  */
-export type LogCode = 'stranded' | 'publishFailed' | 'channelHeld' | 'hot' | 'breathe' | 'spread' | 'notSpread';
+export type LogCode = 'stranded' | 'publishFailed' | 'channelHeld' | 'hot' | 'hotShort' | 'breathe' | 'spread' | 'notSpread';
 
 const TEXT: Record<'en' | 'fr', Record<LogCode, string>> = {
   en: {
@@ -12,6 +13,7 @@ const TEXT: Record<'en' | 'fr', Record<LogCode, string>> = {
     publishFailed: '« {title} » failed to publish; another recipe replaces it.',
     channelHeld: 'This channel cannot publish right now (its connection or permissions). Its recipes are on hold; the other channels carry on.',
     hot: '« {title} » is taking off: {reach} people reached in {hours} h, {times}× what a post usually has by then.',
+    hotShort: '« {title} » is taking off: {reach} people reached, {times}× usual.',
     breathe: 'The next post waits until {time} so this one keeps its reach.',
     spread: 'Planned on {count} similar channels: {channels}.{others}',
     notSpread: 'Not spread to other channels: {why}.',
@@ -21,6 +23,7 @@ const TEXT: Record<'en' | 'fr', Record<LogCode, string>> = {
     publishFailed: '« {title} » n’a pas pu être publié ; une autre recette le remplace.',
     channelHeld: 'Ce canal ne peut pas publier pour le moment (connexion ou autorisations). Ses recettes sont en attente ; les autres canaux continuent.',
     hot: '« {title} » décolle : {reach} personnes touchées en {hours} h, {times}× ce qu’une publication obtient d’habitude à ce stade.',
+    hotShort: '« {title} » décolle : {reach} personnes touchées, {times}× l’habitude.',
     breathe: 'La publication suivante attend jusqu’à {time} pour que celle-ci garde sa portée.',
     spread: 'Planifiée sur {count} canaux proches : {channels}.{others}',
     notSpread: 'Pas diffusée sur d’autres canaux : {why}.',
@@ -40,11 +43,25 @@ function why(locale: 'en' | 'fr', params: Record<string, string | number>): stri
   return parts.join(', ');
 }
 
+/** The English sentences entries were saved with before they carried a code (16 Nov 2026), read back as code and values. */
+const LEGACY: Array<[RegExp, LogCode, (m: RegExpMatchArray) => Record<string, string | number>]> = [
+  [/^« (.+) » was left unsure by an interrupted run and never created; its time is planned again\.$/, 'stranded', m => ({ title: m[1]! })],
+  [/^« (.+) » failed to publish; another recipe replaces it\.$/, 'publishFailed', m => ({ title: m[1]! })],
+  [/^This channel cannot publish right now \(its connection or permissions\)\./, 'channelHeld', () => ({})],
+  [/^« (.+) » is taking off: (\d+) people reached, ([\d.]+)× usual\.$/, 'hotShort', m => ({ title: m[1]!, reach: Number(m[2]), times: Number(m[3]) })],
+  [/^The next post waits until (\d\d:\d\d) UTC so this one keeps its reach\.$/, 'breathe', m => ({ time: `${m[1]} UTC` })],
+  [/^Planned on (\d+) similar channels: (.+)\.$/, 'spread', m => ({ count: Number(m[1]), channels: m[2]! })],
+];
+const fromLegacy = (text: string | undefined): { code: LogCode; params: Record<string, string | number> } | null => {
+  for (const [pattern, code, params] of LEGACY) { const m = text?.match(pattern); if (m) return { code, params: params(m) }; }
+  return null;
+};
+
 /** The entry's sentence in the page language (without the channel name, shown apart). */
 export function logSentence(entry: AutopilotLogEntry, locale: 'en' | 'fr'): string {
-  if (!entry.code || !(entry.code in TEXT.en)) return entry.text ?? '';
-  const params = entry.params ?? {};
-  const code = entry.code as LogCode;
+  const coded = entry.code && entry.code in TEXT.en ? { code: entry.code as LogCode, params: entry.params ?? {} } : fromLegacy(entry.text);
+  if (!coded) return entry.text ?? '';
+  const { code, params } = coded;
   const reasons = why(locale, params);
   if (code === 'notSpread') return fill(TEXT[locale].notSpread, { why: reasons || WHY[locale].none });
   if (code === 'spread') return fill(TEXT[locale].spread, { ...params, others: reasons ? fill(WHY[locale].others, { why: reasons }) : '' });
