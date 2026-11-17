@@ -10,8 +10,8 @@ import { logSentence } from '../autopilot-log';
  * Autopilot (2026-11-16): what it may do on its own, and everything it did. Changes are saved with the recipe
  * settings; the activity log is written by the planner only.
  */
-export function AutopilotPanel({ value, timeZone, pages, busy, onChange, t, locale = 'en' }: {
-  locale?: 'en' | 'fr'; value: unknown; timeZone: string; pages: Array<{ id: string; name: string }>; busy: boolean;
+export function AutopilotPanel({ open = false, value, timeZone, pages, busy, onChange, t, locale = 'en' }: {
+  locale?: 'en' | 'fr'; open?: boolean; value: unknown; timeZone: string; pages: Array<{ id: string; name: string }>; busy: boolean;
   onChange: (next: AutopilotSettings) => void; t: (key: RecipeCopyKey, values?: Record<string, string | number>) => string;
 }) {
   const pilot = autopilotOf(value);
@@ -22,7 +22,7 @@ export function AutopilotPanel({ value, timeZone, pages, busy, onChange, t, loca
   const hours = Array.from({ length: 25 }, (_, hour) => hour);
   const on = [best.enabled, heal.replaceFailed, heal.pauseBroken, pilot.score.enabled, pilot.variety.enabled, pilot.evergreen.enabled, pilot.radar.enabled, pilot.breathe.enabled, pilot.captions.enabled, pilot.hooks.enabled, pilot.comment.enabled, pilot.review.enabled, pilot.digest.enabled, pilot.replies.enabled].filter(Boolean).length;
 
-  return <details id="autopilot" className={styles.group} open>
+  return <details id="autopilot" className={styles.group} open={open || undefined}>
     <summary><strong>{t('autopilotHeading')}</strong><span>{on ? t('autopilotOn', { count: on }) : t('autopilotOff')}</span></summary>
     <div className={styles.groupBody}>
       <span className={styles.help}>{t('autopilotIntro')}</span>

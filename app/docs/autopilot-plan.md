@@ -37,7 +37,7 @@ All 15 proposals are live. Where to find them:
 | 3 | Viral score | `wordpress/score.ts`, `server/wordpress-scoring.ts` (AI ratings in `recipe_ratings`, weather, history), `server/wordpress-pick.ts` |
 | 4, 8 | Viral radar, breathing room | `server/wordpress-radar.ts` |
 | 5, 6, 12 | Captions per channel, first-comment call to action, hook tests | `wordpress/caption.ts`, planner (style stored per slot) |
-| 7, 13, 14 | Tomorrow's plan, cockpit, weekly report | `server/wordpress-cockpit.ts`, `ui/AutopilotScreen.tsx`, notifications `autopilot_board` / `autopilot_report` |
+| 7, 13, 14 | Tomorrow's plan, cockpit, weekly report | `server/wordpress-cockpit.ts`, `ui/AutopilotScreen.tsx`, `ui/AutopilotBoard.tsx`, `ui/AutopilotDays.tsx`, notifications `autopilot_board` / `autopilot_report` |
 | 9, 10, 11 | Moments, variety, past winners | `wordpress/score.ts`, `server/wordpress-pick.ts`, `readCandidates` |
 | 15 | Reply drafts | `server/wordpress-replies.ts`, `post_comments.aiDraft`, Inbox `ThreadTools` |
 

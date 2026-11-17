@@ -4,7 +4,7 @@ export const recipeCopy = {
     title: 'Recipes from your WordPress site',
     intro: 'Keep your channels posting recipes from your website. Every posting time on every channel gets a different recipe: its Facebook image and caption in the post, the full recipe in the first comment.',
     unavailable: 'Recipe planning is not available right now. Posts already scheduled are not affected.',
-    statusActive: 'Active', statusPaused: 'Paused', statusNew: 'Not set up',
+    statusActive: 'Active', statusPaused: 'Paused', statusNew: 'Not set up', viewLabel: 'Recipe source', viewPlan: 'Plan', viewSettings: 'Settings', lastRunWhy: 'Why some times stayed empty', planMenu: 'More actions', feedsOther: 'Other feeds', feedsRecipes: 'Recipes', tabsLabel: 'Kinds of feed',
     lastRun: 'Last run {when}: {planned} scheduled, {failed} failed, {unfilled} times still empty.', neverRun: 'Not run yet.',
     unfilledWhy: 'Of {scanned} recipes read, {candidates} could be used (any already planned on these channels are skipped). Not usable: {shared} already shared, {caption} without a Facebook caption, {image} without an image, {recipe} with unreadable recipe data.',
     sourceHeading: 'Source and channels', name: 'Name', siteUrl: 'Website address', siteUrlHint: 'The address of your recipe site, starting with https://',
@@ -94,7 +94,7 @@ export const recipeCopy = {
     title: 'Recettes de votre site WordPress',
     intro: 'Gardez vos canaux alimentés en recettes de votre site. Chaque horaire de chaque canal reçoit une recette différente : son image et sa légende Facebook dans la publication, la recette complète dans le premier commentaire.',
     unavailable: 'La planification des recettes n’est pas disponible pour le moment. Les publications déjà programmées ne sont pas touchées.',
-    statusActive: 'Actif', statusPaused: 'En pause', statusNew: 'Non configuré',
+    statusActive: 'Actif', statusPaused: 'En pause', statusNew: 'Non configuré', viewLabel: 'Source de recettes', viewPlan: 'Planning', viewSettings: 'Réglages', lastRunWhy: 'Pourquoi des horaires sont restés vides', planMenu: 'Plus d’actions', feedsOther: 'Autres flux', feedsRecipes: 'Recettes', tabsLabel: 'Types de flux',
     lastRun: 'Dernière exécution {when} : {planned} programmées, {failed} en échec, {unfilled} horaires encore vides.', neverRun: 'Pas encore exécuté.',
     unfilledWhy: 'Sur {scanned} recettes lues, {candidates} étaient utilisables (celles déjà prévues sur ces canaux sont ignorées). Inutilisables : {shared} déjà partagées, {caption} sans légende Facebook, {image} sans image, {recipe} avec des données de recette illisibles.',
     sourceHeading: 'Source et canaux', name: 'Nom', siteUrl: 'Adresse du site', siteUrlHint: 'L’adresse de votre site de recettes, commençant par https://',
@@ -189,5 +189,5 @@ export type RecipeCopyCatalog = Record<RecipeLocale, Record<RecipeCopyKey, strin
 
 /** `catalog` is the Root-managed `feeds.recipeCopy` value; the shipped defaults apply when it is not supplied. */
 export function recipeText(locale: RecipeLocale, key: RecipeCopyKey, values: Record<string, string | number> = {}, catalog: RecipeCopyCatalog = recipeCopy): string {
-  return (catalog[locale][key] as string).replace(/\{(\w+)\}/g, (whole, name: string) => name in values ? String(values[name]) : whole);
+  return ((catalog[locale]?.[key] ?? recipeCopy[locale][key]) as string).replace(/\{(\w+)\}/g, (whole, name: string) => name in values ? String(values[name]) : whole);
 }

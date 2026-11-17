@@ -1,6 +1,7 @@
 /** Content feeds customer copy in both shipped languages; wording follows the legacy `feeds.*` messages. */
 export const feedsCopy = {
   en: {
+    stateOk: 'Working', stateError: 'Failing', rowMore: 'More actions for {name}',
     title: 'Content feeds',
     description: 'Watch your websites and turn each new article into a post for your channels.',
     invalidPage: 'Choose a valid page and try again.',
@@ -11,7 +12,7 @@ export const feedsCopy = {
     colFeed: 'Feed',
     colChannels: 'Channels',
     colHandling: 'New items',
-    colChecked: 'Last checked',
+    colChecked: 'Status',
     colActions: 'Actions',
     kindRss: 'RSS or Atom',
     kindWordpress: 'WordPress site',
@@ -131,6 +132,7 @@ export const feedsCopy = {
     footnote: 'Approval rules always apply: nothing here publishes immediately, and a workspace that requires approval reviews every feed post first.',
   },
   fr: {
+    stateOk: 'Fonctionne', stateError: 'En erreur', rowMore: 'Plus d’actions pour {name}',
     title: 'Flux de contenu',
     description: 'Surveillez vos sites et transformez chaque nouvel article en publication pour vos canaux.',
     invalidPage: 'Choisissez une page valide et réessayez.',
@@ -141,7 +143,7 @@ export const feedsCopy = {
     colFeed: 'Flux',
     colChannels: 'Canaux',
     colHandling: 'Nouveaux articles',
-    colChecked: 'Dernière vérification',
+    colChecked: 'État',
     colActions: 'Actions',
     kindRss: 'RSS ou Atom',
     kindWordpress: 'Site WordPress',

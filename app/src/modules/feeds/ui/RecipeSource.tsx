@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { Fragment, useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/Button';
 import { Dialog } from '@/components/Dialog';
 import { ConfirmDialog, Menu } from '@/components';
@@ -39,7 +39,7 @@ export type RecipeView = {
   reuse?: { enabled: boolean; cooldownDays: number };
   pool?: RecipePool | null;
   /** Times formatted on the server in the source's zone; the browser never formats a zoned instant. */
-  labels?: { lastRun: string | null; poolAsOf: string | null; slots: Record<string, string> };
+  labels?: { lastRun: string | null; poolAsOf: string | null; slots: Record<string, string>; days?: Record<string, string>; times?: Record<string, string> };
 };
 export type RecipePool = { asOf: string; complete: boolean; warnDays: number; low: boolean; pages: Array<{ targetId: string; targetName: string; eligible: number; daysLeft: number | null; low: boolean }> };
 type Preview = { items: Array<{ wpPostId: string; title: string; permalink: string; imageUrl: string; caption: string; firstComment: string; writtenByAi?: boolean; score?: number; kind?: string; channelCaption?: { channel: string; text: string } }>; captionsPerChannel?: boolean };
@@ -143,7 +143,7 @@ export function RecipeSource({ initial, locale, canWrite, copy = recipeCopy }: {
     setReview(null);
   });
   const loadPreview = () => run(async () => { const body = await call('/api/feeds/wordpress/preview', 'POST', {}); if (!body || !Array.isArray(body.items)) throw new Error(t('unknownError')); setPreview(body as Preview); });
-  const goPage = (page: number) => run(async () => { const body = await call(`/api/feeds/wordpress?page=${page}`, 'GET'); if (body && 'plans' in body) setView(v => ({ ...v, plans: body.plans, counts: body.counts })); });
+  const goPage = (page: number) => run(async () => { const body = await call(`/api/feeds/wordpress?page=${page}`, 'GET'); if (body && 'plans' in body) setView(v => ({ ...v, plans: body.plans, counts: body.counts, labels: body.labels ?? v.labels })); });
   const toggle = (id: string) => setDraft(d => ({ ...d, targetIds: d.targetIds.includes(id) ? d.targetIds.filter(x => x !== id) : [...d.targetIds, id] }));
   const stateText = (p: RecipePlan) => p.reason === 'left_empty' ? t('stateLeftEmpty') : t(p.state === 'planned' ? 'statePlanned' : p.state === 'claimed' ? 'stateClaimed' : p.state === 'uncertain' ? 'stateUncertain' : 'stateFailed');
   const reasonText = (reason: string | null) => { const key = reason ? `reason${reason.charAt(0).toUpperCase()}${reason.slice(1)}` : ''; return key in copy[locale] ? t(key as RecipeCopyKey) : ''; };
@@ -161,20 +161,67 @@ export function RecipeSource({ initial, locale, canWrite, copy = recipeCopy }: {
 
   // Twelve planned posts first; the rest on request (the page grew by one row per channel and posting time).
   const [showAllPlans, setShowAllPlans] = useState(false);
+  // Plan first, settings one press away (2026-11-17); `#autopilot` and `#settings` in the address open the settings.
+  const [tab, setTab] = useState<'plan' | 'settings'>(initial.source ? 'plan' : 'settings');
+  const [pilotOpen, setPilotOpen] = useState(false);
+  useEffect(() => {
+    const follow = () => {
+      const hash = window.location.hash;
+      if (hash === '#autopilot' || hash === '#settings') { setTab('settings'); setPilotOpen(hash === '#autopilot'); }
+      else if (hash === '#plans' && initial.source) setTab('plan');
+    };
+    follow();
+    window.addEventListener('hashchange', follow);
+    return () => window.removeEventListener('hashchange', follow);
+  }, [initial.source]);
+  // Once the settings are on screen, bring the autopilot group into view.
+  useEffect(() => { if (tab === 'settings' && pilotOpen) document.getElementById('autopilot')?.scrollIntoView({ block: 'start' }); }, [tab, pilotOpen]);
   return <section className={styles.root} aria-labelledby="recipe-heading">
-    <h2 id="recipe-heading" className={styles.sectionTitle}>{t('title')}</h2>
-    <p className={styles.help}>{t('intro')}</p>
+    <header className={styles.recipeHead}>
+      <div><h2 id="recipe-heading" className={styles.sectionTitle}>{t('title')} <span className={styles.badge} data-state={statusKey}>{t(statusKey)}</span></h2>
+        <p className={styles.help}>{source ? lastRun : t('intro')}{source?.lastError && <span className={styles.meta}>{source.lastError}</span>}</p></div>
+      {canWrite && source && <div className={styles.actions}>
+        <Button variant="primary" disabled={busy || !source.enabled || !view.available} onClick={() => openReview('run')}>{t('run')}</Button>
+        <Button disabled={busy} onClick={() => void loadPreview()}>{busy ? t('previewing') : t('preview')}</Button>
+        <Menu label={t('planMenu')} items={[
+          ...(unresolved > 0 ? [{ key: 'retry', label: t('retry'), disabled: busy || !source.enabled || !view.available, onSelect: () => openReview('retry') }] : []),
+          { key: 'state', label: t(source.enabled ? 'pause' : 'resume'), disabled: busy, danger: source.enabled, onSelect: () => openReview(source.enabled ? 'pause' : 'resume') },
+        ]} />
+      </div>}
+    </header>
     {!view.available && <p className={styles.help} role="status">{t('unavailable')}</p>}
     {notice && !review && <RouteNotice error={notice.error} focusKey={`recipe-notice:${notice.key}`}>{notice.text}</RouteNotice>}
-    <p className={styles.help}><span className={styles.badge}>{t(statusKey)}</span> {lastRun}{source?.lastError && <span className={styles.meta}>{source.lastError}</span>}</p>
-    {unfilledWhy ? <p className={styles.help}>{unfilledWhy}</p> : null}
-    {canWrite && source && <div className={styles.actions}>
-      <Button disabled={busy} onClick={() => void loadPreview()}>{busy ? t('previewing') : t('preview')}</Button>
-      <Button disabled={busy || !source.enabled || !view.available} onClick={() => openReview('run')}>{t('run')}</Button>
-      {unresolved > 0 && <Button disabled={busy || !source.enabled || !view.available} onClick={() => openReview('retry')}>{t('retry')}</Button>}
-      <Button disabled={busy} onClick={() => openReview(source.enabled ? 'pause' : 'resume')}>{t(source.enabled ? 'pause' : 'resume')}</Button>
+    {canWrite && source && <div className={styles.viewSwitch} role="group" aria-label={t('viewLabel')}>
+      <button type="button" aria-pressed={tab === 'plan'} onClick={() => setTab('plan')}>{t('viewPlan')}</button>
+      <button type="button" aria-pressed={tab === 'settings'} onClick={() => setTab('settings')}>{t('viewSettings')}</button>
     </div>}
 
+    {tab === 'plan' && <>
+    <h3 className={styles.sectionTitle}>{t('plansHeading')}</h3>
+    {view.plans.items.length ? <div className={styles.tableWrap}><table className={styles.table}><caption className="ui-visually-hidden">{t('plansHeading')}</caption>
+      <thead><tr><th scope="col">{t('colTime')}</th><th scope="col">{t('colChannel')}</th><th scope="col">{t('colRecipe')}</th><th scope="col">{t('colState')}</th>{canWrite ? <th scope="col"><span className="ui-visually-hidden">{t('colActions')}</span></th> : null}</tr></thead>
+      <tbody>{(showAllPlans ? view.plans.items : view.plans.items.slice(0, 12)).map((p, index, list) => { const day = view.labels?.days?.[p.id]; const newDay = day && day !== view.labels?.days?.[list[index - 1]?.id ?? '']; return <Fragment key={p.id}>
+        {newDay ? <tr className={styles.dayRow}><th scope="colgroup" colSpan={canWrite ? 5 : 4}>{day}</th></tr> : null}
+        <tr data-state={p.reason === 'left_empty' ? 'empty' : p.state}><th scope="row" className={styles.planTime}>{day ? view.labels?.times?.[p.id] : view.labels?.slots[p.id] ?? ''}</th><td>{p.targetName}</td><td>{p.title}{showScore && typeof p.score === 'number' ? <span className={styles.scoreChip} data-band={p.score >= 70 ? 'high' : p.score >= 45 ? 'mid' : 'low'} title={t('scoreHint')}>{p.score}</span> : null}{p.kind ? <span className={styles.meta}>{t(`kind_${p.kind}` as RecipeCopyKey)}</span> : null}</td><td>{stateText(p)}{reasonText(p.reason) && <span className={styles.meta}>{reasonText(p.reason)}</span>}</td>
+        {canWrite ? <td className={styles.planActions}>{Date.parse(p.slotAt) <= Date.now() ? null : p.reason === 'left_empty'
+          ? <Button size="sm" variant="quiet" disabled={busy} onClick={() => setSlotChange({ plan: p, kind: 'fill' })}>{t('planFill')}</Button>
+          : p.state === 'planned' && p.postId ? <>
+          {/* Control over each planned post (2026-11-15): open it, another recipe, choose one, leave the time empty, never post it again. */}
+          <a className="ui-button ui-button--quiet ui-button--sm" href={`/content/post/${encodeURIComponent(p.postId)}`}>{t('planOpen')}</a>
+          <Button size="sm" variant="quiet" disabled={busy} onClick={() => setSlotChange({ plan: p, kind: 'replace' })}>{t('planReplace')}</Button>
+          <Menu label={t('planMore')} items={[
+            { key: 'choose', label: t('planChoose'), disabled: busy, onSelect: () => openChooser(p) },
+            { key: 'leave', label: t('planLeaveEmpty'), disabled: busy, onSelect: () => setSlotChange({ plan: p, kind: 'leave_empty' }) },
+            { key: 'exclude', label: t('planExclude'), danger: true, disabled: busy, onSelect: () => setSlotChange({ plan: p, kind: 'exclude' }) },
+          ]} />
+        </> : null}</td> : null}</tr></Fragment>; })}</tbody>
+    </table>{view.plans.items.length > 12 ? <button type="button" className={styles.showAll} onClick={() => setShowAllPlans(v => !v)}>{showAllPlans ? t('plansFewer') : t('plansMore', { count: view.plans.items.length - 12 })}</button> : null}</div> : <p className={styles.empty}>{t('plansEmpty')}</p>}
+    <nav className={styles.pagination} aria-label={t('plansHeading')}>
+      {view.plans.page > 1 ? <Button size="sm" disabled={busy} onClick={() => void goPage(view.plans.page - 1)}>{t('previous')}</Button> : <span />}
+      <span>{t('pageLabel', { page: view.plans.page })}</span>
+      {view.plans.hasMore ? <Button size="sm" disabled={busy} onClick={() => void goPage(view.plans.page + 1)}>{t('next')}</Button> : <span />}
+    </nav>
+    {unfilledWhy ? <details className={styles.poolDetails}><summary>{t('lastRunWhy')}</summary><p className={styles.help}>{unfilledWhy}</p></details> : null}
     {source && view.pool !== undefined && <div aria-live="polite">
       <h3 className={styles.sectionTitle}>{t('poolHeading')}</h3>
       {view.pool ? <>
@@ -211,6 +258,9 @@ export function RecipeSource({ initial, locale, canWrite, copy = recipeCopy }: {
     </div>}
     {!preview && source && <p className={styles.help}>{t('previewNone')}</p>}
 
+    </>}
+
+    {tab === 'settings' && <>
     {canWrite && <form className={styles.form} onSubmit={submit} noValidate aria-label={t('sourceHeading')}>
       {/* Settings in folded groups, each summarised on one line (2026-11-14): the page was 5,500 px of always-open form. */}
       <details className={styles.group} open={!view.source || undefined}><summary><strong>{t('sourceHeading')}</strong><span>{draft.siteUrl || '—'} · {draft.allTargets ? t('allChannels') : `${draft.targetIds.length} ${t('channels').toLowerCase()}`}</span></summary><div className={styles.groupBody}>
@@ -224,7 +274,7 @@ export function RecipeSource({ initial, locale, canWrite, copy = recipeCopy }: {
       </fieldset>
       </div></details>
 
-      <AutopilotPanel locale={locale === 'fr' ? 'fr' : 'en'} value={draft.config.autopilot} timeZone={draft.config.timezone} pages={view.pages} busy={busy} t={t} onChange={autopilot => setConfig({ autopilot })} />
+      <AutopilotPanel open={pilotOpen} locale={locale === 'fr' ? 'fr' : 'en'} value={draft.config.autopilot} timeZone={draft.config.timezone} pages={view.pages} busy={busy} t={t} onChange={autopilot => setConfig({ autopilot })} />
 
       <ChannelSettings pages={scopePages} config={draft.config} busy={busy} maxTemplate={view.limits.maxTemplateCharacters} t={t} dayName={dayName}
         onChange={(channels, channelSlots) => setConfig({ channels, channelSlots: Object.keys(channelSlots).length ? channelSlots : undefined })} />
@@ -279,29 +329,8 @@ export function RecipeSource({ initial, locale, canWrite, copy = recipeCopy }: {
         <Button type="button" disabled={busy} onClick={() => setDraft(d => ({ ...d, config: defaultConfig(view.defaults) }))}>{t('reset')}</Button>
       </div>
     </form>}
+    </>}
 
-    <h3 className={styles.sectionTitle}>{t('plansHeading')}</h3>
-    {view.plans.items.length ? <div className={styles.tableWrap}><table className={styles.table}><caption className="ui-visually-hidden">{t('plansHeading')}</caption>
-      <thead><tr><th scope="col">{t('colTime')}</th><th scope="col">{t('colChannel')}</th><th scope="col">{t('colRecipe')}</th><th scope="col">{t('colState')}</th>{canWrite ? <th scope="col"><span className="ui-visually-hidden">{t('colActions')}</span></th> : null}</tr></thead>
-      <tbody>{(showAllPlans ? view.plans.items : view.plans.items.slice(0, 12)).map(p => <tr key={p.id}><th scope="row">{view.labels?.slots[p.id] ?? ''}</th><td>{p.targetName}</td><td>{p.title}{showScore && typeof p.score === 'number' ? <span className={styles.scoreChip} data-band={p.score >= 70 ? 'high' : p.score >= 45 ? 'mid' : 'low'} title={t('scoreHint')}>{p.score}</span> : null}{p.kind ? <span className={styles.meta}>{t(`kind_${p.kind}` as RecipeCopyKey)}</span> : null}</td><td>{stateText(p)}{reasonText(p.reason) && <span className={styles.meta}>{reasonText(p.reason)}</span>}</td>
-        {canWrite ? <td className={styles.planActions}>{Date.parse(p.slotAt) <= Date.now() ? null : p.reason === 'left_empty'
-          ? <Button size="sm" variant="quiet" disabled={busy} onClick={() => setSlotChange({ plan: p, kind: 'fill' })}>{t('planFill')}</Button>
-          : p.state === 'planned' && p.postId ? <>
-          {/* Control over each planned post (2026-11-15): open it, another recipe, choose one, leave the time empty, never post it again. */}
-          <a className="ui-button ui-button--quiet ui-button--sm" href={`/content/post/${encodeURIComponent(p.postId)}`}>{t('planOpen')}</a>
-          <Button size="sm" variant="quiet" disabled={busy} onClick={() => setSlotChange({ plan: p, kind: 'replace' })}>{t('planReplace')}</Button>
-          <Menu label={t('planMore')} items={[
-            { key: 'choose', label: t('planChoose'), disabled: busy, onSelect: () => openChooser(p) },
-            { key: 'leave', label: t('planLeaveEmpty'), disabled: busy, onSelect: () => setSlotChange({ plan: p, kind: 'leave_empty' }) },
-            { key: 'exclude', label: t('planExclude'), danger: true, disabled: busy, onSelect: () => setSlotChange({ plan: p, kind: 'exclude' }) },
-          ]} />
-        </> : null}</td> : null}</tr>)}</tbody>
-    </table>{view.plans.items.length > 12 ? <button type="button" className={styles.showAll} onClick={() => setShowAllPlans(v => !v)}>{showAllPlans ? t('plansFewer') : t('plansMore', { count: view.plans.items.length - 12 })}</button> : null}</div> : <p className={styles.empty}>{t('plansEmpty')}</p>}
-    <nav className={styles.pagination} aria-label={t('plansHeading')}>
-      {view.plans.page > 1 ? <Button size="sm" disabled={busy} onClick={() => void goPage(view.plans.page - 1)}>{t('previous')}</Button> : <span />}
-      <span>{t('pageLabel', { page: view.plans.page })}</span>
-      {view.plans.hasMore ? <Button size="sm" disabled={busy} onClick={() => void goPage(view.plans.page + 1)}>{t('next')}</Button> : <span />}
-    </nav>
 
     {slotChange && (() => {
       const { plan, kind } = slotChange;

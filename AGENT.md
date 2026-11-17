@@ -339,3 +339,19 @@ ads_management (owner asked to rework Ads like Meta Ads Manager first). The subm
   drops that Page's roll-ups and covering runs so the next roll-up run rebuilds them. Window aborts are not logged.
 - Composer channels: > 8 channels use `ChannelSelect` (« Post to » chips + searchable checklist). Sidebar channel
   filter is `ChannelPicker` behind one switcher, shown only on Home, Content lists, Inbox and Insights.
+
+### 7.1h Content feeds and Autopilot screens (2026-11-17), on branch `claude/quirky-cori-7g9knj`, not on `main`
+- Autopilot (`/content/autopilot`): summary card (published today, reached today, planned tomorrow, 7-day reach), « Needs a
+  look » list (held or paused channels, failures, low scores, plan to review; each line links to where it is settled), a
+  pinned section bar, and one Plan section with a Today / Tomorrow switch (`AutopilotDays`; `#today` / `#tomorrow` open
+  a day). `AutopilotBoard` serves both days: by time or by channel, a « Now » line on today, live posts with people
+  reached, « Plan a recipe » on a time left empty. `readCockpit` now returns `today`, each post's `status` / `reach` /
+  `url`, and each channel's 7-day `daily` reach.
+- Content feeds (`/content/feeds`): two tabs, Recipes and Other feeds (`FeedsTabs`, both stay mounted; `#feeds` opens the
+  second). The recipe source shows the plan first, grouped by day, with settings behind a Plan / Settings switch
+  (`#settings`, and `#autopilot` which also opens that group). Pause / retry moved into a menu; feed rows show a status
+  and keep Edit / Delete in a menu.
+- Fixed on the way: page 2 of the planned posts showed no times (labels were not refreshed); `--warn` was not a token
+  (now `--warning`); `recipeText` falls back to the shipped text when a Root-edited catalog lacks a key.
+- Checked locally only, with sample data (`security.twoStep` off, rows inserted by hand): desktop and 390 px, French and
+  English, a production build. Not checked on the live site. The planned-posts table still scrolls sideways on phones.

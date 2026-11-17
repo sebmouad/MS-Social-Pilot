@@ -11,6 +11,8 @@ import { automaticCheckingStatus } from '../server/polling';
 import { FEEDS_FEATURE_ID } from '../manifest';
 import { feedsLocale, feedsText, type FeedsCopyKey } from '../copy';
 import { FeedManager } from './FeedManager';
+import { FeedsTabs } from './FeedsTabs';
+import { recipeText, type RecipeCopyCatalog, type RecipeCopyKey } from '../copy-recipes';
 import { RecipeSource, type RecipePool, type RecipeView } from './RecipeSource';
 import { RecipeStatusCard } from './RecipeStatusCard';
 import { loadRecipeStatus } from './recipe-status';
@@ -42,12 +44,17 @@ export default async function FeedsScreen({ searchParams }: { searchParams: Prom
       automaticCheckingStatus(),
       import('@/modules/studio/server/ai').then(ai => ai.articleWritingAvailable(viewer.workspaceId)).catch(() => false),
     ]);
+    const feedList = <FeedManager initialFeeds={result.feeds.map(f => ({ ...f, lastPolledAt: f.lastPolledAt?.toISOString() ?? null, createdAt: f.createdAt.toISOString(), updatedAt: f.updatedAt.toISOString() }))}
+      channels={channels.map(c => ({ id: c.id, name: c.name }))} page={result.page} hasMore={result.hasMore} canWrite={canWrite} limits={result.limits} locale={locale} automaticMinutes={automatic.intervalMinutes} copy={copy} aiAvailable={aiAvailable} />;
+    const showRecipes = recipes && (recipes.source || canWrite);
+    const r = (key: RecipeCopyKey) => recipeText(locale, key, {}, recipeCopy as RecipeCopyCatalog);
     return <>
       {heading}
-      {recipeStatus ? <RecipeStatusCard status={recipeStatus} locale={locale} copy={copy} /> : null}
-      <FeedManager initialFeeds={result.feeds.map(f => ({ ...f, lastPolledAt: f.lastPolledAt?.toISOString() ?? null, createdAt: f.createdAt.toISOString(), updatedAt: f.updatedAt.toISOString() }))}
-        channels={channels.map(c => ({ id: c.id, name: c.name }))} page={result.page} hasMore={result.hasMore} canWrite={canWrite} limits={result.limits} locale={locale} automaticMinutes={automatic.intervalMinutes} copy={copy} aiAvailable={aiAvailable} />
-      {recipes && (recipes.source || canWrite) && <RecipeSource initial={withRecipeLabels(recipes, locale) as unknown as RecipeView} locale={locale} canWrite={canWrite} copy={recipeCopy} />}
+      {showRecipes ? <FeedsTabs label={r('tabsLabel')} recipesLabel={r('feedsRecipes')} feedsLabel={r('feedsOther')} feedCount={result.feeds.length} initial={recipes.source || params.page === undefined && !result.feeds.length ? 'recipes' : 'feeds'}
+        recipes={<>
+          {recipeStatus ? <RecipeStatusCard status={recipeStatus} locale={locale} copy={copy} /> : null}
+          <RecipeSource initial={withRecipeLabels(recipes, locale) as unknown as RecipeView} locale={locale} canWrite={canWrite} copy={recipeCopy} />
+        </>} feeds={feedList} /> : feedList}
       <p className={styles.privacy}>{t('footnote')}</p>
     </>;
   } catch (error) {

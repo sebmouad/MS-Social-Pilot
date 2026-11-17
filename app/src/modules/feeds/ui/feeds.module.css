@@ -132,3 +132,28 @@
 .scoreChip[data-band="high"] { border-color: var(--accent); background: var(--accent-soft); color: var(--ink); }
 .scoreChip[data-band="low"] { opacity: .75; }
 .checkRow { display: flex; flex-wrap: wrap; gap: 6px 18px; }
+
+/* Recipe source: plan first, settings behind a switch (2026-11-17). */
+.recipeHead { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 12px 20px; }
+.recipeHead > div:first-child { display: grid; gap: 4px; min-width: 0; flex: 1 1 22rem; }
+.recipeHead .sectionTitle { margin: 0; font-size: 1.1rem; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.recipeHead .actions { align-items: center; }
+.badge[data-state="statusActive"] { border-color: transparent; background: var(--success-soft); color: var(--success); }
+.badge[data-state="statusPaused"] { border-color: var(--warning); color: var(--warning); }
+.viewSwitch { display: inline-flex; justify-self: start; padding: 3px; border: 1px solid var(--line-strong); border-radius: 999px; background: var(--surface); }
+.viewSwitch button { min-height: 34px; padding: 0 16px; border: 0; border-radius: 999px; background: none; color: var(--ink-soft); font: inherit; font-size: var(--text-sm); font-weight: 650; cursor: pointer; }
+.viewSwitch button[aria-pressed="true"] { background: var(--accent-soft); color: var(--ink); }
+.dayRow th { padding: .55rem .9rem; background: var(--surface-muted); color: var(--ink); font-size: .82rem; font-weight: 700; }
+.dayRow th::first-letter { text-transform: uppercase; }
+.planTime { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.table tr[data-state="empty"] td, .table tr[data-state="empty"] th { color: var(--ink-soft); }
+.table tr[data-state="failed"] td:nth-child(4), .table tr[data-state="uncertain"] td:nth-child(4) { color: var(--warning); font-weight: 650; }
+.table td, .table tbody th { vertical-align: middle; }
+/* Feed list (2026-11-17). */
+.feedState { display: inline-flex; align-items: center; gap: 6px; font-size: .8rem; font-weight: 650; color: var(--ink-soft); }
+.feedState::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--line-strong); }
+.feedState[data-state="ok"] { color: var(--success); }
+.feedState[data-state="ok"]::before { background: var(--success); }
+.feedState[data-state="error"] { color: var(--warning); }
+.feedState[data-state="error"]::before { background: var(--warning); }
+.rowActions { display: flex; gap: 4px; align-items: center; justify-content: flex-end; white-space: nowrap; }

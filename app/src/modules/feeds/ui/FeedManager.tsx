@@ -4,6 +4,7 @@ import { useRef, useState } from 'react';
 import { IconPlus } from '@tabler/icons-react';
 import { Button } from '@/components/Button';
 import { Dialog } from '@/components/Dialog';
+import { Menu } from '@/components/Menu';
 import { RouteNotice } from '@/components/RouteNotice';
 import { feedsCopy, feedsText, type FeedsCopyCatalog, type FeedsCopyKey, type FeedsLocale } from '../copy';
 import { ChannelSelect } from '@/modules/publishing/ui/compose/ChannelSelect';
@@ -89,12 +90,17 @@ export function FeedManager({ initialFeeds, channels, page, hasMore, canWrite = 
       <div><p className={styles.help}>{automaticMinutes ? t('automatic', { minutes: automaticMinutes }) : t('manualOnly')}</p><p className={styles.help}>{t('reviewNotice')}</p></div>
       {canWrite && <Button variant="primary" leading={<IconPlus size={18} />} onClick={() => begin()}>{t('add')}</Button>}
     </div>
-    {feeds.length ? <div className={styles.tableWrap}><table className={styles.table}><caption className="sr-only">{t('title')}</caption><thead><tr><th scope="col">{t('colFeed')}</th><th scope="col">{t('colChannels')}</th><th scope="col">{t('colHandling')}</th><th scope="col">{t('colChecked')}</th>{canWrite && <th scope="col">{t('colActions')}</th>}</tr></thead><tbody>
+    {feeds.length ? <div className={styles.tableWrap}><table className={styles.table}><caption className="sr-only">{t('title')}</caption><thead><tr><th scope="col">{t('colFeed')}</th><th scope="col">{t('colChannels')}</th><th scope="col">{t('colHandling')}</th><th scope="col">{t('colChecked')}</th>{canWrite && <th scope="col"><span className="ui-visually-hidden">{t('colActions')}</span></th>}</tr></thead><tbody>
       {feeds.map(feed => <tr key={feed.id}><th scope="row"><span className={styles.name}>{feed.name}</span><span className={styles.meta}>{host(feed.url)} · {t(feed.kind === 'wordpress' ? 'kindWordpress' : 'kindRss')}{feed.enabled ? '' : ` · ${t('off')}`}</span></th>
         <td>{feed.targetIds.length ? feed.targetIds.map(id => names.get(id) ?? t('channel')).join(', ') : t('noChannels')}</td>
         <td>{handlingText(feed.handling)}<span className={styles.meta}>{feed.spreadMinutes > 0 ? t('spreadEvery', { minutes: feed.spreadMinutes }) : t('spreadNone')}</span>{feed.aiCaptions ? <span className={styles.meta}>{t('aiCaptionsBadge')}</span> : null}</td>
-        <td>{when(feed.lastPolledAt)}{feed.failureCount > 0 && <span className={styles.meta}>{t('failures', { count: feed.failureCount })}</span>}{feed.lastError && <span className={styles.meta}>{feed.lastError}</span>}</td>
-        {canWrite && <td><div className={styles.actions}><Button size="sm" disabled={busy || !feed.enabled} onClick={() => void performCheck(feed, 'preview')}>{t('checkNow')}</Button><Button size="sm" disabled={busy} onClick={() => begin(feed)}>{t('edit')}</Button><Button size="sm" variant="danger" disabled={busy} onClick={() => { setConfirmation(''); setReview({ kind: 'delete', feed }); }}>{t('delete')}</Button></div></td>}</tr>)}
+        <td><span className={styles.feedState} data-state={!feed.enabled ? 'off' : feed.failureCount > 0 || feed.lastError ? 'error' : 'ok'}>{!feed.enabled ? t('off') : feed.failureCount > 0 || feed.lastError ? t('stateError') : t('stateOk')}</span>
+          <span className={styles.meta}>{when(feed.lastPolledAt)}</span>{feed.failureCount > 0 && <span className={styles.meta}>{t('failures', { count: feed.failureCount })}</span>}{feed.lastError && <span className={styles.meta}>{feed.lastError}</span>}</td>
+        {canWrite && <td><div className={styles.rowActions}><Button size="sm" disabled={busy || !feed.enabled} onClick={() => void performCheck(feed, 'preview')}>{t('checkNow')}</Button>
+          <Menu label={t('rowMore', { name: feed.name })} items={[
+            { key: 'edit', label: t('edit'), disabled: busy, onSelect: () => begin(feed) },
+            { key: 'delete', label: t('delete'), danger: true, disabled: busy, onSelect: () => { setConfirmation(''); setReview({ kind: 'delete', feed }); } },
+          ]} /></div></td>}</tr>)}
     </tbody></table></div> : <p className={styles.empty}>{t('empty')}</p>}
     {(page > 1 || hasMore) && <nav className={styles.pagination} aria-label={t('pagesNav')}>{page > 1 && <a href={`/content/feeds?page=${page - 1}`}>{t('previous')}</a>}<span>{t('pageLabel', { page })}</span>{hasMore && <a href={`/content/feeds?page=${page + 1}`}>{t('next')}</a>}</nav>}
 

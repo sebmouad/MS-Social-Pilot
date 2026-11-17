@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { OperationError } from '@/lib/operation-error';
 import { addDaysToKey, instantToWall, wallTimeToInstant } from '@/lib/calendar-dates';
 import { prisma } from '@/server/data';
-import { postThumbnail } from '@/components/post-thumbnail';
+import { postThumbnail, safeWebUrl } from '@/components/post-thumbnail';
 import { autopilotOf, postScore, type AutopilotLogEntry, type AutopilotSettings } from '../wordpress/autopilot';
 import { bestStyle } from '../wordpress/caption';
 import { channelConfig } from '../wordpress/recipe';
@@ -15,17 +15,21 @@ import { selectSource, type SourceRow } from './wordpress-store';
  * Autopilot cockpit (2026-11-16, docs/autopilot-plan.md): every channel at a glance, tomorrow's plan to approve in one
  * tap, and the weekly report. Also sends the evening « plan ready » and the weekly report notifications.
  */
-export type CockpitPost = { planId: string; targetId: string; targetName: string; slotAt: string; time: string; title: string; score: number | null; kind: string | null; postId: string | null; caption: string; image: string | null; flagged: boolean; state: string; reason: string | null };
-export type CockpitChannel = { id: string; name: string; paused: boolean; pausedReason: string | null; autoTimes: boolean; times: string[]; next: CockpitPost | null; reachToday: number; postsToday: number; failedWeek: number };
+export type CockpitPost = { planId: string; targetId: string; targetName: string; slotAt: string; time: string; title: string; score: number | null; kind: string | null; postId: string | null; caption: string; image: string | null; flagged: boolean; state: string; reason: string | null;
+  /** Where the post stands (2026-11-17): live, still to come, failed, or a time left empty; people reached once live. */
+  status: 'published' | 'upcoming' | 'failed' | 'empty'; reach: number | null; url: string | null };
+export type CockpitChannel = { id: string; name: string; paused: boolean; pausedReason: string | null; autoTimes: boolean; times: string[]; next: CockpitPost | null; reachToday: number; postsToday: number; failedWeek: number;
+  /** The last seven days (2026-11-17): people reached per day, oldest first, the total and the seven days before. */
+  daily: number[]; weekReach: number; previousReach: number; weekPosts: number };
 export type WeeklyReport = {
   from: string; to: string; published: number; reach: number; previousReach: number;
-  channels: Array<{ id: string; name: string; posts: number; reach: number; best: { title: string; reach: number } | null }>;
+  channels: Array<{ id: string; name: string; posts: number; reach: number; previousReach: number; daily: number[]; best: { title: string; reach: number } | null }>;
   best: { title: string; channel: string; reach: number } | null; bestHour: number | null;
   learned: AutopilotLogEntry[]; styles: Record<string, { posts: number; average: number }>; preferredStyle: string | null;
 };
 export type CockpitView = {
   enabled: boolean; sourceName: string; timeZone: string; pilot: AutopilotSettings; canWrite: boolean;
-  channels: CockpitChannel[]; tomorrow: { date: string; posts: CockpitPost[]; approved: boolean; averageScore: number | null; flagged: number };
+  channels: CockpitChannel[]; today: { date: string; posts: CockpitPost[] }; tomorrow: { date: string; posts: CockpitPost[]; approved: boolean; averageScore: number | null; flagged: number };
   report: WeeklyReport;
   ai: AiUse | null;
 };
@@ -52,10 +56,12 @@ async function context(actor: FeedActor, write = false) {
   return { auth, settings, source, pages, config: configOf(settings, source) };
 }
 
-type PlanRow = { id: string; targetId: string; slotAt: Date; scheduledAt: Date | null; title: string; score: number | null; kind: string | null; postId: string | null; state: string; reason: string | null; message: string | null; media: unknown };
+type PlanRow = { id: string; targetId: string; slotAt: Date; scheduledAt: Date | null; title: string; score: number | null; kind: string | null; postId: string | null; state: string; reason: string | null; message: string | null; media: unknown; targetStatus: string | null; remoteUrl: string | null; insights: unknown };
 async function plansBetween(sourceId: string, from: Date, to: Date): Promise<PlanRow[]> {
-  return prisma.$queryRaw<PlanRow[]>`SELECT l.id, l."targetId", l."slotAt", p."scheduledAt", l.title, l.score, l.kind, l."postId", l.state, l.reason, p.message, p.media FROM wordpress_recipe_plans l
+  return prisma.$queryRaw<PlanRow[]>`SELECT l.id, l."targetId", l."slotAt", p."scheduledAt", l.title, l.score, l.kind, l."postId", l.state, l.reason, p.message, p.media, pt.status::text AS "targetStatus", pt."remoteUrl", ep.insights FROM wordpress_recipe_plans l
     LEFT JOIN posts p ON p.id = l."postId" AND p."workspaceId" = l."workspaceId"
+    LEFT JOIN post_targets pt ON pt."postId" = l."postId" AND pt."targetId" = l."targetId"
+    LEFT JOIN external_posts ep ON ep."targetId" = pt."targetId" AND ep."remoteId" = pt."remotePostId"
     WHERE l."sourceId" = ${sourceId} AND l."slotAt" >= ${from} AND l."slotAt" < ${to} ORDER BY l."slotAt" ASC, l."targetId" ASC`;
 }
 
@@ -71,26 +77,34 @@ export async function readCockpit(actor: FeedActor, now = new Date()): Promise<C
     planId: row.id, targetId: row.targetId, targetName: names.get(row.targetId) ?? '', slotAt: (row.scheduledAt ?? row.slotAt).toISOString(), time: instantToWall(row.scheduledAt ?? row.slotAt, tz).time,
     title: row.title, score: row.score, kind: row.kind, postId: row.postId, caption: (row.message ?? '').slice(0, 280), image: thumb(row.media),
     flagged: row.state === 'planned' && typeof row.score === 'number' && row.score < 45, state: row.state, reason: row.reason,
+    status: row.reason === 'left_empty' ? 'empty' : row.state !== 'planned' || row.targetStatus === 'failed' || row.targetStatus === 'cancelled' ? 'failed' : row.targetStatus === 'published' ? 'published' : 'upcoming',
+    reach: row.targetStatus === 'published' ? reachOf(row.insights) : null, url: row.targetStatus === 'published' ? safeWebUrl(row.remoteUrl) : null,
   });
-  const [upcoming, board] = await Promise.all([plansBetween(source.id, now, new Date(now.getTime() + 3 * 86_400_000)), plansBetween(source.id, dayStart(tomorrow), dayStart(addDaysToKey(tomorrow, 1)))]);
+  const [upcoming, board, todayPlans] = await Promise.all([plansBetween(source.id, now, new Date(now.getTime() + 3 * 86_400_000)), plansBetween(source.id, dayStart(tomorrow), dayStart(addDaysToKey(tomorrow, 1))), plansBetween(source.id, dayStart(today), dayStart(tomorrow))]);
   const ids = pages.map(page => page.id);
   const [todayRows, failed] = await Promise.all([
     ids.length ? prisma.$queryRaw<Array<{ targetId: string; insights: unknown }>>`SELECT "targetId", insights FROM external_posts WHERE "targetId" = ANY(${ids}::text[]) AND "createdTime" >= ${dayStart(today)}` : [],
     prisma.$queryRaw<Array<{ targetId: string; count: bigint }>>`SELECT "targetId", COUNT(*)::bigint AS count FROM wordpress_recipe_plans WHERE "sourceId" = ${source.id} AND state IN ('failed', 'uncertain') AND reason IS DISTINCT FROM 'left_empty' AND reason IS DISTINCT FROM 'replaced' AND "slotAt" >= ${new Date(now.getTime() - 7 * 86_400_000)} GROUP BY "targetId"`,
   ]);
+  const report = await weeklyReport(source, pages, pilot, tz, now);
   const channels: CockpitChannel[] = pages.map(page => {
+    const week = report.channels.find(row => row.id === page.id);
     const own = config.channels?.[page.id];
     const next = upcoming.find(row => row.targetId === page.id && row.state === 'planned');
     const mine = todayRows.filter(row => row.targetId === page.id);
     return { id: page.id, name: page.name, paused: own?.paused === true, pausedReason: own?.pausedReason ?? null, autoTimes: own?.autoTimes === true || (!own?.slots?.length && Boolean(pilot.learnedTimes?.[page.id])), times: channelConfig(config, page.id).slots,
-      next: next ? view(next) : null, reachToday: mine.reduce((sum, row) => sum + reachOf(row.insights), 0), postsToday: mine.length, failedWeek: Number(failed.find(row => row.targetId === page.id)?.count ?? 0) };
+      next: next ? view(next) : null, reachToday: mine.reduce((sum, row) => sum + reachOf(row.insights), 0), postsToday: mine.length, failedWeek: Number(failed.find(row => row.targetId === page.id)?.count ?? 0),
+      daily: week?.daily ?? [], weekReach: week?.reach ?? 0, previousReach: week?.previousReach ?? 0, weekPosts: week?.posts ?? 0 };
   });
-  const boardPosts = board.filter(row => names.has(row.targetId) && (row.state === 'planned' || row.reason === 'left_empty')).map(view).sort((a, b) => a.slotAt.localeCompare(b.slotAt) || a.targetName.localeCompare(b.targetName));
+  const byTime = (a: CockpitPost, b: CockpitPost) => a.slotAt.localeCompare(b.slotAt) || a.targetName.localeCompare(b.targetName);
+  // Today keeps what failed too: the day's page says what happened, not only what is planned.
+  const todayPosts = todayPlans.filter(row => names.has(row.targetId) && row.reason !== 'replaced' && row.state !== 'claimed').map(view).sort(byTime);
+  const boardPosts = board.filter(row => names.has(row.targetId) && (row.state === 'planned' || row.reason === 'left_empty')).map(view).sort(byTime);
   const scores = boardPosts.flatMap(post => typeof post.score === 'number' && post.state === 'planned' ? [post.score] : []);
   return {
     enabled: source.enabled, sourceName: source.name, timeZone: tz, pilot, canWrite: auth.role === 'owner' || auth.role === 'admin' || auth.role === 'editor',
-    channels, tomorrow: { date: tomorrow, posts: boardPosts, approved: (pilot.approvedDays ?? []).includes(tomorrow), averageScore: scores.length ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : null, flagged: boardPosts.filter(post => post.flagged).length },
-    report: await weeklyReport(source, pages, pilot, tz, now),
+    channels, today: { date: today, posts: todayPosts }, tomorrow: { date: tomorrow, posts: boardPosts, approved: (pilot.approvedDays ?? []).includes(tomorrow), averageScore: scores.length ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : null, flagged: boardPosts.filter(post => post.flagged).length },
+    report,
     ai: await aiUse(actor.workspaceId, now).catch(() => null),
   };
 }
@@ -109,7 +123,8 @@ export async function weeklyReport(source: SourceRow, pages: ReadonlyArray<{ id:
   const channels = pages.map(page => {
     const mine = week.filter(row => row.targetId === page.id);
     const top = [...mine].sort((a, b) => reachOf(b.insights) - reachOf(a.insights))[0];
-    return { id: page.id, name: page.name, posts: mine.length, reach: total(mine), best: top && reachOf(top.insights) ? { title: top.title ?? '', reach: reachOf(top.insights) } : null };
+    const daily = Array.from({ length: 7 }, (_, index) => total(mine.filter(row => Math.min(6, Math.floor((row.slotAt.getTime() - from.getTime()) / 86_400_000)) === index)));
+    return { id: page.id, name: page.name, posts: mine.length, reach: total(mine), previousReach: total(previous.filter(row => row.targetId === page.id)), daily, best: top && reachOf(top.insights) ? { title: top.title ?? '', reach: reachOf(top.insights) } : null };
   });
   const top = [...week].sort((a, b) => reachOf(b.insights) - reachOf(a.insights))[0];
   const byHour = new Map<number, number[]>();
