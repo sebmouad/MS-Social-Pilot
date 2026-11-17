@@ -134,3 +134,7 @@
   .log li > div { grid-column: 1 / -1; grid-row: 2; }
 }
 .day { display: grid; gap: 12px; min-width: 0; padding-top: 12px; }
+.showAll { min-height: 40px; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface); color: var(--accent); font: inherit; font-weight: 700; cursor: pointer; }
+.showAll:hover { background: var(--surface-muted); }
+.more > summary { padding: 6px 2px; color: var(--accent); font-weight: 700; font-size: .88rem; cursor: pointer; }
+.more[open] > summary { margin-bottom: 8px; }

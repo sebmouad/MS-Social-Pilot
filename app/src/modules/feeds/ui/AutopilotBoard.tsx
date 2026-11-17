@@ -26,6 +26,8 @@ export function AutopilotBoard({ mode, date, dateLabel, posts, approved = false,
   const toast = useToast();
   const [onlyFlagged, setOnlyFlagged] = useState(false);
   const [grouping, setGrouping] = useState<'time' | 'channel'>('time');
+  // A busy day opens on its next posts (2026-11-17): the rest is one press away.
+  const [expanded, setExpanded] = useState(false);
   const [approving, setApproving] = useState(false);
   const [change, setChange] = useState<{ post: CockpitPost; action: Action } | null>(null);
   const send = async (url: string, body: unknown) => {
@@ -38,7 +40,12 @@ export function AutopilotBoard({ mode, date, dateLabel, posts, approved = false,
 
   if (!posts.length) return <p className={styles.emptyBox}>{mode === 'today' ? labels.emptyToday : labels.emptyTomorrow}</p>;
 
-  const shown = onlyFlagged ? posts.filter(post => post.flagged) : posts;
+  const all = onlyFlagged ? posts.filter(post => post.flagged) : posts;
+  const SHORT = 8;
+  const ahead = mode === 'today' ? all.findIndex(post => Date.parse(post.slotAt) > now) : 0;
+  const from = ahead < 0 ? Math.max(0, all.length - SHORT) : Math.max(0, Math.min(ahead - 1, all.length - SHORT));
+  const short = grouping === 'time' && !expanded && all.length > SHORT + 2;
+  const shown = short ? all.slice(from, from + SHORT) : all;
   const groups = grouping === 'channel'
     ? [...new Set(shown.map(post => post.targetId))].map(id => ({ id, name: shown.find(post => post.targetId === id)!.targetName, posts: shown.filter(post => post.targetId === id) }))
         .sort((a, b) => a.name.localeCompare(b.name))
@@ -95,6 +102,7 @@ export function AutopilotBoard({ mode, date, dateLabel, posts, approved = false,
         {row(p)}
       </Fragment>)}</ul>
     </Fragment>)}
+    {grouping === 'time' && all.length > SHORT + 2 ? <button type="button" className={styles.showAll} aria-expanded={expanded} onClick={() => setExpanded(v => !v)}>{expanded ? labels.showFewer : fill(labels.showEvery, { count: all.length })}</button> : null}
     <ConfirmDialog open={approving} title={labels.approveTitle} objectName={fill(labels.approveObject, { date: dateLabel })} consequence={labels.approveConsequence}
       confirmLabel={labels.approveAll} cancelLabel={labels.cancel} failureLabel={labels.approveFailed} danger={false} onClose={() => setApproving(false)}
       onConfirm={async () => {

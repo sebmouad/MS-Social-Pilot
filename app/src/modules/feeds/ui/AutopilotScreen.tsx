@@ -39,7 +39,7 @@ export default async function AutopilotScreen() {
   const change = percent(report.reach, report.previousReach);
   const next = view.channels.flatMap(channel => channel.next ? [channel.next] : []).sort((a, b) => a.slotAt.localeCompare(b.slotAt))[0];
   const boardLabels = Object.fromEntries((['approveAll', 'approved', 'approveTitle', 'approveObject', 'approveConsequence', 'approveDone', 'approveFailed', 'cancel', 'showFlagged', 'showAll', 'emptyTomorrow', 'emptyToday', 'another', 'leaveEmpty', 'open', 'leftEmpty',
-    'anotherTitle', 'anotherConsequence', 'emptyTitle', 'emptyConsequence', 'fill', 'fillTitle', 'fillConsequence', 'changed', 'changeFailed', 'scoreLabel', 'flaggedHint', 'groupBy', 'byTime', 'byChannel', 'now', 'view', 'more', 'failed', 'publishedReach', 'publishedNoReach',
+    'anotherTitle', 'anotherConsequence', 'emptyTitle', 'emptyConsequence', 'fill', 'fillTitle', 'fillConsequence', 'changed', 'changeFailed', 'scoreLabel', 'flaggedHint', 'groupBy', 'byTime', 'byChannel', 'now', 'view', 'more', 'failed', 'publishedReach', 'publishedNoReach', 'showEvery', 'showFewer',
     'kind_dessert', 'kind_main', 'kind_starter', 'kind_drink', 'kind_aperitif', 'kind_bread', 'kind_side', 'kind_breakfast', 'kind_sauce'] as const).map(key => [key, autopilotText(locale, key)])) as Record<string, string>;
 
   const today = view.today.posts;
@@ -63,6 +63,12 @@ export default async function AutopilotScreen() {
   const styleRows = Object.entries(report.styles).sort((a, b) => b[1].average - a[1].average);
   const topStyle = Math.max(0.01, ...styleRows.map(([, stat]) => stat.average));
   const logTime = (at: string) => new Intl.DateTimeFormat(locale, { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: view.timeZone }).format(new Date(at));
+  const logRow = (entry: (typeof report.learned)[number], index: number) => <li key={`${entry.at}-${index}`} data-kind={entry.kind}>
+          <span className={styles.logKind}>{t(`log_${entry.kind}` as AutopilotCopyKey)}</span>
+          <div><strong>{entry.channelName ?? ''}</strong>
+            <span>{entry.kind === 'times' ? <>{t('timesMoved')} <s>{(entry.from ?? []).join(' · ')}</s> → {(entry.to ?? []).join(' · ')}</> : logSentence(entry, locale)}</span></div>
+          <time dateTime={entry.at}>{logTime(entry.at)}</time>
+        </li>;
   const sections: Array<[string, string]> = [['plan', t('planHeading')], ['channels', t('channelsHeading')], ['report', t('reportHeading')], ['activity', t('navActivity')], ...(view.ai ? [['ai', t('navAi')] as [string, string]] : [])];
 
   return <>
@@ -76,7 +82,7 @@ export default async function AutopilotScreen() {
         </div>
         <dl className={styles.heroStats}>
           <div><dt>{t('statToday')}</dt><dd>{live.length}<small> / {live.length + toCome.length}</small></dd><span>{failedToday.length ? <span className={styles.warn}>{failedToday.length === 1 ? t('statFailedOne') : t('statFailed', { count: failedToday.length })}</span> : toCome.length ? t('statToCome', { count: toCome.length }) : t('statDayDone')}</span></div>
-          <div><dt>{t('statReachToday')}</dt><dd>{number(reachToday)}</dd><span>{live.length ? t('statPerPost', { reach: number(reachToday / live.length) }) : t('statNoneLive')}</span></div>
+          <div><dt>{t('statReachToday')}</dt><dd>{number(reachToday)}</dd><span>{!live.length ? t('statNoneLive') : reachToday ? t('statPerPost', { reach: number(reachToday / live.length) }) : t('statNotMeasured')}</span></div>
           <div><dt>{t('statTomorrow')}</dt><dd>{planned.length}</dd><span>{!planned.length ? t('statNotPlanned') : view.tomorrow.approved ? t('approved') : view.tomorrow.flagged ? <span className={styles.warn}>{t('flagged', { count: view.tomorrow.flagged })}</span> : t('statToReview')}</span></div>
           <div><dt>{t('statWeek')}</dt><dd>{compact(report.reach)}</dd><span>{change !== null ? <><span className={styles.delta} data-direction={change > 0.5 ? 'up' : change < -0.5 ? 'down' : 'flat'}>{signed(change)}</span> {t('vsPrevious')}</> : t('statFirstWeek')}</span></div>
         </dl>
@@ -151,12 +157,10 @@ export default async function AutopilotScreen() {
 
       <section id="activity" aria-labelledby="ap-activity" className={styles.section}>
         <h2 id="ap-activity">{t('learnedHeading')} <span className={styles.muted}>{t('reportRange')}</span></h2>
-        {report.learned.length ? <ul className={styles.log}>{report.learned.map((entry, index) => <li key={`${entry.at}-${index}`} data-kind={entry.kind}>
-          <span className={styles.logKind}>{t(`log_${entry.kind}` as AutopilotCopyKey)}</span>
-          <div><strong>{entry.channelName ?? ''}</strong>
-            <span>{entry.kind === 'times' ? <>{t('timesMoved')} <s>{(entry.from ?? []).join(' · ')}</s> → {(entry.to ?? []).join(' · ')}</> : logSentence(entry, locale)}</span></div>
-          <time dateTime={entry.at}>{logTime(entry.at)}</time>
-        </li>)}</ul> : <p className={styles.emptyBox}>{t('learnedEmpty')}</p>}
+        {report.learned.length ? <>
+          <ul className={styles.log}>{report.learned.slice(0, 6).map(logRow)}</ul>
+          {report.learned.length > 6 ? <details className={styles.more}><summary>{t('logMore', { count: report.learned.length - 6 })}</summary><ul className={styles.log}>{report.learned.slice(6).map(logRow)}</ul></details> : null}
+        </> : <p className={styles.emptyBox}>{t('learnedEmpty')}</p>}
       </section>
 
       {view.ai ? <section id="ai" aria-labelledby="ap-ai" className={styles.section}>

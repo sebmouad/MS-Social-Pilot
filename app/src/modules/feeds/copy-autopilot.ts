@@ -36,7 +36,7 @@ export const autopilotCopy = {
     todayHeading: 'Today, {date}', emptyToday: 'Nothing is planned for today.', groupBy: 'Group the posts', byTime: 'By time', byChannel: 'By channel', now: 'Now', view: 'View post', more: 'More for « {title} »', failed: 'Failed',
     publishedReach: 'Live · {reach} reached', publishedNoReach: 'Live', fill: 'Plan a recipe', fillTitle: 'Plan a recipe at this time', fillConsequence: 'The autopilot picks a recipe for this time on {channel}.',
     bestOf: 'best: {title} ({reach})', stylesHint: 'Each style against what the channel usually reaches. The best one becomes the default once every style has enough posts.', timesMoved: 'Posting times moved:',
-    log_times: 'Times', log_healing: 'Repair', log_supply: 'Recipes', log_radar: 'Radar', aiEmpty: 'No AI request this month yet.',
+    statNotMeasured: 'Not measured yet', showEvery: 'Show all {count} posts', showFewer: 'Show fewer', logMore: '{count} earlier changes', log_times: 'Times', log_healing: 'Repair', log_supply: 'Recipes', log_radar: 'Radar', aiEmpty: 'No AI request this month yet.',
     noAccess: 'Set up the recipe source on the Content feeds page to use the autopilot.', loadFailed: 'The autopilot could not be loaded. Refresh to try again.',
   },
   fr: {
@@ -75,7 +75,7 @@ export const autopilotCopy = {
     todayHeading: 'Aujourd’hui, {date}', emptyToday: 'Rien n’est planifié pour aujourd’hui.', groupBy: 'Regrouper les publications', byTime: 'Par heure', byChannel: 'Par canal', now: 'Maintenant', view: 'Voir la publication', more: 'Plus pour « {title} »', failed: 'Échec',
     publishedReach: 'En ligne · {reach} touchées', publishedNoReach: 'En ligne', fill: 'Planifier une recette', fillTitle: 'Planifier une recette à cet horaire', fillConsequence: 'Le pilote choisit une recette pour cet horaire sur {channel}.',
     bestOf: 'meilleure : {title} ({reach})', stylesHint: 'Chaque style par rapport à ce que le canal touche d’habitude. Le meilleur devient le style par défaut quand chacun a assez de publications.', timesMoved: 'Horaires déplacés :',
-    log_times: 'Horaires', log_healing: 'Réparation', log_supply: 'Recettes', log_radar: 'Radar', aiEmpty: 'Aucune requête IA ce mois-ci pour l’instant.',
+    statNotMeasured: 'Pas encore mesuré', showEvery: 'Afficher les {count} publications', showFewer: 'Afficher moins', logMore: '{count} changements plus anciens', log_times: 'Horaires', log_healing: 'Réparation', log_supply: 'Recettes', log_radar: 'Radar', aiEmpty: 'Aucune requête IA ce mois-ci pour l’instant.',
     noAccess: 'Configurez la source de recettes sur la page Flux de contenu pour utiliser le pilote.', loadFailed: 'Le pilote n’a pas pu être chargé. Actualisez pour réessayer.',
   },
 } as const;
