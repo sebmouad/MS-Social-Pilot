@@ -40,6 +40,7 @@ test('ai replies: the prompt names the page, the decision rules, the link and th
   const comment = aiReplyPrompt({ kind: 'comment', channel: 'Cuisine Qui Réunit', voice: null, author: 'Julie', text: 'On peut la congeler ?', post: 'Carbonnade flamande', link: 'https://recettes.example/c' }, 'friendly');
   assert.match(comment.system, /« Cuisine Qui Réunit »/);
   assert.match(comment.system, /"handoff"/);
+  assert.match(comment.system, /Never guess whether the person is a man or a woman/);
   assert.match(comment.system, /give this link and no other: https:\/\/recettes\.example\/c/);
   assert.match(comment.prompt, /Comment from Julie: On peut la congeler \?/);
   const message = aiReplyPrompt({ kind: 'message', channel: 'P', voice: 'Tutoie les gens', author: null, text: 'Et pour 6 ?', history: [{ from: 'visitor', text: 'Bonjour' }, { from: 'page', text: 'Bonjour !' }] }, 'short');
