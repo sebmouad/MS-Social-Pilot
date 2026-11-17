@@ -362,5 +362,12 @@ ads_management (owner asked to rework Ads like Meta Ads Manager first). The subm
 - Autopilot « Needs a look » names the week's last three failures (recipe, channel, time, reason; `readCockpit`
   `failures`). The recipe count (« Recipe supply ») takes about a minute after each deploy because a restart empties its
   in-memory cache: Feeds now refreshes itself (`RefreshSoon`) until it arrives. Not a bug; seen live on 2026-11-17.
+- A failed time counts as a problem (Autopilot « Needs a look », Feeds status card) only when it was not left empty or
+  replaced on purpose and no planned post on that channel sits within the autopilot gap (`stillFailedSql`). Seen live:
+  an interrupted run left 16 Nov 15:00 « not created » after the autopilot had moved that channel's time to 15:30, which
+  carried the post. Known gap, not fixed: a slot freed at a time a channel no longer uses is never refilled (the
+  planner only fills current times), so such a day can run one post short if the new time was not free.
+- Fragments built with `Prisma.sql` must go into `prisma.$queryRaw(Prisma.sql\`…\`)`; nested in a tagged
+  `$queryRaw\`…\`` they are sent as a JSON value (error 42804).
 - Live-site credentials for read-only checks are in the cloud environment as `MSP_APP_URL`, `MSP_TEST_EMAIL`,
   `MSP_TEST_PASSWORD` (never print them); sign in with `POST /api/auth/sign-in` and an `Origin` header.
