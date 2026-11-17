@@ -367,7 +367,7 @@ ads_management (owner asked to rework Ads like Meta Ads Manager first). The subm
   an interrupted run left 16 Nov 15:00 « not created » after the autopilot had moved that channel's time to 15:30, which
   carried the post. Known gap, not fixed: a slot freed at a time a channel no longer uses is never refilled (the
   planner only fills current times), so such a day can run one post short if the new time was not free.
-- Fragments built with `Prisma.sql` must go into `prisma.$queryRaw(Prisma.sql\`…\`)`; nested in a tagged
-  `$queryRaw\`…\`` they are sent as a JSON value (error 42804).
+- A fragment built with `Prisma.sql` works only when the whole query is a `Prisma.sql` object passed to `$queryRaw(...)`;
+  nested inside a tagged `$queryRaw` template it is sent as a JSON value (error 42804).
 - Live-site credentials for read-only checks are in the cloud environment as `MSP_APP_URL`, `MSP_TEST_EMAIL`,
   `MSP_TEST_PASSWORD` (never print them); sign in with `POST /api/auth/sign-in` and an `Origin` header.
