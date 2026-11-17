@@ -340,7 +340,7 @@ ads_management (owner asked to rework Ads like Meta Ads Manager first). The subm
 - Composer channels: > 8 channels use `ChannelSelect` (« Post to » chips + searchable checklist). Sidebar channel
   filter is `ChannelPicker` behind one switcher, shown only on Home, Content lists, Inbox and Insights.
 
-### 7.1h Content feeds and Autopilot screens (2026-11-17), on branch `claude/quirky-cori-7g9knj`, not on `main`
+### 7.1h Content feeds and Autopilot screens (2026-11-17), on `main`, live
 - Autopilot (`/content/autopilot`): summary card (published today, reached today, planned tomorrow, 7-day reach), « Needs a
   look » list (held or paused channels, failures, low scores, plan to review; each line links to where it is settled), a
   pinned section bar, and one Plan section with a Today / Tomorrow switch (`AutopilotDays`; `#today` / `#tomorrow` open
@@ -353,5 +353,9 @@ ads_management (owner asked to rework Ads like Meta Ads Manager first). The subm
   and keep Edit / Delete in a menu.
 - Fixed on the way: page 2 of the planned posts showed no times (labels were not refreshed); `--warn` was not a token
   (now `--warning`); `recipeText` falls back to the shipped text when a Root-edited catalog lacks a key.
-- Checked locally only, with sample data (`security.twoStep` off, rows inserted by hand): desktop and 390 px, French and
-  English, a production build. Not checked on the live site. The planned-posts table still scrolls sideways on phones.
+- A busy day (the live site has 11 channels, 44 posts a day) opens on eight posts around now, the rest behind « Show
+  all »; the activity log shows six entries, older ones folded.
+- Checked on the live site after deploy (read-only, desktop and 390 px, no page errors), and locally with sample data
+  where « leave empty » and « approve all » were run. The planned-posts table on Feeds still scrolls sideways on phones.
+- Live-site credentials for read-only checks are in the cloud environment as `MSP_APP_URL`, `MSP_TEST_EMAIL`,
+  `MSP_TEST_PASSWORD` (never print them); sign in with `POST /api/auth/sign-in` and an `Origin` header.
