@@ -359,5 +359,8 @@ ads_management (owner asked to rework Ads like Meta Ads Manager first). The subm
   where « leave empty » and « approve all » were run.
 - Planned posts (Feeds) list what is to come first, soonest first, then « Already passed », latest first
   (`selectPlans`); on phones each row is a card. A channel trend past ten times the week before reads « ×58 ».
+- Autopilot « Needs a look » names the week's last three failures (recipe, channel, time, reason; `readCockpit`
+  `failures`). The recipe count (« Recipe supply ») takes about a minute after each deploy because a restart empties its
+  in-memory cache: Feeds now refreshes itself (`RefreshSoon`) until it arrives. Not a bug; seen live on 2026-11-17.
 - Live-site credentials for read-only checks are in the cloud environment as `MSP_APP_URL`, `MSP_TEST_EMAIL`,
   `MSP_TEST_PASSWORD` (never print them); sign in with `POST /api/auth/sign-in` and an `Origin` header.
