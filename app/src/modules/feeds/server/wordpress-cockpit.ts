@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { OperationError } from '@/lib/operation-error';
 import { addDaysToKey, instantToWall, wallTimeToInstant } from '@/lib/calendar-dates';
 import { prisma } from '@/server/data';
+import { Prisma } from '../../../../generated/client';
 import { postThumbnail, safeWebUrl } from '@/components/post-thumbnail';
 import { autopilotOf, postScore, type AutopilotLogEntry, type AutopilotSettings } from '../wordpress/autopilot';
 import { bestStyle } from '../wordpress/caption';
@@ -9,7 +10,7 @@ import { channelConfig } from '../wordpress/recipe';
 import { authorizeFeeds, authorizeFeedWrite, type FeedActor } from './access';
 import { configOf } from './wordpress-planner';
 import { loadWordpressSettings, type WordpressSettings } from './wordpress-settings';
-import { selectSource, type SourceRow } from './wordpress-store';
+import { selectSource, stillFailedSql, type SourceRow } from './wordpress-store';
 
 /**
  * Autopilot cockpit (2026-11-16, docs/autopilot-plan.md): every channel at a glance, tomorrow's plan to approve in one
@@ -85,12 +86,13 @@ export async function readCockpit(actor: FeedActor, now = new Date()): Promise<C
   const [upcoming, board, todayPlans] = await Promise.all([plansBetween(source.id, now, new Date(now.getTime() + 3 * 86_400_000)), plansBetween(source.id, dayStart(tomorrow), dayStart(addDaysToKey(tomorrow, 1))), plansBetween(source.id, dayStart(today), dayStart(tomorrow))]);
   const ids = pages.map(page => page.id);
   const weekAgo = new Date(now.getTime() - 7 * 86_400_000);
+  const gap = pilot.bestTimes.gapMinutes;
   const [todayRows, failed, failures] = await Promise.all([
     ids.length ? prisma.$queryRaw<Array<{ targetId: string; insights: unknown }>>`SELECT "targetId", insights FROM external_posts WHERE "targetId" = ANY(${ids}::text[]) AND "createdTime" >= ${dayStart(today)}` : [],
-    prisma.$queryRaw<Array<{ targetId: string; count: bigint }>>`SELECT "targetId", COUNT(*)::bigint AS count FROM wordpress_recipe_plans WHERE "sourceId" = ${source.id} AND state IN ('failed', 'uncertain') AND reason IS DISTINCT FROM 'left_empty' AND reason IS DISTINCT FROM 'replaced' AND "slotAt" >= ${weekAgo} GROUP BY "targetId"`,
-    ids.length ? prisma.$queryRaw<Array<{ id: string; targetId: string; slotAt: Date; title: string; reason: string | null; postId: string | null }>>`SELECT id, "targetId", "slotAt", title, reason, "postId" FROM wordpress_recipe_plans
-      WHERE "sourceId" = ${source.id} AND "targetId" = ANY(${ids}::text[]) AND state IN ('failed', 'uncertain') AND reason IS DISTINCT FROM 'left_empty' AND reason IS DISTINCT FROM 'replaced' AND "slotAt" >= ${weekAgo} AND "slotAt" < ${now}
-      ORDER BY "slotAt" DESC LIMIT 3` : [],
+    prisma.$queryRaw<Array<{ targetId: string; count: bigint }>>(Prisma.sql`SELECT l."targetId", COUNT(*)::bigint AS count FROM wordpress_recipe_plans l WHERE l."sourceId" = ${source.id} AND l.state IN ('failed', 'uncertain') AND ${stillFailedSql('l', gap)} AND l."slotAt" >= ${weekAgo} GROUP BY l."targetId"`),
+    ids.length ? prisma.$queryRaw<Array<{ id: string; targetId: string; slotAt: Date; title: string; reason: string | null; postId: string | null }>>(Prisma.sql`SELECT l.id, l."targetId", l."slotAt", l.title, l.reason, l."postId" FROM wordpress_recipe_plans l
+      WHERE l."sourceId" = ${source.id} AND l."targetId" = ANY(${ids}::text[]) AND l.state IN ('failed', 'uncertain') AND ${stillFailedSql('l', gap)} AND l."slotAt" >= ${weekAgo} AND l."slotAt" < ${now}
+      ORDER BY l."slotAt" DESC LIMIT 3`) : [],
   ]);
   const report = await weeklyReport(source, pages, pilot, tz, now);
   const channels: CockpitChannel[] = pages.map(page => {

@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { prisma } from '@/server/data';
+import { Prisma } from '../../../../generated/client';
 
 /** Persistence of recipe sources and the plan ledger. Every statement is scoped by workspace. */
 export type PlanState = 'claimed' | 'planned' | 'uncertain' | 'failed';
@@ -138,13 +139,22 @@ export async function hasRecipeSource(workspaceId: string): Promise<boolean> {
   return rows.length > 0;
 }
 
+/**
+ * A failed time that still needs a look (2026-11-17): not left empty or replaced on purpose, and not superseded by a
+ * planned post on the same channel within `gapMinutes` (when the autopilot moves a channel's times, an interrupted
+ * 15:00 slot is taken over by the new 15:30 one; it is history, not a problem). `alias` is the plan table's alias.
+ */
+export const stillFailedSql = (alias: 'l' | 'p', gapMinutes: number) => Prisma.sql`${Prisma.raw(alias)}.reason IS DISTINCT FROM 'left_empty' AND ${Prisma.raw(alias)}.reason IS DISTINCT FROM 'replaced'
+  AND NOT EXISTS (SELECT 1 FROM wordpress_recipe_plans o WHERE o."sourceId" = ${Prisma.raw(alias)}."sourceId" AND o."targetId" = ${Prisma.raw(alias)}."targetId" AND o.state = 'planned'
+    AND o."slotAt" > ${Prisma.raw(alias)}."slotAt" - make_interval(mins => ${gapMinutes}::int) AND o."slotAt" < ${Prisma.raw(alias)}."slotAt" + make_interval(mins => ${gapMinutes}::int))`;
+
 export type StatusSnapshot = {
   upcoming: Array<{ slotAt: Date; targetName: string; title: string }>;
   publishedToday: number;
   unresolved: { failed: number; uncertain: number };
 };
 /** Next planned slots, posts published inside [dayStart, dayEnd) and unresolved slots since `failuresSince`. */
-export async function selectStatusSnapshot(workspaceId: string, sourceId: string, input: { now: Date; dayStart: Date; dayEnd: Date; failuresSince: Date; upcomingLimit: number; targetIds?: readonly string[] }): Promise<StatusSnapshot> {
+export async function selectStatusSnapshot(workspaceId: string, sourceId: string, input: { now: Date; dayStart: Date; dayEnd: Date; failuresSince: Date; upcomingLimit: number; targetIds?: readonly string[]; gapMinutes?: number }): Promise<StatusSnapshot> {
   const unscoped = input.targetIds === undefined;
   const ids = [...(input.targetIds ?? [])];
   const [upcoming, published, unresolved] = await Promise.all([
@@ -154,8 +164,9 @@ export async function selectStatusSnapshot(workspaceId: string, sourceId: string
       ORDER BY p."slotAt" ASC, p.id ASC LIMIT ${input.upcomingLimit}`,
     prisma.$queryRaw<Array<{ count: bigint }>>`SELECT COUNT(*)::bigint AS count FROM wordpress_recipe_plans p JOIN posts po ON po.id = p."postId" AND po."workspaceId" = p."workspaceId"
       WHERE p."workspaceId" = ${workspaceId} AND p."sourceId" = ${sourceId} AND po.status = 'published' AND po."publishedAt" >= ${input.dayStart} AND po."publishedAt" < ${input.dayEnd} AND (${unscoped} OR p."targetId" = ANY(${ids}::text[]))`,
-    prisma.$queryRaw<Array<{ state: string; count: bigint }>>`SELECT p.state, COUNT(*)::bigint AS count FROM wordpress_recipe_plans p
-      WHERE p."workspaceId" = ${workspaceId} AND p."sourceId" = ${sourceId} AND p."slotAt" >= ${input.failuresSince} AND p.state IN ('failed', 'uncertain') AND (${unscoped} OR p."targetId" = ANY(${ids}::text[])) GROUP BY p.state`,
+    prisma.$queryRaw<Array<{ state: string; count: bigint }>>(Prisma.sql`SELECT p.state, COUNT(*)::bigint AS count FROM wordpress_recipe_plans p
+      WHERE p."workspaceId" = ${workspaceId} AND p."sourceId" = ${sourceId} AND p."slotAt" >= ${input.failuresSince} AND p.state IN ('failed', 'uncertain') AND (${unscoped} OR p."targetId" = ANY(${ids}::text[]))
+        AND (p.state = 'uncertain' OR (${stillFailedSql('p', input.gapMinutes ?? 60)})) GROUP BY p.state`),
   ]);
   const count = (state: string) => Number(unresolved.find(row => row.state === state)?.count ?? 0);
   return { upcoming: upcoming.map(row => ({ slotAt: row.slotAt, targetName: row.targetName ?? '', title: row.title })), publishedToday: Number(published[0]?.count ?? 0), unresolved: { failed: count('failed'), uncertain: count('uncertain') } };

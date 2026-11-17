@@ -1,5 +1,6 @@
 import { addDaysToKey, wallTimeToInstant, workspaceDateKey } from '@/lib/calendar-dates';
 import { selectStatusSnapshot } from '../server/wordpress-store';
+import { autopilotOf } from '../wordpress/autopilot';
 import type { RecipePool } from './RecipeSource';
 
 export type RecipeStatus = {
@@ -13,7 +14,7 @@ export type RecipeStatus = {
   pool: { low: boolean; complete: boolean; pages: RecipePool['pages'] } | null;
 };
 
-type Source = { id: string; enabled: boolean; lastRunAt: string | null; config: { timezone: string; horizonDays: number } };
+type Source = { id: string; enabled: boolean; lastRunAt: string | null; config: { timezone: string; horizonDays: number; autopilot?: unknown } };
 
 /**
  * Status for the card at the top of Feeds, read from the plan ledger. `source` and `pool` come from the authorized
@@ -29,7 +30,7 @@ export async function loadRecipeStatus(input: { workspaceId: string; source: Sou
   const dayStart = start.ok ? start.instant : new Date(now.getTime() - 86_400_000);
   const dayEnd = end.ok ? end.instant : new Date(dayStart.getTime() + 86_400_000);
   const snapshot = await selectStatusSnapshot(input.workspaceId, input.source.id, {
-    now, dayStart, dayEnd, failuresSince: new Date(now.getTime() - input.failureWindowDays * 86_400_000), upcomingLimit: input.upcomingLimit, targetIds: input.allowedTargetIds,
+    now, dayStart, dayEnd, failuresSince: new Date(now.getTime() - input.failureWindowDays * 86_400_000), upcomingLimit: input.upcomingLimit, targetIds: input.allowedTargetIds, gapMinutes: autopilotOf(input.source.config.autopilot).bestTimes.gapMinutes,
   });
   return {
     state: !input.available ? 'unavailable' : input.source.enabled ? 'active' : 'paused',
