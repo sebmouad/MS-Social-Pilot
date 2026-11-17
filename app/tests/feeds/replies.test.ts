@@ -17,6 +17,7 @@ test('reply drafts: the prompt carries the comment, the recipe and the tone', ()
   const { system, prompt } = replyPrompt(comment, 'friendly');
   assert.match(system, /Recettes - Faciles/); assert.match(system, /warm and friendly/); assert.match(system, /site\.example\/gratin/);
   assert.match(prompt, /Je peux remplacer la crème/); assert.match(prompt, /pommes de terre/);
+  assert.match(system, /Never guess whether the person is a man or a woman/);
 });
 
 test('reply drafts: each waiting comment gets one draft; an AI refusal stops the run without sending anything', async () => {

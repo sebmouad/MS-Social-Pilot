@@ -5,7 +5,7 @@ import type { AutopilotLogEntry } from './wordpress/autopilot';
  * written when shown, so a French page reads French. Entries saved before codes existed are recognised by their English
  * sentence and written the same way (2026-11-17); any other text is shown as saved.
  */
-export type LogCode = 'stranded' | 'refilled' | 'publishFailed' | 'channelHeld' | 'hot' | 'hotShort' | 'breathe' | 'spread' | 'notSpread';
+export type LogCode = 'stranded' | 'refilled' | 'publishFailed' | 'channelHeld' | 'hot' | 'hotShort' | 'breathe' | 'spread' | 'notSpread' | 'radarFailed';
 
 const TEXT: Record<'en' | 'fr', Record<LogCode, string>> = {
   en: {
@@ -18,6 +18,7 @@ const TEXT: Record<'en' | 'fr', Record<LogCode, string>> = {
     breathe: 'The next post waits until {time} so this one keeps its reach.',
     spread: 'Planned on {count} similar channels: {channels}.{others}',
     notSpread: 'Not spread to other channels: {why}.',
+    radarFailed: 'The viral radar could not run: {reason}. Planning carried on.',
   },
   fr: {
     stranded: '« {title} » est resté incertain après une exécution interrompue et n’a jamais été créé ; son horaire est replanifié.',
@@ -29,6 +30,7 @@ const TEXT: Record<'en' | 'fr', Record<LogCode, string>> = {
     breathe: 'La publication suivante attend jusqu’à {time} pour que celle-ci garde sa portée.',
     spread: 'Planifiée sur {count} canaux proches : {channels}.{others}',
     notSpread: 'Pas diffusée sur d’autres canaux : {why}.',
+    radarFailed: 'Le radar viral n’a pas pu tourner : {reason}. La planification a continué.',
   },
 };
 const WHY: Record<'en' | 'fr', { already: string; noSlot: string; refused: string; none: string; others: string }> = {

@@ -29,6 +29,8 @@ export function replyPrompt(c: DraftCandidate, tone: AutopilotSettings['replies'
     'Answer the actual comment. Use only the recipe below for facts; if the answer is not in it, say so kindly and suggest something simple and safe.',
     c.permalink ? `If they ask for the recipe or the link, give this link: ${c.permalink}` : 'Do not include any link.',
     'Use the person’s first name only if it reads naturally. Never invent a promise, a price or a medical claim. Answer with the reply only.',
+    // A name says nothing certain about the person (2026-11-17: « Merci d’être passée » assumed a woman).
+    'Never guess whether the person is a man or a woman: no gendered agreements about them (write « merci pour votre message », not « merci d’être passé·e »).',
     // Replies on a public Page must not read as copies of each other (2026-11-16).
     ...(avoid.length ? ['Vary your wording: do not reuse the opening or the sentence of these recent replies:', ...avoid.slice(0, 8).map(text => `- ${text.slice(0, 160)}`)] : []),
   ].join('\n');
