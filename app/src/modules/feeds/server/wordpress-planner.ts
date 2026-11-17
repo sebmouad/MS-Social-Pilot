@@ -621,7 +621,14 @@ export async function runRecipePlanning(overrides: Partial<PlannerPorts> & { aut
           const radar = await runRadar({ timeZone: configOf(settings, source).timezone, pilot: autopilotOf(configOf(settings, source).autopilot), sourceId: source.id, workspaceId: source.workspaceId, actor: auth.actor, now, handled: new Set(pilot.radarHandled ?? []),
             names: new Map(channels.map(page => [page.id, page.name])), blocked: recentOn }, radarPorts);
           entries.push(...radar.entries); handled = radar.handled;
-        } catch { /* the radar never stops planning */ }
+        } catch (error) {
+          // The radar never stops planning, but a failure is said once every six hours instead of passing silently (2026-11-17).
+          const last = pilot.log?.find(entry => entry.code === 'radarFailed');
+          if (!last || now.getTime() - Date.parse(last.at) >= 6 * 3_600_000) {
+            const reason = error instanceof Error ? error.message.slice(0, 160) : 'unknown error';
+            entries.push({ at: now.toISOString(), kind: 'radar', text: `The viral radar could not run: ${reason}. Planning carried on.`, code: 'radarFailed', params: { reason } });
+          }
+        }
       }
       await autopilot.logAutopilot(settings, source, entries, overrides.autopilot, handled).catch(() => undefined);
       // Evening « plan ready » and the weekly report (2026-11-16); sent once each.

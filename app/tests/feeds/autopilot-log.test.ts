@@ -23,3 +23,9 @@ test('log: entries saved before codes existed read in the page language when the
   assert.equal(logSentence(old('Planned on 2 similar channels: A, B.'), 'fr'), 'Planifiée sur 2 canaux proches : A, B.');
   assert.equal(logSentence(old('« Gratin » is taking off: 1100 people reached, 1.5× usual.'), 'en'), '« Gratin » is taking off: 1,100 people reached, 1.5× usual.');
 });
+
+test('log: a radar failure is said in the page language', () => {
+  const failed = { at: 'x', kind: 'radar' as const, code: 'radarFailed', params: { reason: 'timeout' } };
+  assert.equal(logSentence(failed, 'fr'), 'Le radar viral n’a pas pu tourner : timeout. La planification a continué.');
+  assert.equal(logSentence(failed, 'en'), 'The viral radar could not run: timeout. Planning carried on.');
+});
