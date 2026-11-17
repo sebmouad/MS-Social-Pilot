@@ -356,6 +356,8 @@ ads_management (owner asked to rework Ads like Meta Ads Manager first). The subm
 - A busy day (the live site has 11 channels, 44 posts a day) opens on eight posts around now, the rest behind « Show
   all »; the activity log shows six entries, older ones folded.
 - Checked on the live site after deploy (read-only, desktop and 390 px, no page errors), and locally with sample data
-  where « leave empty » and « approve all » were run. The planned-posts table on Feeds still scrolls sideways on phones.
+  where « leave empty » and « approve all » were run.
+- Planned posts (Feeds) list what is to come first, soonest first, then « Already passed », latest first
+  (`selectPlans`); on phones each row is a card. A channel trend past ten times the week before reads « ×58 ».
 - Live-site credentials for read-only checks are in the cloud environment as `MSP_APP_URL`, `MSP_TEST_EMAIL`,
   `MSP_TEST_PASSWORD` (never print them); sign in with `POST /api/auth/sign-in` and an `Origin` header.
