@@ -9,9 +9,12 @@ import { useConfirm } from '@/components/useConfirm';
 import { MODERATION_ACTIONS, MODERATION_MATCHES, moderationConfirmation, moderationRuleProblem, moderationText, type ModerationLocale, type ModerationRuleInput } from '../moderation';
 import { ChannelSelect } from '@/modules/publishing/ui/compose/ChannelSelect';
 import styles from './ModerationRules.module.css';
+import { aiRepliesCopy } from './AiRepliesPanel';
+
+const AI_DONE = { en: { ai_reply: 'AI replied', ai_handoff: 'Left for a person', ai_skip: 'Not answered (spam)' }, fr: { ai_reply: 'Réponse de l’IA', ai_handoff: 'Laissé à une personne', ai_skip: 'Sans réponse (spam)' } } as const;
 
 type Rule = ModerationRuleInput & { id: string };
-type LogRow = { id: string; ruleName: string; targetId: string; authorName: string | null; message: string; action: string; error: string | null; undoneAt: string | null; createdAt: string; undoable: boolean; labels?: { createdAt?: string } };
+type LogRow = { replyText?: string | null; id: string; ruleName: string; targetId: string; authorName: string | null; message: string; action: string; error: string | null; undoneAt: string | null; createdAt: string; undoable: boolean; labels?: { createdAt?: string } };
 type Data = { rules: Rule[]; log: LogRow[]; channels: { id: string; name: string }[]; canTargetAllChannels: boolean };
 const blank = (): ModerationRuleInput => ({ name: '', enabled: true, targetIds: [], match: 'links', keywords: [], action: 'hide', replyText: null, dailyCap: 20, oncePerUser: true });
 
@@ -114,9 +117,10 @@ export function ModerationRules({ canWrite, locale = 'en' }: { canWrite: boolean
       <p className={styles.hint}>{t('logHint')}</p>
       {data && data.log.length === 0 && <EmptyState icon={<IconHistory size={26} />} title={t('logEmptyTitle')}>{t('logEmptyHint')}</EmptyState>}
       {data && data.log.length > 0 && <ul className={styles.list}>{data.log.map(row => <li key={row.id} className={styles.item}>
-        <span className={styles.meta}>{row.labels?.createdAt ?? ''} · {channelName(row.targetId)} · {row.ruleName}</span>
+        <span className={styles.meta}>{row.labels?.createdAt ?? ''} · {channelName(row.targetId)} · {row.action.startsWith('ai_') ? aiRepliesCopy[locale].title : row.ruleName}</span>
         <span><strong>{row.authorName || t('someone')}</strong>: {row.message}</span>
-        <span><Badge tone={moderationOutcomeTone(row)}>{row.error ? t('failed', { reason: row.error }) : row.undoneAt ? t('undone') : t(`done.${row.action}` as 'done.hide')}</Badge></span>
+        {row.action.startsWith('ai_') && row.replyText ? <span className={styles.hint}>{row.action === 'ai_reply' ? '↳ ' : ''}{row.replyText}</span> : null}
+        <span><Badge tone={row.action === 'ai_handoff' && !row.error ? 'warning' : moderationOutcomeTone(row)}>{row.error ? t('failed', { reason: row.error }) : row.undoneAt ? t('undone') : row.action.startsWith('ai_') ? AI_DONE[locale][row.action as keyof typeof AI_DONE.en] ?? row.action : t(`done.${row.action}` as 'done.hide')}</Badge></span>
         {canWrite && row.undoable && <div><Button size="sm" variant="quiet" disabled={busy} onClick={async () => { const result = await act({ action: 'action.undo', id: row.id, confirmation: moderationConfirmation.undo(row.id) }, t('undoHideConfirm')); if (result) setNotice(t('undoneOk')); }}>{t('undoHide')}</Button></div>}
       </li>)}</ul>}
     </section>

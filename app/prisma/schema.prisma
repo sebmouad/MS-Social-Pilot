@@ -33,39 +33,39 @@ model User {
   emailVerifiedAt                  DateTime?
   planId                           String?
   extraChannels                    Int                     @default(0)
-  ai_generations                   ai_generations[] @ignore
-  api_tokens                       api_tokens[] @ignore
+  ai_generations                   ai_generations[]        @ignore
+  api_tokens                       api_tokens[]            @ignore
   app_settings                     AppSetting[]
-  autopilot_policies               autopilot_policies[] @ignore
-  calendar_feeds                   calendar_feeds[] @ignore
-  chart_notes                      chart_notes[] @ignore
-  client_invitations               client_invitations[] @ignore
-  email_tokens                     email_tokens[] @ignore
-  inbox_notes                      inbox_notes[] @ignore
-  invitations                      invitations[] @ignore
+  autopilot_policies               autopilot_policies[]    @ignore
+  calendar_feeds                   calendar_feeds[]        @ignore
+  chart_notes                      chart_notes[]           @ignore
+  client_invitations               client_invitations[]    @ignore
+  email_tokens                     email_tokens[]          @ignore
+  inbox_notes                      inbox_notes[]           @ignore
+  invitations                      invitations[]           @ignore
   mcpApiKeys                       McpApiKey[]
-  mcp_oauth_codes                  mcp_oauth_codes[] @ignore
+  mcp_oauth_codes                  mcp_oauth_codes[]       @ignore
   memberships                      Membership[]
-  metric_alert_rules               metric_alert_rules[] @ignore
-  notification_mutes               notification_mutes[] @ignore
+  metric_alert_rules               metric_alert_rules[]    @ignore
+  notification_mutes               notification_mutes[]    @ignore
   notification_settings            notification_settings[] @ignore
   notifications                    Notification[]
   passkeys                         Passkey[]
-  person_mcp_keys                  person_mcp_keys[] @ignore
-  post_export_runs                 post_export_runs[] @ignore
-  post_exports                     post_exports[] @ignore
-  post_notes                       post_notes[] @ignore
-  post_versions                    post_versions[] @ignore
+  person_mcp_keys                  person_mcp_keys[]       @ignore
+  post_export_runs                 post_export_runs[]      @ignore
+  post_exports                     post_exports[]          @ignore
+  post_notes                       post_notes[]            @ignore
+  post_versions                    post_versions[]         @ignore
   posts                            Post[]
   posts_posts_reviewedByIdTousers  Post[]                  @relation("posts_reviewedByIdTousers")
   posts_posts_submittedByIdTousers Post[]                  @relation("posts_submittedByIdTousers")
   recoveryCodes                    RecoveryCode[]
-  root_activities                  root_activities[] @ignore
+  root_activities                  root_activities[]       @ignore
   saved_views                      SavedView[]
   sessions                         Session[]
-  task_checklist_items             task_checklist_items[] @ignore
-  task_comments                    task_comments[] @ignore
-  trusted_devices                  trusted_devices[] @ignore
+  task_checklist_items             task_checklist_items[]  @ignore
+  task_comments                    task_comments[]         @ignore
+  trusted_devices                  trusted_devices[]       @ignore
   plans                            plans?                  @relation(fields: [planId], references: [id]) @ignore
   writing_agent_runs               WritingAgentRun[]
   writing_agents                   WritingAgent[]
@@ -175,75 +175,76 @@ model Workspace {
   clientApprovalAfterTeam          Boolean                            @default(false)
   tasksAreaEnabled                 Boolean                            @default(false)
   scheduleMode                     String?
-  activity_logs                    activity_logs[] @ignore
+  activity_logs                    activity_logs[]                    @ignore
   adAccounts                       AdAccount[]
-  ads_management_operations        ads_management_operations[] @ignore
-  ai_agents                        ai_agents[] @ignore
-  ai_generations                   ai_generations[] @ignore
-  ai_videos                        ai_videos[] @ignore
-  analytics_rollup_daily           analytics_rollup_daily[] @ignore
-  analytics_rollup_runs            analytics_rollup_runs[] @ignore
-  analytics_rollup_weekly          analytics_rollup_weekly[] @ignore
-  api_tokens                       api_tokens[] @ignore
-  autopilot_policies               autopilot_policies? @ignore
-  bio_pages                        bio_pages? @ignore
-  calendar_feeds                   calendar_feeds[] @ignore
-  caption_tests                    caption_tests[] @ignore
-  chart_notes                      chart_notes[] @ignore
+  ads_management_operations        ads_management_operations[]        @ignore
+  ai_agents                        ai_agents[]                        @ignore
+  ai_generations                   ai_generations[]                   @ignore
+  ai_videos                        ai_videos[]                        @ignore
+  analytics_rollup_daily           analytics_rollup_daily[]           @ignore
+  analytics_rollup_runs            analytics_rollup_runs[]            @ignore
+  analytics_rollup_weekly          analytics_rollup_weekly[]          @ignore
+  api_tokens                       api_tokens[]                       @ignore
+  autopilot_policies               autopilot_policies?                @ignore
+  bio_pages                        bio_pages?                         @ignore
+  calendar_feeds                   calendar_feeds[]                   @ignore
+  caption_tests                    caption_tests[]                    @ignore
+  chart_notes                      chart_notes[]                      @ignore
   chat_channels                    ChatChannel[]
   chat_deliveries                  ChatDelivery[]
-  content_mix_rules                content_mix_rules[] @ignore
-  custom_fields                    custom_fields[] @ignore
-  email_logs                       email_logs[] @ignore
-  facebook_media_deletions         facebook_media_deletions[] @ignore
-  facebook_media_resolutions       facebook_media_resolutions[] @ignore
-  facebook_media_steps             facebook_media_steps[] @ignore
-  facebook_native_journal          facebook_native_journal[] @ignore
+  content_mix_rules                content_mix_rules[]                @ignore
+  custom_fields                    custom_fields[]                    @ignore
+  email_logs                       email_logs[]                       @ignore
+  facebook_media_deletions         facebook_media_deletions[]         @ignore
+  facebook_media_resolutions       facebook_media_resolutions[]       @ignore
+  facebook_media_steps             facebook_media_steps[]             @ignore
+  facebook_native_journal          facebook_native_journal[]          @ignore
   facebook_native_schedule_changes facebook_native_schedule_changes[] @ignore
-  facebook_native_status_proofs    facebook_native_status_proofs[] @ignore
-  facebook_sync_cursors            facebook_sync_cursors[] @ignore
-  feed_sources                     feed_sources[] @ignore
+  facebook_native_status_proofs    facebook_native_status_proofs[]    @ignore
+  facebook_sync_cursors            facebook_sync_cursors[]            @ignore
+  feed_sources                     feed_sources[]                     @ignore
   inboxDeletions                   InboxDeletion[]
-  inbox_notes                      inbox_notes[] @ignore
+  inbox_notes                      inbox_notes[]                      @ignore
   instagramAccounts                InstagramAccount[]
-  invitations                      invitations[] @ignore
-  key_dates                        key_dates[] @ignore
-  labels                           labels[] @ignore
+  invitations                      invitations[]                      @ignore
+  key_dates                        key_dates[]                        @ignore
+  labels                           labels[]                           @ignore
   mcpApiKeys                       McpApiKey[]
-  mcp_oauth_codes                  mcp_oauth_codes[] @ignore
-  media                            media[] @ignore
+  mcp_oauth_codes                  mcp_oauth_codes[]                  @ignore
+  media                            media[]                            @ignore
   memberships                      Membership[]
-  metric_alert_firings             metric_alert_firings[] @ignore
-  metric_alert_rules               metric_alert_rules[] @ignore
-  moderation_actions               moderation_actions[] @ignore
-  moderation_rules                 moderation_rules[] @ignore
-  notification_settings            notification_settings[] @ignore
+  metric_alert_firings             metric_alert_firings[]             @ignore
+  metric_alert_rules               metric_alert_rules[]               @ignore
+  moderation_actions               moderation_actions[]               @ignore
+  moderation_rules                 moderation_rules[]                 @ignore
+  inbox_ai_replies                 inbox_ai_replies?                  @ignore
+  notification_settings            notification_settings[]            @ignore
   notifications                    Notification[]
-  page_goals                       page_goals[] @ignore
-  page_groups                      page_groups[] @ignore
+  page_goals                       page_goals[]                       @ignore
+  page_groups                      page_groups[]                      @ignore
   postDeletions                    PostDeletion[]
-  post_export_runs                 post_export_runs[] @ignore
-  post_exports                     post_exports[] @ignore
-  post_language_variants           post_language_variants[] @ignore
-  post_templates                   post_templates[] @ignore
+  post_export_runs                 post_export_runs[]                 @ignore
+  post_exports                     post_exports[]                     @ignore
+  post_language_variants           post_language_variants[]           @ignore
+  post_templates                   post_templates[]                   @ignore
   posts                            Post[]
   publicationAttempts              PublicationAttempt[]
-  queue_slots                      queue_slots[] @ignore
+  queue_slots                      queue_slots[]                      @ignore
   reportRuns                       ReportRun[]
-  report_schedules                 report_schedules[] @ignore
-  report_templates                 report_templates[] @ignore
-  saved_replies                    saved_replies[] @ignore
+  report_schedules                 report_schedules[]                 @ignore
+  report_templates                 report_templates[]                 @ignore
+  saved_replies                    saved_replies[]                    @ignore
   saved_views                      SavedView[]
-  seasonal_modes                   seasonal_modes[] @ignore
-  share_links                      share_links[] @ignore
-  short_links                      short_links[] @ignore
-  snippets                         snippets[] @ignore
+  seasonal_modes                   seasonal_modes[]                   @ignore
+  share_links                      share_links[]                      @ignore
+  short_links                      short_links[]                      @ignore
+  snippets                         snippets[]                         @ignore
   socialAccounts                   SocialAccount[]
   targets                          Target[]
-  task_checklist_items             task_checklist_items[] @ignore
-  task_comments                    task_comments[] @ignore
-  tasks                            tasks[] @ignore
-  webhook_endpoints                webhook_endpoints[] @ignore
+  task_checklist_items             task_checklist_items[]             @ignore
+  task_comments                    task_comments[]                    @ignore
+  tasks                            tasks[]                            @ignore
+  webhook_endpoints                webhook_endpoints[]                @ignore
   wordpress_recipe_plans           WordpressRecipePlan[]
   wordpress_recipe_sources         WordpressRecipeSource?
   dataPurge                        WorkspaceDataPurge?
@@ -251,6 +252,7 @@ model Workspace {
   workspace_watermarks             WorkspaceWatermark?
   writing_agent_runs               WritingAgentRun[]
   writing_agents                   WritingAgent[]
+  facebookAdsBackfills             facebook_ads_backfill[]            @ignore
 
   @@map("workspaces")
 }
@@ -378,29 +380,29 @@ model Target {
   watermark               Json?
   negativeAlertAt         DateTime?
   locale                  String?
-  analytics_rollup_daily  analytics_rollup_daily[] @ignore
+  analytics_rollup_daily  analytics_rollup_daily[]  @ignore
   analytics_rollup_weekly analytics_rollup_weekly[] @ignore
-  channel_profiles        channel_profiles? @ignore
-  chart_notes             chart_notes[] @ignore
-  content_mix_rules       content_mix_rules[] @ignore
+  channel_profiles        channel_profiles?         @ignore
+  chart_notes             chart_notes[]             @ignore
+  content_mix_rules       content_mix_rules[]       @ignore
   conversations           Conversation[]
-  external_posts          external_posts[] @ignore
-  facebook_sync_cursors   facebook_sync_cursors[] @ignore
+  external_posts          external_posts[]          @ignore
+  facebook_sync_cursors   facebook_sync_cursors[]   @ignore
   instagram_accounts      InstagramAccount[]
-  member_page_access      member_page_access[] @ignore
-  metric_alert_rules      metric_alert_rules[] @ignore
-  metric_availability     metric_availability[] @ignore
-  notification_mutes      notification_mutes[] @ignore
+  member_page_access      member_page_access[]      @ignore
+  metric_alert_rules      metric_alert_rules[]      @ignore
+  metric_availability     metric_availability[]     @ignore
+  notification_mutes      notification_mutes[]      @ignore
   notifications           Notification[]
-  page_goals              page_goals[] @ignore
-  page_group_targets      page_group_targets[] @ignore
+  page_goals              page_goals[]              @ignore
+  page_group_targets      page_group_targets[]      @ignore
   insights                PageInsight[]
-  page_reviews            page_reviews[] @ignore
-  page_videos             page_videos[] @ignore
+  page_reviews            page_reviews[]            @ignore
+  page_videos             page_videos[]             @ignore
   postTargets             PostTarget[]
-  queue_slots             queue_slots[] @ignore
+  queue_slots             queue_slots[]             @ignore
   reportRuns              ReportRun[]
-  short_links             short_links[] @ignore
+  short_links             short_links[]             @ignore
   socialAccount           SocialAccount?            @relation(fields: [socialAccountId], references: [id])
   workspace               Workspace                 @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   wordpress_recipe_plans  WordpressRecipePlan[]
@@ -538,20 +540,20 @@ model Post {
   place                            String?
   textBackground                   String?
   notifications                    Notification[]
-  post_field_values                post_field_values[] @ignore
-  post_labels                      post_labels[] @ignore
+  post_field_values                post_field_values[]      @ignore
+  post_labels                      post_labels[]            @ignore
   post_language_variants           post_language_variants[] @ignore
-  post_notes                       post_notes[] @ignore
+  post_notes                       post_notes[]             @ignore
   targets                          PostTarget[]
-  post_versions                    post_versions[] @ignore
+  post_versions                    post_versions[]          @ignore
   author                           User                     @relation(fields: [authorId], references: [id])
   caption_tests                    caption_tests?           @relation(fields: [captionTestId], references: [id]) @ignore
   users_posts_reviewedByIdTousers  User?                    @relation("posts_reviewedByIdTousers", fields: [reviewedById], references: [id])
   feed_items                       feed_items?              @relation(fields: [sourceFeedItemId], references: [id]) @ignore
   users_posts_submittedByIdTousers User?                    @relation("posts_submittedByIdTousers", fields: [submittedById], references: [id])
   workspace                        Workspace                @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  review_decisions                 review_decisions[] @ignore
-  short_links                      short_links[] @ignore
+  review_decisions                 review_decisions[]       @ignore
+  short_links                      short_links[]            @ignore
 
   @@index([workspaceId, status])
   @@index([workspaceId, scheduledAt])
@@ -704,7 +706,9 @@ model AdAccount {
   workspace                 Workspace                   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   insights                  AdInsight[]
   ads_management_operations ads_management_operations[] @ignore
-  ads_objects               ads_objects[] @ignore
+  ads_objects               ads_objects[]               @ignore
+
+  facebook_ads_backfill facebook_ads_backfill? @ignore
 
   @@unique([workspaceId, actId])
   @@index([workspaceId])
@@ -833,7 +837,7 @@ model PublicationAttempt {
   attestedBy                    String?
   createdAt                     DateTime                        @default(now())
   updatedAt                     DateTime                        @default(now()) @updatedAt
-  facebook_native_journal       facebook_native_journal? @ignore
+  facebook_native_journal       facebook_native_journal?        @ignore
   facebook_native_status_proofs facebook_native_status_proofs[] @ignore
   workspace                     Workspace                       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
@@ -1140,7 +1144,6 @@ model activity_logs {
   workspaces  Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   @@index([workspaceId, createdAt])
-
   @@ignore
 }
 
@@ -1170,24 +1173,22 @@ model ads_management_operations {
 
   @@unique([workspaceId, actorId, requestId], map: "ads_management_operations_actor_request")
   @@index([workspaceId, adAccountId, createdAt(sort: Desc), id], map: "ads_management_operations_history")
-
   @@ignore
 }
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
 model ads_objects {
-  adAccountId String
-  level       String
-  objectId    String
-  name        String?
-  parentId    String?
-  status      String?
-  fetchedAt   DateTime
+  adAccountId  String
+  level        String
+  objectId     String
+  name         String?
+  parentId     String?
+  status       String?
+  fetchedAt    DateTime
   thumbnailUrl String?
-  ad_accounts AdAccount @relation(fields: [adAccountId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  ad_accounts  AdAccount @relation(fields: [adAccountId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@id([adAccountId, level, objectId])
-
   @@ignore
 }
 
@@ -1205,7 +1206,6 @@ model ai_agents {
   workspaces  Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   @@index([workspaceId])
-
   @@ignore
 }
 
@@ -1227,7 +1227,6 @@ model ai_generations {
 
   @@index([createdAt])
   @@index([workspaceId, createdAt])
-
   @@ignore
 }
 
@@ -1246,7 +1245,6 @@ model ai_videos {
 
   @@index([status])
   @@index([workspaceId, createdAt])
-
   @@ignore
 }
 
@@ -1270,7 +1268,6 @@ model analytics_rollup_daily {
 
   @@unique([targetId, metric, period, day], map: "analytics_rollup_daily_target_uniq")
   @@index([workspaceId, provider, day], map: "analytics_rollup_daily_workspace_idx")
-
   @@ignore
 }
 
@@ -1291,7 +1288,6 @@ model analytics_rollup_runs {
   workspaces  Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   @@index([workspaceId, provider, granularity, finishedAt(sort: Desc)], map: "analytics_rollup_runs_workspace_idx")
-
   @@ignore
 }
 
@@ -1315,7 +1311,6 @@ model analytics_rollup_weekly {
 
   @@unique([targetId, metric, period, weekStart], map: "analytics_rollup_weekly_target_uniq")
   @@index([workspaceId, provider, weekStart], map: "analytics_rollup_weekly_workspace_idx")
-
   @@ignore
 }
 
@@ -1334,7 +1329,6 @@ model api_tokens {
   workspaces  Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   @@index([workspaceId])
-
   @@ignore
 }
 
@@ -1355,7 +1349,6 @@ model app_updates {
 
   @@index([createdAt], map: "app_updates_created")
   @@index([status, createdAt], map: "app_updates_status_created")
-
   @@ignore
 }
 
@@ -1381,7 +1374,6 @@ model backup_runs {
   finishedAt DateTime @default(now())
 
   @@index([kind, finishedAt])
-
   @@ignore
 }
 
@@ -1395,7 +1387,6 @@ model bio_links {
   bio_pages bio_pages @relation(fields: [pageId], references: [id], onDelete: Cascade)
 
   @@index([pageId, position])
-
   @@ignore
 }
 
@@ -1429,7 +1420,6 @@ model calendar_feeds {
   workspaces  Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   @@index([workspaceId, userId])
-
   @@ignore
 }
 
@@ -1453,7 +1443,6 @@ model caption_tests {
 
   @@index([status])
   @@index([workspaceId, createdAt])
-
   @@ignore
 }
 
@@ -1465,7 +1454,6 @@ model changelog_entries {
   createdAt   DateTime @default(now())
 
   @@index([publishedOn])
-
   @@ignore
 }
 
@@ -1491,7 +1479,6 @@ model chart_notes {
   workspaces  Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   @@index([workspaceId, day])
-
   @@ignore
 }
 
@@ -1508,7 +1495,6 @@ model client_invitations {
   users            User      @relation(fields: [invitedById], references: [id], onDelete: Cascade)
 
   @@index([email])
-
   @@ignore
 }
 
@@ -1527,7 +1513,6 @@ model content_mix_rules {
   workspaces    Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   @@index([workspaceId])
-
   @@ignore
 }
 
@@ -1543,7 +1528,6 @@ model custom_fields {
   post_field_values post_field_values[]
 
   @@unique([workspaceId, name])
-
   @@ignore
 }
 
@@ -1560,7 +1544,6 @@ model email_logs {
   workspaces  Workspace?  @relation(fields: [workspaceId], references: [id])
 
   @@index([workspaceId, createdAt])
-
   @@ignore
 }
 
@@ -1575,7 +1558,6 @@ model email_tokens {
   users     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, purpose])
-
   @@ignore
 }
 
@@ -1594,7 +1576,6 @@ model error_events {
   resolvedAt  DateTime?
 
   @@index([lastSeenAt])
-
   @@ignore
 }
 
@@ -1614,7 +1595,6 @@ model external_posts {
 
   @@unique([targetId, remoteId])
   @@index([targetId, createdTime])
-
   @@ignore
 }
 
@@ -1640,7 +1620,6 @@ model facebook_media_deletions {
 
   @@index([workspaceId, mediaStepId, createdAt(sort: Desc), id(sort: Desc)], map: "facebook_media_deletions_step_history_idx")
   @@index([workspaceId, updatedAt(sort: Desc), id(sort: Desc)], map: "facebook_media_deletions_workspace_updated_idx")
-
   @@ignore
 }
 
@@ -1667,7 +1646,6 @@ model facebook_media_resolutions {
 
   @@index([workspaceId, operationId, createdAt(sort: Desc), id(sort: Desc)], map: "facebook_media_resolutions_operation_history_idx")
   @@index([workspaceId, mediaStepId, createdAt(sort: Desc), id(sort: Desc)], map: "facebook_media_resolutions_step_history_idx")
-
   @@ignore
 }
 
@@ -1696,7 +1674,6 @@ model facebook_media_steps {
   @@unique([operationId, phase, ordinal], map: "facebook_media_steps_operation_phase_ordinal_key")
   @@index([workspaceId, operationId, phase, ordinal], map: "facebook_media_steps_workspace_operation_idx")
   @@index([workspaceId, targetId, updatedAt], map: "facebook_media_steps_workspace_target_updated_idx")
-
   @@ignore
 }
 
@@ -1728,7 +1705,6 @@ model facebook_native_journal {
 
   @@unique([workspaceId, operationId])
   @@index([workspaceId, targetId, updatedAt], map: "facebook_native_journal_workspace_target_updated_idx")
-
   @@ignore
 }
 
@@ -1750,7 +1726,6 @@ model facebook_native_schedule_changes {
   workspaces              Workspace               @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   @@index([workspaceId, publishOperationId, createdAt], map: "facebook_native_schedule_changes_publish_idx")
-
   @@ignore
 }
 
@@ -1776,7 +1751,6 @@ model facebook_native_status_proofs {
   workspaces              Workspace               @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   @@index([workspaceId, operationId, observedAt], map: "fb_native_proofs_workspace_operation_time_idx")
-
   @@ignore
 }
 
@@ -1793,7 +1767,6 @@ model facebook_sync_cursors {
 
   @@id([workspaceId, targetId, kind])
   @@index([targetId], map: "facebook_sync_cursors_target_idx")
-
   @@ignore
 }
 
@@ -1810,7 +1783,6 @@ model feed_items {
 
   @@unique([feedSourceId, guid])
   @@index([feedSourceId])
-
   @@ignore
 }
 
@@ -1841,7 +1813,6 @@ model feed_sources {
 
   @@index([enabled, lastPolledAt])
   @@index([workspaceId])
-
   @@ignore
 }
 
@@ -1860,7 +1831,6 @@ model holiday_years {
   fetchedAt DateTime @default(now())
 
   @@id([country, year])
-
   @@ignore
 }
 
@@ -1877,7 +1847,6 @@ model inbox_notes {
   workspaces  Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   @@index([workspaceId, kind, itemId])
-
   @@ignore
 }
 
@@ -1898,7 +1867,6 @@ model invitations {
   @@unique([workspaceId, email])
   @@index([email])
   @@index([workspaceId])
-
   @@ignore
 }
 
@@ -1914,7 +1882,6 @@ model key_dates {
   workspaces  Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   @@index([workspaceId, date])
-
   @@ignore
 }
 
@@ -1931,7 +1898,6 @@ model labels {
   post_templates    post_templates[]
 
   @@unique([workspaceId, name])
-
   @@ignore
 }
 
@@ -1947,7 +1913,6 @@ model link_clicks {
 
   @@index([shortLinkId, createdAt])
   @@index([shortLinkId, ipHash, createdAt])
-
   @@ignore
 }
 
@@ -1960,7 +1925,6 @@ model link_preview_cache {
   expiresAt DateTime
 
   @@index([expiresAt])
-
   @@ignore
 }
 
@@ -1974,7 +1938,6 @@ model mcp_oauth_clients {
   mcp_oauth_codes mcp_oauth_codes[]
 
   @@index([createdAt])
-
   @@ignore
 }
 
@@ -2000,7 +1963,6 @@ model mcp_oauth_codes {
 
   @@index([clientId])
   @@index([expiresAt])
-
   @@ignore
 }
 
@@ -2027,7 +1989,6 @@ model media {
   @@unique([derivedFromId, variant])
   @@index([workspaceId, createdAt])
   @@index([workspaceId])
-
   @@ignore
 }
 
@@ -2039,7 +2000,6 @@ model member_page_access {
 
   @@id([membershipId, targetId])
   @@index([targetId])
-
   @@ignore
 }
 
@@ -2056,7 +2016,6 @@ model meta_webhook_deliveries {
   receivedAt     DateTime @default(now())
 
   @@index([provider, receivedAt(sort: Desc)], map: "meta_webhook_deliveries_provider_idx")
-
   @@ignore
 }
 
@@ -2075,7 +2034,6 @@ model metric_alert_firings {
   workspaces         Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   @@index([workspaceId, firedAt(sort: Desc)], map: "metric_alert_firings_workspace_idx")
-
   @@ignore
 }
 
@@ -2099,7 +2057,6 @@ model metric_alert_rules {
   workspaces           Workspace              @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   @@index([workspaceId, targetId], map: "metric_alert_rules_workspace_idx")
-
   @@ignore
 }
 
@@ -2115,6 +2072,32 @@ model metric_availability {
 
   @@unique([targetId, metric, period])
   @@index([targetId])
+  @@ignore
+}
+
+model facebook_ads_backfill {
+  adAccountId String    @id
+  workspaceId String
+  cursor      Json
+  updatedAt   DateTime  @default(now())
+  ad_accounts AdAccount @relation(fields: [adAccountId], references: [id], onDelete: Cascade)
+  workspaces  Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@ignore
+}
+
+model inbox_ai_replies {
+  workspaceId  String    @id
+  enabled      Boolean   @default(false)
+  comments     Boolean   @default(true)
+  messages     Boolean   @default(true)
+  delayMinutes Int       @default(30)
+  targetIds    String[]  @default([])
+  tone         String    @default("friendly")
+  enabledAt    DateTime?
+  updatedAt    DateTime  @default(now())
+  updatedById  String?
+  workspaces   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   @@ignore
 }
@@ -2131,6 +2114,7 @@ model moderation_actions {
   message          String
   action           String
   replyRemoteId    String?
+  replyText        String?
   error            String?
   undoneAt         DateTime?
   undoneById       String?
@@ -2141,7 +2125,6 @@ model moderation_actions {
   @@unique([ruleId, remoteCommentId])
   @@index([ruleId, createdAt])
   @@index([workspaceId, createdAt])
-
   @@ignore
 }
 
@@ -2163,7 +2146,6 @@ model moderation_rules {
   workspaces         Workspace            @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   @@index([workspaceId])
-
   @@ignore
 }
 
@@ -2178,7 +2160,6 @@ model monitoring_deliveries {
   finishedAt DateTime?
 
   @@index([status, createdAt], map: "monitoring_deliveries_status_created")
-
   @@ignore
 }
 
@@ -2192,7 +2173,6 @@ model notification_mutes {
 
   @@unique([userId, targetId, event])
   @@index([targetId, event])
-
   @@ignore
 }
 
@@ -2217,7 +2197,6 @@ model notification_settings {
   workspaces         Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   @@unique([userId, workspaceId])
-
   @@ignore
 }
 
@@ -2234,7 +2213,6 @@ model page_goals {
 
   @@unique([targetId, metric])
   @@index([workspaceId])
-
   @@ignore
 }
 
@@ -2246,7 +2224,6 @@ model page_group_targets {
 
   @@id([groupId, targetId])
   @@index([targetId])
-
   @@ignore
 }
 
@@ -2262,7 +2239,6 @@ model page_groups {
   workspaces         Workspace            @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   @@unique([workspaceId, name])
-
   @@ignore
 }
 
@@ -2283,7 +2259,6 @@ model page_reviews {
   @@index([reviewerName(ops: raw("gin_trgm_ops"))], map: "page_reviews_author_trgm_idx", type: Gin)
   @@index([targetId, createdTime])
   @@index([reviewText(ops: raw("gin_trgm_ops"))], map: "page_reviews_text_trgm_idx", type: Gin)
-
   @@ignore
 }
 
@@ -2304,7 +2279,6 @@ model page_videos {
 
   @@unique([targetId, remoteId])
   @@index([targetId, createdTime])
-
   @@ignore
 }
 
@@ -2368,7 +2342,6 @@ model post_export_runs {
   @@unique([exportId, attempt])
   @@index([workspaceId, exportId, attempt])
   @@index([workspaceId, exportId, attempt], map: "post_export_runs_workspaceId_exportId_attempt_idx1")
-
   @@ignore
 }
 
@@ -2398,7 +2371,6 @@ model post_exports {
   @@unique([id, workspaceId, userId])
   @@index([status, nextAttemptAt, createdAt])
   @@index([status, nextAttemptAt, createdAt], map: "post_exports_status_nextAttemptAt_createdAt_idx1")
-
   @@ignore
 }
 
@@ -2412,7 +2384,6 @@ model post_field_values {
 
   @@unique([postId, fieldId])
   @@index([fieldId])
-
   @@ignore
 }
 
@@ -2424,7 +2395,6 @@ model post_labels {
 
   @@id([postId, labelId])
   @@index([labelId])
-
   @@ignore
 }
 
@@ -2443,23 +2413,21 @@ model post_language_variants {
   @@unique([postId, locale], map: "post_language_variants_post_locale_unique")
   @@index([postId])
   @@index([workspaceId])
-
   @@ignore
 }
 
 model post_notes {
-  id            String         @id
-  postId        String
-  authorId      String?
-  body          String
-  mentionIds    String[]       @default([])
-  createdAt     DateTime       @default(now())
-  users         User?          @relation(fields: [authorId], references: [id])
-  posts         Post           @relation(fields: [postId], references: [id], onDelete: Cascade)
+  id         String   @id
+  postId     String
+  authorId   String?
+  body       String
+  mentionIds String[] @default([])
+  createdAt  DateTime @default(now())
+  users      User?    @relation(fields: [authorId], references: [id])
+  posts      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
 
   @@index([authorId])
   @@index([postId, createdAt])
-
   @@ignore
 }
 
@@ -2480,7 +2448,6 @@ model post_templates {
   workspaces               Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   @@unique([workspaceId, name])
-
   @@ignore
 }
 
@@ -2506,7 +2473,6 @@ model post_versions {
 
   @@index([authorId])
   @@index([postId, createdAt])
-
   @@ignore
 }
 
@@ -2518,7 +2484,6 @@ model public_holidays {
 
   @@id([country, date, name])
   @@index([date])
-
   @@ignore
 }
 
@@ -2536,7 +2501,6 @@ model queue_slots {
   @@unique([workspaceId, targetId, dayOfWeek, hour, minute])
   @@index([targetId])
   @@index([workspaceId])
-
   @@ignore
 }
 
@@ -2558,7 +2522,6 @@ model report_schedules {
   workspaces       Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   @@index([nextRunAt])
-
   @@ignore
 }
 
@@ -2573,7 +2536,6 @@ model report_templates {
   workspaces       Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   @@unique([workspaceId, name])
-
   @@ignore
 }
 
@@ -2590,7 +2552,6 @@ model review_decisions {
 
   @@index([postId])
   @@index([shareLinkId])
-
   @@ignore
 }
 
@@ -2603,7 +2564,6 @@ model root_activities {
   users     User?    @relation(fields: [actorId], references: [id])
 
   @@index([createdAt])
-
   @@ignore
 }
 
@@ -2617,7 +2577,6 @@ model saved_replies {
   workspaces  Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   @@index([workspaceId])
-
   @@ignore
 }
 
@@ -2635,7 +2594,6 @@ model seasonal_modes {
   workspaces   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   @@index([workspaceId])
-
   @@ignore
 }
 
@@ -2660,7 +2618,6 @@ model share_links {
   workspaces         Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   @@index([workspaceId])
-
   @@ignore
 }
 
@@ -2681,7 +2638,6 @@ model short_links {
   @@index([postId])
   @@index([targetId])
   @@index([workspaceId])
-
   @@ignore
 }
 
@@ -2694,7 +2650,6 @@ model snippets {
   workspaces  Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   @@index([workspaceId])
-
   @@ignore
 }
 
@@ -2707,7 +2662,6 @@ model system_alerts {
 
   @@index([key, resolvedAt])
   @@index([openedAt])
-
   @@ignore
 }
 
@@ -2728,7 +2682,6 @@ model task_checklist_items {
   @@index([createdById])
   @@index([taskId, position, id])
   @@index([workspaceId])
-
   @@ignore
 }
 
@@ -2747,7 +2700,6 @@ model task_comments {
   @@index([authorId])
   @@index([taskId, createdAt, id])
   @@index([workspaceId])
-
   @@ignore
 }
 
@@ -2769,7 +2721,6 @@ model tasks {
 
   @@unique([id, workspaceId])
   @@index([workspaceId, status])
-
   @@ignore
 }
 
@@ -2785,7 +2736,6 @@ model trending_topics {
 
   @@unique([country, title])
   @@index([country, fetchedAt])
-
   @@ignore
 }
 
@@ -2800,7 +2750,6 @@ model trusted_devices {
   users      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
-
   @@ignore
 }
 
@@ -2810,7 +2759,6 @@ model uptime_days {
   minutes   Int    @default(0)
 
   @@id([day, component])
-
   @@ignore
 }
 
@@ -2820,7 +2768,6 @@ model uptime_samples {
   component String
 
   @@id([minute, component])
-
   @@ignore
 }
 
@@ -2841,7 +2788,6 @@ model webhook_deliveries {
 
   @@index([endpointId, createdAt])
   @@index([status, nextAttemptAt])
-
   @@ignore
 }
 
@@ -2861,7 +2807,6 @@ model webhook_endpoints {
   workspaces         Workspace            @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   @@index([workspaceId])
-
   @@ignore
 }
 
@@ -2871,7 +2816,6 @@ model worker_heartbeats {
   jobs     String[]
 
   @@index([seenAt])
-
   @@ignore
 }
 

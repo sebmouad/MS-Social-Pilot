@@ -7,6 +7,7 @@ import { requireViewer } from '@/server/context';
 import { canAccessFeature } from '@/server/permissions';
 import { shellChrome } from '@/modules/shell/server/chrome';
 import { ModerationRules } from '@/modules/inbox/components/ModerationRules';
+import { AiRepliesPanel } from '@/modules/inbox/components/AiRepliesPanel';
 import styles from '@/modules/inbox/ui/inbox.module.css';
 import { InboxHeader } from '@/modules/inbox/ui/InboxChrome';
 import { inboxLocale } from '@/modules/inbox/ui/locale';
@@ -25,6 +26,7 @@ export default async function InboxRulesPage() {
     items={[{ id: 'conversations', href: '/inbox', label: screen.tabConversations }, { id: 'rules', href: '/inbox/rules', label: screen.tabRules }]} />;
   return <InboxCopyProvider catalog={catalog}><PageFrame module="inbox" scopedAccess><div className={styles.page}>
     <InboxHeader title={copy.title} info={<InfoTip name={moderation.title}>{moderation.pageIntro}</InfoTip>} tabs={tabs} />
+    <AiRepliesPanel locale={locale} canWrite={canWrite && (viewer.membership.role === 'owner' || viewer.membership.role === 'admin')} />
     <ModerationRules locale={locale} canWrite={canWrite} />
   </div></PageFrame></InboxCopyProvider>;
 }

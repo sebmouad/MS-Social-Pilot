@@ -124,12 +124,15 @@ return {
     const result = await runEnabledPlatformJob('inbox', now, retryLimit, retryBackoff);
     const { runAutomaticInboxModeration } = await import('@/modules/inbox/server/moderation');
     const moderation = await runAutomaticInboxModeration(new Date()).catch(() => null);
+    // AI auto-replies after the rules, so a rule that hid or answered a comment takes precedence (2026-11-17).
+    const { runAutomaticAiReplies } = await import('@/modules/inbox/server/ai-replies');
+    const ai = await runAutomaticAiReplies(new Date()).catch(() => null);
     const { runInboxAlertProducers } = await import('@/modules/inbox/server/notification-events');
     await runInboxAlertProducers(now);
     const { reconcileInboxDeletions } = await import('@/modules/inbox/server/deletion-reconcile');
     const deletions = await reconcileInboxDeletions(now).catch(() => null);
     const rules =moderation ? `rules=${moderation.workspaces}/${moderation.acted} rulesFailed=${moderation.failed}` : 'rules=unavailable';
-    return `examined=${result.examined} updated=${result.updated} skipped=${result.skipped} failed=${result.failed} ${rules} deletions=${deletions ? `${deletions.examined}/${deletions.updated}` : 'unavailable'}`;
+    return `examined=${result.examined} updated=${result.updated} skipped=${result.skipped} failed=${result.failed} ${rules} ${ai ? `ai=${ai.replied}/${ai.handedOff}/${ai.failed}` : 'ai=unavailable'} deletions=${deletions ? `${deletions.examined}/${deletions.updated}` : 'unavailable'}`;
   },
   async tryLease(job, leaseOwner, token, until) {
     const rows = await prisma.$queryRaw<Array<{ name: string }>>`

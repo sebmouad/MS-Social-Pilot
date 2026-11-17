@@ -26,7 +26,7 @@ import {
  * scope, grants, deletion guards and platform capabilities apply unchanged.
  */
 export type ModerationRuleRow = ModerationRuleInput & { id: string; createdAt: Date; updatedAt: Date };
-export type ModerationLogRow = { id: string; ruleId: string | null; ruleName: string; targetId: string; authorName: string | null; message: string; action: string; error: string | null; undoneAt: Date | null; createdAt: Date; undoable: boolean };
+export type ModerationLogRow = { replyText?: string | null; id: string; ruleId: string | null; ruleName: string; targetId: string; authorName: string | null; message: string; action: string; error: string | null; undoneAt: Date | null; createdAt: Date; undoable: boolean };
 
 const invalid = async (message?: string) => new OperationError('invalid_request', message ?? await inboxServiceText('moderationAction'));
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -64,7 +64,7 @@ export async function readInboxModeration(actor: InboxReadActor) {
   const access = await authorizeInbox(actor, ceiling(actor), 'read');
   const [cap, every] = await Promise.all([limits(), hasEveryChannel(actor)]);
   const rules = (await readRules(actor.workspaceId)).filter(rule => ruleVisible(rule.targetIds, access.channelIds, every));
-  const log = access.channelIds.length ? await prisma.$queryRaw<Omit<ModerationLogRow, 'undoable'>[]>(Prisma.sql`SELECT id, "ruleId", "ruleName", "targetId", "authorName", message, action, error, "undoneAt", "createdAt" FROM moderation_actions WHERE "workspaceId" = ${actor.workspaceId} AND "targetId" = ANY(${access.channelIds}::text[]) ORDER BY "createdAt" DESC, id DESC LIMIT ${cap.logLimit}`) : [];
+  const log = access.channelIds.length ? await prisma.$queryRaw<Omit<ModerationLogRow, 'undoable'>[]>(Prisma.sql`SELECT id, "ruleId", "ruleName", "targetId", "authorName", message, action, error, "undoneAt", "createdAt", "replyText" FROM moderation_actions WHERE "workspaceId" = ${actor.workspaceId} AND "targetId" = ANY(${access.channelIds}::text[]) ORDER BY "createdAt" DESC, id DESC LIMIT ${cap.logLimit}`) : [];
   return {
     ok: true as const,
     rules,

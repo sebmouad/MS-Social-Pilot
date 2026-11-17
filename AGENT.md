@@ -377,3 +377,19 @@ ads_management (owner asked to rework Ads like Meta Ads Manager first). The subm
   nested inside a tagged `$queryRaw` template it is sent as a JSON value (error 42804).
 - Live-site credentials for read-only checks are in the cloud environment as `MSP_APP_URL`, `MSP_TEST_EMAIL`,
   `MSP_TEST_PASSWORD` (never print them); sign in with `POST /api/auth/sign-in` and an `Origin` header.
+
+### 7.1i AI auto-replies to comments and messages (2026-11-17, owner's choices by form)
+- Inbox › Rules › « AI auto-replies » (`modules/inbox/components/AiRepliesPanel.tsx`, `modules/inbox/ai-replies.ts`,
+  `modules/inbox/server/ai-replies.ts`, `GET/PUT /api/inbox/ai-replies`, migration 0020). Off by default; owners and
+  admins switch it on. Choices: comments and Messenger messages; everything except negative, sensitive and spam; only
+  after 30 minutes with no reply from the team (15/30/60/120 offered); no daily limit (the hourly AI limit applies).
+- Runs after each Inbox sync (`server/jobs/runtime.ts`, after the moderation rules, which take precedence) with an
+  active owner's authority. Looks only at what arrived after it was switched on (`enabledAt`), within 24 h (Messenger:
+  23 h, inside Meta's window). Links and phone numbers are spam and comments already read as negative go to a person
+  without an AI call; otherwise one AI call (`inbox.autoreply`) returns reply / handoff / skip as JSON. A handoff sends
+  the existing `moderation_alert` notification. At most 3 AI replies per Messenger conversation per 24 h, then a person.
+- Every outcome is claimed first in `moderation_actions` (`ruleId` NULL, action `ai_reply` / `ai_handoff` / `ai_skip`,
+  partial unique index `moderation_actions_ai_once_key`), so nothing is answered twice; `replyText` holds what was sent
+  or why it was left. A failed send stays claimed (never resent blindly); the AI being unavailable releases the claim.
+- Checked locally end to end with a stand-in AI and account (no real send). Not yet run on the live site.
+- Also fixed: `schema.prisma` lacked `facebook_ads_backfill` (migration 0013), so CI's schema check had been failing.
