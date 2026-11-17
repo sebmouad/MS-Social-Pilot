@@ -66,6 +66,8 @@ export function RecipeSource({ initial, locale, canWrite, copy = recipeCopy }: {
   // A large library is scanned up to a limit: its figures are minimums (shown with « + »).
   const count = (value: number) => new Intl.NumberFormat(locale).format(value);
   const [view, setView] = useState(initial);
+  // The recipe count arrives with a later refresh of the page (2026-11-17): take it without touching what is being edited.
+  useEffect(() => { if (initial.pool) setView(v => v.pool ? v : { ...v, pool: initial.pool, labels: v.labels && initial.labels ? { ...v.labels, poolAsOf: initial.labels.poolAsOf } : v.labels }); }, [initial.pool, initial.labels]);
   const [draft, setDraft] = useState(() => initialDraft(initial));
   const [review, setReview] = useState<Review | null>(null);
   const [confirmation, setConfirmation] = useState('');

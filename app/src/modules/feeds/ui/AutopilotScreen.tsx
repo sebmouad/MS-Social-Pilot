@@ -13,6 +13,7 @@ import { readCockpit, approveDayConfirmation } from '../server/wordpress-cockpit
 import { AutopilotBoard } from './AutopilotBoard';
 import { AutopilotDays } from './AutopilotDays';
 import { logSentence } from '../autopilot-log';
+import { recipeCopy, recipeText, type RecipeCopyKey } from '../copy-recipes';
 import styles from './autopilot.module.css';
 
 /**
@@ -53,10 +54,16 @@ export default async function AutopilotScreen() {
   const failedWeek = view.channels.reduce((sum, channel) => sum + channel.failedWeek, 0);
   const idle = view.enabled ? view.channels.filter(channel => !channel.paused && !channel.next) : [];
   // What needs a look, most pressing first; each line leads to where it is settled.
+  const logTime = (at: string) => new Intl.DateTimeFormat(locale, { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: view.timeZone }).format(new Date(at));
+  const reasonOf = (reason: string | null) => { const key = reason ? `reason${reason.charAt(0).toUpperCase()}${reason.slice(1)}` : ''; return key && key in recipeCopy[locale] ? recipeText(locale, key as RecipeCopyKey) : ''; };
   const attention: Array<{ key: string; tone: 'warn' | 'info'; text: string; href: string; action: string }> = [
     ...(!view.enabled ? [{ key: 'source', tone: 'warn' as const, text: t('sourcePaused'), href: '/content/feeds', action: t('attentionResume') }] : []),
     ...view.channels.filter(channel => channel.paused).map(channel => ({ key: `paused-${channel.id}`, tone: 'warn' as const, text: t(channel.pausedReason ? 'attentionHeld' : 'attentionPaused', { channel: channel.name }), href: channel.pausedReason ? '/settings/channels' : '/content/feeds#settings', action: t(channel.pausedReason ? 'attentionChannels' : 'attentionSettings') })),
-    ...(failedWeek ? [{ key: 'failed', tone: 'warn' as const, text: failedWeek === 1 ? t('attentionFailedOne') : t('attentionFailed', { count: failedWeek }), href: '/content/feeds#plans', action: t('attentionSee') }] : []),
+    // Each recent failure by name, with why and where to open it; any beyond those shown are counted on one line.
+    ...view.failures.map(failure => ({ key: `failure-${failure.planId}`, tone: 'warn' as const,
+      text: t('attentionFailedPost', { title: failure.title, channel: failure.targetName, when: logTime(failure.slotAt) }) + (reasonOf(failure.reason) ? ` ${reasonOf(failure.reason)}.` : ''),
+      href: failure.postId ? `/content/post/${encodeURIComponent(failure.postId)}` : '/content/feeds#plans', action: t(failure.postId ? 'attentionOpen' : 'attentionSee') })),
+    ...(failedWeek > view.failures.length ? [{ key: 'failed', tone: 'warn' as const, text: t('attentionFailedMore', { count: failedWeek - view.failures.length }), href: '/content/feeds#plans', action: t('attentionSee') }] : []),
     ...(idle.length ? [{ key: 'idle', tone: 'info' as const, text: t('attentionIdle', { channels: idle.map(channel => channel.name).join(', ') }), href: '/content/feeds', action: t('attentionSee') }] : []),
     ...(view.tomorrow.flagged ? [{ key: 'flagged', tone: 'info' as const, text: view.tomorrow.flagged === 1 ? t('attentionFlaggedOne') : t('attentionFlagged', { count: view.tomorrow.flagged }), href: '#tomorrow', action: t('attentionReview') }] : []),
     ...(planned.length && !view.tomorrow.approved && view.canWrite ? [{ key: 'approve', tone: 'info' as const, text: t('attentionApprove', { count: planned.length }), href: '#tomorrow', action: t('attentionReview') }] : []),
@@ -64,7 +71,6 @@ export default async function AutopilotScreen() {
   const topReach = Math.max(1, ...report.channels.map(row => row.reach));
   const styleRows = Object.entries(report.styles).sort((a, b) => b[1].average - a[1].average);
   const topStyle = Math.max(0.01, ...styleRows.map(([, stat]) => stat.average));
-  const logTime = (at: string) => new Intl.DateTimeFormat(locale, { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: view.timeZone }).format(new Date(at));
   const logRow = (entry: (typeof report.learned)[number], index: number) => <li key={`${entry.at}-${index}`} data-kind={entry.kind}>
           <span className={styles.logKind}>{t(`log_${entry.kind}` as AutopilotCopyKey)}</span>
           <div><strong>{entry.channelName ?? ''}</strong>

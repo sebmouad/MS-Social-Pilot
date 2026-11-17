@@ -31,6 +31,8 @@ export type CockpitView = {
   enabled: boolean; sourceName: string; timeZone: string; pilot: AutopilotSettings; canWrite: boolean;
   channels: CockpitChannel[]; today: { date: string; posts: CockpitPost[] }; tomorrow: { date: string; posts: CockpitPost[]; approved: boolean; averageScore: number | null; flagged: number };
   report: WeeklyReport;
+  /** The latest failures of the last seven days (2026-11-17), so « 1 failed » names which one. */
+  failures: Array<{ planId: string; title: string; targetName: string; slotAt: string; reason: string | null; postId: string | null }>;
   ai: AiUse | null;
 };
 /** AI use this month (2026-11-16): requests and estimated tokens by use, cost when the model is priced, and the busiest hour against the hourly limit. */
@@ -82,9 +84,13 @@ export async function readCockpit(actor: FeedActor, now = new Date()): Promise<C
   });
   const [upcoming, board, todayPlans] = await Promise.all([plansBetween(source.id, now, new Date(now.getTime() + 3 * 86_400_000)), plansBetween(source.id, dayStart(tomorrow), dayStart(addDaysToKey(tomorrow, 1))), plansBetween(source.id, dayStart(today), dayStart(tomorrow))]);
   const ids = pages.map(page => page.id);
-  const [todayRows, failed] = await Promise.all([
+  const weekAgo = new Date(now.getTime() - 7 * 86_400_000);
+  const [todayRows, failed, failures] = await Promise.all([
     ids.length ? prisma.$queryRaw<Array<{ targetId: string; insights: unknown }>>`SELECT "targetId", insights FROM external_posts WHERE "targetId" = ANY(${ids}::text[]) AND "createdTime" >= ${dayStart(today)}` : [],
-    prisma.$queryRaw<Array<{ targetId: string; count: bigint }>>`SELECT "targetId", COUNT(*)::bigint AS count FROM wordpress_recipe_plans WHERE "sourceId" = ${source.id} AND state IN ('failed', 'uncertain') AND reason IS DISTINCT FROM 'left_empty' AND reason IS DISTINCT FROM 'replaced' AND "slotAt" >= ${new Date(now.getTime() - 7 * 86_400_000)} GROUP BY "targetId"`,
+    prisma.$queryRaw<Array<{ targetId: string; count: bigint }>>`SELECT "targetId", COUNT(*)::bigint AS count FROM wordpress_recipe_plans WHERE "sourceId" = ${source.id} AND state IN ('failed', 'uncertain') AND reason IS DISTINCT FROM 'left_empty' AND reason IS DISTINCT FROM 'replaced' AND "slotAt" >= ${weekAgo} GROUP BY "targetId"`,
+    ids.length ? prisma.$queryRaw<Array<{ id: string; targetId: string; slotAt: Date; title: string; reason: string | null; postId: string | null }>>`SELECT id, "targetId", "slotAt", title, reason, "postId" FROM wordpress_recipe_plans
+      WHERE "sourceId" = ${source.id} AND "targetId" = ANY(${ids}::text[]) AND state IN ('failed', 'uncertain') AND reason IS DISTINCT FROM 'left_empty' AND reason IS DISTINCT FROM 'replaced' AND "slotAt" >= ${weekAgo} AND "slotAt" < ${now}
+      ORDER BY "slotAt" DESC LIMIT 3` : [],
   ]);
   const report = await weeklyReport(source, pages, pilot, tz, now);
   const channels: CockpitChannel[] = pages.map(page => {
@@ -105,6 +111,7 @@ export async function readCockpit(actor: FeedActor, now = new Date()): Promise<C
     enabled: source.enabled, sourceName: source.name, timeZone: tz, pilot, canWrite: auth.role === 'owner' || auth.role === 'admin' || auth.role === 'editor',
     channels, today: { date: today, posts: todayPosts }, tomorrow: { date: tomorrow, posts: boardPosts, approved: (pilot.approvedDays ?? []).includes(tomorrow), averageScore: scores.length ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : null, flagged: boardPosts.filter(post => post.flagged).length },
     report,
+    failures: failures.map(row => ({ planId: row.id, title: row.title, targetName: names.get(row.targetId) ?? '', slotAt: row.slotAt.toISOString(), reason: row.reason, postId: row.postId })),
     ai: await aiUse(actor.workspaceId, now).catch(() => null),
   };
 }

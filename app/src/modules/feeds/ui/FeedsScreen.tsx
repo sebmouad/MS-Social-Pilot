@@ -12,6 +12,7 @@ import { FEEDS_FEATURE_ID } from '../manifest';
 import { feedsLocale, feedsText, type FeedsCopyKey } from '../copy';
 import { FeedManager } from './FeedManager';
 import { FeedsTabs } from './FeedsTabs';
+import { RefreshSoon } from './RefreshSoon';
 import { recipeText, type RecipeCopyCatalog, type RecipeCopyKey } from '../copy-recipes';
 import { RecipeSource, type RecipePool, type RecipeView } from './RecipeSource';
 import { RecipeStatusCard } from './RecipeStatusCard';
@@ -50,6 +51,7 @@ export default async function FeedsScreen({ searchParams }: { searchParams: Prom
     const r = (key: RecipeCopyKey) => recipeText(locale, key, {}, recipeCopy as RecipeCopyCatalog);
     return <>
       {heading}
+      {showRecipes && recipes.source && recipes.available && !recipes.pool ? <RefreshSoon /> : null}
       {showRecipes ? <FeedsTabs label={r('tabsLabel')} recipesLabel={r('feedsRecipes')} feedsLabel={r('feedsOther')} feedCount={result.feeds.length} initial={recipes.source || params.page === undefined && !result.feeds.length ? 'recipes' : 'feeds'}
         recipes={<>
           {recipeStatus ? <RecipeStatusCard status={recipeStatus} locale={locale} copy={copy} /> : null}
