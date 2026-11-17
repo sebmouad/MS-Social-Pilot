@@ -12,6 +12,7 @@ import { AutopilotPanel } from './AutopilotPanel';
 import { autopilotOf } from '../wordpress/autopilot';
 import styles from './feeds.module.css';
 import { RecipeSupplyWarning } from './RecipeSupplyWarning';
+import type { RecipeFigure } from './recipe-figures';
 
 type Mapping = { captionMetaKey: string; imageMetaKey: string; recipeMetaKey: string; skipMetaKey: string; attachedFileMetaKey: string; postType: string; postStatus: string };
 export type RecipeConfig = {
@@ -61,7 +62,7 @@ const initialDraft = (view: RecipeView): Draft => view.source
 
 const WEEK_ORDER = [1, 2, 3, 4, 5, 6, 0] as const;
 
-export function RecipeSource({ initial, locale, canWrite, copy = recipeCopy }: { initial: RecipeView; locale: RecipeLocale; canWrite: boolean; copy?: RecipeCopyCatalog }) {
+export function RecipeSource({ initial, locale, canWrite, copy = recipeCopy, figures }: { initial: RecipeView; locale: RecipeLocale; canWrite: boolean; copy?: RecipeCopyCatalog; figures?: RecipeFigure[] }) {
   const t = (key: RecipeCopyKey, values: Record<string, string | number> = {}) => recipeText(locale, key, values, copy);
   // A large library is scanned up to a limit: its figures are minimums (shown with « + »).
   const count = (value: number) => new Intl.NumberFormat(locale).format(value);
@@ -191,6 +192,7 @@ export function RecipeSource({ initial, locale, canWrite, copy = recipeCopy }: {
         ]} />
       </div>}
     </header>
+    {figures?.length ? <dl className={styles.figures}>{figures.map(figure => <div key={figure.key} data-alert={figure.alert || undefined} data-pending={figure.pending || undefined}><dt>{figure.label}</dt><dd>{figure.value}{figure.detail ? <span>{figure.detail}</span> : null}</dd></div>)}</dl> : null}
     {!view.available && <p className={styles.help} role="status">{t('unavailable')}</p>}
     {notice && !review && <RouteNotice error={notice.error} focusKey={`recipe-notice:${notice.key}`}>{notice.text}</RouteNotice>}
     {canWrite && source && <div className={styles.viewSwitch} role="group" aria-label={t('viewLabel')}>

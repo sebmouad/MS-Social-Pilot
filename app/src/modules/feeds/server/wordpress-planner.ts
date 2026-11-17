@@ -575,6 +575,17 @@ export async function runRecipePlanning(overrides: Partial<PlannerPorts> & { aut
           // Interrupted runs: settle their upcoming slots with proof, so the channel is planned again (2026-11-16).
           const healed = await autopilot.healStranded(source.id, now, overrides.autopilot).catch(() => ({ reconciled: 0, released: 0, titles: [] as string[] }));
           for (const title of healed.titles) entries.push({ at: now.toISOString(), kind: 'healing', text: `« ${title.slice(0, 120)} » was left unsure by an interrupted run and never created; its time is planned again.`, code: 'stranded', params: { title: title.slice(0, 120) } });
+          // A freed slot at a time the channel no longer uses: refilled at its next free time when its day runs short (2026-11-17).
+          const healConfig = configOf(settings, source);
+          const healPages = await ports.store.pages(source, settings.targetTypes, settings.maxTargets);
+          const refills = autopilot.shortDayRefills({ rows: await ports.store.ledgerSince(source.id, new Date(now.getTime() - 2 * 86_400_000)), now, timezone: healConfig.timezone,
+            minLeadMinutes: settings.minLeadMinutes, gapMinutes: pilot.bestTimes.gapMinutes, window: pilot.bestTimes.window, maxAttempts: settings.maxSlotAttempts,
+            timesFor: id => healPages.some(page => page.id === id) ? channelConfig(healConfig, id) : null });
+          for (const { row, at } of refills) {
+            (makeup ??= new Map()).set(slotKey(row.targetId, row.slotAt), at);
+            const time = instantToWall(at, healConfig.timezone).time;
+            entries.push({ at: now.toISOString(), kind: 'healing', channelId: row.targetId, channelName: healPages.find(page => page.id === row.targetId)?.name.slice(0, 200), text: `« ${row.title.slice(0, 120)} » never went out after an interrupted run; another recipe goes out at ${time} so the day keeps its posts.`, code: 'refilled', params: { title: row.title.slice(0, 120), time } });
+          }
           const failed = await (overrides.autopilot ?? autopilot.prismaAutopilotPorts).failedPublications(source.id, new Date(now.getTime() - 6 * 3_600_000));
           const at = new Date(now.getTime() + (settings.minLeadMinutes + 2) * 60_000);
           for (const row of failed) {

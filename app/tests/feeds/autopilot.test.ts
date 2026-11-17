@@ -102,3 +102,33 @@ test('self-healing: an interrupted run’s slot is reconciled when its post exis
   assert.deepEqual(settled, [['found', { postId: 'post1' }], ['absent', { released: true }]]);
   assert.equal(out.reconciled, 1); assert.equal(out.released, 1); assert.deepEqual(out.titles, ['Recipe absent']);
 });
+
+// Freed slots on a short day (2026-11-17): Paris times, the channel posts at 11:30, 15:30, 17:30, 20:30.
+test('refill: a freed old-time slot is refilled only when the day would run short, at the next free time', async () => {
+  const { shortDayRefills } = await import('@/modules/feeds/server/wordpress-autopilot');
+  const row = (id: string, paris: string, state: 'planned' | 'failed', reason: string | null = null) => ({ id, sourceId: 's', targetId: 'c1', wpPostId: id, slotAt: new Date(`2026-11-16T${paris}:00+01:00`), state, postId: state === 'planned' ? `p-${id}` : null, title: `T ${id}`, permalink: null, reason, skipped: [], claimedAt: new Date('2026-11-16T05:00:00Z') });
+  const base = { timezone: 'Europe/Paris', minLeadMinutes: 5, gapMinutes: 60, window: [6, 23] as const, maxAttempts: 5, timesFor: () => ({ slots: ['11:30', '15:30', '17:30', '20:30'], paused: false }) };
+  const freed = row('f', '15:00', 'failed', 'not_created');
+
+  // 14:00 in Paris: 15:30, 17:30 and 20:30 are still to be planned by this run, so the day is full: no refill (16 Nov).
+  assert.deepEqual(shortDayRefills({ ...base, now: new Date('2026-11-16T13:00:00Z'), rows: [row('a', '11:30', 'planned'), freed] }), []);
+
+  // 15:40: 15:30 has passed unfilled, the day would end with three posts: the freed slot goes out at 15:50.
+  const late = { ...base, now: new Date('2026-11-16T14:40:00Z'), rows: [row('a', '11:30', 'planned'), freed, row('c', '17:30', 'planned'), row('d', '20:30', 'planned')] };
+  const out = shortDayRefills(late);
+  assert.equal(out.length, 1); assert.equal(out[0]!.row.id, 'f'); assert.equal(out[0]!.at.toISOString(), '2026-11-16T14:50:00.000Z');
+
+  // Its next free time keeps the gap: posts at 11:30, 16:15 and 20:30 (17:30 failed): 15:50 is too close to 16:15, so 17:15.
+  const tight = shortDayRefills({ ...late, rows: [row('a', '11:30', 'planned'), freed, row('b', '16:15', 'planned'), row('c', '17:30', 'failed', 'publish_failed'), row('d', '20:30', 'planned')] });
+  assert.equal(tight.length, 1); assert.equal(tight[0]!.at.toISOString(), '2026-11-16T16:15:00.000Z');
+  // A paused channel, a day already over, a time left empty on purpose: left alone.
+  assert.deepEqual(shortDayRefills({ ...late, timesFor: () => ({ slots: ['11:30', '15:30', '17:30', '20:30'], paused: true }) }), []);
+  assert.deepEqual(shortDayRefills({ ...late, now: new Date('2026-11-17T09:00:00Z') }), []);
+  assert.deepEqual(shortDayRefills({ ...late, rows: [...late.rows, row('e', '15:30', 'failed', 'left_empty')] }), []);
+  // Two freed slots when one post is missing (17:30 still to come): only one is refilled, the day never gets a fifth post.
+  const one = shortDayRefills({ ...late, rows: [row('a', '11:30', 'planned'), freed, row('g', '15:10', 'failed', 'not_created'), row('d', '20:30', 'planned')] });
+  assert.equal(one.length, 1);
+  // Two posts missing (17:30 failed too): both are refilled, an hour apart: 15:50 and 16:50.
+  const two = shortDayRefills({ ...late, rows: [row('a', '11:30', 'planned'), freed, row('g', '15:10', 'failed', 'not_created'), row('c', '17:30', 'failed', 'publish_failed'), row('d', '20:30', 'planned')] });
+  assert.deepEqual(two.map(item => item.at.toISOString()), ['2026-11-16T14:50:00.000Z', '2026-11-16T15:50:00.000Z']);
+});

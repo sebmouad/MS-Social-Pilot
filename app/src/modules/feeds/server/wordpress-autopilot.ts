@@ -2,7 +2,8 @@ import { prisma } from '@/server/data';
 import { AUTOPILOT_LOG_MAX, LEARN_EVERY_DAYS, LEARN_VERSION, autopilotOf, hourStats, learnTimes, relativeByHour, postScore, type AutopilotLogEntry, type AutopilotSettings, type Observation } from '../wordpress/autopilot';
 import { channelConfig, type ChannelSettings } from '../wordpress/recipe';
 import { configOf } from './wordpress-planner';
-import type { SourceRow } from './wordpress-store';
+import type { LedgerRow, SourceRow } from './wordpress-store';
+import { addDaysToKey, instantToWall, wallTimeToInstant } from '@/lib/calendar-dates';
 import type { WordpressSettings } from './wordpress-settings';
 
 /** What the autopilot reads and writes outside the planner; replaced in tests. */
@@ -129,3 +130,48 @@ export async function healStranded(sourceId: string, now: Date, ports: Autopilot
   }
   return out;
 }
+
+/**
+ * Freed slots on a short day (2026-11-17, owner's choice): a slot an interrupted run never created (`not_created`) sits
+ * at a time the channel may no longer use, so the planner never fills it again. When the channel's day would end with
+ * fewer posts than its times allow, counting the upcoming times this run still fills, the slot is revived at the
+ * channel's next free time that day: inside the autopilot window, at least `gapMinutes` from its other posts. Never
+ * doubles a day; a paused channel or a day already over is left alone. Returns each slot with its new time.
+ */
+export function shortDayRefills(input: {
+  rows: readonly LedgerRow[]; now: Date; timezone: string; minLeadMinutes: number; gapMinutes: number; window: readonly [number, number]; maxAttempts: number;
+  timesFor: (targetId: string) => { slots: readonly string[]; weekdays?: readonly number[]; paused: boolean } | null;
+}): Array<{ row: LedgerRow; at: Date }> {
+  const { rows, now, timezone: tz, gapMinutes } = input;
+  const gap = gapMinutes * 60_000; const earliest = now.getTime() + (input.minLeadMinutes + 2) * 60_000;
+  const at = (date: string, time: string) => { const r = wallTimeToInstant(date, time, tz); return r.ok ? r.instant.getTime() : null; };
+  const today = instantToWall(now, tz).date;
+  const taken = new Map<string, number[]>(); // channel|day → times already used, refills included
+  const out: Array<{ row: LedgerRow; at: Date }> = [];
+  for (const row of rows) {
+    if (row.state !== 'failed' || row.reason !== NOT_CREATED_REASON || row.postId || row.skipped.length >= input.maxAttempts) continue;
+    const own = input.timesFor(row.targetId);
+    if (!own || own.paused) continue;
+    const day = instantToWall(row.slotAt, tz).date;
+    if (day < today) continue;
+    const weekday = new Date(`${day}T12:00:00Z`).getUTCDay();
+    const expected = own.weekdays && !own.weekdays.includes(weekday) ? 0 : own.slots.length;
+    const sameDay = rows.filter(other => other.targetId === row.targetId && instantToWall(other.slotAt, tz).date === day);
+    // Kept posts (and times left empty on purpose), plus the channel's upcoming times this run still fills.
+    const kept = sameDay.filter(other => other.state !== 'failed' || other.reason === 'left_empty').map(other => other.slotAt.getTime());
+    const coming = own.slots.flatMap(time => { const t = at(day, time); return t !== null && t > now.getTime() + input.minLeadMinutes * 60_000 && !sameDay.some(other => other.slotAt.getTime() === t) ? [t] : []; });
+    const key = `${row.targetId}|${day}`;
+    const used = taken.get(key) ?? [...kept, ...coming];
+    if (used.length >= expected) { taken.set(key, used); continue; }
+    const from = at(day, `${String(input.window[0]).padStart(2, '0')}:00`); const to = input.window[1] >= 24 ? at(addDaysToKey(day, 1), '00:00') : at(day, `${String(input.window[1]).padStart(2, '0')}:00`);
+    if (from === null || to === null) continue;
+    const step = 5 * 60_000;
+    let t = Math.ceil(Math.max(from, earliest) / step) * step;
+    while (t < to && used.some(other => Math.abs(other - t) < gap)) t += step;
+    if (t >= to) { taken.set(key, used); continue; }
+    used.push(t); taken.set(key, used);
+    out.push({ row, at: new Date(t) });
+  }
+  return out;
+}
+const NOT_CREATED_REASON = 'not_created';

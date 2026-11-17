@@ -365,8 +365,14 @@ ads_management (owner asked to rework Ads like Meta Ads Manager first). The subm
 - A failed time counts as a problem (Autopilot « Needs a look », Feeds status card) only when it was not left empty or
   replaced on purpose and no planned post on that channel sits within the autopilot gap (`stillFailedSql`). Seen live:
   an interrupted run left 16 Nov 15:00 « not created » after the autopilot had moved that channel's time to 15:30, which
-  carried the post. Known gap, not fixed: a slot freed at a time a channel no longer uses is never refilled (the
-  planner only fills current times), so such a day can run one post short if the new time was not free.
+  carried the post.
+- Freed slots on a short day (owner's choice by form, 2026-11-17): a `not_created` slot at a time the channel no longer
+  uses is revived through `makeup` at the channel's next free time that day (inside the autopilot window, at least the
+  gap from its other posts), only when the day would otherwise end with fewer posts than its times; upcoming times the
+  run still fills count as posts, so a day is never doubled (`shortDayRefills`, logged as `refilled`).
+- Feeds: the separate « Recipe automation » card is merged into the recipe source header as a row of figures (owner's
+  choice by form, 2026-11-17; `recipe-figures.ts`). Its unused `recipeStatus*` copy keys stay in `feeds.copy` because
+  Root-edited catalogs are validated against them.
 - A fragment built with `Prisma.sql` works only when the whole query is a `Prisma.sql` object passed to `$queryRaw(...)`;
   nested inside a tagged `$queryRaw` template it is sent as a JSON value (error 42804).
 - Live-site credentials for read-only checks are in the cloud environment as `MSP_APP_URL`, `MSP_TEST_EMAIL`,

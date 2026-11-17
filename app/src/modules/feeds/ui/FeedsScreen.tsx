@@ -15,7 +15,7 @@ import { FeedsTabs } from './FeedsTabs';
 import { RefreshSoon } from './RefreshSoon';
 import { recipeText, type RecipeCopyCatalog, type RecipeCopyKey } from '../copy-recipes';
 import { RecipeSource, type RecipePool, type RecipeView } from './RecipeSource';
-import { RecipeStatusCard } from './RecipeStatusCard';
+import { recipeFigures } from './recipe-figures';
 import { loadRecipeStatus } from './recipe-status';
 import { readRecipeSource } from '../server/wordpress';
 import { withRecipeLabels } from '../server/recipe-labels';
@@ -53,10 +53,8 @@ export default async function FeedsScreen({ searchParams }: { searchParams: Prom
       {heading}
       {showRecipes && recipes.source && recipes.available && !recipes.pool ? <RefreshSoon /> : null}
       {showRecipes ? <FeedsTabs label={r('tabsLabel')} recipesLabel={r('feedsRecipes')} feedsLabel={r('feedsOther')} feedCount={result.feeds.length} initial={recipes.source || params.page === undefined && !result.feeds.length ? 'recipes' : 'feeds'}
-        recipes={<>
-          {recipeStatus ? <RecipeStatusCard status={recipeStatus} locale={locale} copy={copy} /> : null}
-          <RecipeSource initial={withRecipeLabels(recipes, locale) as unknown as RecipeView} locale={locale} canWrite={canWrite} copy={recipeCopy} />
-        </>} feeds={feedList} /> : feedList}
+        recipes={<RecipeSource initial={withRecipeLabels(recipes, locale) as unknown as RecipeView} locale={locale} canWrite={canWrite} copy={recipeCopy}
+          figures={recipeStatus ? recipeFigures(recipeStatus, locale, copy) : undefined} />} feeds={feedList} /> : feedList}
       <p className={styles.privacy}>{t('footnote')}</p>
     </>;
   } catch (error) {

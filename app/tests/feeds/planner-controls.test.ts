@@ -273,3 +273,14 @@ test('planner: a chosen recipe beyond the scan is read by its id, so its slot is
   assert.equal(out.planned, 1);
   assert.equal(h.ledger.find(r => r.targetId === slot.targetId && r.slotAt.getTime() === slot.slotAt.getTime())?.wpPostId, 'r30');
 });
+
+test('planner: a freed slot at a time the channel no longer uses is revived at the make-up time (2026-11-17)', async () => {
+  const oldTime = new Date('2026-11-16T14:00:00Z'); // 15:00 in Paris; the channel now posts at 11:00 and 17:00
+  const freed: LedgerRow = { id: 'freed', sourceId: 'src1', targetId: 'pageA', wpPostId: 'r29', slotAt: oldTime, state: 'failed', postId: null, title: 'Recipe 29', permalink: null, reason: 'not_created', skipped: [], claimedAt: new Date(now.getTime() - 7200_000) };
+  const h = harness([freed]);
+  const soon = new Date(now.getTime() + 20 * 60_000);
+  await planSource({ settings: settings(), ports: h.ports, db: h.db as never, budget: { left: 50 }, now, makeup: new Map([[slotKey('pageA', oldTime), soon]]) }, source(), auth);
+  const row = h.ledger.find(r => r.targetId === 'pageA' && r.slotAt.getTime() === oldTime.getTime())!;
+  assert.equal(row.state, 'planned');
+  assert.ok(h.created.some(p => p.targetId === 'pageA' && p.scheduledAt.getTime() === soon.getTime()));
+});
