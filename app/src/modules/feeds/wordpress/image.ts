@@ -40,6 +40,14 @@ export async function convertToJpeg(bytes: Buffer, s: Pick<ImageSettings, 'maxPi
   }
 }
 
+/**
+ * A small JPEG of a photo for the AI to look at (2026-11-18): at most `side` pixels on its longest side. The photo
+ * reader used to pass its target size as the input limit, so every real recipe photo (about 1080 × 1350) was refused.
+ */
+export async function photoForAi(bytes: Buffer, side = 768): Promise<Buffer> {
+  return sharp(bytes, { failOn: 'error', limitInputPixels: 80_000_000 }).rotate().resize({ width: side, height: side, fit: 'inside', withoutEnlargement: true }).flatten({ background: '#ffffff' }).jpeg({ quality: 72 }).toBuffer();
+}
+
 export const defaultImagePorts = (net: FetchDeps): ImagePorts => ({
   async download(url, policy) {
     const fetched = await guardedFetch(url, policy, net, { headers: { accept: 'image/*' } });

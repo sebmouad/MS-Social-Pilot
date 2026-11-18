@@ -283,3 +283,12 @@ test('memory: the number of posts a day is learned from whole days, and one more
   assert.equal(model.bestCount('A', 5).count, 5);
   assert.ok(MAX_POSTS_PER_DAY <= 10);
 });
+
+test('photos: a real-size recipe photo is shrunk for the AI, not refused', async () => {
+  const sharp = (await import('sharp')).default;
+  const { photoForAi } = await import('@/modules/feeds/wordpress/image');
+  const photo = await sharp({ create: { width: 1080, height: 1350, channels: 3, background: '#c86' } }).webp().toBuffer();
+  const small = await photoForAi(photo);
+  const meta = await sharp(small).metadata();
+  assert.equal(meta.format, 'jpeg'); assert.ok(meta.height === 768 && (meta.width ?? 0) <= 768, `${meta.width}x${meta.height}`);
+});
