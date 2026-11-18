@@ -436,3 +436,5 @@ ads_management (owner asked to rework Ads like Meta Ads Manager first). The subm
   day (`days`, `dayUsual`). `bestCount`: the best count with ≥ 3 days wins; while the current one is best and one more
   has not had 3 days, one more is tried (up to `MAX_POSTS_PER_DAY` = 10). The count sets how many times `bestTimes`
   picks. More posts use recipes faster: watch the recipe supply warning.
+- Daily re-plan: from 17:00 local, once a day (audit `feeds.autopilot_replanned` today = done), `dailyReplan` runs the
+  same re-planning as the manual action, after the planning run.

@@ -666,6 +666,9 @@ export async function runRecipePlanning(overrides: Partial<PlannerPorts> & { aut
       await autopilot.logAutopilot(settings, source, entries, overrides.autopilot, handled).catch(() => undefined);
       // Evening « plan ready » and the weekly report (2026-11-16); sent once each.
       if (!overrides.autopilot) await import('./wordpress-cockpit').then(cockpit => cockpit.notifyAutopilot(settings, source, now)).catch(() => undefined);
+      // Once a day from 17:00, tomorrow and the day after are checked again with the latest Page memories, before the
+      // evening review (2026-11-18). It runs after this run; each replacement is written in the activity log.
+      if (!overrides.autopilot && pilot.score.enabled) void import('./wordpress-cockpit').then(cockpit => cockpit.dailyReplan(auth.actor, configOf(settings, source).timezone, now)).catch(() => undefined);
       // Reply drafts for new comments on recipe posts (2026-11-16): stored for the Inbox, never sent.
       if (!overrides.autopilot && pilot.replies.enabled && await ports.writer.available(source.workspaceId).catch(() => false)) await import('./wordpress-replies').then(replies => replies.draftRecipeReplies({ sourceId: source.id, actor: auth.actor, pilot, now })).catch(() => undefined);
       totals(summary, outcome);

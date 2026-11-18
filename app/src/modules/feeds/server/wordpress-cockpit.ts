@@ -282,3 +282,20 @@ export async function refreshPlanWithMemory(actor: FeedActor, input: unknown, no
   await audit(prisma as unknown as Parameters<typeof audit>[0], actor.workspaceId, actor, 'feeds.autopilot_replanned', { sourceId: source.id, ...out }).catch(() => undefined);
   return out;
 }
+
+/** From this local hour, once a day, the coming plan is checked again with the Page memories. */
+export const DAILY_REPLAN_HOUR = 17;
+/**
+ * The daily re-check (2026-11-18): from DAILY_REPLAN_HOUR, once per local day (the audit log tells whether it ran
+ * today), the same re-planning a member can ask for.
+ */
+export async function dailyReplan(actor: FeedActor, timeZone: string, now = new Date()): Promise<boolean> {
+  const wall = instantToWall(now, timeZone);
+  if (Number(wall.time.slice(0, 2)) < DAILY_REPLAN_HOUR) return false;
+  const start = wallTimeToInstant(wall.date, '00:00', timeZone);
+  if (!start.ok) return false;
+  const done = await prisma.$queryRaw<Array<{ count: number }>>`SELECT COUNT(*)::int AS count FROM activity_logs WHERE "workspaceId" = ${actor.workspaceId} AND action = 'feeds.autopilot_replanned' AND "createdAt" >= ${start.instant}`;
+  if (Number(done[0]?.count ?? 0) > 0) return false;
+  await refreshPlanWithMemory(actor, { confirmation: REFRESH_PLAN_CONFIRMATION }, now);
+  return true;
+}
