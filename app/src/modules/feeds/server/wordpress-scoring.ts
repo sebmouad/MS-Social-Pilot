@@ -14,7 +14,7 @@ export type ScoringPorts = {
   /** Rate unrated recipes with AI (title hook and kind) and store the ratings; at most a batch per call. */
   rate(actor: FeedActor, source: { id: string; workspaceId: string }, items: ReadonlyArray<{ id: string; title: string }>): Promise<void>;
   /** Look at photos with AI vision (2026-11-18): how appetising, and which visual traits. Returns how many were read. */
-  ratePhotos(actor: FeedActor, source: { id: string; workspaceId: string }, items: ReadonlyArray<{ id: string; imageUrl: string }>): Promise<number | void>;
+  ratePhotos(actor: FeedActor, source: { id: string; workspaceId: string }, items: ReadonlyArray<{ id: string; imageUrl?: string; mediaId?: string }>): Promise<number | void>;
   outcomes(sourceId: string, since: Date): Promise<Outcome[]>;
   /** Each Page's memory (2026-11-18); absent in tests and before the first run. */
   memories?(sourceId: string): Promise<Map<string, import('../wordpress/memory').PageMemory>>;
@@ -133,8 +133,11 @@ export const prismaScoringPorts: ScoringPorts = {
     const { defaultFetchDeps } = await import('@/modules/publishing/server/media/network/net-guard');
     const image = defaultImagePorts(defaultFetchDeps());
     let read = 0; lastPhotoProblem = null;
-    const one = async (item: { id: string; imageUrl: string }) => {
-      const bytes = await image.download(item.imageUrl, { timeoutMs: 10_000, maxBytes: 15_000_000, maxRedirects: 3, allowHttp: false, hostAllowlist: [] });
+    const { readWorkspaceImage } = await import('@/modules/publishing/server/media/storage');
+    const one = async (item: { id: string; imageUrl?: string; mediaId?: string }) => {
+      // The photo as posted, from the app's own library, or else from the recipe site (2026-11-18).
+      const bytes = item.mediaId ? Buffer.from((await readWorkspaceImage(source.workspaceId, item.mediaId)).bytes)
+        : await image.download(item.imageUrl ?? '', { timeoutMs: 10_000, maxBytes: 15_000_000, maxRedirects: 3, allowHttp: false, hostAllowlist: [] });
       const small = await convertToJpeg(bytes, { maxPixels: 600_000, quality: 75, minQuality: 50, qualityStep: 10, maxOutputBytes: 400_000 });
       const seen = parsePhoto(await autopilotComplete(actor, 'autopilot.photo', PHOTO_SYSTEM, 'The photo.', { image: { mimeType: 'image/jpeg', base64: small.toString('base64') }, maxTokens: 300 }));
       if (!seen) return;

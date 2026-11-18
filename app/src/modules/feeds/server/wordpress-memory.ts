@@ -61,12 +61,17 @@ export async function updatePageMemories(source: SourceRow, pages: ReadonlyArray
   return learned;
 }
 
-/** Published recipes of the last 30 days whose photo the AI has not read yet, newest first, for learning. */
-export async function photosToLearn(sourceId: string, now: Date, limit: number): Promise<string[]> {
-  const rows = await prisma.$queryRaw<Array<{ wpPostId: string }>>`SELECT l."wpPostId" FROM wordpress_recipe_plans l
+/** Published recipes of the last 30 days whose photo the AI has not read yet, newest first, with the photo as posted. */
+export async function photosToLearn(sourceId: string, now: Date, limit: number): Promise<Array<{ id: string; mediaId: string }>> {
+  const rows = await prisma.$queryRaw<Array<{ wpPostId: string; media: unknown }>>`SELECT DISTINCT ON (l."wpPostId") l."wpPostId", p.media FROM wordpress_recipe_plans l
     JOIN post_targets pt ON pt."postId" = l."postId" AND pt."targetId" = l."targetId" AND pt.status::text = 'published'
+    JOIN posts p ON p.id = l."postId"
     LEFT JOIN recipe_ratings r ON r."sourceId" = l."sourceId" AND r."wpPostId" = l."wpPostId"
     WHERE l."sourceId" = ${sourceId} AND l.state = 'planned' AND r."photoTraits" IS NULL AND l."slotAt" >= ${new Date(now.getTime() - 30 * 86_400_000)} AND l."slotAt" <= ${now}
-    GROUP BY l."wpPostId" ORDER BY MAX(l."slotAt") DESC LIMIT ${limit}`;
-  return rows.map(row => row.wpPostId);
+    ORDER BY l."wpPostId", l."slotAt" DESC`;
+  const withMedia = rows.flatMap(row => {
+    const first = Array.isArray(row.media) ? (row.media as Array<{ kind?: unknown; url?: unknown }>).find(item => item?.kind === 'image' && typeof item.url === 'string' && item.url.startsWith('media:')) : undefined;
+    return first ? [{ id: row.wpPostId, mediaId: String(first.url).slice('media:'.length) }] : [];
+  });
+  return withMedia.slice(0, limit);
 }
