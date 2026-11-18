@@ -35,8 +35,8 @@ export async function readFacebookPostPerformance(request: PostPerformanceReques
   const rows = await prisma.$queryRaw<Row[]>(Prisma.sql`
     SELECT * FROM (
       SELECT p.id AS "postId", p.message, pt."publishedAt", COALESCE(pt."remoteUrl", ep.permalink) AS "remoteUrl",
-        CASE WHEN pt."insightsSyncedAt" IS NULL AND ep."insightsSyncedAt" IS NOT NULL THEN ep.insights ELSE pt.insights END AS insights,
-        COALESCE(pt."insightsSyncedAt", ep."insightsSyncedAt") AS "insightsSyncedAt", p.media, ep."pictureUrl"
+        CASE WHEN ep."insightsSyncedAt" IS NOT NULL AND (pt."insightsSyncedAt" IS NULL OR ep."insightsSyncedAt" > pt."insightsSyncedAt") THEN ep.insights ELSE COALESCE(pt.insights, ep.insights) END AS insights,
+        GREATEST(pt."insightsSyncedAt", ep."insightsSyncedAt") AS "insightsSyncedAt", p.media, ep."pictureUrl"
       FROM post_targets pt JOIN posts p ON p.id = pt."postId" JOIN targets t ON t.id = pt."targetId"
       -- Post history stores current insights on the synced remote copy of an app-published post.
       LEFT JOIN external_posts ep ON ep."targetId" = pt."targetId" AND ep."remoteId" = pt."remotePostId"

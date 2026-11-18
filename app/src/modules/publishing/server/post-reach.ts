@@ -94,46 +94,49 @@ export async function loadPostReach(workspaceId: string, postIds: readonly strin
         pt."remotePostId" AS "remotePostId",
         COALESCE(pt."remoteUrl", ep.permalink) AS "remoteUrl",
         COALESCE(
-          CASE WHEN (COALESCE(pt.insights, ep.insights)->>'reactions') ~ '^[0-9]+(\.[0-9]+)?$' THEN (COALESCE(pt.insights, ep.insights)->>'reactions')::double precision END,
-          CASE WHEN (COALESCE(pt.insights, ep.insights)->>'reactions_like') ~ '^[0-9]+(\.[0-9]+)?$' THEN (COALESCE(pt.insights, ep.insights)->>'reactions_like')::double precision END,
-          CASE WHEN (COALESCE(pt.insights, ep.insights)->>'likes') ~ '^[0-9]+(\.[0-9]+)?$' THEN (COALESCE(pt.insights, ep.insights)->>'likes')::double precision END,
-          CASE WHEN (COALESCE(pt.insights, ep.insights)->>'likeCount') ~ '^[0-9]+(\.[0-9]+)?$' THEN (COALESCE(pt.insights, ep.insights)->>'likeCount')::double precision END,
+          CASE WHEN (cur.insights->>'reactions') ~ '^[0-9]+(\.[0-9]+)?$' THEN (cur.insights->>'reactions')::double precision END,
+          CASE WHEN (cur.insights->>'reactions_like') ~ '^[0-9]+(\.[0-9]+)?$' THEN (cur.insights->>'reactions_like')::double precision END,
+          CASE WHEN (cur.insights->>'likes') ~ '^[0-9]+(\.[0-9]+)?$' THEN (cur.insights->>'likes')::double precision END,
+          CASE WHEN (cur.insights->>'likeCount') ~ '^[0-9]+(\.[0-9]+)?$' THEN (cur.insights->>'likeCount')::double precision END,
           0
         )::text AS likes,
         COALESCE(
-          CASE WHEN (COALESCE(pt.insights, ep.insights)->>'comments') ~ '^[0-9]+(\.[0-9]+)?$' THEN (COALESCE(pt.insights, ep.insights)->>'comments')::double precision END,
-          CASE WHEN (COALESCE(pt.insights, ep.insights)->>'commentsCount') ~ '^[0-9]+(\.[0-9]+)?$' THEN (COALESCE(pt.insights, ep.insights)->>'commentsCount')::double precision END,
+          CASE WHEN (cur.insights->>'comments') ~ '^[0-9]+(\.[0-9]+)?$' THEN (cur.insights->>'comments')::double precision END,
+          CASE WHEN (cur.insights->>'commentsCount') ~ '^[0-9]+(\.[0-9]+)?$' THEN (cur.insights->>'commentsCount')::double precision END,
           0
         )::text AS comments,
         COALESCE(
-          CASE WHEN (COALESCE(pt.insights, ep.insights)->>'shares') ~ '^[0-9]+(\.[0-9]+)?$' THEN (COALESCE(pt.insights, ep.insights)->>'shares')::double precision END,
-          CASE WHEN (COALESCE(pt.insights, ep.insights)->>'sharesCount') ~ '^[0-9]+(\.[0-9]+)?$' THEN (COALESCE(pt.insights, ep.insights)->>'sharesCount')::double precision END,
+          CASE WHEN (cur.insights->>'shares') ~ '^[0-9]+(\.[0-9]+)?$' THEN (cur.insights->>'shares')::double precision END,
+          CASE WHEN (cur.insights->>'sharesCount') ~ '^[0-9]+(\.[0-9]+)?$' THEN (cur.insights->>'sharesCount')::double precision END,
           0
         )::text AS shares,
         COALESCE(
-          CASE WHEN (COALESCE(pt.insights, ep.insights)->>'post_total_media_view_unique') ~ '^[0-9]+(\.[0-9]+)?$' THEN (COALESCE(pt.insights, ep.insights)->>'post_total_media_view_unique')::double precision END,
-          CASE WHEN (COALESCE(pt.insights, ep.insights)->>'reach') ~ '^[0-9]+(\.[0-9]+)?$' THEN (COALESCE(pt.insights, ep.insights)->>'reach')::double precision END,
-          CASE WHEN (COALESCE(pt.insights, ep.insights)->>'post_impressions_unique') ~ '^[0-9]+(\.[0-9]+)?$' THEN (COALESCE(pt.insights, ep.insights)->>'post_impressions_unique')::double precision END,
+          CASE WHEN (cur.insights->>'post_total_media_view_unique') ~ '^[0-9]+(\.[0-9]+)?$' THEN (cur.insights->>'post_total_media_view_unique')::double precision END,
+          CASE WHEN (cur.insights->>'reach') ~ '^[0-9]+(\.[0-9]+)?$' THEN (cur.insights->>'reach')::double precision END,
+          CASE WHEN (cur.insights->>'post_impressions_unique') ~ '^[0-9]+(\.[0-9]+)?$' THEN (cur.insights->>'post_impressions_unique')::double precision END,
           0
         )::text AS reach,
         COALESCE(
-          CASE WHEN (COALESCE(pt.insights, ep.insights)->>'post_media_view') ~ '^[0-9]+(\.[0-9]+)?$' THEN (COALESCE(pt.insights, ep.insights)->>'post_media_view')::double precision END,
-          CASE WHEN (COALESCE(pt.insights, ep.insights)->>'post_impressions') ~ '^[0-9]+(\.[0-9]+)?$' THEN (COALESCE(pt.insights, ep.insights)->>'post_impressions')::double precision END,
-          CASE WHEN (COALESCE(pt.insights, ep.insights)->>'impressions') ~ '^[0-9]+(\.[0-9]+)?$' THEN (COALESCE(pt.insights, ep.insights)->>'impressions')::double precision END,
-          CASE WHEN (COALESCE(pt.insights, ep.insights)->>'views') ~ '^[0-9]+(\.[0-9]+)?$' THEN (COALESCE(pt.insights, ep.insights)->>'views')::double precision END,
+          CASE WHEN (cur.insights->>'post_media_view') ~ '^[0-9]+(\.[0-9]+)?$' THEN (cur.insights->>'post_media_view')::double precision END,
+          CASE WHEN (cur.insights->>'post_impressions') ~ '^[0-9]+(\.[0-9]+)?$' THEN (cur.insights->>'post_impressions')::double precision END,
+          CASE WHEN (cur.insights->>'impressions') ~ '^[0-9]+(\.[0-9]+)?$' THEN (cur.insights->>'impressions')::double precision END,
+          CASE WHEN (cur.insights->>'views') ~ '^[0-9]+(\.[0-9]+)?$' THEN (cur.insights->>'views')::double precision END,
           0
         )::text AS views,
         COALESCE(
-          CASE WHEN (COALESCE(pt.insights, ep.insights)->>'clicks') ~ '^[0-9]+(\.[0-9]+)?$' THEN (COALESCE(pt.insights, ep.insights)->>'clicks')::double precision END,
-          CASE WHEN (COALESCE(pt.insights, ep.insights)->>'post_clicks') ~ '^[0-9]+(\.[0-9]+)?$' THEN (COALESCE(pt.insights, ep.insights)->>'post_clicks')::double precision END,
+          CASE WHEN (cur.insights->>'clicks') ~ '^[0-9]+(\.[0-9]+)?$' THEN (cur.insights->>'clicks')::double precision END,
+          CASE WHEN (cur.insights->>'post_clicks') ~ '^[0-9]+(\.[0-9]+)?$' THEN (cur.insights->>'post_clicks')::double precision END,
           0
         )::text AS clicks,
-        COALESCE(pt.insights, ep.insights) AS "rawInsights",
-        COALESCE(pt."insightsSyncedAt", ep."insightsSyncedAt") AS "syncedAt"
+        cur.insights AS "rawInsights",
+        GREATEST(pt."insightsSyncedAt", ep."insightsSyncedAt") AS "syncedAt"
       FROM post_targets pt
       JOIN posts p ON p.id = pt."postId"
       JOIN targets t ON t.id = pt."targetId"
       LEFT JOIN external_posts ep ON ep."targetId" = pt."targetId" AND ep."remoteId" = pt."remotePostId"
+      -- The most recently read figures (2026-11-17): the viral radar reads a new post once at ~2 h and stores it on the
+      -- post; the hourly sync keeps refreshing the remote copy, which must win once it is newer.
+      CROSS JOIN LATERAL (SELECT CASE WHEN ep."insightsSyncedAt" IS NOT NULL AND (pt."insightsSyncedAt" IS NULL OR ep."insightsSyncedAt" > pt."insightsSyncedAt") THEN ep.insights ELSE COALESCE(pt.insights, ep.insights) END AS insights) cur
       WHERE pt."postId" IN (${Prisma.join(ids)})
         AND p."workspaceId" = ${workspaceId}
         AND t."workspaceId" = ${workspaceId}

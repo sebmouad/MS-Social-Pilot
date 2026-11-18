@@ -35,7 +35,7 @@ export async function readFacebookPostCohort(request: { workspaceId: string; tar
     WITH app AS (
       -- One row per remote post: a retried or duplicated target never counts twice. Current insights may live on the synced remote copy.
       SELECT DISTINCT ON (COALESCE(pt."remotePostId", pt.id)) COALESCE(pt."remotePostId", pt.id) AS key, pt."publishedAt" AS at,
-        CASE WHEN pt."insightsSyncedAt" IS NULL AND ep."insightsSyncedAt" IS NOT NULL THEN ep.insights ELSE pt.insights END AS insights
+        CASE WHEN ep."insightsSyncedAt" IS NOT NULL AND (pt."insightsSyncedAt" IS NULL OR ep."insightsSyncedAt" > pt."insightsSyncedAt") THEN ep.insights ELSE COALESCE(pt.insights, ep.insights) END AS insights
       FROM post_targets pt JOIN posts p ON p.id = pt."postId" JOIN targets t ON t.id = pt."targetId"
       LEFT JOIN external_posts ep ON ep."targetId" = pt."targetId" AND ep."remoteId" = pt."remotePostId"
       WHERE pt."targetId" = ${request.targetId} AND t."workspaceId" = ${request.workspaceId} AND p."workspaceId" = ${request.workspaceId}
