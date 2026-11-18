@@ -431,5 +431,8 @@ ads_management (owner asked to rework Ads like Meta Ads Manager first). The subm
   post target: text as title, Facebook `statusType` as format `f:`, origin `o:app`/`o:external`, Facebook picture read
   for traits under rating id `ext:<external_posts.id>`). Published autopilot photos are read from the app's own media
   library. Posting times come from the memory every day (`memoryModel.bestTimes`: best hours with evidence, spaced by
-  the gap; `LEARN_VERSION` 5); the 14-day learner is the fallback. Owner asked for no limits; the post count per day is
-  not learned yet (no evidence on volume).
+  the gap; `LEARN_VERSION` 5); the 14-day learner is the fallback.
+- Posts per day (owner's request): the memory keeps, per count, how whole days did in total against the Page's usual
+  day (`days`, `dayUsual`). `bestCount`: the best count with ≥ 3 days wins; while the current one is best and one more
+  has not had 3 days, one more is tried (up to `MAX_POSTS_PER_DAY` = 10). The count sets how many times `bestTimes`
+  picks. More posts use recipes faster: watch the recipe supply warning.

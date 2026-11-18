@@ -257,3 +257,21 @@ test('memory: posting times come from what each Page learned, hours with evidenc
   assert.deepEqual(model.bestTimes('A', 3, [6, 23], 120, 5), ['07:05', '11:05', '15:05'], 'with two hours apart, 8 h is too close to 7 h');
   assert.equal(model.bestTimes('A', 6, [6, 23], 60), null, 'not enough known hours: no change');
 });
+
+test('memory: the number of posts a day is learned from whole days, and one more is tried', async () => {
+  const { absorb, memoryModel, MAX_POSTS_PER_DAY } = await import('@/modules/feeds/wordpress/memory');
+  const tz = 'Europe/Paris'; const now = new Date('2026-11-30T12:00:00Z');
+  const day = (d: number, count: number, reachEach: number) => Array.from({ length: count }, (_, i) => ({ at: new Date(Date.UTC(2026, 10, d, 8 + i * 3)), title: 'Plat', kind: null, style: null, caption: '', reach: reachEach, reactions: reachEach / 20, comments: 2, shares: 2 }));
+  const four = Array.from({ length: 10 }, (_, i) => day(10 + i, 4, 1000)).flat();
+  let model = memoryModel(new Map([['A', absorb(null, [...four, ...day(25, 1, 1000)], now, tz)]]));
+  assert.deepEqual(model.bestCount('A', 4).values.map(v => [v.count, v.days]), [[4, 10]], 'whole days only');
+  assert.equal(model.bestCount('A', 4).count, 5, 'the current count is the best known: one more is tried');
+  const better = [...four, ...Array.from({ length: 3 }, (_, i) => day(20 + i, 5, 1000)).flat(), ...day(25, 1, 1000)];
+  model = memoryModel(new Map([['A', absorb(null, better, now, tz)]]));
+  assert.equal(model.bestCount('A', 5).count, 6, 'five did better: kept, and six is tried next');
+  const worse = [...four, ...Array.from({ length: 3 }, (_, i) => day(20 + i, 5, 300)).flat(), ...day(25, 1, 1000)];
+  model = memoryModel(new Map([['A', absorb(null, worse, now, tz)]]));
+  assert.equal(model.bestCount('A', 5).count, 4, 'five did worse in total: back to four');
+  assert.equal(memoryModel(new Map()).bestCount('A', 4).count, 4, 'nothing known: no change');
+  assert.ok(MAX_POSTS_PER_DAY <= 10);
+});

@@ -1,4 +1,4 @@
-import { instantToWall } from '@/lib/calendar-dates';
+import { addDaysToKey, instantToWall, wallTimeToInstant } from '@/lib/calendar-dates';
 import { guessKind, titleWords, type RecipeKind } from './score';
 import { HOOK_STYLES, type HookStyle } from './caption';
 
@@ -24,7 +24,12 @@ export type PageMemory = {
   f: Record<string, FeatureStat>;
   /** How a title word was written, for people (« gratinées » for « gratinee »). */
   names?: Record<string, string>;
+  /** Posts per day (2026-11-18): for each count, how its whole days did against the Page's usual day. */
+  days?: Record<string, FeatureStat>;
+  dayUsual?: number | null;
 };
+/** Most posts a day the autopilot may try on one Page (a guard against being seen as spam). */
+export const MAX_POSTS_PER_DAY = 10;
 export type LearnedPost = { at: Date; title: string; kind: string | null; style: string | null; caption: string; reach: number; reactions: number; comments: number; shares: number;
   /** What the AI saw in the photo (2026-11-18): visual traits and appeal 0–10, when read. */
   traits?: readonly string[] | null; appeal?: number | null;
@@ -102,13 +107,31 @@ export function absorb(memory: PageMemory | null, posts: readonly LearnedPost[],
     for (const token of post.title.toLocaleLowerCase('fr').split(/[^\p{L}]+/u)) { const [word] = titleWords(token); if (word) next.names![word] = token; }
     next.usual = Object.fromEntries(SIGNALS.map(([key]) => [key, usual[key] + USUAL_RATE * (Math.log1p(post[key]) - usual[key])])) as Usual;
   }
+  // Whole days only (every post of the day settled): how many posts, and the day's total result.
+  const settledBefore = usable.length ? usable[usable.length - 1]!.at.getTime() : 0;
+  const byDay = new Map<string, LearnedPost[]>();
+  for (const post of usable) { const date = instantToWall(post.at, timeZone).date; byDay.set(date, [...(byDay.get(date) ?? []), post]); }
+  const dayScore = (posts: readonly LearnedPost[]) => SIGNALS.reduce((sum, [key, share]) => sum + share * Math.log1p(posts.reduce((total, post) => total + post[key], 0)), 0);
+  const whole = [...byDay].filter(([date]) => { const end = wallTimeToInstant(addDaysToKey(date, 1), '00:00', timeZone); return end.ok && end.instant.getTime() <= settledBefore; });
+  if (whole.length) {
+    next.days = { ...(next.days ?? {}) };
+    if (fade < 1) for (const [key, stat] of Object.entries(next.days)) next.days[key] = { s: stat.s * fade, w: stat.w * fade, n: stat.n };
+    if (next.dayUsual == null) next.dayUsual = median(whole.map(([, posts]) => dayScore(posts)));
+    for (const [date, posts] of whole) {
+      const y = Math.max(-CAP, Math.min(CAP, dayScore(posts) - next.dayUsual!));
+      const weight = 0.5 ** (Math.max(0, now.getTime() - Date.parse(`${date}T12:00:00Z`)) / DAY / MEMORY_HALF_LIFE_DAYS);
+      const key = String(Math.min(posts.length, MAX_POSTS_PER_DAY));
+      const stat = next.days[key] ?? { s: 0, w: 0, n: 0 };
+      next.days[key] = { s: stat.s + weight * y, w: stat.w + weight, n: stat.n + 1 };
+    }
+  }
   next.at = now.toISOString();
   next.posts += usable.length;
   return next;
 }
 
 export type CaptionTip = { code: 'qstart' | 'noqstart' | 'qend' | 'noqend' | 'emoji0' | 'emoji1' | 'emoji3' | 'short' | 'medium' | 'long' | 'hash' | 'nohash'; times: number };
-export type Highlights = { formats: Array<{ format: string; times: number; posts: number }>; origins: Array<{ origin: string; times: number; posts: number }>; photos: Array<{ trait: string; times: number }>; posts: number; best: Array<{ word: string; times: number }>; worst: Array<{ word: string; times: number }>; hours: Array<{ hour: number; times: number }>; kinds: Array<{ kind: string; times: number }>; tips: CaptionTip[]; style: HookStyle | null };
+export type Highlights = { perDay: Array<{ count: number; times: number; days: number }>; formats: Array<{ format: string; times: number; posts: number }>; origins: Array<{ origin: string; times: number; posts: number }>; photos: Array<{ trait: string; times: number }>; posts: number; best: Array<{ word: string; times: number }>; worst: Array<{ word: string; times: number }>; hours: Array<{ hour: number; times: number }>; kinds: Array<{ kind: string; times: number }>; tips: CaptionTip[]; style: HookStyle | null };
 
 /** What all Pages' memories teach, and each Page's own lessons on top. */
 export function memoryModel(memories: ReadonlyMap<string, PageMemory>) {
@@ -167,6 +190,21 @@ export function memoryModel(memories: ReadonlyMap<string, PageMemory>) {
       for (const { hour } of ranked) if (picked.length < count && !picked.some(other => Math.abs(other - hour) * 60 < gapMinutes)) picked.push(hour);
       return picked.length === count ? picked.sort((a, b) => a - b).map(hour => `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`) : null;
     },
+    /**
+     * How many posts a day this Page should make (2026-11-18, owner: learn the number of posts per day too). Each count
+     * with at least three whole days is judged by its days' total result; the best one wins. While the current count is
+     * the best known and one more post a day has not been tried for three days, one more is tried. Never above
+     * MAX_POSTS_PER_DAY; a count not yet tried for three days keeps going until it has been.
+     */
+    bestCount(targetId: string, current: number): { count: number; why: 'best' | 'trial' | 'keep'; values: Array<{ count: number; times: number; days: number }> } {
+      const days = memories.get(targetId)?.days ?? {};
+      const known = Object.entries(days).filter(([, stat]) => stat.n >= 3).map(([count, stat]) => ({ count: Number(count), value: stat.s / (stat.w + 1), days: stat.n }));
+      const values = known.map(k => ({ count: k.count, times: Math.exp(k.value), days: k.days })).sort((a, b) => a.count - b.count);
+      if (!known.some(k => k.count === current)) return { count: current, why: 'keep', values };
+      const best = [...known].sort((a, b) => b.value - a.value)[0]!;
+      if (best.count === current && current < MAX_POSTS_PER_DAY && !known.some(k => k.count === current + 1)) return { count: current + 1, why: 'trial', values };
+      return { count: best.count, why: best.count === current ? 'keep' : 'best', values };
+    },
     /** The hook style this Page's own posts favour (at least three posts each), or null. */
     bestStyle(targetId: string): HookStyle | null {
       const known = HOOK_STYLES.filter(style => ownPosts(targetId, `s:${style}`) >= 3).map(style => ({ style, value: lift(targetId, `s:${style}`)! })).sort((a, b) => b.value - a.value);
@@ -189,6 +227,7 @@ export function memoryModel(memories: ReadonlyMap<string, PageMemory>) {
         worst: words.filter(w => w.times <= 0.85).sort((a, b) => a.times - b.times).slice(0, count).map(w => ({ word: memory?.names?.[w.name] ?? w.name, times: w.times })),
         hours: of('h:').filter(h => h.times >= 1.1).sort((a, b) => b.times - a.times).slice(0, count).map(h => ({ hour: Number(h.name), times: h.times })),
         kinds: of('k:').filter(k => k.times >= 1.1).sort((a, b) => b.times - a.times).slice(0, 2).map(k => ({ kind: k.name, times: k.times })),
+        perDay: this.bestCount(targetId, 0).values,
         formats: of('f:').map(f => ({ format: f.name, times: f.times, posts: memory?.f[f.key]?.n ?? 0 })).sort((a, b) => b.times - a.times),
         origins: of('o:').map(o => ({ origin: o.name, times: o.times, posts: memory?.f[o.key]?.n ?? 0 })).sort((a, b) => b.times - a.times),
         photos: of('i:').filter(p => p.times >= 1.1).sort((a, b) => b.times - a.times).slice(0, count).map(p => ({ trait: p.name, times: p.times })),
