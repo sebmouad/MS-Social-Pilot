@@ -131,8 +131,27 @@ export function scoreRecipe(recipe: ScoreInput, at: ScoreContext): { score: numb
 
 const TITLE_STOP = new Set('la le les de des du au aux a et en d l un une recette facile rapide maison express pour avec sans sur pret prete minutes min ma mon mes tres ultra vraie vrai meilleur meilleure ces ce cette tout toute tous leger legere super petit petite petits petites mini dans comme plus bien servi servie'.split(' '));
 /** The words of a title that say what the dish is (ingredients, dish, technique), singular, for learning what works. */
+/**
+ * French dish and ingredient names written in several words, learned as one (2026-11-18): « pommes de terre » is not
+ * « terre », « Saint-Jacques » is not « saint » and « jacques ». Folded form → token → how people read it.
+ */
+const COMPOUNDS: ReadonlyArray<[string, string, string]> = [
+  ['pommes? de terre', 'pommedeterre', 'pommes de terre'], ['saint jacques', 'saintjacques', 'Saint-Jacques'], ['fruits? de mer', 'fruitsdemer', 'fruits de mer'],
+  ['noix de coco', 'noixdecoco', 'noix de coco'], ['pain perdu', 'painperdu', 'pain perdu'], ['croques? monsieur', 'croquemonsieur', 'croque-monsieur'],
+  ['pot au feu', 'potaufeu', 'pot-au-feu'], ['choux? fleurs?', 'choufleur', 'chou-fleur'], ['petits pois', 'petitspois', 'petits pois'],
+  ['creme fraiche', 'cremefraiche', 'crème fraîche'], ['foie gras', 'foiegras', 'foie gras'], ['creme brulee', 'cremebrulee', 'crème brûlée'],
+  ['pate feuilletee', 'patefeuilletee', 'pâte feuilletée'], ['pate brisee', 'patebrisee', 'pâte brisée'], ['chocolat chaud', 'chocolatchaud', 'chocolat chaud'],
+  ['vin chaud', 'vinchaud', 'vin chaud'], ['galettes? des rois', 'galettedesrois', 'galette des rois'], ['oeufs? mimosa', 'oeufmimosa', 'œufs mimosa'],
+  ['hachis parmentier', 'hachisparmentier', 'hachis parmentier'], ['boeuf bourguignon', 'boeufbourguignon', 'bœuf bourguignon'], ['pain d epices?', 'paindepice', 'pain d’épices'],
+  ['bain marie', 'bainmarie', 'au bain-marie'], ['saumon fume', 'saumonfume', 'saumon fumé'], ['poulet roti', 'pouletroti', 'poulet rôti'],
+];
+/** How a compound token reads for people. */
+export const COMPOUND_NAMES: Readonly<Record<string, string>> = Object.fromEntries(COMPOUNDS.map(([, token, name]) => [token, name]));
+
 export function titleWords(title: string): string[] {
-  return [...new Set(fold(title).trim().split(' ').filter(word => word.length > 3 && !TITLE_STOP.has(word) && !/^\d+$/.test(word)).map(word => word.length > 4 && word.endsWith('s') ? word.slice(0, -1) : word))].sort();
+  let folded = fold(title);
+  for (const [phrase, token] of COMPOUNDS) folded = folded.replace(new RegExp(` ${phrase} `, 'g'), ` ${token} `);
+  return [...new Set(folded.trim().split(' ').filter(word => word.length > 3 && !TITLE_STOP.has(word) && !/^\d+$/.test(word)).map(word => word.length > 4 && word.endsWith('s') && !(word in COMPOUND_NAMES) ? word.slice(0, -1) : word))].sort();
 }
 
 /**

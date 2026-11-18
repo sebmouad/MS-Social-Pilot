@@ -58,8 +58,13 @@ test('variety: no more than the allowed run of one kind', () => {
   assert.equal(breaksVariety([{ at: 1 * h, kind: 'dessert' }], 3 * h, 'dessert', 2), false);
 });
 
+test('title words: compound names are one ingredient', () => {
+  assert.deepEqual(titleWords('Gratin de pommes de terre aux noix de Saint-Jacques'), ['gratin', 'noix', 'pommedeterre', 'saintjacques']);
+  assert.deepEqual(titleWords('Croque-monsieur au saumon fumé'), ['croquemonsieur', 'saumonfume']);
+});
+
 test('title words: what the dish is, without filler, singular', () => {
-  assert.deepEqual(titleWords('Mini-quiches au saumon fumé, pâte dorée'), ['doree', 'fume', 'pate', 'quiche', 'saumon']);
+  assert.deepEqual(titleWords('Mini-quiches au saumon fumé, pâte dorée'), ['doree', 'pate', 'quiche', 'saumonfume']);
   assert.deepEqual(titleWords('Recette facile de quiche lorraine'), ['lorraine', 'quiche']);
 });
 

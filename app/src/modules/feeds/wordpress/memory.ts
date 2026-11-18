@@ -1,5 +1,5 @@
 import { addDaysToKey, instantToWall, wallTimeToInstant } from '@/lib/calendar-dates';
-import { guessKind, titleWords, type RecipeKind } from './score';
+import { COMPOUND_NAMES, guessKind, titleWords, type RecipeKind } from './score';
 import { HOOK_STYLES, type HookStyle } from './caption';
 
 /**
@@ -223,8 +223,8 @@ export function memoryModel(memories: ReadonlyMap<string, PageMemory>) {
       const words = of('w:');
       return {
         posts: memory?.posts ?? 0,
-        best: words.filter(w => w.times >= 1.15).sort((a, b) => b.times - a.times).slice(0, count).map(w => ({ word: memory?.names?.[w.name] ?? w.name, times: w.times })),
-        worst: words.filter(w => w.times <= 0.85).sort((a, b) => a.times - b.times).slice(0, count).map(w => ({ word: memory?.names?.[w.name] ?? w.name, times: w.times })),
+        best: words.filter(w => w.times >= 1.15).sort((a, b) => b.times - a.times).slice(0, count).map(w => ({ word: COMPOUND_NAMES[w.name] ?? memory?.names?.[w.name] ?? w.name, times: w.times })),
+        worst: words.filter(w => w.times <= 0.85).sort((a, b) => a.times - b.times).slice(0, count).map(w => ({ word: COMPOUND_NAMES[w.name] ?? memory?.names?.[w.name] ?? w.name, times: w.times })),
         hours: of('h:').filter(h => h.times >= 1.1).sort((a, b) => b.times - a.times).slice(0, count).map(h => ({ hour: Number(h.name), times: h.times })),
         kinds: of('k:').filter(k => k.times >= 1.1).sort((a, b) => b.times - a.times).slice(0, 2).map(k => ({ kind: k.name, times: k.times })),
         perDay: this.bestCount(targetId, 0).values,
