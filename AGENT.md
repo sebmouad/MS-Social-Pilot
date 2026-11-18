@@ -392,4 +392,7 @@ ads_management (owner asked to rework Ads like Meta Ads Manager first). The subm
   partial unique index `moderation_actions_ai_once_key`), so nothing is answered twice; `replyText` holds what was sent
   or why it was left. A failed send stays claimed (never resent blindly); the AI being unavailable releases the claim.
 - Checked locally end to end with a stand-in AI and account (no real send). Not yet run on the live site.
+- « Try on recent messages » (`previewAiReplies`, `POST /api/inbox/ai-replies/preview`, owners and admins): what the AI
+  would answer to the latest unanswered comments and messages of 24 h, with the settings being edited; nothing is
+  claimed, recorded or sent (one AI request per item the rules do not decide).
 - Also fixed: `schema.prisma` lacked `facebook_ads_backfill` (migration 0013), so CI's schema check had been failing.

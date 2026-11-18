@@ -17,3 +17,7 @@
 .channels legend{padding:0 .3rem;font-weight:600}
 .head{display:flex;align-items:center;justify-content:space-between;gap:.75rem;flex-wrap:wrap}
 .head h2{margin:0}
+/* AI auto-replies preview (2026-11-17): the reply the AI would send, quoted under the visitor's words. */
+.preview { display: grid; gap: 8px; padding-top: 8px; border-top: 1px solid var(--line); }
+.preview h3 { margin: 0; font-size: 1rem; }
+.reply { padding: 8px 12px; border-left: 3px solid var(--accent); border-radius: var(--radius-sm); background: var(--accent-soft); color: var(--ink); white-space: pre-wrap; }

@@ -43,11 +43,15 @@ export async function readAiReplies(actor: InboxReadActor): Promise<AiRepliesVie
   return { ...settings, enabledAt: row?.enabledAt?.toISOString() ?? null, channels: access.channels.map(channel => ({ id: channel.id, name: channel.name })), week: { replied: count('ai_reply', false), handedOff: count('ai_handoff', false), skipped: count('ai_skip', false), failed: counts.filter(c => c.failed).reduce((sum, c) => sum + Number(c.count), 0) } };
 }
 
+async function requireManager(actor: InboxReadActor) {
+  const role = await prisma.$queryRaw<Array<{ role: string }>>`SELECT role::text AS role FROM memberships WHERE "workspaceId" = ${actor.workspaceId} AND "userId" = ${actor.userId}`;
+  if (!['owner', 'admin'].includes(role[0]?.role ?? '')) throw new OperationError('forbidden', 'Only owners and admins can change AI auto-replies.');
+}
+
 /** Owners and admins only: it lets the AI speak for the Pages. The time it was switched on is when it starts looking. */
 export async function saveAiReplies(actor: InboxReadActor, input: unknown): Promise<AiRepliesView> {
   const access = await authorizeInbox(actor, ceiling(actor), 'write');
-  const role = await prisma.$queryRaw<Array<{ role: string }>>`SELECT role::text AS role FROM memberships WHERE "workspaceId" = ${actor.workspaceId} AND "userId" = ${actor.userId}`;
-  if (!['owner', 'admin'].includes(role[0]?.role ?? '')) throw new OperationError('forbidden', 'Only owners and admins can change AI auto-replies.');
+  await requireManager(actor);
   const parsed = aiRepliesSchema.safeParse(input);
   if (!parsed.success) throw new OperationError('invalid_request', parsed.error.issues[0]?.message ?? 'Invalid AI auto-reply settings.');
   const value = parsed.data;
@@ -63,7 +67,7 @@ export async function saveAiReplies(actor: InboxReadActor, input: unknown): Prom
 
 type Waiting = AiReplyContext & { id: string; remoteId: string; targetId: string; authorId: string | null; sentiment: string | null };
 
-async function waitingComments(workspaceId: string, channelIds: string[], since: Date, before: Date, limit: number): Promise<Waiting[]> {
+async function waitingComments(workspaceId: string, channelIds: string[], since: Date, before: Date, limit: number, order: 'oldest' | 'newest' = 'oldest'): Promise<Waiting[]> {
   if (!channelIds.length || limit < 1) return [];
   const rows = await prisma.$queryRaw<Array<{ id: string; remoteId: string; targetId: string; channel: string; voice: string | null; author: string | null; authorId: string | null; text: string; sentiment: string | null; post: string | null; comment: string | null; link: string | null }>>`
     SELECT c.id, c."remoteId", t.id AS "targetId", t.name AS channel, t."brandVoice" AS voice, c."fromName" AS author, c."fromId" AS "authorId", c.message AS text, c.sentiment,
@@ -75,7 +79,7 @@ async function waitingComments(workspaceId: string, channelIds: string[], since:
       AND (c."fromId" IS NULL OR c."fromId" <> t."providerId") AND c."createdTime" >= ${since} AND c."createdTime" <= ${before}
       AND NOT EXISTS (SELECT 1 FROM post_comments r WHERE r."postTargetId" = c."postTargetId" AND r."parentRemoteId" = c."remoteId" AND (r."sentById" IS NOT NULL OR r."fromId" = t."providerId"))
       AND NOT EXISTS (SELECT 1 FROM moderation_actions m WHERE m."workspaceId" = ${workspaceId} AND m."targetId" = t.id AND m."remoteCommentId" = c."remoteId")
-    ORDER BY c."createdTime" ASC LIMIT ${limit}`;
+    ORDER BY CASE WHEN ${order} = 'newest' THEN c."createdTime" END DESC, c."createdTime" ASC LIMIT ${limit}`;
   return rows.map(row => ({ kind: 'comment' as const, id: row.id, remoteId: row.remoteId, targetId: row.targetId, channel: row.channel, voice: row.voice, author: row.author, authorId: row.authorId, text: row.text, sentiment: row.sentiment,
     post: [row.post, row.comment].filter(Boolean).join('\n\n') || null, link: row.link }));
 }
@@ -198,4 +202,43 @@ export async function runAutomaticAiReplies(now = new Date()) {
     }
   }
   return total;
+}
+
+export type AiPreviewItem = { kind: 'comment' | 'message'; channel: string; author: string | null; text: string; decision: 'reply' | 'handoff' | 'skip'; reply: string | null; reason: string; by: 'rule' | 'ai' };
+/** Recent comments and messages the preview looks at. */
+const PREVIEW_ITEMS = 5;
+
+/**
+ * What the AI would answer to the latest unanswered comments and messages, with the settings being edited (saved or
+ * not), so an owner can judge it on their own audience before switching it on (2026-11-17). Nothing is claimed,
+ * recorded or sent; it costs one AI request per item that the rules do not already decide.
+ */
+export async function previewAiReplies(actor: InboxReadActor, input: unknown, now = new Date(), deps?: { complete: (system: string, prompt: string) => Promise<string> }): Promise<{ items: AiPreviewItem[]; aiUnavailable: boolean }> {
+  const access = await authorizeInbox(actor, ceiling(actor), 'write');
+  await requireManager(actor);
+  const parsed = aiRepliesSchema.safeParse(input);
+  if (!parsed.success) throw new OperationError('invalid_request', parsed.error.issues[0]?.message ?? 'Invalid AI auto-reply settings.');
+  const draft = parsed.data;
+  const channelIds = draft.targetIds.length ? draft.targetIds.filter(id => access.channelIds.includes(id)) : access.channelIds;
+  const since = new Date(now.getTime() - DAY_MS);
+  const messages = draft.messages ? await waitingMessages(actor.workspaceId, channelIds, since, now, now, 2) : [];
+  const comments = draft.comments ? await waitingComments(actor.workspaceId, channelIds, since, now, PREVIEW_ITEMS - messages.length, 'newest') : [];
+  const complete = deps?.complete ?? (async (system: string, prompt: string) => {
+    const { autopilotComplete } = await import('@/modules/studio/server/ai');
+    return autopilotComplete({ userId: actor.userId, workspaceId: actor.workspaceId }, 'inbox.autoreply', system, prompt, { maxTokens: 400 });
+  });
+  const items: AiPreviewItem[] = [];
+  for (const item of [...messages, ...comments]) {
+    const base = { kind: item.kind, channel: item.channel, author: item.author, text: item.text };
+    const pre = precheck(item.text, item.sentiment);
+    if (pre) { items.push({ ...base, decision: pre === 'spam' ? 'skip' : 'handoff', reply: null, reason: pre, by: 'rule' }); continue; }
+    const { system, prompt } = aiReplyPrompt(item, draft.tone);
+    let raw: string;
+    try { raw = await complete(system, prompt); } catch { return { items, aiUnavailable: true }; }
+    const decision = parseAiReply(raw, item.link);
+    if (!decision) items.push({ ...base, decision: 'handoff', reply: null, reason: 'unusable', by: 'ai' });
+    else if (decision.decision === 'reply') items.push({ ...base, decision: 'reply', reply: decision.reply, reason: '', by: 'ai' });
+    else items.push({ ...base, decision: decision.decision, reply: null, reason: decision.reason, by: 'ai' });
+  }
+  return { items, aiUnavailable: false };
 }
