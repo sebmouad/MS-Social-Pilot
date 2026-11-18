@@ -73,7 +73,11 @@ export async function learnBestTimes(settings: WordpressSettings, source: Source
   const autopilot = autopilotOf(config.autopilot);
   const best = autopilot.bestTimes;
   if (!best.enabled || best.apply !== 'auto' || !pages.length) return 0;
-  if (autopilot.lastLearnedAt && autopilot.learnVersion === LEARN_VERSION && now.getTime() - Date.parse(autopilot.lastLearnedAt) < LEARN_EVERY_DAYS * 86_400_000) return 0;
+  // With Page memories, times are chosen every day from them (2026-11-18); without, every LEARN_EVERY_DAYS from 14 days.
+  const memories = ports === prismaAutopilotPorts ? await import('./wordpress-memory').then(m => m.readPageMemories(source.id)).catch(() => new Map()) : new Map();
+  const model = memories.size ? (await import('../wordpress/memory')).memoryModel(memories) : null;
+  const every = model ? 1 : LEARN_EVERY_DAYS;
+  if (autopilot.lastLearnedAt && autopilot.learnVersion === LEARN_VERSION && now.getTime() - Date.parse(autopilot.lastLearnedAt) < every * 86_400_000) return 0;
   const rows = await ports.observations(pages.map(page => page.id), new Date(now.getTime() - best.learnDays * 86_400_000));
   const channels: Record<string, ChannelSettings> = { ...(config.channels ?? {}) };
   const learnedTimes: Record<string, string[]> = { ...(autopilot.learnedTimes ?? {}) };
@@ -88,7 +92,8 @@ export async function learnBestTimes(settings: WordpressSettings, source: Source
     const own = channels[page.id];
     if (own?.paused || (own?.slots?.length && !own.autoTimes) || config.channelSlots?.[page.id]?.length) continue;
     const current = channelConfig(config, page.id).slots;
-    const learned = learnTimes({ observations: scored(page.id), current, timeZone: config.timezone, window: best.window, gapMinutes: best.gapMinutes, channelIndex: index, pooled });
+    const learned = (model && memories.has(page.id) ? model.bestTimes(page.id, current.length, best.window, best.gapMinutes, (index * 5) % 60) : null)
+      ?? learnTimes({ observations: scored(page.id), current, timeZone: config.timezone, window: best.window, gapMinutes: best.gapMinutes, channelIndex: index, pooled });
     if (JSON.stringify(learned) === JSON.stringify(current)) continue;
     learnedTimes[page.id] = learned;
     // Times learned earlier were kept on the channel itself; they move to the autopilot's own record.

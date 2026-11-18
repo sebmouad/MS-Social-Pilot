@@ -427,3 +427,9 @@ ads_management (owner asked to rework Ads like Meta Ads Manager first). The subm
   scheduled > 3 h ahead, recipes the memory expects below their Page's usual are replaced (« another recipe »).
 - AI content label: Meta documents reading IPTC/C2PA metadata to show « AI info »; no confirmed Graph API parameter.
   sharp can embed XMP (`withXmp`). Not done: only right if the photos are AI-made — owner to decide.
+- 2026-11-18 later: the memory also learns from posts made outside the autopilot (`external_posts` not linked to a
+  post target: text as title, Facebook `statusType` as format `f:`, origin `o:app`/`o:external`, Facebook picture read
+  for traits under rating id `ext:<external_posts.id>`). Published autopilot photos are read from the app's own media
+  library. Posting times come from the memory every day (`memoryModel.bestTimes`: best hours with evidence, spaced by
+  the gap; `LEARN_VERSION` 5); the 14-day learner is the fallback. Owner asked for no limits; the post count per day is
+  not learned yet (no evidence on volume).

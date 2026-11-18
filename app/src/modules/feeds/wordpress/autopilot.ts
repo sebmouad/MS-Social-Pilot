@@ -60,7 +60,7 @@ export const AUTOPILOT_LOG_MAX = 60;
 /** Times are relearned at most this often. */
 export const LEARN_EVERY_DAYS = 7;
 /** Raised when the learning method improves: times chosen by an older method are relearned at the next run. */
-export const LEARN_VERSION = 4;
+export const LEARN_VERSION = 5;
 
 const logEntry = z.object({
   at: z.string().max(40), kind: z.enum(['times', 'healing', 'supply', 'radar']), channelId: z.string().max(100).optional(), channelName: z.string().max(200).optional(),

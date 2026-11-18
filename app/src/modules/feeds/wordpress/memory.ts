@@ -27,7 +27,15 @@ export type PageMemory = {
 };
 export type LearnedPost = { at: Date; title: string; kind: string | null; style: string | null; caption: string; reach: number; reactions: number; comments: number; shares: number;
   /** What the AI saw in the photo (2026-11-18): visual traits and appeal 0–10, when read. */
-  traits?: readonly string[] | null; appeal?: number | null };
+  traits?: readonly string[] | null; appeal?: number | null;
+  /** Posted by the autopilot, or outside it (by hand, another tool) (2026-11-18); and its format. */
+  origin?: 'app' | 'external'; format?: PostFormat | null };
+export type PostFormat = 'photo' | 'video' | 'link' | 'text';
+/** Facebook's post type as a format. */
+export const formatOf = (statusType: string | null | undefined, hasPicture = false): PostFormat => {
+  const t = (statusType ?? '').toLowerCase();
+  return t.includes('video') ? 'video' : t.includes('photo') ? 'photo' : t === 'shared_story' ? 'link' : hasPicture ? 'photo' : 'text';
+};
 type Usual = { reach: number; reactions: number; comments: number; shares: number };
 /** How a post's result is made (2026-11-18, owner: learn from comments, shares, any data): shares spread a post furthest. */
 const SIGNALS: ReadonlyArray<[keyof Usual, number]> = [['reach', 0.45], ['reactions', 0.2], ['comments', 0.15], ['shares', 0.2]];
@@ -46,7 +54,7 @@ const EMOJI = /\p{Extended_Pictographic}/gu;
 
 /** What a post was: its content, time and caption, as features. */
 export const appealBand = (appeal: number) => appeal >= 8 ? 'high' : appeal >= 6 ? 'mid' : 'low';
-export function postFeatures(post: Pick<LearnedPost, 'at' | 'title' | 'kind' | 'style' | 'caption' | 'traits' | 'appeal'>, timeZone: string): string[] {
+export function postFeatures(post: Pick<LearnedPost, 'at' | 'title' | 'kind' | 'style' | 'caption' | 'traits' | 'appeal' | 'origin' | 'format'>, timeZone: string): string[] {
   const kind = (post.kind as RecipeKind | null) ?? guessKind(post.title);
   const wall = instantToWall(post.at, timeZone);
   const hour = Number(wall.time.slice(0, 2));
@@ -66,6 +74,8 @@ export function postFeatures(post: Pick<LearnedPost, 'at' | 'title' | 'kind' | '
   if (post.style && (HOOK_STYLES as readonly string[]).includes(post.style)) out.push(`s:${post.style}`);
   for (const trait of post.traits ?? []) out.push(`i:${trait}`);
   if (typeof post.appeal === 'number') out.push(`p:${appealBand(post.appeal)}`);
+  if (post.origin) out.push(`o:${post.origin}`);
+  if (post.format) out.push(`f:${post.format}`);
   return out;
 }
 
@@ -98,7 +108,7 @@ export function absorb(memory: PageMemory | null, posts: readonly LearnedPost[],
 }
 
 export type CaptionTip = { code: 'qstart' | 'noqstart' | 'qend' | 'noqend' | 'emoji0' | 'emoji1' | 'emoji3' | 'short' | 'medium' | 'long' | 'hash' | 'nohash'; times: number };
-export type Highlights = { photos: Array<{ trait: string; times: number }>; posts: number; best: Array<{ word: string; times: number }>; worst: Array<{ word: string; times: number }>; hours: Array<{ hour: number; times: number }>; kinds: Array<{ kind: string; times: number }>; tips: CaptionTip[]; style: HookStyle | null };
+export type Highlights = { formats: Array<{ format: string; times: number; posts: number }>; origins: Array<{ origin: string; times: number; posts: number }>; photos: Array<{ trait: string; times: number }>; posts: number; best: Array<{ word: string; times: number }>; worst: Array<{ word: string; times: number }>; hours: Array<{ hour: number; times: number }>; kinds: Array<{ kind: string; times: number }>; tips: CaptionTip[]; style: HookStyle | null };
 
 /** What all Pages' memories teach, and each Page's own lessons on top. */
 export function memoryModel(memories: ReadonlyMap<string, PageMemory>) {
@@ -145,6 +155,18 @@ export function memoryModel(memories: ReadonlyMap<string, PageMemory>) {
       if (!known.length) return null;
       return Math.exp(known.reduce((sum, [value, weight]) => sum + value * weight, 0) / known.reduce((sum, [, weight]) => sum + weight, 0));
     },
+    /**
+     * A Page's posting times from its memory (2026-11-18, owner: « posts at 7 h do better, use it »): its `count` best
+     * hours inside the window, at least `gapMinutes` apart, only hours some Page has evidence for; `minute` past the hour.
+     * Null when too few hours are known to fill `count`.
+     */
+    bestTimes(targetId: string, count: number, window: readonly [number, number], gapMinutes: number, minute = 0): string[] | null {
+      const ranked = Array.from({ length: 24 }, (_, hour) => hour).filter(hour => hour >= window[0] && hour < window[1])
+        .flatMap(hour => { const value = lift(targetId, `h:${hour}`); return value === null ? [] : [{ hour, value }]; }).sort((a, b) => b.value - a.value || a.hour - b.hour);
+      const picked: number[] = [];
+      for (const { hour } of ranked) if (picked.length < count && !picked.some(other => Math.abs(other - hour) * 60 < gapMinutes)) picked.push(hour);
+      return picked.length === count ? picked.sort((a, b) => a - b).map(hour => `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`) : null;
+    },
     /** The hook style this Page's own posts favour (at least three posts each), or null. */
     bestStyle(targetId: string): HookStyle | null {
       const known = HOOK_STYLES.filter(style => ownPosts(targetId, `s:${style}`) >= 3).map(style => ({ style, value: lift(targetId, `s:${style}`)! })).sort((a, b) => b.value - a.value);
@@ -167,6 +189,8 @@ export function memoryModel(memories: ReadonlyMap<string, PageMemory>) {
         worst: words.filter(w => w.times <= 0.85).sort((a, b) => a.times - b.times).slice(0, count).map(w => ({ word: memory?.names?.[w.name] ?? w.name, times: w.times })),
         hours: of('h:').filter(h => h.times >= 1.1).sort((a, b) => b.times - a.times).slice(0, count).map(h => ({ hour: Number(h.name), times: h.times })),
         kinds: of('k:').filter(k => k.times >= 1.1).sort((a, b) => b.times - a.times).slice(0, 2).map(k => ({ kind: k.name, times: k.times })),
+        formats: of('f:').map(f => ({ format: f.name, times: f.times, posts: memory?.f[f.key]?.n ?? 0 })).sort((a, b) => b.times - a.times),
+        origins: of('o:').map(o => ({ origin: o.name, times: o.times, posts: memory?.f[o.key]?.n ?? 0 })).sort((a, b) => b.times - a.times),
         photos: of('i:').filter(p => p.times >= 1.1).sort((a, b) => b.times - a.times).slice(0, count).map(p => ({ trait: p.name, times: p.times })),
         tips: this.captionTips(targetId), style: this.bestStyle(targetId),
       };

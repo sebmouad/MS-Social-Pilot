@@ -233,3 +233,27 @@ test('photos: with the AI label on, the uploaded JPEG carries the IPTC « made b
   assert.match(String((await sharp(tagged).metadata()).xmp ?? ''), /digitalsourcetype\/trainedAlgorithmicMedia/);
   assert.equal((await sharp(plain).metadata()).xmp, undefined);
 });
+
+test('memory: posts made outside the autopilot teach it too, with their format', async () => {
+  const { absorb, memoryModel, formatOf } = await import('@/modules/feeds/wordpress/memory');
+  assert.equal(formatOf('added_video'), 'video'); assert.equal(formatOf('added_photos'), 'photo'); assert.equal(formatOf('shared_story'), 'link'); assert.equal(formatOf(null, true), 'photo'); assert.equal(formatOf('mobile_status_update'), 'text');
+  const tz = 'Europe/Paris'; const now = new Date('2026-11-18T12:00:00Z');
+  const post = (i: number, origin: 'app' | 'external', format: 'photo' | 'video', reach: number) => ({ at: new Date(now.getTime() - (i + 1) * 86_400_000), title: `Plat ${i}`, kind: null, style: null, caption: '', reach, reactions: reach / 20, comments: 2, shares: 2, origin, format });
+  const memory = absorb(null, [...Array.from({ length: 5 }, (_, i) => post(i, 'external', 'video', 5000)), ...Array.from({ length: 5 }, (_, i) => post(i + 5, 'app', 'photo', 800))], now, tz);
+  const h = memoryModel(new Map([['A', memory]])).highlights('A');
+  assert.equal(h.formats[0]!.format, 'video', 'videos do better here');
+  const app = h.origins.find(o => o.origin === 'app')!, other = h.origins.find(o => o.origin === 'external')!;
+  assert.ok(app.times < other.times, 'the autopilot posts do worse than the Page\'s other posts here');
+});
+
+test('memory: posting times come from what each Page learned, hours with evidence only, spaced', async () => {
+  const { absorb, memoryModel } = await import('@/modules/feeds/wordpress/memory');
+  const tz = 'Europe/Paris'; const now = new Date('2026-11-18T12:00:00Z');
+  const at = (day: number, hour: number) => new Date(Date.UTC(2026, 10, 18 - day, hour - 1, 0));
+  const post = (day: number, hour: number, reach: number) => ({ at: at(day, hour), title: 'Plat', kind: null, style: null, caption: '', reach, reactions: reach / 20, comments: 2, shares: 2 });
+  const posts = Array.from({ length: 6 }, (_, d) => [post(d + 1, 7, 4000), post(d + 1, 8, 3500), post(d + 1, 11, 1500), post(d + 1, 15, 1200), post(d + 1, 20, 600)]).flat();
+  const model = memoryModel(new Map([['A', absorb(null, posts, now, tz)]]));
+  assert.deepEqual(model.bestTimes('A', 3, [6, 23], 60, 5), ['07:05', '08:05', '11:05'], 'the best hours, an hour apart is allowed');
+  assert.deepEqual(model.bestTimes('A', 3, [6, 23], 120, 5), ['07:05', '11:05', '15:05'], 'with two hours apart, 8 h is too close to 7 h');
+  assert.equal(model.bestTimes('A', 6, [6, 23], 60), null, 'not enough known hours: no change');
+});

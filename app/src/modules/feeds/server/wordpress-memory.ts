@@ -1,5 +1,5 @@
 import { prisma } from '@/server/data';
-import { absorb, type LearnedPost, type PageMemory } from '../wordpress/memory';
+import { absorb, formatOf, type LearnedPost, type PageMemory } from '../wordpress/memory';
 import type { SourceRow } from './wordpress-store';
 
 /**
@@ -48,9 +48,25 @@ export async function updatePageMemories(source: SourceRow, pages: ReadonlyArray
     WHERE l."sourceId" = ${source.id} AND l."targetId" = ANY(${pages.map(page => page.id)}::text[]) AND l.state = 'planned' AND ep.insights IS NOT NULL
       AND COALESCE(pt."publishedAt", l."slotAt") > ${new Date(now.getTime() - 365 * 86_400_000)} AND COALESCE(pt."publishedAt", l."slotAt") <= ${settled}
     ORDER BY 2 ASC LIMIT ${PER_RUN * 10}`;
+  // Posts made outside the autopilot (by hand, another tool, videos, shared links) teach the memory too (2026-11-18):
+  // their text stands for the title, Facebook's post type gives the format, their photo is read like the others.
+  const outside = await prisma.$queryRaw<Array<{ id: string; targetId: string; at: Date; message: string | null; statusType: string | null; pictureUrl: string | null; insights: unknown; photo: number | null; photoTraits: string[] | null }>>`
+    SELECT ep.id, ep."targetId", ep."createdTime" AS at, ep.message, ep."statusType", ep."pictureUrl", ep.insights, r.photo, r."photoTraits"
+    FROM external_posts ep
+    LEFT JOIN recipe_ratings r ON r."sourceId" = ${source.id} AND r."wpPostId" = ('ext:' || ep.id)
+    WHERE ep."targetId" = ANY(${pages.map(page => page.id)}::text[]) AND ep.insights IS NOT NULL
+      AND ep."createdTime" > ${new Date(now.getTime() - 365 * 86_400_000)} AND ep."createdTime" <= ${settled}
+      AND NOT EXISTS (SELECT 1 FROM post_targets pt WHERE pt."targetId" = ep."targetId" AND pt."remotePostId" = ep."remoteId")
+    ORDER BY 3 ASC LIMIT ${PER_RUN * 10}`;
   let learned = 0;
   for (const page of pages) {
-    const posts: LearnedPost[] = rows.filter(row => row.targetId === page.id).flatMap(row => { const f = figures(row.insights); return f ? [{ at: row.at, title: row.title, kind: row.kind, style: row.style, caption: row.caption ?? '', ...f, traits: row.photoTraits, appeal: row.photo }] : []; });
+    const posts: LearnedPost[] = [
+      ...rows.filter(row => row.targetId === page.id).flatMap(row => { const f = figures(row.insights); return f ? [{ at: row.at, title: row.title, kind: row.kind, style: row.style, caption: row.caption ?? '', ...f, traits: row.photoTraits, appeal: row.photo, origin: 'app' as const, format: 'photo' as const }] : []; }),
+      ...outside.filter(row => row.targetId === page.id).flatMap(row => {
+        const f = figures(row.insights); const text = (row.message ?? '').trim();
+        return f ? [{ at: row.at, title: (text.split(/\n|(?<=[.!?…])\s/)[0] ?? '').slice(0, 140), kind: null, style: null, caption: text, ...f, traits: row.photoTraits, appeal: row.photo, origin: 'external' as const, format: formatOf(row.statusType, Boolean(row.pictureUrl)) }] : [];
+      }),
+    ].sort((x, y) => x.at.getTime() - y.at.getTime());
     if (!posts.length) continue;
     const memory = absorb(null, posts, now, timeZone);
     await prisma.$executeRaw`INSERT INTO autopilot_memory ("sourceId", "targetId", "workspaceId", memory, "learnedThrough", "updatedAt")
@@ -61,8 +77,8 @@ export async function updatePageMemories(source: SourceRow, pages: ReadonlyArray
   return learned;
 }
 
-/** Published recipes of the last 30 days whose photo the AI has not read yet, newest first, with the photo as posted. */
-export async function photosToLearn(sourceId: string, now: Date, limit: number): Promise<Array<{ id: string; mediaId: string }>> {
+/** Published posts of the last 30 days whose photo the AI has not read yet, newest first: the autopilot's with the photo as posted, and posts made outside it. */
+export async function photosToLearn(sourceId: string, now: Date, limit: number): Promise<Array<{ id: string; mediaId?: string; imageUrl?: string }>> {
   const rows = await prisma.$queryRaw<Array<{ wpPostId: string; media: unknown }>>`SELECT DISTINCT ON (l."wpPostId") l."wpPostId", p.media FROM wordpress_recipe_plans l
     JOIN post_targets pt ON pt."postId" = l."postId" AND pt."targetId" = l."targetId" AND pt.status::text = 'published'
     JOIN posts p ON p.id = l."postId"
@@ -73,5 +89,14 @@ export async function photosToLearn(sourceId: string, now: Date, limit: number):
     const first = Array.isArray(row.media) ? (row.media as Array<{ kind?: unknown; url?: unknown }>).find(item => item?.kind === 'image' && typeof item.url === 'string' && item.url.startsWith('media:')) : undefined;
     return first ? [{ id: row.wpPostId, mediaId: String(first.url).slice('media:'.length) }] : [];
   });
-  return withMedia.slice(0, limit);
+  // Half the batch for posts made outside the autopilot, read from Facebook's picture (2026-11-18).
+  const outside = await prisma.$queryRaw<Array<{ id: string; pictureUrl: string }>>`SELECT ep.id, ep."pictureUrl" FROM external_posts ep
+    JOIN wordpress_recipe_sources s ON s.id = ${sourceId}
+    JOIN targets t ON t.id = ep."targetId" AND t."workspaceId" = s."workspaceId"
+    LEFT JOIN recipe_ratings r ON r."sourceId" = ${sourceId} AND r."wpPostId" = ('ext:' || ep.id)
+    WHERE ep."pictureUrl" IS NOT NULL AND r."photoTraits" IS NULL AND ep."createdTime" >= ${new Date(now.getTime() - 30 * 86_400_000)}
+      AND NOT EXISTS (SELECT 1 FROM post_targets pt WHERE pt."targetId" = ep."targetId" AND pt."remotePostId" = ep."remoteId")
+    ORDER BY ep."createdTime" DESC LIMIT ${Math.ceil(limit / 2)}`;
+  const external = outside.map(row => ({ id: `ext:${row.id}`, imageUrl: row.pictureUrl }));
+  return [...withMedia.slice(0, limit - external.length), ...external];
 }
