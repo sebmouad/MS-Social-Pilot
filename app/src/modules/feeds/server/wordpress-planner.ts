@@ -4,9 +4,10 @@ import { decryptSecret } from '@/server/secret-crypto';
 import { defaultFetchDeps, type FetchDeps } from '@/modules/publishing/server/media/network/net-guard';
 import type { ArticleInput, ArticleWriting } from '@/modules/studio/ai';
 import { autopilotOf, type AutopilotSettings } from '../wordpress/autopilot';
-import { prismaScoringPorts, pageLearning, type ScoringPorts } from './wordpress-scoring';
+import { prismaScoringPorts, pageLearning, PHOTO_BATCH, type ScoringPorts } from './wordpress-scoring';
 import { makePicker } from './wordpress-pick';
 import { guessKind, type RecipeKind } from '../wordpress/score';
+import { captionGuidance, memoryModel } from '../wordpress/memory';
 import { bestStyle, captionPrompt, cleanCaption, ctaFor, opensLike, styleFor, voiceFor, withCta, type HookStyle } from '../wordpress/caption';
 import { instantToWall } from '@/lib/calendar-dates';
 import { allocateRecipes, channelConfig, recipeTitleKey, buildImageUrl, buildPermalink, reportedPermalink, parseRecipe, renderComment, resolveConfig, slotInstants, type PlanConfig, type Recipe, type SlotNeed } from '../wordpress/recipe';
@@ -247,8 +248,13 @@ async function prepareChoosing(ctx: Ctx, source: SourceRow, config: PlanConfig, 
     scoring.outcomes(source.id, new Date(now.getTime() - 365 * 86_400_000)).catch(() => []),
     pilot.moments.rules.includes('weather') ? scoring.weather(pilot.moments.latitude, pilot.moments.longitude, config.timezone).catch(() => new Map<string, number>()) : Promise.resolve(new Map<string, number>()),
   ]);
-  // What works on each channel, from its own recent posts (2026-11-18).
-  const history = pageLearning(outcomes, now);
+  // What works on each channel (2026-11-18): its stored memory (content, time, caption; reach, reactions, comments,
+  // shares), or, before a Page has one, what its own recent posts show.
+  const memories = await scoring.memories?.(source.id).catch(() => new Map()) ?? new Map();
+  const model = memories.size ? memoryModel(memories) : null;
+  const recent = pageLearning(outcomes, now);
+  const history = (targetId: string | null, title: string, kind: RecipeKind | null, slotAt: Date | null, photo?: { traits?: readonly string[] | null; appeal?: number | null } | null) =>
+    (model && targetId && memories.has(targetId) ? model.contentValue(targetId, title, kind, slotAt, config.timezone, photo) : null) ?? recent(targetId, title);
   // Past winners: the best tenth of published recipes (and clearly above usual), back after the cooldown.
   const best = new Map<string, number>();
   for (const o of outcomes) best.set(o.wpPostId, Math.max(best.get(o.wpPostId) ?? 0, o.relative));
@@ -267,7 +273,7 @@ async function prepareChoosing(ctx: Ctx, source: SourceRow, config: PlanConfig, 
   const winnerQuota = Math.floor(needCount * pilot.evergreen.share / 100);
   const preferredStyle = bestStyle(outcomes).style;
   return {
-    winners, blocked, preferredStyle,
+    winners, blocked, preferredStyle, model,
     async picker(candidates: Candidate[]) {
       const ids = candidates.map(c => c.wpPostId);
       let ratings = await scoring.ratings(source.id, ids).catch(() => new Map());
@@ -280,10 +286,15 @@ async function prepareChoosing(ctx: Ctx, source: SourceRow, config: PlanConfig, 
       const timeline = new Map<string, Array<{ at: number; kind: RecipeKind }>>();
       for (const row of view.byKey.values()) if (row.state !== 'failed') timeline.set(row.targetId, [...(timeline.get(row.targetId) ?? []), { at: row.slotAt.getTime(), kind: kindOfRow(row) }]);
       const picker = makePicker({ pilot, timeZone: config.timezone, ratings, history, weather, timeline, winners: new Set(winners.map(w => w.wpPostId)), winnerQuota, candidates });
+      // The photos of the most promising candidates not seen yet are read before choosing (2026-11-18), so what each
+      // Page's memory learned about photos counts in this run's choice; the picker is built again with them.
       if (writer) {
         const soon = new Date(now.getTime() + 86_400_000);
-        const photoless = candidates.filter(c => ratings.get(c.wpPostId)?.photo == null).sort((a, b) => picker.scoreAt(b, soon) - picker.scoreAt(a, soon)).slice(0, 2);
-        if (photoless.length) void scoring.ratePhotos(actor, source, photoless.map(c => ({ id: c.wpPostId, imageUrl: c.imageUrl }))).catch(() => undefined);
+        const unseen = candidates.filter(c => !ratings.get(c.wpPostId)?.traits).sort((a, b) => picker.scoreAt(b, soon) - picker.scoreAt(a, soon)).slice(0, PHOTO_BATCH);
+        if (unseen.length && await scoring.ratePhotos(actor, source, unseen.map(c => ({ id: c.wpPostId, imageUrl: c.imageUrl }))).catch(() => 0)) {
+          ratings = await scoring.ratings(source.id, ids).catch(() => ratings);
+          return makePicker({ pilot, timeZone: config.timezone, ratings, history, weather, timeline, winners: new Set(winners.map(w => w.wpPostId)), winnerQuota, candidates });
+        }
       }
       return picker;
     },
@@ -451,8 +462,11 @@ export async function planSource(ctx: Ctx, source: SourceRow, auth: FeedAuthoriz
     const key = slotKey(targetId, slotAt);
     if (pilot.captions.enabled && writer && ports.captions) {
       const avoid = openings.slice(0, 10);
-      const pick = styleFor(key, prep?.preferredStyle ?? null, pilot.hooks.enabled ? pilot.hooks.share : 0);
-      const { system, prompt } = captionPrompt({ channel: pages.find(page => page.id === targetId)?.name ?? '', voice: voiceFor(pilot.captions.voice, pageOrder.get(targetId) ?? 0), style: pick.style, question: pilot.captions.question, emoji: pilot.captions.emoji,
+      // Each Page's own lessons (2026-11-18): its best hook style and the caption habits that work there.
+      const tips = prep?.model?.captionTips(targetId) ?? [];
+      const question = tips.some(tip => tip.code === 'qend') ? true : tips.some(tip => tip.code === 'noqend') ? false : pilot.captions.question;
+      const pick = styleFor(key, prep?.model?.bestStyle(targetId) ?? prep?.preferredStyle ?? null, pilot.hooks.enabled ? pilot.hooks.share : 0);
+      const { system, prompt } = captionPrompt({ channel: pages.find(page => page.id === targetId)?.name ?? '', voice: voiceFor(pilot.captions.voice, pageOrder.get(targetId) ?? 0), style: pick.style, question, guidance: captionGuidance(tips.filter(tip => tip.code !== 'qend' && tip.code !== 'noqend')), emoji: pilot.captions.emoji,
         title: c.title, caption: written.caption, ingredients: c.recipe.ingredients.filter(line => !line.heading).map(line => line.text), avoid });
       try {
         let clean = cleanCaption(await ports.captions.write(auth.actor, system, prompt), settings.textMax);
@@ -572,6 +586,8 @@ export async function runRecipePlanning(overrides: Partial<PlannerPorts> & { aut
       let makeup: Map<string, Date> | undefined;
       try {
         await autopilot.learnBestTimes(settings, source, await ports.store.pages(source, settings.targetTypes, settings.maxTargets), now, overrides.autopilot);
+        // Each Page's memory learns its newly settled posts before this run chooses (2026-11-18).
+        if (!overrides.autopilot) await import('./wordpress-memory').then(async memory => memory.updatePageMemories(source, await ports.store.pages(source, settings.targetTypes, settings.maxTargets), configOf(settings, source).timezone, now)).catch(() => 0);
         if (pilot.healing.replaceFailed) {
           // Interrupted runs: settle their upcoming slots with proof, so the channel is planned again (2026-11-16).
           const healed = await autopilot.healStranded(source.id, now, overrides.autopilot).catch(() => ({ reconciled: 0, released: 0, titles: [] as string[] }));
@@ -597,6 +613,15 @@ export async function runRecipePlanning(overrides: Partial<PlannerPorts> & { aut
         }
       } catch { /* the autopilot never stops planning */ }
       const outcome = await planSource({ settings, ports, db, budget, now, ...(makeup ? { makeup } : {}) }, source, auth);
+      // Photos of published recipes are read for learning (2026-11-18): newest first, a batch per run, within the AI limit.
+      if (!overrides.autopilot && pilot.score.enabled && await ports.writer.available(source.workspaceId).catch(() => false)) {
+        try {
+          const { photosToLearn } = await import('./wordpress-memory');
+          const ids = await photosToLearn(source.id, now, PHOTO_BATCH);
+          const found = ids.length ? await readCandidates(db, settings, source, configOf(settings, source), ids, now, true).catch(() => []) : [];
+          if (found.length) await (ports.scoring ?? prismaScoringPorts).ratePhotos(auth.actor, source, found.map(c => ({ id: c.wpPostId, imageUrl: c.imageUrl })));
+        } catch { /* photos are learned on a later run */ }
+      }
       if (pilot.healing.pauseBroken) for (const name of outcome.excludedNames ?? []) {
         const recent = (pilot.log ?? []).some(entry => entry.kind === 'healing' && entry.channelName === name && now.getTime() - Date.parse(entry.at) < 86_400_000);
         if (!recent) entries.push({ at: now.toISOString(), kind: 'healing', channelName: name.slice(0, 200), text: 'This channel cannot publish right now (its connection or permissions). Its recipes are on hold; the other channels carry on.', code: 'channelHeld' });

@@ -4,7 +4,7 @@ import { postScore } from '../wordpress/autopilot';
 import type { FeedActor } from './access';
 
 /** AI ratings of one recipe; a missing rating is null. */
-export type Rating = { kind: RecipeKind | null; hook: number | null; photo: number | null };
+export type Rating = { kind: RecipeKind | null; hook: number | null; photo: number | null; traits?: string[] | null };
 /** One published recipe post and how it did relative to its channel's usual (1 = usual). */
 export type Outcome = { targetId: string; wpPostId: string; title: string; slotAt: Date; relative: number; style?: string | null };
 
@@ -13,21 +13,43 @@ export type ScoringPorts = {
   ratings(sourceId: string, ids: readonly string[]): Promise<Map<string, Rating>>;
   /** Rate unrated recipes with AI (title hook and kind) and store the ratings; at most a batch per call. */
   rate(actor: FeedActor, source: { id: string; workspaceId: string }, items: ReadonlyArray<{ id: string; title: string }>): Promise<void>;
-  /** Rate how appetising a few photos are, with AI vision. */
-  ratePhotos(actor: FeedActor, source: { id: string; workspaceId: string }, items: ReadonlyArray<{ id: string; imageUrl: string }>): Promise<void>;
+  /** Look at photos with AI vision (2026-11-18): how appetising, and which visual traits. Returns how many were read. */
+  ratePhotos(actor: FeedActor, source: { id: string; workspaceId: string }, items: ReadonlyArray<{ id: string; imageUrl: string }>): Promise<number | void>;
   outcomes(sourceId: string, since: Date): Promise<Outcome[]>;
+  /** Each Page's memory (2026-11-18); absent in tests and before the first run. */
+  memories?(sourceId: string): Promise<Map<string, import('../wordpress/memory').PageMemory>>;
   /** Highest temperature by local date (YYYY-MM-DD) for the next days; empty when unknown. */
   weather(latitude: number, longitude: number, timeZone: string): Promise<Map<string, number>>;
 };
 
 export const RATE_BATCH = 40;
-export const PHOTO_BATCH = 2;
+/** Photos read at once (in parallel) by one call. */
+export const PHOTO_BATCH = 12;
+/** What the AI may see in a recipe photo; anything else it says is ignored. */
+export const PHOTO_TRAITS = ['close_up', 'overhead', 'side_angle', 'collage', 'steps_shown', 'text_overlay', 'cheese_pull', 'melting', 'golden_crust', 'glossy_sauce', 'steam', 'cut_open', 'generous_portion', 'single_serving', 'rustic', 'elegant_plating', 'bright', 'dark', 'colorful', 'hands', 'ingredients_around', 'plain_background'] as const;
 
 const RATE_SYSTEM = `You rate recipe posts for a French Facebook food page. For each recipe give:
 - kind: one of ${RECIPE_KINDS.join(', ')}
 - hook: 0 to 10, how much the title makes people stop scrolling and want to cook it (10 irresistible, 5 ordinary, 0 dull or confusing).
 Answer only with a JSON array, one object per recipe, in the order given: [{"id":"…","kind":"…","hook":7}]`;
-const PHOTO_SYSTEM = 'Rate how appetising this food photo is in a Facebook feed, from 0 to 10: light, sharpness, colour, the dish shown close and inviting. Answer only with the number.';
+const PHOTO_SYSTEM = `You look at the photo of a recipe post for a French Facebook food page.
+- appeal: 0 to 10, how much it makes people stop scrolling (light, sharpness, colour, the dish shown close and inviting).
+- traits: every one of these that clearly applies: ${PHOTO_TRAITS.join(', ')}.
+Answer only with JSON: {"appeal":7,"traits":["close_up","golden_crust"]}`;
+
+/** The AI's answer about a photo; an unreadable answer gives null. */
+export function parsePhoto(raw: string): { appeal: number; traits: string[] } | null {
+  const start = raw.indexOf('{'); const end = raw.lastIndexOf('}');
+  if (start >= 0 && end > start) {
+    try {
+      const value = JSON.parse(raw.slice(start, end + 1)) as { appeal?: unknown; traits?: unknown };
+      const appeal = Number(value.appeal);
+      if (Number.isFinite(appeal)) return { appeal: Math.max(0, Math.min(10, Math.round(appeal))), traits: Array.isArray(value.traits) ? [...new Set(value.traits.filter((t): t is string => typeof t === 'string' && (PHOTO_TRAITS as readonly string[]).includes(t)))] : [] };
+    } catch { /* fall through to a bare number */ }
+  }
+  const bare = Number((raw.match(/\d+(\.\d+)?/) ?? [])[0]);
+  return Number.isFinite(bare) ? { appeal: Math.max(0, Math.min(10, Math.round(bare))), traits: [] } : null;
+}
 
 /** Read the AI's answer to a rating batch; anything malformed is skipped. */
 export function parseRatings(raw: string, ids: ReadonlySet<string>): Map<string, { kind: RecipeKind | null; hook: number | null }> {
@@ -85,10 +107,11 @@ export function pageLearning(outcomes: readonly Outcome[], now: Date, options: {
 const weatherCache = new Map<string, { at: number; days: Map<string, number> }>();
 
 export const prismaScoringPorts: ScoringPorts = {
+  async memories(sourceId) { const { readPageMemories } = await import('./wordpress-memory'); return readPageMemories(sourceId); },
   async ratings(sourceId, ids) {
     if (!ids.length) return new Map();
-    const rows = await prisma.$queryRaw<Array<{ wpPostId: string; kind: string | null; hook: number | null; photo: number | null }>>`SELECT "wpPostId", kind, hook, photo FROM recipe_ratings WHERE "sourceId" = ${sourceId} AND "wpPostId" = ANY(${[...ids]}::text[])`;
-    return new Map(rows.map(row => [row.wpPostId, { kind: (RECIPE_KINDS as readonly string[]).includes(row.kind ?? '') ? row.kind as RecipeKind : null, hook: row.hook, photo: row.photo }]));
+    const rows = await prisma.$queryRaw<Array<{ wpPostId: string; kind: string | null; hook: number | null; photo: number | null; photoTraits: string[] | null }>>`SELECT "wpPostId", kind, hook, photo, "photoTraits" FROM recipe_ratings WHERE "sourceId" = ${sourceId} AND "wpPostId" = ANY(${[...ids]}::text[])`;
+    return new Map(rows.map(row => [row.wpPostId, { kind: (RECIPE_KINDS as readonly string[]).includes(row.kind ?? '') ? row.kind as RecipeKind : null, hook: row.hook, photo: row.photo, traits: row.photoTraits }]));
   },
   async rate(actor, source, items) {
     const batch = items.slice(0, RATE_BATCH);
@@ -107,17 +130,24 @@ export const prismaScoringPorts: ScoringPorts = {
     const { defaultImagePorts, convertToJpeg } = await import('../wordpress/image');
     const { defaultFetchDeps } = await import('@/modules/publishing/server/media/network/net-guard');
     const image = defaultImagePorts(defaultFetchDeps());
-    for (const item of items.slice(0, PHOTO_BATCH)) {
-      try {
-        const bytes = await image.download(item.imageUrl, { timeoutMs: 10_000, maxBytes: 15_000_000, maxRedirects: 3, allowHttp: false, hostAllowlist: [] });
-        const small = await convertToJpeg(bytes, { maxPixels: 600_000, quality: 75, minQuality: 50, qualityStep: 10, maxOutputBytes: 400_000 });
-        const raw = await autopilotComplete(actor, 'autopilot.photo', PHOTO_SYSTEM, 'Rate this photo.', { image: { mimeType: 'image/jpeg', base64: small.toString('base64') }, maxTokens: 20 });
-        const value = Number((raw.match(/\d+(\.\d+)?/) ?? [])[0]);
-        if (!Number.isFinite(value)) continue;
-        await prisma.$executeRaw`INSERT INTO recipe_ratings ("sourceId", "wpPostId", "workspaceId", photo, "photoAt", "ratedAt") VALUES (${source.id}, ${item.id}, ${source.workspaceId}, ${Math.max(0, Math.min(10, Math.round(value)))}, NOW(), NOW())
-          ON CONFLICT ("sourceId", "wpPostId") DO UPDATE SET photo = EXCLUDED.photo, "photoAt" = NOW()`;
-      } catch { /* a photo that cannot be read or rated is tried again on a later run */ }
+    let read = 0;
+    const one = async (item: { id: string; imageUrl: string }) => {
+      const bytes = await image.download(item.imageUrl, { timeoutMs: 10_000, maxBytes: 15_000_000, maxRedirects: 3, allowHttp: false, hostAllowlist: [] });
+      const small = await convertToJpeg(bytes, { maxPixels: 600_000, quality: 75, minQuality: 50, qualityStep: 10, maxOutputBytes: 400_000 });
+      const seen = parsePhoto(await autopilotComplete(actor, 'autopilot.photo', PHOTO_SYSTEM, 'The photo.', { image: { mimeType: 'image/jpeg', base64: small.toString('base64') }, maxTokens: 300 }));
+      if (!seen) return;
+      await prisma.$executeRaw`INSERT INTO recipe_ratings ("sourceId", "wpPostId", "workspaceId", photo, "photoTraits", "photoAt", "ratedAt") VALUES (${source.id}, ${item.id}, ${source.workspaceId}, ${seen.appeal}, ${seen.traits}::text[], NOW(), NOW())
+        ON CONFLICT ("sourceId", "wpPostId") DO UPDATE SET photo = EXCLUDED.photo, "photoTraits" = EXCLUDED."photoTraits", "photoAt" = NOW()`;
+      read++;
+    };
+    // Four at a time. A photo that cannot be read is tried again on a later run; the AI over its limit stops the batch.
+    const queue = items.slice(0, PHOTO_BATCH);
+    for (let index = 0; index < queue.length; index += 4) {
+      const outcomes = await Promise.allSettled(queue.slice(index, index + 4).map(one));
+      const { OperationError } = await import('@/lib/operation-error');
+      if (outcomes.some(o => o.status === 'rejected' && o.reason instanceof OperationError && (o.reason.code === 'conflict' || o.reason.code === 'unavailable'))) break;
     }
+    return read;
   },
   async outcomes(sourceId, since) {
     const rows = await prisma.$queryRaw<Array<{ targetId: string; wpPostId: string; title: string | null; slotAt: Date; insights: unknown; style: string | null }>>`SELECT l."targetId", l."wpPostId", l.title, l."slotAt", l.style, ep.insights
@@ -151,3 +181,4 @@ export const prismaScoringPorts: ScoringPorts = {
     return days;
   },
 };
+

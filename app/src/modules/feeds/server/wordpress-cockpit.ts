@@ -21,7 +21,9 @@ export type CockpitPost = { planId: string; targetId: string; targetName: string
   status: 'published' | 'upcoming' | 'failed' | 'empty'; reach: number | null; url: string | null };
 export type CockpitChannel = { id: string; name: string; paused: boolean; pausedReason: string | null; autoTimes: boolean; times: string[]; next: CockpitPost | null; reachToday: number; postsToday: number; failedWeek: number;
   /** The last seven days (2026-11-17): people reached per day, oldest first, the total and the seven days before. */
-  daily: number[]; weekReach: number; previousReach: number; weekPosts: number };
+  daily: number[]; weekReach: number; previousReach: number; weekPosts: number;
+  /** What this Page's memory has learned (2026-11-18); null before its first lesson. */
+  learned: import('../wordpress/memory').Highlights | null };
 export type WeeklyReport = {
   from: string; to: string; published: number; reach: number; previousReach: number;
   channels: Array<{ id: string; name: string; posts: number; reach: number; previousReach: number; daily: number[]; best: { title: string; reach: number } | null }>;
@@ -59,9 +61,9 @@ async function context(actor: FeedActor, write = false) {
   return { auth, settings, source, pages, config: configOf(settings, source) };
 }
 
-type PlanRow = { id: string; targetId: string; slotAt: Date; scheduledAt: Date | null; title: string; score: number | null; kind: string | null; postId: string | null; state: string; reason: string | null; message: string | null; media: unknown; targetStatus: string | null; remoteUrl: string | null; insights: unknown };
+type PlanRow = { wpPostIdForRating?: string; id: string; targetId: string; slotAt: Date; scheduledAt: Date | null; title: string; score: number | null; kind: string | null; postId: string | null; state: string; reason: string | null; message: string | null; media: unknown; targetStatus: string | null; remoteUrl: string | null; insights: unknown };
 async function plansBetween(sourceId: string, from: Date, to: Date): Promise<PlanRow[]> {
-  return prisma.$queryRaw<PlanRow[]>`SELECT l.id, l."targetId", l."slotAt", p."scheduledAt", l.title, l.score, l.kind, l."postId", l.state, l.reason, p.message, p.media, pt.status::text AS "targetStatus", pt."remoteUrl", ep.insights FROM wordpress_recipe_plans l
+  return prisma.$queryRaw<PlanRow[]>`SELECT l.id, l."targetId", l."wpPostId" AS "wpPostIdForRating", l."slotAt", p."scheduledAt", l.title, l.score, l.kind, l."postId", l.state, l.reason, p.message, p.media, pt.status::text AS "targetStatus", pt."remoteUrl", ep.insights FROM wordpress_recipe_plans l
     LEFT JOIN posts p ON p.id = l."postId" AND p."workspaceId" = l."workspaceId"
     LEFT JOIN post_targets pt ON pt."postId" = l."postId" AND pt."targetId" = l."targetId"
     LEFT JOIN external_posts ep ON ep."targetId" = pt."targetId" AND ep."remoteId" = pt."remotePostId"
@@ -95,6 +97,9 @@ export async function readCockpit(actor: FeedActor, now = new Date()): Promise<C
       ORDER BY l."slotAt" DESC LIMIT 3`) : [],
   ]);
   const report = await weeklyReport(source, pages, pilot, tz, now);
+  const memories = await import('./wordpress-memory').then(m => m.readPageMemories(source.id)).catch(() => new Map());
+  const { memoryModel } = await import('../wordpress/memory');
+  const model = memoryModel(memories);
   const channels: CockpitChannel[] = pages.map(page => {
     const week = report.channels.find(row => row.id === page.id);
     const own = config.channels?.[page.id];
@@ -102,7 +107,8 @@ export async function readCockpit(actor: FeedActor, now = new Date()): Promise<C
     const mine = todayRows.filter(row => row.targetId === page.id);
     return { id: page.id, name: page.name, paused: own?.paused === true, pausedReason: own?.pausedReason ?? null, autoTimes: own?.autoTimes === true || (!own?.slots?.length && Boolean(pilot.learnedTimes?.[page.id])), times: channelConfig(config, page.id).slots,
       next: next ? view(next) : null, reachToday: mine.reduce((sum, row) => sum + reachOf(row.insights), 0), postsToday: mine.length, failedWeek: Number(failed.find(row => row.targetId === page.id)?.count ?? 0),
-      daily: week?.daily ?? [], weekReach: week?.reach ?? 0, previousReach: week?.previousReach ?? 0, weekPosts: week?.posts ?? 0 };
+      daily: week?.daily ?? [], weekReach: week?.reach ?? 0, previousReach: week?.previousReach ?? 0, weekPosts: week?.posts ?? 0,
+      learned: memories.has(page.id) ? model.highlights(page.id) : null };
   });
   const byTime = (a: CockpitPost, b: CockpitPost) => a.slotAt.localeCompare(b.slotAt) || a.targetName.localeCompare(b.targetName);
   // Today keeps what failed too: the day's page says what happened, not only what is planned.
@@ -218,4 +224,48 @@ export async function aiUse(workspaceId: string, now: Date): Promise<AiUse> {
     byKind: kinds.map(k => ({ kind: k.kind ?? 'other', requests: n(k.requests), inputTokens: n(k.input), outputTokens: n(k.output) })),
     peakHour: n(peak[0]?.count ?? 0), hourlyLimit: Number.isFinite(limit) && limit > 0 ? limit : null, model: model[0]?.model ?? null,
   };
+}
+
+export const REFRESH_PLAN_CONFIRMATION = 'REPLAN WITH PAGE MEMORY';
+/** Below this expected value (1 = the Page's usual), a planned recipe is replaced. */
+const REPLACE_BELOW = 1;
+
+/**
+ * Re-plan with each Page's memory (2026-11-18, owner: « plan viral content starting from tomorrow »): the recipes
+ * planned for tomorrow and the day after, still scheduled and more than three hours away, that their Page's memory
+ * expects to do below that Page's usual are replaced through the usual « another recipe » path, which now chooses
+ * with the memory. Recipes the memory knows nothing about are left as they are. Logged in the audit log.
+ */
+export async function refreshPlanWithMemory(actor: FeedActor, input: unknown, now = new Date()): Promise<{ examined: number; replaced: number; kept: number; failed: number; unknown: number }> {
+  const parsed = z.object({ confirmation: z.literal(REFRESH_PLAN_CONFIRMATION) }).strict().safeParse(input);
+  if (!parsed.success) throw new OperationError('invalid_request', 'Confirm the re-planning.');
+  const { source, pages, config } = await context(actor, true);
+  const { readPageMemories } = await import('./wordpress-memory');
+  const memories = await readPageMemories(source.id);
+  if (!memories.size) throw new OperationError('conflict', 'The Pages have not learned anything yet. Try again after the next planning run.');
+  const { memoryModel } = await import('../wordpress/memory');
+  const model = memoryModel(memories);
+  const tz = config.timezone;
+  const tomorrow = addDaysToKey(instantToWall(now, tz).date, 1);
+  const start = wallTimeToInstant(tomorrow, '00:00', tz); const end = wallTimeToInstant(addDaysToKey(tomorrow, 2), '00:00', tz);
+  if (!start.ok || !end.ok) throw new OperationError('unavailable', 'The plan could not be read.');
+  const names = new Set(pages.map(page => page.id));
+  const rows = (await plansBetween(source.id, start.instant, end.instant)).filter(row => names.has(row.targetId) && row.state === 'planned' && row.postId && row.targetStatus !== 'published'
+    && (row.scheduledAt ?? row.slotAt).getTime() > now.getTime() + 3 * 3_600_000);
+  const { prismaScoringPorts } = await import('./wordpress-scoring');
+  const ratings = await prismaScoringPorts.ratings(source.id, rows.map(row => row.wpPostIdForRating ?? '')).catch(() => new Map());
+  const { changeRecipeSlotNow } = await import('./wordpress');
+  const { replaceRecipeSlotConfirmation } = await import('../wordpress/recipe');
+  const out = { examined: rows.length, replaced: 0, kept: 0, failed: 0, unknown: 0 };
+  for (const row of rows) {
+    const rating = ratings.get(row.wpPostIdForRating ?? '');
+    const value = model.contentValue(row.targetId, row.title, row.kind, row.slotAt, tz, rating ? { traits: rating.traits ?? null, appeal: rating.photo } : null);
+    if (value === null) { out.unknown++; continue; }
+    if (value >= REPLACE_BELOW) { out.kept++; continue; }
+    try { await changeRecipeSlotNow(actor, { planId: row.id, confirmation: replaceRecipeSlotConfirmation(row.id), action: 'replace' }); out.replaced++; }
+    catch { out.failed++; }
+  }
+  const { audit } = await import('./core');
+  await audit(prisma as unknown as Parameters<typeof audit>[0], actor.workspaceId, actor, 'feeds.autopilot_replanned', { sourceId: source.id, ...out }).catch(() => undefined);
+  return out;
 }

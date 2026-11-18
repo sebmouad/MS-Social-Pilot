@@ -1,0 +1,72 @@
+import { prisma } from '@/server/data';
+import { absorb, type LearnedPost, type PageMemory } from '../wordpress/memory';
+import type { SourceRow } from './wordpress-store';
+
+/**
+ * Storage of the autopilot's memory of each Page (2026-11-18, see ../wordpress/memory.ts). On every planning run, each
+ * Page's memory is rebuilt from its recipe posts whose figures have settled (published at least SETTLE_HOURS ago), and
+ * stored. Read by the planner, the cockpit and captions.
+ */
+export const SETTLE_HOURS = 48;
+/** Posts learned per Page in one run; a long history is learned over a few runs. */
+const PER_RUN = 2000;
+
+const num = (value: unknown) => typeof value === 'number' && Number.isFinite(value) ? value : 0;
+/** Reach, reactions, comments and shares from stored post figures (Graph API names or the app's own). */
+export function figures(insights: unknown): { reach: number; reactions: number; comments: number; shares: number } | null {
+  if (!insights || typeof insights !== 'object') return null;
+  const i = insights as Record<string, unknown>;
+  const reach = num(i.post_total_media_view_unique) || num(i.reach) || num(i.post_media_view) || num(i.impressions);
+  const byType = i.post_reactions_by_type_total;
+  const reactions = byType && typeof byType === 'object' ? Object.values(byType as Record<string, unknown>).reduce<number>((sum, v) => sum + num(v), 0) : num(i.reactions) || num(i.likes);
+  const comments = num(i.comments) || num(i.commentsCount);
+  const shares = num(i.shares) || num(i.sharesCount);
+  if (!reach && !reactions && !comments && !shares) return null;
+  return { reach, reactions, comments, shares };
+}
+
+export async function readPageMemories(sourceId: string): Promise<Map<string, PageMemory>> {
+  const rows = await prisma.$queryRaw<Array<{ targetId: string; memory: PageMemory }>>`SELECT "targetId", memory FROM autopilot_memory WHERE "sourceId" = ${sourceId}`;
+  return new Map(rows.filter(row => row.memory && row.memory.v === 1).map(row => [row.targetId, row.memory]));
+}
+
+/**
+ * Rebuild each Page's memory from all its settled posts of the last year, with what was seen in their photos, and
+ * store it (2026-11-18). Rebuilt rather than added to, so a photo read later and corrected figures still count.
+ * Returns how many posts the memories learned from.
+ */
+export async function updatePageMemories(source: SourceRow, pages: ReadonlyArray<{ id: string }>, timeZone: string, now: Date): Promise<number> {
+  if (!pages.length) return 0;
+  const settled = new Date(now.getTime() - SETTLE_HOURS * 3_600_000);
+  const rows = await prisma.$queryRaw<Array<{ targetId: string; at: Date; title: string; kind: string | null; style: string | null; caption: string | null; insights: unknown; photo: number | null; photoTraits: string[] | null }>>`
+    SELECT l."targetId", COALESCE(pt."publishedAt", l."slotAt") AS at, l.title, l.kind, l.style, p.message AS caption, ep.insights, r.photo, r."photoTraits"
+    FROM wordpress_recipe_plans l
+    JOIN post_targets pt ON pt."postId" = l."postId" AND pt."targetId" = l."targetId" AND pt.status::text = 'published'
+    JOIN posts p ON p.id = l."postId"
+    JOIN external_posts ep ON ep."targetId" = pt."targetId" AND ep."remoteId" = pt."remotePostId"
+    LEFT JOIN recipe_ratings r ON r."sourceId" = l."sourceId" AND r."wpPostId" = l."wpPostId"
+    WHERE l."sourceId" = ${source.id} AND l."targetId" = ANY(${pages.map(page => page.id)}::text[]) AND l.state = 'planned' AND ep.insights IS NOT NULL
+      AND COALESCE(pt."publishedAt", l."slotAt") > ${new Date(now.getTime() - 365 * 86_400_000)} AND COALESCE(pt."publishedAt", l."slotAt") <= ${settled}
+    ORDER BY 2 ASC LIMIT ${PER_RUN * 10}`;
+  let learned = 0;
+  for (const page of pages) {
+    const posts: LearnedPost[] = rows.filter(row => row.targetId === page.id).flatMap(row => { const f = figures(row.insights); return f ? [{ at: row.at, title: row.title, kind: row.kind, style: row.style, caption: row.caption ?? '', ...f, traits: row.photoTraits, appeal: row.photo }] : []; });
+    if (!posts.length) continue;
+    const memory = absorb(null, posts, now, timeZone);
+    await prisma.$executeRaw`INSERT INTO autopilot_memory ("sourceId", "targetId", "workspaceId", memory, "learnedThrough", "updatedAt")
+      VALUES (${source.id}, ${page.id}, ${source.workspaceId}, ${JSON.stringify(memory)}::jsonb, ${posts[posts.length - 1]!.at}, NOW())
+      ON CONFLICT ("sourceId", "targetId") DO UPDATE SET memory = EXCLUDED.memory, "learnedThrough" = EXCLUDED."learnedThrough", "updatedAt" = NOW()`;
+    learned += posts.length;
+  }
+  return learned;
+}
+
+/** Published recipes of the last 30 days whose photo the AI has not read yet, newest first, for learning. */
+export async function photosToLearn(sourceId: string, now: Date, limit: number): Promise<string[]> {
+  const rows = await prisma.$queryRaw<Array<{ wpPostId: string }>>`SELECT l."wpPostId" FROM wordpress_recipe_plans l
+    JOIN post_targets pt ON pt."postId" = l."postId" AND pt."targetId" = l."targetId" AND pt.status::text = 'published'
+    LEFT JOIN recipe_ratings r ON r."sourceId" = l."sourceId" AND r."wpPostId" = l."wpPostId"
+    WHERE l."sourceId" = ${sourceId} AND l.state = 'planned' AND r."photoTraits" IS NULL AND l."slotAt" >= ${new Date(now.getTime() - 30 * 86_400_000)} AND l."slotAt" <= ${now}
+    GROUP BY l."wpPostId" ORDER BY MAX(l."slotAt") DESC LIMIT ${limit}`;
+  return rows.map(row => row.wpPostId);
+}

@@ -409,3 +409,21 @@ ads_management (owner asked to rework Ads like Meta Ads Manager first). The subm
 - Backtest on 1,097 live recipe posts (21 Oct – 17 Nov, three test weeks): within-channel rank correlation of any
   title-based method is only ~0.10–0.13; per-channel, 30 days: top quarter 1.33× vs bottom 1.08× (single first word
   before: 1.28× vs 1.04×). Day × channel explains ~60 % of reach swings; titles explain little. Do not promise more.
+
+### 7.1k The autopilot's memory of each Page (2026-11-18, owner's request)
+- `wordpress/memory.ts` (pure) + `server/wordpress-memory.ts` + table `autopilot_memory` (migration 0021). Every
+  planning run rebuilds each Page's memory from its settled recipe posts (published ≥ 48 h, last 365 days) and stores
+  it. A post's result = reach 45 %, shares 20 %, reactions 20 %, comments 15 %, each as log vs the Page's usual
+  (capped 20×); lessons fade with a 30-day half-life; a Page borrows from the others until it has its own evidence (k=3).
+- Features: title words, dish kind, hour, weekday, kind × time of day, kind × weekend, « quick »/« easy » titles,
+  caption traits (question first/last, emoji, length, hashtags), hook style, and the photo (AI vision: appeal 0–10 and
+  traits from `PHOTO_TRAITS`, stored in `recipe_ratings.photoTraits`).
+- Used: recipe scoring per Page (`contentValue`, through `history` in the picker), each Page's hook style
+  (`bestStyle`) and caption guidance (`captionTips` → `captionPrompt.guidance`), and the Autopilot channel cards.
+- Photos: until now photo rating ran two at a time, fire-and-forget, only on runs with empty slots; none showed in the
+  live AI usage this month. Now the most promising unseen candidates are read before choosing, and published photos
+  are read for learning (12 a run, newest first).
+- `POST /api/feeds/wordpress/autopilot/replan` (confirmation `REPLAN WITH PAGE MEMORY`): tomorrow and the day after,
+  scheduled > 3 h ahead, recipes the memory expects below their Page's usual are replaced (« another recipe »).
+- AI content label: Meta documents reading IPTC/C2PA metadata to show « AI info »; no confirmed Graph API parameter.
+  sharp can embed XMP (`withXmp`). Not done: only right if the photos are AI-made — owner to decide.

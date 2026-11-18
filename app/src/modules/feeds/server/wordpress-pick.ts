@@ -13,7 +13,7 @@ export type PickInput<C extends { wpPostId: string; title: string; publishedAt?:
   pilot: AutopilotSettings; timeZone: string;
   ratings: ReadonlyMap<string, Rating>;
   /** How a recipe would do on a channel, learned from that channel's own posts (1 = usual; null when unknown). */
-  history: (targetId: string | null, title: string) => number | null;
+  history: (targetId: string | null, title: string, kind: RecipeKind | null, slotAt: Date | null, photo?: { traits?: readonly string[] | null; appeal?: number | null } | null) => number | null;
   /** Local date → highest temperature. */
   weather: ReadonlyMap<string, number>;
   /** Posts already on each channel (planned or published), for the variety guard. */
@@ -46,7 +46,7 @@ export function makePicker<C extends { wpPostId: string; title: string; publishe
     const key = `${c.wpPostId}|${slotAt.getTime()}|${targetId ?? ''}`;
     const hit = cache.get(key); if (hit !== undefined) return hit;
     const rating = input.ratings.get(c.wpPostId);
-    const value = scoreRecipe({ title: c.title, hook: rating?.hook ?? null, photo: rating?.photo ?? null, kind: rating?.kind ?? null, history: input.history(targetId, c.title) }, contextOf(slotAt)).score;
+    const value = scoreRecipe({ title: c.title, hook: rating?.hook ?? null, photo: rating?.photo ?? null, kind: rating?.kind ?? null, history: input.history(targetId, c.title, rating?.kind ?? null, slotAt, rating ? { traits: rating.traits ?? null, appeal: rating.photo } : null) }, contextOf(slotAt)).score;
     cache.set(key, value); return value;
   };
   const combined = (c: C, slotAt: Date, targetId: string) => {

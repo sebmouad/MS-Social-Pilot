@@ -166,3 +166,59 @@ test('page learning: the picker ranks a recipe for the channel it would go to', 
   assert.equal(picker.rank({ targetId: 'A', slotAt: at }, candidates)[0]!.wpPostId, 'g');
   assert.equal(picker.rank({ targetId: 'B', slotAt: at }, candidates)[0]!.wpPostId, 't');
 });
+
+
+// The autopilot's memory of each Page (2026-11-18): content, time and caption, from reach, reactions, comments, shares.
+test('memory: each Page learns from its settled posts, keeps it, and lets older lessons fade', async () => {
+  const { absorb, memoryModel } = await import('@/modules/feeds/wordpress/memory');
+  const tz = 'Europe/Paris'; const now = new Date('2026-11-18T12:00:00Z');
+  const post = (title: string, daysAgo: number, reach: number, extra: Partial<{ comments: number; shares: number; caption: string; style: string; hour: number }> = {}) =>
+    ({ at: new Date(Date.UTC(2026, 10, 18 - daysAgo, (extra.hour ?? 18) - 1, 0)), title, kind: null, style: extra.style ?? null, caption: extra.caption ?? 'Une recette.', reach, reactions: reach / 20, comments: extra.comments ?? 1, shares: extra.shares ?? 1 });
+  const a = absorb(null, [
+    ...Array.from({ length: 6 }, (_, i) => post(`Gratin de pâtes ${i}`, i + 1, 3000, { shares: 40, comments: 20, caption: 'Qui en veut ? Un gratin doré.', style: 'question' })),
+    ...Array.from({ length: 6 }, (_, i) => post(`Terrine de poisson ${i}`, i + 8, 300, { caption: 'Une terrine.', style: 'story' })),
+  ], now, tz);
+  const b = absorb(null, Array.from({ length: 6 }, (_, i) => post(`Gratin de pâtes ${i}`, i + 1, 200)), now, tz);
+  assert.equal(a.posts, 12);
+  const model = memoryModel(new Map([['A', a], ['B', b]]));
+  const gratinA = model.contentValue('A', 'Gratin dauphinois', null, new Date('2026-11-19T17:00:00Z'), tz)!;
+  const terrineA = model.contentValue('A', 'Terrine de saumon', null, new Date('2026-11-19T17:00:00Z'), tz)!;
+  assert.ok(gratinA > 1.2 && terrineA < 0.9, `A: gratins ${gratinA}, terrines ${terrineA}`);
+  assert.equal(model.bestStyle('A'), 'question');
+  const h = model.highlights('A');
+  assert.ok(h.best.some(item => item.word === 'gratin' || item.word === 'pâtes'), JSON.stringify(h.best));
+  assert.ok(h.worst.some(item => item.word === 'terrine'), JSON.stringify(h.worst));
+  assert.ok(model.captionTips('A').some(tip => tip.code === 'qstart'), 'captions opening with a question work on A');
+  // Stored and updated: a later run adds new posts, and earlier lessons have faded.
+  const later = absorb(a, [post('Quiche lorraine', 0, 2000)], new Date(now.getTime() + 60 * 86_400_000), tz);
+  assert.equal(later.posts, 13);
+  assert.ok(later.f['w:gratin']!.w < a.f['w:gratin']!.w / 3, 'two half-lives later a lesson weighs a quarter');
+});
+
+test('memory: shares and comments count, not reach alone', async () => {
+  const { absorb, memoryModel } = await import('@/modules/feeds/wordpress/memory');
+  const tz = 'Europe/Paris'; const now = new Date('2026-11-18T12:00:00Z');
+  const post = (title: string, i: number, shares: number) => ({ at: new Date(now.getTime() - (i + 1) * 86_400_000), title, kind: null, style: null, caption: '', reach: 1000, reactions: 50, comments: 5, shares });
+  const memory = absorb(null, [...Array.from({ length: 5 }, (_, i) => post(`Crêpes ${i}`, i, 60)), ...Array.from({ length: 5 }, (_, i) => post(`Velouté ${i}`, i + 5, 1))], now, tz);
+  const model = memoryModel(new Map([['A', memory]]));
+  assert.ok(model.contentValue('A', 'Crêpes sucrées', null, null, tz)! > model.contentValue('A', 'Velouté de légumes', null, null, tz)!, 'shared recipes rank higher at equal reach');
+});
+
+test('photos: the AI answer is read as appeal and known traits only', async () => {
+  const { parsePhoto } = await import('@/modules/feeds/server/wordpress-scoring');
+  assert.deepEqual(parsePhoto('```json\n{"appeal": 8.4, "traits": ["close_up", "golden_crust", "unicorn"]}\n```'), { appeal: 8, traits: ['close_up', 'golden_crust'] });
+  assert.deepEqual(parsePhoto('7'), { appeal: 7, traits: [] });
+  assert.equal(parsePhoto('no idea'), null);
+});
+
+test('memory: what a photo shows is learned per Page and counts for a candidate', async () => {
+  const { absorb, memoryModel } = await import('@/modules/feeds/wordpress/memory');
+  const tz = 'Europe/Paris'; const now = new Date('2026-11-18T12:00:00Z');
+  const post = (i: number, traits: string[], reach: number) => ({ at: new Date(now.getTime() - (i + 1) * 86_400_000), title: `Plat ${i}`, kind: null, style: null, caption: '', reach, reactions: reach / 20, comments: 2, shares: 2, traits, appeal: 7 });
+  const memory = absorb(null, [...Array.from({ length: 5 }, (_, i) => post(i, ['cheese_pull', 'close_up'], 3000)), ...Array.from({ length: 5 }, (_, i) => post(i + 5, ['dark'], 300))], now, tz);
+  const model = memoryModel(new Map([['A', memory]]));
+  const cheesy = model.contentValue('A', 'Croque-monsieur', null, null, tz, { traits: ['cheese_pull'], appeal: 7 })!;
+  const dark = model.contentValue('A', 'Croque-monsieur', null, null, tz, { traits: ['dark'], appeal: 7 })!;
+  assert.ok(cheesy > dark, `cheese pull ${cheesy} vs dark ${dark}`);
+  assert.ok(model.highlights('A').photos.some(p => p.trait === 'cheese_pull'));
+});

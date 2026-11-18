@@ -253,6 +253,7 @@ model Workspace {
   writing_agent_runs               WritingAgentRun[]
   writing_agents                   WritingAgent[]
   facebookAdsBackfills             facebook_ads_backfill[]            @ignore
+  autopilotMemories                autopilot_memory[]                 @ignore
 
   @@map("workspaces")
 }
@@ -406,6 +407,7 @@ model Target {
   socialAccount           SocialAccount?            @relation(fields: [socialAccountId], references: [id])
   workspace               Workspace                 @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   wordpress_recipe_plans  WordpressRecipePlan[]
+  autopilot_memory        autopilot_memory[]        @ignore
 
   @@unique([workspaceId, providerId])
   @@index([socialAccountId])
@@ -930,22 +932,23 @@ model ExportFileCleanup {
 
 /// WordPress / CMS recipe & content source configured per workspace.
 model WordpressRecipeSource {
-  id            String                @id
-  workspaceId   String                @unique(map: "wordpress_recipe_sources_workspace_key")
-  name          String
-  siteUrl       String
-  enabled       Boolean               @default(false)
-  allTargets    Boolean               @default(true)
-  targetIds     Json                  @default("[]")
-  config        Json                  @default("{}")
-  lastRunAt     DateTime?
-  lastError     String?
-  lastSummary   Json?
-  createdAt     DateTime              @default(now())
-  updatedAt     DateTime              @default(now()) @updatedAt
-  apiCredential String?
-  plans         WordpressRecipePlan[]
-  workspaces    Workspace             @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  id               String                @id
+  workspaceId      String                @unique(map: "wordpress_recipe_sources_workspace_key")
+  name             String
+  siteUrl          String
+  enabled          Boolean               @default(false)
+  allTargets       Boolean               @default(true)
+  targetIds        Json                  @default("[]")
+  config           Json                  @default("{}")
+  lastRunAt        DateTime?
+  lastError        String?
+  lastSummary      Json?
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @default(now()) @updatedAt
+  apiCredential    String?
+  plans            WordpressRecipePlan[]
+  workspaces       Workspace             @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  autopilot_memory autopilot_memory[]    @ignore
 
   @@map("wordpress_recipe_sources")
 }
@@ -2086,6 +2089,21 @@ model facebook_ads_backfill {
   @@ignore
 }
 
+model autopilot_memory {
+  sourceId                 String
+  targetId                 String
+  workspaceId              String
+  memory                   Json                  @default("{}")
+  learnedThrough           DateTime?
+  updatedAt                DateTime              @default(now())
+  wordpress_recipe_sources WordpressRecipeSource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  targets                  Target                @relation(fields: [targetId], references: [id], onDelete: Cascade)
+  workspaces               Workspace             @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@id([sourceId, targetId])
+  @@ignore
+}
+
 model inbox_ai_replies {
   workspaceId  String    @id
   enabled      Boolean   @default(false)
@@ -2937,6 +2955,7 @@ model RecipeRating {
   photo       Int?      @db.SmallInt
   ratedAt     DateTime  @default(now())
   photoAt     DateTime?
+  photoTraits String[]
 
   @@id([sourceId, wpPostId], map: "recipe_ratings_pkey")
   @@index([workspaceId], map: "recipe_ratings_workspace_idx")

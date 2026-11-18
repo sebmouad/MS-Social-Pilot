@@ -32,6 +32,7 @@ export default async function AutopilotScreen() {
     return <>{heading}<RouteNotice error={!(error instanceof OperationError && error.code === 'not_found')} focusKey="autopilot-load">{error instanceof OperationError && error.code === 'not_found' ? t('noAccess') : t('loadFailed')}</RouteNotice></>;
   }
   const number = (value: number) => new Intl.NumberFormat(locale).format(Math.round(value));
+  const times = (value: number) => new Intl.NumberFormat(locale, { maximumFractionDigits: 1, minimumFractionDigits: 1 }).format(value);
   const compact = (value: number) => new Intl.NumberFormat(locale, { notation: 'compact', maximumFractionDigits: 1 }).format(value);
   const dateLabel = (date: string) => new Intl.DateTimeFormat(locale, { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' }).format(new Date(`${date}T12:00:00Z`));
   const percent = (now: number, before: number) => before > 0 ? (now - before) / before * 100 : null;
@@ -130,6 +131,16 @@ export default async function AutopilotScreen() {
             {channel.daily.some(value => value > 0) ? <Sparkline data={channel.daily} width={96} height={28} label={t('sparkLabel', { channel: channel.name })} /> : null}
           </div>
           <p className={styles.meta}>{channel.weekPosts === 1 ? t('postsWeekOne') : t('postsWeek', { count: channel.weekPosts })}{channel.failedWeek ? <> · <span className={styles.warn}>{channel.failedWeek === 1 ? t('failedWeekOne') : t('failedWeek', { count: channel.failedWeek })}</span></> : null}</p>
+          {channel.learned ? <div className={styles.learned}>
+            <span className={styles.learnedHead}>{t('learnedTitle')} <span>{t('learnedFrom', { count: number(channel.learned.posts) })}</span></span>
+            {channel.learned.best.length || channel.learned.worst.length || channel.learned.hours.length || channel.learned.photos.length || channel.learned.tips.length || channel.learned.style ? <>
+              {channel.learned.best.length ? <p><b>{t('worksHere')}</b> {channel.learned.best.map(item => `${item.word} ×${times(item.times)}`).join(' · ')}</p> : null}
+              {channel.learned.worst.length ? <p><b>{t('lessHere')}</b> {channel.learned.worst.map(item => `${item.word} ×${times(item.times)}`).join(' · ')}</p> : null}
+              {channel.learned.hours.length ? <p><b>{t('hoursHere')}</b> {channel.learned.hours.map(item => `${String(item.hour).padStart(2, '0')} h ×${times(item.times)}`).join(' · ')}</p> : null}
+              {channel.learned.photos.length ? <p><b>{t('photosHere')}</b> {channel.learned.photos.map(item => `${t(`trait_${item.trait}` as AutopilotCopyKey)} ×${times(item.times)}`).join(' · ')}</p> : null}
+              {channel.learned.tips.length || channel.learned.style ? <p><b>{t('captionsHere')}</b> {[...channel.learned.tips.map(tip => t(`tip_${tip.code}` as AutopilotCopyKey)), ...(channel.learned.style ? [`${t('styleHere').toLowerCase()} « ${t(`style_${channel.learned.style}` as AutopilotCopyKey).toLowerCase()} »`] : [])].join(' · ')}</p> : null}
+            </> : <p className={styles.muted}>{t('noLessons')}</p>}
+          </div> : null}
           <div className={styles.channelFoot}>
             <span className={styles.times}>{channel.times.join(' · ')}</span>
             {channel.next ? <p className={styles.next}><span>{t('next')} {channel.next.time}</span> {channel.next.title}</p> : <p className={styles.muted}>{channel.paused ? t('noNextPaused') : t('noNext')}</p>}
