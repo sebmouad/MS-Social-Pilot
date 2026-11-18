@@ -5,12 +5,14 @@ import type { AutopilotLogEntry } from './wordpress/autopilot';
  * written when shown, so a French page reads French. Entries saved before codes existed are recognised by their English
  * sentence and written the same way (2026-11-17); any other text is shown as saved.
  */
-export type LogCode = 'stranded' | 'refilled' | 'publishFailed' | 'channelHeld' | 'hot' | 'hotShort' | 'breathe' | 'spread' | 'notSpread' | 'radarFailed';
+export type LogCode = 'photosUnread' | 'replanned' | 'stranded' | 'refilled' | 'publishFailed' | 'channelHeld' | 'hot' | 'hotShort' | 'breathe' | 'spread' | 'notSpread' | 'radarFailed';
 
 const TEXT: Record<'en' | 'fr', Record<LogCode, string>> = {
   en: {
     stranded: '« {title} » was left unsure by an interrupted run and never created; its time is planned again.',
     refilled: '« {title} » never went out after an interrupted run; another recipe goes out at {time} so the day keeps its posts.',
+    photosUnread: 'Photos could not be read ({found} of {tried} recipes found): {why}',
+    replanned: 'Re-planned with this Page’s memory: « {from} » (expected ×{fromValue}) replaced by « {to} » at {time}.',
     publishFailed: '« {title} » failed to publish; another recipe replaces it.',
     channelHeld: 'This channel cannot publish right now (its connection or permissions). Its recipes are on hold; the other channels carry on.',
     hot: '« {title} » is taking off: {reach} people reached in {hours} h, {times}× what a post usually has by then.',
@@ -23,6 +25,8 @@ const TEXT: Record<'en' | 'fr', Record<LogCode, string>> = {
   fr: {
     stranded: '« {title} » est resté incertain après une exécution interrompue et n’a jamais été créé ; son horaire est replanifié.',
     refilled: '« {title} » n’est jamais parti après une exécution interrompue ; une autre recette part à {time} pour que la journée garde ses publications.',
+    photosUnread: 'Les photos n’ont pas pu être lues ({found} recettes trouvées sur {tried}) : {why}',
+    replanned: 'Replanifié avec la mémoire de cette Page : « {from} » (attendu ×{fromValue}) remplacée par « {to} » à {time}.',
     publishFailed: '« {title} » n’a pas pu être publié ; une autre recette le remplace.',
     channelHeld: 'Ce canal ne peut pas publier pour le moment (connexion ou autorisations). Ses recettes sont en attente ; les autres canaux continuent.',
     hot: '« {title} » décolle : {reach} personnes touchées en {hours} h, {times}× ce qu’une publication obtient d’habitude à ce stade.',

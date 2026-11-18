@@ -618,9 +618,15 @@ export async function runRecipePlanning(overrides: Partial<PlannerPorts> & { aut
         try {
           const { photosToLearn } = await import('./wordpress-memory');
           const ids = await photosToLearn(source.id, now, PHOTO_BATCH);
-          const found = ids.length ? await readCandidates(db, settings, source, configOf(settings, source), ids, now, true).catch(() => []) : [];
-          if (found.length) await (ports.scoring ?? prismaScoringPorts).ratePhotos(auth.actor, source, found.map(c => ({ id: c.wpPostId, imageUrl: c.imageUrl })));
-        } catch { /* photos are learned on a later run */ }
+          const found = ids.length ? await readCandidates(db, settings, source, configOf(settings, source), ids, now, false) : [];
+          const read = found.length ? Number(await (ports.scoring ?? prismaScoringPorts).ratePhotos(auth.actor, source, found.map(c => ({ id: c.wpPostId, imageUrl: c.imageUrl })))) || 0 : 0;
+          const { lastPhotoProblem } = await import('./wordpress-scoring');
+          // A batch that read nothing says why in the activity log, once a day at most (2026-11-18).
+          if (ids.length && !read && !(pilot.log ?? []).some(entry => entry.code === 'photosUnread' && now.getTime() - Date.parse(entry.at) < 86_400_000))
+            entries.push({ at: now.toISOString(), kind: 'healing', code: 'photosUnread', params: { tried: ids.length, found: found.length, why: (lastPhotoProblem ?? (found.length ? 'no answer' : 'recipes not found on the site')).slice(0, 200) }, text: 'Photos could not be read.' });
+        } catch (error) {
+          entries.push({ at: now.toISOString(), kind: 'healing', code: 'photosUnread', params: { tried: 0, found: 0, why: String(error instanceof Error ? error.message : error).slice(0, 200) }, text: 'Photos could not be read.' });
+        }
       }
       if (pilot.healing.pauseBroken) for (const name of outcome.excludedNames ?? []) {
         const recent = (pilot.log ?? []).some(entry => entry.kind === 'healing' && entry.channelName === name && now.getTime() - Date.parse(entry.at) < 86_400_000);

@@ -14,7 +14,12 @@ export class RecipeImageError extends Error {
 }
 export type ImageSettings = {
   fetch: FetchPolicy; maxPixels: number; quality: number; minQuality: number; qualityStep: number; maxOutputBytes: number;
+  /** Tag the photo as AI-made (IPTC digital source type), so Facebook can show « AI info » (2026-11-18, owner's choice). */
+  aiLabel?: boolean;
 };
+
+/** IPTC « created by a trained algorithm » (AI-generated), in XMP, as Meta reads it for its « AI info » label. */
+export const AI_PHOTO_XMP = '<x:xmpmeta xmlns:x="adobe:ns:meta/"><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"><rdf:Description rdf:about="" xmlns:Iptc4xmpExt="http://iptc.org/std/Iptc4xmpExt/2008-02-29/"><Iptc4xmpExt:DigitalSourceType>http://cv.iptc.org/newscodes/digitalsourcetype/trainedAlgorithmicMedia</Iptc4xmpExt:DigitalSourceType></rdf:Description></rdf:RDF></x:xmpmeta>';
 export type ImagePorts = {
   download(url: string, policy: FetchPolicy): Promise<Buffer>;
   inspect(bytes: Buffer): Promise<void>;
@@ -23,11 +28,12 @@ export type ImagePorts = {
 };
 
 /** Quality is lowered in steps until the file fits; a file that still does not fit is refused. */
-export async function convertToJpeg(bytes: Buffer, s: Pick<ImageSettings, 'maxPixels' | 'quality' | 'minQuality' | 'qualityStep' | 'maxOutputBytes'>): Promise<Buffer> {
+export async function convertToJpeg(bytes: Buffer, s: Pick<ImageSettings, 'maxPixels' | 'quality' | 'minQuality' | 'qualityStep' | 'maxOutputBytes' | 'aiLabel'>): Promise<Buffer> {
   const floor = Math.min(s.minQuality, s.quality);
   let quality = s.quality;
   for (;;) {
-    const out = await sharp(bytes, { failOn: 'error', limitInputPixels: s.maxPixels }).rotate().flatten({ background: '#ffffff' }).jpeg({ quality }).toBuffer();
+    const image = sharp(bytes, { failOn: 'error', limitInputPixels: s.maxPixels }).rotate().flatten({ background: '#ffffff' }).jpeg({ quality });
+    const out = await (s.aiLabel ? image.withXmp(AI_PHOTO_XMP) : image).toBuffer();
     if (out.length <= s.maxOutputBytes) return out;
     if (quality <= floor) throw new RecipeImageError('image_too_large');
     quality = Math.max(floor, quality - s.qualityStep);

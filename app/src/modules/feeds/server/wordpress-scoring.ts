@@ -25,6 +25,8 @@ export type ScoringPorts = {
 export const RATE_BATCH = 40;
 /** Photos read at once (in parallel) by one call. */
 export const PHOTO_BATCH = 12;
+/** Why the last photo batch failed, if it did (2026-11-18): shown in the autopilot's activity log. */
+export let lastPhotoProblem: string | null = null;
 /** What the AI may see in a recipe photo; anything else it says is ignored. */
 export const PHOTO_TRAITS = ['close_up', 'overhead', 'side_angle', 'collage', 'steps_shown', 'text_overlay', 'cheese_pull', 'melting', 'golden_crust', 'glossy_sauce', 'steam', 'cut_open', 'generous_portion', 'single_serving', 'rustic', 'elegant_plating', 'bright', 'dark', 'colorful', 'hands', 'ingredients_around', 'plain_background'] as const;
 
@@ -130,7 +132,7 @@ export const prismaScoringPorts: ScoringPorts = {
     const { defaultImagePorts, convertToJpeg } = await import('../wordpress/image');
     const { defaultFetchDeps } = await import('@/modules/publishing/server/media/network/net-guard');
     const image = defaultImagePorts(defaultFetchDeps());
-    let read = 0;
+    let read = 0; lastPhotoProblem = null;
     const one = async (item: { id: string; imageUrl: string }) => {
       const bytes = await image.download(item.imageUrl, { timeoutMs: 10_000, maxBytes: 15_000_000, maxRedirects: 3, allowHttp: false, hostAllowlist: [] });
       const small = await convertToJpeg(bytes, { maxPixels: 600_000, quality: 75, minQuality: 50, qualityStep: 10, maxOutputBytes: 400_000 });
@@ -144,6 +146,7 @@ export const prismaScoringPorts: ScoringPorts = {
     const queue = items.slice(0, PHOTO_BATCH);
     for (let index = 0; index < queue.length; index += 4) {
       const outcomes = await Promise.allSettled(queue.slice(index, index + 4).map(one));
+      for (const o of outcomes) if (o.status === 'rejected' && !lastPhotoProblem) lastPhotoProblem = String(o.reason instanceof Error ? `${o.reason.name}: ${o.reason.message}` : o.reason).slice(0, 300);
       const { OperationError } = await import('@/lib/operation-error');
       if (outcomes.some(o => o.status === 'rejected' && o.reason instanceof OperationError && (o.reason.code === 'conflict' || o.reason.code === 'unavailable'))) break;
     }

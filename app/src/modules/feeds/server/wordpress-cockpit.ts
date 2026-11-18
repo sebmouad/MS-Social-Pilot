@@ -257,13 +257,26 @@ export async function refreshPlanWithMemory(actor: FeedActor, input: unknown, no
   const { changeRecipeSlotNow } = await import('./wordpress');
   const { replaceRecipeSlotConfirmation } = await import('../wordpress/recipe');
   const out = { examined: rows.length, replaced: 0, kept: 0, failed: 0, unknown: 0 };
+  const entries: import('../wordpress/autopilot').AutopilotLogEntry[] = [];
+  const pageName = new Map(pages.map(page => [page.id, page.name]));
   for (const row of rows) {
     const rating = ratings.get(row.wpPostIdForRating ?? '');
     const value = model.contentValue(row.targetId, row.title, row.kind, row.slotAt, tz, rating ? { traits: rating.traits ?? null, appeal: rating.photo } : null);
     if (value === null) { out.unknown++; continue; }
     if (value >= REPLACE_BELOW) { out.kept++; continue; }
-    try { await changeRecipeSlotNow(actor, { planId: row.id, confirmation: replaceRecipeSlotConfirmation(row.id), action: 'replace' }); out.replaced++; }
-    catch { out.failed++; }
+    try {
+      await changeRecipeSlotNow(actor, { planId: row.id, confirmation: replaceRecipeSlotConfirmation(row.id), action: 'replace' });
+      const after = (await plansBetween(source.id, row.slotAt, new Date(row.slotAt.getTime() + 1))).find(other => other.targetId === row.targetId && other.state === 'planned');
+      out.replaced++;
+      entries.push({ at: new Date().toISOString(), kind: 'healing', channelId: row.targetId, channelName: pageName.get(row.targetId)?.slice(0, 200), code: 'replanned', text: `« ${row.title.slice(0, 100)} » replaced by « ${(after?.title ?? '').slice(0, 100)} ».`,
+        params: { from: row.title.slice(0, 120), to: (after?.title ?? '').slice(0, 120), fromValue: Math.round(value * 10) / 10, time: instantToWall(row.scheduledAt ?? row.slotAt, tz).time } });
+    } catch { out.failed++; }
+  }
+  if (entries.length) {
+    const { loadWordpressSettings } = await import('./wordpress-settings');
+    const { logAutopilot } = await import('./wordpress-autopilot');
+    const fresh = await selectSource(actor.workspaceId);
+    if (fresh) await logAutopilot(await loadWordpressSettings(), fresh, entries).catch(() => undefined);
   }
   const { audit } = await import('./core');
   await audit(prisma as unknown as Parameters<typeof audit>[0], actor.workspaceId, actor, 'feeds.autopilot_replanned', { sourceId: source.id, ...out }).catch(() => undefined);

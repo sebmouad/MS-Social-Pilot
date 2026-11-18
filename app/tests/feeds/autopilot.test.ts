@@ -222,3 +222,14 @@ test('memory: what a photo shows is learned per Page and counts for a candidate'
   assert.ok(cheesy > dark, `cheese pull ${cheesy} vs dark ${dark}`);
   assert.ok(model.highlights('A').photos.some(p => p.trait === 'cheese_pull'));
 });
+
+test('photos: with the AI label on, the uploaded JPEG carries the IPTC « made by AI » tag; off, it does not', async () => {
+  const sharp = (await import('sharp')).default;
+  const { convertToJpeg } = await import('@/modules/feeds/wordpress/image');
+  const source = await sharp({ create: { width: 64, height: 64, channels: 3, background: '#c86' } }).png().toBuffer();
+  const settings = { maxPixels: 1_000_000, quality: 80, minQuality: 60, qualityStep: 5, maxOutputBytes: 1_000_000 };
+  const tagged = await convertToJpeg(source, { ...settings, aiLabel: true });
+  const plain = await convertToJpeg(source, settings);
+  assert.match(String((await sharp(tagged).metadata()).xmp ?? ''), /digitalsourcetype\/trainedAlgorithmicMedia/);
+  assert.equal((await sharp(plain).metadata()).xmp, undefined);
+});
