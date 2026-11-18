@@ -132,3 +132,37 @@ test('refill: a freed old-time slot is refilled only when the day would run shor
   const two = shortDayRefills({ ...late, rows: [row('a', '11:30', 'planned'), freed, row('g', '15:10', 'failed', 'not_created'), row('c', '17:30', 'failed', 'publish_failed'), row('d', '20:30', 'planned')] });
   assert.deepEqual(two.map(item => item.at.toISOString()), ['2026-11-16T14:50:00.000Z', '2026-11-16T15:50:00.000Z']);
 });
+
+// What works on each Page (2026-11-18): the score learns from each channel's own posts.
+test('page learning: each channel learns what works on it, borrows from the others when thin, recent counts more', async () => {
+  const { pageLearning } = await import('@/modules/feeds/server/wordpress-scoring');
+  const now = new Date('2026-11-18T12:00:00Z');
+  const o = (targetId: string, title: string, relative: number, daysAgo = 1) => ({ targetId, wpPostId: `${targetId}-${title}-${daysAgo}`, title, relative, slotAt: new Date(now.getTime() - daysAgo * 86_400_000) });
+  const outcomes = [
+    ...Array.from({ length: 6 }, (_, i) => o('A', `Gratin de pâtes ${i}`, 3, i + 1)),
+    ...Array.from({ length: 6 }, (_, i) => o('B', `Gratin de pâtes ${i}`, 0.4, i + 1)),
+    o('A', 'Terrine de poisson', 0.3), o('B', 'Terrine de poisson', 0.3),
+  ];
+  const learn = pageLearning(outcomes, now);
+  const onA = learn('A', 'Gratin dauphinois')!, onB = learn('B', 'Gratin dauphinois')!, onC = learn('C', 'Gratin dauphinois')!;
+  assert.ok(onA > 1.5, `gratins work on A (${onA})`);
+  assert.ok(onB < 0.8, `gratins do not on B (${onB})`);
+  assert.ok(onC > onB && onC < onA, 'a channel without gratins borrows what the others learned');
+  assert.equal(learn('A', 'Cocktail exotique'), null, 'nothing known: no opinion');
+  // A single viral post is capped, and old results fade.
+  const viral = pageLearning([o('A', 'Crêpes', 1432)], now)('A', 'Crêpes')!;
+  assert.ok(viral < 20, `one viral post does not dominate (${viral})`);
+  const old = pageLearning([o('A', 'Quiche', 3, 120)], now)('A', 'Quiche')!, fresh = pageLearning([o('A', 'Quiche', 3, 1)], now)('A', 'Quiche')!;
+  assert.ok(fresh > old, 'recent results count more');
+});
+
+test('page learning: the picker ranks a recipe for the channel it would go to', async () => {
+  const { makePicker } = await import('@/modules/feeds/server/wordpress-pick');
+  const { AUTOPILOT_DEFAULTS } = await import('@/modules/feeds/wordpress/autopilot');
+  const candidates = [{ wpPostId: 'g', title: 'Gratin de pâtes' }, { wpPostId: 't', title: 'Terrine de poisson' }];
+  const history = (targetId: string | null, title: string) => title.startsWith('Gratin') ? (targetId === 'A' ? 3 : 0.4) : (targetId === 'A' ? 0.4 : 3);
+  const picker = makePicker({ pilot: { ...AUTOPILOT_DEFAULTS, moments: { ...AUTOPILOT_DEFAULTS.moments, rules: [] } }, timeZone: 'Europe/Paris', ratings: new Map(), history, weather: new Map(), timeline: new Map(), winners: new Set(), winnerQuota: 0, candidates });
+  const at = new Date('2026-11-19T10:00:00Z');
+  assert.equal(picker.rank({ targetId: 'A', slotAt: at }, candidates)[0]!.wpPostId, 'g');
+  assert.equal(picker.rank({ targetId: 'B', slotAt: at }, candidates)[0]!.wpPostId, 't');
+});

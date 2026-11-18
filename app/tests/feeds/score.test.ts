@@ -1,7 +1,7 @@
 // Recipe viral score (2026-11-16): moments, season, weekday mood, weather, variety.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { scoreRecipe, guessKind, easter, activeMoments, breaksVariety, dishWord, type ScoreContext } from '@/modules/feeds/wordpress/score';
+import { scoreRecipe, guessKind, easter, activeMoments, breaksVariety, titleWords, type ScoreContext } from '@/modules/feeds/wordpress/score';
 
 const all = new Set(['holidays', 'season', 'weekday', 'weather'] as const);
 const ctx = (iso: string, hour: number, extra: Partial<ScoreContext> = {}): ScoreContext => { const date = new Date(`${iso}T12:00:00Z`); return { date, weekday: date.getUTCDay(), hour, leadDays: 14, rules: all, ...extra }; };
@@ -58,9 +58,9 @@ test('variety: no more than the allowed run of one kind', () => {
   assert.equal(breaksVariety([{ at: 1 * h, kind: 'dessert' }], 3 * h, 'dessert', 2), false);
 });
 
-test('dish word: names the dish family', () => {
-  assert.equal(dishWord('Le gratin dauphinois crémeux'), 'gratin');
-  assert.equal(dishWord('Recette facile de quiche lorraine'), 'quiche');
+test('title words: what the dish is, without filler, singular', () => {
+  assert.deepEqual(titleWords('Mini-quiches au saumon fumé, pâte dorée'), ['doree', 'fume', 'pate', 'quiche', 'saumon']);
+  assert.deepEqual(titleWords('Recette facile de quiche lorraine'), ['lorraine', 'quiche']);
 });
 
 test('score: « pommes de terre » are potatoes, not seasonal apples', () => {

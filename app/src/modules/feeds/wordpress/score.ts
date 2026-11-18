@@ -84,7 +84,7 @@ export type ScoreInput = {
   title: string;
   /** AI ratings 0–10 when known: how strong the title is as a hook, how appetising the photo is. */
   hook?: number | null; photo?: number | null; kind?: RecipeKind | null;
-  /** How dishes sharing this recipe's main word did on these channels, relative to usual (1 = usual). */
+  /** How recipes like this one did on the channel it is planned for, relative to that channel's usual (1 = usual). */
   history?: number | null;
 };
 export type ScoreContext = { date: Date; weekday: number; hour: number; leadDays: number; rules: ReadonlySet<'holidays' | 'season' | 'weekday' | 'weather'>; weather?: Weather | null };
@@ -98,7 +98,8 @@ export function scoreRecipe(recipe: ScoreInput, at: ScoreContext): { score: numb
   const kind = recipe.kind ?? guessKind(recipe.title);
   if (typeof recipe.hook === 'number') add('hook', (recipe.hook - 5) * 3);
   if (typeof recipe.photo === 'number') add('photo', (recipe.photo - 5) * 3);
-  if (typeof recipe.history === 'number' && Number.isFinite(recipe.history)) add('history', Math.max(-15, Math.min(15, (recipe.history - 1) * 20)));
+  // What works on this channel, learned from its own recent posts (2026-11-18): 1.3× usual ≈ +7, 2× ≈ +17, at most ±20.
+  if (typeof recipe.history === 'number' && Number.isFinite(recipe.history)) add('history', Math.max(-20, Math.min(20, Math.log(Math.max(recipe.history, 0.05)) * 25)));
   const month = at.date.getUTCMonth() + 1;
   if (at.rules.has('season')) {
     // « Pommes de terre » are potatoes, not apples: they never count as seasonal fruit (2026-11-16).
@@ -128,11 +129,10 @@ export function scoreRecipe(recipe: ScoreInput, at: ScoreContext): { score: numb
   return { score, parts };
 }
 
-/** The word that names a dish family (« gratin », « quiche »), used to compare a recipe with past ones. */
-export function dishWord(title: string): string | null {
-  const stop = new Set(['la', 'le', 'les', 'de', 'des', 'du', 'au', 'aux', 'a', 'et', 'en', 'd', 'l', 'un', 'une', 'recette', 'facile', 'rapide', 'maison', 'express', 'ma', 'mon', 'mes', 'super', 'tres', 'ultra', 'vraie', 'vrai', 'meilleur', 'meilleure', 'ces', 'ce', 'cette', 'pour', 'avec', 'sans']);
-  const words = fold(title).trim().split(' ').filter(word => word.length > 2 && !stop.has(word) && !/^\d+$/.test(word));
-  return words[0] ?? null;
+const TITLE_STOP = new Set('la le les de des du au aux a et en d l un une recette facile rapide maison express pour avec sans sur pret prete minutes min ma mon mes tres ultra vraie vrai meilleur meilleure ces ce cette tout toute tous leger legere super petit petite petits petites mini dans comme plus bien servi servie'.split(' '));
+/** The words of a title that say what the dish is (ingredients, dish, technique), singular, for learning what works. */
+export function titleWords(title: string): string[] {
+  return [...new Set(fold(title).trim().split(' ').filter(word => word.length > 3 && !TITLE_STOP.has(word) && !/^\d+$/.test(word)).map(word => word.length > 4 && word.endsWith('s') ? word.slice(0, -1) : word))].sort();
 }
 
 /**

@@ -1,5 +1,5 @@
 import { prisma } from '@/server/data';
-import { RECIPE_KINDS, dishWord, type RecipeKind } from '../wordpress/score';
+import { RECIPE_KINDS, titleWords, type RecipeKind } from '../wordpress/score';
 import { postScore } from '../wordpress/autopilot';
 import type { FeedActor } from './access';
 
@@ -48,12 +48,38 @@ export function parseRatings(raw: string, ids: ReadonlySet<string>): Map<string,
   return out;
 }
 
-/** Each outcome's dish family and its average result: how « gratin » or « quiche » usually does here. */
-export function dishHistory(outcomes: readonly Outcome[]): Map<string, number> {
-  const sums = new Map<string, { total: number; count: number }>();
-  for (const o of outcomes) { const word = dishWord(o.title); if (!word) continue; const s = sums.get(word) ?? { total: 0, count: 0 }; s.total += o.relative; s.count++; sums.set(word, s); }
-  // Two posts or more before a family counts, pulled towards usual.
-  return new Map([...sums].filter(([, s]) => s.count >= 2).map(([word, s]) => [word, (s.total + 1) / (s.count + 1)]));
+/**
+ * What works on each channel (2026-11-18, owner: « the score must be based on what works on each page »). Every word
+ * of a published recipe's title (ingredient, dish, technique) learns how that post did against its channel's usual, on
+ * a log scale (one viral post cannot dominate; capped at 20×), recent posts counting more (half-life `halfLifeDays`).
+ * A channel with little evidence on a word borrows what the other channels learned, and relies on its own as it grows
+ * (`k` posts' worth of pull). A recipe's value on a channel is the mean of its three strongest known words, as a
+ * multiplier of usual (1 = usual), or null when none of its words was ever published.
+ * Checked on a month of live posts (2026-11-18): as good as or better than the single-word history on every test week.
+ */
+export function pageLearning(outcomes: readonly Outcome[], now: Date, options: { halfLifeDays?: number; k?: number } = {}): (targetId: string | null, title: string) => number | null {
+  const half = options.halfLifeDays ?? 30; const k = options.k ?? 3; const cap = Math.log(20);
+  const all = new Map<string, { sum: number; weight: number }>();
+  const own = new Map<string, { sum: number; weight: number }>();
+  const add = (map: Map<string, { sum: number; weight: number }>, key: string, value: number, weight: number) => { const s = map.get(key) ?? { sum: 0, weight: 0 }; s.sum += weight * value; s.weight += weight; map.set(key, s); };
+  for (const o of outcomes) {
+    if (!(o.relative > 0) || !Number.isFinite(o.relative)) continue;
+    const value = Math.max(-cap, Math.min(cap, Math.log(o.relative)));
+    const weight = 0.5 ** (Math.max(0, now.getTime() - o.slotAt.getTime()) / 86_400_000 / half);
+    for (const word of titleWords(o.title)) { add(all, word, value, weight); add(own, `${o.targetId}|${word}`, value, weight); }
+  }
+  const lift = (targetId: string | null, word: string): number | null => {
+    const shared = all.get(word);
+    if (!shared) return null;
+    const general = shared.sum / (shared.weight + k);
+    if (!targetId) return general;
+    const mine = own.get(`${targetId}|${word}`) ?? { sum: 0, weight: 0 };
+    return (mine.sum + k * general) / (mine.weight + k);
+  };
+  return (targetId, title) => {
+    const known = titleWords(title).flatMap(word => { const value = lift(targetId, word); return value === null ? [] : [value]; }).sort((a, b) => Math.abs(b) - Math.abs(a)).slice(0, 3);
+    return known.length ? Math.exp(known.reduce((sum, value) => sum + value, 0) / known.length) : null;
+  };
 }
 
 const weatherCache = new Map<string, { at: number; days: Map<string, number> }>();

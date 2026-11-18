@@ -4,7 +4,7 @@ import { decryptSecret } from '@/server/secret-crypto';
 import { defaultFetchDeps, type FetchDeps } from '@/modules/publishing/server/media/network/net-guard';
 import type { ArticleInput, ArticleWriting } from '@/modules/studio/ai';
 import { autopilotOf, type AutopilotSettings } from '../wordpress/autopilot';
-import { prismaScoringPorts, dishHistory, type ScoringPorts } from './wordpress-scoring';
+import { prismaScoringPorts, pageLearning, type ScoringPorts } from './wordpress-scoring';
 import { makePicker } from './wordpress-pick';
 import { guessKind, type RecipeKind } from '../wordpress/score';
 import { bestStyle, captionPrompt, cleanCaption, ctaFor, opensLike, styleFor, voiceFor, withCta, type HookStyle } from '../wordpress/caption';
@@ -247,7 +247,8 @@ async function prepareChoosing(ctx: Ctx, source: SourceRow, config: PlanConfig, 
     scoring.outcomes(source.id, new Date(now.getTime() - 365 * 86_400_000)).catch(() => []),
     pilot.moments.rules.includes('weather') ? scoring.weather(pilot.moments.latitude, pilot.moments.longitude, config.timezone).catch(() => new Map<string, number>()) : Promise.resolve(new Map<string, number>()),
   ]);
-  const history = dishHistory(outcomes);
+  // What works on each channel, from its own recent posts (2026-11-18).
+  const history = pageLearning(outcomes, now);
   // Past winners: the best tenth of published recipes (and clearly above usual), back after the cooldown.
   const best = new Map<string, number>();
   for (const o of outcomes) best.set(o.wpPostId, Math.max(best.get(o.wpPostId) ?? 0, o.relative));
@@ -415,7 +416,7 @@ export async function planSource(ctx: Ctx, source: SourceRow, auth: FeedAuthoriz
     }
     const automatic = allocateRecipes({ needs: picker ? picker.orderNeeds(autoTodo) : autoTodo, candidates: scan.candidates, allowReuse: scan.exhausted, blocked: prep?.blocked ?? view.blocked, taken, reused: view.reused, distinct: config.distinctAcrossPages,
       ...(picker ? { rank: picker.rank, fits: picker.fits, onAssign: picker.onAssign } : {}) });
-    if (picker) for (const f of groupForced) chosenScores.set(slotKey(f.targetId, f.slotAt), { score: picker.scoreAt(f.candidate, f.slotAt), kind: picker.kindOf(f.candidate) });
+    if (picker) for (const f of groupForced) chosenScores.set(slotKey(f.targetId, f.slotAt), { score: picker.scoreAt(f.candidate, f.slotAt, f.targetId), kind: picker.kindOf(f.candidate) });
     if (picker) for (const a of automatic.assignments) { const c = picker.chosen(a.targetId, a.slotAt); if (c) chosenScores.set(slotKey(a.targetId, a.slotAt), c); }
     for (const { candidate } of [...groupForced, ...automatic.assignments]) { taken.add(candidate.wpPostId); if (candidate.title) taken.add(recipeTitleKey(candidate.title)); }
     assignments.push(...groupForced, ...automatic.assignments);

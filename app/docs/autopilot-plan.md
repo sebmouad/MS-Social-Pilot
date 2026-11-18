@@ -34,7 +34,7 @@ All 15 proposals are live. Where to find them:
 |---|----------|---------------|
 | 1 | Best times | `server/wordpress-autopilot.ts` (`learnBestTimes`), learned times in `autopilot.learnedTimes` |
 | 2 | Self-healing | `runRecipePlanning` (replacement of failed posts, channel holds), `wordpress-pool.ts` (warning days) |
-| 3 | Viral score | `wordpress/score.ts`, `server/wordpress-scoring.ts` (AI ratings in `recipe_ratings`, weather, history), `server/wordpress-pick.ts` |
+| 3 | Viral score | `wordpress/score.ts`, `server/wordpress-scoring.ts` (AI ratings in `recipe_ratings`, weather, `pageLearning`: what works on each channel, 2026-11-18), `server/wordpress-pick.ts` |
 | 4, 8 | Viral radar, breathing room | `server/wordpress-radar.ts` |
 | 5, 6, 12 | Captions per channel, first-comment call to action, hook tests | `wordpress/caption.ts`, planner (style stored per slot) |
 | 7, 13, 14 | Tomorrow's plan, cockpit, weekly report | `server/wordpress-cockpit.ts`, `ui/AutopilotScreen.tsx`, `ui/AutopilotBoard.tsx`, `ui/AutopilotDays.tsx`, notifications `autopilot_board` / `autopilot_report` |

@@ -1,5 +1,5 @@
 import { instantToWall } from '@/lib/calendar-dates';
-import { breaksVariety, dishWord, guessKind, scoreRecipe, type RecipeKind, type ScoreContext } from '../wordpress/score';
+import { breaksVariety, guessKind, scoreRecipe, type RecipeKind, type ScoreContext } from '../wordpress/score';
 import type { AutopilotSettings } from '../wordpress/autopilot';
 import type { SlotNeed } from '../wordpress/recipe';
 import type { Rating } from './wordpress-scoring';
@@ -12,8 +12,8 @@ import type { Rating } from './wordpress-scoring';
 export type PickInput<C extends { wpPostId: string; title: string; publishedAt?: Date | null }> = {
   pilot: AutopilotSettings; timeZone: string;
   ratings: ReadonlyMap<string, Rating>;
-  /** Dish family → how it usually does here (1 = usual). */
-  history: ReadonlyMap<string, number>;
+  /** How a recipe would do on a channel, learned from that channel's own posts (1 = usual; null when unknown). */
+  history: (targetId: string | null, title: string) => number | null;
   /** Local date → highest temperature. */
   weather: ReadonlyMap<string, number>;
   /** Posts already on each channel (planned or published), for the variety guard. */
@@ -41,17 +41,17 @@ export function makePicker<C extends { wpPostId: string; title: string; publishe
     const maxC = input.weather.get(wall.date);
     return { date, weekday: date.getUTCDay(), hour: Number(wall.time.slice(0, 2)), leadDays: pilot.moments.leadDays, rules, ...(maxC !== undefined ? { weather: { maxC } } : {}) };
   };
-  const scoreAt = (c: C, slotAt: Date): number => {
-    const key = `${c.wpPostId}|${slotAt.getTime()}`;
+  /** A recipe's score at a time on a channel: what works on that channel counts (2026-11-18). */
+  const scoreAt = (c: C, slotAt: Date, targetId: string | null = null): number => {
+    const key = `${c.wpPostId}|${slotAt.getTime()}|${targetId ?? ''}`;
     const hit = cache.get(key); if (hit !== undefined) return hit;
     const rating = input.ratings.get(c.wpPostId);
-    const word = dishWord(c.title);
-    const value = scoreRecipe({ title: c.title, hook: rating?.hook ?? null, photo: rating?.photo ?? null, kind: rating?.kind ?? null, history: word ? input.history.get(word) ?? null : null }, contextOf(slotAt)).score;
+    const value = scoreRecipe({ title: c.title, hook: rating?.hook ?? null, photo: rating?.photo ?? null, kind: rating?.kind ?? null, history: input.history(targetId, c.title) }, contextOf(slotAt)).score;
     cache.set(key, value); return value;
   };
-  const combined = (c: C, slotAt: Date) => {
+  const combined = (c: C, slotAt: Date, targetId: string) => {
     const recency = 100 * (1 - (position.get(c.wpPostId) ?? 0) / Math.max(1, input.candidates.length));
-    return weight * scoreAt(c, slotAt) + (1 - weight) * recency;
+    return weight * scoreAt(c, slotAt, targetId) + (1 - weight) * recency;
   };
 
   return {
@@ -66,7 +66,7 @@ export function makePicker<C extends { wpPostId: string; title: string; publishe
     },
     rank(need: SlotNeed, candidates: readonly C[]): C[] {
       const open = winnersUsed < input.winnerQuota;
-      return candidates.filter(c => open || !input.winners.has(c.wpPostId)).sort((a, b) => combined(b, need.slotAt) - combined(a, need.slotAt));
+      return candidates.filter(c => open || !input.winners.has(c.wpPostId)).sort((a, b) => combined(b, need.slotAt, need.targetId) - combined(a, need.slotAt, need.targetId));
     },
     fits(need: SlotNeed, c: C): boolean {
       if (!pilot.variety.enabled) return true;
@@ -77,7 +77,7 @@ export function makePicker<C extends { wpPostId: string; title: string; publishe
       if (input.winners.has(c.wpPostId)) winnersUsed++;
       const kind = kindOf(c);
       timeline.set(need.targetId, [...(timeline.get(need.targetId) ?? []), { at: need.slotAt.getTime(), kind }]);
-      chosen.set(`${need.targetId}|${need.slotAt.getTime()}`, { score: scoreAt(c, need.slotAt), kind });
+      chosen.set(`${need.targetId}|${need.slotAt.getTime()}`, { score: scoreAt(c, need.slotAt, need.targetId), kind });
     },
   };
 }

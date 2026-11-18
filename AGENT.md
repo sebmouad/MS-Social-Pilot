@@ -396,3 +396,16 @@ ads_management (owner asked to rework Ads like Meta Ads Manager first). The subm
   would answer to the latest unanswered comments and messages of 24 h, with the settings being edited; nothing is
   claimed, recorded or sent (one AI request per item the rules do not decide).
 - Also fixed: `schema.prisma` lacked `facebook_ads_backfill` (migration 0013), so CI's schema check had been failing.
+
+### 7.1j Post figures and per-channel learning (2026-11-18)
+- Bug fixed: since 16 Nov the viral radar (`syncPostMetrics`) stores a post's figures on `post_targets` ~2 h after
+  publishing; post analytics, post reach and cohorts preferred that copy over `external_posts` (refreshed hourly), so
+  every post looked like ~0.2× its channel's usual. Readers now take the copy read last (`post-reach.ts`,
+  `post-performance.ts`, `destination-measures.ts`). The autopilot's learning read `external_posts` and was fine.
+  Corrected figures: recipe posts ran 1.1–1.6× their channels' usual from 11 to 17 Nov.
+- Owner: « the score must be based on what works on each page ». `pageLearning` (server/wordpress-scoring.ts) learns
+  per channel from every title word (log of reach vs that channel's median, capped 20×, 30-day half-life, shrunk to all
+  channels with k = 3); the picker scores each recipe for the channel it would go to; up to ±20 points.
+- Backtest on 1,097 live recipe posts (21 Oct – 17 Nov, three test weeks): within-channel rank correlation of any
+  title-based method is only ~0.10–0.13; per-channel, 30 days: top quarter 1.33× vs bottom 1.08× (single first word
+  before: 1.28× vs 1.04×). Day × channel explains ~60 % of reach swings; titles explain little. Do not promise more.
