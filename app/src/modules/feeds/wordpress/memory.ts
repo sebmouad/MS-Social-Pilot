@@ -200,8 +200,11 @@ export function memoryModel(memories: ReadonlyMap<string, PageMemory>) {
       const days = memories.get(targetId)?.days ?? {};
       const known = Object.entries(days).filter(([, stat]) => stat.n >= 3).map(([count, stat]) => ({ count: Number(count), value: stat.s / (stat.w + 1), days: stat.n }));
       const values = known.map(k => ({ count: k.count, times: Math.exp(k.value), days: k.days })).sort((a, b) => a.count - b.count);
-      if (!known.some(k => k.count === current)) return { count: current, why: 'keep', values };
-      const best = [...known].sort((a, b) => b.value - a.value)[0]!;
+      const best = known.length ? [...known].sort((a, b) => b.value - a.value)[0]! : null;
+      // An untried current count is kept only while it is the trial of one more after the best known one (2026-11-18:
+      // Recettes - Faciles had done best at 7 a day and was kept at 4 because it never posted 4).
+      if (!known.some(k => k.count === current)) return best && best.count !== current - 1 ? { count: best.count, why: 'best', values } : { count: current, why: 'keep', values };
+      if (!best) return { count: current, why: 'keep', values };
       if (best.count === current && current < MAX_POSTS_PER_DAY && !known.some(k => k.count === current + 1)) return { count: current + 1, why: 'trial', values };
       return { count: best.count, why: best.count === current ? 'keep' : 'best', values };
     },

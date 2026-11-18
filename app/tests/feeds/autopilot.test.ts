@@ -273,5 +273,13 @@ test('memory: the number of posts a day is learned from whole days, and one more
   model = memoryModel(new Map([['A', absorb(null, worse, now, tz)]]));
   assert.equal(model.bestCount('A', 5).count, 4, 'five did worse in total: back to four');
   assert.equal(memoryModel(new Map()).bestCount('A', 4).count, 4, 'nothing known: no change');
+  // A Page that did best at 7 a day and now posts an untried 4: straight to 7.
+  const seven = Array.from({ length: 4 }, (_, i) => day(10 + i, 7, 1500)).flat();
+  const five = Array.from({ length: 4 }, (_, i) => day(15 + i, 5, 800)).flat();
+  model = memoryModel(new Map([['A', absorb(null, [...seven, ...five, ...day(25, 1, 1000)], now, tz)]]));
+  assert.equal(model.bestCount('A', 4).count, 7);
+  // A trial of one more (5 after a best of 4) is kept until it has three days.
+  model = memoryModel(new Map([['A', absorb(null, [...four, ...day(25, 1, 1000)], now, tz)]]));
+  assert.equal(model.bestCount('A', 5).count, 5);
   assert.ok(MAX_POSTS_PER_DAY <= 10);
 });

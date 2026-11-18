@@ -299,3 +299,16 @@ export async function dailyReplan(actor: FeedActor, timeZone: string, now = new 
   await refreshPlanWithMemory(actor, { confirmation: REFRESH_PLAN_CONFIRMATION }, now);
   return true;
 }
+
+export const READ_PHOTOS_CONFIRMATION = 'READ PHOTOS NOW';
+/** Read a batch of published photos now and say exactly what happened (2026-11-18): the AI usage and any problem. */
+export async function readPhotosNow(actor: FeedActor, input: unknown, now = new Date()): Promise<{ queued: number; read: number; problem: string | null }> {
+  const parsed = z.object({ confirmation: z.literal(READ_PHOTOS_CONFIRMATION) }).strict().safeParse(input);
+  if (!parsed.success) throw new OperationError('invalid_request', 'Confirm reading the photos.');
+  const { source } = await context(actor, true);
+  const { photosToLearn } = await import('./wordpress-memory');
+  const scoring = await import('./wordpress-scoring');
+  const queue = await photosToLearn(source.id, now, scoring.PHOTO_BATCH);
+  const read = queue.length ? Number(await scoring.prismaScoringPorts.ratePhotos({ userId: actor.userId, workspaceId: actor.workspaceId }, source, queue)) || 0 : 0;
+  return { queued: queue.length, read, problem: (await import('./wordpress-scoring')).lastPhotoProblem };
+}
