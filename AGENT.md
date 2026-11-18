@@ -438,3 +438,7 @@ ads_management (owner asked to rework Ads like Meta Ads Manager first). The subm
   picks. More posts use recipes faster: watch the recipe supply warning.
 - Daily re-plan: from 17:00 local, once a day (audit `feeds.autopilot_replanned` today = done), `dailyReplan` runs the
   same re-planning as the manual action, after the planning run.
+- Photo rating never worked before 2026-11-18: `convertToJpeg(..., { maxPixels: 600_000 })` uses maxPixels as sharp's
+  input limit, so every 1080 × 1350 photo was refused (« Input image exceeds pixel limit »). The AI copy now uses
+  `photoForAi` (resize to ≤ 768 px). `POST /api/feeds/wordpress/autopilot/photos` (confirmation `READ PHOTOS NOW`) reads a
+  batch on demand and answers with `{ queued, read, problem }`: live 12/12 after the fix.
