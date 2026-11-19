@@ -221,7 +221,9 @@ export async function supplyLedgerView(settings: WordpressSettings, ports: Plann
 
 /* ----- one source ----- */
 
-export type SourceOutcome = { excludedNames?: string[]; sourceId: string; planned: number; failed: number; uncertain: number; unfilled: number; slots: number; pages: number; excludedPages: number; scanned: number; reason?: string; candidates?: number; rejected?: ScanRejections };
+export type SourceOutcome = { excludedNames?: string[]; sourceId: string; planned: number; failed: number; uncertain: number; unfilled: number; slots: number; pages: number; excludedPages: number; scanned: number; reason?: string; candidates?: number; rejected?: ScanRejections;
+  /** Photos generated in this run (2026-11-19), and the last reason one could not be. */
+  generated?: Array<{ targetId: string; title: string; appeal: number }>; photoProblem?: string };
 export type Ctx = {
   settings: WordpressSettings; ports: PlannerPorts; db: WpDb; budget: { left: number }; now: Date;
   /** Manual retry: only these slots (see slotKey) are planned, and a failed slot is revived even past its attempt cap. */
@@ -497,8 +499,9 @@ export async function planSource(ctx: Ctx, source: SourceRow, auth: FeedAuthoriz
             image = await photos.generateRecipePhoto(mediaActor, { title: c.title, ingredients: c.recipe.ingredients.filter(line => !line.heading).map(line => line.text),
               traits: prep?.model?.highlights(targetId, 4).photos.map(p => p.trait) ?? [], fileName: safeName(c.slug), settings: settings.image, wpPostId: c.wpPostId }, ports.image);
             imageSource = 'generated';
+            (out.generated ??= []).push({ targetId, title: c.title.slice(0, 120), appeal });
           }
-        } catch { image = null; }
+        } catch (error) { image = null; out.photoProblem = String(error instanceof Error ? error.message : error).slice(0, 200); }
       }
       image ??= await prepareRecipeImage(ports.image, { actor: mediaActor, url: c.imageUrl, fileName: safeName(c.slug), settings: settings.image });
       const post = await ports.createPost(auth.actor, {
@@ -634,6 +637,9 @@ export async function runRecipePlanning(overrides: Partial<PlannerPorts> & { aut
         }
       } catch { /* the autopilot never stops planning */ }
       const outcome = await planSource({ settings, ports, db, budget, now, ...(makeup ? { makeup } : {}) }, source, auth);
+      for (const made of outcome.generated ?? []) entries.push({ at: now.toISOString(), kind: 'supply', channelId: made.targetId, code: 'photoMade', params: { title: made.title, appeal: made.appeal }, text: `New photo generated for « ${made.title} ».` });
+      if (outcome.photoProblem && !(pilot.log ?? []).some(entry => entry.code === 'photoNotMade' && now.getTime() - Date.parse(entry.at) < 86_400_000))
+        entries.push({ at: now.toISOString(), kind: 'healing', code: 'photoNotMade', params: { why: outcome.photoProblem }, text: 'A new photo could not be generated.' });
       // Photos of published recipes are read for learning (2026-11-18): newest first, a batch per run, within the AI limit.
       if (!overrides.autopilot && pilot.score.enabled && await ports.writer.available(source.workspaceId).catch(() => false)) {
         try {

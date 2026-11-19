@@ -29,3 +29,10 @@ test('log: a radar failure is said in the page language', () => {
   assert.equal(logSentence(failed, 'fr'), 'Le radar viral n’a pas pu tourner : timeout. La planification a continué.');
   assert.equal(logSentence(failed, 'en'), 'The viral radar could not run: timeout. Planning carried on.');
 });
+
+test('log: a re-plan whose replacement is not known yet, and generated photos', () => {
+  const at = '2026-11-19T00:10:00Z';
+  assert.equal(logSentence({ at, kind: 'supply', code: 'replanned', params: { from: 'Biscuits sablés', to: '', fromValue: 0.9, time: '09:50' } }, 'fr'),
+    'Replanifié avec la mémoire de cette Page : « Biscuits sablés » (attendu ×0.9) retirée ; une recette plus forte prend 09:50.');
+  assert.equal(logSentence({ at, kind: 'supply', code: 'photoMade', params: { title: 'Gratin', appeal: 4 } }, 'en'), 'New photo generated for « Gratin »: the recipe’s own photo was rated 4/10.');
+});
