@@ -12,6 +12,8 @@ import { convertToJpeg, type ImagePorts, type ImageSettings } from '../wordpress
 export const LOW_APPEAL = 5;
 /** Most photos generated in 24 hours, for all Pages of the workspace. */
 export const GENERATED_PER_DAY = 6;
+/** A title the AI rated this strong (0–10) is worth a new photo when its own is weak. */
+export const STRONG_HOOK = 7;
 const TRAIT_WORDS: Record<string, string> = {
   close_up: 'close-up shot', overhead: 'shot from above', side_angle: 'side view', cheese_pull: 'melted cheese stretching', melting: 'melting texture', golden_crust: 'golden crust',
   glossy_sauce: 'glossy sauce', steam: 'gentle steam', cut_open: 'one portion cut open to show the inside', generous_portion: 'generous portion', single_serving: 'single serving',

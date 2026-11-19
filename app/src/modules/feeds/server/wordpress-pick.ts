@@ -22,6 +22,8 @@ export type PickInput<C extends { wpPostId: string; title: string; publishedAt?:
   winners: ReadonlySet<string>; winnerQuota: number;
   /** Recipes in their scan order (newest or oldest first), for the weight of recency. */
   candidates: readonly C[];
+  /** A weak photo that will be replaced by a generated one on this channel (2026-11-19): scored as an average photo. */
+  replacesPhoto?: (targetId: string | null, rating: Rating) => boolean;
 };
 
 export function makePicker<C extends { wpPostId: string; title: string; publishedAt?: Date | null }>(input: PickInput<C>) {
@@ -45,7 +47,8 @@ export function makePicker<C extends { wpPostId: string; title: string; publishe
   const scoreAt = (c: C, slotAt: Date, targetId: string | null = null): number => {
     const key = `${c.wpPostId}|${slotAt.getTime()}|${targetId ?? ''}`;
     const hit = cache.get(key); if (hit !== undefined) return hit;
-    const rating = input.ratings.get(c.wpPostId);
+    const found = input.ratings.get(c.wpPostId);
+    const rating = found && input.replacesPhoto?.(targetId, found) ? { ...found, photo: null, traits: null } : found;
     const value = scoreRecipe({ title: c.title, hook: rating?.hook ?? null, photo: rating?.photo ?? null, kind: rating?.kind ?? null, history: input.history(targetId, c.title, rating?.kind ?? null, slotAt, rating ? { traits: rating.traits ?? null, appeal: rating.photo } : null) }, contextOf(slotAt)).score;
     cache.set(key, value); return value;
   };

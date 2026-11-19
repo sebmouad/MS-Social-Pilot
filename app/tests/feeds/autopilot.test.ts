@@ -315,3 +315,15 @@ test('generated photo prompt: the dish, the Page\'s best photo traits, no text',
   assert.match(prompt, /melted cheese stretching, close-up shot\./);
   assert.match(prompt, /No text/);
 });
+
+test('picker: a strong recipe with a weak photo is not passed over when a new photo will replace it', async () => {
+  const { makePicker } = await import('@/modules/feeds/server/wordpress-pick');
+  const { AUTOPILOT_DEFAULTS } = await import('@/modules/feeds/wordpress/autopilot');
+  const candidates = [{ wpPostId: 'weak', title: 'Gratin de pâtes' }, { wpPostId: 'ok', title: 'Gratin de pâtes au jambon' }];
+  const ratings = new Map([['weak', { kind: null, hook: 9, photo: 2 }], ['ok', { kind: null, hook: 6, photo: 6 }]]);
+  const base = { pilot: { ...AUTOPILOT_DEFAULTS, moments: { ...AUTOPILOT_DEFAULTS.moments, rules: [] } }, timeZone: 'Europe/Paris', ratings, history: () => null, weather: new Map(), timeline: new Map(), winners: new Set<string>(), winnerQuota: 0, candidates };
+  const at = new Date('2026-11-19T10:00:00Z');
+  const without = makePicker(base), withNew = makePicker({ ...base, replacesPhoto: (_: string | null, r: { photo: number | null; hook: number | null }) => (r.photo ?? 10) <= 5 && (r.hook ?? 0) >= 7 });
+  assert.ok(withNew.scoreAt(candidates[0]!, at, 'A') > without.scoreAt(candidates[0]!, at, 'A'));
+  assert.equal(withNew.scoreAt(candidates[1]!, at, 'A'), without.scoreAt(candidates[1]!, at, 'A'));
+});

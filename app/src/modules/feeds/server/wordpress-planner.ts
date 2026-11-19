@@ -4,7 +4,7 @@ import { decryptSecret } from '@/server/secret-crypto';
 import { defaultFetchDeps, type FetchDeps } from '@/modules/publishing/server/media/network/net-guard';
 import type { ArticleInput, ArticleWriting } from '@/modules/studio/ai';
 import { autopilotOf, type AutopilotSettings } from '../wordpress/autopilot';
-import { prismaScoringPorts, pageLearning, PHOTO_BATCH, type ScoringPorts } from './wordpress-scoring';
+import { prismaScoringPorts, pageLearning, PHOTO_BATCH, type ScoringPorts, type Rating } from './wordpress-scoring';
 import { makePicker } from './wordpress-pick';
 import { guessKind, type RecipeKind } from '../wordpress/score';
 import { captionGuidance, memoryModel } from '../wordpress/memory';
@@ -258,6 +258,14 @@ async function prepareChoosing(ctx: Ctx, source: SourceRow, config: PlanConfig, 
   const memories = await scoring.memories?.(source.id).catch(() => new Map()) ?? new Map();
   const model = memories.size ? memoryModel(memories) : null;
   const recent = pageLearning(outcomes, now);
+  // A strong recipe whose photo is weak is no longer passed over while a new photo can be generated for it
+  // (2026-11-19): its photo then counts as average, and the planner generates one (see ./wordpress-photos.ts).
+  let replacesPhoto: ((targetId: string | null, rating: Rating) => boolean) | undefined;
+  if (writer && ctx.ports.generatePhotos) {
+    const photos = await import('./wordpress-photos').catch(() => null);
+    const left = photos ? await photos.generationsLeft(source.workspaceId, now).catch(() => 0) : 0;
+    if (photos && left > 0) replacesPhoto = (targetId, rating) => typeof rating.photo === 'number' && rating.photo <= photos.LOW_APPEAL && (rating.hook ?? 0) >= photos.STRONG_HOOK && (!targetId || model?.generatedPhotosOk(targetId) !== false);
+  }
   const history = (targetId: string | null, title: string, kind: RecipeKind | null, slotAt: Date | null, photo?: { traits?: readonly string[] | null; appeal?: number | null } | null) =>
     (model && targetId && memories.has(targetId) ? model.contentValue(targetId, title, kind, slotAt, config.timezone, photo) : null) ?? recent(targetId, title);
   // Past winners: the best tenth of published recipes (and clearly above usual), back after the cooldown.
@@ -290,7 +298,7 @@ async function prepareChoosing(ctx: Ctx, source: SourceRow, config: PlanConfig, 
       const kindOfRow = (row: LedgerRow): RecipeKind => (row.kind as RecipeKind | null | undefined) ?? ratings.get(row.wpPostId)?.kind ?? guessKind(row.title);
       const timeline = new Map<string, Array<{ at: number; kind: RecipeKind }>>();
       for (const row of view.byKey.values()) if (row.state !== 'failed') timeline.set(row.targetId, [...(timeline.get(row.targetId) ?? []), { at: row.slotAt.getTime(), kind: kindOfRow(row) }]);
-      const picker = makePicker({ pilot, timeZone: config.timezone, ratings, history, weather, timeline, winners: new Set(winners.map(w => w.wpPostId)), winnerQuota, candidates });
+      const picker = makePicker({ pilot, timeZone: config.timezone, ratings, history, weather, timeline, winners: new Set(winners.map(w => w.wpPostId)), winnerQuota, candidates, replacesPhoto });
       // The photos of the most promising candidates not seen yet are read before choosing (2026-11-18), so what each
       // Page's memory learned about photos counts in this run's choice; the picker is built again with them.
       if (writer) {
@@ -298,7 +306,7 @@ async function prepareChoosing(ctx: Ctx, source: SourceRow, config: PlanConfig, 
         const unseen = candidates.filter(c => !ratings.get(c.wpPostId)?.traits).sort((a, b) => picker.scoreAt(b, soon) - picker.scoreAt(a, soon)).slice(0, PHOTO_BATCH);
         if (unseen.length && await scoring.ratePhotos(actor, source, unseen.map(c => ({ id: c.wpPostId, imageUrl: c.imageUrl }))).catch(() => 0)) {
           ratings = await scoring.ratings(source.id, ids).catch(() => ratings);
-          return makePicker({ pilot, timeZone: config.timezone, ratings, history, weather, timeline, winners: new Set(winners.map(w => w.wpPostId)), winnerQuota, candidates });
+          return makePicker({ pilot, timeZone: config.timezone, ratings, history, weather, timeline, winners: new Set(winners.map(w => w.wpPostId)), winnerQuota, candidates, replacesPhoto });
         }
       }
       return picker;
