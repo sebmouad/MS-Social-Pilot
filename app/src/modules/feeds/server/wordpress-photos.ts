@@ -14,7 +14,8 @@ export const LOW_APPEAL = 7;
 /** The prompt's version: photos from an older one are remade (2 since 2026-11-19: true to the recipe). */
 export const PROMPT_VERSION = 2;
 /** Most photos generated in 24 hours, for all Pages of the workspace. */
-export const GENERATED_PER_DAY = 6;
+/** 12 since 2026-11-19 (owner: raise it); about $0.05 each, within the workspace AI budget. */
+export const GENERATED_PER_DAY = 12;
 /** A title the AI rated this strong (0–10) is worth a new photo when its own is weak. */
 export const STRONG_HOOK = 7;
 /**
