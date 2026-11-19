@@ -34,7 +34,7 @@ export function validateFacebookConfig(config: FacebookConfig): FacebookConfig {
   if (typeof config.appSecretProofEnabled !== 'boolean') throw new Error('Facebook app secret proof policy must be configured.');
   if (config.appSecret !== undefined && (typeof config.appSecret !== 'string' || !config.appSecret.trim())) throw new Error('Facebook app secret must be a non-empty string when configured.');
   if (!Number.isInteger(config.maxImageUploadBytes) || config.maxImageUploadBytes < 1 || config.maxImageUploadBytes > 25 * 1024 * 1024) throw new Error('Facebook image upload limit is out of range.');
-  if (!Array.isArray(config.allowedImageMimeTypes) || !config.allowedImageMimeTypes.length || config.allowedImageMimeTypes.some(type => !['image/jpeg', 'image/png', 'image/gif'].includes(type))) throw new Error('Facebook image MIME allowlist is invalid.');
+  if (!Array.isArray(config.allowedImageMimeTypes) || !config.allowedImageMimeTypes.length || config.allowedImageMimeTypes.some(type => !['image/jpeg', 'image/png', 'image/gif', 'image/webp'].includes(type))) throw new Error('Facebook image MIME allowlist is invalid.');
   if (base.username || base.password || oauth.username || oauth.password || oauth.search || oauth.hash) throw new Error('Facebook endpoints cannot contain credentials, query strings, or fragments.');
   return config;
 }
