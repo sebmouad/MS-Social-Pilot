@@ -9,7 +9,8 @@ import { convertToJpeg, type ImagePorts, type ImageSettings } from '../wordpress
  * that Page's memory shows generated photos doing worse. Generation goes through the studio's image service (budget,
  * hourly limit, usage); the result is stored as the recipe JPEG would be, with the AI tag, and the PNG copy removed.
  */
-export const LOW_APPEAL = 5;
+/** 7 since 2026-11-19: no recipe photo is rated 5 or less (144 rated: 1 at 6, 14 at 7, 129 at 8–9), so the weakest are tested; each Page’s memory stops it where it does worse. */
+export const LOW_APPEAL = 7;
 /** Most photos generated in 24 hours, for all Pages of the workspace. */
 export const GENERATED_PER_DAY = 6;
 /** A title the AI rated this strong (0–10) is worth a new photo when its own is weak. */

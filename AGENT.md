@@ -444,7 +444,7 @@ ads_management (owner asked to rework Ads like Meta Ads Manager first). The subm
   batch on demand and answers with `{ queued, read, problem }`: live 12/12 after the fix.
 
 ### 7.1l Generated photos for weak recipe photos (2026-11-19, owner: « you can also generate new images if necessary »)
-- `server/wordpress-photos.ts`. When the autopilot plans a recipe whose own photo the AI rated 5/10 or less for appeal,
+- `server/wordpress-photos.ts`. When the autopilot plans a recipe whose own photo the AI rated 7/10 or less for appeal (5 until the figures showed none that weak),
   it generates a photo of the dish (studio image service: `ai.imagePolicy`, AI budget, hourly limit) in the photo traits
   that work on that Page, stores it as a JPEG with the AI tag, and posts it. At most 6 in 24 h per workspace (audit
   `autopilot.photo_generated`). Any problem: the recipe's own photo goes out.
