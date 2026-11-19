@@ -29,10 +29,12 @@ export function photoPrompt(title: string, ingredients: readonly string[], steps
     `Recipe: ${title.slice(0, 140)}.`,
   ].join(' ');
   // True to the recipe (2026-11-19): a cheese pull was invented on a cold salmon roll and a gratin on a chicken stew.
-  const tail = ' Step 1: the ingredients below in small bowls; steps 2 to 4: the key steps of the method below. Big final photo: close-up of the finished dish exactly as this recipe makes it, a generous portion lifted or cut open. Only ingredients from the list; melted cheese stretching only if the dish is served hot with a melting cheese; a cold dish shows a neat slice.';
+  const tail = ' Step 1: the listed ingredients in small bowls; steps 2 to 4: the key steps of the method. Big final photo: close-up of the finished dish exactly as this recipe makes it, a generous portion lifted or cut open. Only ingredients from the list; melted cheese stretching only if the dish is served hot with a melting cheese; a cold dish shows a neat slice.';
   const room = 1000 - head.length - tail.length;
   const facts = [ingredients.length ? ` Ingredients: ${ingredients.slice(0, 8).join(', ')}.` : '', steps.length ? ` Method: ${steps.slice(0, 6).join(' ')}` : ''].join('');
-  return head + (room > 0 ? facts.slice(0, room) : '') + tail;
+  // Cut at the last sentence or word that fits, never mid-word.
+  const fit = facts.length <= room ? facts : facts.slice(0, Math.max(0, room)).replace(/\s+\S*$/, '').replace(/[,;:]$/, '') + '.';
+  return head + (room > 0 ? fit : '') + tail;
 }
 
 /** Ingredients and method from a post's first comment (bullets, then numbered steps), for a queued post's photo. */

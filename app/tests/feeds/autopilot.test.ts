@@ -314,7 +314,9 @@ test('generated photo prompt: the owner-approved step-by-step collage, the recip
   assert.match(prompt, /two rows of 2 small square step photos/);
   assert.match(prompt, /Ingredients: pommes de terre, crème\./);
   assert.match(prompt, /no text/);
-  assert.ok(photoPrompt('x'.repeat(140), Array(20).fill('ingrédient très long '.repeat(5)), Array(20).fill('étape '.repeat(40))).length <= 1000);
+  const long = photoPrompt('x'.repeat(140), Array(20).fill('ingrédient très long '.repeat(5)), Array(20).fill('étape '.repeat(40)));
+  assert.ok(long.length <= 1000);
+  assert.match(long, /(ingrédient|long|très|étape)\. Step 1/, 'cut at a word, never mid-word');
 });
 
 test('picker: a strong recipe with a weak photo is not passed over when a new photo will replace it', async () => {
