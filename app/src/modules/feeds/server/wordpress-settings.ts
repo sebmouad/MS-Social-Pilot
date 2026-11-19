@@ -11,7 +11,7 @@ const KEYS = [
   'horizonDays', 'minLeadMinutes', 'pageStaggerMinutes', 'distinctAcrossPages', 'repostCooldownDays', 'targetTypes', 'runBudget', 'maxSourcesPerRun', 'claimLeaseSeconds', 'maxSlotAttempts', 'previewCount', 'ledgerPageSize',
   'firstCommentTemplate', 'firstCommentMaxCharacters', 'firstCommentDelayMinutes', 'minutesSuffix', 'truncationMark', 'jpegQuality', 'jpegMinQuality', 'jpegQualityStep',
   'imageMaxBytes', 'imageMaxPixels', 'imageFetchTimeoutMs', 'sourceNameMaxCharacters', 'textMaxCharacters', 'titleMaxCharacters',
-  'reuseEnabled', 'reuseCooldownDays', 'poolWarnDays', 'poolCacheSeconds', 'pauseCancelEnabled', 'pauseCancelBatchSize', 'labelPhotosAsAi',
+  'reuseEnabled', 'reuseCooldownDays', 'poolWarnDays', 'poolCacheSeconds', 'pauseCancelEnabled', 'pauseCancelBatchSize', 'labelPhotosAsAi', 'keepWebp',
 ].map(name => `${P}${name}`);
 const SHARED = ['feeds.fetchMaxRedirects', 'feeds.allowHttp', 'feeds.hostAllowlist', 'feeds.maxTargets', 'feeds.identifierMaxCharacters', 'feeds.pageNumberMax', 'feeds.transactionTimeoutMs', 'feeds.transactionMaxWaitMs',
   'data.workspaceOperationTimeoutMs', 'publishing.maxMessageCharacters', 'publishing.maxImageAltCharacters', 'publishing.maxImageUploadBytes'];
@@ -54,6 +54,7 @@ export async function loadWordpressSettings(): Promise<WordpressSettings> {
       fetch: { timeoutMs: n(w('imageFetchTimeoutMs')), maxBytes: n(w('imageMaxBytes')), maxRedirects: n(s('feeds.fetchMaxRedirects')), allowHttp: s('feeds.allowHttp') === true, hostAllowlist: s('feeds.hostAllowlist') as string[] },
       maxPixels: n(w('imageMaxPixels')), quality: n(w('jpegQuality')), minQuality: n(w('jpegMinQuality')), qualityStep: n(w('jpegQualityStep')), maxOutputBytes: uploadMax,
       aiLabel: w('labelPhotosAsAi') === true,
+      keepWebp: w('keepWebp') === true,
     },
     reuse: { enabled: w('reuseEnabled') === true, cooldownDays: n(w('reuseCooldownDays')) },
     poolWarnDays: n(w('poolWarnDays')), poolCacheSeconds: n(w('poolCacheSeconds')), pauseCancel: { enabled: w('pauseCancelEnabled') === true, batchSize: n(w('pauseCancelBatchSize')) },

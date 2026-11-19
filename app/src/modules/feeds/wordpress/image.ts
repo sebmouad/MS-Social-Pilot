@@ -16,6 +16,8 @@ export type ImageSettings = {
   fetch: FetchPolicy; maxPixels: number; quality: number; minQuality: number; qualityStep: number; maxOutputBytes: number;
   /** Mark the published posts as AI-generated on Facebook (« AI info », `is_ai_generated`, see ../server/wordpress-ai-disclosure.ts). Nothing is written into the photo itself (2026-11-19, owner: keep photos as downloaded). */
   aiLabel?: boolean;
+  /** A WebP from WordPress goes out unchanged instead of becoming a JPEG (2026-11-19, owner's test; off by default). */
+  keepWebp?: boolean;
 };
 
 export type ImagePorts = {
@@ -30,9 +32,9 @@ export type ImagePorts = {
  * owner: keep images as downloaded from WordPress); anything else (WebP, PNG, too large) becomes a JPEG, with nothing
  * added. Quality is lowered in steps until the file fits; a file that still does not fit is refused.
  */
-export async function convertToJpeg(bytes: Buffer, s: Pick<ImageSettings, 'maxPixels' | 'quality' | 'minQuality' | 'qualityStep' | 'maxOutputBytes'>): Promise<Buffer> {
+export async function convertToJpeg(bytes: Buffer, s: Pick<ImageSettings, 'maxPixels' | 'quality' | 'minQuality' | 'qualityStep' | 'maxOutputBytes' | 'keepWebp'>): Promise<Buffer> {
   const meta = await sharp(bytes, { failOn: 'error', limitInputPixels: s.maxPixels }).metadata();
-  if (meta.format === 'jpeg' && bytes.length <= s.maxOutputBytes) return bytes;
+  if ((meta.format === 'jpeg' || (meta.format === 'webp' && s.keepWebp)) && bytes.length <= s.maxOutputBytes) return bytes;
   const floor = Math.min(s.minQuality, s.quality);
   let quality = s.quality;
   for (;;) {
@@ -61,7 +63,8 @@ export const defaultImagePorts = (net: FetchDeps): ImagePorts => ({
   async inspect(bytes) { await inspectMediaSnapshot(bytes, 'image'); },
   convert: (bytes, settings) => convertToJpeg(bytes, settings),
   async store(actor, bytes, name) {
-    const stored = await uploadWorkspaceImage(actor, new File([new Uint8Array(bytes)], name, { type: 'image/jpeg' }));
+    const webp = bytes.length >= 12 && bytes.toString('ascii', 0, 4) === 'RIFF' && bytes.toString('ascii', 8, 12) === 'WEBP';
+    const stored = await uploadWorkspaceImage(actor, new File([new Uint8Array(bytes)], webp ? name.replace(/\.jpe?g$/i, '') + '.webp' : name, { type: webp ? 'image/webp' : 'image/jpeg' }));
     return { id: stored.id };
   },
 });

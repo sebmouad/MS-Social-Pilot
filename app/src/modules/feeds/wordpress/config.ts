@@ -17,7 +17,7 @@ export const WORDPRESS_DEFAULTS = {
   jpegQuality: 88, jpegMinQuality: 60, jpegQualityStep: 8, imageMaxBytes: 8388608, imageMaxPixels: 40000000, imageFetchTimeoutMs: 20000,
   sourceNameMaxCharacters: 120, textMaxCharacters: 10000, titleMaxCharacters: 300,
   reuseEnabled: false, reuseCooldownDays: 365,
-  poolWarnDays: 14, poolCacheSeconds: 900, pauseCancelEnabled: true, pauseCancelBatchSize: 100, labelPhotosAsAi: false,
+  poolWarnDays: 14, poolCacheSeconds: 900, pauseCancelEnabled: true, pauseCancelBatchSize: 100, labelPhotosAsAi: false, keepWebp: false,
   statusUpcomingCount: 5, statusFailureWindowDays: 7,
 } as const;
 export const WORDPRESS_BOUNDS = {
@@ -103,7 +103,8 @@ export const WORDPRESS_CONFIG = [
   num(`${P}reuseCooldownDays`, 'Minimum recipe reuse cooldown (days)', 'Minimum elapsed days since confirmed publication on the same channel. The longer of this and the source cooldown applies. Unconfirmed posts remain blocked.', WORDPRESS_DEFAULTS.reuseCooldownDays, WORDPRESS_BOUNDS.reuseCooldownDays),
   num(`${P}poolWarnDays`, 'Recipe pool warning (days)', 'A channel is flagged as running low when its remaining eligible recipes last fewer days than this at the current posting times.', WORDPRESS_DEFAULTS.poolWarnDays, WORDPRESS_BOUNDS.poolWarnDays),
   num(`${P}poolCacheSeconds`, 'Recipe pool check cache (seconds)', 'How long a computed recipe pool health result is reused before the recipe library is scanned again; 0 scans on every view.', WORDPRESS_DEFAULTS.poolCacheSeconds, WORDPRESS_BOUNDS.poolCacheSeconds),
-  flag(`${P}labelPhotosAsAi`, 'Label recipe photos as AI-made', 'When on, every recipe photo uploaded to the networks carries the standard IPTC « made by AI » tag (digital source type trainedAlgorithmicMedia); Facebook can then show « AI info » on the post. Only for photos that really are AI-generated.', WORDPRESS_DEFAULTS.labelPhotosAsAi),
+  flag(`${P}labelPhotosAsAi`, 'Label recipe photos as AI-made', 'When on, the published recipe posts are marked as AI-generated on Facebook (« AI info », is_ai_generated). Nothing is written into the photos. Only for photos that really are AI-generated.', WORDPRESS_DEFAULTS.labelPhotosAsAi),
+  flag(`${P}keepWebp`, 'Keep WebP photos as downloaded', 'When on, a WebP recipe photo from WordPress is stored and uploaded to Facebook unchanged instead of being converted to JPEG (needs image/webp in publishing.allowedImageMimeTypes and meta.allowedImageMimeTypes). Off by default: Meta documents JPEG, BMP, PNG, GIF and TIFF for photo uploads.', WORDPRESS_DEFAULTS.keepWebp),
   flag(`${P}pauseCancelEnabled`, 'Allow cancelling scheduled posts on pause', 'When on, pausing a recipe source may also cancel its scheduled, not yet published posts (only when the member asks and confirms).', WORDPRESS_DEFAULTS.pauseCancelEnabled),
   num(`${P}pauseCancelBatchSize`, 'Posts cancelled per pause request', 'Most scheduled posts one pause request cancels; repeat the request to continue.', WORDPRESS_DEFAULTS.pauseCancelBatchSize, WORDPRESS_BOUNDS.pauseCancelBatchSize),
   num(`${P}statusUpcomingCount`, 'Status card: next posts shown', 'Upcoming planned posts listed on the recipe status card at the top of Content feeds.', WORDPRESS_DEFAULTS.statusUpcomingCount, WORDPRESS_BOUNDS.statusUpcomingCount),

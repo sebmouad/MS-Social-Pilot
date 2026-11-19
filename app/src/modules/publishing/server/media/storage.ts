@@ -36,6 +36,8 @@ const allowedSignatures: Record<string, (bytes: Buffer) => boolean> = {
   'image/jpeg': bytes => bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff,
   'image/png': bytes => bytes.length >= 8 && bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])),
   'image/gif': bytes => bytes.length >= 6 && ['GIF87a', 'GIF89a'].includes(bytes.toString('ascii', 0, 6)),
+  // Accepted only when Root's allowed types include it (2026-11-19, recipe photos kept as downloaded from WordPress).
+  'image/webp': bytes => bytes.length >= 12 && bytes.toString('ascii', 0, 4) === 'RIFF' && bytes.toString('ascii', 8, 12) === 'WEBP',
 };
 
 function safeName(name: string, policy: MediaPresentationPolicy): string {

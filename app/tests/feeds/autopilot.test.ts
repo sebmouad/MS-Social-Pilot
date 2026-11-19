@@ -235,6 +235,9 @@ test('photos: a JPEG goes out exactly as downloaded; a PNG becomes a JPEG with n
   assert.equal((await sharp(converted).metadata()).xmp, undefined);
   const big = await sharp({ create: { width: 900, height: 900, channels: 3, background: '#c86' }, }).jpeg({ quality: 100 }).toBuffer();
   assert.ok((await convertToJpeg(big, { ...settings, maxOutputBytes: big.length - 1 })).length < big.length, 'a JPEG over the limit is made smaller');
+  const webp = await sharp({ create: { width: 64, height: 64, channels: 3, background: '#c86' } }).webp().toBuffer();
+  assert.equal((await sharp(await convertToJpeg(webp, settings)).metadata()).format, 'jpeg', 'WebP becomes JPEG by default');
+  assert.ok((await convertToJpeg(webp, { ...settings, keepWebp: true })).equals(webp), 'kept byte for byte when asked');
 });
 
 test('memory: posts made outside the autopilot teach it too, with their format', async () => {
