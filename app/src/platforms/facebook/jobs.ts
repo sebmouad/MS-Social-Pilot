@@ -7,6 +7,7 @@ import { randomUUID } from 'node:crypto';
 import { prisma } from '@/server/data';
 import { decryptSecret } from '@/server/secret-crypto';
 import { configuredFacebookEngine } from '@/platforms/facebook/runtime';
+import { FacebookApiError } from '@/platforms/facebook/publishing';
 import { runtimeConfig } from '@/server/config/store';
 import { recordError } from '@/server/errors/recorder';
 import { Prisma } from '../../../generated/client';
@@ -567,7 +568,15 @@ async function fetchInboxTarget(target: { id: string; workspaceId: string; provi
     const commentBatches: InboxFetch['commentBatches'] = [];
     for (const post of posts) {
       if (jobStopRequested()) break;
-      if (post.remotePostId) commentBatches.push({ postTargetId: post.id, comments: await withRetries(async () => { const binding = await freshTarget(); const engine = await configuredFacebookEngine({ signal }); return engine.listComments(binding.token, post.remotePostId!, bounds); }, retryLimit, retryBackoff) });
+      if (!post.remotePostId) continue;
+      try {
+        commentBatches.push({ postTargetId: post.id, comments: await withRetries(async () => { const binding = await freshTarget(); const engine = await configuredFacebookEngine({ signal }); return engine.listComments(binding.token, post.remotePostId!, bounds); }, retryLimit, retryBackoff) });
+      } catch (error) {
+        // A post deleted on Facebook (code 100/33) is skipped, its stored comments untouched, so the Page's other posts
+        // still sync (2026-11-19: one deleted post had failed a Page's whole inbox every two minutes since 17 Nov).
+        if (error instanceof FacebookApiError && error.code === 100 && error.subcode === 33) continue;
+        throw error;
+      }
     }
     return { conversations, commentBatches, postRemoteIds: new Map(posts.map(post => [post.id, post.remotePostId])), recheck: freshTarget };
   } finally {

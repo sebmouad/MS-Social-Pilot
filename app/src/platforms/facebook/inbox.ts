@@ -1,3 +1,4 @@
+import { FacebookApiError } from '@/platforms/facebook/publishing';
 import { storeInboxMetadata } from '@/modules/inbox/server/metadata';
 import { randomBytes } from 'node:crypto';
 import { OperationError } from '@/lib/operation-error';
@@ -91,7 +92,11 @@ export async function syncFacebookInbox(actor: InboxActor, targetId?: string) {
         prisma.postTarget.findMany({ where: { targetId: item.id, remotePostId: { not: null }, status: 'published' }, orderBy: { publishedAt: 'desc' }, take: postSyncLimit, select: { id: true, remotePostId: true } }),
       ]);
       const comments: Array<{ postTargetId: string; items: Awaited<ReturnType<typeof engine.listComments>> }> = [];
-      for (const post of publishedPosts) if (post.remotePostId) comments.push({ postTargetId: post.id, items: await engine.listComments(channel.token, post.remotePostId, bounds) });
+      for (const post of publishedPosts) if (post.remotePostId) {
+        // A post deleted on Facebook is skipped, so it does not stop the Page's other posts (2026-11-19, as in jobs.ts).
+        try { comments.push({ postTargetId: post.id, items: await engine.listComments(channel.token, post.remotePostId, bounds) }); }
+        catch (error) { if (!(error instanceof FacebookApiError && error.code === 100 && error.subcode === 33)) throw error; }
+      }
       batches.push({ targetId: item.id, incomplete: discoveryIncomplete(conversations, ...comments.map(entry => entry.items)), conversations, comments });
     } catch (error) { failures.push(error); }
   }
