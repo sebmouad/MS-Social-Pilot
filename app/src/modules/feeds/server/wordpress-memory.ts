@@ -38,8 +38,8 @@ export async function readPageMemories(sourceId: string): Promise<Map<string, Pa
 export async function updatePageMemories(source: SourceRow, pages: ReadonlyArray<{ id: string }>, timeZone: string, now: Date): Promise<number> {
   if (!pages.length) return 0;
   const settled = new Date(now.getTime() - SETTLE_HOURS * 3_600_000);
-  const rows = await prisma.$queryRaw<Array<{ targetId: string; at: Date; title: string; kind: string | null; style: string | null; caption: string | null; insights: unknown; photo: number | null; photoTraits: string[] | null; imageSource: string | null }>>`
-    SELECT l."targetId", COALESCE(pt."publishedAt", l."slotAt") AS at, l.title, l.kind, l.style, l."imageSource", p.message AS caption, ep.insights, r.photo, r."photoTraits"
+  const rows = await prisma.$queryRaw<Array<{ targetId: string; at: Date; title: string; kind: string | null; style: string | null; caption: string | null; insights: unknown; photo: number | null; photoTraits: string[] | null; imageSource: string | null; media: unknown }>>`
+    SELECT l."targetId", COALESCE(pt."publishedAt", l."slotAt") AS at, l.title, l.kind, l.style, l."imageSource", p.media, p.message AS caption, ep.insights, r.photo, r."photoTraits"
     FROM wordpress_recipe_plans l
     JOIN post_targets pt ON pt."postId" = l."postId" AND pt."targetId" = l."targetId" AND pt.status::text = 'published'
     JOIN posts p ON p.id = l."postId"
@@ -58,10 +58,18 @@ export async function updatePageMemories(source: SourceRow, pages: ReadonlyArray
       AND ep."createdTime" > ${new Date(now.getTime() - 365 * 86_400_000)} AND ep."createdTime" <= ${settled}
       AND NOT EXISTS (SELECT 1 FROM post_targets pt WHERE pt."targetId" = ep."targetId" AND pt."remotePostId" = ep."remoteId")
     ORDER BY 3 ASC LIMIT ${PER_RUN * 10}`;
+  // Generated only when the photo actually posted is one the autopilot generated (2026-11-19: three posts were put
+  // back on their original collage by hand after the owner judged the first generated photos).
+  const made = new Set((await prisma.$queryRaw<Array<{ mediaId: string | null }>>`SELECT detail->>'mediaId' AS "mediaId" FROM activity_logs WHERE "workspaceId" = ${source.workspaceId} AND action = 'autopilot.photo_generated'`).flatMap(row => row.mediaId ? [row.mediaId] : []));
+  const sourceOf = (imageSource: string | null, media: unknown): 'site' | 'generated' | null => {
+    if (imageSource !== 'generated') return imageSource === 'site' ? 'site' : null;
+    const first = Array.isArray(media) ? (media as Array<{ url?: unknown }>)[0]?.url : undefined;
+    return typeof first === 'string' && made.has(first.replace(/^media:/, '')) ? 'generated' : 'site';
+  };
   let learned = 0;
   for (const page of pages) {
     const posts: LearnedPost[] = [
-      ...rows.filter(row => row.targetId === page.id).flatMap(row => { const f = figures(row.insights); return f ? [{ at: row.at, title: row.title, kind: row.kind, style: row.style, caption: row.caption ?? '', ...f, traits: row.photoTraits, appeal: row.photo, origin: 'app' as const, format: 'photo' as const, imageSource: row.imageSource === 'generated' ? 'generated' as const : row.imageSource === 'site' ? 'site' as const : null }] : []; }),
+      ...rows.filter(row => row.targetId === page.id).flatMap(row => { const f = figures(row.insights); return f ? [{ at: row.at, title: row.title, kind: row.kind, style: row.style, caption: row.caption ?? '', ...f, traits: row.photoTraits, appeal: row.photo, origin: 'app' as const, format: 'photo' as const, imageSource: sourceOf(row.imageSource, row.media) }] : []; }),
       ...outside.filter(row => row.targetId === page.id).flatMap(row => {
         const f = figures(row.insights); const text = (row.message ?? '').trim();
         return f ? [{ at: row.at, title: (text.split(/\n|(?<=[.!?…])\s/)[0] ?? '').slice(0, 140), kind: null, style: null, caption: text, ...f, traits: row.photoTraits, appeal: row.photo, origin: 'external' as const, format: formatOf(row.statusType, Boolean(row.pictureUrl)) }] : [];
