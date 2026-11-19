@@ -1,4 +1,4 @@
-import { readPhotosNow } from '@/modules/feeds/server/wordpress-cockpit';
+import { photoFigures, readPhotosNow } from '@/modules/feeds/server/wordpress-cockpit';
 import { failure, readJson, reply, sameOrigin, viewerActor } from '@/modules/feeds/server/http';
 export const dynamic = 'force-dynamic';
 
@@ -8,4 +8,11 @@ export async function POST(request: Request) {
   const actor = await viewerActor(true); if (actor instanceof Response) return actor;
   try { return reply(await readPhotosNow(actor, await readJson(request, 'Confirm reading the photos.'))); }
   catch (error) { return failure(error, 'The photos could not be read.'); }
+}
+
+/** How the recipe photos were rated (read-only, 2026-11-19). */
+export async function GET() {
+  const actor = await viewerActor(false); if (actor instanceof Response) return actor;
+  try { return reply(await photoFigures(actor)); }
+  catch (error) { return failure(error, 'The photo figures could not be read.'); }
 }

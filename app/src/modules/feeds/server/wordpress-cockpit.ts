@@ -312,3 +312,14 @@ export async function readPhotosNow(actor: FeedActor, input: unknown, now = new 
   const read = queue.length ? Number(await scoring.prismaScoringPorts.ratePhotos({ userId: actor.userId, workspaceId: actor.workspaceId }, source, queue)) || 0 : 0;
   return { queued: queue.length, read, problem: (await import('./wordpress-scoring')).lastPhotoProblem };
 }
+
+/** How the AI rated the recipe photos (2026-11-19, read-only): all rated recipes and the posts queued in the next 3 days, by photo appeal; and generated photos so far. */
+export async function photoFigures(actor: FeedActor, now = new Date()): Promise<{ recipes: Record<string, number>; queued: Record<string, number>; queuedStrongWeak: number; generated: number }> {
+  const { source } = await context(actor, false);
+  const rows = await prisma.$queryRaw<Array<{ photo: number; count: number }>>`SELECT photo, COUNT(*)::int AS count FROM recipe_ratings WHERE "sourceId" = ${source.id} AND photo IS NOT NULL AND "wpPostId" NOT LIKE 'ext:%' GROUP BY photo`;
+  const queued = await prisma.$queryRaw<Array<{ photo: number; hook: number | null }>>`SELECT r.photo, r.hook FROM wordpress_recipe_plans l JOIN posts p ON p.id = l."postId" JOIN recipe_ratings r ON r."sourceId" = l."sourceId" AND r."wpPostId" = l."wpPostId"
+    WHERE l."sourceId" = ${source.id} AND l.state = 'planned' AND p.status::text = 'scheduled' AND p."scheduledAt" > ${now} AND p."scheduledAt" < ${new Date(now.getTime() + 3 * 86_400_000)} AND r.photo IS NOT NULL`;
+  const generated = await prisma.$queryRaw<Array<{ count: number }>>`SELECT COUNT(*)::int AS count FROM wordpress_recipe_plans WHERE "sourceId" = ${source.id} AND "imageSource" = 'generated'`;
+  const byAppeal = (list: Array<{ photo: number; count?: number }>) => list.reduce<Record<string, number>>((out, row) => { out[row.photo] = (out[row.photo] ?? 0) + (row.count ?? 1); return out; }, {});
+  return { recipes: byAppeal(rows), queued: byAppeal(queued), queuedStrongWeak: queued.filter(row => row.photo <= 5 && (row.hook ?? 0) >= 7).length, generated: Number(generated[0]?.count ?? 0) };
+}
