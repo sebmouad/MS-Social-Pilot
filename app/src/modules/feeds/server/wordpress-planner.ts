@@ -37,11 +37,14 @@ export type PlannerPorts = {
   scoring?: import('./wordpress-scoring').ScoringPorts;
   /** Autopilot captions (2026-11-16): one AI request for a channel's caption; without it the recipe's own caption is used. */
   captions?: { write(actor: FeedActor, system: string, prompt: string): Promise<string>; recent?(sourceId: string, limit: number): Promise<string[]> };
+  /** Generated photos for weak recipe photos (2026-11-19, ./wordpress-photos.ts); off without it. */
+  generatePhotos?: boolean;
 };
 export type PlannedPostInput = { message: string; firstComment: string; targetIds: string[]; scheduledAt: Date; media: Array<{ kind: 'image'; url: string; altText: string }>; firstCommentDelayMinutes: number };
 
 export function defaultPlannerPorts(net: FetchDeps = defaultFetchDeps()): PlannerPorts {
   return {
+    generatePhotos: true,
     openDb: settings => openWordpressDb(settings),
     async validateTarget(actor, targetId) {
       const { validateTargets } = await import('@/modules/publishing/server/lifecycle');
@@ -438,6 +441,7 @@ export async function planSource(ctx: Ctx, source: SourceRow, auth: FeedAuthoriz
   else if (readable > 0 && !writer && !config.mapping.recipeMetaKey && recipeMissing === readable) out.reason = 'needs_ai';
   out.unfilled = unfilled + (needs.length - todo.length);
 
+  let generationsLeft: number | undefined;
   for (const [index, { targetId, slotAt, candidate: c }] of assignments.entries()) {
     if (ctx.budget.left <= 0) break;
     if (ctx.deadline !== undefined && Date.now() >= ctx.deadline) { out.unfilled += assignments.length - index; out.reason = 'time_limit'; break; }
@@ -478,8 +482,25 @@ export async function planSource(ctx: Ctx, source: SourceRow, auth: FeedAuthoriz
     }
     if (pilot.comment.enabled) written = { ...written, firstComment: withCta(written.firstComment, ctaFor(pilot.comment.cta, key), settings.commentMax) };
     let postId: string;
+    let imageSource: 'site' | 'generated' = 'site';
     try {
-      const image = await prepareRecipeImage(ports.image, { actor: { userId: auth.actor.userId, workspaceId: source.workspaceId }, url: c.imageUrl, fileName: safeName(c.slug), settings: settings.image });
+      const mediaActor = { userId: auth.actor.userId, workspaceId: source.workspaceId };
+      // A weak recipe photo is replaced by a generated one (2026-11-19, see ./wordpress-photos.ts); any problem, and the recipe's own photo goes out.
+      let image: { mediaId: string } | null = null;
+      if (writer && ports.generatePhotos && prep?.model?.generatedPhotosOk(targetId) !== false) {
+        try {
+          const photos = await import('./wordpress-photos');
+          generationsLeft ??= await photos.generationsLeft(source.workspaceId, now);
+          const appeal = generationsLeft > 0 ? await photos.photoAppeal(source.id, c.wpPostId) : null;
+          if (appeal !== null && appeal <= photos.LOW_APPEAL) {
+            generationsLeft -= 1;
+            image = await photos.generateRecipePhoto(mediaActor, { title: c.title, ingredients: c.recipe.ingredients.filter(line => !line.heading).map(line => line.text),
+              traits: prep?.model?.highlights(targetId, 4).photos.map(p => p.trait) ?? [], fileName: safeName(c.slug), settings: settings.image, wpPostId: c.wpPostId }, ports.image);
+            imageSource = 'generated';
+          }
+        } catch { image = null; }
+      }
+      image ??= await prepareRecipeImage(ports.image, { actor: mediaActor, url: c.imageUrl, fileName: safeName(c.slug), settings: settings.image });
       const post = await ports.createPost(auth.actor, {
         // The slot keeps its identity (ledger key); only the publish time is offset per Page, so Pages never post in lockstep.
         message: written.caption, firstComment: written.firstComment, targetIds: [targetId], scheduledAt: ctx.makeup?.get(slotKey(targetId, slotAt)) ?? staggered(slotAt, targetId),
@@ -500,7 +521,7 @@ export async function planSource(ctx: Ctx, source: SourceRow, auth: FeedAuthoriz
       }
       continue;
     }
-    try { await ports.store.settle(source.workspaceId, claimId, { state: 'planned', postId, ...(style ? { style } : {}) }); out.planned += 1; }
+    try { await ports.store.settle(source.workspaceId, claimId, { state: 'planned', postId, imageSource, ...(style ? { style } : {}) }); out.planned += 1; }
     catch { out.uncertain += 1; /* the claim stays; it turns uncertain when its lease ends */ }
   }
   return out;

@@ -16,7 +16,7 @@ export type LedgerRow = {
   score?: number | null; kind?: string | null;
 };
 export type ClaimInput = { workspaceId: string; sourceId: string; targetId: string; wpPostId: string; slotAt: Date; title: string; permalink: string | null; skipped: string[]; score?: number | null; kind?: string | null };
-export type Settlement = { state: PlanState; postId?: string | null; reason?: string | null; skipped?: string[]; style?: string | null };
+export type Settlement = { state: PlanState; postId?: string | null; reason?: string | null; skipped?: string[]; style?: string | null; imageSource?: 'site' | 'generated' | null };
 export type RunRecord = { at: Date; error: string | null; summary: Record<string, unknown> };
 
 export interface RecipeStore {
@@ -94,7 +94,7 @@ export const prismaRecipeStore: RecipeStore = {
     return rows[0]?.id ?? null;
   },
   async settle(workspaceId, id, s) {
-    await prisma.$executeRaw`UPDATE wordpress_recipe_plans SET state = ${s.state}, "postId" = ${s.postId ?? null}, reason = ${s.reason ?? null}, skipped = COALESCE(${s.skipped === undefined ? null : JSON.stringify(s.skipped)}::jsonb, skipped), style = COALESCE(${s.style ?? null}, style), "updatedAt" = NOW() WHERE id = ${id} AND "workspaceId" = ${workspaceId}`;
+    await prisma.$executeRaw`UPDATE wordpress_recipe_plans SET state = ${s.state}, "postId" = ${s.postId ?? null}, reason = ${s.reason ?? null}, skipped = COALESCE(${s.skipped === undefined ? null : JSON.stringify(s.skipped)}::jsonb, skipped), style = COALESCE(${s.style ?? null}, style), "imageSource" = COALESCE(${s.imageSource ?? null}, "imageSource"), "updatedAt" = NOW() WHERE id = ${id} AND "workspaceId" = ${workspaceId}`;
   },
   async unresolved(sourceId, from, limit) {
     const rows = await prisma.$queryRawUnsafe<RawLedger[]>(`SELECT ${LEDGER_COLUMNS} FROM wordpress_recipe_plans WHERE "sourceId" = $1 AND "slotAt" >= $2 AND state IN ('failed', 'uncertain') ORDER BY "slotAt" ASC, id ASC LIMIT $3`, sourceId, from, limit);

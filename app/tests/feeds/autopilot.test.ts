@@ -292,3 +292,26 @@ test('photos: a real-size recipe photo is shrunk for the AI, not refused', async
   const meta = await sharp(small).metadata();
   assert.equal(meta.format, 'jpeg'); assert.ok(meta.height === 768 && (meta.width ?? 0) <= 768, `${meta.width}x${meta.height}`);
 });
+
+test('memory: generated photos stop on a Page where they do clearly worse', async () => {
+  const { absorb, memoryModel } = await import('@/modules/feeds/wordpress/memory');
+  const now = new Date('2026-11-25T12:00:00Z');
+  const post = (i: number, imageSource: 'site' | 'generated', reach: number) => ({ at: new Date(now.getTime() - (i + 3) * 86_400_000), title: `Gratin ${i}`, kind: null, style: null, caption: '', reach, reactions: reach / 20, comments: 5, shares: 5, imageSource });
+  const site = Array.from({ length: 6 }, (_, i) => post(i, 'site', 2000));
+  const worse = memoryModel(new Map([['A', absorb(null, [...site, ...Array.from({ length: 6 }, (_, i) => post(i + 6, 'generated', 600))], now, tz)]]));
+  assert.equal(worse.generatedPhotosOk('A'), false);
+  const fine = memoryModel(new Map([['A', absorb(null, [...site, ...Array.from({ length: 6 }, (_, i) => post(i + 6, 'generated', 2400))], now, tz)]]));
+  assert.equal(fine.generatedPhotosOk('A'), true);
+  // Too few posts with one to judge: still tried.
+  const early = memoryModel(new Map([['A', absorb(null, [...site, post(6, 'generated', 300)], now, tz)]]));
+  assert.equal(early.generatedPhotosOk('A'), true);
+});
+
+test('generated photo prompt: the dish, the Page\'s best photo traits, no text', async () => {
+  const { photoPrompt } = await import('@/modules/feeds/server/wordpress-photos');
+  const prompt = photoPrompt('Gratin dauphinois', ['pommes de terre', 'crème'], ['cheese_pull', 'close_up', 'unknown']);
+  assert.match(prompt, /Gratin dauphinois/);
+  assert.match(prompt, /pommes de terre, crème/);
+  assert.match(prompt, /melted cheese stretching, close-up shot\./);
+  assert.match(prompt, /No text/);
+});

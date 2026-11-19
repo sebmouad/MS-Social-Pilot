@@ -442,3 +442,11 @@ ads_management (owner asked to rework Ads like Meta Ads Manager first). The subm
   input limit, so every 1080 × 1350 photo was refused (« Input image exceeds pixel limit »). The AI copy now uses
   `photoForAi` (resize to ≤ 768 px). `POST /api/feeds/wordpress/autopilot/photos` (confirmation `READ PHOTOS NOW`) reads a
   batch on demand and answers with `{ queued, read, problem }`: live 12/12 after the fix.
+
+### 7.1l Generated photos for weak recipe photos (2026-11-19, owner: « you can also generate new images if necessary »)
+- `server/wordpress-photos.ts`. When the autopilot plans a recipe whose own photo the AI rated 5/10 or less for appeal,
+  it generates a photo of the dish (studio image service: `ai.imagePolicy`, AI budget, hourly limit) in the photo traits
+  that work on that Page, stores it as a JPEG with the AI tag, and posts it. At most 6 in 24 h per workspace (audit
+  `autopilot.photo_generated`). Any problem: the recipe's own photo goes out.
+- The plan row records `imageSource` (`site` / `generated`, migration 0022); the memory learns it as `g:<source>`.
+  `generatedPhotosOk`: once a Page has 5 settled posts of each, generated photos stop there if they do ≥ 15 % worse.

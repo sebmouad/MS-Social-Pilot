@@ -38,8 +38,8 @@ export async function readPageMemories(sourceId: string): Promise<Map<string, Pa
 export async function updatePageMemories(source: SourceRow, pages: ReadonlyArray<{ id: string }>, timeZone: string, now: Date): Promise<number> {
   if (!pages.length) return 0;
   const settled = new Date(now.getTime() - SETTLE_HOURS * 3_600_000);
-  const rows = await prisma.$queryRaw<Array<{ targetId: string; at: Date; title: string; kind: string | null; style: string | null; caption: string | null; insights: unknown; photo: number | null; photoTraits: string[] | null }>>`
-    SELECT l."targetId", COALESCE(pt."publishedAt", l."slotAt") AS at, l.title, l.kind, l.style, p.message AS caption, ep.insights, r.photo, r."photoTraits"
+  const rows = await prisma.$queryRaw<Array<{ targetId: string; at: Date; title: string; kind: string | null; style: string | null; caption: string | null; insights: unknown; photo: number | null; photoTraits: string[] | null; imageSource: string | null }>>`
+    SELECT l."targetId", COALESCE(pt."publishedAt", l."slotAt") AS at, l.title, l.kind, l.style, l."imageSource", p.message AS caption, ep.insights, r.photo, r."photoTraits"
     FROM wordpress_recipe_plans l
     JOIN post_targets pt ON pt."postId" = l."postId" AND pt."targetId" = l."targetId" AND pt.status::text = 'published'
     JOIN posts p ON p.id = l."postId"
@@ -61,7 +61,7 @@ export async function updatePageMemories(source: SourceRow, pages: ReadonlyArray
   let learned = 0;
   for (const page of pages) {
     const posts: LearnedPost[] = [
-      ...rows.filter(row => row.targetId === page.id).flatMap(row => { const f = figures(row.insights); return f ? [{ at: row.at, title: row.title, kind: row.kind, style: row.style, caption: row.caption ?? '', ...f, traits: row.photoTraits, appeal: row.photo, origin: 'app' as const, format: 'photo' as const }] : []; }),
+      ...rows.filter(row => row.targetId === page.id).flatMap(row => { const f = figures(row.insights); return f ? [{ at: row.at, title: row.title, kind: row.kind, style: row.style, caption: row.caption ?? '', ...f, traits: row.photoTraits, appeal: row.photo, origin: 'app' as const, format: 'photo' as const, imageSource: row.imageSource === 'generated' ? 'generated' as const : row.imageSource === 'site' ? 'site' as const : null }] : []; }),
       ...outside.filter(row => row.targetId === page.id).flatMap(row => {
         const f = figures(row.insights); const text = (row.message ?? '').trim();
         return f ? [{ at: row.at, title: (text.split(/\n|(?<=[.!?…])\s/)[0] ?? '').slice(0, 140), kind: null, style: null, caption: text, ...f, traits: row.photoTraits, appeal: row.photo, origin: 'external' as const, format: formatOf(row.statusType, Boolean(row.pictureUrl)) }] : [];
