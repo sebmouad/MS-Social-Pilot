@@ -327,3 +327,17 @@ test('picker: a strong recipe with a weak photo is not passed over when a new ph
   assert.ok(withNew.scoreAt(candidates[0]!, at, 'A') > without.scoreAt(candidates[0]!, at, 'A'));
   assert.equal(withNew.scoreAt(candidates[1]!, at, 'A'), without.scoreAt(candidates[1]!, at, 'A'));
 });
+
+test('hit words: what the biggest posts share boosts similar recipes on every Page', async () => {
+  const { hitWords, hitBoost } = await import('@/modules/feeds/wordpress/memory');
+  const posts = [
+    { title: 'Mini-quiches au jambon et fromage', reach: 400_000 }, { title: 'Gaufres salées jambon fromage', reach: 200_000 },
+    { title: 'Roulés jambon-fromage panés', reach: 120_000 }, { title: 'Charlotte aux framboises', reach: 60 }, { title: 'Velouté de potiron', reach: 40 },
+  ];
+  const words = hitWords(posts, 3);
+  assert.ok(words.has('jambon') && words.has('fromage'));
+  assert.ok(!words.has('framboise'), 'weak posts are not hits');
+  assert.equal(hitBoost(words, 'Croque au jambon et fromage'), 2);
+  assert.equal(hitBoost(words, 'Tarte aux pommes'), 1);
+  assert.equal(hitBoost(new Map(), 'Croque au jambon'), 1);
+});

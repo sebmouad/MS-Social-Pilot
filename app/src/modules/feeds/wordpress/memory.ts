@@ -263,3 +263,21 @@ export function captionGuidance(tips: readonly CaptionTip[]): string[] {
   };
   return tips.map(tip => text[tip.code]);
 }
+
+/**
+ * What the biggest hits share (2026-11-19, owner: favour hit content on every Page). From the `top` posts by reach
+ * across all Pages, the title words found in at least `min` of them, with how many hits have each.
+ */
+export function hitWords(posts: ReadonlyArray<{ title: string; reach: number }>, top = 30, min = 2): Map<string, number> {
+  const counts = new Map<string, number>();
+  for (const post of [...posts].sort((a, b) => b.reach - a.reach).slice(0, top)) for (const word of titleWords(post.title)) counts.set(word, (counts.get(word) ?? 0) + 1);
+  return new Map([...counts].filter(([, count]) => count >= min));
+}
+
+/** A recipe's boost from hit words: ×1 with none, up to ×2 with two or more (the most common hit words count most). */
+export function hitBoost(words: ReadonlyMap<string, number>, title: string): number {
+  if (!words.size) return 1;
+  const most = Math.max(...words.values());
+  const matched = titleWords(title).reduce((sum, word) => sum + (words.get(word) ?? 0) / most, 0);
+  return 1 + Math.min(1, matched / 2 + (matched > 0 ? 0.25 : 0));
+}

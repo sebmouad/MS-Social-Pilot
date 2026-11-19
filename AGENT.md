@@ -453,3 +453,12 @@ ads_management (owner asked to rework Ads like Meta Ads Manager first). The subm
 - Queued posts too (2026-11-19): each planner run, a queued recipe post going out in 3 h–3 days with a title rated
   ≥ 7 and its own photo ≤ 5 gets a generated photo: made first, then the post goes back to draft, takes it and is
   scheduled again at the same time (re-scheduled as it was if the change fails). Same daily cap and Page stop rule.
+
+### 7.1m Hit content on every Page (2026-11-19, owner's choice)
+- Reach is all in the hits (median post 61, top 401k). Each choosing run reads the 30 biggest posts of the last 60 days
+  on the source's Pages (`hitPosts`, app and outside posts) and keeps the title words in ≥ 2 of them (`hitWords`:
+  fromage, jambon, saumon fumé, gaufre, terrine, quiche…). A recipe's expected value on any Page is multiplied by
+  `hitBoost` (×1 with none, up to ×2), on top of that Page's own memory.
+- AI photos are off (`ai.imagePolicy.enabled` false) since the owner judged the studio-style photos not viral: the posts'
+  real Facebook pictures are step-by-step collages (4 steps + big final shot), as are 11 of the top 12. Collage examples
+  are being shown to the owner before any comes back on.

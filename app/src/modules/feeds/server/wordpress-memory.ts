@@ -100,3 +100,12 @@ export async function photosToLearn(sourceId: string, now: Date, limit: number):
   const external = outside.map(row => ({ id: `ext:${row.id}`, imageUrl: row.pictureUrl }));
   return [...withMedia.slice(0, limit - external.length), ...external];
 }
+
+/** The biggest posts of the last 60 days on these Pages (app and outside posts), with their reach: what hits share (2026-11-19). */
+export async function hitPosts(pageIds: readonly string[], now: Date, limit = 30): Promise<Array<{ title: string; reach: number }>> {
+  if (!pageIds.length) return [];
+  const rows = await prisma.$queryRaw<Array<{ message: string | null; insights: unknown }>>`SELECT ep.message, ep.insights FROM external_posts ep
+    WHERE ep."targetId" = ANY(${[...pageIds]}::text[]) AND ep.insights IS NOT NULL AND ep."createdTime" > ${new Date(now.getTime() - 60 * 86_400_000)}`;
+  return rows.flatMap(row => { const f = figures(row.insights); const text = (row.message ?? '').trim(); return f && text ? [{ title: (text.split(/\n|(?<=[.!?…])\s/)[0] ?? '').slice(0, 140), reach: f.reach }] : []; })
+    .sort((a, b) => b.reach - a.reach).slice(0, limit);
+}

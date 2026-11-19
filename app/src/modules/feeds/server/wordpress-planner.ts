@@ -7,7 +7,7 @@ import { autopilotOf, type AutopilotSettings } from '../wordpress/autopilot';
 import { prismaScoringPorts, pageLearning, PHOTO_BATCH, type ScoringPorts, type Rating } from './wordpress-scoring';
 import { makePicker } from './wordpress-pick';
 import { guessKind, type RecipeKind } from '../wordpress/score';
-import { captionGuidance, memoryModel } from '../wordpress/memory';
+import { captionGuidance, hitBoost, hitWords, memoryModel } from '../wordpress/memory';
 import { bestStyle, captionPrompt, cleanCaption, ctaFor, opensLike, styleFor, voiceFor, withCta, type HookStyle } from '../wordpress/caption';
 import { instantToWall } from '@/lib/calendar-dates';
 import { allocateRecipes, channelConfig, recipeTitleKey, buildImageUrl, buildPermalink, reportedPermalink, parseRecipe, renderComment, resolveConfig, slotInstants, type PlanConfig, type Recipe, type SlotNeed } from '../wordpress/recipe';
@@ -266,8 +266,13 @@ async function prepareChoosing(ctx: Ctx, source: SourceRow, config: PlanConfig, 
     const left = photos ? await photos.generationsLeft(source.workspaceId, now).catch(() => 0) : 0;
     if (photos && left > 0) replacesPhoto = (targetId, rating) => typeof rating.photo === 'number' && rating.photo <= photos.LOW_APPEAL && (rating.hook ?? 0) >= photos.STRONG_HOOK && (!targetId || model?.generatedPhotosOk(targetId) !== false);
   }
-  const history = (targetId: string | null, title: string, kind: RecipeKind | null, slotAt: Date | null, photo?: { traits?: readonly string[] | null; appeal?: number | null } | null) =>
-    (model && targetId && memories.has(targetId) ? model.contentValue(targetId, title, kind, slotAt, config.timezone, photo) : null) ?? recent(targetId, title);
+  // What the biggest hits share counts on every Page (2026-11-19, owner's choice), on top of each Page's own memory.
+  const hits = hitWords(await import('./wordpress-memory').then(m => m.hitPosts(pages.map(page => page.id), now)).catch(() => []));
+  const history = (targetId: string | null, title: string, kind: RecipeKind | null, slotAt: Date | null, photo?: { traits?: readonly string[] | null; appeal?: number | null } | null) => {
+    const own = (model && targetId && memories.has(targetId) ? model.contentValue(targetId, title, kind, slotAt, config.timezone, photo) : null) ?? recent(targetId, title);
+    const boost = hitBoost(hits, title);
+    return own === null ? (boost > 1 ? boost : null) : own * boost;
+  };
   // Past winners: the best tenth of published recipes (and clearly above usual), back after the cooldown.
   const best = new Map<string, number>();
   for (const o of outcomes) best.set(o.wpPostId, Math.max(best.get(o.wpPostId) ?? 0, o.relative));
