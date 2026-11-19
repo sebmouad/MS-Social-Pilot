@@ -61,7 +61,7 @@ export async function generateRecipePhoto(actor: { userId: string; workspaceId: 
   }
 }
 
-type Queued = { id: string; postId: string; targetId: string; wpPostId: string; title: string; message: string; firstComment: string | null; firstCommentDelayMinutes: number | null; media: unknown; scheduledAt: Date; photo: number };
+type Queued = { id: string; postId: string; targetId: string; wpPostId: string; title: string; message: string; firstComment: string | null; firstCommentDelayMinutes: number | null; media: unknown; scheduledAt: Date; photo: number; hook: number | null };
 
 /**
  * New photos for posts already queued (2026-11-19): a queued recipe post with a strong title (STRONG_HOOK) and a weak
@@ -73,17 +73,22 @@ export async function upgradeQueuedPhotos(actor: { userId: string; workspaceId: 
   let left = await generationsLeft(actor.workspaceId, now);
   if (left <= 0) return [];
   const rows = await prisma.$queryRaw<Queued[]>`
-    SELECT l.id, l."postId", l."targetId", l."wpPostId", l.title, p.message, p."firstComment", p."firstCommentDelayMinutes", p.media, p."scheduledAt", r.photo
+    SELECT l.id, l."postId", l."targetId", l."wpPostId", l.title, p.message, p."firstComment", p."firstCommentDelayMinutes", p.media, p."scheduledAt", r.photo, r.hook
     FROM wordpress_recipe_plans l JOIN posts p ON p.id = l."postId" JOIN recipe_ratings r ON r."sourceId" = l."sourceId" AND r."wpPostId" = l."wpPostId"
     WHERE l."sourceId" = ${sourceId} AND l.state = 'planned' AND l."imageSource" IS DISTINCT FROM 'generated' AND p.status::text = 'scheduled'
       AND p."scheduledAt" > ${new Date(now.getTime() + 3 * 3_600_000)} AND p."scheduledAt" < ${new Date(now.getTime() + 3 * 86_400_000)}
-      AND r.photo <= ${LOW_APPEAL} AND r.hook >= ${STRONG_HOOK}
-    ORDER BY r.hook DESC, p."scheduledAt" ASC LIMIT 20`;
+      AND r.photo <= ${LOW_APPEAL}
+    ORDER BY r.hook DESC NULLS LAST, p."scheduledAt" ASC LIMIT 60`;
+  // A strong title, or a recipe sharing what the Pages' biggest hits share (2026-11-19, owner: favour hit content).
+  const { hitPosts } = await import('./wordpress-memory');
+  const { hitBoost, hitWords } = await import('../wordpress/memory');
+  const hits = hitWords(await hitPosts([...new Set(rows.map(row => row.targetId))], now).catch(() => []));
+  const worth = (row: Queued) => (row.hook ?? 0) >= STRONG_HOOK || hitBoost(hits, row.title) > 1;
   const { cancelScheduledPost, updatePost, schedulePost } = await import('@/modules/publishing/server/lifecycle');
   const made: Array<{ targetId: string; title: string; appeal: number }> = [];
   for (const row of rows) {
     if (left <= 0) break;
-    if (!pageOk(row.targetId)) continue;
+    if (!pageOk(row.targetId) || !worth(row)) continue;
     left -= 1;
     const image = await generateRecipePhoto(actor, { title: row.title, ingredients: [], steps: [], fileName: `${row.wpPostId}-new.jpg`, settings, wpPostId: row.wpPostId }, ports);
     const first = Array.isArray(row.media) ? (row.media as Array<{ altText?: string }>)[0] : undefined;
