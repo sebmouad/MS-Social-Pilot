@@ -129,3 +129,15 @@ test('a Graph error reaches the caller instead of passing as success', async () 
   const { engine } = engineWith([{ method: 'POST', path: /^\/111\/feed$/, status: 400, reply: { error: { message: '(#200) The user hasn\'t authorized the application', code: 200 } } }]);
   await assert.rejects(engine.publish({ accessToken: 'PAGE-TOKEN', targetId: '111', text: 'x' } as never));
 });
+
+test('AI-generated mark: an existing Page post is edited with is_ai_generated=true through Graph API v27.0, Page token, signed', async () => {
+  const graph = fakeGraph([{ method: 'POST', path: /^\/111_222$/, reply: { success: true } }]);
+  const urls: string[] = [];
+  const engine = createFacebookEngine(facebookConfig, (input, init) => { urls.push(String(input)); return graph.fetch(input, init); });
+  await engine.discloseAiGenerated!('PAGE-TOKEN', '111_222');
+  assert.match(urls[0]!, /\/v27\.0\/111_222$/);
+  assert.equal(graph.sent[0]!.method, 'POST');
+  assert.equal(graph.sent[0]!.body.is_ai_generated, 'true');
+  assert.equal(graph.sent[0]!.token, 'PAGE-TOKEN');
+  assert.ok(graph.sent[0]!.proof);
+});

@@ -660,6 +660,16 @@ export async function runRecipePlanning(overrides: Partial<PlannerPorts> & { aut
           (outcome.generated ??= []).push(...upgraded);
         } catch (error) { outcome.photoProblem = String(error instanceof Error ? error.message : error).slice(0, 200); }
       }
+      // « AI info » on published recipe posts (2026-11-19, ./wordpress-ai-disclosure.ts), when photos are labelled as AI-made.
+      if (!overrides.autopilot && settings.image.aiLabel) {
+        try {
+          const { discloseAiPosts } = await import('./wordpress-ai-disclosure');
+          const tagged = await discloseAiPosts(source.workspaceId, source.id, now);
+          if (tagged.done) entries.push({ at: now.toISOString(), kind: 'healing', code: 'aiTagged', params: { count: tagged.done }, text: `${tagged.done} posts marked as AI-generated.` });
+          if (tagged.problem && !(pilot.log ?? []).some(entry => entry.code === 'aiTagFailed' && now.getTime() - Date.parse(entry.at) < 86_400_000))
+            entries.push({ at: now.toISOString(), kind: 'healing', code: 'aiTagFailed', params: { why: tagged.problem }, text: 'Facebook did not accept the AI-generated mark.' });
+        } catch { /* never stops planning */ }
+      }
       for (const made of outcome.generated ?? []) entries.push({ at: now.toISOString(), kind: 'supply', channelId: made.targetId, code: 'photoMade', params: { title: made.title, appeal: made.appeal }, text: `New photo generated for « ${made.title} ».` });
       if (outcome.photoProblem && !(pilot.log ?? []).some(entry => entry.code === 'photoNotMade' && now.getTime() - Date.parse(entry.at) < 86_400_000))
         entries.push({ at: now.toISOString(), kind: 'healing', code: 'photoNotMade', params: { why: outcome.photoProblem }, text: 'A new photo could not be generated.' });

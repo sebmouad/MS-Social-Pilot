@@ -5,7 +5,7 @@ import type { AutopilotLogEntry } from './wordpress/autopilot';
  * written when shown, so a French page reads French. Entries saved before codes existed are recognised by their English
  * sentence and written the same way (2026-11-17); any other text is shown as saved.
  */
-export type LogCode = 'photosUnread' | 'replanned' | 'stranded' | 'refilled' | 'publishFailed' | 'channelHeld' | 'hot' | 'hotShort' | 'breathe' | 'spread' | 'notSpread' | 'radarFailed' | 'photoMade' | 'photoNotMade' | 'replacedOpen';
+export type LogCode = 'photosUnread' | 'replanned' | 'stranded' | 'refilled' | 'publishFailed' | 'channelHeld' | 'hot' | 'hotShort' | 'breathe' | 'spread' | 'notSpread' | 'radarFailed' | 'photoMade' | 'photoNotMade' | 'replacedOpen' | 'aiTagged' | 'aiTagFailed';
 
 const TEXT: Record<'en' | 'fr', Record<LogCode, string>> = {
   en: {
@@ -24,6 +24,8 @@ const TEXT: Record<'en' | 'fr', Record<LogCode, string>> = {
     photoMade: 'New photo generated for « {title} »: the recipe’s own photo was rated {appeal}/10.',
     photoNotMade: 'A new photo could not be generated ({why}); the recipe’s own photo went out.',
     replacedOpen: 'Re-planned with this Page’s memory: « {from} » (expected ×{fromValue}) removed; a stronger recipe takes {time}.',
+    aiTagged: '{count} published posts marked as AI-generated on Facebook (« AI info »).',
+    aiTagFailed: 'Facebook did not accept the AI-generated mark: {why}',
   },
   fr: {
     stranded: '« {title} » est resté incertain après une exécution interrompue et n’a jamais été créé ; son horaire est replanifié.',
@@ -41,6 +43,8 @@ const TEXT: Record<'en' | 'fr', Record<LogCode, string>> = {
     photoMade: 'Nouvelle photo générée pour « {title} » : la photo de la recette était notée {appeal}/10.',
     photoNotMade: 'Une nouvelle photo n’a pas pu être générée ({why}) ; la photo de la recette est partie.',
     replacedOpen: 'Replanifié avec la mémoire de cette Page : « {from} » (attendu ×{fromValue}) retirée ; une recette plus forte prend {time}.',
+    aiTagged: '{count} publications marquées comme générées par IA sur Facebook (« Info IA »).',
+    aiTagFailed: 'Facebook n’a pas accepté la mention IA : {why}',
   },
 };
 const WHY: Record<'en' | 'fr', { already: string; noSlot: string; refused: string; none: string; others: string }> = {

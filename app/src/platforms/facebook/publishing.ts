@@ -27,6 +27,8 @@ export class FacebookMediaRecoveryError extends FacebookApiError {
   }
 }
 
+/** First Graph API version with the Page post AI-generated self-disclosure (Meta changelog v27.0, 4 Nov 2026). */
+export const AI_DISCLOSURE_GRAPH_VERSION = 'v27.0';
 export interface FacebookPage { id: string; name: string; category: string | null; accessToken: string }
 /** `profileUrl` is the profile's own link, only when the connection was granted user_link; Facebook shares no usernames. */
 export interface FacebookCurrentUser { id: string; name: string; pictureUrl: string | null; profileUrl: string | null }
@@ -88,6 +90,8 @@ export interface FacebookEngine {
   deletePhoto(accessToken: string, remoteId: string, onDispatch?: () => void, onConfirmed?: () => void): Promise<void>;
   listInbox(accessToken: string, pageId: string, bounds?: FacebookInboxBounds): Promise<FacebookDiscovered<FacebookConversation>>;
   listComments(accessToken: string, postId: string, bounds?: FacebookInboxBounds): Promise<FacebookDiscovered<FacebookComment>>;
+  /** Marks a published Page post as AI-generated (« AI info »), through Graph API v27.0's `is_ai_generated`, which Meta accepts only when editing an existing post (2026-11-19). */
+  discloseAiGenerated?(accessToken: string, postId: string): Promise<void>;
   /** Empty when Meta no longer serves Page ratings on any version. */
   listReviews(accessToken: string, pageId: string): Promise<InboxReview[]>;
   getPageAnalytics(accessToken: string, pageId: string, since?: Date, until?: Date): Promise<Record<string, number | null>>;
@@ -149,9 +153,9 @@ export function createFacebookEngine(rawConfig: FacebookConfig, fetchImpl: Faceb
     if (!config.appSecret) throw new FacebookApiError('Facebook app secret is required for signed Graph requests.', 0);
     return facebookAppSecretProof(token, config.appSecret);
   };
-  async function request<T = unknown>(path: string, options: { method?: string; token: string; params?: Record<string, string | number | undefined>; body?: Record<string, string | undefined>; file?: { bytes: Uint8Array; mimeType: string; fileName: string }; onDispatch?: () => void; onSuccess?: (payload: T) => Promise<void> | void } ): Promise<T> {
+  async function request<T = unknown>(path: string, options: { method?: string; token: string; params?: Record<string, string | number | undefined>; body?: Record<string, string | undefined>; file?: { bytes: Uint8Array; mimeType: string; fileName: string }; onDispatch?: () => void; onSuccess?: (payload: T) => Promise<void> | void; version?: string } ): Promise<T> {
     assertOperationActive();
-    const url = graphObjectUrl(config, path);
+    const url = graphObjectUrl(options.version ? { ...config, graphVersion: options.version } : config, path);
     if (options.method !== 'POST') {
       for (const [key, value] of Object.entries(options.params ?? {})) if (value !== undefined) url.searchParams.set(key, String(value));
       url.searchParams.set('access_token', options.token);
@@ -614,6 +618,10 @@ export function createFacebookEngine(rawConfig: FacebookConfig, fetchImpl: Faceb
       if (version !== config.graphVersion) return createFacebookEngine({ ...rawConfig, graphVersion: version }, fetchImpl, operationSignalOrJournalFactory, suppliedJournalFactory).listReviews(token, pageId);
       const raw = await pages<JsonObject>(collectionUrl(`${encodeURIComponent(pageId)}/ratings`, token, FACEBOOK_RATINGS_FIELDS), token);
       return raw.flatMap(item => { const review = mapFacebookReview(item); return review ? [review] : []; });
+    },
+    async discloseAiGenerated(token, postId) {
+      // The setting exists from v27.0 only; the rest of the app stays on its configured version.
+      await request(encodeURIComponent(postId), { method: 'POST', token, body: { is_ai_generated: 'true' }, version: AI_DISCLOSURE_GRAPH_VERSION });
     },
     async listComments(token, postId, bounds) {
       // filter=stream returns replies flattened beside top-level comments (each carries parent{id}), so stored threads can nest them.

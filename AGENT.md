@@ -463,3 +463,11 @@ ads_management (owner asked to rework Ads like Meta Ads Manager first). The subm
   real Facebook pictures are step-by-step collages (4 steps + big final shot), as are 11 of the top 12. Collage examples
   were shown and approved (19 Nov): `photoPrompt` now asks for that collage (ingredients, 3 steps, big final shot at its
   most tempting moment), and generation is back on.
+
+### 7.1n « AI info » on Facebook (2026-11-19)
+- The IPTC marker in the photos (`labelPhotosAsAi`) did not make Facebook show « AI info »: Meta does not document reading
+  it on API uploads. Graph API v27.0 (4 Nov 2026) added `is_ai_generated`, accepted only when editing an existing post
+  (`POST /{post-id}`). `discloseAiGenerated` (Facebook client) sends it through v27.0 for that call only (the app stays on
+  `meta.graphVersion`). `server/wordpress-ai-disclosure.ts` marks the autopilot's recipe posts published in the last 7
+  days, once each (audit `autopilot.ai_disclosed`), after each planner run while `labelPhotosAsAi` is on; the first
+  failure stops the batch and is logged (`aiTagFailed`, once a day).
