@@ -450,3 +450,6 @@ ads_management (owner asked to rework Ads like Meta Ads Manager first). The subm
   `autopilot.photo_generated`). Any problem: the recipe's own photo goes out.
 - The plan row records `imageSource` (`site` / `generated`, migration 0022); the memory learns it as `g:<source>`.
   `generatedPhotosOk`: once a Page has 5 settled posts of each, generated photos stop there if they do ≥ 15 % worse.
+- Queued posts too (2026-11-19): each planner run, a queued recipe post going out in 3 h–3 days with a title rated
+  ≥ 7 and its own photo ≤ 5 gets a generated photo: made first, then the post goes back to draft, takes it and is
+  scheduled again at the same time (re-scheduled as it was if the change fails). Same daily cap and Page stop rule.

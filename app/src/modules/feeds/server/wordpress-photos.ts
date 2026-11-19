@@ -59,3 +59,41 @@ export async function generateRecipePhoto(actor: { userId: string; workspaceId: 
     await fsMediaStore.removeImage(actor.workspaceId, made.id, true).catch(() => undefined);
   }
 }
+
+type Queued = { id: string; postId: string; targetId: string; wpPostId: string; title: string; message: string; firstComment: string | null; firstCommentDelayMinutes: number | null; media: unknown; scheduledAt: Date; photo: number };
+
+/**
+ * New photos for posts already queued (2026-11-19): a queued recipe post with a strong title (STRONG_HOOK) and a weak
+ * photo (LOW_APPEAL), going out between 3 hours and 3 days from now, gets a generated photo. The photo is made first;
+ * the post then goes back to draft, takes the new photo and is scheduled again at the same time. If the change fails,
+ * the post is scheduled again as it was. Within the same daily cap as new posts; not on Pages where they do worse.
+ */
+export async function upgradeQueuedPhotos(actor: { userId: string; workspaceId: string }, sourceId: string, settings: ImageSettings, ports: ImagePorts, now: Date, pageOk: (targetId: string) => boolean): Promise<Array<{ targetId: string; title: string; appeal: number }>> {
+  let left = await generationsLeft(actor.workspaceId, now);
+  if (left <= 0) return [];
+  const rows = await prisma.$queryRaw<Queued[]>`
+    SELECT l.id, l."postId", l."targetId", l."wpPostId", l.title, p.message, p."firstComment", p."firstCommentDelayMinutes", p.media, p."scheduledAt", r.photo
+    FROM wordpress_recipe_plans l JOIN posts p ON p.id = l."postId" JOIN recipe_ratings r ON r."sourceId" = l."sourceId" AND r."wpPostId" = l."wpPostId"
+    WHERE l."sourceId" = ${sourceId} AND l.state = 'planned' AND l."imageSource" IS DISTINCT FROM 'generated' AND p.status::text = 'scheduled'
+      AND p."scheduledAt" > ${new Date(now.getTime() + 3 * 3_600_000)} AND p."scheduledAt" < ${new Date(now.getTime() + 3 * 86_400_000)}
+      AND r.photo <= ${LOW_APPEAL} AND r.hook >= ${STRONG_HOOK}
+    ORDER BY r.hook DESC, p."scheduledAt" ASC LIMIT 20`;
+  const { cancelScheduledPost, updatePost, schedulePost } = await import('@/modules/publishing/server/lifecycle');
+  const made: Array<{ targetId: string; title: string; appeal: number }> = [];
+  for (const row of rows) {
+    if (left <= 0) break;
+    if (!pageOk(row.targetId)) continue;
+    left -= 1;
+    const image = await generateRecipePhoto(actor, { title: row.title, ingredients: [], traits: [], fileName: `${row.wpPostId}-new.jpg`, settings, wpPostId: row.wpPostId }, ports);
+    const first = Array.isArray(row.media) ? (row.media as Array<{ altText?: string }>)[0] : undefined;
+    await cancelScheduledPost(actor, row.postId);
+    try {
+      await updatePost(actor, { postId: row.postId, message: row.message, firstComment: row.firstComment ?? '', targetIds: [row.targetId], media: [{ kind: 'image', url: `media:${image.mediaId}`, altText: first?.altText ?? row.title }], ...(row.firstCommentDelayMinutes === null ? {} : { firstCommentDelayMinutes: row.firstCommentDelayMinutes }) });
+    } finally {
+      await schedulePost(actor, row.postId, row.scheduledAt);
+    }
+    await prisma.$executeRaw`UPDATE wordpress_recipe_plans SET "imageSource" = 'generated', "updatedAt" = NOW() WHERE id = ${row.id}`;
+    made.push({ targetId: row.targetId, title: row.title.slice(0, 120), appeal: row.photo });
+  }
+  return made;
+}

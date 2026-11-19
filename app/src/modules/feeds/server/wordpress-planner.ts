@@ -645,6 +645,16 @@ export async function runRecipePlanning(overrides: Partial<PlannerPorts> & { aut
         }
       } catch { /* the autopilot never stops planning */ }
       const outcome = await planSource({ settings, ports, db, budget, now, ...(makeup ? { makeup } : {}) }, source, auth);
+      // Queued posts with a strong title and a weak photo get a new photo too (2026-11-19, ./wordpress-photos.ts).
+      if (!overrides.autopilot && ports.generatePhotos && await ports.writer.available(source.workspaceId).catch(() => false)) {
+        try {
+          const photos = await import('./wordpress-photos');
+          const { readPageMemories } = await import('./wordpress-memory');
+          const model = memoryModel(await readPageMemories(source.id));
+          const upgraded = await photos.upgradeQueuedPhotos({ userId: auth.actor.userId, workspaceId: source.workspaceId }, source.id, settings.image, ports.image, now, targetId => model.generatedPhotosOk(targetId));
+          (outcome.generated ??= []).push(...upgraded);
+        } catch (error) { outcome.photoProblem = String(error instanceof Error ? error.message : error).slice(0, 200); }
+      }
       for (const made of outcome.generated ?? []) entries.push({ at: now.toISOString(), kind: 'supply', channelId: made.targetId, code: 'photoMade', params: { title: made.title, appeal: made.appeal }, text: `New photo generated for « ${made.title} ».` });
       if (outcome.photoProblem && !(pilot.log ?? []).some(entry => entry.code === 'photoNotMade' && now.getTime() - Date.parse(entry.at) < 86_400_000))
         entries.push({ at: now.toISOString(), kind: 'healing', code: 'photoNotMade', params: { why: outcome.photoProblem }, text: 'A new photo could not be generated.' });
