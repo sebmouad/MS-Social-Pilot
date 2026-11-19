@@ -24,6 +24,8 @@ export interface RecipeStore {
   pages(source: SourceRow, types: readonly string[], limit: number): Promise<Array<{ id: string; name: string }>>;
   ledgerSince(sourceId: string, from: Date): Promise<LedgerRow[]>;
   expireStale(sourceId: string, before: Date): Promise<number>;
+  /** Upcoming planned slots whose post a member moved back to draft are released (2026-11-19); optional for test stores. */
+  releaseDrafted?(sourceId: string, now: Date): Promise<number>;
   claim(input: ClaimInput): Promise<string | null>;
   settle(workspaceId: string, id: string, settlement: Settlement): Promise<void>;
   recordRun(workspaceId: string, sourceId: string, run: RunRecord): Promise<void>;
@@ -81,6 +83,12 @@ export const prismaRecipeStore: RecipeStore = {
       LEFT JOIN post_targets pt ON pt."postId" = p.id AND pt."targetId" = l."targetId"
       WHERE l."sourceId" = $1 AND l."slotAt" >= $2`, sourceId, from);
     return rows.map(toLedger);
+  },
+  async releaseDrafted(sourceId, now) {
+    // The autopilot only ever creates scheduled posts, so a draft behind an upcoming planned slot was withdrawn by a member:
+    // the slot is released (cancelled), so the day's count and its free times are right again.
+    return prisma.$executeRaw`UPDATE wordpress_recipe_plans l SET state = 'failed', reason = 'cancelled', "updatedAt" = NOW() FROM posts p
+      WHERE p.id = l."postId" AND l."sourceId" = ${sourceId} AND l.state = 'planned' AND l."slotAt" > ${now} AND p.status::text = 'draft'`;
   },
   async expireStale(sourceId, before) {
     return prisma.$executeRaw`UPDATE wordpress_recipe_plans SET state = 'uncertain', reason = 'claim_expired', "updatedAt" = NOW() WHERE "sourceId" = ${sourceId} AND state = 'claimed' AND "claimedAt" < ${before}`;

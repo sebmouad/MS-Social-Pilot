@@ -329,6 +329,7 @@ export async function planSource(ctx: Ctx, source: SourceRow, auth: FeedAuthoriz
   const config = configOf(settings, source);
   const out: SourceOutcome = { sourceId: source.id, planned: 0, failed: 0, uncertain: 0, unfilled: 0, slots: 0, pages: 0, excludedPages: 0, scanned: 0 };
   await ports.store.expireStale(source.id, new Date(now.getTime() - settings.claimLeaseSeconds * 1000));
+  await ports.store.releaseDrafted?.(source.id, now).catch(() => 0);
 
   const candidatePages = await ports.store.pages(source, settings.targetTypes, settings.maxTargets);
   const pages: Array<{ id: string; name: string }> = [];

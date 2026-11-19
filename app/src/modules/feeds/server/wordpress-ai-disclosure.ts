@@ -7,8 +7,8 @@ import { decryptSecret } from '@/server/secret-crypto';
  * marker written into the photos (IPTC DigitalSourceType) is not what Facebook labels from when a photo is uploaded
  * through the API; Graph API v27.0 added `is_ai_generated`, accepted only when editing a post that already exists.
  * So each recipe post published in the last 7 days is marked once, after it is published; each success is recorded
- * in the audit trail (`autopilot.ai_disclosed`). The first failure stops the batch and is returned, so a missing
- * permission costs one request per run, not one per post.
+ * in the audit trail (`autopilot.ai_disclosed`), a refusal too, with Facebook's reason, so it is not tried again; the
+ * first refusal of a run is returned for the activity log.
  */
 export async function discloseAiPosts(workspaceId: string, sourceId: string, now: Date, limit = 20): Promise<{ done: number; problem: string | null }> {
   const rows = await prisma.$queryRaw<Array<{ id: string; remotePostId: string; targetId: string; token: string | null; accountToken: string | null }>>`
@@ -24,14 +24,16 @@ export async function discloseAiPosts(workspaceId: string, sourceId: string, now
   const { configuredFacebookEngine } = await import('@/platforms/facebook/runtime');
   const engine = await configuredFacebookEngine({});
   if (!engine.discloseAiGenerated) return { done: 0, problem: 'not supported' };
-  let done = 0;
+  let done = 0; let problem: string | null = null;
   for (const row of rows) {
     const sealed = row.token ?? row.accountToken;
     if (!sealed) continue;
+    let error: string | null = null;
     try { await engine.discloseAiGenerated(decryptSecret(sealed), row.remotePostId); }
-    catch (error) { return { done, problem: String(error instanceof Error ? error.message : error).slice(0, 200) }; }
-    await prisma.$executeRaw`INSERT INTO activity_logs (id, "workspaceId", "actorId", action, detail, "createdAt") VALUES (${randomUUID()}, ${workspaceId}, NULL, 'autopilot.ai_disclosed', ${JSON.stringify({ postTargetId: row.id, remotePostId: row.remotePostId })}::jsonb, NOW())`;
-    done += 1;
+    catch (caught) { error = String(caught instanceof Error ? caught.message : caught).slice(0, 200); }
+    // A post Facebook refuses is recorded with its reason and not tried again; the others carry on (2026-11-19).
+    await prisma.$executeRaw`INSERT INTO activity_logs (id, "workspaceId", "actorId", action, detail, "createdAt") VALUES (${randomUUID()}, ${workspaceId}, NULL, 'autopilot.ai_disclosed', ${JSON.stringify({ postTargetId: row.id, remotePostId: row.remotePostId, ...(error ? { error } : {}) })}::jsonb, NOW())`;
+    if (error) problem ??= error; else done += 1;
   }
-  return { done, problem: null };
+  return { done, problem };
 }
