@@ -15,21 +15,21 @@ export const LOW_APPEAL = 7;
 export const GENERATED_PER_DAY = 6;
 /** A title the AI rated this strong (0–10) is worth a new photo when its own is weak. */
 export const STRONG_HOOK = 7;
-const TRAIT_WORDS: Record<string, string> = {
-  close_up: 'close-up shot', overhead: 'shot from above', side_angle: 'side view', cheese_pull: 'melted cheese stretching', melting: 'melting texture', golden_crust: 'golden crust',
-  glossy_sauce: 'glossy sauce', steam: 'gentle steam', cut_open: 'one portion cut open to show the inside', generous_portion: 'generous portion', single_serving: 'single serving',
-  rustic: 'rustic cookware on a wooden table', elegant_plating: 'elegant plating', bright: 'bright natural light', colorful: 'colourful', hands: 'a hand serving', ingredients_around: 'a few fresh ingredients around',
-  plain_background: 'plain background',
-};
-
-export function photoPrompt(title: string, ingredients: readonly string[], traits: readonly string[]): string {
-  const look = traits.map(trait => TRAIT_WORDS[trait]).filter(Boolean);
-  return [
-    `Appetising, realistic food photograph for a French home-cooking Facebook page: ${title}.`,
-    ingredients.length ? `It contains ${ingredients.slice(0, 8).join(', ').slice(0, 300)}.` : '',
-    `${(look.length ? look : ['close-up shot', 'generous portion', 'warm natural light']).join(', ')}.`,
-    'Vertical photo, the dish fills the frame, looks home-made and delicious. No text, no logo, no watermark, no faces.',
-  ].filter(Boolean).join(' ');
+/**
+ * The owner's approved look (2026-11-19, after judging examples): the format of the Pages' own hits, a step-by-step
+ * collage (4 small step photos, then one big photo of the finished dish at its most tempting moment), real home-kitchen
+ * phone photos, no text. Kept under the image policy's 1000 characters.
+ */
+export function photoPrompt(title: string, ingredients: readonly string[], steps: readonly string[]): string {
+  const head = [
+    'One vertical image made of 5 real home-kitchen phone photos separated by thin white lines: two rows of 2 small square step photos on top, one big photo of the finished dish filling the bottom third.',
+    'Realistic, natural daylight, grey stone or wooden worktop, the cook hands visible in some steps, no text, no title, no logo, no faces.',
+    `Recipe: ${title.slice(0, 140)}.`,
+  ].join(' ');
+  const tail = ' Step 1: the main ingredients in small bowls on the worktop; steps 2 to 4: the key preparation steps of this recipe. Big final photo: close-up of the finished dish at its most tempting moment: melted cheese stretching, cut open to show the inside, or a spoon or hand lifting a generous portion.';
+  const room = 1000 - head.length - tail.length;
+  const facts = [ingredients.length ? ` Ingredients: ${ingredients.slice(0, 8).join(', ')}.` : '', steps.length ? ` Method: ${steps.slice(0, 6).join(' ')}` : ''].join('');
+  return head + (room > 0 ? facts.slice(0, room) : '') + tail;
 }
 
 /** How many more photos may be generated now (GENERATED_PER_DAY in the last 24 hours). */
@@ -44,9 +44,9 @@ export async function photoAppeal(sourceId: string, wpPostId: string): Promise<n
   return typeof rows[0]?.photo === 'number' ? rows[0].photo : null;
 }
 
-export async function generateRecipePhoto(actor: { userId: string; workspaceId: string }, input: { title: string; ingredients: readonly string[]; traits: readonly string[]; fileName: string; settings: ImageSettings; wpPostId: string }, ports: ImagePorts): Promise<{ mediaId: string }> {
+export async function generateRecipePhoto(actor: { userId: string; workspaceId: string }, input: { title: string; ingredients: readonly string[]; steps: readonly string[]; fileName: string; settings: ImageSettings; wpPostId: string }, ports: ImagePorts): Promise<{ mediaId: string }> {
   const { generateImage } = await import('@/modules/studio/content-tools/server/media');
-  const made = await generateImage(actor, { prompt: photoPrompt(input.title, input.ingredients, input.traits), size: 'portrait', confirmation: 'GENERATE IMAGE' }) as { id?: string };
+  const made = await generateImage(actor, { prompt: photoPrompt(input.title, input.ingredients, input.steps), size: 'portrait', confirmation: 'GENERATE IMAGE' }) as { id?: string };
   if (!made?.id) throw new Error('No picture was made.');
   const { readWorkspaceImage } = await import('@/modules/publishing/server/media/storage');
   const { fsMediaStore } = await import('@/modules/media/server/store');
@@ -85,7 +85,7 @@ export async function upgradeQueuedPhotos(actor: { userId: string; workspaceId: 
     if (left <= 0) break;
     if (!pageOk(row.targetId)) continue;
     left -= 1;
-    const image = await generateRecipePhoto(actor, { title: row.title, ingredients: [], traits: [], fileName: `${row.wpPostId}-new.jpg`, settings, wpPostId: row.wpPostId }, ports);
+    const image = await generateRecipePhoto(actor, { title: row.title, ingredients: [], steps: [], fileName: `${row.wpPostId}-new.jpg`, settings, wpPostId: row.wpPostId }, ports);
     const first = Array.isArray(row.media) ? (row.media as Array<{ altText?: string }>)[0] : undefined;
     await cancelScheduledPost(actor, row.postId);
     try {

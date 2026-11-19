@@ -307,13 +307,14 @@ test('memory: generated photos stop on a Page where they do clearly worse', asyn
   assert.equal(early.generatedPhotosOk('A'), true);
 });
 
-test('generated photo prompt: the dish, the Page\'s best photo traits, no text', async () => {
+test('generated photo prompt: the owner-approved step-by-step collage, the recipe, no text, within 1000 characters', async () => {
   const { photoPrompt } = await import('@/modules/feeds/server/wordpress-photos');
-  const prompt = photoPrompt('Gratin dauphinois', ['pommes de terre', 'crème'], ['cheese_pull', 'close_up', 'unknown']);
-  assert.match(prompt, /Gratin dauphinois/);
-  assert.match(prompt, /pommes de terre, crème/);
-  assert.match(prompt, /melted cheese stretching, close-up shot\./);
-  assert.match(prompt, /No text/);
+  const prompt = photoPrompt('Gratin dauphinois', ['pommes de terre', 'crème'], ['Éplucher les pommes de terre.', 'Cuire au four 1 h.']);
+  assert.match(prompt, /Recipe: Gratin dauphinois\./);
+  assert.match(prompt, /two rows of 2 small square step photos/);
+  assert.match(prompt, /Ingredients: pommes de terre, crème\./);
+  assert.match(prompt, /no text/);
+  assert.ok(photoPrompt('x'.repeat(140), Array(20).fill('ingrédient très long '.repeat(5)), Array(20).fill('étape '.repeat(40))).length <= 1000);
 });
 
 test('picker: a strong recipe with a weak photo is not passed over when a new photo will replace it', async () => {

@@ -461,4 +461,5 @@ ads_management (owner asked to rework Ads like Meta Ads Manager first). The subm
   `hitBoost` (×1 with none, up to ×2), on top of that Page's own memory.
 - AI photos are off (`ai.imagePolicy.enabled` false) since the owner judged the studio-style photos not viral: the posts'
   real Facebook pictures are step-by-step collages (4 steps + big final shot), as are 11 of the top 12. Collage examples
-  are being shown to the owner before any comes back on.
+  were shown and approved (19 Nov): `photoPrompt` now asks for that collage (ingredients, 3 steps, big final shot at its
+  most tempting moment), and generation is back on.

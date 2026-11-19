@@ -510,7 +510,7 @@ export async function planSource(ctx: Ctx, source: SourceRow, auth: FeedAuthoriz
           if (appeal !== null && appeal <= photos.LOW_APPEAL) {
             generationsLeft -= 1;
             image = await photos.generateRecipePhoto(mediaActor, { title: c.title, ingredients: c.recipe.ingredients.filter(line => !line.heading).map(line => line.text),
-              traits: prep?.model?.highlights(targetId, 4).photos.map(p => p.trait) ?? [], fileName: safeName(c.slug), settings: settings.image, wpPostId: c.wpPostId }, ports.image);
+              steps: c.recipe.steps.filter(line => !line.heading).map(line => line.text), fileName: safeName(c.slug), settings: settings.image, wpPostId: c.wpPostId }, ports.image);
             imageSource = 'generated';
             (out.generated ??= []).push({ targetId, title: c.title.slice(0, 120), appeal });
           }
