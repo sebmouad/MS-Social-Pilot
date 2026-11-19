@@ -342,3 +342,14 @@ test('hit words: what the biggest posts share boosts similar recipes on every Pa
   assert.equal(hitBoost(words, 'Tarte aux pommes'), 1);
   assert.equal(hitBoost(new Map(), 'Croque au jambon'), 1);
 });
+
+test('generated photo: the recipe facts come from the first comment, and the final shot stays true to the recipe', async () => {
+  const { recipeFacts, photoPrompt } = await import('@/modules/feeds/server/wordpress-photos');
+  const facts = recipeFacts('💬 Et vous ?\n\n🧂 Ingrédients :\n• 400 g de saumon fumé\n• 200 g de fromage frais\n\n👩‍🍳 Préparation :\n1. Mélanger le fromage frais.\n2. Rouler le saumon.');
+  assert.deepEqual(facts, { ingredients: ['400 g de saumon fumé', '200 g de fromage frais'], steps: ['Mélanger le fromage frais.', 'Rouler le saumon.'] });
+  const prompt = photoPrompt('Rouleau de saumon fumé', facts.ingredients, facts.steps);
+  assert.match(prompt, /Ingredients: 400 g de saumon fumé, 200 g de fromage frais\./);
+  assert.match(prompt, /Only ingredients from the list/);
+  assert.match(prompt, /a cold dish shows a neat slice/);
+  assert.ok(prompt.length <= 1000);
+});
