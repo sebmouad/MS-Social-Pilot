@@ -471,3 +471,6 @@ ads_management (owner asked to rework Ads like Meta Ads Manager first). The subm
   `meta.graphVersion`). `server/wordpress-ai-disclosure.ts` marks the autopilot's recipe posts published in the last 7
   days, once each (audit `autopilot.ai_disclosed`), after each planner run while `labelPhotosAsAi` is on; the first
   failure stops the batch and is logged (`aiTagFailed`, once a day).
+- 2026-11-19 (owner): photos are kept as downloaded from WordPress. A JPEG within `maxOutputBytes` is stored and posted
+  byte for byte; WebP/PNG (or too large) is converted to JPEG with nothing added. No AI marker is written into any photo
+  any more; « AI info » comes only from `is_ai_generated` on the published post.

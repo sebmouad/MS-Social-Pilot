@@ -14,12 +14,10 @@ export class RecipeImageError extends Error {
 }
 export type ImageSettings = {
   fetch: FetchPolicy; maxPixels: number; quality: number; minQuality: number; qualityStep: number; maxOutputBytes: number;
-  /** Tag the photo as AI-made (IPTC digital source type), so Facebook can show « AI info » (2026-11-18, owner's choice). */
+  /** Mark the published posts as AI-generated on Facebook (« AI info », `is_ai_generated`, see ../server/wordpress-ai-disclosure.ts). Nothing is written into the photo itself (2026-11-19, owner: keep photos as downloaded). */
   aiLabel?: boolean;
 };
 
-/** IPTC « created by a trained algorithm » (AI-generated), in XMP, as Meta reads it for its « AI info » label. */
-export const AI_PHOTO_XMP = '<x:xmpmeta xmlns:x="adobe:ns:meta/"><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"><rdf:Description rdf:about="" xmlns:Iptc4xmpExt="http://iptc.org/std/Iptc4xmpExt/2008-02-29/"><Iptc4xmpExt:DigitalSourceType>http://cv.iptc.org/newscodes/digitalsourcetype/trainedAlgorithmicMedia</Iptc4xmpExt:DigitalSourceType></rdf:Description></rdf:RDF></x:xmpmeta>';
 export type ImagePorts = {
   download(url: string, policy: FetchPolicy): Promise<Buffer>;
   inspect(bytes: Buffer): Promise<void>;
@@ -27,13 +25,19 @@ export type ImagePorts = {
   store(actor: MediaActor, bytes: Buffer, name: string): Promise<{ id: string }>;
 };
 
-/** Quality is lowered in steps until the file fits; a file that still does not fit is refused. */
-export async function convertToJpeg(bytes: Buffer, s: Pick<ImageSettings, 'maxPixels' | 'quality' | 'minQuality' | 'qualityStep' | 'maxOutputBytes' | 'aiLabel'>): Promise<Buffer> {
+/**
+ * The photo as Facebook gets it. A JPEG within the limits goes out exactly as downloaded, byte for byte (2026-11-19,
+ * owner: keep images as downloaded from WordPress); anything else (WebP, PNG, too large) becomes a JPEG, with nothing
+ * added. Quality is lowered in steps until the file fits; a file that still does not fit is refused.
+ */
+export async function convertToJpeg(bytes: Buffer, s: Pick<ImageSettings, 'maxPixels' | 'quality' | 'minQuality' | 'qualityStep' | 'maxOutputBytes'>): Promise<Buffer> {
+  const meta = await sharp(bytes, { failOn: 'error', limitInputPixels: s.maxPixels }).metadata();
+  if (meta.format === 'jpeg' && bytes.length <= s.maxOutputBytes) return bytes;
   const floor = Math.min(s.minQuality, s.quality);
   let quality = s.quality;
   for (;;) {
     const image = sharp(bytes, { failOn: 'error', limitInputPixels: s.maxPixels }).rotate().flatten({ background: '#ffffff' }).jpeg({ quality });
-    const out = await (s.aiLabel ? image.withXmp(AI_PHOTO_XMP) : image).toBuffer();
+    const out = await image.toBuffer();
     if (out.length <= s.maxOutputBytes) return out;
     if (quality <= floor) throw new RecipeImageError('image_too_large');
     quality = Math.max(floor, quality - s.qualityStep);

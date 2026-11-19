@@ -223,15 +223,18 @@ test('memory: what a photo shows is learned per Page and counts for a candidate'
   assert.ok(model.highlights('A').photos.some(p => p.trait === 'cheese_pull'));
 });
 
-test('photos: with the AI label on, the uploaded JPEG carries the IPTC « made by AI » tag; off, it does not', async () => {
+test('photos: a JPEG goes out exactly as downloaded; a PNG becomes a JPEG with nothing added', async () => {
   const sharp = (await import('sharp')).default;
   const { convertToJpeg } = await import('@/modules/feeds/wordpress/image');
-  const source = await sharp({ create: { width: 64, height: 64, channels: 3, background: '#c86' } }).png().toBuffer();
   const settings = { maxPixels: 1_000_000, quality: 80, minQuality: 60, qualityStep: 5, maxOutputBytes: 1_000_000 };
-  const tagged = await convertToJpeg(source, { ...settings, aiLabel: true });
-  const plain = await convertToJpeg(source, settings);
-  assert.match(String((await sharp(tagged).metadata()).xmp ?? ''), /digitalsourcetype\/trainedAlgorithmicMedia/);
-  assert.equal((await sharp(plain).metadata()).xmp, undefined);
+  const jpeg = await sharp({ create: { width: 64, height: 64, channels: 3, background: '#c86' } }).jpeg({ quality: 95 }).withMetadata().toBuffer();
+  assert.ok((await convertToJpeg(jpeg, settings)).equals(jpeg), 'byte for byte');
+  const png = await sharp({ create: { width: 64, height: 64, channels: 3, background: '#c86' } }).png().toBuffer();
+  const converted = await convertToJpeg(png, settings);
+  assert.equal((await sharp(converted).metadata()).format, 'jpeg');
+  assert.equal((await sharp(converted).metadata()).xmp, undefined);
+  const big = await sharp({ create: { width: 900, height: 900, channels: 3, background: '#c86' }, }).jpeg({ quality: 100 }).toBuffer();
+  assert.ok((await convertToJpeg(big, { ...settings, maxOutputBytes: big.length - 1 })).length < big.length, 'a JPEG over the limit is made smaller');
 });
 
 test('memory: posts made outside the autopilot teach it too, with their format', async () => {
