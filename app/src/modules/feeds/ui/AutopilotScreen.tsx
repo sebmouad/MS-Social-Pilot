@@ -24,7 +24,8 @@ export default async function AutopilotScreen() {
   const locale = feedsLocale((await headers()).get('accept-language'));
   const t = (key: AutopilotCopyKey, values: Record<string, string | number> = {}) => autopilotText(locale, key, values);
   const viewer = await requireViewer({ feature: FEEDS_FEATURE_ID, channelScoped: true });
-  const actions = <><Link className="ui-button ui-button--quiet" href="/content/feeds">{t('recipes')}</Link><Link className="ui-button ui-button--secondary" href="/content/feeds#autopilot">{t('settings')}</Link></>;
+  // « Recettes et flux » is the hub's second tab (2026-11-20); only the direct way to the pilot's settings stays here.
+  const actions = <Link className="ui-button ui-button--secondary" href="/content/feeds#autopilot">{t('settings')}</Link>;
   const heading = <PageHeader module="publishing" title={t('title')} description={t('description')} actions={actions} />;
   let view;
   try { view = await readCockpit({ userId: viewer.user.id, workspaceId: viewer.workspaceId, ...(viewer.permissions.pageScope.all ? {} : { allowedTargetIds: [...viewer.permissions.pageScope.ids] }) }); }

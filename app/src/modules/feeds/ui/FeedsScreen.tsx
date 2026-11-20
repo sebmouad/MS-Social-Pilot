@@ -27,7 +27,8 @@ export default async function FeedsScreen({ searchParams }: { searchParams: Prom
   const t = (key: FeedsCopyKey, values: Record<string, string | number> = {}) => feedsText(locale, key, values, copy);
   const viewer = await requireViewer({ feature: FEEDS_FEATURE_ID, channelScoped: true });
   const params = await searchParams;
-  const heading = <PageHeader module="publishing" title={t('title')} description={t('description')} actions={<a className="ui-button ui-button--secondary" href="/content/autopilot">{locale === 'fr' ? 'Pilote automatique' : 'Autopilot'}</a>} />;
+  // The cockpit is the Pilot hub's first tab (2026-11-20), so the header needs no link to it.
+  const heading = <PageHeader module="publishing" title={t('title')} description={t('description')} />;
   if (Object.entries(params).some(([key, value]) => key !== 'page' || typeof value !== 'string') || (params.page && !/^[1-9]\d{0,5}$/.test(params.page))) return <>{heading}<RouteNotice error focusKey="feed-load-error">{t('invalidPage')}</RouteNotice></>;
   const actor = { userId: viewer.user.id, workspaceId: viewer.workspaceId };
   const canWrite = canAccessFeature(viewer.permissions, FEEDS_FEATURE_ID, 'write');

@@ -30,7 +30,7 @@ function Mark() {
 /** Hubs that carry a needs-attention badge, in hub order. */
 const BADGED_HUBS: readonly HubId[] = ["engage", "plan", "measure"];
 /** Phone bottom bar: the four page hubs; Create stays the raised central action. */
-const BOTTOM_HUBS: readonly HubId[] = ["plan", "engage", "measure", "grow"];
+const BOTTOM_HUBS: readonly HubId[] = ["pilot", "plan", "engage", "measure", "grow"];
 const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 type PaletteCopy = { trigger: string; placeholder: string; noResults: string; hint: string; close: string; sectionActions: string; sectionPages: string; sectionChannels: string };
@@ -335,7 +335,7 @@ export function AppShell({ children, activeModule, enabledModules, enabledFeatur
     ? [{ id: "home", href: "/home", label: copy.backToApp, icon: <ModuleGlyph id="home" size={22} />, active: false }, { id: "root", href: "/root", label: copy.root, icon: <ModuleGlyph id="root" size={22} />, active: true }]
     : BOTTOM_HUBS.filter(hubOn).map(hub => {
       const count = hubCount(hub);
-      return { id: hub, href: hubHref(hub), label: copy.hubs[hub], icon: <HubGlyph id={hub} size={22} />, active: activeHub === hub, ...(count > 0 ? { badge: count, badgeLabel: hubName(hub) } : {}) };
+      return { id: hub, href: hubHref(hub), label: (copy.hubsShort as Partial<Record<HubId, string>>)[hub] ?? copy.hubs[hub], icon: <HubGlyph id={hub} size={22} />, active: activeHub === hub, ...(count > 0 ? { badge: count, badgeLabel: hubName(hub) } : {}) };
     });
 
   const scopeActive = !settingsActive && activeArea !== "tasks" && activeArea !== "agency";

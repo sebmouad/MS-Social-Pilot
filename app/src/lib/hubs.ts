@@ -8,17 +8,25 @@
  *   plus the team task board once the workspace uses it.
  * - Engage: the inbox.
  * - Measure: insights.
+ * - Pilot: the recipe autopilot (its cockpit, then the recipe source and feeds), the owner's daily screen (2026-11-20).
+ *   It uses the content-feeds feature; its pages leave Plan's tabs.
  * - Grow: ads. Agency (all workspaces) is reached from the workspace menu, like Meta's business-portfolio list,
  *   and shows its own tabs without a hub (2026-11-14).
  */
 import { areaPages, pageForPath, type ModuleId, type ProductPage } from './product';
+import { FEEDS_FEATURE_ID } from '@/modules/feeds/manifest';
 import type { AreaId } from '@/modules/types';
 
-export type HubId = 'create' | 'plan' | 'engage' | 'measure' | 'grow';
-export const HUB_ORDER: readonly HubId[] = ['create', 'plan', 'engage', 'measure', 'grow'];
+export type HubId = 'create' | 'pilot' | 'plan' | 'engage' | 'measure' | 'grow';
+export const HUB_ORDER: readonly HubId[] = ['create', 'pilot', 'plan', 'engage', 'measure', 'grow'];
+
+/** The autopilot cockpit is a screen of the content-feeds feature, shown as the Pilot hub's first tab. */
+const AUTOPILOT_ROUTE = '/content/autopilot';
+const AUTOPILOT_PAGE = { id: 'publishing/autopilot', title: 'Autopilot', href: AUTOPILOT_ROUTE, module: 'publishing', area: 'content' } as unknown as ProductPage;
 
 /** Hub of one page, or undefined for the Home landing and Settings. */
 export function hubForPage(page: ProductPage): HubId | undefined {
+  if (page.id === FEEDS_FEATURE_ID) return 'pilot';
   switch (page.area) {
     case 'content': return page.module === 'studio' ? 'create' : 'plan';
     case 'tasks': return 'plan';
@@ -37,7 +45,8 @@ export function hubPages(hub: HubId, enabledFeatures: readonly string[], optiona
   const optional = new Set<AreaId>(optionalAreas);
   switch (hub) {
     case 'create': return areaPages('content', enabledFeatures).filter(page => page.module === 'studio');
-    case 'plan': return [...areaPages('content', enabledFeatures).filter(page => page.module !== 'studio'), ...(optional.has('tasks') ? areaPages('tasks', enabledFeatures) : [])];
+    case 'pilot': return enabledFeatures.includes(FEEDS_FEATURE_ID) ? [AUTOPILOT_PAGE, ...areaPages('content', enabledFeatures).filter(page => page.id === FEEDS_FEATURE_ID)] : [];
+    case 'plan': return [...areaPages('content', enabledFeatures).filter(page => page.module !== 'studio' && page.id !== FEEDS_FEATURE_ID), ...(optional.has('tasks') ? areaPages('tasks', enabledFeatures) : [])];
     case 'engage': return areaPages('inbox', enabledFeatures);
     case 'measure': return areaPages('insights', enabledFeatures);
     case 'grow': return areaPages('ads', enabledFeatures);
@@ -51,6 +60,7 @@ const HUB_BY_MODULE: Partial<Record<ModuleId, HubId>> = {
 
 /** Hub of a pathname; the Home landing and Settings return undefined. */
 export function hubForPath(pathname: string, fallbackModule?: ModuleId): HubId | undefined {
+  if (pathname === AUTOPILOT_ROUTE || pathname.startsWith(`${AUTOPILOT_ROUTE}/`)) return 'pilot';
   const page = pageForPath(pathname);
   if (page) return hubForPage(page);
   return (fallbackModule && HUB_BY_MODULE[fallbackModule]) ?? undefined;

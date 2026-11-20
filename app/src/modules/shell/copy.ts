@@ -8,10 +8,12 @@ const en = {
   hubTabsLabel: '{hub} sections',
   moreTabs: 'More',
   areas: { home: 'Home', content: 'Content', inbox: 'Inbox', insights: 'Insights', ads: 'Ads', tasks: 'Tasks', agency: 'Agency', settings: 'Settings' },
-  hubs: { create: 'Create', plan: 'Content', engage: 'Inbox', measure: 'Insights', grow: 'Ads' },
+  /** Shorter labels for the phone's bottom bar, where the full ones are cut. */
+  hubsShort: { pilot: 'Pilot' },
+  hubs: { create: 'Create', pilot: 'Autopilot', plan: 'Content', engage: 'Inbox', measure: 'Insights', grow: 'Ads' },
   pageTitles: {
     'home/overview': 'Overview', 'publishing/posts': 'Posts', 'publishing/calendar': 'Calendar', 'publishing/queue': 'Queue', 'publishing/approvals': 'Approvals',
-    'publishing/media': 'Library', 'publishing/feeds': 'Feeds', 'studio/ai-studio': 'AI studio', 'publishing/collaboration': 'Organize', 'publishing/labels': 'Labels', 'publishing/templates': 'Templates',
+    'publishing/media': 'Library', 'publishing/autopilot': 'Autopilot', 'publishing/feeds': 'Recipes & feeds', 'studio/ai-studio': 'AI studio', 'publishing/collaboration': 'Organize', 'publishing/labels': 'Labels', 'publishing/templates': 'Templates',
     'studio/agents': 'Writing agents', 'inbox/conversations': 'Inbox', 'analytics/overview': 'Overview', 'analytics/explorer': 'Explore', 'analytics/demographics': 'Audience',
     'analytics/compare': 'Compare', 'analytics/ads': 'Ads analysis', 'analytics/posts': 'Posts', 'studio/tests': 'Caption tests', 'analytics/goals': 'Goals', 'analytics/pins': 'Pinned metrics', 'analytics/reports': 'Reports', 'analytics/notes': 'Chart notes',
     'ads/overview': 'Overview', 'ads/compare': 'Compare', 'ads/objects': 'Manage', 'ads/campaigns': 'Campaigns', 'tasks/board': 'Tasks',
@@ -83,10 +85,11 @@ const fr = {
   hubTabsLabel: 'Sections : {hub}',
   moreTabs: 'Plus',
   areas: { home: 'Accueil', content: 'Contenu', inbox: 'Messages', insights: 'Statistiques', ads: 'Publicités', tasks: 'Tâches', agency: 'Agence', settings: 'Réglages' },
-  hubs: { create: 'Créer', plan: 'Contenu', engage: 'Boîte de réception', measure: 'Statistiques', grow: 'Publicités' },
+  hubsShort: { pilot: 'Pilote' },
+  hubs: { create: 'Créer', pilot: 'Pilote automatique', plan: 'Contenu', engage: 'Boîte de réception', measure: 'Statistiques', grow: 'Publicités' },
   pageTitles: {
     'home/overview': 'Aperçu', 'publishing/posts': 'Publications', 'publishing/calendar': 'Calendrier', 'publishing/queue': 'File d’attente', 'publishing/approvals': 'Approbations',
-    'publishing/media': 'Bibliothèque', 'publishing/feeds': 'Flux', 'studio/ai-studio': 'Studio IA', 'publishing/collaboration': 'Organisation', 'publishing/labels': 'Étiquettes', 'publishing/templates': 'Modèles',
+    'publishing/media': 'Bibliothèque', 'publishing/autopilot': 'Pilote automatique', 'publishing/feeds': 'Recettes et flux', 'studio/ai-studio': 'Studio IA', 'publishing/collaboration': 'Organisation', 'publishing/labels': 'Étiquettes', 'publishing/templates': 'Modèles',
     'studio/agents': 'Agents de rédaction', 'inbox/conversations': 'Messages', 'analytics/overview': 'Vue d’ensemble', 'analytics/explorer': 'Explorateur', 'analytics/demographics': 'Audience',
     'analytics/compare': 'Comparer', 'analytics/ads': 'Analyse publicitaire', 'analytics/posts': 'Publications', 'studio/tests': 'Tests de légendes', 'analytics/goals': 'Objectifs', 'analytics/pins': 'Indicateurs épinglés', 'analytics/reports': 'Rapports', 'analytics/notes': 'Notes des graphiques',
     'ads/overview': 'Vue d’ensemble', 'ads/compare': 'Comparer', 'ads/objects': 'Gérer', 'ads/campaigns': 'Campagnes', 'tasks/board': 'Tâches',

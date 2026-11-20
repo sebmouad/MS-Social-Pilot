@@ -38,7 +38,7 @@ export function ModuleGlyph({ id, size = 19 }: { id: string; size?: number }) {
 
 /** Sidebar hub icons (UI wave 1); hubs regroup pages without changing routes. */
 export const HUB_ICONS: Record<string, TablerIcon> = {
-  create: IconSparkles, plan: IconCalendarEvent, engage: IconMessageCircle, measure: IconChartBar, grow: IconSpeakerphone,
+  create: IconSparkles, pilot: IconBolt, plan: IconCalendarEvent, engage: IconMessageCircle, measure: IconChartBar, grow: IconSpeakerphone,
 };
 
 export function HubGlyph({ id, size = 17 }: { id: string; size?: number }) {

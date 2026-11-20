@@ -485,3 +485,11 @@ ads_management (owner asked to rework Ads like Meta Ads Manager first). The subm
   AI judge scored 70.6 vs 66.7 and brightness 134 vs 127 (correlation with reach 0.18): small. The clear image signal is
   posters (title text + ingredient graphic): 3 of the weakest vs 1 hit. Dish type (cheesy, golden, ham/cheese bites)
   separates hits from weak posts more than how the photo is made.
+
+### 7.1p Navigation: « Pilote automatique » hub (2026-11-20, owner's choice)
+- New sidebar hub `pilot` (src/lib/hubs.ts), second after Create, on the phone bar too (« Pilote »): tabs
+  « Pilote automatique » (`/content/autopilot`, the cockpit) and « Recettes et flux » (`/content/feeds`, which left
+  Contenu's tabs). It uses the content-feeds feature (`publishing/feeds`); no route, feature or permission changed.
+- Scope agreed with the owner: only the autopilot moves while Meta's App Review runs; the screens in the review
+  recordings (composer, posts, Inbox, Insights, Ads, Channels) are unchanged. After approval: the wider clean-up
+  (Contenu's tabs; the owner uses Inbox & AI replies, Statistics, Ads, and not manual posting).
