@@ -371,3 +371,10 @@ test('photo rating v2: strict parts make one 0–10, defects lower it, the old a
   assert.equal(parsePhoto('{"appeal":7,"traits":["close_up"]}')!.appeal, 7);
   assert.deepEqual(parsePhoto('{"realism":5,"appetite":5,"final_shot":5,"scroll_stop":5,"traits":["unknown_thing"]}')!.traits, []);
 });
+
+test('autopilot copy: every photo trait has a label in both languages, and a missing key never throws', async () => {
+  const { autopilotText, autopilotCopy } = await import('@/modules/feeds/copy-autopilot');
+  const { PHOTO_TRAITS } = await import('@/modules/feeds/server/wordpress-scoring');
+  for (const trait of PHOTO_TRAITS) for (const locale of ['en', 'fr'] as const) assert.ok(typeof (autopilotCopy[locale] as Record<string, unknown>)[`trait_${trait}`] === 'string', `${locale} trait_${trait}`);
+  assert.equal(autopilotText('fr', 'trait_never_seen' as never), 'never seen');
+});

@@ -132,7 +132,7 @@ export async function runRadar(input: { timeZone?: string;
       const median = medians.get(post.targetId);
       if (median === undefined || !isLateHit(post.reach, median)) continue;
       out.handled.push(`late:${post.planId}`);
-      out.entries.push({ at: now.toISOString(), kind: 'radar', channelId: post.targetId, channelName: name(post.targetId), text: `« ${post.title.slice(0, 120)} » became a hit: ${post.reach} people reached, ${Math.round(post.reach / median * 10) / 10}× usual.`, code: 'hotShort', params: { title: post.title.slice(0, 120), reach: post.reach, times: Math.round(post.reach / median * 10) / 10 } });
+      out.entries.push({ at: now.toISOString(), kind: 'radar', channelId: post.targetId, channelName: name(post.targetId), text: `« ${post.title.slice(0, 120)} » became a hit: ${post.reach} people reached.`, code: 'lateHit', params: { title: post.title.slice(0, 120), reach: post.reach } });
       await spreadHit(post, post.reach);
     }
   }

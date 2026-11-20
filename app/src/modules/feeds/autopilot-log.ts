@@ -5,7 +5,7 @@ import type { AutopilotLogEntry } from './wordpress/autopilot';
  * written when shown, so a French page reads French. Entries saved before codes existed are recognised by their English
  * sentence and written the same way (2026-11-17); any other text is shown as saved.
  */
-export type LogCode = 'photosUnread' | 'replanned' | 'stranded' | 'refilled' | 'publishFailed' | 'channelHeld' | 'hot' | 'hotShort' | 'breathe' | 'spread' | 'notSpread' | 'radarFailed' | 'photoMade' | 'photoNotMade' | 'replacedOpen' | 'aiTagged' | 'aiTagFailed';
+export type LogCode = 'photosUnread' | 'replanned' | 'stranded' | 'refilled' | 'publishFailed' | 'channelHeld' | 'hot' | 'hotShort' | 'breathe' | 'spread' | 'notSpread' | 'radarFailed' | 'photoMade' | 'photoNotMade' | 'replacedOpen' | 'aiTagged' | 'aiTagFailed' | 'lateHit';
 
 const TEXT: Record<'en' | 'fr', Record<LogCode, string>> = {
   en: {
@@ -26,6 +26,7 @@ const TEXT: Record<'en' | 'fr', Record<LogCode, string>> = {
     replacedOpen: 'Re-planned with this Page’s memory: « {from} » (expected ×{fromValue}) removed; a stronger recipe takes {time}.',
     aiTagged: '{count} published posts marked as AI-generated on Facebook (« AI info »).',
     aiTagFailed: 'Facebook did not accept the AI-generated mark: {why}',
+    lateHit: '« {title} » became a hit: {reach} people reached.',
   },
   fr: {
     stranded: '« {title} » est resté incertain après une exécution interrompue et n’a jamais été créé ; son horaire est replanifié.',
@@ -45,6 +46,7 @@ const TEXT: Record<'en' | 'fr', Record<LogCode, string>> = {
     replacedOpen: 'Replanifié avec la mémoire de cette Page : « {from} » (attendu ×{fromValue}) retirée ; une recette plus forte prend {time}.',
     aiTagged: '{count} publications marquées comme générées par IA sur Facebook (« Info IA »).',
     aiTagFailed: 'Facebook n’a pas accepté la mention IA : {why}',
+    lateHit: '« {title} » est devenue un succès : {reach} personnes touchées.',
   },
 };
 const WHY: Record<'en' | 'fr', { already: string; noSlot: string; refused: string; none: string; others: string }> = {
