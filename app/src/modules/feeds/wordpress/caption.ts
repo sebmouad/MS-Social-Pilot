@@ -59,7 +59,9 @@ export function bestStyle(results: ReadonlyArray<{ style?: string | null; relati
 
 export function captionPrompt(input: { channel: string; voice: Voice; style: HookStyle; question: boolean; emoji: AutopilotSettings['captions']['emoji']; title: string; caption: string; ingredients: readonly string[]; avoid?: readonly string[];
   /** What works on this page, from its memory (2026-11-18). */
-  guidance?: readonly string[] }): { system: string; prompt: string } {
+  guidance?: readonly string[];
+  /** When the post goes out, in the page's time (2026-11-20: « Le dimanche matin… » went out on a Wednesday evening). */
+  when?: { weekday: string; moment: string } }): { system: string; prompt: string } {
   const emoji = input.emoji === 'none' ? 'Use no emoji.' : input.emoji === 'few' ? 'Use one or two emojis.' : 'Use several fitting emojis to make it lively, without overdoing it.';
   const system = [
     `You write the Facebook caption of one recipe for the French page « ${input.channel} ».`,
@@ -69,6 +71,7 @@ export function captionPrompt(input: { channel: string; voice: Voice; style: Hoo
     emoji,
     input.question ? 'End with one short question that invites people to comment.' : 'Do not end with a question.',
     'No link, no hashtag, no price. Never invent an ingredient or a step that is not in the recipe. Do not mention that you are an AI.',
+    input.when ? `This post goes out on ${input.when.weekday} ${input.when.moment} (French time). If you mention a day or a time of day, it must be exactly this one; otherwise mention none (no other weekday, no « ce matin » in the evening, no « ce soir » in the morning).` : 'Do not mention a weekday or a time of day.',
     ...(input.guidance ?? []),
     'Answer with the caption only.',
     // Channels must not read alike (2026-11-16): openings written lately are listed so this one differs.
@@ -76,6 +79,14 @@ export function captionPrompt(input: { channel: string; voice: Voice; style: Hoo
   ].join('\n');
   const prompt = [`Recipe: ${input.title}`, input.caption ? `About it: ${input.caption.slice(0, 600)}` : '', input.ingredients.length ? `Ingredients: ${input.ingredients.slice(0, 10).join(', ').slice(0, 500)}` : ''].filter(Boolean).join('\n');
   return { system, prompt };
+}
+
+const WEEKDAYS = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'];
+/** The posting moment in French words, from a local date (YYYY-MM-DD) and hour. */
+export function postingMoment(date: string, hour: number): { weekday: string; moment: string } {
+  const weekday = WEEKDAYS[new Date(`${date}T12:00:00Z`).getUTCDay()]!;
+  const moment = hour < 11 ? 'matin' : hour < 14 ? 'midi' : hour < 18 ? 'après-midi' : 'soir';
+  return { weekday, moment };
 }
 
 /** True when a caption starts with the same two words as one of the recent openings. */

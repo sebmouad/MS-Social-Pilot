@@ -45,3 +45,12 @@ test('openings: the same first two words as a recent caption are caught, accents
   assert.equal(opensLike('ENVIE d’un gratin', ['Envie d’un gratin généreux']), 'ENVIE d’un');
   assert.equal(opensLike('En 85 minutes, un gratin', ['Vous aimez les plats']), null);
 });
+
+test('caption: the writer knows when the post goes out and may mention only that moment', async () => {
+  const { captionPrompt, postingMoment } = await import('@/modules/feeds/wordpress/caption');
+  assert.deepEqual(postingMoment('2026-11-18', 20), { weekday: 'mercredi', moment: 'soir' });
+  assert.deepEqual(postingMoment('2026-11-22', 8), { weekday: 'dimanche', moment: 'matin' });
+  const base = { channel: 'Cuisine', voice: 'warm' as never, style: 'question' as never, question: true, emoji: 'few' as const, title: 'Pains aux raisins', caption: '', ingredients: [] };
+  assert.match(captionPrompt({ ...base, when: postingMoment('2026-11-18', 20) }).system, /goes out on mercredi soir \(French time\)\. If you mention a day/);
+  assert.match(captionPrompt(base).system, /Do not mention a weekday or a time of day/);
+});

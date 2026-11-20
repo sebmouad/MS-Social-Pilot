@@ -8,7 +8,7 @@ import { prismaScoringPorts, pageLearning, PHOTO_BATCH, type ScoringPorts, type 
 import { makePicker } from './wordpress-pick';
 import { guessKind, type RecipeKind } from '../wordpress/score';
 import { captionGuidance, hitBoost, hitWords, memoryModel } from '../wordpress/memory';
-import { bestStyle, captionPrompt, cleanCaption, ctaFor, opensLike, styleFor, voiceFor, withCta, type HookStyle } from '../wordpress/caption';
+import { bestStyle, captionPrompt, cleanCaption, ctaFor, opensLike, postingMoment, styleFor, voiceFor, withCta, type HookStyle } from '../wordpress/caption';
 import { instantToWall } from '@/lib/calendar-dates';
 import { allocateRecipes, channelConfig, recipeTitleKey, buildImageUrl, buildPermalink, reportedPermalink, parseRecipe, renderComment, resolveConfig, slotInstants, type PlanConfig, type Recipe, type SlotNeed } from '../wordpress/recipe';
 import { openWordpressDb, type DbSettings, type WpDb, type WpCandidateRow } from '../wordpress/db';
@@ -486,7 +486,8 @@ export async function planSource(ctx: Ctx, source: SourceRow, auth: FeedAuthoriz
       const tips = prep?.model?.captionTips(targetId) ?? [];
       const question = tips.some(tip => tip.code === 'qend') ? true : tips.some(tip => tip.code === 'noqend') ? false : pilot.captions.question;
       const pick = styleFor(key, prep?.model?.bestStyle(targetId) ?? prep?.preferredStyle ?? null, pilot.hooks.enabled ? pilot.hooks.share : 0);
-      const { system, prompt } = captionPrompt({ channel: pages.find(page => page.id === targetId)?.name ?? '', voice: voiceFor(pilot.captions.voice, pageOrder.get(targetId) ?? 0), style: pick.style, question, guidance: captionGuidance(tips.filter(tip => tip.code !== 'qend' && tip.code !== 'noqend')), emoji: pilot.captions.emoji,
+      const wall = instantToWall(ctx.makeup?.get(slotKey(targetId, slotAt)) ?? staggered(slotAt, targetId), config.timezone);
+      const { system, prompt } = captionPrompt({ when: postingMoment(wall.date, Number(wall.time.slice(0, 2))), channel: pages.find(page => page.id === targetId)?.name ?? '', voice: voiceFor(pilot.captions.voice, pageOrder.get(targetId) ?? 0), style: pick.style, question, guidance: captionGuidance(tips.filter(tip => tip.code !== 'qend' && tip.code !== 'noqend')), emoji: pilot.captions.emoji,
         title: c.title, caption: written.caption, ingredients: c.recipe.ingredients.filter(line => !line.heading).map(line => line.text), avoid });
       try {
         let clean = cleanCaption(await ports.captions.write(auth.actor, system, prompt), settings.textMax);
