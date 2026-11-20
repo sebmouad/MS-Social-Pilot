@@ -46,9 +46,9 @@ export function isHot(input: { reach: number; median: number; ageMinutes: number
   return input.reach >= Math.max(MIN_HOT_REACH, input.median, input.factor * expectedAt(input.median, input.ageMinutes));
 }
 
-/** Channels a hit should go to: the biggest usual audience first, never the hot one itself. */
-export function biggestAudiences(hot: string, medians: ReadonlyMap<string, number>, count: number): string[] {
-  return [...medians.keys()].filter(id => id !== hot).sort((a, b) => (medians.get(b) ?? 0) - (medians.get(a) ?? 0) || a.localeCompare(b)).slice(0, count);
+/** Channels a hit should go to: the biggest usual audience first, never the hot one itself, and (given the hit's reach) never a channel whose usual reach is more than twice it. */
+export function biggestAudiences(hot: string, medians: ReadonlyMap<string, number>, count: number, reach = Infinity): string[] {
+  return [...medians.keys()].filter(id => id !== hot && (medians.get(id) ?? 0) <= 2 * reach).sort((a, b) => (medians.get(b) ?? 0) - (medians.get(a) ?? 0) || a.localeCompare(b)).slice(0, count);
 }
 
 /** Next post's new time: `delay` later on Facebook's 5-minute marks, at least 30 minutes before the post after it. */
@@ -72,11 +72,13 @@ export async function runRadar(input: { timeZone?: string; pilot: AutopilotSetti
   const medians = await ports.medians([...input.names.keys()], new Date(now.getTime() - 30 * 86_400_000));
   const name = (id: string) => input.names.get(id) ?? '';
   /** Spread a hit to the channels with the biggest audience, once (shared by fresh and late hits, 2026-11-20). */
-  const spreadHit = async (post: RecentPost) => {
+  const spreadHit = async (post: RecentPost, reach: number) => {
     const slots = await ports.upcoming(input.sourceId, new Date(now.getTime() + 3 * 3_600_000), new Date(now.getTime() + 72 * 3_600_000));
     const spread: string[] = []; let already = 0, noSlot = 0, refused = 0;
     const chosenTimes: number[] = [];
-    for (const target of biggestAudiences(post.targetId, medians, pilot.radar.pages * 2)) {
+    // A hit only goes where it is big news (2026-11-20: a 324-reach post replaced a planned recipe on a Page whose usual
+    // post reaches 21,000): a channel whose usual reach is at most twice the hit's own reach.
+    for (const target of biggestAudiences(post.targetId, medians, pilot.radar.pages * 2, reach)) {
       if (spread.length >= pilot.radar.pages) break;
       if (input.blocked(target, post.wpPostId) || slots.some(slot => slot.targetId === target && slot.wpPostId === post.wpPostId)) { already++; continue; }
       // The channel's weakest upcoming slot gives way; slots are spread over the days ahead, one per channel.
@@ -114,20 +116,21 @@ export async function runRadar(input: { timeZone?: string; pilot: AutopilotSetti
         }
       }
     }
-    if (pilot.radar.enabled && pilot.radar.mode === 'auto' && isHot({ reach, median, ageMinutes, factor: pilot.radar.factor })) await spreadHit(post);
+    if (pilot.radar.enabled && pilot.radar.mode === 'auto' && isHot({ reach, median, ageMinutes, factor: pilot.radar.factor })) await spreadHit(post, reach);
   }
   // Late hits (2026-11-20): a post that grew over a day or two (« Pains aux raisins » 631k, « Mini-quiches » 408k) was past
   // the two-hour window and never spread. Posts from the last 10 days whose stored reach is far above their channel's usual
   // are spread once too; only fresh posts are read live and only they delay the next post.
   if (pilot.radar.enabled && pilot.radar.mode === 'auto' && ports.storedHits) {
     const late = (await ports.storedHits(input.sourceId, new Date(now.getTime() - 10 * 86_400_000), new Date(now.getTime() - 2 * 3_600_000)).catch(() => []))
-      .filter(post => !input.handled.has(post.planId) && !out.handled.includes(post.planId));
+      // Its own mark: a post handled while fresh (often spread only to small Pages, or not at all) can still be spread once late.
+      .filter(post => !input.handled.has(`late:${post.planId}`));
     for (const post of late) {
       const median = medians.get(post.targetId);
       if (median === undefined || !isLateHit(post.reach, median)) continue;
-      out.handled.push(post.planId);
+      out.handled.push(`late:${post.planId}`);
       out.entries.push({ at: now.toISOString(), kind: 'radar', channelId: post.targetId, channelName: name(post.targetId), text: `« ${post.title.slice(0, 120)} » became a hit: ${post.reach} people reached, ${Math.round(post.reach / median * 10) / 10}× usual.`, code: 'hotShort', params: { title: post.title.slice(0, 120), reach: post.reach, times: Math.round(post.reach / median * 10) / 10 } });
-      await spreadHit(post);
+      await spreadHit(post, post.reach);
     }
   }
   return out;

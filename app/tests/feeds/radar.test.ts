@@ -17,6 +17,7 @@ test('hot: three times what a post usually has at its age, never on small number
 test('spread: the biggest usual audience first, never the hot one', () => {
   const medians = new Map([['hot', 1000], ['a', 950], ['b', 5000], ['c', 1200], ['d', 100]]);
   assert.deepEqual(biggestAudiences('hot', medians, 2), ['b', 'c']);
+  assert.deepEqual(biggestAudiences('hot', medians, 5, 1000), ['c', 'a', 'd'], 'a 1,000-reach hit never goes to a channel whose usual reach is 5,000');
 });
 
 test('breathing room: an hour later on a 5-minute mark, never past the post after it', () => {
@@ -93,8 +94,9 @@ test('radar: a late hit (past its first two hours) is spread once from its store
   };
   const input = { pilot: { ...AUTOPILOT_DEFAULTS, radar: { ...AUTOPILOT_DEFAULTS.radar, pages: 1 } }, sourceId: 's', workspaceId: 'w', actor: { userId: 'u', workspaceId: 'w' }, now, handled: new Set<string>(), names: new Map([['hot', 'Hot'], ['big', 'Big'], ['small', 'Small']]), blocked: () => false };
   const out = await runRadar(input, ports);
-  assert.deepEqual(out.handled, ['late1'], 'only the real hit (5,000 is under the late-hit floor)');
+  assert.deepEqual(out.handled, ['late:late1'], 'only the real hit (5,000 is under the late-hit floor)');
   assert.deepEqual(chosen, ['sbig']);
   assert.equal(moved, 0);
-  assert.equal((await runRadar({ ...input, handled: new Set(['late1']) }, ports)).handled.length, 0, 'once');
+  assert.equal((await runRadar({ ...input, handled: new Set(['late:late1']) }, ports)).handled.length, 0, 'once');
+  assert.equal((await runRadar({ ...input, handled: new Set(['late1']) }, ports)).handled.length, 1, 'handled while fresh, still spread once late');
 });
