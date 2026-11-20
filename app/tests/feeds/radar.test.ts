@@ -26,7 +26,7 @@ test('breathing room: an hour later on a 5-minute mark, never past the post afte
   assert.equal(breatheTime(next, new Date('2026-11-17T16:45:00Z'), 60), null);
 });
 
-test('radar: a hot post delays the next one and spreads to the most similar channels, once', async () => {
+test('radar: a hot post delays the next one and spreads to the biggest audiences, once', async () => {
   const moved: Array<{ postId: string; at: string }> = []; const chosen: Array<{ planId: string; wpPostId: string }> = [];
   const ports: RadarPorts = {
     async recent() { return [{ planId: 'plan1', targetId: 'hot', wpPostId: 'w1', title: 'Cannelés', postId: 'post1', publishedAt: new Date(now.getTime() - 90 * 60_000) }]; },
@@ -46,7 +46,7 @@ test('radar: a hot post delays the next one and spreads to the most similar chan
   const out = await runRadar(input, ports);
   assert.deepEqual(out.handled, ['plan1']);
   assert.equal(moved[0]?.postId, 'next1');
-  assert.deepEqual(chosen, [{ planId: 'sb1', wpPostId: 'w1' }, { planId: 'sa2', wpPostId: 'w1' }]); // B is closest, then A's weakest slot
+  assert.deepEqual(chosen, [{ planId: 'sb1', wpPostId: 'w1' }, { planId: 'sa2', wpPostId: 'w1' }]); // C (biggest) has no free time; then B, then A's weakest slot
   assert.ok(out.entries.some(e => /Planned on 2 channels with the biggest audience/.test(e.text ?? '')));
   const again = await runRadar({ ...input, handled: new Set(['plan1']) }, ports);
   assert.equal(again.entries.length, 0);
@@ -74,4 +74,27 @@ test('radar: channels receiving a hit post it at least three hours apart, never 
   };
   await runRadar({ pilot: AUTOPILOT_DEFAULTS, sourceId: 's', workspaceId: 'w', actor: { userId: 'u', workspaceId: 'w' }, now, handled: new Set(), names: new Map([['hot', 'H'], ['a', 'A'], ['b', 'B'], ['c', 'C']]), blocked: () => false }, ports);
   assert.deepEqual(chosen.map(id => id.split('-')[1]).sort(), ['19', '23', '27']);
+});
+
+test('radar: a late hit (past its first two hours) is spread once from its stored reach, without delaying the next post', async () => {
+  const chosen: string[] = []; let moved = 0;
+  const ports: RadarPorts = {
+    async recent() { return []; },
+    async reach() { throw new Error('a late hit is not read live'); },
+    async storedHits() { return [
+      { planId: 'late1', targetId: 'hot', wpPostId: 'w9', title: 'Pains aux raisins', postId: 'p9', publishedAt: new Date(now.getTime() - 30 * 3_600_000), reach: 480_000 },
+      { planId: 'late2', targetId: 'hot', wpPostId: 'w8', title: 'Soupe', postId: 'p8', publishedAt: new Date(now.getTime() - 30 * 3_600_000), reach: 5_000 },
+    ]; },
+    async medians() { return new Map([['hot', 300], ['big', 20_000], ['small', 50]]); },
+    async nextPosts() { return []; },
+    async reschedule() { moved++; },
+    async upcoming() { return [{ planId: 'sbig', targetId: 'big', wpPostId: 'x', slotAt: new Date(now.getTime() + 20 * 3_600_000), score: 40 }]; },
+    async choose(planId) { chosen.push(planId); return true; },
+  };
+  const input = { pilot: { ...AUTOPILOT_DEFAULTS, radar: { ...AUTOPILOT_DEFAULTS.radar, pages: 1 } }, sourceId: 's', workspaceId: 'w', actor: { userId: 'u', workspaceId: 'w' }, now, handled: new Set<string>(), names: new Map([['hot', 'Hot'], ['big', 'Big'], ['small', 'Small']]), blocked: () => false };
+  const out = await runRadar(input, ports);
+  assert.deepEqual(out.handled, ['late1'], 'only the real hit (5,000 is under the late-hit floor)');
+  assert.deepEqual(chosen, ['sbig']);
+  assert.equal(moved, 0);
+  assert.equal((await runRadar({ ...input, handled: new Set(['late1']) }, ports)).handled.length, 0, 'once');
 });

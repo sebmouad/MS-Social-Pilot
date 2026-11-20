@@ -17,6 +17,8 @@ export type RadarPorts = {
   recent(sourceId: string, from: Date): Promise<RecentPost[]>;
   /** Read the post's latest numbers from the platform, then its people reached (null when unknown). */
   reach(workspaceId: string, postId: string, targetId: string): Promise<number | null>;
+  /** Posts published between `from` and `until` with their stored reach (no platform call), for late hits; optional. */
+  storedHits?(sourceId: string, from: Date, until: Date): Promise<Array<RecentPost & { reach: number }>>;
   /** Usual people reached per channel (median of its posts since `from`). */
   medians(targetIds: readonly string[], from: Date): Promise<Map<string, number>>;
   /** The channel's next scheduled post within the window, and the one after it. */
@@ -32,6 +34,9 @@ export type RadarPorts = {
 export const expectedAt = (median: number, ageMinutes: number) => median * Math.min(1, 0.25 + 0.25 * Math.max(0, ageMinutes) / 60);
 /** People a post must reach before it can count as hot, whatever the channel (2026-11-16: 110 people was called viral). */
 export const MIN_HOT_REACH = 200;
+/** A post past its first two hours is a late hit at 10× its channel's usual and at least this many people. */
+export const LATE_HIT_REACH = 20_000;
+export const isLateHit = (reach: number, median: number) => median > 0 && reach >= Math.max(LATE_HIT_REACH, 10 * median);
 /**
  * Hot: `factor` times what a usual post has at this age, at least the channel's usual full reach, and at least
  * MIN_HOT_REACH people. Young posts get credit for having had little time; small numbers never trigger anything.
@@ -64,9 +69,30 @@ export async function runRadar(input: { timeZone?: string; pilot: AutopilotSetti
   const out: RadarOutcome = { entries: [], handled: [] };
   if (!pilot.radar.enabled && !pilot.breathe.enabled) return out;
   const recent = (await ports.recent(input.sourceId, new Date(now.getTime() - 2 * 3_600_000))).filter(post => !input.handled.has(post.planId));
-  if (!recent.length) return out;
   const medians = await ports.medians([...input.names.keys()], new Date(now.getTime() - 30 * 86_400_000));
   const name = (id: string) => input.names.get(id) ?? '';
+  /** Spread a hit to the channels with the biggest audience, once (shared by fresh and late hits, 2026-11-20). */
+  const spreadHit = async (post: RecentPost) => {
+    const slots = await ports.upcoming(input.sourceId, new Date(now.getTime() + 3 * 3_600_000), new Date(now.getTime() + 72 * 3_600_000));
+    const spread: string[] = []; let already = 0, noSlot = 0, refused = 0;
+    const chosenTimes: number[] = [];
+    for (const target of biggestAudiences(post.targetId, medians, pilot.radar.pages * 2)) {
+      if (spread.length >= pilot.radar.pages) break;
+      if (input.blocked(target, post.wpPostId) || slots.some(slot => slot.targetId === target && slot.wpPostId === post.wpPostId)) { already++; continue; }
+      // The channel's weakest upcoming slot gives way; slots are spread over the days ahead, one per channel.
+      // Spread over the days ahead (2026-11-16): never within three hours of another channel getting this hit, so Pages
+      // do not post the same recipe at the same minute (the first live spread put five Pages at 11:00).
+      const apart = (slot: UpcomingSlot) => chosenTimes.every(at => Math.abs(at - slot.slotAt.getTime()) >= SPREAD_GAP_MS);
+      const mine = slots.filter(s => s.targetId === target).sort((a, b) => (a.score ?? 50) - (b.score ?? 50) || a.slotAt.getTime() - b.slotAt.getTime());
+      const slot = mine.find(apart);
+      if (!slot) { noSlot++; continue; }
+      if (await ports.choose(slot.planId, post.wpPostId).catch(() => false)) { spread.push(name(target) || target); chosenTimes.push(slot.slotAt.getTime()); } else refused++;
+    }
+    // Every outcome is said, so a radar that did nothing is never a mystery (2026-11-16).
+    const why = [already ? `${already} already had this recipe` : '', noSlot ? `${noSlot} had no free time in the next three days` : '', refused ? `${refused} could not be changed` : ''].filter(Boolean).join(', ');
+    out.entries.push({ at: now.toISOString(), kind: 'radar', channelId: post.targetId, channelName: name(post.targetId), text: spread.length ? `Planned on ${spread.length} channels with the biggest audience: ${spread.join(', ')}.${why ? ` Others: ${why}.` : ''}` : `Not spread to other channels: ${why || 'no similar channel'}.`,
+      code: spread.length ? 'spread' : 'notSpread', params: { count: spread.length, channels: spread.join(', ').slice(0, 400), already, noSlot, refused } });
+  };
   for (const post of recent) {
     const reach = await ports.reach(input.workspaceId, post.postId, post.targetId).catch(() => null);
     const median = medians.get(post.targetId);
@@ -88,26 +114,20 @@ export async function runRadar(input: { timeZone?: string; pilot: AutopilotSetti
         }
       }
     }
-    if (pilot.radar.enabled && pilot.radar.mode === 'auto' && isHot({ reach, median, ageMinutes, factor: pilot.radar.factor })) {
-      const slots = await ports.upcoming(input.sourceId, new Date(now.getTime() + 3 * 3_600_000), new Date(now.getTime() + 72 * 3_600_000));
-      const spread: string[] = []; let already = 0, noSlot = 0, refused = 0;
-      const chosenTimes: number[] = [];
-      for (const target of biggestAudiences(post.targetId, medians, pilot.radar.pages * 2)) {
-        if (spread.length >= pilot.radar.pages) break;
-        if (input.blocked(target, post.wpPostId) || slots.some(slot => slot.targetId === target && slot.wpPostId === post.wpPostId)) { already++; continue; }
-        // The channel's weakest upcoming slot gives way; slots are spread over the days ahead, one per channel.
-        // Spread over the days ahead (2026-11-16): never within three hours of another channel getting this hit, so Pages
-        // do not post the same recipe at the same minute (the first live spread put five Pages at 11:00).
-        const apart = (slot: UpcomingSlot) => chosenTimes.every(at => Math.abs(at - slot.slotAt.getTime()) >= SPREAD_GAP_MS);
-        const mine = slots.filter(s => s.targetId === target).sort((a, b) => (a.score ?? 50) - (b.score ?? 50) || a.slotAt.getTime() - b.slotAt.getTime());
-        const slot = mine.find(apart);
-        if (!slot) { noSlot++; continue; }
-        if (await ports.choose(slot.planId, post.wpPostId).catch(() => false)) { spread.push(name(target) || target); chosenTimes.push(slot.slotAt.getTime()); } else refused++;
-      }
-      // Every outcome is said, so a radar that did nothing is never a mystery (2026-11-16).
-      const why = [already ? `${already} already had this recipe` : '', noSlot ? `${noSlot} had no free time in the next three days` : '', refused ? `${refused} could not be changed` : ''].filter(Boolean).join(', ');
-      out.entries.push({ at: now.toISOString(), kind: 'radar', channelId: post.targetId, channelName: name(post.targetId), text: spread.length ? `Planned on ${spread.length} channels with the biggest audience: ${spread.join(', ')}.${why ? ` Others: ${why}.` : ''}` : `Not spread to other channels: ${why || 'no similar channel'}.`,
-        code: spread.length ? 'spread' : 'notSpread', params: { count: spread.length, channels: spread.join(', ').slice(0, 400), already, noSlot, refused } });
+    if (pilot.radar.enabled && pilot.radar.mode === 'auto' && isHot({ reach, median, ageMinutes, factor: pilot.radar.factor })) await spreadHit(post);
+  }
+  // Late hits (2026-11-20): a post that grew over a day or two (« Pains aux raisins » 631k, « Mini-quiches » 408k) was past
+  // the two-hour window and never spread. Posts from the last 10 days whose stored reach is far above their channel's usual
+  // are spread once too; only fresh posts are read live and only they delay the next post.
+  if (pilot.radar.enabled && pilot.radar.mode === 'auto' && ports.storedHits) {
+    const late = (await ports.storedHits(input.sourceId, new Date(now.getTime() - 10 * 86_400_000), new Date(now.getTime() - 2 * 3_600_000)).catch(() => []))
+      .filter(post => !input.handled.has(post.planId) && !out.handled.includes(post.planId));
+    for (const post of late) {
+      const median = medians.get(post.targetId);
+      if (median === undefined || !isLateHit(post.reach, median)) continue;
+      out.handled.push(post.planId);
+      out.entries.push({ at: now.toISOString(), kind: 'radar', channelId: post.targetId, channelName: name(post.targetId), text: `« ${post.title.slice(0, 120)} » became a hit: ${post.reach} people reached, ${Math.round(post.reach / median * 10) / 10}× usual.`, code: 'hotShort', params: { title: post.title.slice(0, 120), reach: post.reach, times: Math.round(post.reach / median * 10) / 10 } });
+      await spreadHit(post);
     }
   }
   return out;
@@ -125,6 +145,17 @@ export function prismaRadarPorts(choose: RadarPorts['choose']): RadarPorts {
       const results = await syncPostMetrics(workspaceId, postId);
       const mine = results.find(result => result.targetId === targetId);
       return mine ? mine.reach || mine.views || null : null;
+    },
+    async storedHits(sourceId, from, until) {
+      const rows = await prisma.$queryRaw<Array<RecentPost & { reach: number | null }>>`SELECT l.id AS "planId", l."targetId", l."wpPostId", l.title, l."postId", pt."publishedAt",
+          COALESCE((ep.insights->>'post_total_media_view_unique')::numeric, (ep.insights->>'reach')::numeric)::int AS reach
+        FROM wordpress_recipe_plans l
+        JOIN post_targets pt ON pt."postId" = l."postId" AND pt."targetId" = l."targetId" AND pt.status::text = 'published'
+        JOIN external_posts ep ON ep."targetId" = pt."targetId" AND ep."remoteId" = pt."remotePostId"
+        WHERE l."sourceId" = ${sourceId} AND l.state = 'planned' AND pt."publishedAt" >= ${from} AND pt."publishedAt" < ${until}
+          AND COALESCE(ep.insights->>'post_total_media_view_unique', ep.insights->>'reach') ~ '^[0-9.]+$'
+        ORDER BY 7 DESC LIMIT 20`;
+      return rows.flatMap(row => row.reach ? [{ ...row, reach: Number(row.reach) }] : []);
     },
     async medians(targetIds, from) {
       if (!targetIds.length) return new Map();
