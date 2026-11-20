@@ -48,3 +48,9 @@ test('ai replies: the prompt names the page, the decision rules, the link and th
   assert.match(message.system, /Tutoie les gens/);
   assert.match(message.prompt, /Visitor: Bonjour\nPage: Bonjour !\nMessage from a visitor: Et pour 6 \?/);
 });
+
+test('AI replies: a calm correction about the recipe is answered with thanks; complaints still go to a person', () => {
+  const { system } = aiReplyPrompt({ kind: 'comment', channel: 'Cuisine', voice: null, author: 'Marie', text: 'La pâte est levée feuilletée.' }, 'friendly');
+  assert.match(system, /A calm correction or extra detail about the recipe .* is a reply too: thank them warmly for the precision/);
+  assert.match(system, /"handoff" when the person complains, is angry/);
+});

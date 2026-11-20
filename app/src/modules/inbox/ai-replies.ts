@@ -41,9 +41,9 @@ export function aiReplyPrompt(c: AiReplyContext, tone: AiReplyTone): { system: s
   const where = c.kind === 'comment' ? 'a public comment under one of its posts' : 'a private Messenger message sent to the page';
   const system = [
     `You answer, on behalf of the Facebook page « ${c.channel} », ${where}. First decide what to do:`,
-    '- "handoff" when the person complains, is angry, upset or worried, reports a problem, mentions health, allergy, safety, money, an order, legal matters or personal data, or anything a person from the page should handle.',
+    '- "handoff" when the person complains, is angry, upset or worried, reports a problem with an order or the page, mentions health, allergy, safety, money, an order, legal matters or personal data, or anything a person from the page should handle.',
     '- "skip" when it is spam, an advert, a link to something else, nonsense, or needs no answer (only a friend tagged, only an emoji).',
-    '- "reply" otherwise: thanks, praise and questions about the content.',
+    '- "reply" otherwise: thanks, praise and questions about the content. A calm correction or extra detail about the recipe (an ingredient, a technique, a name) is a reply too: thank them warmly for the precision and acknowledge it in a few words, without arguing and without inventing anything.',
     `For a reply: write in the same language as the person. Tone: ${TONES[tone]}. ${c.kind === 'comment' ? 'One or two short sentences.' : 'At most three short sentences.'} At most one emoji.`,
     c.voice ? `The page's own voice: ${c.voice.slice(0, 400)}` : '',
     'Use only the facts given below. If the answer is not there, say so kindly and suggest something simple and safe. Never invent a price, a promise, a delivery or a health claim.',

@@ -23,6 +23,8 @@ const PER_RUN = 20;
 /** Messenger allows a reply up to 24 h after the visitor's last message; keep a margin. */
 const MESSAGE_WINDOW_MS = 23 * 60 * 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
+/** How far back waiting comments and messages are answered. */
+const CATCH_UP_MS = 2 * DAY_MS;
 
 const ceiling = (actor: InboxReadActor) => actor.allowedChannelIds === undefined ? {} : { allowedChannelIds: actor.allowedChannelIds };
 
@@ -167,7 +169,8 @@ export async function runAiRepliesFor(actor: InboxReadActor, now = new Date(), d
   if (!row?.enabled || !row.enabledAt) return result;
   const access = await authorizeInbox(actor, ceiling(actor), 'write');
   const channelIds = row.targetIds.length ? row.targetIds.filter(id => access.channelIds.includes(id)) : access.channelIds;
-  const since = new Date(Math.max(row.enabledAt.getTime(), now.getTime() - DAY_MS));
+  // Two days back (2026-11-20): comments that arrived while the AI was held by its hourly limit are still answered.
+  const since = new Date(Math.max(row.enabledAt.getTime(), now.getTime() - CATCH_UP_MS));
   const before = new Date(now.getTime() - row.delayMinutes * 60_000);
   const comments = row.comments ? await waitingComments(actor.workspaceId, channelIds, since, before, PER_RUN) : [];
   const messages = row.messages ? await waitingMessages(actor.workspaceId, channelIds, since, before, now, PER_RUN - comments.length) : [];
