@@ -17,7 +17,7 @@ test('hot: three times what a post usually has at its age, never on small number
 test('spread: the biggest usual audience first, never the hot one', () => {
   const medians = new Map([['hot', 1000], ['a', 950], ['b', 5000], ['c', 1200], ['d', 100]]);
   assert.deepEqual(biggestAudiences('hot', medians, 2), ['b', 'c']);
-  assert.deepEqual(biggestAudiences('hot', medians, 5, 1000), ['c', 'a', 'd'], 'a 1,000-reach hit never goes to a channel whose usual reach is 5,000');
+  assert.deepEqual(biggestAudiences('hot', medians, 5, 2000), ['a', 'd'], 'a 2,000-reach hit only goes where it doubles the usual reach');
 });
 
 test('breathing room: an hour later on a 5-minute mark, never past the post after it', () => {

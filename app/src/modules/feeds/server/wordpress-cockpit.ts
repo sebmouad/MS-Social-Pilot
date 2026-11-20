@@ -254,6 +254,12 @@ export async function refreshPlanWithMemory(actor: FeedActor, input: unknown, no
     && (row.scheduledAt ?? row.slotAt).getTime() > now.getTime() + 3 * 3_600_000);
   const { prismaScoringPorts } = await import('./wordpress-scoring');
   const ratings = await prismaScoringPorts.ratings(source.id, rows.map(row => row.wpPostIdForRating ?? '')).catch(() => new Map());
+  // The re-plan judges like the planner (2026-11-20): what the biggest hits share counts, and a proven hit (a recipe that
+  // reached 20,000 people somewhere in the last 30 days) is never replaced: it had undone two radar spreads of a 631k hit.
+  const { hitPosts, provenHitRecipes } = await import('./wordpress-memory');
+  const { hitBoost, hitWords } = await import('../wordpress/memory');
+  const hits = hitWords(await hitPosts(pages.map(page => page.id), now).catch(() => []));
+  const proven = await provenHitRecipes(source.id, now).catch(() => new Set<string>());
   const { changeRecipeSlotNow } = await import('./wordpress');
   const { replaceRecipeSlotConfirmation } = await import('../wordpress/recipe');
   const out = { examined: rows.length, replaced: 0, kept: 0, failed: 0, unknown: 0 };
@@ -261,8 +267,10 @@ export async function refreshPlanWithMemory(actor: FeedActor, input: unknown, no
   const pageName = new Map(pages.map(page => [page.id, page.name]));
   for (const row of rows) {
     const rating = ratings.get(row.wpPostIdForRating ?? '');
-    const value = model.contentValue(row.targetId, row.title, row.kind, row.slotAt, tz, rating ? { traits: rating.traits ?? null, appeal: rating.photo } : null);
-    if (value === null) { out.unknown++; continue; }
+    if (proven.has(row.wpPostIdForRating ?? '')) { out.kept++; continue; }
+    const own = model.contentValue(row.targetId, row.title, row.kind, row.slotAt, tz, rating ? { traits: rating.traits ?? null, appeal: rating.photo } : null);
+    if (own === null) { out.unknown++; continue; }
+    const value = own * hitBoost(hits, row.title);
     if (value >= REPLACE_BELOW) { out.kept++; continue; }
     try {
       await changeRecipeSlotNow(actor, { planId: row.id, confirmation: replaceRecipeSlotConfirmation(row.id), action: 'replace' });

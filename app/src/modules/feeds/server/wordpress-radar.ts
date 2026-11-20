@@ -46,9 +46,9 @@ export function isHot(input: { reach: number; median: number; ageMinutes: number
   return input.reach >= Math.max(MIN_HOT_REACH, input.median, input.factor * expectedAt(input.median, input.ageMinutes));
 }
 
-/** Channels a hit should go to: the biggest usual audience first, never the hot one itself, and (given the hit's reach) never a channel whose usual reach is more than twice it. */
+/** Channels a hit should go to: the biggest usual audience first, never the hot one itself, and (given the hit's reach) only channels whose usual reach is at most half of it. */
 export function biggestAudiences(hot: string, medians: ReadonlyMap<string, number>, count: number, reach = Infinity): string[] {
-  return [...medians.keys()].filter(id => id !== hot && (medians.get(id) ?? 0) <= 2 * reach).sort((a, b) => (medians.get(b) ?? 0) - (medians.get(a) ?? 0) || a.localeCompare(b)).slice(0, count);
+  return [...medians.keys()].filter(id => id !== hot && (medians.get(id) ?? 0) * 2 <= reach).sort((a, b) => (medians.get(b) ?? 0) - (medians.get(a) ?? 0) || a.localeCompare(b)).slice(0, count);
 }
 
 /** Next post's new time: `delay` later on Facebook's 5-minute marks, at least 30 minutes before the post after it. */
@@ -76,8 +76,8 @@ export async function runRadar(input: { timeZone?: string; pilot: AutopilotSetti
     const slots = await ports.upcoming(input.sourceId, new Date(now.getTime() + 3 * 3_600_000), new Date(now.getTime() + 72 * 3_600_000));
     const spread: string[] = []; let already = 0, noSlot = 0, refused = 0;
     const chosenTimes: number[] = [];
-    // A hit only goes where it is big news (2026-11-20: a 324-reach post replaced a planned recipe on a Page whose usual
-    // post reaches 21,000): a channel whose usual reach is at most twice the hit's own reach.
+    // A hit only goes where it is big news (2026-11-20: a 324-reach post, then 23,000-reach ones, replaced planned recipes
+    // on a Page whose usual post reaches 21,000): a channel whose usual reach is at most half the hit's own reach.
     for (const target of biggestAudiences(post.targetId, medians, pilot.radar.pages * 2, reach)) {
       if (spread.length >= pilot.radar.pages) break;
       if (input.blocked(target, post.wpPostId) || slots.some(slot => slot.targetId === target && slot.wpPostId === post.wpPostId)) { already++; continue; }

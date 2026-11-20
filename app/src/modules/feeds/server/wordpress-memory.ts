@@ -109,6 +109,17 @@ export async function photosToLearn(sourceId: string, now: Date, limit: number):
   return [...withMedia.slice(0, limit - external.length), ...external];
 }
 
+/** Recipes that were a hit on any Page in the last `days` days (at least `minReach` people on one post), 2026-11-20. */
+export async function provenHitRecipes(sourceId: string, now: Date, minReach = 20_000, days = 30): Promise<Set<string>> {
+  const rows = await prisma.$queryRaw<Array<{ wpPostId: string }>>`SELECT DISTINCT l."wpPostId" FROM wordpress_recipe_plans l
+    JOIN post_targets pt ON pt."postId" = l."postId" AND pt."targetId" = l."targetId" AND pt.status::text = 'published'
+    JOIN external_posts ep ON ep."targetId" = pt."targetId" AND ep."remoteId" = pt."remotePostId"
+    WHERE l."sourceId" = ${sourceId} AND l.state = 'planned' AND pt."publishedAt" > ${new Date(now.getTime() - days * 86_400_000)}
+      AND COALESCE(ep.insights->>'post_total_media_view_unique', ep.insights->>'reach') ~ '^[0-9.]+$'
+      AND COALESCE((ep.insights->>'post_total_media_view_unique')::numeric, (ep.insights->>'reach')::numeric) >= ${minReach}`;
+  return new Set(rows.map(row => row.wpPostId));
+}
+
 /** The biggest posts of the last 60 days on these Pages (app and outside posts), with their reach: what hits share (2026-11-19). */
 export async function hitPosts(pageIds: readonly string[], now: Date, limit = 30): Promise<Array<{ title: string; reach: number }>> {
   if (!pageIds.length) return [];
