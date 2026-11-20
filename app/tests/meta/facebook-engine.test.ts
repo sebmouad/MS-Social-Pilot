@@ -141,3 +141,15 @@ test('AI-generated mark: an existing Page post is edited with is_ai_generated=tr
   assert.equal(graph.sent[0]!.token, 'PAGE-TOKEN');
   assert.ok(graph.sent[0]!.proof);
 });
+
+test('local photo upload: a WebP passes the file check when Root allows it, and is refused when it does not', async () => {
+  const webp = new Uint8Array([...Buffer.from('RIFF'), 0, 0, 0, 0, ...Buffer.from('WEBP'), ...new Array(32).fill(1)]);
+  const media = [{ kind: 'image' as const, url: 'media:x', localFile: { bytes: webp, mimeType: 'image/webp', fileName: 'recipe-fb.webp' } }];
+  const allowed = fakeGraph([{ method: 'POST', path: /^\/111\/photos$/, reply: { id: '9', post_id: '111_9' } }]);
+  const engine = createFacebookEngine({ ...facebookConfig, allowedImageMimeTypes: ['image/jpeg', 'image/webp'] }, allowed.fetch);
+  await engine.publish({ targetId: '111', accessToken: 'PAGE', media });
+  assert.equal(allowed.sent[0]!.path, '/111/photos');
+  const refused = fakeGraph([]);
+  await assert.rejects(createFacebookEngine(facebookConfig, refused.fetch).publish({ targetId: '111', accessToken: 'PAGE', media }), /not allowed by Root/);
+  assert.equal(refused.sent.length, 0);
+});

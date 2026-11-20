@@ -357,7 +357,9 @@ export function createFacebookEngine(rawConfig: FacebookConfig, fetchImpl: Faceb
         const bytes = file.bytes;
         const signatureMatches = file.mimeType === 'image/jpeg' ? bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff
           : file.mimeType === 'image/png' ? bytes.length >= 8 && [137, 80, 78, 71, 13, 10, 26, 10].every((value, i) => bytes[i] === value)
-            : file.mimeType === 'image/gif' ? String.fromCharCode(...bytes.slice(0, 6)) === 'GIF87a' || String.fromCharCode(...bytes.slice(0, 6)) === 'GIF89a' : false;
+            : file.mimeType === 'image/gif' ? String.fromCharCode(...bytes.slice(0, 6)) === 'GIF87a' || String.fromCharCode(...bytes.slice(0, 6)) === 'GIF89a'
+              // WebP only reaches here when Root allows image/webp (2026-11-19, recipe photos kept as downloaded).
+              : file.mimeType === 'image/webp' ? bytes.length >= 12 && String.fromCharCode(...bytes.slice(0, 4)) === 'RIFF' && String.fromCharCode(...bytes.slice(8, 12)) === 'WEBP' : false;
         if (!signatureMatches) throw new FacebookApiError('Local image content does not match its allowed MIME type.', 0);
         if (!/^[A-Za-z0-9._-]{1,120}$/.test(file.fileName)) throw new FacebookApiError('Local image filename is invalid.', 0);
       }
