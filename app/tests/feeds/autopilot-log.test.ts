@@ -20,7 +20,7 @@ test('log: entries saved before codes existed read in the page language when the
   assert.equal(logSentence(old('« Sauce thaïe » was left unsure by an interrupted run and never created; its time is planned again.'), 'fr'),
     '« Sauce thaïe » est resté incertain après une exécution interrompue et n’a jamais été créé ; son horaire est replanifié.');
   assert.match(logSentence(old('« Gratin » is taking off: 1100 people reached, 1.5× usual.'), 'fr'), /^« Gratin » décolle : 1\s?100 personnes touchées, 1,5× l’habitude\.$/);
-  assert.equal(logSentence(old('Planned on 2 similar channels: A, B.'), 'fr'), 'Planifiée sur 2 canaux proches : A, B.');
+  assert.equal(logSentence(old('Planned on 2 similar channels: A, B.'), 'fr'), 'Planifiée sur 2 canaux au plus grand public : A, B.');
   assert.equal(logSentence(old('« Gratin » is taking off: 1100 people reached, 1.5× usual.'), 'en'), '« Gratin » is taking off: 1,100 people reached, 1.5× usual.');
 });
 

@@ -1,7 +1,7 @@
 // Viral radar and breathing room for hot posts (2026-11-16).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { isHot, similarChannels, breatheTime, runRadar, type RadarPorts } from '@/modules/feeds/server/wordpress-radar';
+import { isHot, biggestAudiences, breatheTime, runRadar, type RadarPorts } from '@/modules/feeds/server/wordpress-radar';
 import { AUTOPILOT_DEFAULTS } from '@/modules/feeds/wordpress/autopilot';
 
 const now = new Date('2026-11-17T16:00:00Z');
@@ -14,9 +14,9 @@ test('hot: three times what a post usually has at its age, never on small number
   assert.equal(isHot({ reach: 500, median: 0, ageMinutes: 60, factor: 3 }), false);
 });
 
-test('similar channels: closest usual reach first, never the hot one', () => {
+test('spread: the biggest usual audience first, never the hot one', () => {
   const medians = new Map([['hot', 1000], ['a', 950], ['b', 5000], ['c', 1200], ['d', 100]]);
-  assert.deepEqual(similarChannels('hot', medians, 2), ['a', 'c']);
+  assert.deepEqual(biggestAudiences('hot', medians, 2), ['b', 'c']);
 });
 
 test('breathing room: an hour later on a 5-minute mark, never past the post after it', () => {
@@ -47,7 +47,7 @@ test('radar: a hot post delays the next one and spreads to the most similar chan
   assert.deepEqual(out.handled, ['plan1']);
   assert.equal(moved[0]?.postId, 'next1');
   assert.deepEqual(chosen, [{ planId: 'sb1', wpPostId: 'w1' }, { planId: 'sa2', wpPostId: 'w1' }]); // B is closest, then A's weakest slot
-  assert.ok(out.entries.some(e => /Planned on 2 similar channels/.test(e.text ?? '')));
+  assert.ok(out.entries.some(e => /Planned on 2 channels with the biggest audience/.test(e.text ?? '')));
   const again = await runRadar({ ...input, handled: new Set(['plan1']) }, ports);
   assert.equal(again.entries.length, 0);
 });

@@ -5,7 +5,9 @@ import type { FeedActor } from './access';
 /**
  * Viral radar and « let a hot post breathe » (2026-11-16, docs/autopilot-plan.md). A recipe post that reaches `factor`
  * times its channel's usual audience within two hours is hot: the channel's next post waits (up to `maxDelayMinutes`),
- * and the recipe goes to the most similar channels in their weakest upcoming slot, each with its own post.
+ * and the recipe goes to the channels with the biggest usual audience in their weakest upcoming slot, each with its own
+ * post (2026-11-20: « most similar » meant closest usual reach, so a hit on a mid-size Page only ever went to near-empty
+ * Pages and never to « Recettes - Faciles », where most of the reach is).
  */
 export type RecentPost = { planId: string; targetId: string; wpPostId: string; title: string; postId: string; publishedAt: Date };
 export type UpcomingSlot = { planId: string; targetId: string; wpPostId: string; slotAt: Date; score: number | null };
@@ -39,10 +41,9 @@ export function isHot(input: { reach: number; median: number; ageMinutes: number
   return input.reach >= Math.max(MIN_HOT_REACH, input.median, input.factor * expectedAt(input.median, input.ageMinutes));
 }
 
-/** Channels most like the hot one: closest usual reach, never the hot one itself. */
-export function similarChannels(hot: string, medians: ReadonlyMap<string, number>, count: number): string[] {
-  const base = Math.log(Math.max(1, medians.get(hot) ?? 1));
-  return [...medians.keys()].filter(id => id !== hot).sort((a, b) => Math.abs(Math.log(Math.max(1, medians.get(a)!)) - base) - Math.abs(Math.log(Math.max(1, medians.get(b)!)) - base)).slice(0, count);
+/** Channels a hit should go to: the biggest usual audience first, never the hot one itself. */
+export function biggestAudiences(hot: string, medians: ReadonlyMap<string, number>, count: number): string[] {
+  return [...medians.keys()].filter(id => id !== hot).sort((a, b) => (medians.get(b) ?? 0) - (medians.get(a) ?? 0) || a.localeCompare(b)).slice(0, count);
 }
 
 /** Next post's new time: `delay` later on Facebook's 5-minute marks, at least 30 minutes before the post after it. */
@@ -91,7 +92,7 @@ export async function runRadar(input: { timeZone?: string; pilot: AutopilotSetti
       const slots = await ports.upcoming(input.sourceId, new Date(now.getTime() + 3 * 3_600_000), new Date(now.getTime() + 72 * 3_600_000));
       const spread: string[] = []; let already = 0, noSlot = 0, refused = 0;
       const chosenTimes: number[] = [];
-      for (const target of similarChannels(post.targetId, medians, pilot.radar.pages * 2)) {
+      for (const target of biggestAudiences(post.targetId, medians, pilot.radar.pages * 2)) {
         if (spread.length >= pilot.radar.pages) break;
         if (input.blocked(target, post.wpPostId) || slots.some(slot => slot.targetId === target && slot.wpPostId === post.wpPostId)) { already++; continue; }
         // The channel's weakest upcoming slot gives way; slots are spread over the days ahead, one per channel.
@@ -105,7 +106,7 @@ export async function runRadar(input: { timeZone?: string; pilot: AutopilotSetti
       }
       // Every outcome is said, so a radar that did nothing is never a mystery (2026-11-16).
       const why = [already ? `${already} already had this recipe` : '', noSlot ? `${noSlot} had no free time in the next three days` : '', refused ? `${refused} could not be changed` : ''].filter(Boolean).join(', ');
-      out.entries.push({ at: now.toISOString(), kind: 'radar', channelId: post.targetId, channelName: name(post.targetId), text: spread.length ? `Planned on ${spread.length} similar channels: ${spread.join(', ')}.${why ? ` Others: ${why}.` : ''}` : `Not spread to other channels: ${why || 'no similar channel'}.`,
+      out.entries.push({ at: now.toISOString(), kind: 'radar', channelId: post.targetId, channelName: name(post.targetId), text: spread.length ? `Planned on ${spread.length} channels with the biggest audience: ${spread.join(', ')}.${why ? ` Others: ${why}.` : ''}` : `Not spread to other channels: ${why || 'no similar channel'}.`,
         code: spread.length ? 'spread' : 'notSpread', params: { count: spread.length, channels: spread.join(', ').slice(0, 400), already, noSlot, refused } });
     }
   }
