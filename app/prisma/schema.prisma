@@ -2957,6 +2957,7 @@ model RecipeRating {
   ratedAt     DateTime  @default(now())
   photoAt     DateTime?
   photoTraits String[]
+  photoVersion Int?    @db.SmallInt
 
   @@id([sourceId, wpPostId], map: "recipe_ratings_pkey")
   @@index([workspaceId], map: "recipe_ratings_workspace_idx")

@@ -97,7 +97,8 @@ export function scoreRecipe(recipe: ScoreInput, at: ScoreContext): { score: numb
   const folded = fold(recipe.title);
   const kind = recipe.kind ?? guessKind(recipe.title);
   if (typeof recipe.hook === 'number') add('hook', (recipe.hook - 5) * 3);
-  if (typeof recipe.photo === 'number') add('photo', (recipe.photo - 5) * 3);
+  // The photo counts more since its rating is strict (2026-11-20): ±20 instead of ±15.
+  if (typeof recipe.photo === 'number') add('photo', (recipe.photo - 5) * 4);
   // What works on this channel, learned from its own recent posts (2026-11-18): 1.3× usual ≈ +7, 2× ≈ +17, at most ±20.
   if (typeof recipe.history === 'number' && Number.isFinite(recipe.history)) add('history', Math.max(-20, Math.min(20, Math.log(Math.max(recipe.history, 0.05)) * 25)));
   const month = at.date.getUTCMonth() + 1;

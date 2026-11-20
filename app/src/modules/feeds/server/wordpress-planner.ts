@@ -4,7 +4,7 @@ import { decryptSecret } from '@/server/secret-crypto';
 import { defaultFetchDeps, type FetchDeps } from '@/modules/publishing/server/media/network/net-guard';
 import type { ArticleInput, ArticleWriting } from '@/modules/studio/ai';
 import { autopilotOf, type AutopilotSettings } from '../wordpress/autopilot';
-import { prismaScoringPorts, pageLearning, PHOTO_BATCH, type ScoringPorts, type Rating } from './wordpress-scoring';
+import { prismaScoringPorts, pageLearning, PHOTO_BATCH, PHOTO_VERSION, type ScoringPorts, type Rating } from './wordpress-scoring';
 import { makePicker } from './wordpress-pick';
 import { guessKind, type RecipeKind } from '../wordpress/score';
 import { captionGuidance, hitBoost, hitWords, memoryModel } from '../wordpress/memory';
@@ -308,7 +308,7 @@ async function prepareChoosing(ctx: Ctx, source: SourceRow, config: PlanConfig, 
       // Page's memory learned about photos counts in this run's choice; the picker is built again with them.
       if (writer) {
         const soon = new Date(now.getTime() + 86_400_000);
-        const unseen = candidates.filter(c => !ratings.get(c.wpPostId)?.traits).sort((a, b) => picker.scoreAt(b, soon) - picker.scoreAt(a, soon)).slice(0, PHOTO_BATCH);
+        const unseen = candidates.filter(c => { const r = ratings.get(c.wpPostId); return !r?.traits || (r.photoVersion ?? 1) < PHOTO_VERSION; }).sort((a, b) => picker.scoreAt(b, soon) - picker.scoreAt(a, soon)).slice(0, PHOTO_BATCH);
         if (unseen.length && await scoring.ratePhotos(actor, source, unseen.map(c => ({ id: c.wpPostId, imageUrl: c.imageUrl }))).catch(() => 0)) {
           ratings = await scoring.ratings(source.id, ids).catch(() => ratings);
           return makePicker({ pilot, timeZone: config.timezone, ratings, history, weather, timeline, winners: new Set(winners.map(w => w.wpPostId)), winnerQuota, candidates, replacesPhoto });

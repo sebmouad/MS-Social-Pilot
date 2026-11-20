@@ -4,7 +4,15 @@ import { postScore } from '../wordpress/autopilot';
 import type { FeedActor } from './access';
 
 /** AI ratings of one recipe; a missing rating is null. */
-export type Rating = { kind: RecipeKind | null; hook: number | null; photo: number | null; traits?: string[] | null };
+export type Rating = { kind: RecipeKind | null; hook: number | null; photo: number | null; traits?: string[] | null; photoVersion?: number | null };
+/** Mean brightness (0–255) above which a photo is « bright », below which « dim »: the Pages' best posts averaged 134, their weakest 127. */
+const BRIGHT = 140; const DIM = 115;
+async function brightnessOf(jpeg: Buffer): Promise<number> {
+  const sharp = (await import('sharp')).default;
+  const { channels } = await sharp(jpeg).stats();
+  const [r, g, b] = [channels[0]!.mean, channels[1]!.mean, channels[2]!.mean];
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
 /** One published recipe post and how it did relative to its channel's usual (1 = usual). */
 export type Outcome = { targetId: string; wpPostId: string; title: string; slotAt: Date; relative: number; style?: string | null };
 
@@ -28,25 +36,45 @@ export const PHOTO_BATCH = 12;
 /** Why the last photo batch failed, if it did (2026-11-18): shown in the autopilot's activity log. */
 export let lastPhotoProblem: string | null = null;
 /** What the AI may see in a recipe photo; anything else it says is ignored. */
-export const PHOTO_TRAITS = ['close_up', 'overhead', 'side_angle', 'collage', 'steps_shown', 'text_overlay', 'cheese_pull', 'melting', 'golden_crust', 'glossy_sauce', 'steam', 'cut_open', 'generous_portion', 'single_serving', 'rustic', 'elegant_plating', 'bright', 'dark', 'colorful', 'hands', 'ingredients_around', 'plain_background'] as const;
+export const PHOTO_TRAITS = ['close_up', 'overhead', 'side_angle', 'collage', 'steps_shown', 'text_overlay', 'cheese_pull', 'melting', 'golden_crust', 'glossy_sauce', 'steam', 'cut_open', 'generous_portion', 'single_serving', 'rustic', 'elegant_plating', 'bright', 'dark', 'colorful', 'hands', 'ingredients_around', 'plain_background', 'title_text', 'ingredient_graphic', 'ai_artifacts', 'blurry', 'dark', 'bright_image', 'dim_image'] as const;
 
 const RATE_SYSTEM = `You rate recipe posts for a French Facebook food page. For each recipe give:
 - kind: one of ${RECIPE_KINDS.join(', ')}
 - hook: 0 to 10, how much the title makes people stop scrolling and want to cook it (10 irresistible, 5 ordinary, 0 dull or confusing).
 Answer only with a JSON array, one object per recipe, in the order given: [{"id":"…","kind":"…","hook":7}]`;
-const PHOTO_SYSTEM = `You look at the photo of a recipe post for a French Facebook food page.
-- appeal: 0 to 10, how much it makes people stop scrolling (light, sharpness, colour, the dish shown close and inviting).
-- traits: every one of these that clearly applies: ${PHOTO_TRAITS.join(', ')}.
-Answer only with JSON: {"appeal":7,"traits":["close_up","golden_crust"]}`;
+/**
+ * The rules photos are rated with (2026-11-20, owner: image realism and attractiveness drive virality). Version 1 asked
+ * for one 0–10 « appeal »: 499 of about 600 recipes got 8, so photos hardly separated recipes. Version 2 is strict, rates
+ * realism, appetite, the final shot and « stops the scroll » separately, and names defects (title text and ingredient
+ * graphics were the clearest sign of a weak post on the Pages' own posts). Older ratings are done again.
+ */
+export const PHOTO_VERSION = 2;
+const PHOTO_SYSTEM = `You judge the photo of a recipe post for a French home-cooking Facebook page. A step-by-step collage (small step photos, then one big photo of the finished dish) is this page's normal format, not a defect. Be strict and use the whole scale: most photos are average (4 to 6); give 9 or 10 only to a photo almost anyone would stop scrolling for.
+- realism 0-10: looks like a real photo taken in a real home kitchen (natural light, real textures, believable hands and cookware). Low when it looks AI-made, plastic, too smooth or too perfect, or like a stock studio shot.
+- appetite 0-10: makes you hungry right now: golden crust, melted or stretching cheese, glossy sauce, steam, cut open to show the inside, generous portion.
+- final_shot 0-10: the finished dish is big, close, sharp and clearly the main subject (in a collage, judge the big final photo).
+- scroll_stop 0-10: overall, how strongly this image would stop a French home cook scrolling Facebook.
+- traits: every one of these that clearly applies: ${PHOTO_TRAITS.filter(t => t !== 'bright_image' && t !== 'dim_image').join(', ')}. title_text means a title or words written on the image; ingredient_graphic an ingredient list or icons drawn on it; ai_artifacts deformed hands, melted objects or impossible food.
+Answer only with JSON: {"realism":5,"appetite":6,"final_shot":6,"scroll_stop":5,"traits":["collage","golden_crust"]}`;
+/** Defects that mark a weak post; each lowers the photo's rating by 1.5. */
+const PHOTO_DEFECTS = ['title_text', 'ingredient_graphic', 'ai_artifacts', 'blurry', 'dark'];
 
 /** The AI's answer about a photo; an unreadable answer gives null. */
 export function parsePhoto(raw: string): { appeal: number; traits: string[] } | null {
   const start = raw.indexOf('{'); const end = raw.lastIndexOf('}');
   if (start >= 0 && end > start) {
     try {
-      const value = JSON.parse(raw.slice(start, end + 1)) as { appeal?: unknown; traits?: unknown };
+      const value = JSON.parse(raw.slice(start, end + 1)) as { appeal?: unknown; traits?: unknown; realism?: unknown; appetite?: unknown; final_shot?: unknown; scroll_stop?: unknown };
+      const traits = Array.isArray(value.traits) ? [...new Set(value.traits.filter((t): t is string => typeof t === 'string' && (PHOTO_TRAITS as readonly string[]).includes(t)))] : [];
+      const part = (v: unknown) => { const n = Number(v); return Number.isFinite(n) ? Math.max(0, Math.min(10, n)) : null; };
+      const [realism, appetite, finalShot, scroll] = [part(value.realism), part(value.appetite), part(value.final_shot), part(value.scroll_stop)];
+      // Version 2: one strict 0–10 from the four parts, lowered for each defect (2026-11-20).
+      if (realism !== null && appetite !== null && finalShot !== null && scroll !== null) {
+        const combined = 0.3 * realism + 0.25 * appetite + 0.15 * finalShot + 0.3 * scroll - 1.5 * traits.filter(t => PHOTO_DEFECTS.includes(t)).length;
+        return { appeal: Math.max(0, Math.min(10, Math.round(combined))), traits };
+      }
       const appeal = Number(value.appeal);
-      if (Number.isFinite(appeal)) return { appeal: Math.max(0, Math.min(10, Math.round(appeal))), traits: Array.isArray(value.traits) ? [...new Set(value.traits.filter((t): t is string => typeof t === 'string' && (PHOTO_TRAITS as readonly string[]).includes(t)))] : [] };
+      if (Number.isFinite(appeal)) return { appeal: Math.max(0, Math.min(10, Math.round(appeal))), traits };
     } catch { /* fall through to a bare number */ }
   }
   const bare = Number((raw.match(/\d+(\.\d+)?/) ?? [])[0]);
@@ -112,8 +140,8 @@ export const prismaScoringPorts: ScoringPorts = {
   async memories(sourceId) { const { readPageMemories } = await import('./wordpress-memory'); return readPageMemories(sourceId); },
   async ratings(sourceId, ids) {
     if (!ids.length) return new Map();
-    const rows = await prisma.$queryRaw<Array<{ wpPostId: string; kind: string | null; hook: number | null; photo: number | null; photoTraits: string[] | null }>>`SELECT "wpPostId", kind, hook, photo, "photoTraits" FROM recipe_ratings WHERE "sourceId" = ${sourceId} AND "wpPostId" = ANY(${[...ids]}::text[])`;
-    return new Map(rows.map(row => [row.wpPostId, { kind: (RECIPE_KINDS as readonly string[]).includes(row.kind ?? '') ? row.kind as RecipeKind : null, hook: row.hook, photo: row.photo, traits: row.photoTraits }]));
+    const rows = await prisma.$queryRaw<Array<{ wpPostId: string; kind: string | null; hook: number | null; photo: number | null; photoTraits: string[] | null; photoVersion: number | null }>>`SELECT "wpPostId", kind, hook, photo, "photoTraits", "photoVersion" FROM recipe_ratings WHERE "sourceId" = ${sourceId} AND "wpPostId" = ANY(${[...ids]}::text[])`;
+    return new Map(rows.map(row => [row.wpPostId, { kind: (RECIPE_KINDS as readonly string[]).includes(row.kind ?? '') ? row.kind as RecipeKind : null, hook: row.hook, photo: row.photo, traits: row.photoTraits, photoVersion: row.photoVersion }]));
   },
   async rate(actor, source, items) {
     const batch = items.slice(0, RATE_BATCH);
@@ -139,10 +167,14 @@ export const prismaScoringPorts: ScoringPorts = {
       const bytes = item.mediaId ? Buffer.from((await readWorkspaceImage(source.workspaceId, item.mediaId)).bytes)
         : await image.download(item.imageUrl ?? '', { timeoutMs: 10_000, maxBytes: 15_000_000, maxRedirects: 3, allowHttp: false, hostAllowlist: [] });
       const small = await photoForAi(bytes);
-      const seen = parsePhoto(await autopilotComplete(actor, 'autopilot.photo', PHOTO_SYSTEM, 'The photo.', { image: { mimeType: 'image/jpeg', base64: small.toString('base64') }, maxTokens: 300 }));
+      // Room for the model's reasoning: 300 tokens left some answers empty (2026-11-20).
+      const seen = parsePhoto(await autopilotComplete(actor, 'autopilot.photo', PHOTO_SYSTEM, 'The photo.', { image: { mimeType: 'image/jpeg', base64: small.toString('base64') }, maxTokens: 1200 }));
       if (!seen) return;
-      await prisma.$executeRaw`INSERT INTO recipe_ratings ("sourceId", "wpPostId", "workspaceId", photo, "photoTraits", "photoAt", "ratedAt") VALUES (${source.id}, ${item.id}, ${source.workspaceId}, ${seen.appeal}, ${seen.traits}::text[], NOW(), NOW())
-        ON CONFLICT ("sourceId", "wpPostId") DO UPDATE SET photo = EXCLUDED.photo, "photoTraits" = EXCLUDED."photoTraits", "photoAt" = NOW()`;
+      // Brightness measured on the pixels, so each Page's memory can learn whether it matters there (2026-11-20).
+      const tone = await brightnessOf(small).catch(() => null);
+      const traits = [...seen.traits, ...(tone === null ? [] : tone >= BRIGHT ? ['bright_image'] : tone < DIM ? ['dim_image'] : [])];
+      await prisma.$executeRaw`INSERT INTO recipe_ratings ("sourceId", "wpPostId", "workspaceId", photo, "photoTraits", "photoVersion", "photoAt", "ratedAt") VALUES (${source.id}, ${item.id}, ${source.workspaceId}, ${seen.appeal}, ${traits}::text[], ${PHOTO_VERSION}, NOW(), NOW())
+        ON CONFLICT ("sourceId", "wpPostId") DO UPDATE SET photo = EXCLUDED.photo, "photoTraits" = EXCLUDED."photoTraits", "photoVersion" = EXCLUDED."photoVersion", "photoAt" = NOW()`;
       read++;
     };
     // Four at a time. A photo that cannot be read is tried again on a later run; the AI over its limit stops the batch.

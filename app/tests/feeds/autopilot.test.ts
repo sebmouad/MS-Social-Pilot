@@ -361,3 +361,13 @@ test('generated photo: the recipe facts come from the first comment, and the fin
   assert.match(prompt, /a cold dish shows a neat slice/);
   assert.ok(prompt.length <= 1000);
 });
+
+test('photo rating v2: strict parts make one 0–10, defects lower it, the old answer still reads', async () => {
+  const { parsePhoto } = await import('@/modules/feeds/server/wordpress-scoring');
+  const good = parsePhoto('{"realism":8,"appetite":9,"final_shot":9,"scroll_stop":8,"traits":["collage","cheese_pull"]}')!;
+  assert.equal(good.appeal, 8); assert.deepEqual(good.traits, ['collage', 'cheese_pull']);
+  const poster = parsePhoto('{"realism":6,"appetite":8,"final_shot":8,"scroll_stop":7,"traits":["title_text","ingredient_graphic"]}')!;
+  assert.equal(poster.appeal, 4, 'a poster with a title and an ingredient graphic loses 3 points');
+  assert.equal(parsePhoto('{"appeal":7,"traits":["close_up"]}')!.appeal, 7);
+  assert.deepEqual(parsePhoto('{"realism":5,"appetite":5,"final_shot":5,"scroll_stop":5,"traits":["unknown_thing"]}')!.traits, []);
+});

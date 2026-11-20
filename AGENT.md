@@ -474,3 +474,14 @@ ads_management (owner asked to rework Ads like Meta Ads Manager first). The subm
 - 2026-11-19 (owner): photos are kept as downloaded from WordPress. A JPEG within `maxOutputBytes` is stored and posted
   byte for byte; WebP/PNG (or too large) is converted to JPEG with nothing added. No AI marker is written into any photo
   any more; « AI info » comes only from `is_ai_generated` on the published post.
+
+### 7.1o Photo rating v2 (2026-11-20, owner: image realism and attractiveness drive virality)
+- v1 asked one 0–10 « appeal »: 499 of ~600 recipes got 8. v2 (`PHOTO_VERSION` 2, column `recipe_ratings.photoVersion`,
+  migration 0023) rates realism, appetite, final shot and « stops the scroll », combined 0.3/0.25/0.15/0.3 into the same
+  0–10 `photo`, minus 1.5 per defect (title_text, ingredient_graphic, ai_artifacts, blurry, dark). Brightness is measured
+  on the pixels (`bright_image` ≥ 140, `dim_image` < 115) so Page memories can learn it. Older ratings are re-rated.
+  The photo now weighs ±20 points (was ±15).
+- What the data showed before building (owner should know): on « Recettes - Faciles »' 15 best vs 15 weakest posts, the
+  AI judge scored 70.6 vs 66.7 and brightness 134 vs 127 (correlation with reach 0.18): small. The clear image signal is
+  posters (title text + ingredient graphic): 3 of the weakest vs 1 hit. Dish type (cheesy, golden, ham/cheese bites)
+  separates hits from weak posts more than how the photo is made.

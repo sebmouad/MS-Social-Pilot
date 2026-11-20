@@ -91,7 +91,7 @@ export async function photosToLearn(sourceId: string, now: Date, limit: number):
     JOIN post_targets pt ON pt."postId" = l."postId" AND pt."targetId" = l."targetId" AND pt.status::text = 'published'
     JOIN posts p ON p.id = l."postId"
     LEFT JOIN recipe_ratings r ON r."sourceId" = l."sourceId" AND r."wpPostId" = l."wpPostId"
-    WHERE l."sourceId" = ${sourceId} AND l.state = 'planned' AND r."photoTraits" IS NULL AND l."slotAt" >= ${new Date(now.getTime() - 30 * 86_400_000)} AND l."slotAt" <= ${now}
+    WHERE l."sourceId" = ${sourceId} AND l.state = 'planned' AND (r."photoTraits" IS NULL OR COALESCE(r."photoVersion", 1) < 2) AND l."slotAt" >= ${new Date(now.getTime() - 30 * 86_400_000)} AND l."slotAt" <= ${now}
     ORDER BY l."wpPostId", l."slotAt" DESC`;
   const withMedia = rows.flatMap(row => {
     const first = Array.isArray(row.media) ? (row.media as Array<{ kind?: unknown; url?: unknown }>).find(item => item?.kind === 'image' && typeof item.url === 'string' && item.url.startsWith('media:')) : undefined;
@@ -102,7 +102,7 @@ export async function photosToLearn(sourceId: string, now: Date, limit: number):
     JOIN wordpress_recipe_sources s ON s.id = ${sourceId}
     JOIN targets t ON t.id = ep."targetId" AND t."workspaceId" = s."workspaceId"
     LEFT JOIN recipe_ratings r ON r."sourceId" = ${sourceId} AND r."wpPostId" = ('ext:' || ep.id)
-    WHERE ep."pictureUrl" IS NOT NULL AND r."photoTraits" IS NULL AND ep."createdTime" >= ${new Date(now.getTime() - 30 * 86_400_000)}
+    WHERE ep."pictureUrl" IS NOT NULL AND (r."photoTraits" IS NULL OR COALESCE(r."photoVersion", 1) < 2) AND ep."createdTime" >= ${new Date(now.getTime() - 30 * 86_400_000)}
       AND NOT EXISTS (SELECT 1 FROM post_targets pt WHERE pt."targetId" = ep."targetId" AND pt."remotePostId" = ep."remoteId")
     ORDER BY ep."createdTime" DESC LIMIT ${Math.ceil(limit / 2)}`;
   const external = outside.map(row => ({ id: `ext:${row.id}`, imageUrl: row.pictureUrl }));
