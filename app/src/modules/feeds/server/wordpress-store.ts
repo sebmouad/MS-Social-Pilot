@@ -152,7 +152,8 @@ export async function hasRecipeSource(workspaceId: string): Promise<boolean> {
  * planned post on the same channel within `gapMinutes` (when the autopilot moves a channel's times, an interrupted
  * 15:00 slot is taken over by the new 15:30 one; it is history, not a problem). `alias` is the plan table's alias.
  */
-export const stillFailedSql = (alias: 'l' | 'p', gapMinutes: number) => Prisma.sql`${Prisma.raw(alias)}.reason IS DISTINCT FROM 'left_empty' AND ${Prisma.raw(alias)}.reason IS DISTINCT FROM 'replaced'
+// Slots emptied, replaced or cancelled on purpose (a withdrawn post, a paused source: 2026-11-20) are not failures to check.
+export const stillFailedSql = (alias: 'l' | 'p', gapMinutes: number) => Prisma.sql`${Prisma.raw(alias)}.reason IS DISTINCT FROM 'left_empty' AND ${Prisma.raw(alias)}.reason IS DISTINCT FROM 'replaced' AND ${Prisma.raw(alias)}.reason IS DISTINCT FROM 'cancelled'
   AND NOT EXISTS (SELECT 1 FROM wordpress_recipe_plans o WHERE o."sourceId" = ${Prisma.raw(alias)}."sourceId" AND o."targetId" = ${Prisma.raw(alias)}."targetId" AND o.state = 'planned'
     AND o."slotAt" > ${Prisma.raw(alias)}."slotAt" - make_interval(mins => ${gapMinutes}::int) AND o."slotAt" < ${Prisma.raw(alias)}."slotAt" + make_interval(mins => ${gapMinutes}::int))`;
 
