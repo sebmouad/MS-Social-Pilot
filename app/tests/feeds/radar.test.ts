@@ -100,3 +100,20 @@ test('radar: a late hit (past its first two hours) is spread once from its store
   assert.equal((await runRadar({ ...input, handled: new Set(['late:late1']) }, ports)).handled.length, 0, 'once');
   assert.equal((await runRadar({ ...input, handled: new Set(['late1']) }, ports)).handled.length, 1, 'handled while fresh, still spread once late');
 });
+
+test('radar: a slot holding a proven hit never gives way to a spread', async () => {
+  const chosen: string[] = [];
+  const ports: RadarPorts = {
+    async recent() { return []; }, async reach() { return null; },
+    async storedHits() { return [{ planId: 'l1', targetId: 'hot', wpPostId: 'w1', title: 'Terrine', postId: 'p1', publishedAt: new Date(now.getTime() - 30 * 3_600_000), reach: 100_000 }]; },
+    async medians() { return new Map([['hot', 300], ['big', 20_000]]); },
+    async nextPosts() { return []; }, async reschedule() {},
+    async upcoming() { return [
+      { planId: 'hit', targetId: 'big', wpPostId: 'raisins', slotAt: new Date(now.getTime() + 15 * 3_600_000), score: 40 },
+      { planId: 'plain', targetId: 'big', wpPostId: 'gratin', slotAt: new Date(now.getTime() + 20 * 3_600_000), score: 70 },
+    ]; },
+    async choose(planId) { chosen.push(planId); return true; },
+  };
+  await runRadar({ keep: new Set(['raisins']), pilot: { ...AUTOPILOT_DEFAULTS, radar: { ...AUTOPILOT_DEFAULTS.radar, pages: 1 } }, sourceId: 's', workspaceId: 'w', actor: { userId: 'u', workspaceId: 'w' }, now, handled: new Set<string>(), names: new Map([['hot', 'Hot'], ['big', 'Big']]), blocked: () => false }, ports);
+  assert.deepEqual(chosen, ['plain'], 'the lowest score is the hit, so the next slot gives way');
+});

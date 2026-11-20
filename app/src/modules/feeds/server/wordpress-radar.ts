@@ -64,7 +64,9 @@ export const SPREAD_GAP_MS = 3 * 3_600_000;
 
 export type RadarOutcome = { entries: AutopilotLogEntry[]; handled: string[] };
 
-export async function runRadar(input: { timeZone?: string; pilot: AutopilotSettings; sourceId: string; workspaceId: string; actor: FeedActor; now: Date; handled: ReadonlySet<string>; names: ReadonlyMap<string, string>; blocked: (targetId: string, wpPostId: string) => boolean }, ports: RadarPorts): Promise<RadarOutcome> {
+export async function runRadar(input: { timeZone?: string;
+  /** Recipes that were hits: their upcoming slots never give way to another spread (2026-11-20). */
+  keep?: ReadonlySet<string>; pilot: AutopilotSettings; sourceId: string; workspaceId: string; actor: FeedActor; now: Date; handled: ReadonlySet<string>; names: ReadonlyMap<string, string>; blocked: (targetId: string, wpPostId: string) => boolean }, ports: RadarPorts): Promise<RadarOutcome> {
   const { pilot, now } = input;
   const out: RadarOutcome = { entries: [], handled: [] };
   if (!pilot.radar.enabled && !pilot.breathe.enabled) return out;
@@ -85,7 +87,8 @@ export async function runRadar(input: { timeZone?: string; pilot: AutopilotSetti
       // Spread over the days ahead (2026-11-16): never within three hours of another channel getting this hit, so Pages
       // do not post the same recipe at the same minute (the first live spread put five Pages at 11:00).
       const apart = (slot: UpcomingSlot) => chosenTimes.every(at => Math.abs(at - slot.slotAt.getTime()) >= SPREAD_GAP_MS);
-      const mine = slots.filter(s => s.targetId === target).sort((a, b) => (a.score ?? 50) - (b.score ?? 50) || a.slotAt.getTime() - b.slotAt.getTime());
+      // A slot holding a proven hit never gives way (2026-11-20: a 23,000-reach spread replaced a 631k hit, the lowest-scored post).
+      const mine = slots.filter(s => s.targetId === target && !input.keep?.has(s.wpPostId)).sort((a, b) => (a.score ?? 50) - (b.score ?? 50) || a.slotAt.getTime() - b.slotAt.getTime());
       const slot = mine.find(apart);
       if (!slot) { noSlot++; continue; }
       if (await ports.choose(slot.planId, post.wpPostId).catch(() => false)) { spread.push(name(target) || target); chosenTimes.push(slot.slotAt.getTime()); } else refused++;

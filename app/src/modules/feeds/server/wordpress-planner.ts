@@ -713,7 +713,8 @@ export async function runRecipePlanning(overrides: Partial<PlannerPorts> & { aut
           const radarPilot = autopilotOf(configOf(settings, source).autopilot);
           const recentOn = (targetId: string, wpPostId: string) => [...radarView.byKey.values()].some(row => row.targetId === targetId && row.wpPostId === wpPostId && row.state !== 'failed'
             && row.slotAt.getTime() > now.getTime() - radarPilot.evergreen.cooldownDays * 86_400_000);
-          const radar = await runRadar({ timeZone: configOf(settings, source).timezone, pilot: autopilotOf(configOf(settings, source).autopilot), sourceId: source.id, workspaceId: source.workspaceId, actor: auth.actor, now, handled: new Set(pilot.radarHandled ?? []),
+          const keep = await import('./wordpress-memory').then(m => m.provenHitRecipes(source.id, now)).catch(() => new Set<string>());
+          const radar = await runRadar({ keep, timeZone: configOf(settings, source).timezone, pilot: autopilotOf(configOf(settings, source).autopilot), sourceId: source.id, workspaceId: source.workspaceId, actor: auth.actor, now, handled: new Set(pilot.radarHandled ?? []),
             names: new Map(channels.map(page => [page.id, page.name])), blocked: recentOn }, radarPorts);
           entries.push(...radar.entries); handled = radar.handled;
         } catch (error) {
