@@ -9,8 +9,11 @@ import { convertToJpeg, type ImagePorts, type ImageSettings } from '../wordpress
  * that Page's memory shows generated photos doing worse. Generation goes through the studio's image service (budget,
  * hourly limit, usage); the result is stored as the recipe JPEG would be, with the AI tag, and the PNG copy removed.
  */
-/** 7 since 2026-11-19: no recipe photo is rated 5 or less (144 rated: 1 at 6, 14 at 7, 129 at 8–9), so the weakest are tested; each Page’s memory stops it where it does worse. */
-export const LOW_APPEAL = 7;
+/**
+ * Photos rated this low get a generated collage. 5 on photo rating v2 (2026-11-20), where 7 is the usual rating and
+ * posters with title text land at 4; it was 7 under v1, when nearly every photo got 8.
+ */
+export const LOW_APPEAL = 5;
 /** The prompt's version: photos from an older one are remade (2 since 2026-11-19: true to the recipe). */
 export const PROMPT_VERSION = 2;
 /** Most photos generated in 24 hours, for all Pages of the workspace. */
