@@ -40,6 +40,12 @@ export function ChannelSettings({ pages, config, onChange, busy, maxTemplate, t,
     // Times the autopilot learned stay its to move until a member changes them; a pause reason goes with the pause.
     const before = channels[editing.id];
     if (before?.autoTimes && JSON.stringify(before.slots) === JSON.stringify(value.slots)) value.autoTimes = true;
+    // Saving another setting (a first comment with the article link, 2026-11-20) must not pin the times shown: when the
+    // channel had no times of its own and they were left as shown, the autopilot keeps choosing them.
+    const hadOwnTimes = Boolean(before?.slots?.length) || Boolean(config.channelSlots?.[editing.id]?.length);
+    if (!hadOwnTimes && JSON.stringify(value.slots) === JSON.stringify([...resolved(editing.id).slots].sort())) delete (value as Partial<Own>).slots;
+    // A template identical to the shared one is not stored, so later changes to the shared template still reach this channel.
+    if (value.firstCommentTemplate === config.firstCommentTemplate) delete (value as Partial<Own>).firstCommentTemplate;
     if (before?.pausedReason && value.paused && before.paused) value.pausedReason = before.pausedReason;
     onChange({ ...channels, [editing.id]: value }, withoutLegacy(editing.id));
     setEditing(null);
