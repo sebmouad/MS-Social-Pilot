@@ -36,3 +36,9 @@ test('log: a re-plan whose replacement is not known yet, and generated photos', 
     'Replanifié avec la mémoire de cette Page : « Biscuits sablés » (attendu ×0.9) retirée ; une recette plus forte prend 09:50.');
   assert.equal(logSentence({ at, kind: 'supply', code: 'photoMade', params: { title: 'Gratin', appeal: 4 } }, 'en'), 'New photo generated for « Gratin »: the recipe’s own photo was rated 4/10.');
 });
+
+test('log: one post marked as AI-generated reads in the singular', () => {
+  const at = '2026-11-20T19:45:00Z';
+  assert.equal(logSentence({ at, kind: 'healing', code: 'aiTagged', params: { count: 1 } }, 'fr'), 'Une publication marquée comme générée par IA sur Facebook (« Info IA »).');
+  assert.equal(logSentence({ at, kind: 'healing', code: 'aiTagged', params: { count: 3 } }, 'en'), '3 published posts marked as AI-generated on Facebook (« AI info »).');
+});

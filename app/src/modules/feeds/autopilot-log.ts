@@ -5,7 +5,7 @@ import type { AutopilotLogEntry } from './wordpress/autopilot';
  * written when shown, so a French page reads French. Entries saved before codes existed are recognised by their English
  * sentence and written the same way (2026-11-17); any other text is shown as saved.
  */
-export type LogCode = 'photosUnread' | 'replanned' | 'stranded' | 'refilled' | 'publishFailed' | 'channelHeld' | 'hot' | 'hotShort' | 'breathe' | 'spread' | 'notSpread' | 'radarFailed' | 'photoMade' | 'photoNotMade' | 'replacedOpen' | 'aiTagged' | 'aiTagFailed' | 'lateHit';
+export type LogCode = 'photosUnread' | 'replanned' | 'stranded' | 'refilled' | 'publishFailed' | 'channelHeld' | 'hot' | 'hotShort' | 'breathe' | 'spread' | 'notSpread' | 'radarFailed' | 'photoMade' | 'photoNotMade' | 'replacedOpen' | 'aiTagged' | 'aiTaggedOne' | 'aiTagFailed' | 'lateHit';
 
 const TEXT: Record<'en' | 'fr', Record<LogCode, string>> = {
   en: {
@@ -25,6 +25,7 @@ const TEXT: Record<'en' | 'fr', Record<LogCode, string>> = {
     photoNotMade: 'A new photo could not be generated ({why}); the recipe’s own photo went out.',
     replacedOpen: 'Re-planned with this Page’s memory: « {from} » (expected ×{fromValue}) removed; a stronger recipe takes {time}.',
     aiTagged: '{count} published posts marked as AI-generated on Facebook (« AI info »).',
+    aiTaggedOne: 'One published post marked as AI-generated on Facebook (« AI info »).',
     aiTagFailed: 'Facebook did not accept the AI-generated mark: {why}',
     lateHit: '« {title} » became a hit: {reach} people reached.',
   },
@@ -45,6 +46,7 @@ const TEXT: Record<'en' | 'fr', Record<LogCode, string>> = {
     photoNotMade: 'Une nouvelle photo n’a pas pu être générée ({why}) ; la photo de la recette est partie.',
     replacedOpen: 'Replanifié avec la mémoire de cette Page : « {from} » (attendu ×{fromValue}) retirée ; une recette plus forte prend {time}.',
     aiTagged: '{count} publications marquées comme générées par IA sur Facebook (« Info IA »).',
+    aiTaggedOne: 'Une publication marquée comme générée par IA sur Facebook (« Info IA »).',
     aiTagFailed: 'Facebook n’a pas accepté la mention IA : {why}',
     lateHit: '« {title} » est devenue un succès : {reach} personnes touchées.',
   },
@@ -82,7 +84,7 @@ export function logSentence(entry: AutopilotLogEntry, locale: 'en' | 'fr'): stri
   const coded = entry.code && entry.code in TEXT.en ? { code: entry.code as LogCode, params: entry.params ?? {} } : fromLegacy(entry.text);
   if (!coded) return entry.text ?? '';
   const { params } = coded;
-  const code: LogCode = coded.code === 'replanned' && !params.to ? 'replacedOpen' : coded.code;
+  const code: LogCode = coded.code === 'replanned' && !params.to ? 'replacedOpen' : coded.code === 'aiTagged' && Number(params.count) === 1 ? 'aiTaggedOne' : coded.code;
   const reasons = why(locale, params);
   if (code === 'notSpread') return fill(TEXT[locale].notSpread, { why: reasons || WHY[locale].none });
   if (code === 'spread') return fill(TEXT[locale].spread, { ...params, others: reasons ? fill(WHY[locale].others, { why: reasons }) : '' });
