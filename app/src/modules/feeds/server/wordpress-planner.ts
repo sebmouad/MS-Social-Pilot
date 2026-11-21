@@ -682,6 +682,15 @@ export async function runRecipePlanning(overrides: Partial<PlannerPorts> & { aut
           (outcome.generated ??= []).push(...upgraded);
         } catch (error) { outcome.photoProblem = String(error instanceof Error ? error.message : error).slice(0, 200); }
       }
+      // Channels switched to title-only captions: their queued posts follow (2026-11-21, ./wordpress-retitle.ts).
+      if (!overrides.autopilot) {
+        try {
+          const titled = Object.entries(configOf(settings, source).channels ?? {}).filter(([, own]) => own?.captionTitle).map(([id]) => id);
+          const { retitleQueued } = await import('./wordpress-retitle');
+          const count = await retitleQueued({ userId: auth.actor.userId, workspaceId: source.workspaceId }, source.id, titled, now);
+          if (count) entries.push({ at: now.toISOString(), kind: 'healing', code: 'retitled', params: { count }, text: `${count} queued posts now carry the recipe title only.` });
+        } catch { /* never stops planning */ }
+      }
       // « AI info » on published recipe posts (2026-11-19, ./wordpress-ai-disclosure.ts), when photos are labelled as AI-made.
       if (!overrides.autopilot && settings.image.aiLabel) {
         try {

@@ -42,3 +42,8 @@ test('log: one post marked as AI-generated reads in the singular', () => {
   assert.equal(logSentence({ at, kind: 'healing', code: 'aiTagged', params: { count: 1 } }, 'fr'), 'Une publication marquée comme générée par IA sur Facebook (« Info IA »).');
   assert.equal(logSentence({ at, kind: 'healing', code: 'aiTagged', params: { count: 3 } }, 'en'), '3 published posts marked as AI-generated on Facebook (« AI info »).');
 });
+
+test('log: queued posts switched to the recipe title', () => {
+  const at = '2026-11-21T12:00:00Z';
+  assert.equal(logSentence({ at, kind: 'healing', code: 'retitled', params: { count: 4 } }, 'en'), '4 queued posts now carry the recipe title only, as their Page’s setting asks.');
+});
