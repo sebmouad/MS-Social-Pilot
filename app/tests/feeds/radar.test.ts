@@ -1,7 +1,7 @@
 // Viral radar and breathing room for hot posts (2026-11-16).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { isHot, biggestAudiences, breatheTime, runRadar, type RadarPorts } from '@/modules/feeds/server/wordpress-radar';
+import { isHot, biggestAudiences, spreadTargets, breatheTime, runRadar, type RadarPorts } from '@/modules/feeds/server/wordpress-radar';
 import { AUTOPILOT_DEFAULTS } from '@/modules/feeds/wordpress/autopilot';
 
 const now = new Date('2026-11-17T16:00:00Z');
@@ -116,4 +116,15 @@ test('radar: a slot holding a proven hit never gives way to a spread', async () 
   };
   await runRadar({ keep: new Set(['raisins']), pilot: { ...AUTOPILOT_DEFAULTS, radar: { ...AUTOPILOT_DEFAULTS.radar, pages: 1 } }, sourceId: 's', workspaceId: 'w', actor: { userId: 'u', workspaceId: 'w' }, now, handled: new Set<string>(), names: new Map([['hot', 'Hot'], ['big', 'Big']]), blocked: () => false }, ports);
   assert.deepEqual(chosen, ['plain'], 'the lowest score is the hit, so the next slot gives way');
+});
+
+test('radar: a strong early hit goes to the two biggest Pages first, then the usual rule fills up to the count', () => {
+  const medians = new Map([['rf', 8000], ['cpe', 3700], ['nrg', 230], ['rc', 250], ['lct', 118], ['small', 30]]);
+  // 400 people on a Page usually at 30: the big Pages are « too big » for it under the usual rule…
+  assert.deepEqual(biggestAudiences('small', medians, 10, 400), ['lct']);
+  // …but a strong early hit is promoted to them first, then the others.
+  assert.deepEqual(spreadTargets('small', medians, 5, 400, true), ['rf', 'cpe', 'lct']);
+  assert.deepEqual(spreadTargets('small', medians, 5, 400, false), ['lct']);
+  // A hit on a big Page goes to the other big one first, never back to itself.
+  assert.deepEqual(spreadTargets('rf', medians, 3, 100_000, true), ['cpe', 'rc', 'nrg']);
 });

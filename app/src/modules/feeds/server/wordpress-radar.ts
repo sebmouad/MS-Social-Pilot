@@ -51,6 +51,20 @@ export function biggestAudiences(hot: string, medians: ReadonlyMap<string, numbe
   return [...medians.keys()].filter(id => id !== hot && (medians.get(id) ?? 0) * 2 <= reach).sort((a, b) => (medians.get(b) ?? 0) - (medians.get(a) ?? 0) || a.localeCompare(b)).slice(0, count);
 }
 
+/**
+ * A strong early hit (2026-11-21, owner: small Pages are the testing ground, a winner moves up to the big Pages): 5× what
+ * its channel usually has at this age and at least PROMOTE_MIN_REACH people. It goes to the two biggest Pages first even
+ * when it is small next to their usual; late hits count as strong.
+ */
+export const PROMOTE_FACTOR = 5;
+export const PROMOTE_MIN_REACH = 300;
+export const BIG_PAGES = 2;
+/** Where a hit is spread: with `promote`, the two biggest Pages first, then the usual rule (biggestAudiences). */
+export function spreadTargets(hot: string, medians: ReadonlyMap<string, number>, count: number, reach: number, promote: boolean): string[] {
+  const big = promote ? biggestAudiences(hot, medians, BIG_PAGES) : [];
+  return [...big, ...biggestAudiences(hot, medians, count, reach).filter(id => !big.includes(id))].slice(0, Math.max(count, big.length));
+}
+
 /** Next post's new time: `delay` later on Facebook's 5-minute marks, at least 30 minutes before the post after it. */
 export function breatheTime(next: Date, following: Date | null, delayMinutes: number): Date | null {
   let at = next.getTime() + delayMinutes * 60_000;
@@ -74,13 +88,13 @@ export async function runRadar(input: { timeZone?: string;
   const medians = await ports.medians([...input.names.keys()], new Date(now.getTime() - 30 * 86_400_000));
   const name = (id: string) => input.names.get(id) ?? '';
   /** Spread a hit to the channels with the biggest audience, once (shared by fresh and late hits, 2026-11-20). */
-  const spreadHit = async (post: RecentPost, reach: number) => {
+  const spreadHit = async (post: RecentPost, reach: number, promote = false) => {
     const slots = await ports.upcoming(input.sourceId, new Date(now.getTime() + 3 * 3_600_000), new Date(now.getTime() + 72 * 3_600_000));
     const spread: string[] = []; let already = 0, noSlot = 0, refused = 0;
     const chosenTimes: number[] = [];
     // A hit only goes where it is big news (2026-11-20: a 324-reach post, then 23,000-reach ones, replaced planned recipes
     // on a Page whose usual post reaches 21,000): a channel whose usual reach is at most half the hit's own reach.
-    for (const target of biggestAudiences(post.targetId, medians, pilot.radar.pages * 2, reach)) {
+    for (const target of spreadTargets(post.targetId, medians, pilot.radar.pages * 2, reach, promote)) {
       if (spread.length >= pilot.radar.pages) break;
       if (input.blocked(target, post.wpPostId) || slots.some(slot => slot.targetId === target && slot.wpPostId === post.wpPostId)) { already++; continue; }
       // The channel's weakest upcoming slot gives way; slots are spread over the days ahead, one per channel.
@@ -119,7 +133,7 @@ export async function runRadar(input: { timeZone?: string;
         }
       }
     }
-    if (pilot.radar.enabled && pilot.radar.mode === 'auto' && isHot({ reach, median, ageMinutes, factor: pilot.radar.factor })) await spreadHit(post, reach);
+    if (pilot.radar.enabled && pilot.radar.mode === 'auto' && isHot({ reach, median, ageMinutes, factor: pilot.radar.factor })) await spreadHit(post, reach, reach >= PROMOTE_MIN_REACH && isHot({ reach, median, ageMinutes, factor: PROMOTE_FACTOR }));
   }
   // Late hits (2026-11-20): a post that grew over a day or two (« Pains aux raisins » 631k, « Mini-quiches » 408k) was past
   // the two-hour window and never spread. Posts from the last 10 days whose stored reach is far above their channel's usual
@@ -133,7 +147,7 @@ export async function runRadar(input: { timeZone?: string;
       if (median === undefined || !isLateHit(post.reach, median)) continue;
       out.handled.push(`late:${post.planId}`);
       out.entries.push({ at: now.toISOString(), kind: 'radar', channelId: post.targetId, channelName: name(post.targetId), text: `« ${post.title.slice(0, 120)} » became a hit: ${post.reach} people reached.`, code: 'lateHit', params: { title: post.title.slice(0, 120), reach: post.reach } });
-      await spreadHit(post, post.reach);
+      await spreadHit(post, post.reach, true);
     }
   }
   return out;
