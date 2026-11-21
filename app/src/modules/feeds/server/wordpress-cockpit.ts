@@ -329,7 +329,7 @@ export async function readPhotosNow(actor: FeedActor, input: unknown, now = new 
 }
 
 /** How the AI rated the recipe photos (2026-11-19, read-only): all rated recipes and the posts queued in the next 3 days, by photo appeal; and generated photos so far. */
-export async function photoFigures(actor: FeedActor, now = new Date()): Promise<{ lessons: Array<{ feature: string; times: number; posts: number }>; recipes: Record<string, number>; queued: Record<string, number>; queuedStrongWeak: number; generated: number; currentRules: { rated: number; recipes: Record<string, number> } }> {
+export async function photoFigures(actor: FeedActor, now = new Date()): Promise<{ aiLabel: Awaited<ReturnType<typeof import('./wordpress-ai-disclosure').aiLabelFigures>> | null; lessons: Array<{ feature: string; times: number; posts: number }>; recipes: Record<string, number>; queued: Record<string, number>; queuedStrongWeak: number; generated: number; currentRules: { rated: number; recipes: Record<string, number> } }> {
   const { source } = await context(actor, false);
   const photos = await import('./wordpress-photos');
   const rows = await prisma.$queryRaw<Array<{ photo: number; count: number }>>`SELECT photo, COUNT(*)::int AS count FROM recipe_ratings WHERE "sourceId" = ${source.id} AND photo IS NOT NULL AND "wpPostId" NOT LIKE 'ext:%' GROUP BY photo`;
@@ -342,5 +342,6 @@ export async function photoFigures(actor: FeedActor, now = new Date()): Promise<
   // What photos, formats, origins and captions are really worth across the Pages (2026-11-21), from the Page memories.
   const { featureLessons } = await import('../wordpress/memory');
   const lessons = featureLessons(await import('./wordpress-memory').then(m => m.readPageMemories(source.id)).catch(() => new Map()), ['p:', 'i:', 'o:', 'f:', 'c:', 'g:', 's:', 'k:', 'fam:']);
-  return { lessons, recipes: byAppeal(rows), queued: byAppeal(queued), queuedStrongWeak: queued.filter(row => row.photo <= photos.LOW_APPEAL && (row.hook ?? 0) >= photos.STRONG_HOOK).length, generated: Number(generated[0]?.count ?? 0), currentRules: { rated: current.reduce((sum, row) => sum + Number(row.count), 0), recipes: byAppeal(current) } };
+  const aiLabel = await import('./wordpress-ai-disclosure').then(m => m.aiLabelFigures(source.workspaceId, source.id, now)).catch(() => null);
+  return { aiLabel, lessons, recipes: byAppeal(rows), queued: byAppeal(queued), queuedStrongWeak: queued.filter(row => row.photo <= photos.LOW_APPEAL && (row.hook ?? 0) >= photos.STRONG_HOOK).length, generated: Number(generated[0]?.count ?? 0), currentRules: { rated: current.reduce((sum, row) => sum + Number(row.count), 0), recipes: byAppeal(current) } };
 }
