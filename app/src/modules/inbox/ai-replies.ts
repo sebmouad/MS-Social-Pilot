@@ -3,7 +3,8 @@ import { matchesModerationRule } from './moderation';
 
 /**
  * AI auto-replies to comments and Messenger messages (2026-11-17, owner's choices by form): comments and messages;
- * everything except negative, sensitive and spam, which are left for a person; sent only once nobody on the team has
+ * everything except negative, sensitive and spam, which are left for a person (2026-11-21, owner: a comment read as
+ * negative goes to the AI, which replies only to a calm remark about the recipe); sent only once nobody on the team has
  * replied for the chosen wait (30 minutes); no daily limit. Pure parts: settings, the prompt and reading the answer.
  */
 export const AI_REPLY_TONES = ['friendly', 'short', 'expert'] as const;
@@ -23,6 +24,8 @@ export const AI_REPLIES_DEFAULTS: AiRepliesSettings = { enabled: false, comments
 
 export type AiReplyContext = {
   kind: 'comment' | 'message'; channel: string; voice: string | null; author: string | null; text: string;
+  /** The inbox's own reading of the text; a comment read as negative is answered only when it is a calm remark. */
+  sentiment?: string | null;
   /** The post a comment is under (its caption, then the recipe from its first comment). */
   post?: string | null;
   /** The only link a reply may contain (the recipe page), when known. */
@@ -45,6 +48,7 @@ export function aiReplyPrompt(c: AiReplyContext, tone: AiReplyTone): { system: s
     '- "skip" when it is spam, an advert, a link to something else, nonsense, or needs no answer (only a friend tagged, only an emoji).',
     '- "reply" otherwise: thanks, praise and questions about the content. A calm correction or extra detail about the recipe (an ingredient, a technique, a name) is a reply too: thank them warmly for the precision and acknowledge it in a few words, without arguing and without inventing anything.',
     `For a reply: write in the same language as the person. Tone: ${TONES[tone]}. ${c.kind === 'comment' ? 'One or two short sentences.' : 'At most three short sentences.'} At most one emoji.`,
+    c.sentiment === 'negative' ? 'This comment reads as negative. Reply only when it is a calm remark, preference or correction about the recipe; anything critical of the page, the person or the result, or upset in tone, is a "handoff".' : '',
     c.voice ? `The page's own voice: ${c.voice.slice(0, 400)}` : '',
     'Use only the facts given below. If the answer is not there, say so kindly and suggest something simple and safe. Never invent a price, a promise, a delivery or a health claim.',
     c.link ? `If they ask for the recipe or the link, give this link and no other: ${c.link}` : 'Do not include any link.',
@@ -82,11 +86,11 @@ export function parseAiReply(raw: string, link: string | null | undefined, max =
 }
 
 /**
- * Decided without asking the AI: links and phone numbers are spam, a comment already read as negative goes to a person.
- * Null when the AI decides.
+ * Decided without asking the AI: links and phone numbers are spam, a private message already read as negative goes to a
+ * person. A negative comment is left to the AI with a stricter rule (2026-11-21). Null when the AI decides.
  */
-export function precheck(text: string, sentiment: string | null | undefined): 'spam' | 'negative' | null {
+export function precheck(text: string, sentiment: string | null | undefined, kind: 'comment' | 'message' = 'message'): 'spam' | 'negative' | null {
   if (matchesModerationRule({ match: 'links', keywords: [] }, text) || matchesModerationRule({ match: 'phones', keywords: [] }, text)) return 'spam';
-  if (sentiment === 'negative') return 'negative';
+  if (sentiment === 'negative' && kind === 'message') return 'negative';
   return null;
 }

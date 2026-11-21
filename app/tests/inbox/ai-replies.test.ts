@@ -29,10 +29,15 @@ test('ai replies: a reply may carry only the recipe link', () => {
   assert.equal(parseAiReply(`{"decision":"reply","reply":"La voici : ${link}"}`, null), null);
 });
 
-test('ai replies: spam and negative comments are decided without the AI', () => {
+test('ai replies: spam and negative messages are decided without the AI; a negative comment goes to the AI with a stricter rule', () => {
   assert.equal(precheck('Gagnez 500€ sur www.promo-facile.com', null), 'spam');
   assert.equal(precheck('Appelez le 06 12 34 56 78', null), 'spam');
   assert.equal(precheck('C’était immangeable', 'negative'), 'negative');
+  assert.equal(precheck('C’était immangeable', 'negative', 'message'), 'negative');
+  assert.equal(precheck('Je préférais avec de la pâte levée', 'negative', 'comment'), null);
+  const strict = aiReplyPrompt({ kind: 'comment', channel: 'P', voice: null, author: null, text: 'Je préférais avec de la pâte levée', sentiment: 'negative' }, 'friendly').system;
+  assert.match(strict, /reads as negative/);
+  assert.doesNotMatch(aiReplyPrompt({ kind: 'comment', channel: 'P', voice: null, author: null, text: 'Merci', sentiment: 'positive' }, 'friendly').system, /reads as negative/);
   assert.equal(precheck('Merci pour la recette !', 'positive'), null);
 });
 

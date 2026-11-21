@@ -130,7 +130,7 @@ async function handle(actor: InboxReadActor, item: Waiting, tone: AiRepliesSetti
   });
   const fail = (reason: string) => prisma.$executeRaw`UPDATE moderation_actions SET error = ${reason.slice(0, 500)} WHERE id = ${claimId}`;
 
-  const pre = precheck(item.text, item.sentiment);
+  const pre = precheck(item.text, item.sentiment, item.kind);
   if (pre === 'spam') { await settle('ai_skip', ''); return 'skipped'; }
   if (pre === 'negative') { await settle('ai_handoff', ''); return 'handed_off'; }
   if (item.kind === 'message' && await aiRepliesInConversation(actor.workspaceId, item.id, now) >= AI_REPLIES_PER_CONVERSATION_DAY) { await settle('ai_handoff', ''); return 'handed_off'; }
@@ -233,7 +233,7 @@ export async function previewAiReplies(actor: InboxReadActor, input: unknown, no
   const items: AiPreviewItem[] = [];
   for (const item of [...messages, ...comments]) {
     const base = { kind: item.kind, channel: item.channel, author: item.author, text: item.text };
-    const pre = precheck(item.text, item.sentiment);
+    const pre = precheck(item.text, item.sentiment, item.kind);
     if (pre) { items.push({ ...base, decision: pre === 'spam' ? 'skip' : 'handoff', reply: null, reason: pre, by: 'rule' }); continue; }
     const { system, prompt } = aiReplyPrompt(item, draft.tone);
     let raw: string;
