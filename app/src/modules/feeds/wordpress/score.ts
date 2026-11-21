@@ -28,7 +28,7 @@ const KIND_WORDS: Array<[RecipeKind, string[]]> = [
  * belong to several families (« Feuilletés jambon-fromage » is both).
  */
 const FAMILIES: Array<[string, string[]]> = [
-  ['gratin', ['gratin*', 'tartiflette', 'hachis parmentier', 'parmentier']],
+  ['gratin', ['gratin', 'gratins', 'tartiflette', 'tarticlette', 'hachis parmentier', 'parmentier']],
   ['feuillete', ['feuillete*', 'pate feuilletee', 'chausson*', 'friand*']],
   ['jambon_fromage', ['jambon', 'croque*', 'raclette', 'cordon bleu']],
   ['quiche_tarte_salee', ['quiche*', 'tarte salee', 'tourte*', 'pizza*', 'flammekueche']],
@@ -42,12 +42,13 @@ const FAMILIES: Array<[string, string[]]> = [
   ['pomme_de_terre', ['pomme de terre', 'pommes de terre', 'patate*', 'frites', 'puree']],
   ['sandwich_wrap', ['wrap*', 'sandwich*', 'panini*', 'burger*', 'tacos', 'galette*', 'roule*']],
   ['viennoiserie', ['brioche*', 'croissant*', 'pain aux raisins', 'pains aux raisins', 'chocolatine*', 'beignet*', 'donut*', 'gaufre*', 'crepe*', 'pancake*']],
-  ['gateau', ['gateau*', 'cake*', 'cheesecake*', 'moelleux', 'fondant*', 'brownie*', 'cookie*', 'muffin*', 'madeleine*', 'financier*', 'quatre quarts']],
-  ['tarte_sucree', ['tarte au*', 'tarte aux*', 'tartelette*', 'clafoutis', 'crumble*', 'flan*', 'paris brest', 'eclair*', 'choux', 'chouquette*', 'profiterole*', 'saint honore', 'mille feuille*']],
+  ['gateau', ['gateau*', 'cake', 'cakes', 'cheesecake*', 'moelleux au*', 'fondant au chocolat', 'brownie*', 'cookie*', 'muffin*', 'madeleine*', 'financier*', 'quatre quarts']],
+  ['tarte_sucree', ['tarte au*', 'tarte aux*', 'tartelette*', 'clafoutis', 'crumble*', 'flan*', 'paris brest', 'pasteis', 'eclair*', 'choux', 'chouquette*', 'profiterole*', 'saint honore', 'mille feuille*']],
   ['dessert_creme', ['mousse au*', 'creme brulee', 'creme caramel', 'creme dessert', 'creme anglaise', 'tiramisu', 'panna cotta', 'riz au lait', 'verrine*', 'entremet*', 'pavlova', 'bavarois']],
   ['fete', ['buche*', 'noel', 'festi*', 'reveillon', 'galette des rois', 'foie gras', 'paques']],
   ['sable_biscuit', ['sable*', 'biscuit*', 'palmier*', 'macaron*', 'meringue*']],
-  ['salade_frais', ['salade*', 'avocat*', 'carpaccio', 'tartare', 'gaspacho', 'tomates farcies']],
+  ['farci', ['farci', 'farcis', 'farcie', 'farcies']],
+  ['salade_frais', ['salade*', 'avocat*', 'carpaccio', 'tartare', 'gaspacho']],
 ];
 export function familiesOf(title: string): string[] {
   const folded = fold(title);

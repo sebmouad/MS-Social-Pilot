@@ -429,6 +429,8 @@ test('dish families: a title can be in several; the memory learns each family an
   assert.deepEqual(familiesOf('Feuilletés au fromage et au jambon, garniture crémeuse'), ['feuillete', 'jambon_fromage']);
   assert.deepEqual(familiesOf('Terrine de saumon fumé'), ['terrine', 'poisson']);
   assert.deepEqual(familiesOf('Lait crémeux aux agrumes'), []);
+  assert.deepEqual(familiesOf('Camembert feuilleté au bacon, doré et fondant'), ['feuillete']);
+  assert.deepEqual(familiesOf('Potimarron farci, fondant et gratiné au four'), ['farci']);
   const tz = 'Europe/Paris'; const now = new Date('2026-11-21T12:00:00Z');
   const post = (i: number, title: string, reach: number) => ({ at: new Date(now.getTime() - (i + 1) * 86_400_000), title, kind: null, style: null, caption: '', reach, reactions: reach / 20, comments: 2, shares: 2 });
   const memory = absorb(null, [...Array.from({ length: 6 }, (_, i) => post(i, `Gratin numéro ${i}`, 5000)), ...Array.from({ length: 6 }, (_, i) => post(i + 6, `Soupe numéro ${i}`, 500))], now, tz);
