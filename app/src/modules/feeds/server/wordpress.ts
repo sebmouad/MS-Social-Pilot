@@ -71,6 +71,19 @@ async function selectablePages(workspaceId: string, s: WordpressSettings, auth: 
 
 /** Pool health for the source's channels the viewer may see; null when the library cannot be read right now. */
 /** How long a screen waits for a first library scan before showing the page without its figures. */
+/** What the autopilot learned and logged; only the planner writes these. */
+const LEARNED_KEYS = ['log', 'lastLearnedAt', 'learnVersion', 'hourValues', 'learnedTimes', 'radarHandled', 'approvedDays'] as const;
+/**
+ * A saved form never changes what the autopilot learned (2026-11-16), and never drops it either (2026-11-21: a save
+ * without an autopilot block erased the learned times, the radar's handled hits and the log).
+ */
+export function keepLearned(storedConfig: unknown, config: Record<string, unknown>): void {
+  const stored = storedConfig && typeof storedConfig === 'object' ? (storedConfig as { autopilot?: Record<string, unknown> }).autopilot : undefined;
+  if (!stored || typeof stored !== 'object') return;
+  const mine = (config.autopilot && typeof config.autopilot === 'object' ? config.autopilot : (config.autopilot = {})) as Record<string, unknown>;
+  for (const key of LEARNED_KEYS) { if (stored[key] !== undefined) mine[key] = stored[key]; else delete mine[key]; }
+}
+
 /** How long the Feeds page waits for a first recipe count before showing « Still counting » (was 2.5 s). */
 const POOL_WAIT_MS = 800;
 
@@ -149,9 +162,7 @@ export async function saveRecipeSource(actor: FeedActor, input: unknown, deps: R
     const rows = await tx.$queryRaw<Array<{ id: string; enabled: boolean; config: unknown }>>`SELECT id, enabled, config FROM wordpress_recipe_sources WHERE "workspaceId" = ${actor.workspaceId} FOR UPDATE`;
     const existing = rows[0];
     // What the autopilot learned and logged is written by the planner, never by a settings form (2026-11-16).
-    const stored = existing?.config && typeof existing.config === 'object' ? (existing.config as { autopilot?: Record<string, unknown> }).autopilot : undefined;
-    const mine = (config as { autopilot?: Record<string, unknown> }).autopilot;
-    if (stored && mine) for (const key of ['log', 'lastLearnedAt', 'learnVersion', 'hourValues', 'learnedTimes', 'radarHandled', 'approvedDays']) { if (stored[key] !== undefined) mine[key] = stored[key]; else delete mine[key]; }
+    keepLearned(existing?.config, config);
     const enabled = data.enabled ?? existing?.enabled ?? false;
     const id = existing?.id ?? `wrs_${randomUUID()}`;
     if (existing) {

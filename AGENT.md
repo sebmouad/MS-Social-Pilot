@@ -505,3 +505,14 @@ ads_management (owner asked to rework Ads like Meta Ads Manager first). The subm
   cut off (`AbortError` in facebook.inbox) while saving thousands of comments. Guard 180000 + 2×5000 + 2000 stays under
   `data.workspaceOperationTimeoutMs` (300000).
 - Fonts ship with the app (`src/app/fonts`, next/font/local): next/font/google failed CI builds now and then.
+- Title-only caption test (owner's choice, 21 Nov → 26 Nov): `captionTitle: true` on Recettes Sans Complication, Recettes
+  Sans Routine and Recettes Sans Soucis; controls with similar reach: Cuisine Qui Réunit, La Cuisine Décontractée,
+  La Cuisine Ensoleillée. Why: on Recettes - Faciles, posts published by another tool (title-only captions) reached 1.17M
+  people over 14–20 Nov (median 12.5k) vs 172k (median 3.4k) for the autopilot's posts there. Only RF has such posts.
+- Incident (21 Nov, 07:21 UTC): a probe saved the source with `config: {}`; the save replaces the config, so settings fell
+  to defaults and the learned data (times, hour values, radar handled list, log) was dropped. Settings were restored from a
+  copy taken minutes before; the planner relearned the times at 07:30; the radar's handled list and the log are lost (a
+  hit of the last 10 days may be spread once more, only to Pages without that recipe). Fix: `keepLearned()` keeps learned
+  data on every save. Never probe write endpoints with partial bodies on the live site.
+- Open: on 21 Nov 07:18–07:23 the live PUT /api/feeds/wordpress answered an HTML 500 for the full config (learned data
+  present), not reproducible locally with the same config; saves work again since the relearn. Recheck if it recurs.
