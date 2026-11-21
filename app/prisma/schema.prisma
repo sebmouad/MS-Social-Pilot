@@ -1595,6 +1595,7 @@ model external_posts {
   insightsSyncedAt DateTime?
   fetchedAt        DateTime  @default(now())
   pictureUrl       String?
+  remoteMissingAt  DateTime?
   targets          Target    @relation(fields: [targetId], references: [id], onDelete: Cascade)
 
   @@unique([targetId, remoteId])

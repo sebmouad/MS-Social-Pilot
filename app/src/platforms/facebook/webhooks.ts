@@ -191,6 +191,8 @@ async function eligibleTargets(pageId: string): Promise<MatchedTarget[]> {
 
 async function storeFeedPost(targetId: string, event: MetaWebhookEvent, now: Date): Promise<boolean> {
   if (!event.postId) return false;
+  // A post deleted on the Page (2026-11-21): recorded as missing, never stored again as a new post.
+  if (event.verb === 'remove') { const { markPostMissing } = await import('./remote-missing'); return await markPostMissing(targetId, event.postId, now) > 0; }
   await prisma.$executeRaw`INSERT INTO external_posts (id, "targetId", "remoteId", message, permalink, "statusType", "pictureUrl", "createdTime", insights, "insightsSyncedAt", "fetchedAt")
     VALUES (${`fb_${randomUUID()}`}, ${targetId}, ${event.postId}, ${event.text}, NULL, NULL, NULL, ${event.createdAt ?? now}, NULL, NULL, ${now})
     ON CONFLICT ("targetId", "remoteId") DO UPDATE SET message = EXCLUDED.message, "fetchedAt" = EXCLUDED."fetchedAt"`;

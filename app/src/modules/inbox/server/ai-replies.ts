@@ -77,7 +77,8 @@ async function waitingComments(workspaceId: string, channelIds: string[], since:
       (SELECT l.permalink FROM wordpress_recipe_plans l WHERE l."postId" = p.id AND l."targetId" = t.id AND l.permalink IS NOT NULL LIMIT 1) AS link
     FROM post_comments c JOIN post_targets pt ON pt.id = c."postTargetId" JOIN posts p ON p.id = pt."postId" JOIN targets t ON t.id = pt."targetId"
     WHERE p."workspaceId" = ${workspaceId} AND t."workspaceId" = ${workspaceId} AND t.id = ANY(${channelIds}::text[])
-      AND c."parentRemoteId" IS NULL AND c."sentById" IS NULL AND c."isHidden" = false AND c."resolvedAt" IS NULL AND length(trim(c.message)) > 0
+      -- A comment under a post deleted on Facebook cannot be answered (2026-11-21).
+      AND pt."remoteMissingAt" IS NULL AND c."parentRemoteId" IS NULL AND c."sentById" IS NULL AND c."isHidden" = false AND c."resolvedAt" IS NULL AND length(trim(c.message)) > 0
       AND (c."fromId" IS NULL OR c."fromId" <> t."providerId") AND c."createdTime" >= ${since} AND c."createdTime" <= ${before}
       AND NOT EXISTS (SELECT 1 FROM post_comments r WHERE r."postTargetId" = c."postTargetId" AND r."parentRemoteId" = c."remoteId" AND (r."sentById" IS NOT NULL OR r."fromId" = t."providerId"))
       AND NOT EXISTS (SELECT 1 FROM moderation_actions m WHERE m."workspaceId" = ${workspaceId} AND m."targetId" = t.id AND m."remoteCommentId" = c."remoteId")

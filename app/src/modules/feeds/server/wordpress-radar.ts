@@ -158,7 +158,7 @@ export function prismaRadarPorts(choose: RadarPorts['choose']): RadarPorts {
     async recent(sourceId, from) {
       return prisma.$queryRaw<RecentPost[]>`SELECT l.id AS "planId", l."targetId", l."wpPostId", l.title, l."postId", pt."publishedAt" FROM wordpress_recipe_plans l
         JOIN post_targets pt ON pt."postId" = l."postId" AND pt."targetId" = l."targetId"
-        WHERE l."sourceId" = ${sourceId} AND l.state = 'planned' AND pt.status::text = 'published' AND pt."publishedAt" >= ${from}`;
+        WHERE l."sourceId" = ${sourceId} AND l.state = 'planned' AND pt.status::text = 'published' AND pt."remoteMissingAt" IS NULL AND pt."publishedAt" >= ${from}`;
     },
     async reach(workspaceId, postId, targetId) {
       const { syncPostMetrics } = await import('@/modules/publishing/server/sync-post-metrics');
@@ -171,7 +171,7 @@ export function prismaRadarPorts(choose: RadarPorts['choose']): RadarPorts {
           COALESCE((ep.insights->>'post_total_media_view_unique')::numeric, (ep.insights->>'reach')::numeric)::int AS reach
         FROM wordpress_recipe_plans l
         JOIN post_targets pt ON pt."postId" = l."postId" AND pt."targetId" = l."targetId" AND pt.status::text = 'published'
-        JOIN external_posts ep ON ep."targetId" = pt."targetId" AND ep."remoteId" = pt."remotePostId"
+        JOIN external_posts ep ON ep."targetId" = pt."targetId" AND ep."remoteId" = pt."remotePostId" AND ep."remoteMissingAt" IS NULL AND pt."remoteMissingAt" IS NULL
         WHERE l."sourceId" = ${sourceId} AND l.state = 'planned' AND pt."publishedAt" >= ${from} AND pt."publishedAt" < ${until}
           AND COALESCE(ep.insights->>'post_total_media_view_unique', ep.insights->>'reach') ~ '^[0-9.]+$'
         ORDER BY 7 DESC LIMIT 20`;
@@ -180,7 +180,7 @@ export function prismaRadarPorts(choose: RadarPorts['choose']): RadarPorts {
     async medians(targetIds, from) {
       if (!targetIds.length) return new Map();
       const rows = await prisma.$queryRaw<Array<{ targetId: string; median: number | null }>>`SELECT "targetId", percentile_cont(0.5) WITHIN GROUP (ORDER BY COALESCE((insights->>'post_total_media_view_unique')::numeric, (insights->>'reach')::numeric)) AS median
-        FROM external_posts WHERE "targetId" = ANY(${[...targetIds]}::text[]) AND "createdTime" >= ${from} AND insights IS NOT NULL
+        FROM external_posts WHERE "targetId" = ANY(${[...targetIds]}::text[]) AND "createdTime" >= ${from} AND insights IS NOT NULL AND "remoteMissingAt" IS NULL
           AND COALESCE(insights->>'post_total_media_view_unique', insights->>'reach') ~ '^[0-9.]+$' GROUP BY "targetId"`;
       return new Map(rows.filter(row => Number(row.median) > 0).map(row => [row.targetId, Number(row.median)]));
     },

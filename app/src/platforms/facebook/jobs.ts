@@ -26,6 +26,7 @@ import type { FeatureId } from '@/lib/product';
 import { jobAbortSignal, jobStopRequested } from '@/server/jobs/job-context';
 import { FACEBOOK_ANALYTICS_LOOKBACK_DAYS_SCHEMA } from './module';
 import { purgeExpiredWebhookDeliveries } from './webhooks';
+import { isMissingPostError, markPostMissing } from './remote-missing';
 
 const jobFeatures = {
   publishing: ['publishing/posts'],
@@ -352,7 +353,7 @@ export async function syncPageAnalytics(now = new Date(), retryLimit = 0, retryB
               if (ownFirstComment.has(post.remoteId) && typeof post.insights.comments === 'number' && post.insights.comments > 0) post.insights = { ...post.insights, comments: post.insights.comments - 1 };
               await tx.$executeRaw`INSERT INTO external_posts (id, "targetId", "remoteId", message, permalink, "statusType", "pictureUrl", "createdTime", insights, "insightsSyncedAt", "fetchedAt")
                 VALUES (${`fb_${randomUUID()}`}, ${target.id}, ${post.remoteId}, ${post.message}, ${post.permalink}, ${post.statusType}, ${post.pictureUrl}, ${post.createdTime}, ${JSON.stringify(post.insights)}::jsonb, ${now}, ${now})
-                ON CONFLICT ("targetId", "remoteId") DO UPDATE SET message = EXCLUDED.message, permalink = EXCLUDED.permalink, "statusType" = EXCLUDED."statusType", "pictureUrl" = EXCLUDED."pictureUrl", "createdTime" = EXCLUDED."createdTime", insights = EXCLUDED.insights, "insightsSyncedAt" = EXCLUDED."insightsSyncedAt", "fetchedAt" = EXCLUDED."fetchedAt"`;
+                ON CONFLICT ("targetId", "remoteId") DO UPDATE SET "remoteMissingAt" = NULL, message = EXCLUDED.message, permalink = EXCLUDED.permalink, "statusType" = EXCLUDED."statusType", "pictureUrl" = EXCLUDED."pictureUrl", "createdTime" = EXCLUDED."createdTime", insights = EXCLUDED.insights, "insightsSyncedAt" = EXCLUDED."insightsSyncedAt", "fetchedAt" = EXCLUDED."fetchedAt"`;
               persistedCount++;
             }
             // Facebook's own time wins: a held post goes live on Facebook's schedule (on a 5-minute mark), not always the minute asked for.
@@ -564,7 +565,7 @@ async function fetchInboxTarget(target: { id: string; workspaceId: string; provi
   };
   try {
     const conversations = await withRetries(async () => { const binding = await freshTarget(); const engine = await configuredFacebookEngine({ signal }); return engine.listInbox(binding.token, binding.providerId, bounds); }, retryLimit, retryBackoff);
-    const posts = await prisma.postTarget.findMany({ where: { targetId: target.id, status: 'published', remotePostId: { not: null }, post: { workspaceId: target.workspaceId } }, orderBy: [{ publishedAt: 'desc' }, { id: 'asc' }], take: limit, select: { id: true, remotePostId: true } });
+    const posts = await prisma.postTarget.findMany({ where: { targetId: target.id, status: 'published', remotePostId: { not: null }, remoteMissingAt: null, post: { workspaceId: target.workspaceId } }, orderBy: [{ publishedAt: 'desc' }, { id: 'asc' }], take: limit, select: { id: true, remotePostId: true } });
     const commentBatches: InboxFetch['commentBatches'] = [];
     for (const post of posts) {
       if (jobStopRequested()) break;
@@ -574,7 +575,8 @@ async function fetchInboxTarget(target: { id: string; workspaceId: string; provi
       } catch (error) {
         // A post deleted on Facebook (code 100/33) is skipped, its stored comments untouched, so the Page's other posts
         // still sync (2026-11-19: one deleted post had failed a Page's whole inbox every two minutes since 17 Nov).
-        if (error instanceof FacebookApiError && error.code === 100 && error.subcode === 33) continue;
+        // It is recorded as missing (2026-11-21, ./remote-missing.ts), so it is not asked for again.
+        if (isMissingPostError(error)) { await markPostMissing(target.id, post.remotePostId).catch(() => 0); continue; }
         throw error;
       }
     }

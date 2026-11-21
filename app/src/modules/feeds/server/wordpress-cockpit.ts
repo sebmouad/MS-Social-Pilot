@@ -18,7 +18,7 @@ import { selectSource, stillFailedSql, type SourceRow } from './wordpress-store'
  */
 export type CockpitPost = { planId: string; targetId: string; targetName: string; slotAt: string; time: string; title: string; score: number | null; kind: string | null; postId: string | null; caption: string; image: string | null; flagged: boolean; state: string; reason: string | null;
   /** Where the post stands (2026-11-17): live, still to come, failed, or a time left empty; people reached once live. */
-  status: 'published' | 'upcoming' | 'failed' | 'empty'; reach: number | null; url: string | null };
+  status: 'published' | 'upcoming' | 'failed' | 'empty' | 'removed'; reach: number | null; url: string | null };
 export type CockpitChannel = { id: string; name: string; paused: boolean; pausedReason: string | null; autoTimes: boolean; times: string[]; next: CockpitPost | null; reachToday: number; postsToday: number; failedWeek: number;
   /** The last seven days (2026-11-17): people reached per day, oldest first, the total and the seven days before. */
   daily: number[]; weekReach: number; previousReach: number; weekPosts: number;
@@ -61,9 +61,9 @@ async function context(actor: FeedActor, write = false) {
   return { auth, settings, source, pages, config: configOf(settings, source) };
 }
 
-type PlanRow = { wpPostIdForRating?: string; id: string; targetId: string; slotAt: Date; scheduledAt: Date | null; title: string; score: number | null; kind: string | null; postId: string | null; state: string; reason: string | null; message: string | null; media: unknown; targetStatus: string | null; remoteUrl: string | null; insights: unknown };
+type PlanRow = { wpPostIdForRating?: string; id: string; targetId: string; slotAt: Date; scheduledAt: Date | null; title: string; score: number | null; kind: string | null; postId: string | null; state: string; reason: string | null; message: string | null; media: unknown; targetStatus: string | null; remoteMissingAt?: Date | null; remoteUrl: string | null; insights: unknown };
 async function plansBetween(sourceId: string, from: Date, to: Date): Promise<PlanRow[]> {
-  return prisma.$queryRaw<PlanRow[]>`SELECT l.id, l."targetId", l."wpPostId" AS "wpPostIdForRating", l."slotAt", p."scheduledAt", l.title, l.score, l.kind, l."postId", l.state, l.reason, p.message, p.media, pt.status::text AS "targetStatus", pt."remoteUrl", ep.insights FROM wordpress_recipe_plans l
+  return prisma.$queryRaw<PlanRow[]>`SELECT l.id, l."targetId", l."wpPostId" AS "wpPostIdForRating", l."slotAt", p."scheduledAt", l.title, l.score, l.kind, l."postId", l.state, l.reason, p.message, p.media, pt.status::text AS "targetStatus", pt."remoteUrl", pt."remoteMissingAt", ep.insights FROM wordpress_recipe_plans l
     LEFT JOIN posts p ON p.id = l."postId" AND p."workspaceId" = l."workspaceId"
     LEFT JOIN post_targets pt ON pt."postId" = l."postId" AND pt."targetId" = l."targetId"
     LEFT JOIN external_posts ep ON ep."targetId" = pt."targetId" AND ep."remoteId" = pt."remotePostId"
@@ -82,8 +82,9 @@ export async function readCockpit(actor: FeedActor, now = new Date()): Promise<C
     planId: row.id, targetId: row.targetId, targetName: names.get(row.targetId) ?? '', slotAt: (row.scheduledAt ?? row.slotAt).toISOString(), time: instantToWall(row.scheduledAt ?? row.slotAt, tz).time,
     title: row.title, score: row.score, kind: row.kind, postId: row.postId, caption: (row.message ?? '').slice(0, 280), image: thumb(row.media),
     flagged: row.state === 'planned' && typeof row.score === 'number' && row.score < 45, state: row.state, reason: row.reason,
-    status: row.reason === 'left_empty' ? 'empty' : row.state !== 'planned' || row.targetStatus === 'failed' || row.targetStatus === 'cancelled' ? 'failed' : row.targetStatus === 'published' ? 'published' : 'upcoming',
-    reach: row.targetStatus === 'published' ? reachOf(row.insights) : null, url: row.targetStatus === 'published' ? safeWebUrl(row.remoteUrl) : null,
+    // Deleted on Facebook after it went out (2026-11-21): said as such, with no link or reach.
+    status: row.reason === 'left_empty' ? 'empty' : row.remoteMissingAt ? 'removed' : row.state !== 'planned' || row.targetStatus === 'failed' || row.targetStatus === 'cancelled' ? 'failed' : row.targetStatus === 'published' ? 'published' : 'upcoming',
+    reach: row.targetStatus === 'published' && !row.remoteMissingAt ? reachOf(row.insights) : null, url: row.targetStatus === 'published' && !row.remoteMissingAt ? safeWebUrl(row.remoteUrl) : null,
   });
   const [upcoming, board, todayPlans] = await Promise.all([plansBetween(source.id, now, new Date(now.getTime() + 3 * 86_400_000)), plansBetween(source.id, dayStart(tomorrow), dayStart(addDaysToKey(tomorrow, 1))), plansBetween(source.id, dayStart(today), dayStart(tomorrow))]);
   const ids = pages.map(page => page.id);

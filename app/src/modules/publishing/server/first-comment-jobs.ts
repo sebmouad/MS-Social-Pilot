@@ -44,7 +44,7 @@ async function readCandidates(now: Date, limit: number, maxDelayMinutes: number)
     JOIN post_targets pt ON pt."postId"=p.id
     JOIN targets t ON t.id=pt."targetId" AND t."workspaceId"=p."workspaceId"
     JOIN social_accounts sa ON sa.id=t."socialAccountId" AND sa."workspaceId"=p."workspaceId"
-    WHERE pt.status::text='published' AND pt."remotePostId" IS NOT NULL AND p.status::text IN ('published','partially_failed')
+    WHERE pt.status::text='published' AND pt."remotePostId" IS NOT NULL AND pt."remoteMissingAt" IS NULL AND p.status::text IN ('published','partially_failed')
       AND p."firstComment" IS NOT NULL AND btrim(p."firstComment")<>''
       AND p."firstCommentDelayMinutes" BETWEEN 0 AND ${maxDelayMinutes}
       AND pt."publishedAt" IS NOT NULL AND pt."publishedAt" <= ${now} - (p."firstCommentDelayMinutes" * INTERVAL '1 minute')

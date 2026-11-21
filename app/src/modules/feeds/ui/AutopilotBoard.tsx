@@ -67,6 +67,7 @@ export function AutopilotBoard({ mode, date, dateLabel, posts, approved = false,
       <div className={styles.boardSide}>
         {p.status === 'published' ? <span className={styles.badge} data-tone="good">{p.reach ? fill(labels.publishedReach, { reach: number(p.reach) }) : labels.publishedNoReach}</span>
           : p.status === 'failed' ? <span className={styles.badge} data-tone="warn">{labels.failed}</span>
+          : p.status === 'removed' ? <span className={styles.badge}>{labels.removed}</span>
           : p.status === 'upcoming' && typeof p.score === 'number' ? <span className={styles.score} data-band={p.score >= 70 ? 'high' : p.score >= 45 ? 'mid' : 'low'} title={p.flagged ? labels.flaggedHint : fill(labels.scoreLabel, { score: p.score })}>
             <span className="ui-visually-hidden">{fill(labels.scoreLabel, { score: '' })}</span>{p.score}</span> : null}
       </div>

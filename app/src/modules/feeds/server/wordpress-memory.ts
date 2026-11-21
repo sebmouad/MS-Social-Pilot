@@ -43,7 +43,7 @@ export async function updatePageMemories(source: SourceRow, pages: ReadonlyArray
     FROM wordpress_recipe_plans l
     JOIN post_targets pt ON pt."postId" = l."postId" AND pt."targetId" = l."targetId" AND pt.status::text = 'published'
     JOIN posts p ON p.id = l."postId"
-    JOIN external_posts ep ON ep."targetId" = pt."targetId" AND ep."remoteId" = pt."remotePostId"
+    JOIN external_posts ep ON ep."targetId" = pt."targetId" AND ep."remoteId" = pt."remotePostId" AND ep."remoteMissingAt" IS NULL AND pt."remoteMissingAt" IS NULL
     LEFT JOIN recipe_ratings r ON r."sourceId" = l."sourceId" AND r."wpPostId" = l."wpPostId"
     WHERE l."sourceId" = ${source.id} AND l."targetId" = ANY(${pages.map(page => page.id)}::text[]) AND l.state = 'planned' AND ep.insights IS NOT NULL
       AND COALESCE(pt."publishedAt", l."slotAt") > ${new Date(now.getTime() - 365 * 86_400_000)} AND COALESCE(pt."publishedAt", l."slotAt") <= ${settled}
@@ -54,7 +54,7 @@ export async function updatePageMemories(source: SourceRow, pages: ReadonlyArray
     SELECT ep.id, ep."targetId", ep."createdTime" AS at, ep.message, ep."statusType", ep."pictureUrl", ep.insights, r.photo, r."photoTraits"
     FROM external_posts ep
     LEFT JOIN recipe_ratings r ON r."sourceId" = ${source.id} AND r."wpPostId" = ('ext:' || ep.id)
-    WHERE ep."targetId" = ANY(${pages.map(page => page.id)}::text[]) AND ep.insights IS NOT NULL
+    WHERE ep."targetId" = ANY(${pages.map(page => page.id)}::text[]) AND ep.insights IS NOT NULL AND ep."remoteMissingAt" IS NULL
       AND ep."createdTime" > ${new Date(now.getTime() - 365 * 86_400_000)} AND ep."createdTime" <= ${settled}
       AND NOT EXISTS (SELECT 1 FROM post_targets pt WHERE pt."targetId" = ep."targetId" AND pt."remotePostId" = ep."remoteId")
     ORDER BY 3 ASC LIMIT ${PER_RUN * 10}`;
@@ -102,7 +102,7 @@ export async function photosToLearn(sourceId: string, now: Date, limit: number):
     JOIN wordpress_recipe_sources s ON s.id = ${sourceId}
     JOIN targets t ON t.id = ep."targetId" AND t."workspaceId" = s."workspaceId"
     LEFT JOIN recipe_ratings r ON r."sourceId" = ${sourceId} AND r."wpPostId" = ('ext:' || ep.id)
-    WHERE ep."pictureUrl" IS NOT NULL AND (r."photoTraits" IS NULL OR COALESCE(r."photoVersion", 1) < 2) AND ep."createdTime" >= ${new Date(now.getTime() - 30 * 86_400_000)}
+    WHERE ep."pictureUrl" IS NOT NULL AND ep."remoteMissingAt" IS NULL AND (r."photoTraits" IS NULL OR COALESCE(r."photoVersion", 1) < 2) AND ep."createdTime" >= ${new Date(now.getTime() - 30 * 86_400_000)}
       AND NOT EXISTS (SELECT 1 FROM post_targets pt WHERE pt."targetId" = ep."targetId" AND pt."remotePostId" = ep."remoteId")
     ORDER BY ep."createdTime" DESC LIMIT ${Math.ceil(limit / 2)}`;
   const external = outside.map(row => ({ id: `ext:${row.id}`, imageUrl: row.pictureUrl }));
@@ -113,7 +113,7 @@ export async function photosToLearn(sourceId: string, now: Date, limit: number):
 export async function provenHitRecipes(sourceId: string, now: Date, minReach = 20_000, days = 30): Promise<Set<string>> {
   const rows = await prisma.$queryRaw<Array<{ wpPostId: string }>>`SELECT DISTINCT l."wpPostId" FROM wordpress_recipe_plans l
     JOIN post_targets pt ON pt."postId" = l."postId" AND pt."targetId" = l."targetId" AND pt.status::text = 'published'
-    JOIN external_posts ep ON ep."targetId" = pt."targetId" AND ep."remoteId" = pt."remotePostId"
+    JOIN external_posts ep ON ep."targetId" = pt."targetId" AND ep."remoteId" = pt."remotePostId" AND ep."remoteMissingAt" IS NULL AND pt."remoteMissingAt" IS NULL
     WHERE l."sourceId" = ${sourceId} AND l.state = 'planned' AND pt."publishedAt" > ${new Date(now.getTime() - days * 86_400_000)}
       AND COALESCE(ep.insights->>'post_total_media_view_unique', ep.insights->>'reach') ~ '^[0-9.]+$'
       AND COALESCE((ep.insights->>'post_total_media_view_unique')::numeric, (ep.insights->>'reach')::numeric) >= ${minReach}`;
@@ -124,7 +124,7 @@ export async function provenHitRecipes(sourceId: string, now: Date, minReach = 2
 export async function hitPosts(pageIds: readonly string[], now: Date, limit = 30): Promise<Array<{ title: string; reach: number }>> {
   if (!pageIds.length) return [];
   const rows = await prisma.$queryRaw<Array<{ message: string | null; insights: unknown }>>`SELECT ep.message, ep.insights FROM external_posts ep
-    WHERE ep."targetId" = ANY(${[...pageIds]}::text[]) AND ep.insights IS NOT NULL AND ep."createdTime" > ${new Date(now.getTime() - 60 * 86_400_000)}`;
+    WHERE ep."targetId" = ANY(${[...pageIds]}::text[]) AND ep.insights IS NOT NULL AND ep."remoteMissingAt" IS NULL AND ep."createdTime" > ${new Date(now.getTime() - 60 * 86_400_000)}`;
   return rows.flatMap(row => { const f = figures(row.insights); const text = (row.message ?? '').trim(); return f && text ? [{ title: (text.split(/\n|(?<=[.!?…])\s/)[0] ?? '').slice(0, 140), reach: f.reach }] : []; })
     .sort((a, b) => b.reach - a.reach).slice(0, limit);
 }

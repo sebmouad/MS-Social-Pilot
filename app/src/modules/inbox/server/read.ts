@@ -109,7 +109,7 @@ export async function readInboxList(actor: InboxReadActor, input: unknown = {}, 
     UNION ALL
     SELECT pc.id, 'comment'::text AS kind, pc."createdTime" AS time FROM post_comments pc
       JOIN post_targets pt ON pt.id = pc."postTargetId" JOIN targets t ON t.id = pt."targetId" JOIN posts p ON p.id = pt."postId"
-    WHERE ${gate === 'all' || gate === 'comment'} AND pc."parentRemoteId" IS NULL ${NOT_OWN_COMMENT} AND t."workspaceId" = ${actor.workspaceId} AND p."workspaceId" = ${actor.workspaceId} AND t.id IN (${Prisma.join(channelIds)}) ${status('pc')} ${narrow('comment')}
+    WHERE ${gate === 'all' || gate === 'comment'} AND pc."parentRemoteId" IS NULL ${NOT_OWN_COMMENT} AND pt."remoteMissingAt" IS NULL AND t."workspaceId" = ${actor.workspaceId} AND p."workspaceId" = ${actor.workspaceId} AND t.id IN (${Prisma.join(channelIds)}) ${status('pc')} ${narrow('comment')}
       ${hidden === 'visible' ? Prisma.sql`AND pc."isHidden" = false` : Prisma.empty}
       ${q ? Prisma.sql`AND (pc.message ILIKE ${pattern} ESCAPE ${'\\'} OR pc."fromName" ILIKE ${pattern} ESCAPE ${'\\'})` : Prisma.empty}
     UNION ALL
