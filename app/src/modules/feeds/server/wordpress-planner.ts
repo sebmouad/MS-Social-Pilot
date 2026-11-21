@@ -283,6 +283,10 @@ async function prepareChoosing(ctx: Ctx, source: SourceRow, config: PlanConfig, 
     const boost = hitBoost(hits, title);
     return own === null ? (boost > 1 ? boost : null) : own * boost;
   };
+  // Testing ground (2026-11-21, owner's choice): every Page but the two with the biggest usual reach explores new dish
+  // families; a winner there moves up to the big Pages through the radar (wordpress-radar.ts spreadTargets).
+  const big = model ? new Set(model.bigPages(2)) : null;
+  const explore = model && big?.size ? { pages: new Set(pages.map(page => page.id).filter(id => !big.has(id))), novelty: (title: string) => model.novelty(title) } : null;
   // Past winners: the best tenth of published recipes (and clearly above usual), back after the cooldown.
   const best = new Map<string, number>();
   for (const o of outcomes) best.set(o.wpPostId, Math.max(best.get(o.wpPostId) ?? 0, o.relative));
@@ -313,7 +317,8 @@ async function prepareChoosing(ctx: Ctx, source: SourceRow, config: PlanConfig, 
       const kindOfRow = (row: LedgerRow): RecipeKind => (row.kind as RecipeKind | null | undefined) ?? ratings.get(row.wpPostId)?.kind ?? guessKind(row.title);
       const timeline = new Map<string, Array<{ at: number; kind: RecipeKind }>>();
       for (const row of view.byKey.values()) if (row.state !== 'failed') timeline.set(row.targetId, [...(timeline.get(row.targetId) ?? []), { at: row.slotAt.getTime(), kind: kindOfRow(row) }]);
-      const picker = makePicker({ pilot, timeZone: config.timezone, ratings, history, weather, timeline, winners: new Set(winners.map(w => w.wpPostId)), winnerQuota, candidates, replacesPhoto });
+      const picker = makePicker({ pilot, timeZone: config.timezone, ratings, history, weather, timeline, winners: new Set(winners.map(w => w.wpPostId)), winnerQuota, candidates, replacesPhoto, ...(explore ? { explore } : {}),
+        photoValue: (targetId, traits) => model?.photoValue(targetId, traits) ?? null });
       // The photos of the most promising candidates not seen yet are read before choosing (2026-11-18), so what each
       // Page's memory learned about photos counts in this run's choice; the picker is built again with them.
       if (writer) {
@@ -321,7 +326,8 @@ async function prepareChoosing(ctx: Ctx, source: SourceRow, config: PlanConfig, 
         const unseen = candidates.filter(c => { const r = ratings.get(c.wpPostId); return !r?.traits || (r.photoVersion ?? 1) < PHOTO_VERSION; }).sort((a, b) => picker.scoreAt(b, soon) - picker.scoreAt(a, soon)).slice(0, PHOTO_BATCH);
         if (unseen.length && await scoring.ratePhotos(actor, source, unseen.map(c => ({ id: c.wpPostId, imageUrl: c.imageUrl }))).catch(() => 0)) {
           ratings = await scoring.ratings(source.id, ids).catch(() => ratings);
-          return makePicker({ pilot, timeZone: config.timezone, ratings, history, weather, timeline, winners: new Set(winners.map(w => w.wpPostId)), winnerQuota, candidates, replacesPhoto });
+          return makePicker({ pilot, timeZone: config.timezone, ratings, history, weather, timeline, winners: new Set(winners.map(w => w.wpPostId)), winnerQuota, candidates, replacesPhoto, ...(explore ? { explore } : {}),
+        photoValue: (targetId, traits) => model?.photoValue(targetId, traits) ?? null });
         }
       }
       return picker;

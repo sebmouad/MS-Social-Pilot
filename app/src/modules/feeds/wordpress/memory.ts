@@ -48,6 +48,8 @@ type Usual = { reach: number; reactions: number; comments: number; shares: numbe
 const SIGNALS: ReadonlyArray<[keyof Usual, number]> = [['reach', 0.45], ['reactions', 0.2], ['comments', 0.15], ['shares', 0.2]];
 
 export const MEMORY_HALF_LIFE_DAYS = 30;
+/** Posts of a dish family after which it is no longer new to explore. */
+export const EXPLORED = 10;
 /** Posts' worth of pull towards what the other Pages learned. */
 const K = 3;
 /** A single post moves a lesson by at most 20× (one viral post cannot dominate). */
@@ -177,6 +179,20 @@ export function memoryModel(memories: ReadonlyMap<string, PageMemory>) {
   };
   return {
     lift,
+    /** The Pages with the biggest usual reach (2026-11-21): they exploit what is proven, the others explore. */
+    bigPages(count: number): string[] {
+      return [...memories].filter(([, memory]) => memory.usual).sort((a, b) => b[1].usual!.reach - a[1].usual!.reach || a[0].localeCompare(b[0])).slice(0, count).map(([id]) => id);
+    },
+    /**
+     * How new a recipe is to all Pages (2026-11-21, owner: the small Pages are the testing ground): 1 when its dish
+     * families have no learned post yet, falling to 0 at EXPLORED posts; 1/3 for a recipe in no family.
+     */
+    novelty(title: string): number {
+      const families = familiesOf(title);
+      if (!families.length) return 1 / 3;
+      const seen = Math.min(...families.map(family => [...memories.values()].reduce((sum, memory) => sum + (memory.f[`fam:${family}`]?.n ?? 0), 0)));
+      return Math.max(0, 1 - seen / EXPLORED);
+    },
     /**
      * What a photo is worth on a Page from what it shows (2026-11-21, owner's photo check): its three strongest known
      * traits (1 = usual; null when none is known). The AI's overall appeal score did not follow reach (low ×1.11,

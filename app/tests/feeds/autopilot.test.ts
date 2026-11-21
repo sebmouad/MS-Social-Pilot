@@ -435,3 +435,15 @@ test('dish families: a title can be in several; the memory learns each family an
   const model = memoryModel(new Map([['A', memory]]));
   assert.ok(model.contentValue('A', 'Gratin de chou-fleur', null, null, tz)! > model.contentValue('A', 'Soupe de chou-fleur', null, null, tz)!);
 });
+
+test('testing ground: the two biggest Pages exploit, the others favour recipes from families new to all Pages', async () => {
+  const { absorb, memoryModel, EXPLORED } = await import('@/modules/feeds/wordpress/memory');
+  const tz = 'Europe/Paris'; const now = new Date('2026-11-21T12:00:00Z');
+  const post = (i: number, title: string, reach: number) => ({ at: new Date(now.getTime() - (i + 1) * 86_400_000), title, kind: null, style: null, caption: '', reach, reactions: reach / 20, comments: 2, shares: 2 });
+  const page = (reach: number) => absorb(null, Array.from({ length: EXPLORED }, (_, i) => post(i, `Gratin numéro ${i}`, reach)), now, tz);
+  const model = memoryModel(new Map([['rf', page(9000)], ['cpe', page(4000)], ['small', page(50)]]));
+  assert.deepEqual(model.bigPages(2), ['rf', 'cpe']);
+  assert.equal(model.novelty('Gratin de chou-fleur'), 0);
+  assert.equal(model.novelty('Soupe de potiron'), 1);
+  assert.ok(Math.abs(model.novelty('Lait aux agrumes') - 1 / 3) < 1e-9);
+});

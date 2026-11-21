@@ -22,12 +22,16 @@ export type PickInput<C extends { wpPostId: string; title: string; publishedAt?:
   timeline: ReadonlyMap<string, ReadonlyArray<{ at: number; kind: RecipeKind }>>;
   /** Past winners that may come back, and how many slots they may take. */
   winners: ReadonlySet<string>; winnerQuota: number;
+  /** Testing ground (2026-11-21): on these Pages a recipe new to all Pages (novelty 0–1) gets up to EXPLORE_POINTS. */
+  explore?: { pages: ReadonlySet<string>; novelty: (title: string) => number };
   /** Recipes in their scan order (newest or oldest first), for the weight of recency. */
   candidates: readonly C[];
   /** A weak photo that will be replaced by a generated one on this channel (2026-11-19): scored as an average photo. */
   replacesPhoto?: (targetId: string | null, rating: Rating) => boolean;
 };
 
+/** Most points a recipe new to all Pages gets on a testing-ground Page. */
+export const EXPLORE_POINTS = 15;
 export function makePicker<C extends { wpPostId: string; title: string; publishedAt?: Date | null }>(input: PickInput<C>) {
   const { pilot, timeZone } = input;
   const rules = new Set(pilot.moments.rules);
@@ -57,7 +61,8 @@ export function makePicker<C extends { wpPostId: string; title: string; publishe
   };
   const combined = (c: C, slotAt: Date, targetId: string) => {
     const recency = 100 * (1 - (position.get(c.wpPostId) ?? 0) / Math.max(1, input.candidates.length));
-    return weight * scoreAt(c, slotAt, targetId) + (1 - weight) * recency;
+    const bonus = input.explore?.pages.has(targetId) ? EXPLORE_POINTS * input.explore.novelty(c.title) : 0;
+    return weight * (scoreAt(c, slotAt, targetId) + bonus) + (1 - weight) * recency;
   };
 
   return {
