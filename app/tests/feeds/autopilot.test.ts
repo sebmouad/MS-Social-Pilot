@@ -436,6 +436,9 @@ test('dish families: a title can be in several; the memory learns each family an
   const memory = absorb(null, [...Array.from({ length: 6 }, (_, i) => post(i, `Gratin numéro ${i}`, 5000)), ...Array.from({ length: 6 }, (_, i) => post(i + 6, `Soupe numéro ${i}`, 500))], now, tz);
   const model = memoryModel(new Map([['A', memory]]));
   assert.ok(model.contentValue('A', 'Gratin de chou-fleur', null, null, tz)! > model.contentValue('A', 'Soupe de chou-fleur', null, null, tz)!);
+  const families = model.highlights('A').families.map(f => f.family);
+  assert.equal(families[0], 'gratin');
+  assert.equal(families.at(-1), 'soupe');
 });
 
 test('testing ground: the two biggest Pages exploit, the others favour recipes from families new to all Pages', async () => {

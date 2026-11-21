@@ -141,7 +141,7 @@ export function absorb(memory: PageMemory | null, posts: readonly LearnedPost[],
 }
 
 export type CaptionTip = { code: 'qstart' | 'noqstart' | 'qend' | 'noqend' | 'emoji0' | 'emoji1' | 'emoji3' | 'short' | 'medium' | 'long' | 'hash' | 'nohash'; times: number };
-export type Highlights = { perDay: Array<{ count: number; times: number; days: number }>; formats: Array<{ format: string; times: number; posts: number }>; origins: Array<{ origin: string; times: number; posts: number }>; photos: Array<{ trait: string; times: number }>; posts: number; best: Array<{ word: string; times: number }>; worst: Array<{ word: string; times: number }>; hours: Array<{ hour: number; times: number }>; kinds: Array<{ kind: string; times: number }>; tips: CaptionTip[]; style: HookStyle | null };
+export type Highlights = { perDay: Array<{ count: number; times: number; days: number }>; formats: Array<{ format: string; times: number; posts: number }>; origins: Array<{ origin: string; times: number; posts: number }>; photos: Array<{ trait: string; times: number }>; families: Array<{ family: string; times: number }>; posts: number; best: Array<{ word: string; times: number }>; worst: Array<{ word: string; times: number }>; hours: Array<{ hour: number; times: number }>; kinds: Array<{ kind: string; times: number }>; tips: CaptionTip[]; style: HookStyle | null };
 
 /**
  * What each feature is worth across all Pages (2026-11-21, owner: check what really drives reach): « times » the Pages'
@@ -288,6 +288,8 @@ export function memoryModel(memories: ReadonlyMap<string, PageMemory>) {
         formats: of('f:').map(f => ({ format: f.name, times: f.times, posts: memory?.f[f.key]?.n ?? 0 })).sort((a, b) => b.times - a.times),
         origins: of('o:').map(o => ({ origin: o.name, times: o.times, posts: memory?.f[o.key]?.n ?? 0 })).sort((a, b) => b.times - a.times),
         photos: of('i:').filter(p => p.times >= 1.1).sort((a, b) => b.times - a.times).slice(0, count).map(p => ({ trait: p.name, times: p.times })),
+        // Dish families that clearly do better or worse here (2026-11-21), best first.
+        families: of('fam:').filter(f => f.times >= 1.15 || f.times <= 0.85).sort((a, b) => b.times - a.times).map(f => ({ family: f.name, times: f.times })),
         tips: this.captionTips(targetId), style: this.bestStyle(targetId),
       };
     },
