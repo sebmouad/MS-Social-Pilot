@@ -89,13 +89,16 @@ export async function readCockpit(actor: FeedActor, now = new Date()): Promise<C
   const ids = pages.map(page => page.id);
   const weekAgo = new Date(now.getTime() - 7 * 86_400_000);
   const gap = pilot.bestTimes.gapMinutes;
-  const [todayRows, failed, failures] = await Promise.all([
+  const [todayRows, weekRows] = await Promise.all([
     ids.length ? prisma.$queryRaw<Array<{ targetId: string; insights: unknown }>>`SELECT "targetId", insights FROM external_posts WHERE "targetId" = ANY(${ids}::text[]) AND "createdTime" >= ${dayStart(today)}` : [],
-    prisma.$queryRaw<Array<{ targetId: string; count: bigint }>>(Prisma.sql`SELECT l."targetId", COUNT(*)::bigint AS count FROM wordpress_recipe_plans l WHERE l."sourceId" = ${source.id} AND l.state IN ('failed', 'uncertain') AND ${stillFailedSql('l', gap)} AND l."slotAt" >= ${weekAgo} GROUP BY l."targetId"`),
-    ids.length ? prisma.$queryRaw<Array<{ id: string; targetId: string; slotAt: Date; title: string; reason: string | null; postId: string | null }>>(Prisma.sql`SELECT l.id, l."targetId", l."slotAt", l.title, l.reason, l."postId" FROM wordpress_recipe_plans l
-      WHERE l."sourceId" = ${source.id} AND l."targetId" = ANY(${ids}::text[]) AND l.state IN ('failed', 'uncertain') AND ${stillFailedSql('l', gap)} AND l."slotAt" >= ${weekAgo} AND l."slotAt" < ${now}
-      ORDER BY l."slotAt" DESC LIMIT 3`) : [],
+    ids.length ? prisma.$queryRaw<Array<{ id: string; targetId: string; slotAt: Date; title: string; state: string; reason: string | null; postId: string | null }>>(Prisma.sql`SELECT l.id, l."targetId", l."slotAt", l.title, l.state, l.reason, l."postId" FROM wordpress_recipe_plans l
+      WHERE l."sourceId" = ${source.id} AND l."targetId" = ANY(${ids}::text[]) AND l."slotAt" >= ${weekAgo} AND l."slotAt" < ${new Date(now.getTime() + 3 * 86_400_000)}
+        AND (l.state = 'planned' OR (l.state IN ('failed', 'uncertain') AND ${stillFailedSql('l', gap)}))`) : [],
   ]);
+  // A failed time on a channel whose day still got its full count of posts was moved, not missed (2026-11-21).
+  const moved = settledFailures(weekRows, targetId => channelConfig(config, targetId).slots.length, row => `${row.targetId}|${instantToWall(row.slotAt, tz).date}`);
+  const stillFailed = weekRows.filter(row => row.state !== 'planned' && !moved.has(row.id));
+  const failures = stillFailed.filter(row => row.slotAt < now).sort((a, b) => b.slotAt.getTime() - a.slotAt.getTime()).slice(0, 3);
   const report = await weeklyReport(source, pages, pilot, tz, now);
   const memories = await import('./wordpress-memory').then(m => m.readPageMemories(source.id)).catch(() => new Map());
   const { memoryModel } = await import('../wordpress/memory');
@@ -106,7 +109,7 @@ export async function readCockpit(actor: FeedActor, now = new Date()): Promise<C
     const next = upcoming.find(row => row.targetId === page.id && row.state === 'planned');
     const mine = todayRows.filter(row => row.targetId === page.id);
     return { id: page.id, name: page.name, paused: own?.paused === true, pausedReason: own?.pausedReason ?? null, autoTimes: own?.autoTimes === true || (!own?.slots?.length && Boolean(pilot.learnedTimes?.[page.id])), times: channelConfig(config, page.id).slots,
-      next: next ? view(next) : null, reachToday: mine.reduce((sum, row) => sum + reachOf(row.insights), 0), postsToday: mine.length, failedWeek: Number(failed.find(row => row.targetId === page.id)?.count ?? 0),
+      next: next ? view(next) : null, reachToday: mine.reduce((sum, row) => sum + reachOf(row.insights), 0), postsToday: mine.length, failedWeek: stillFailed.filter(row => row.targetId === page.id).length,
       daily: week?.daily ?? [], weekReach: week?.reach ?? 0, previousReach: week?.previousReach ?? 0, weekPosts: week?.posts ?? 0,
       learned: memories.has(page.id) ? model.highlights(page.id) : null };
   });

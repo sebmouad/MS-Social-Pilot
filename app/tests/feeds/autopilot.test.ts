@@ -388,3 +388,11 @@ test('settledFailures: cancelled, replaced and moved-off-a-full-day slots are hi
   ];
   assert.deepEqual([...settledFailures(rows, () => 2)].sort(), ['a3', 'a4', 'b3']);
 });
+
+test('settledFailures by day: a full day settles its failed time, a short day on the same channel keeps it', async () => {
+  const { settledFailures } = await import('../../src/modules/feeds/wordpress/autopilot');
+  const row = (id: string, day: string, state: string, reason: string | null = null) => ({ id, targetId: 'A', day, state, reason });
+  const rows = [row('m1', 'mon', 'planned'), row('m2', 'mon', 'planned'), row('mf', 'mon', 'failed', 'writing:conflict'),
+    row('t1', 'tue', 'planned'), row('tf', 'tue', 'failed', 'writing:conflict')];
+  assert.deepEqual([...settledFailures(rows, () => 2, r => `${r.targetId}|${r.day}`)], ['mf']);
+});
