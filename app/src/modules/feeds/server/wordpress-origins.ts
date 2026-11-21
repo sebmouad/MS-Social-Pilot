@@ -34,5 +34,12 @@ export async function idCheck(workspaceId: string) {
       (SELECT e."remoteId" FROM external_posts e WHERE e."targetId" = t.id ORDER BY e."createdTime" DESC LIMIT 1) AS feed,
       (SELECT pt."remotePostId" FROM post_targets pt WHERE pt."targetId" = t.id AND pt."remotePostId" IS NOT NULL ORDER BY pt."publishedAt" DESC NULLS LAST LIMIT 1) AS app
     FROM targets t WHERE t."workspaceId" = ${workspaceId} AND t.type = 'page' ORDER BY t.name`;
-  return { mismatched: Number(mismatched[0]?.count ?? 0), samples };
+  const coverage = await prisma.$queryRaw<Array<{ name: string; published: number; withCopy: number; withReach: number; feedRows: number; feedWithReach: number }>>`SELECT t.name,
+      (SELECT COUNT(*)::int FROM post_targets pt WHERE pt."targetId" = t.id AND pt.status::text = 'published' AND pt."publishedAt" > NOW() - INTERVAL '30 days') AS published,
+      (SELECT COUNT(*)::int FROM post_targets pt JOIN external_posts e ON e."targetId" = pt."targetId" AND e."remoteId" = pt."remotePostId" WHERE pt."targetId" = t.id AND pt.status::text = 'published' AND pt."publishedAt" > NOW() - INTERVAL '30 days') AS "withCopy",
+      (SELECT COUNT(*)::int FROM post_targets pt JOIN external_posts e ON e."targetId" = pt."targetId" AND e."remoteId" = pt."remotePostId" WHERE pt."targetId" = t.id AND pt.status::text = 'published' AND pt."publishedAt" > NOW() - INTERVAL '30 days' AND e.insights IS NOT NULL) AS "withReach",
+      (SELECT COUNT(*)::int FROM external_posts e WHERE e."targetId" = t.id AND e."createdTime" > NOW() - INTERVAL '30 days') AS "feedRows",
+      (SELECT COUNT(*)::int FROM external_posts e WHERE e."targetId" = t.id AND e."createdTime" > NOW() - INTERVAL '30 days' AND e.insights IS NOT NULL) AS "feedWithReach"
+    FROM targets t WHERE t."workspaceId" = ${workspaceId} AND t.type = 'page' AND t.name IN ('Recettes - Faciles', 'Cuisine Pleine d’Envie', 'Recettes Sans Soucis') ORDER BY t.name`;
+  return { mismatched: Number(mismatched[0]?.count ?? 0), coverage };
 }
