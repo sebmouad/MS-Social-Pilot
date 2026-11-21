@@ -20,7 +20,7 @@ export function ChannelSettings({ pages, config, onChange, busy, maxTemplate, t,
   pages: Array<{ id: string; name: string }>; config: RecipeConfig; onChange: (channels: Record<string, Own>, channelSlots: Record<string, string[]>) => void; busy: boolean; maxTemplate: number;
   t: (key: RecipeCopyKey, values?: Record<string, string | number>) => string; dayName: (day: number) => string;
 }) {
-  const [editing, setEditing] = useState<{ id: string; name: string; value: Required<Omit<Own, 'pausedReason' | 'autoTimes'>> } | null>(null);
+  const [editing, setEditing] = useState<{ id: string; name: string; value: Required<Omit<Own, 'pausedReason' | 'autoTimes' | 'captionTitle'>> } | null>(null);
   const channels = config.channels ?? {};
   const resolved = (id: string) => channelConfig(config as unknown as PlanConfig, id);
   const own = (id: string) => Boolean(channels[id] && Object.keys(channels[id]!).length) || Boolean(config.channelSlots?.[id]?.length);
@@ -47,6 +47,8 @@ export function ChannelSettings({ pages, config, onChange, busy, maxTemplate, t,
     // A template identical to the shared one is not stored, so later changes to the shared template still reach this channel.
     if (value.firstCommentTemplate === config.firstCommentTemplate) delete (value as Partial<Own>).firstCommentTemplate;
     if (before?.pausedReason && value.paused && before.paused) value.pausedReason = before.pausedReason;
+    // The title-only caption test (2026-11-21) has no control here yet: saving other settings keeps it.
+    if (before?.captionTitle) value.captionTitle = true;
     onChange({ ...channels, [editing.id]: value }, withoutLegacy(editing.id));
     setEditing(null);
   };

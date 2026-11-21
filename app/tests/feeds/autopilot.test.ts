@@ -396,3 +396,13 @@ test('settledFailures by day: a full day settles its failed time, a short day on
     row('t1', 'tue', 'planned'), row('tf', 'tue', 'failed', 'writing:conflict')];
   assert.deepEqual([...settledFailures(rows, () => 2, r => `${r.targetId}|${r.day}`)], ['mf']);
 });
+
+test('captionTitle: a channel can post with the recipe title alone; others keep the written caption', async () => {
+  const { channelConfig, planConfigPatchSchema } = await import('@/modules/feeds/wordpress/recipe');
+  const base = { slots: ['11:00'], autopilot: AUTOPILOT_DEFAULTS, channels: { a: { captionTitle: true } } } as unknown as Parameters<typeof channelConfig>[0];
+  assert.equal(channelConfig(base, 'a').captionTitle, true);
+  assert.equal(channelConfig(base, 'b').captionTitle, false);
+  const schema = planConfigPatchSchema({ template: 2000, horizon: { min: 1, max: 14 }, cooldown: { min: 0, max: 730 }, age: { min: 0, max: 3650 }, delay: { min: 0, max: 60 } });
+  assert.equal(schema.safeParse({ channels: { a: { captionTitle: true } } }).success, true);
+  assert.equal(schema.safeParse({ channels: { a: { captionTitle: 'yes' } } }).success, false);
+});

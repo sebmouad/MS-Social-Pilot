@@ -24,10 +24,12 @@ export type PlanConfig = {
 /** What one channel can set for itself; `paused` stops planning on it without touching the others. */
 export type ChannelSettings = { slots?: string[]; weekdays?: number[]; order?: 'newest' | 'oldest'; firstCommentTemplate?: string; firstCommentDelayMinutes?: number; paused?: boolean; pausedReason?: string;
   /** The times were set by the autopilot's learning, which may move them again; a member's own times are kept. */
-  autoTimes?: boolean };
+  autoTimes?: boolean;
+  /** The caption is only the recipe's title, with no written hook (2026-11-21, owner's test on 3 Pages). */
+  captionTitle?: boolean };
 
 /** The settings one channel posts with: its own where it has them, the shared ones otherwise. */
-export function channelConfig(config: PlanConfig, channelId: string): PlanConfig & { paused: boolean } {
+export function channelConfig(config: PlanConfig, channelId: string): PlanConfig & { paused: boolean; captionTitle: boolean } {
   const own = config.channels?.[channelId] ?? {};
   // A member's own times win; then times the autopilot learned (while best times are on); then the shared times.
   const pilot = autopilotOf(config.autopilot);
@@ -36,7 +38,7 @@ export function channelConfig(config: PlanConfig, channelId: string): PlanConfig
   return {
     ...config, slots: normalizeSlots(slots), order: own.order ?? config.order,
     firstCommentTemplate: own.firstCommentTemplate ?? config.firstCommentTemplate, firstCommentDelayMinutes: own.firstCommentDelayMinutes ?? config.firstCommentDelayMinutes,
-    ...(own.weekdays?.length ? { weekdays: own.weekdays } : {}), paused: own.paused === true,
+    ...(own.weekdays?.length ? { weekdays: own.weekdays } : {}), paused: own.paused === true, captionTitle: own.captionTitle === true,
   };
 }
 
@@ -61,7 +63,7 @@ export const planConfigPatchSchema = (limits: { template: number; horizon: { min
     slots: z.array(z.string().regex(SLOT_TIME)).min(1).max(SLOTS_MAX).transform(normalizeSlotsList),
     weekdays: z.array(z.number().int().min(0).max(6)).min(1).max(7).transform(days => [...new Set(days)].sort()),
     order: z.enum(['newest', 'oldest']), firstCommentTemplate: z.string().min(1).max(limits.template),
-    firstCommentDelayMinutes: z.number().int().min(limits.delay.min).max(limits.delay.max), paused: z.boolean(), pausedReason: z.string().max(300), autoTimes: z.boolean(),
+    firstCommentDelayMinutes: z.number().int().min(limits.delay.min).max(limits.delay.max), paused: z.boolean(), pausedReason: z.string().max(300), autoTimes: z.boolean(), captionTitle: z.boolean(),
   }).partial().strict()).refine(map => Object.keys(map).length <= 500, 'Too many channels.'),
   horizonDays: z.number().int().min(limits.horizon.min).max(limits.horizon.max), distinctAcrossPages: z.boolean(),
   cooldownDays: z.number().int().min(limits.cooldown.min).max(limits.cooldown.max),

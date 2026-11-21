@@ -480,7 +480,9 @@ export async function planSource(ctx: Ctx, source: SourceRow, auth: FeedAuthoriz
     // Autopilot (2026-11-16): the channel's own caption in its voice and a hook style, and a call to action on the comment.
     let style: HookStyle | null = null;
     const key = slotKey(targetId, slotAt);
-    if (pilot.captions.enabled && writer && ports.captions) {
+    // Title-only test (2026-11-21): the outside posts on « Recettes - Faciles » carry only the recipe's title and reach far more.
+    if (of(targetId).captionTitle && c.title.trim()) written = { ...written, caption: c.title.trim().slice(0, settings.textMax) };
+    else if (pilot.captions.enabled && writer && ports.captions) {
       const avoid = openings.slice(0, 10);
       // Each Page's own lessons (2026-11-18): its best hook style and the caption habits that work there.
       const tips = prep?.model?.captionTips(targetId) ?? [];
