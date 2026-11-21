@@ -378,3 +378,13 @@ test('autopilot copy: every photo trait has a label in both languages, and a mis
   for (const trait of PHOTO_TRAITS) for (const locale of ['en', 'fr'] as const) assert.ok(typeof (autopilotCopy[locale] as Record<string, unknown>)[`trait_${trait}`] === 'string', `${locale} trait_${trait}`);
   assert.equal(autopilotText('fr', 'trait_never_seen' as never), 'never seen');
 });
+
+test('settledFailures: cancelled, replaced and moved-off-a-full-day slots are history; a short day keeps its failure', async () => {
+  const { settledFailures } = await import('../../src/modules/feeds/wordpress/autopilot');
+  const row = (id: string, targetId: string, state: string, reason: string | null = null) => ({ id, targetId, state, reason });
+  const rows = [
+    row('a1', 'A', 'planned'), row('a2', 'A', 'planned'), row('a3', 'A', 'failed', 'writing:conflict'), row('a4', 'A', 'failed', 'cancelled'),
+    row('b1', 'B', 'planned'), row('b2', 'B', 'failed', 'writing:conflict'), row('b3', 'B', 'failed', 'replaced'), row('b4', 'B', 'failed', 'left_empty'),
+  ];
+  assert.deepEqual([...settledFailures(rows, () => 2)].sort(), ['a3', 'a4', 'b3']);
+});

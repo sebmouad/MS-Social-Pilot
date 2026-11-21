@@ -205,3 +205,15 @@ export function postScore(insights: unknown): number | null {
   if (!reach && !engagement) return null;
   return reach + engagement * 10;
 }
+
+/**
+ * Failed times that are history, not failures (2026-11-21): a slot cancelled on purpose (a withdrawn post, a channel's
+ * times changed), or any failed slot on a channel whose day already has its full count of planned posts (the autopilot
+ * moved its times and the new ones were planned). A day short of posts keeps its failures.
+ */
+export function settledFailures<T extends { id: string; targetId: string; state: string; reason: string | null }>(rows: readonly T[], perDay: (targetId: string) => number): Set<string> {
+  const planned = new Map<string, number>();
+  for (const row of rows) if (row.state === 'planned') planned.set(row.targetId, (planned.get(row.targetId) ?? 0) + 1);
+  return new Set(rows.filter(row => row.state === 'failed' && row.reason !== 'left_empty'
+    && (row.reason === 'cancelled' || row.reason === 'replaced' || (planned.get(row.targetId) ?? 0) >= perDay(row.targetId))).map(row => row.id));
+}

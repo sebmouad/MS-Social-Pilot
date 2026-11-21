@@ -4,7 +4,7 @@ import { addDaysToKey, instantToWall, wallTimeToInstant } from '@/lib/calendar-d
 import { prisma } from '@/server/data';
 import { Prisma } from '../../../../generated/client';
 import { postThumbnail, safeWebUrl } from '@/components/post-thumbnail';
-import { autopilotOf, postScore, type AutopilotLogEntry, type AutopilotSettings } from '../wordpress/autopilot';
+import { autopilotOf, postScore, settledFailures, type AutopilotLogEntry, type AutopilotSettings } from '../wordpress/autopilot';
 import { bestStyle } from '../wordpress/caption';
 import { channelConfig } from '../wordpress/recipe';
 import { authorizeFeeds, authorizeFeedWrite, type FeedActor } from './access';
@@ -112,7 +112,9 @@ export async function readCockpit(actor: FeedActor, now = new Date()): Promise<C
   });
   const byTime = (a: CockpitPost, b: CockpitPost) => a.slotAt.localeCompare(b.slotAt) || a.targetName.localeCompare(b.targetName);
   // Today keeps what failed too: the day's page says what happened, not only what is planned.
-  const todayPosts = todayPlans.filter(row => names.has(row.targetId) && row.reason !== 'replaced' && row.state !== 'claimed').map(view).sort(byTime);
+  // A cancelled time, or one the autopilot moved off a day already full, is not shown as failed (2026-11-21).
+  const settled = settledFailures(todayPlans, targetId => channelConfig(config, targetId).slots.length);
+  const todayPosts = todayPlans.filter(row => names.has(row.targetId) && !settled.has(row.id) && row.state !== 'claimed').map(view).sort(byTime);
   const boardPosts = board.filter(row => names.has(row.targetId) && (row.state === 'planned' || row.reason === 'left_empty')).map(view).sort(byTime);
   const scores = boardPosts.flatMap(post => typeof post.score === 'number' && post.state === 'planned' ? [post.score] : []);
   return {
