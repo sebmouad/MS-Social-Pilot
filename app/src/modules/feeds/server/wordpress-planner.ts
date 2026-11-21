@@ -8,7 +8,7 @@ import { prismaScoringPorts, pageLearning, PHOTO_BATCH, PHOTO_VERSION, type Scor
 import { makePicker } from './wordpress-pick';
 import { guessKind, type RecipeKind } from '../wordpress/score';
 import { captionGuidance, hitBoost, hitWords, memoryModel, photoWeak } from '../wordpress/memory';
-import { bestStyle, captionPrompt, cleanCaption, ctaFor, opensLike, postingMoment, styleFor, voiceFor, withCta, type HookStyle } from '../wordpress/caption';
+import { bestStyle, captionPrompt, cleanCaption, clicheIn, ctaFor, opensLike, postingMoment, styleFor, voiceFor, withCta, type HookStyle } from '../wordpress/caption';
 import { instantToWall } from '@/lib/calendar-dates';
 import { allocateRecipes, channelConfig, recipeTitleKey, buildImageUrl, buildPermalink, reportedPermalink, parseRecipe, renderComment, resolveConfig, slotInstants, type PlanConfig, type Recipe, type SlotNeed } from '../wordpress/recipe';
 import { openWordpressDb, type DbSettings, type WpDb, type WpCandidateRow } from '../wordpress/db';
@@ -512,6 +512,9 @@ export async function planSource(ctx: Ctx, source: SourceRow, auth: FeedAuthoriz
         // Same first two words as a recent caption: written once more, told which words to avoid.
         const echo = clean ? opensLike(clean, avoid) : null;
         if (clean && echo) clean = cleanCaption(await ports.captions.write(auth.actor, `${system}\nDo not start with « ${echo} ».`, prompt).catch(() => ''), settings.textMax) ?? clean;
+        // A worn-out phrase (2026-11-21): written once more, told which one; kept only when the new one is free of it.
+        const worn = clean ? clicheIn(clean) : null;
+        if (clean && worn) { const again = cleanCaption(await ports.captions.write(auth.actor, `${system}\nDo not write « ${worn} » or anything like it.`, prompt).catch(() => ''), settings.textMax); if (again && !clicheIn(again)) clean = again; }
         if (clean) { written = { ...written, caption: clean }; style = pick.style; openings.unshift(clean.split('\n')[0]!.slice(0, 90)); } }
       catch { /* over the AI limit or unavailable: the recipe's own caption goes out */ }
     }

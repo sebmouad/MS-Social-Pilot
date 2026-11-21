@@ -452,3 +452,14 @@ test('testing ground: the two biggest Pages exploit, the others favour recipes f
   assert.equal(model.novelty('Soupe de potiron'), 1);
   assert.ok(Math.abs(model.novelty('Lait aux agrumes') - 1 / 3) < 1e-9);
 });
+
+test('captions: worn-out phrases are found whatever the accents or apostrophes, and named in the prompt', async () => {
+  const { clicheIn, captionPrompt, CLICHES } = await import('@/modules/feeds/wordpress/caption');
+  assert.equal(clicheIn('Chez nous, la famille se retrouve autour d’un ragoût'), 'la famille se retrouve');
+  assert.equal(clicheIn('LES SOURIRES se dessinent'), 'les sourires');
+  assert.equal(clicheIn('Ce gratin met tout le monde d\'accord'), 'met tout le monde d’accord');
+  assert.equal(clicheIn('Croustillant dehors, fondant dedans.'), null);
+  const { system } = captionPrompt({ channel: 'P', voice: 'warm', style: 'story', question: false, emoji: 'few', title: 'Gratin', caption: '', ingredients: [] });
+  assert.ok(CLICHES.every(phrase => system.includes(phrase)));
+  assert.ok(!system.includes('family life'));
+});

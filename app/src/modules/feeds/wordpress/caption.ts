@@ -9,7 +9,7 @@ export type HookStyle = typeof HOOK_STYLES[number];
 const STYLE_TEXT: Record<HookStyle, string> = {
   question: 'Open with a short question the reader answers yes to.',
   benefit: 'Open with the concrete benefit: time, ease or result.',
-  story: 'Open with a short, warm scene from family life.',
+  story: 'Open with one concrete moment around the dish: a smell, a sound, a gesture, a time of day.',
   curiosity: 'Open with a curiosity hook: a secret, a tip, a surprise.',
   promise: 'Open with a confident promise about the result.',
 };
@@ -71,6 +71,7 @@ export function captionPrompt(input: { channel: string; voice: Voice; style: Hoo
     emoji,
     input.question ? 'End with one short question that invites people to comment.' : 'Do not end with a question.',
     'No link, no hashtag, no price. Never invent an ingredient or a step that is not in the recipe. Do not mention that you are an AI.',
+    `Avoid worn-out phrases: ${CLICHES.map(phrase => `« ${phrase} »`).join(', ')}.`,
     input.when ? `This post goes out on ${input.when.weekday} ${input.when.moment} (French time). If you mention a day or a time of day, it must be exactly this one; otherwise mention none (no other weekday, no « ce matin » in the evening, no « ce soir » in the morning).` : 'Do not mention a weekday or a time of day.',
     ...(input.guidance ?? []),
     'Answer with the caption only.',
@@ -90,6 +91,18 @@ export function postingMoment(date: string, hour: number): { weekday: string; mo
 }
 
 /** True when a caption starts with the same two words as one of the recent openings. */
+/**
+ * Phrases the captions kept repeating on every Page (2026-11-21: « La famille se retrouve autour de la table… » opened
+ * about half of the queued captions in several forms). The prompt names them; a caption still using one is rewritten once.
+ */
+export const CLICHES = ['la famille se retrouve', 'on se retrouve autour', 'autour de la table', 'les sourires', 'tout le monde se régale', 'met tout le monde d’accord'] as const;
+const foldText = (text: string) => ` ${text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[’']/g, ' ').replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim()} `;
+/** The first worn-out phrase a caption uses, as written in CLICHES; null when none. */
+export function clicheIn(caption: string): string | null {
+  const text = foldText(caption);
+  return CLICHES.find(phrase => text.includes(foldText(phrase))) ?? null;
+}
+
 export function opensLike(caption: string, openings: readonly string[]): string | null {
   const head = (text: string) => text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9’' ]+/g, ' ').trim().split(/\s+/).slice(0, 2).join(' ');
   const mine = head(caption);
