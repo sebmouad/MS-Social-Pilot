@@ -8,10 +8,13 @@ import type { AppearanceCopy } from '@/modules/settings/ui/appearance/copy';
 import { ThemeProvider } from '@/components/ThemeProvider';
 import { runtimeConfig } from '@/server/config/store';
 import { ClientErrorReporterGate } from '@/server/errors/ClientErrorReporterGate';
-import { DM_Sans, Inter } from 'next/font/google';
+import localFont from 'next/font/local';
 import './globals.css';
-const inter = Inter({ subsets: ['latin', 'latin-ext'], display: 'swap', variable: '--font-inter' });
-const brand = DM_Sans({ subsets: ['latin', 'latin-ext'], display: 'swap', variable: '--font-brand', weight: ['400', '500', '600', '700'] });
+// Fonts ship with the app: fetching them from Google Fonts at build time failed now and then (CI runs 221, 224, 227).
+const inter = localFont({ src: './fonts/inter-latin-wght-normal.woff2', weight: '100 900', display: 'swap', variable: '--font-inter', adjustFontFallback: false });
+const interExt = localFont({ src: './fonts/inter-latin-ext-wght-normal.woff2', weight: '100 900', display: 'swap', variable: '--font-inter-ext', preload: false });
+const brand = localFont({ src: './fonts/dm-sans-latin-wght-normal.woff2', weight: '100 1000', display: 'swap', variable: '--font-brand', adjustFontFallback: false });
+const brandExt = localFont({ src: './fonts/dm-sans-latin-ext-wght-normal.woff2', weight: '100 1000', display: 'swap', variable: '--font-brand-ext', preload: false });
 export async function generateMetadata(): Promise<Metadata> {
   const [policy, locale] = await Promise.all([publicWebApp(), settingsLocale()]);
   const t = policy.copy[locale];
@@ -19,5 +22,5 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const [{ theme: safeTheme, mode: safeMode }, locale, copy] = await Promise.all([initialAppearance(), settingsLocale(), runtimeConfig('settings.appearanceCopy')]);
-  return <html lang={locale} className={`${brand.variable} ${inter.variable}`} data-theme={safeTheme} data-mode={safeMode}><body><WebAppProvider><ThemeProvider initialTheme={safeTheme} initialMode={safeMode} copy={copy[locale] as AppearanceCopy}>{children}<ClientErrorReporterGate /></ThemeProvider></WebAppProvider></body></html>;
+  return <html lang={locale} className={`${brand.variable} ${brandExt.variable} ${inter.variable} ${interExt.variable}`} data-theme={safeTheme} data-mode={safeMode}><body><WebAppProvider><ThemeProvider initialTheme={safeTheme} initialMode={safeMode} copy={copy[locale] as AppearanceCopy}>{children}<ClientErrorReporterGate /></ThemeProvider></WebAppProvider></body></html>;
 }
