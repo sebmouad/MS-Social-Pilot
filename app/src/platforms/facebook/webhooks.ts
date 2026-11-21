@@ -193,8 +193,10 @@ async function storeFeedPost(targetId: string, event: MetaWebhookEvent, now: Dat
   if (!event.postId) return false;
   // A post deleted on the Page (2026-11-21): recorded as missing, never stored again as a new post.
   if (event.verb === 'remove') { const { markPostMissing } = await import('./remote-missing'); return await markPostMissing(targetId, event.postId, now) > 0; }
+  // The app's id for this post when it published it (one post, two ids: see the feed sync in jobs.ts).
+  const own = await prisma.$queryRaw<Array<{ remotePostId: string }>>`SELECT "remotePostId" FROM post_targets WHERE "targetId" = ${targetId} AND split_part("remotePostId", '_', 2) <> '' AND split_part("remotePostId", '_', 2) = split_part(${event.postId}, '_', 2) LIMIT 1`;
   await prisma.$executeRaw`INSERT INTO external_posts (id, "targetId", "remoteId", message, permalink, "statusType", "pictureUrl", "createdTime", insights, "insightsSyncedAt", "fetchedAt")
-    VALUES (${`fb_${randomUUID()}`}, ${targetId}, ${event.postId}, ${event.text}, NULL, NULL, NULL, ${event.createdAt ?? now}, NULL, NULL, ${now})
+    VALUES (${`fb_${randomUUID()}`}, ${targetId}, ${own[0]?.remotePostId ?? event.postId}, ${event.text}, NULL, NULL, NULL, ${event.createdAt ?? now}, NULL, NULL, ${now})
     ON CONFLICT ("targetId", "remoteId") DO UPDATE SET message = EXCLUDED.message, "fetchedAt" = EXCLUDED."fetchedAt"`;
   return true;
 }

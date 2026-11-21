@@ -19,3 +19,10 @@ test('a feed webhook removing a post carries the post and the « remove » verb'
   assert.equal(event?.verb, 'remove');
   assert.equal(event?.postId, '123_456');
 });
+
+test('one post, two ids: the post part is the same whatever the Page or profile prefix', async () => {
+  const { postPart } = await import('@/platforms/facebook/remote-missing');
+  assert.equal(postPart('480386571820832_122194441490614220'), '122194441490614220');
+  assert.equal(postPart('122193628256614220_122194441490614220'), '122194441490614220');
+  assert.equal(postPart('122194441490614220'), '122194441490614220');
+});

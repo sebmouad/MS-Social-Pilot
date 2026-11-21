@@ -25,7 +25,7 @@ import type { FeatureId } from '@/lib/product';
 import { jobAbortSignal, jobStopRequested } from '@/server/jobs/job-context';
 import { FACEBOOK_ANALYTICS_LOOKBACK_DAYS_SCHEMA } from './module';
 import { purgeExpiredWebhookDeliveries } from './webhooks';
-import { isMissingPostError, markPostMissing } from './remote-missing';
+import { isMissingPostError, markPostMissing, postPart } from './remote-missing';
 
 const jobFeatures = {
   publishing: ['publishing/posts'],
@@ -345,6 +345,13 @@ export async function syncPageAnalytics(now = new Date(), retryLimit = 0, retryB
           // while Facebook was being read means another run already advanced it, so keep that one.
           const history = fetched.history;
           if (history && JSON.stringify(await readHistoryCursor(tx, target) ?? null) === JSON.stringify(fetched.startCursor ?? null)) {
+            // One post, two ids (2026-11-22): a Page with a new-style profile lists its posts as « profileId_postId » while
+            // publishing returned « pageId_postId ». The app's id is kept, so the feed copy joins its post everywhere.
+            if (history.posts.length) {
+              const own = new Map((await tx.$queryRaw<Array<{ remotePostId: string }>>`SELECT "remotePostId" FROM post_targets WHERE "targetId" = ${target.id} AND "remotePostId" IS NOT NULL`)
+                .map(row => [postPart(row.remotePostId), row.remotePostId]));
+              for (const post of history.posts) post.remoteId = own.get(postPart(post.remoteId)) ?? post.remoteId;
+            }
             // Facebook's comment total includes the comment this app posted under its own post (the recipe); it is not audience engagement.
             const ownFirstComment = new Set((history.posts.length ? await tx.$queryRaw<Array<{ remotePostId: string }>>`SELECT "remotePostId" FROM post_targets WHERE "targetId" = ${target.id} AND "firstCommentId" IS NOT NULL AND "remotePostId" = ANY(${history.posts.map(post => post.remoteId)}::text[])` : []).map(row => row.remotePostId));
             for (const post of history.posts) {
