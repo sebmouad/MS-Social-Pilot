@@ -533,3 +533,7 @@ ads_management (owner asked to rework Ads like Meta Ads Manager first). The subm
   with < 10 learned posts). Winners move up through the radar.
 - Forms never send the autopilot's learned keys (`AUTOPILOT_LEARNED_KEYS`, `configPatch`): live full saves carrying them
   got an HTML 500 (cause not found); the server keeps its own copy anyway (`keepLearned`).
+- Top-hits study (21 Nov, 1,625 posts since August): the top 1% (16 posts) made 36% of all reach, the top 30 made 45%;
+  27 of the top 30 are title-only RF posts from another tool (the WordPress title, 42–74 characters, no emoji: « Camembert
+  feuilleté au bacon, doré et fondant » 1.24M). Owner's choice: Recettes - Faciles is `captionTitle` from 21 Nov ~12:00
+  UTC; Cuisine Pleine d'Envie keeps written captions as the big-Page comparison.
