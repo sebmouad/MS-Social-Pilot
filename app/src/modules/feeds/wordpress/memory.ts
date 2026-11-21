@@ -136,6 +136,20 @@ export function absorb(memory: PageMemory | null, posts: readonly LearnedPost[],
 export type CaptionTip = { code: 'qstart' | 'noqstart' | 'qend' | 'noqend' | 'emoji0' | 'emoji1' | 'emoji3' | 'short' | 'medium' | 'long' | 'hash' | 'nohash'; times: number };
 export type Highlights = { perDay: Array<{ count: number; times: number; days: number }>; formats: Array<{ format: string; times: number; posts: number }>; origins: Array<{ origin: string; times: number; posts: number }>; photos: Array<{ trait: string; times: number }>; posts: number; best: Array<{ word: string; times: number }>; worst: Array<{ word: string; times: number }>; hours: Array<{ hour: number; times: number }>; kinds: Array<{ kind: string; times: number }>; tips: CaptionTip[]; style: HookStyle | null };
 
+/**
+ * What each feature is worth across all Pages (2026-11-21, owner: check what really drives reach): « times » the Pages'
+ * usual result (1 = usual), from all posts that had it. Read-only, for the photo and content checks.
+ */
+export function featureLessons(memories: ReadonlyMap<string, PageMemory>, prefixes: readonly string[], minPosts = 5): Array<{ feature: string; times: number; posts: number }> {
+  const all = new Map<string, { s: number; w: number; n: number }>();
+  for (const memory of memories.values()) for (const [key, stat] of Object.entries(memory.f)) {
+    if (!prefixes.some(prefix => key.startsWith(prefix))) continue;
+    const g = all.get(key) ?? { s: 0, w: 0, n: 0 }; g.s += stat.s; g.w += stat.w; g.n += stat.n; all.set(key, g);
+  }
+  return [...all].filter(([, g]) => g.n >= minPosts && g.w > 0).map(([feature, g]) => ({ feature, times: Math.round(Math.exp(g.s / g.w) * 100) / 100, posts: g.n }))
+    .sort((a, b) => b.times - a.times);
+}
+
 /** What all Pages' memories teach, and each Page's own lessons on top. */
 export function memoryModel(memories: ReadonlyMap<string, PageMemory>) {
   const global = new Map<string, { s: number; w: number }>();
