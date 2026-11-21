@@ -216,6 +216,16 @@ export async function supplyLedgerView(settings: WordpressSettings, ports: Plann
     const pages = await ports.store.pages(source, settings.targetTypes, settings.maxTargets);
     for (const page of pages) { view.blocked.set(page.id, blocked); view.reused.set(page.id, reused); }
   }
+  // A recipe the Page already got from another tool (its caption is the title) is not planned there again (2026-11-21).
+  if (ports.store.outsideTitles) {
+    const pages = await ports.store.pages(source, settings.targetTypes, settings.maxTargets);
+    const outside = await ports.store.outsideTitles(pages.map(page => page.id), new Date(now.getTime() - config.cooldownDays * 86_400_000));
+    for (const { targetId, title } of outside) {
+      const key = recipeTitleKey(title); if (key === 'title:') continue;
+      // With distinct recipes across Pages, every Page shares one set: the recipe is then kept off all of them.
+      const set = view.blocked.get(targetId) ?? new Set<string>(); set.add(key); view.blocked.set(targetId, set);
+    }
+  }
   return view;
 }
 

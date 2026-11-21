@@ -26,6 +26,8 @@ export interface RecipeStore {
   expireStale(sourceId: string, before: Date): Promise<number>;
   /** Upcoming planned slots whose post a member moved back to draft are released (2026-11-19); optional for test stores. */
   releaseDrafted?(sourceId: string, now: Date): Promise<number>;
+  /** First lines of the Pages' posts published outside this app since `from` (2026-11-21); optional for test stores. */
+  outsideTitles?(pageIds: readonly string[], from: Date): Promise<Array<{ targetId: string; title: string }>>;
   claim(input: ClaimInput): Promise<string | null>;
   settle(workspaceId: string, id: string, settlement: Settlement): Promise<void>;
   recordRun(workspaceId: string, sourceId: string, run: RunRecord): Promise<void>;
@@ -83,6 +85,14 @@ export const prismaRecipeStore: RecipeStore = {
       LEFT JOIN post_targets pt ON pt."postId" = p.id AND pt."targetId" = l."targetId"
       WHERE l."sourceId" = $1 AND l."slotAt" >= $2`, sourceId, from);
     return rows.map(toLedger);
+  },
+  async outsideTitles(pageIds, from) {
+    if (!pageIds.length) return [];
+    // Another tool posting on the same Page (2026-11-21: on Recettes - Faciles its captions are the recipe's title) must
+    // not be followed by the autopilot posting the same recipe again.
+    return prisma.$queryRaw<Array<{ targetId: string; title: string }>>`SELECT ep."targetId", split_part(ep.message, E'\n', 1) AS title FROM external_posts ep
+      WHERE ep."targetId" = ANY(${[...pageIds]}::text[]) AND ep."createdTime" > ${from} AND ep.message IS NOT NULL
+        AND NOT EXISTS (SELECT 1 FROM post_targets pt WHERE pt."targetId" = ep."targetId" AND pt."remotePostId" = ep."remoteId")`.catch(() => []);
   },
   async releaseDrafted(sourceId, now) {
     // The autopilot only ever creates scheduled posts, so a draft behind an upcoming planned slot was withdrawn by a member:

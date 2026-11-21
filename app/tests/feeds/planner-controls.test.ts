@@ -3,7 +3,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import '@/server/platforms/registry';
-import { planSource, slotKey, LEFT_EMPTY, type PlannerPorts } from '@/modules/feeds/server/wordpress-planner';
+import { planSource, slotKey, supplyLedgerView, LEFT_EMPTY, type PlannerPorts } from '@/modules/feeds/server/wordpress-planner';
 import type { WordpressSettings } from '@/modules/feeds/server/wordpress-settings';
 import type { LedgerRow, SourceRow, ClaimInput, Settlement } from '@/modules/feeds/server/wordpress-store';
 import type { FeedAuthorization } from '@/modules/feeds/server/access';
@@ -283,4 +283,17 @@ test('planner: a freed slot at a time the channel no longer uses is revived at t
   const row = h.ledger.find(r => r.targetId === 'pageA' && r.slotAt.getTime() === oldTime.getTime())!;
   assert.equal(row.state, 'planned');
   assert.ok(h.created.some(p => p.targetId === 'pageA' && p.scheduledAt.getTime() === soon.getTime()));
+});
+
+test('planner: a recipe the Page already got from another tool is kept off (all Pages when recipes are distinct)', async () => {
+  const store = { async pages() { return pages; }, async ledgerSince() { return []; },
+    async outsideTitles() { return [{ targetId: 'pageA', title: 'Recipe 3' }, { targetId: 'pageA', title: '' }]; } };
+  const ports = { store } as unknown as PlannerPorts;
+  const distinct = await supplyLedgerView(settings(), ports, source(), now);
+  assert.ok(distinct.blocked.get('pageA')?.has('title:recipe 3'));
+  assert.ok(distinct.blocked.get('pageB')?.has('title:recipe 3'));
+  assert.ok(!distinct.blocked.get('pageA')?.has('title:'));
+  const own = await supplyLedgerView(settings(), ports, source({ distinctAcrossPages: false }), now);
+  assert.ok(own.blocked.get('pageA')?.has('title:recipe 3'));
+  assert.ok(!own.blocked.get('pageB')?.has('title:recipe 3'));
 });
