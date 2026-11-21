@@ -501,9 +501,11 @@ ads_management (owner asked to rework Ads like Meta Ads Manager first). The subm
 - AI replies (owner's choice): a comment read as negative is no longer handed off by `precheck()`; it reaches the AI with
   a stricter line (reply only to a calm remark, preference or correction about the recipe). Negative private messages
   still go to a person.
-- Root config `inbox.commentOperationTimeoutMs` raised 60000 → 180000 (live, 21 Nov): busy Pages' sync batches were
-  cut off (`AbortError` in facebook.inbox) while saving thousands of comments. Guard 180000 + 2×5000 + 2000 stays under
-  `data.workspaceOperationTimeoutMs` (300000).
+- Root config `sync.resourceOperationTimeoutMs` raised 60000 → 180000 (live, 21 Nov ~07:40 UTC): the worker's inbox
+  and analytics syncs save each Page inside `withSelectedResourceOperation`, and busy Pages were cut off (`AbortError` in
+  facebook.inbox / facebook.pageAnalytics). 180000 + maxWait 2000 + grace 5000 stays under
+  `data.workspaceOperationTimeoutMs` (300000). (A first change to `inbox.commentOperationTimeoutMs`, which only guards
+  members' comment actions, was the wrong key and was put back to 60000.)
 - Fonts ship with the app (`src/app/fonts`, next/font/local): next/font/google failed CI builds now and then.
 - Title-only caption test (owner's choice, 21 Nov → 26 Nov): `captionTitle: true` on Recettes Sans Complication, Recettes
   Sans Routine and Recettes Sans Soucis; controls with similar reach: Cuisine Qui Réunit, La Cuisine Décontractée,
