@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { addDaysToKey, instantToWall, wallTimeToInstant } from '@/lib/calendar-dates';
 import { META_KEY, SLOT_TIME, SLOTS_MAX } from './config';
 import { decodeWordpressText } from './text';
-import { autopilotOf, autopilotSchema, salvageAutopilot } from './autopilot';
+import { AUTOPILOT_LEARNED_KEYS, autopilotOf, autopilotSchema, salvageAutopilot } from './autopilot';
 
 /** Pure logic of the WordPress recipe source: field mapping, recipe parsing, comment rendering, slots and allocation. */
 export type Mapping = { captionMetaKey: string; imageMetaKey: string; recipeMetaKey: string; skipMetaKey: string; attachedFileMetaKey: string; postType: string; postStatus: string };
@@ -107,6 +107,12 @@ export function configPatch(config: PlanConfig, defaults: PlanConfig): Record<st
     if (key === 'mapping') {
       const mapping = Object.fromEntries((Object.keys(config.mapping) as Array<keyof Mapping>).filter(k => config.mapping[k] !== defaults.mapping[k]).map(k => [k, config.mapping[k]]));
       if (Object.keys(mapping).length) patch['mapping'] = mapping;
+    } else if (key === 'autopilot') {
+      // What the autopilot learned is never sent back by a form (2026-11-21): the server keeps its own copy, and full
+      // saves carrying it were refused on the live site.
+      const own = Object.fromEntries(Object.entries((config.autopilot ?? {}) as Record<string, unknown>).filter(([k]) => !(AUTOPILOT_LEARNED_KEYS as readonly string[]).includes(k)));
+      const base = Object.fromEntries(Object.entries((defaults.autopilot ?? {}) as Record<string, unknown>).filter(([k]) => !(AUTOPILOT_LEARNED_KEYS as readonly string[]).includes(k)));
+      if (!same(own, base)) patch[key] = own;
     } else if (!same(config[key], defaults[key])) patch[key] = config[key];
   }
   return patch;

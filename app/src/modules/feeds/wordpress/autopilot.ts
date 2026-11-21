@@ -218,3 +218,6 @@ export function settledFailures<T extends { id: string; targetId: string; state:
   return new Set(rows.filter(row => row.state === 'failed' && row.reason !== 'left_empty'
     && (row.reason === 'cancelled' || row.reason === 'replaced' || (planned.get(dayOf(row)) ?? 0) >= perDay(row.targetId))).map(row => row.id));
 }
+
+/** What the autopilot learns and logs; only the planner writes these, forms never send them (2026-11-21). */
+export const AUTOPILOT_LEARNED_KEYS = ['log', 'lastLearnedAt', 'learnVersion', 'hourValues', 'learnedTimes', 'radarHandled', 'approvedDays'] as const;

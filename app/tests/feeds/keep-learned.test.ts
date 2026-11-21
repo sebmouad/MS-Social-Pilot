@@ -22,3 +22,16 @@ test('keepLearned: a first save has nothing to keep', () => {
   keepLearned(undefined, config);
   assert.deepEqual(config, { slots: ['10:00'] });
 });
+
+test('configPatch: a form never sends what the autopilot learned, only its settings', async () => {
+  const { configPatch } = await import('@/modules/feeds/wordpress/recipe');
+  const { AUTOPILOT_DEFAULTS } = await import('@/modules/feeds/wordpress/autopilot');
+  type Config = Parameters<typeof configPatch>[0];
+  const defaults = { slots: ['11:00'], autopilot: AUTOPILOT_DEFAULTS } as unknown as Config;
+  const learnedOnly = { slots: ['11:00'], autopilot: { ...AUTOPILOT_DEFAULTS, log: [{ at: 'x' }], hourValues: { a: { 9: 1 } }, radarHandled: ['wrp_1'] } } as unknown as Config;
+  assert.deepEqual(configPatch(learnedOnly, defaults), {});
+  const changed = { slots: ['11:00'], autopilot: { ...AUTOPILOT_DEFAULTS, evergreen: { enabled: true, cooldownDays: 30, share: 20 }, log: [{ at: 'x' }] } } as unknown as Config;
+  const patch = configPatch(changed, defaults) as { autopilot: Record<string, unknown> };
+  assert.deepEqual(patch.autopilot.evergreen, { enabled: true, cooldownDays: 30, share: 20 });
+  assert.equal('log' in patch.autopilot, false);
+});
