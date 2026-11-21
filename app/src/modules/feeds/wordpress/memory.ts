@@ -60,6 +60,10 @@ export const daypart = (hour: number) => hour < 12 ? 'morning' : hour < 18 ? 'af
 const EMOJI = /\p{Extended_Pictographic}/gu;
 
 /** What a post was: its content, time and caption, as features. */
+/** Below this learned photo value (× the Page's usual) a photo is weak; without one, an AI appeal of 5 or less. */
+export const WEAK_PHOTO = 0.98;
+export const photoWeak = (value: number | null | undefined, appeal: number | null | undefined): boolean =>
+  typeof value === 'number' && Number.isFinite(value) ? value < WEAK_PHOTO : typeof appeal === 'number' && appeal <= 5;
 export const appealBand = (appeal: number) => appeal >= 8 ? 'high' : appeal >= 6 ? 'mid' : 'low';
 export function postFeatures(post: Pick<LearnedPost, 'at' | 'title' | 'kind' | 'style' | 'caption' | 'traits' | 'appeal' | 'origin' | 'format' | 'imageSource'>, timeZone: string): string[] {
   const kind = (post.kind as RecipeKind | null) ?? guessKind(post.title);
@@ -173,11 +177,20 @@ export function memoryModel(memories: ReadonlyMap<string, PageMemory>) {
   return {
     lift,
     /**
+     * What a photo is worth on a Page from what it shows (2026-11-21, owner's photo check): its three strongest known
+     * traits (1 = usual; null when none is known). The AI's overall appeal score did not follow reach (low ×1.11,
+     * mid ×1.01, high ×1.08 over ~1,350 posts), so it is left out.
+     */
+    photoValue(targetId: string | null, traits: readonly string[] | null | undefined): number | null {
+      const known = (traits ?? []).flatMap(trait => { const v = lift(targetId, `i:${trait}`); return v === null ? [] : [v]; }).sort((a, b) => Math.abs(b) - Math.abs(a)).slice(0, 3);
+      return known.length ? Math.exp(known.reduce((sum, v) => sum + v, 0) / known.length) : null;
+    },
+    /**
      * How a recipe would do on a Page at a time, from that Page's memory (1 = usual; null when nothing is known):
      * its three strongest title words (2), its dish kind (1), the kind at that time of day (1) and that day of week (½),
      * and the « quick » or « easy » promise of its title (½ each).
      */
-    contentValue(targetId: string | null, title: string, kind: string | null, slotAt: Date | null, timeZone: string, photo?: { traits?: readonly string[] | null; appeal?: number | null } | null): number | null {
+    contentValue(targetId: string | null, title: string, kind: string | null, slotAt: Date | null, timeZone: string): number | null {
       const words = titleWords(title).flatMap(word => { const value = lift(targetId, `w:${word}`); return value === null ? [] : [value]; }).sort((a, b) => Math.abs(b) - Math.abs(a)).slice(0, 3);
       const k = (kind as RecipeKind | null) ?? guessKind(title);
       const wall = slotAt ? instantToWall(slotAt, timeZone) : null;
@@ -187,10 +200,7 @@ export function memoryModel(memories: ReadonlyMap<string, PageMemory>) {
         [wall ? lift(targetId, `kd:${k}@${daypart(Number(wall.time.slice(0, 2)))}`) : null, 1],
         [weekday !== null ? lift(targetId, `kw:${k}@${weekday === 0 || weekday === 6 ? 'weekend' : 'week'}`) : null, 0.5],
         [/\b(rapide|express|minute|minutes|\d+\s?min)\b/.test(folded) ? lift(targetId, 't:quick') : null, 0.5],
-        [/\b(facile|simple|inratable)\b/.test(folded) ? lift(targetId, 't:easy') : null, 0.5],
-        // What the photo shows and how appetising it is (2026-11-18): the three strongest known traits, and the appeal band.
-        [(() => { const known = (photo?.traits ?? []).flatMap(trait => { const v = lift(targetId, `i:${trait}`); return v === null ? [] : [v]; }).sort((a, b) => Math.abs(b) - Math.abs(a)).slice(0, 3); return known.length ? known.reduce((s, v) => s + v, 0) / known.length : null; })(), 1.5],
-        [typeof photo?.appeal === 'number' ? lift(targetId, `p:${appealBand(photo.appeal)}`) : null, 1]];
+        [/\b(facile|simple|inratable)\b/.test(folded) ? lift(targetId, 't:easy') : null, 0.5]];
       const known = parts.filter((part): part is [number, number] => part[0] !== null);
       if (!known.length) return null;
       return Math.exp(known.reduce((sum, [value, weight]) => sum + value * weight, 0) / known.reduce((sum, [, weight]) => sum + weight, 0));

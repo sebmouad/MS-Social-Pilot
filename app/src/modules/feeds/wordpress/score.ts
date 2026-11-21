@@ -84,6 +84,8 @@ export type ScoreInput = {
   title: string;
   /** AI ratings 0–10 when known: how strong the title is as a hook, how appetising the photo is. */
   hook?: number | null; photo?: number | null; kind?: RecipeKind | null;
+  /** What the photo's traits are worth on the channel, learned (1 = usual) (2026-11-21); replaces the raw appeal when known. */
+  photoValue?: number | null;
   /** How recipes like this one did on the channel it is planned for, relative to that channel's usual (1 = usual). */
   history?: number | null;
 };
@@ -97,8 +99,10 @@ export function scoreRecipe(recipe: ScoreInput, at: ScoreContext): { score: numb
   const folded = fold(recipe.title);
   const kind = recipe.kind ?? guessKind(recipe.title);
   if (typeof recipe.hook === 'number') add('hook', (recipe.hook - 5) * 3);
-  // The photo counts more since its rating is strict (2026-11-20): ±20 instead of ±15.
-  if (typeof recipe.photo === 'number') add('photo', (recipe.photo - 5) * 4);
+  // The photo by what it shows, learned from results (2026-11-21): 1.31× usual (a cheese pull) ≈ +11, at most ±20. The AI's
+  // overall appeal did not follow reach, so without a learned value it only nudges (±5).
+  if (typeof recipe.photoValue === 'number' && Number.isFinite(recipe.photoValue)) add('photo', Math.max(-20, Math.min(20, Math.log(Math.max(recipe.photoValue, 0.05)) * 40)));
+  else if (typeof recipe.photo === 'number') add('photo', recipe.photo - 5);
   // What works on this channel, learned from its own recent posts (2026-11-18): 1.3× usual ≈ +7, 2× ≈ +17, at most ±20.
   if (typeof recipe.history === 'number' && Number.isFinite(recipe.history)) add('history', Math.max(-20, Math.min(20, Math.log(Math.max(recipe.history, 0.05)) * 25)));
   const month = at.date.getUTCMonth() + 1;

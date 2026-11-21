@@ -273,7 +273,9 @@ export async function refreshPlanWithMemory(actor: FeedActor, input: unknown, no
   for (const row of rows) {
     const rating = ratings.get(row.wpPostIdForRating ?? '');
     if (proven.has(row.wpPostIdForRating ?? '')) { out.kept++; continue; }
-    const own = model.contentValue(row.targetId, row.title, row.kind, row.slotAt, tz, rating ? { traits: rating.traits ?? null, appeal: rating.photo } : null);
+    // What the photo shows counts apart from the recipe (2026-11-21), as in the planner's score.
+    const content = model.contentValue(row.targetId, row.title, row.kind, row.slotAt, tz);
+    const own = content === null ? null : content * (model.photoValue(row.targetId, rating?.traits ?? null) ?? 1);
     if (own === null) { out.unknown++; continue; }
     const value = own * hitBoost(hits, row.title);
     if (value >= REPLACE_BELOW) { out.kept++; continue; }

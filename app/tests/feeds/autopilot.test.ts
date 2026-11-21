@@ -217,8 +217,9 @@ test('memory: what a photo shows is learned per Page and counts for a candidate'
   const post = (i: number, traits: string[], reach: number) => ({ at: new Date(now.getTime() - (i + 1) * 86_400_000), title: `Plat ${i}`, kind: null, style: null, caption: '', reach, reactions: reach / 20, comments: 2, shares: 2, traits, appeal: 7 });
   const memory = absorb(null, [...Array.from({ length: 5 }, (_, i) => post(i, ['cheese_pull', 'close_up'], 3000)), ...Array.from({ length: 5 }, (_, i) => post(i + 5, ['dark'], 300))], now, tz);
   const model = memoryModel(new Map([['A', memory]]));
-  const cheesy = model.contentValue('A', 'Croque-monsieur', null, null, tz, { traits: ['cheese_pull'], appeal: 7 })!;
-  const dark = model.contentValue('A', 'Croque-monsieur', null, null, tz, { traits: ['dark'], appeal: 7 })!;
+  const cheesy = model.photoValue('A', ['cheese_pull'])!;
+  const dark = model.photoValue('A', ['dark'])!;
+  assert.equal(model.photoValue('A', ['never_seen']), null);
   assert.ok(cheesy > dark, `cheese pull ${cheesy} vs dark ${dark}`);
   assert.ok(model.highlights('A').photos.some(p => p.trait === 'cheese_pull'));
 });
@@ -405,4 +406,19 @@ test('captionTitle: a channel can post with the recipe title alone; others keep 
   const schema = planConfigPatchSchema({ template: 2000, horizon: { min: 1, max: 14 }, cooldown: { min: 0, max: 730 }, age: { min: 0, max: 3650 }, delay: { min: 0, max: 60 } });
   assert.equal(schema.safeParse({ channels: { a: { captionTitle: true } } }).success, true);
   assert.equal(schema.safeParse({ channels: { a: { captionTitle: 'yes' } } }).success, false);
+});
+
+test('photo score: a learned trait value replaces the raw AI appeal, which only nudges without one', async () => {
+  const { scoreRecipe } = await import('@/modules/feeds/wordpress/score');
+  const { photoWeak } = await import('@/modules/feeds/wordpress/memory');
+  const at = { date: new Date('2026-11-21T12:00:00Z'), weekday: 6, hour: 12, leadDays: 14, rules: new Set<never>() };
+  const part = (input: Parameters<typeof scoreRecipe>[0]) => scoreRecipe(input, at).parts.find(p => p.label === 'photo')?.points ?? 0;
+  assert.equal(part({ title: 'Gratin', photo: 9, photoValue: 1.31 }), 11);
+  assert.equal(part({ title: 'Gratin', photo: 9, photoValue: 0.98 }), -1);
+  assert.equal(part({ title: 'Gratin', photo: 9 }), 4);
+  assert.equal(part({ title: 'Gratin', photo: 2 }), -3);
+  assert.equal(photoWeak(0.95, 9), true);
+  assert.equal(photoWeak(1.2, 2), false);
+  assert.equal(photoWeak(null, 5), true);
+  assert.equal(photoWeak(null, 6), false);
 });

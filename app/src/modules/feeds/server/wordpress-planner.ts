@@ -7,7 +7,7 @@ import { autopilotOf, type AutopilotSettings } from '../wordpress/autopilot';
 import { prismaScoringPorts, pageLearning, PHOTO_BATCH, PHOTO_VERSION, type ScoringPorts, type Rating } from './wordpress-scoring';
 import { makePicker } from './wordpress-pick';
 import { guessKind, type RecipeKind } from '../wordpress/score';
-import { captionGuidance, hitBoost, hitWords, memoryModel } from '../wordpress/memory';
+import { captionGuidance, hitBoost, hitWords, memoryModel, photoWeak } from '../wordpress/memory';
 import { bestStyle, captionPrompt, cleanCaption, ctaFor, opensLike, postingMoment, styleFor, voiceFor, withCta, type HookStyle } from '../wordpress/caption';
 import { instantToWall } from '@/lib/calendar-dates';
 import { allocateRecipes, channelConfig, recipeTitleKey, buildImageUrl, buildPermalink, reportedPermalink, parseRecipe, renderComment, resolveConfig, slotInstants, type PlanConfig, type Recipe, type SlotNeed } from '../wordpress/recipe';
@@ -233,7 +233,7 @@ export async function supplyLedgerView(settings: WordpressSettings, ports: Plann
 
 export type SourceOutcome = { excludedNames?: string[]; sourceId: string; planned: number; failed: number; uncertain: number; unfilled: number; slots: number; pages: number; excludedPages: number; scanned: number; reason?: string; candidates?: number; rejected?: ScanRejections;
   /** Photos generated in this run (2026-11-19), and the last reason one could not be. */
-  generated?: Array<{ targetId: string; title: string; appeal: number }>; photoProblem?: string };
+  generated?: Array<{ targetId: string; title: string; appeal: number | null }>; photoProblem?: string };
 export type Ctx = {
   settings: WordpressSettings; ports: PlannerPorts; db: WpDb; budget: { left: number }; now: Date;
   /** Manual retry: only these slots (see slotKey) are planned, and a failed slot is revived even past its attempt cap. */
@@ -274,12 +274,12 @@ async function prepareChoosing(ctx: Ctx, source: SourceRow, config: PlanConfig, 
   if (writer && ctx.ports.generatePhotos) {
     const photos = await import('./wordpress-photos').catch(() => null);
     const left = photos ? await photos.generationsLeft(source.workspaceId, now).catch(() => 0) : 0;
-    if (photos && left > 0) replacesPhoto = (targetId, rating) => typeof rating.photo === 'number' && rating.photo <= photos.LOW_APPEAL && (rating.hook ?? 0) >= photos.STRONG_HOOK && (!targetId || model?.generatedPhotosOk(targetId) !== false);
+    if (photos && left > 0) replacesPhoto = (targetId, rating) => photoWeak(model?.photoValue(targetId, rating.traits) ?? null, rating.photo) && (rating.hook ?? 0) >= photos.STRONG_HOOK && (!targetId || model?.generatedPhotosOk(targetId) !== false);
   }
   // What the biggest hits share counts on every Page (2026-11-19, owner's choice), on top of each Page's own memory.
   const hits = hitWords(await import('./wordpress-memory').then(m => m.hitPosts(pages.map(page => page.id), now)).catch(() => []));
-  const history = (targetId: string | null, title: string, kind: RecipeKind | null, slotAt: Date | null, photo?: { traits?: readonly string[] | null; appeal?: number | null } | null) => {
-    const own = (model && targetId && memories.has(targetId) ? model.contentValue(targetId, title, kind, slotAt, config.timezone, photo) : null) ?? recent(targetId, title);
+  const history = (targetId: string | null, title: string, kind: RecipeKind | null, slotAt: Date | null) => {
+    const own = (model && targetId && memories.has(targetId) ? model.contentValue(targetId, title, kind, slotAt, config.timezone) : null) ?? recent(targetId, title);
     const boost = hitBoost(hits, title);
     return own === null ? (boost > 1 ? boost : null) : own * boost;
   };
@@ -520,8 +520,9 @@ export async function planSource(ctx: Ctx, source: SourceRow, auth: FeedAuthoriz
         try {
           const photos = await import('./wordpress-photos');
           generationsLeft ??= await photos.generationsLeft(source.workspaceId, now);
-          const appeal = generationsLeft > 0 ? await photos.photoAppeal(source.id, c.wpPostId) : null;
-          if (appeal !== null && appeal <= photos.LOW_APPEAL) {
+          const rated = generationsLeft > 0 ? await photos.photoAppeal(source.id, c.wpPostId) : null;
+          const appeal = rated?.photo ?? null;
+          if (rated && photoWeak(prep?.model?.photoValue(targetId, rated.traits) ?? null, appeal)) {
             generationsLeft -= 1;
             image = await photos.generateRecipePhoto(mediaActor, { title: c.title, ingredients: c.recipe.ingredients.filter(line => !line.heading).map(line => line.text),
               steps: c.recipe.steps.filter(line => !line.heading).map(line => line.text), fileName: safeName(c.slug), settings: settings.image, wpPostId: c.wpPostId }, ports.image);
@@ -670,7 +671,8 @@ export async function runRecipePlanning(overrides: Partial<PlannerPorts> & { aut
           const photos = await import('./wordpress-photos');
           const { readPageMemories } = await import('./wordpress-memory');
           const model = memoryModel(await readPageMemories(source.id));
-          const upgraded = await photos.upgradeQueuedPhotos({ userId: auth.actor.userId, workspaceId: source.workspaceId }, source.id, settings.image, ports.image, now, targetId => model.generatedPhotosOk(targetId));
+          const upgraded = await photos.upgradeQueuedPhotos({ userId: auth.actor.userId, workspaceId: source.workspaceId }, source.id, settings.image, ports.image, now, targetId => model.generatedPhotosOk(targetId),
+            (targetId, traits, appeal) => photoWeak(model.photoValue(targetId, traits), appeal));
           (outcome.generated ??= []).push(...upgraded);
         } catch (error) { outcome.photoProblem = String(error instanceof Error ? error.message : error).slice(0, 200); }
       }
@@ -684,7 +686,7 @@ export async function runRecipePlanning(overrides: Partial<PlannerPorts> & { aut
             entries.push({ at: now.toISOString(), kind: 'healing', code: 'aiTagFailed', params: { why: tagged.problem }, text: 'Facebook did not accept the AI-generated mark.' });
         } catch { /* never stops planning */ }
       }
-      for (const made of outcome.generated ?? []) entries.push({ at: now.toISOString(), kind: 'supply', channelId: made.targetId, code: 'photoMade', params: { title: made.title, appeal: made.appeal }, text: `New photo generated for « ${made.title} ».` });
+      for (const made of outcome.generated ?? []) entries.push({ at: now.toISOString(), kind: 'supply', channelId: made.targetId, code: 'photoMade', params: { title: made.title, appeal: made.appeal ?? 0 }, text: `New photo generated for « ${made.title} ».` });
       if (outcome.photoProblem && !(pilot.log ?? []).some(entry => entry.code === 'photoNotMade' && now.getTime() - Date.parse(entry.at) < 86_400_000))
         entries.push({ at: now.toISOString(), kind: 'healing', code: 'photoNotMade', params: { why: outcome.photoProblem }, text: 'A new photo could not be generated.' });
       // Photos of published recipes are read for learning (2026-11-18): newest first, a batch per run, within the AI limit.

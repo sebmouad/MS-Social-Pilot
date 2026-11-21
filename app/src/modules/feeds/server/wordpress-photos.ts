@@ -57,9 +57,11 @@ export async function generationsLeft(workspaceId: string, now: Date): Promise<n
 }
 
 /** The AI's appeal rating (0–10) of a recipe's own photo, or null when it has not been read. */
-export async function photoAppeal(sourceId: string, wpPostId: string): Promise<number | null> {
-  const rows = await prisma.$queryRaw<Array<{ photo: number | null }>>`SELECT photo FROM recipe_ratings WHERE "sourceId" = ${sourceId} AND "wpPostId" = ${wpPostId}`;
-  return typeof rows[0]?.photo === 'number' ? rows[0].photo : null;
+/** A recipe photo's rating: the AI's appeal and what it shows (null when not read yet). */
+export async function photoAppeal(sourceId: string, wpPostId: string): Promise<{ photo: number | null; traits: string[] } | null> {
+  const rows = await prisma.$queryRaw<Array<{ photo: number | null; photoTraits: string[] | null }>>`SELECT photo, "photoTraits" FROM recipe_ratings WHERE "sourceId" = ${sourceId} AND "wpPostId" = ${wpPostId}`;
+  const row = rows[0];
+  return row && (typeof row.photo === 'number' || row.photoTraits?.length) ? { photo: row.photo, traits: row.photoTraits ?? [] } : null;
 }
 
 export async function generateRecipePhoto(actor: { userId: string; workspaceId: string }, input: { title: string; ingredients: readonly string[]; steps: readonly string[]; fileName: string; settings: ImageSettings; wpPostId: string }, ports: ImagePorts): Promise<{ mediaId: string }> {
@@ -79,7 +81,7 @@ export async function generateRecipePhoto(actor: { userId: string; workspaceId: 
   }
 }
 
-type Queued = { imageSource: string | null; id: string; postId: string; targetId: string; wpPostId: string; title: string; message: string; firstComment: string | null; firstCommentDelayMinutes: number | null; media: unknown; scheduledAt: Date; photo: number; hook: number | null };
+type Queued = { imageSource: string | null; id: string; postId: string; targetId: string; wpPostId: string; title: string; message: string; firstComment: string | null; firstCommentDelayMinutes: number | null; media: unknown; scheduledAt: Date; photo: number | null; photoTraits: string[] | null; hook: number | null };
 
 /**
  * New photos for posts already queued (2026-11-19): a queued recipe post with a strong title (STRONG_HOOK) and a weak
@@ -87,15 +89,15 @@ type Queued = { imageSource: string | null; id: string; postId: string; targetId
  * the post then goes back to draft, takes the new photo and is scheduled again at the same time. If the change fails,
  * the post is scheduled again as it was. Within the same daily cap as new posts; not on Pages where they do worse.
  */
-export async function upgradeQueuedPhotos(actor: { userId: string; workspaceId: string }, sourceId: string, settings: ImageSettings, ports: ImagePorts, now: Date, pageOk: (targetId: string) => boolean): Promise<Array<{ targetId: string; title: string; appeal: number }>> {
+export async function upgradeQueuedPhotos(actor: { userId: string; workspaceId: string }, sourceId: string, settings: ImageSettings, ports: ImagePorts, now: Date, pageOk: (targetId: string) => boolean,
+  weak: (targetId: string, traits: readonly string[], appeal: number | null) => boolean = (_t, _traits, appeal) => typeof appeal === 'number' && appeal <= LOW_APPEAL): Promise<Array<{ targetId: string; title: string; appeal: number | null }>> {
   let left = await generationsLeft(actor.workspaceId, now);
   if (left <= 0) return [];
   const rows = await prisma.$queryRaw<Queued[]>`
-    SELECT l."imageSource", l.id, l."postId", l."targetId", l."wpPostId", l.title, p.message, p."firstComment", p."firstCommentDelayMinutes", p.media, p."scheduledAt", r.photo, r.hook
+    SELECT l."imageSource", l.id, l."postId", l."targetId", l."wpPostId", l.title, p.message, p."firstComment", p."firstCommentDelayMinutes", p.media, p."scheduledAt", r.photo, r."photoTraits", r.hook
     FROM wordpress_recipe_plans l JOIN posts p ON p.id = l."postId" JOIN recipe_ratings r ON r."sourceId" = l."sourceId" AND r."wpPostId" = l."wpPostId"
     WHERE l."sourceId" = ${sourceId} AND l.state = 'planned' AND p.status::text = 'scheduled'
       AND p."scheduledAt" > ${new Date(now.getTime() + 3 * 3_600_000)} AND p."scheduledAt" < ${new Date(now.getTime() + 3 * 86_400_000)}
-      AND r.photo <= ${LOW_APPEAL}
     ORDER BY r.hook DESC NULLS LAST, p."scheduledAt" ASC LIMIT 60`;
   // A strong title, or a recipe sharing what the Pages' biggest hits share (2026-11-19, owner: favour hit content).
   const { hitPosts } = await import('./wordpress-memory');
@@ -103,7 +105,7 @@ export async function upgradeQueuedPhotos(actor: { userId: string; workspaceId: 
   const hits = hitWords(await hitPosts([...new Set(rows.map(row => row.targetId))], now).catch(() => []));
   const worth = (row: Queued) => (row.hook ?? 0) >= STRONG_HOOK || hitBoost(hits, row.title) > 1;
   const { cancelScheduledPost, updatePost, schedulePost } = await import('@/modules/publishing/server/lifecycle');
-  const made: Array<{ targetId: string; title: string; appeal: number }> = [];
+  const made: Array<{ targetId: string; title: string; appeal: number | null }> = [];
   // A post on a generated photo is remade only when that photo came from an older prompt; one put back on its own
   // photo by hand (its plan still says generated) is left alone.
   const generated = new Map((await prisma.$queryRaw<Array<{ mediaId: string | null; prompt: string | null }>>`SELECT detail->>'mediaId' AS "mediaId", detail->>'prompt' AS prompt FROM activity_logs WHERE "workspaceId" = ${actor.workspaceId} AND action = 'autopilot.photo_generated'`)
@@ -113,7 +115,7 @@ export async function upgradeQueuedPhotos(actor: { userId: string; workspaceId: 
   for (const row of rows) {
     if (!eligible(row)) continue;
     if (left <= 0) break;
-    if (!pageOk(row.targetId) || !worth(row)) continue;
+    if (!pageOk(row.targetId) || !worth(row) || !weak(row.targetId, row.photoTraits ?? [], row.photo)) continue;
     left -= 1;
     const image = await generateRecipePhoto(actor, { title: row.title, ...recipeFacts(row.firstComment ?? ''), fileName: `${row.wpPostId}-new.jpg`, settings, wpPostId: row.wpPostId }, ports);
     const first = Array.isArray(row.media) ? (row.media as Array<{ altText?: string }>)[0] : undefined;
