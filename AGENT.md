@@ -518,3 +518,18 @@ ads_management (owner asked to rework Ads like Meta Ads Manager first). The subm
   data on every save. Never probe write endpoints with partial bodies on the live site.
 - Open: on 21 Nov 07:18–07:23 the live PUT /api/feeds/wordpress answered an HTML 500 for the full config (learned data
   present), not reproducible locally with the same config; saves work again since the relearn. Recheck if it recurs.
+
+### 7.1r Choosing viral content: learn, explore, promote (2026-11-21, owner's choices by form)
+- Photo check (`featureLessons`, GET /api/feeds/wordpress/autopilot/photos → `lessons`): the AI's overall appeal did not
+  follow reach (low ×1.11, mid ×1.01, high ×1.08); traits did (cheese_pull ×1.31, melting ×1.16, steam ×1.13). The photo
+  part of the score now comes from `photoValue` (learned trait value, log × 40, ±20); `photoWeak` (< 0.98, or appeal ≤ 5
+  with nothing learned) decides photo generation, the queued-photo upgrade and the replan.
+- Radar: a strong early hit (5× its Page's usual at that age, ≥ 300 people) and a late hit go to the two biggest Pages
+  first, then up to `radar.pages` (5) under the usual rule (`spreadTargets`).
+- Top hits come back on their Page after 30 days (`autopilot.evergreen.cooldownDays` 60 → 30, live).
+- Dish families (`familiesOf`, ~20) are a memory feature (`fam:`), weight 1.5 in `contentValue`; first live values:
+  terrine ×1.34, quiche/tarte salée ×1.24, viennoiserie ×1.19 … sablé/biscuit ×0.82.
+- Testing ground: every Page except `bigPages(2)` gives up to 15 points to recipes new to all Pages (`novelty`, families
+  with < 10 learned posts). Winners move up through the radar.
+- Forms never send the autopilot's learned keys (`AUTOPILOT_LEARNED_KEYS`, `configPatch`): live full saves carrying them
+  got an HTML 500 (cause not found); the server keeps its own copy anyway (`keepLearned`).
