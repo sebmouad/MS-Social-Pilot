@@ -22,6 +22,38 @@ const KIND_WORDS: Array<[RecipeKind, string[]]> = [
 ];
 
 /** Kind from the title alone, for recipes the AI has not rated yet. Main dish when nothing matches. */
+/**
+ * Dish families (2026-11-21, owner's choice): recipes that look alike to the people who see them. The memory learns how
+ * each family does lately (its stats fade with a 30-day half-life), so a family that is hot now is favoured. A title can
+ * belong to several families (« Feuilletés jambon-fromage » is both).
+ */
+const FAMILIES: Array<[string, string[]]> = [
+  ['gratin', ['gratin*', 'tartiflette', 'hachis parmentier', 'parmentier']],
+  ['feuillete', ['feuillete*', 'pate feuilletee', 'chausson*', 'friand*']],
+  ['jambon_fromage', ['jambon', 'croque*', 'raclette', 'cordon bleu']],
+  ['quiche_tarte_salee', ['quiche*', 'tarte salee', 'tourte*', 'pizza*', 'flammekueche']],
+  ['terrine', ['terrine*', 'pate en croute', 'pain de viande']],
+  ['mijote', ['ragout*', 'mijote*', 'cocotte', 'bourguignon', 'carbonnade', 'blanquette', 'pot au feu', 'daube', 'roti*', 'braise*']],
+  ['soupe', ['soupe*', 'veloute*', 'potage*', 'bouillon']],
+  ['pates', ['pates', 'lasagne*', 'macaroni*', 'spaghetti*', 'tagliatelle*', 'gnocchi*', 'cannelloni*', 'carbonara']],
+  ['volaille', ['poulet', 'dinde', 'canard', 'pintade', 'volaille']],
+  ['boeuf_porc', ['boeuf', 'porc', 'veau', 'agneau', 'saucisse*', 'filet mignon', 'boulette*', 'viande']],
+  ['poisson', ['saumon', 'cabillaud', 'thon', 'crevette*', 'saint jacques', 'moule*', 'poisson*', 'fruits de mer', 'truite', 'colin']],
+  ['pomme_de_terre', ['pomme de terre', 'pommes de terre', 'patate*', 'frites', 'puree']],
+  ['sandwich_wrap', ['wrap*', 'sandwich*', 'panini*', 'burger*', 'tacos', 'galette*', 'roule*']],
+  ['viennoiserie', ['brioche*', 'croissant*', 'pain aux raisins', 'pains aux raisins', 'chocolatine*', 'beignet*', 'donut*', 'gaufre*', 'crepe*', 'pancake*']],
+  ['gateau', ['gateau*', 'cake*', 'cheesecake*', 'moelleux', 'fondant*', 'brownie*', 'cookie*', 'muffin*', 'madeleine*', 'financier*', 'quatre quarts']],
+  ['tarte_sucree', ['tarte au*', 'tarte aux*', 'tartelette*', 'clafoutis', 'crumble*', 'flan*', 'paris brest', 'eclair*', 'choux', 'chouquette*', 'profiterole*', 'saint honore', 'mille feuille*']],
+  ['dessert_creme', ['mousse au*', 'creme brulee', 'creme caramel', 'creme dessert', 'creme anglaise', 'tiramisu', 'panna cotta', 'riz au lait', 'verrine*', 'entremet*', 'pavlova', 'bavarois']],
+  ['fete', ['buche*', 'noel', 'festi*', 'reveillon', 'galette des rois', 'foie gras', 'paques']],
+  ['sable_biscuit', ['sable*', 'biscuit*', 'palmier*', 'macaron*', 'meringue*']],
+  ['salade_frais', ['salade*', 'avocat*', 'carpaccio', 'tartare', 'gaspacho', 'tomates farcies']],
+];
+export function familiesOf(title: string): string[] {
+  const folded = fold(title);
+  return FAMILIES.filter(([, words]) => has(folded, words)).map(([family]) => family);
+}
+
 export function guessKind(title: string): RecipeKind {
   const folded = fold(title);
   for (const [kind, words] of KIND_WORDS) if (has(folded, words)) return kind;

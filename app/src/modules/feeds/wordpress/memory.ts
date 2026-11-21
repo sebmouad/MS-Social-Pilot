@@ -1,5 +1,5 @@
 import { addDaysToKey, instantToWall, wallTimeToInstant } from '@/lib/calendar-dates';
-import { COMPOUND_NAMES, guessKind, titleWords, type RecipeKind } from './score';
+import { COMPOUND_NAMES, familiesOf, guessKind, titleWords, type RecipeKind } from './score';
 import { HOOK_STYLES, type HookStyle } from './caption';
 
 /**
@@ -88,6 +88,7 @@ export function postFeatures(post: Pick<LearnedPost, 'at' | 'title' | 'kind' | '
   if (post.origin) out.push(`o:${post.origin}`);
   if (post.format) out.push(`f:${post.format}`);
   if (post.imageSource) out.push(`g:${post.imageSource}`);
+  for (const family of familiesOf(post.title)) out.push(`fam:${family}`);
   return out;
 }
 
@@ -200,7 +201,9 @@ export function memoryModel(memories: ReadonlyMap<string, PageMemory>) {
         [wall ? lift(targetId, `kd:${k}@${daypart(Number(wall.time.slice(0, 2)))}`) : null, 1],
         [weekday !== null ? lift(targetId, `kw:${k}@${weekday === 0 || weekday === 6 ? 'weekend' : 'week'}`) : null, 0.5],
         [/\b(rapide|express|minute|minutes|\d+\s?min)\b/.test(folded) ? lift(targetId, 't:quick') : null, 0.5],
-        [/\b(facile|simple|inratable)\b/.test(folded) ? lift(targetId, 't:easy') : null, 0.5]];
+        [/\b(facile|simple|inratable)\b/.test(folded) ? lift(targetId, 't:easy') : null, 0.5],
+        // Its dish families, as they did lately (2026-11-21): hot families rise, cooled ones rest.
+        [(() => { const known = familiesOf(title).flatMap(family => { const v = lift(targetId, `fam:${family}`); return v === null ? [] : [v]; }); return known.length ? known.reduce((sum, v) => sum + v, 0) / known.length : null; })(), 1.5]];
       const known = parts.filter((part): part is [number, number] => part[0] !== null);
       if (!known.length) return null;
       return Math.exp(known.reduce((sum, [value, weight]) => sum + value * weight, 0) / known.reduce((sum, [, weight]) => sum + weight, 0));

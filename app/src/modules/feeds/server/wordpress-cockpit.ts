@@ -341,6 +341,6 @@ export async function photoFigures(actor: FeedActor, now = new Date()): Promise<
   const byAppeal = (list: Array<{ photo: number; count?: number }>) => list.reduce<Record<string, number>>((out, row) => { out[row.photo] = (out[row.photo] ?? 0) + (row.count ?? 1); return out; }, {});
   // What photos, formats, origins and captions are really worth across the Pages (2026-11-21), from the Page memories.
   const { featureLessons } = await import('../wordpress/memory');
-  const lessons = featureLessons(await import('./wordpress-memory').then(m => m.readPageMemories(source.id)).catch(() => new Map()), ['p:', 'i:', 'o:', 'f:', 'c:', 'g:', 's:', 'k:']);
+  const lessons = featureLessons(await import('./wordpress-memory').then(m => m.readPageMemories(source.id)).catch(() => new Map()), ['p:', 'i:', 'o:', 'f:', 'c:', 'g:', 's:', 'k:', 'fam:']);
   return { lessons, recipes: byAppeal(rows), queued: byAppeal(queued), queuedStrongWeak: queued.filter(row => row.photo <= photos.LOW_APPEAL && (row.hook ?? 0) >= photos.STRONG_HOOK).length, generated: Number(generated[0]?.count ?? 0), currentRules: { rated: current.reduce((sum, row) => sum + Number(row.count), 0), recipes: byAppeal(current) } };
 }

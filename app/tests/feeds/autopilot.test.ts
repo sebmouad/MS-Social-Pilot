@@ -422,3 +422,16 @@ test('photo score: a learned trait value replaces the raw AI appeal, which only 
   assert.equal(photoWeak(null, 5), true);
   assert.equal(photoWeak(null, 6), false);
 });
+
+test('dish families: a title can be in several; the memory learns each family and a hot one lifts its recipes', async () => {
+  const { familiesOf } = await import('@/modules/feeds/wordpress/score');
+  const { absorb, memoryModel } = await import('@/modules/feeds/wordpress/memory');
+  assert.deepEqual(familiesOf('Feuilletés au fromage et au jambon, garniture crémeuse'), ['feuillete', 'jambon_fromage']);
+  assert.deepEqual(familiesOf('Terrine de saumon fumé'), ['terrine', 'poisson']);
+  assert.deepEqual(familiesOf('Lait crémeux aux agrumes'), []);
+  const tz = 'Europe/Paris'; const now = new Date('2026-11-21T12:00:00Z');
+  const post = (i: number, title: string, reach: number) => ({ at: new Date(now.getTime() - (i + 1) * 86_400_000), title, kind: null, style: null, caption: '', reach, reactions: reach / 20, comments: 2, shares: 2 });
+  const memory = absorb(null, [...Array.from({ length: 6 }, (_, i) => post(i, `Gratin numéro ${i}`, 5000)), ...Array.from({ length: 6 }, (_, i) => post(i + 6, `Soupe numéro ${i}`, 500))], now, tz);
+  const model = memoryModel(new Map([['A', memory]]));
+  assert.ok(model.contentValue('A', 'Gratin de chou-fleur', null, null, tz)! > model.contentValue('A', 'Soupe de chou-fleur', null, null, tz)!);
+});
