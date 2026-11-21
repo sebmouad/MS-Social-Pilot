@@ -537,3 +537,16 @@ ads_management (owner asked to rework Ads like Meta Ads Manager first). The subm
   27 of the top 30 are title-only RF posts from another tool (the WordPress title, 42–74 characters, no emoji: « Camembert
   feuilleté au bacon, doré et fondant » 1.24M). Owner's choice: Recettes - Faciles is `captionTitle` from 21 Nov ~12:00
   UTC; Cuisine Pleine d'Envie keeps written captions as the big-Page comparison.
+- Posts deleted on Facebook (21 Nov): `post_targets."remoteMissingAt"` and `external_posts."remoteMissingAt"` (migration
+  0024), set by `markPostMissing` (src/platforms/facebook/remote-missing.ts) on Graph 100/33 in the inbox syncs or a feed
+  webhook with verb « remove »; cleared when the Page feed shows the post again. Excluded from comment syncs, first
+  comments, « AI info », Page memory, hit words, radar, Inbox list/badge and AI replies; the Autopilot page shows
+  « Supprimée sur Facebook ». The 13 « (#100) permission » refusals of the AI label were deleted RF posts. Posts and
+  Insights screens unchanged while Meta's review runs (a marker on the Posts list can come after approval).
+- « AI info » on every autopilot post (21 Nov): no 7-day window any more, 60 a run, a refusal retried once a day later;
+  backlog of ~890 done the same night (1,306 / 1,306). `aiLabel` in GET /api/feeds/wordpress/autopilot/photos.
+- Captions: CLICHES (« la famille se retrouve », « autour de la table »…) named in the prompt, a caption using one is
+  rewritten once (`clicheIn`); the « story » hook asks for a concrete moment, not a family scene.
+- Plaisirs en Cuisine (added 21 Nov): own first comment « 🍽️ {title} / 👉 {link} » (owner: link, no « La recette
+  complète : »); written captions; testing-ground Page.
+- Queued posts of a channel switched to `captionTitle` are retitled by the planner (`retitleQueued`, 20 a run).

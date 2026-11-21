@@ -7,7 +7,6 @@ import { randomUUID } from 'node:crypto';
 import { prisma } from '@/server/data';
 import { decryptSecret } from '@/server/secret-crypto';
 import { configuredFacebookEngine } from '@/platforms/facebook/runtime';
-import { FacebookApiError } from '@/platforms/facebook/publishing';
 import { runtimeConfig } from '@/server/config/store';
 import { recordError } from '@/server/errors/recorder';
 import { Prisma } from '../../../generated/client';

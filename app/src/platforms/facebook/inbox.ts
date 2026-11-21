@@ -1,4 +1,3 @@
-import { FacebookApiError } from '@/platforms/facebook/publishing';
 import { storeInboxMetadata } from '@/modules/inbox/server/metadata';
 import { randomBytes } from 'node:crypto';
 import { OperationError } from '@/lib/operation-error';
