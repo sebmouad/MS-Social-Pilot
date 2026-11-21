@@ -20,7 +20,7 @@ export function ChannelSettings({ pages, config, onChange, busy, maxTemplate, t,
   pages: Array<{ id: string; name: string }>; config: RecipeConfig; onChange: (channels: Record<string, Own>, channelSlots: Record<string, string[]>) => void; busy: boolean; maxTemplate: number;
   t: (key: RecipeCopyKey, values?: Record<string, string | number>) => string; dayName: (day: number) => string;
 }) {
-  const [editing, setEditing] = useState<{ id: string; name: string; value: Required<Omit<Own, 'pausedReason' | 'autoTimes' | 'captionTitle'>> } | null>(null);
+  const [editing, setEditing] = useState<{ id: string; name: string; value: Required<Omit<Own, 'pausedReason' | 'autoTimes'>> } | null>(null);
   const channels = config.channels ?? {};
   const resolved = (id: string) => channelConfig(config as unknown as PlanConfig, id);
   const own = (id: string) => Boolean(channels[id] && Object.keys(channels[id]!).length) || Boolean(config.channelSlots?.[id]?.length);
@@ -30,7 +30,7 @@ export function ChannelSettings({ pages, config, onChange, busy, maxTemplate, t,
 
   const open = (page: { id: string; name: string }) => {
     const r = resolved(page.id);
-    setEditing({ id: page.id, name: page.name, value: { slots: [...r.slots], weekdays: [...(r.weekdays ?? ALL_DAYS)], order: r.order, firstCommentTemplate: r.firstCommentTemplate, firstCommentDelayMinutes: r.firstCommentDelayMinutes, paused: r.paused } });
+    setEditing({ id: page.id, name: page.name, value: { slots: [...r.slots], weekdays: [...(r.weekdays ?? ALL_DAYS)], order: r.order, firstCommentTemplate: r.firstCommentTemplate, firstCommentDelayMinutes: r.firstCommentDelayMinutes, paused: r.paused, captionTitle: r.captionTitle } });
   };
   const withoutLegacy = (id: string) => { const next = { ...(config.channelSlots ?? {}) }; delete next[id]; return next; };
   const save = () => {
@@ -47,8 +47,8 @@ export function ChannelSettings({ pages, config, onChange, busy, maxTemplate, t,
     // A template identical to the shared one is not stored, so later changes to the shared template still reach this channel.
     if (value.firstCommentTemplate === config.firstCommentTemplate) delete (value as Partial<Own>).firstCommentTemplate;
     if (before?.pausedReason && value.paused && before.paused) value.pausedReason = before.pausedReason;
-    // The title-only caption test (2026-11-21) has no control here yet: saving other settings keeps it.
-    if (before?.captionTitle) value.captionTitle = true;
+    // Title-only captions (2026-11-21) are stored only when on.
+    if (!value.captionTitle) delete (value as Partial<Own>).captionTitle;
     onChange({ ...channels, [editing.id]: value }, withoutLegacy(editing.id));
     setEditing(null);
   };
@@ -66,7 +66,7 @@ export function ChannelSettings({ pages, config, onChange, busy, maxTemplate, t,
       <span className={styles.help}>{t('perChannelHint')}</span>
       {pages.length ? <ul className={styles.channelList}>{pages.map(page => {
         const r = resolved(page.id); const mine = own(page.id); const paused = channels[page.id]?.paused === true;
-        const summary = paused ? t('perChannelPaused') : [r.slots.join(' · '), daysText(r.weekdays), r.order === 'oldest' ? t('orderOldest') : t('orderNewest')].filter(Boolean).join(' · ');
+        const summary = paused ? t('perChannelPaused') : [r.slots.join(' · '), daysText(r.weekdays), r.order === 'oldest' ? t('orderOldest') : t('orderNewest'), r.captionTitle ? t('perChannelCaptionTitleShort') : ''].filter(Boolean).join(' · ');
         return <li key={page.id} className={styles.channelRow}>
           <div><strong>{page.name}</strong><span className={styles.meta}>{summary}</span></div>
           <span className={styles.channelBadge} data-own={mine ? 'true' : undefined} data-paused={paused ? 'true' : undefined}>{paused ? t('perChannelPaused') : (channels[page.id]?.autoTimes || (!channels[page.id]?.slots?.length && autopilotOf(config.autopilot).learnedTimes?.[page.id])) ? t('autoTimesBadge') : mine ? t('perChannelOwn') : t('perChannelShared')}</span>
@@ -94,6 +94,7 @@ export function ChannelSettings({ pages, config, onChange, busy, maxTemplate, t,
         </fieldset>
         <label>{t('order')}<select disabled={editing.value.paused} value={editing.value.order} onChange={e => set({ order: e.target.value === 'oldest' ? 'oldest' : 'newest' })}>
           <option value="newest">{t('orderNewest')}</option><option value="oldest">{t('orderOldest')}</option></select></label>
+        <label className={styles.inline}><input type="checkbox" disabled={editing.value.paused} checked={editing.value.captionTitle} onChange={e => set({ captionTitle: e.target.checked })} /> {t('perChannelCaptionTitle')}</label>
         <label>{t('template')}<textarea disabled={editing.value.paused} rows={7} maxLength={maxTemplate} value={editing.value.firstCommentTemplate} onChange={e => set({ firstCommentTemplate: e.target.value })} /><span>{t('templateHint')}</span></label>
         <label>{t('delay')}<input disabled={editing.value.paused} type="number" min={0} step={1} value={editing.value.firstCommentDelayMinutes} onChange={e => set({ firstCommentDelayMinutes: Math.max(0, Math.trunc(Number(e.target.value)) || 0) })} /></label>
       </div>}
