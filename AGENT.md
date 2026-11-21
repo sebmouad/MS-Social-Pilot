@@ -493,3 +493,15 @@ ads_management (owner asked to rework Ads like Meta Ads Manager first). The subm
 - Scope agreed with the owner: only the autopilot moves while Meta's App Review runs; the screens in the review
   recordings (composer, posts, Inbox, Insights, Ads, Channels) are unchanged. After approval: the wider clean-up
   (Contenu's tabs; the owner uses Inbox & AI replies, Statistics, Ads, and not manual posting).
+
+### 7.1q Failed times, negative comments, inbox sync budget (2026-11-21)
+- A failed slot is history, not a failure, when it was cancelled or replaced, or when its channel's day still got its
+  full count of planned posts (the autopilot moves times nightly): `settledFailures()` in feeds/wordpress/autopilot.ts,
+  used by the cockpit's Today list, each channel's « failed this week » and the « À regarder » list.
+- AI replies (owner's choice): a comment read as negative is no longer handed off by `precheck()`; it reaches the AI with
+  a stricter line (reply only to a calm remark, preference or correction about the recipe). Negative private messages
+  still go to a person.
+- Root config `inbox.commentOperationTimeoutMs` raised 60000 → 180000 (live, 21 Nov): busy Pages' sync batches were
+  cut off (`AbortError` in facebook.inbox) while saving thousands of comments. Guard 180000 + 2×5000 + 2000 stays under
+  `data.workspaceOperationTimeoutMs` (300000).
+- Fonts ship with the app (`src/app/fonts`, next/font/local): next/font/google failed CI builds now and then.
