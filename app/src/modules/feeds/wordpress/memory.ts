@@ -288,8 +288,9 @@ export function memoryModel(memories: ReadonlyMap<string, PageMemory>) {
         formats: of('f:').map(f => ({ format: f.name, times: f.times, posts: memory?.f[f.key]?.n ?? 0 })).sort((a, b) => b.times - a.times),
         origins: of('o:').map(o => ({ origin: o.name, times: o.times, posts: memory?.f[o.key]?.n ?? 0 })).sort((a, b) => b.times - a.times),
         photos: of('i:').filter(p => p.times >= 1.1).sort((a, b) => b.times - a.times).slice(0, count).map(p => ({ trait: p.name, times: p.times })),
-        // Dish families that clearly do better or worse here (2026-11-21), best first.
-        families: of('fam:').filter(f => f.times >= 1.15 || f.times <= 0.85).sort((a, b) => b.times - a.times).map(f => ({ family: f.name, times: f.times })),
+        // Dish families that clearly do better (four best) or worse (two worst) here (2026-11-21), best first.
+        families: [...of('fam:').filter(f => f.times >= 1.15).sort((a, b) => b.times - a.times).slice(0, 4),
+          ...of('fam:').filter(f => f.times <= 0.85).sort((a, b) => b.times - a.times).slice(-2)].map(f => ({ family: f.name, times: f.times })),
         tips: this.captionTips(targetId), style: this.bestStyle(targetId),
       };
     },
