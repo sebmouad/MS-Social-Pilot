@@ -34,6 +34,15 @@ Submit **only after the current App Review is approved**, as a separate request,
    market hit »).
 5. Remove the competitor Page; its stored posts are deleted.
 
+## First competitors to read (owner, 22 Nov 2026)
+
+- https://www.facebook.com/magickitchen038
+- https://www.facebook.com/cookikitchen1
+- https://www.facebook.com/mabonnerecette92
+
+All three are behind Facebook's login on the web; no public copy or search index has them. Owner's choice: wait for this
+permission rather than screenshots or a swipe file.
+
 ## How the app would use it (to build after approval)
 
 - `competitor_pages` (owner-managed list) and `competitor_posts` (90-day retention).
