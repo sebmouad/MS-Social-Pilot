@@ -29,3 +29,15 @@ export async function reachByOrigin(workspaceId: string, now: Date, days = 30): 
     GROUP BY g."targetId", t.name, g.origin ORDER BY t.name, g.origin`;
 }
 
+
+/** Each post of the last `days` with its reach at 3 and 24 hours (2026-11-22), for tests read at the same age. */
+export async function postsAtAge(workspaceId: string, now: Date, days = 10) {
+  return prisma.$queryRaw<Array<{ name: string; at: Date; origin: string; caption: string | null; reach3h: number | null; reach24h: number | null }>>`
+    SELECT t.name, e."createdTime" AS at,
+      CASE WHEN pt.id IS NULL THEN 'outside' WHEN pt."nativeScheduledFor" IS NOT NULL THEN 'facebook_scheduler' ELSE 'app_held' END AS origin,
+      left(e.message, 300) AS caption, e."reach3h", e."reach24h"
+    FROM external_posts e JOIN targets t ON t.id = e."targetId" AND t."workspaceId" = ${workspaceId}
+    LEFT JOIN post_targets pt ON pt."targetId" = e."targetId" AND pt."remotePostId" = e."remoteId"
+    WHERE e."createdTime" > ${new Date(now.getTime() - days * 86_400_000)} AND e."remoteMissingAt" IS NULL
+    ORDER BY e."createdTime" DESC`;
+}
