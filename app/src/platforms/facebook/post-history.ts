@@ -3,6 +3,9 @@ import type { FacebookConfig } from './config';
 import { facebookHistoryPolicySchema } from './config';
 import { facebookAppSecretProof, graphObjectUrl } from './protocol';
 
+/** Pause before trying a metric again after Facebook's passing HTTP 5xx failure. */
+const RETRY_PAUSE_MS = 1500;
+
 export type HistoryProgress = { after: string | null; since: string; until: string; complete: boolean };
 const obj = (v: unknown): Record<string, unknown> => v && typeof v === 'object' && !Array.isArray(v) ? v as Record<string, unknown> : {};
 const number = (v: unknown): number | null => (typeof v === 'number' || typeof v === 'string' && v.trim()) && Number.isFinite(Number(v)) && Number(v) >= 0 ? Number(v) : null;
@@ -147,7 +150,16 @@ export function createFacebookPostHistory(config: FacebookConfig, policyInput: z
           }
         };
         const readMetric = async (metric: string) => {
-          const data = await page(`${encodeURIComponent(post.id as string)}/insights`, token, { metric, period: 'lifetime', limit: String(config.pageSize) }, { timeWindow: true });
+          const once = () => page(`${encodeURIComponent(post.id as string)}/insights`, token, { metric, period: 'lifetime', limit: String(config.pageSize) }, { timeWindow: true });
+          // Facebook's own passing failure (« HTTP 500 … please retry your request later », hourly in Root › Errors since
+          // 17 Nov) gets one more try after a short pause (2026-11-22); a refusal (4xx) does not.
+          const data = await once().catch(async error => {
+            if (!(error instanceof Error && /\(HTTP 5\d\d\b/.test(error.message))) throw error;
+            signal?.throwIfAborted();
+            await new Promise(resolve => setTimeout(resolve, RETRY_PAUSE_MS));
+            signal?.throwIfAborted();
+            return once();
+          });
           // Insights always return time-window paging links (previous/next) even for one lifetime value; they are not a continuation of this metric.
           applyRows(data.rows, new Set([metric]));
         };

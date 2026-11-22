@@ -50,3 +50,23 @@ test('post history: when the window runs out in the first batch, finished posts 
   assert.ok(result.posts.length <= 2);
   assert.ok(!result.posts.some(item => ['p3', 'p4', 'p5'].includes(item.remoteId)));
 });
+
+test('post history: a metric Facebook fails with HTTP 500 is tried once more; a 4xx refusal is not', async () => {
+  const calls: string[] = [];
+  const reply = (status: number, body: unknown) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
+  let reachTries = 0;
+  const fetcher = (async (input: string | URL) => {
+    const url = new URL(String(input)); const metric = url.searchParams.get('metric') ?? '';
+    calls.push(`${url.pathname} ${metric}`);
+    if (url.pathname.endsWith('/published_posts')) return reply(200, { data: [post('p1')] });
+    if (metric.includes(',')) return reply(400, { error: { message: 'one metric refused', code: 100 } });
+    if (metric === 'post_total_media_view_unique') { reachTries++; return reachTries === 1 ? reply(500, { error: { message: 'An unexpected error has occurred. Please retry your request later.', code: 1 } }) : reply(200, { data: [{ name: metric, values: [{ value: 1234 }] }] }); }
+    return reply(400, { error: { message: 'Invalid metric', code: 100 } });
+  }) as unknown as typeof fetch;
+  const history = createFacebookPostHistory(facebookConfig, { ...policy, metrics: ['post_total_media_view_unique', 'post_clicks'] }, fetcher);
+  const result = await history.collect('page-token', 'page1', now);
+  assert.equal(reachTries, 2);
+  assert.equal((result.posts[0]?.insights as Record<string, unknown>)?.post_total_media_view_unique, 1234);
+  assert.equal(calls.filter(call => call.endsWith(' post_clicks')).length, 1);
+  assert.ok(result.failures.some(failure => failure.startsWith('post_clicks')));
+});
