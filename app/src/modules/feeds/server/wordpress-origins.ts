@@ -26,20 +26,3 @@ export async function reachByOrigin(workspaceId: string, now: Date, days = 30): 
     GROUP BY g."targetId", t.name, g.origin ORDER BY t.name, g.origin`;
 }
 
-/** Diagnostic (2026-11-22): feed copies whose id still differs from their app post's, and a sample of feed ids per Page. */
-export async function idCheck(workspaceId: string) {
-  const mismatched = await prisma.$queryRaw<Array<{ count: bigint }>>`SELECT COUNT(*) AS count FROM external_posts e JOIN targets t ON t.id = e."targetId" AND t."workspaceId" = ${workspaceId}
-    JOIN post_targets pt ON pt."targetId" = e."targetId" AND split_part(pt."remotePostId", '_', 2) <> '' AND split_part(pt."remotePostId", '_', 2) = split_part(e."remoteId", '_', 2) AND e."remoteId" <> pt."remotePostId"`;
-  const samples = await prisma.$queryRaw<Array<{ name: string; feed: string | null; app: string | null }>>`SELECT t.name,
-      (SELECT e."remoteId" FROM external_posts e WHERE e."targetId" = t.id ORDER BY e."createdTime" DESC LIMIT 1) AS feed,
-      (SELECT pt."remotePostId" FROM post_targets pt WHERE pt."targetId" = t.id AND pt."remotePostId" IS NOT NULL ORDER BY pt."publishedAt" DESC NULLS LAST LIMIT 1) AS app
-    FROM targets t WHERE t."workspaceId" = ${workspaceId} AND t.type = 'page' ORDER BY t.name`;
-  const coverage = await prisma.$queryRaw<Array<{ name: string; published: number; withCopy: number; withReach: number; feedRows: number; feedWithReach: number }>>`SELECT t.name,
-      (SELECT COUNT(*)::int FROM post_targets pt WHERE pt."targetId" = t.id AND pt.status::text = 'published' AND pt."publishedAt" > NOW() - INTERVAL '30 days') AS published,
-      (SELECT COUNT(*)::int FROM post_targets pt JOIN external_posts e ON e."targetId" = pt."targetId" AND e."remoteId" = pt."remotePostId" WHERE pt."targetId" = t.id AND pt.status::text = 'published' AND pt."publishedAt" > NOW() - INTERVAL '30 days') AS "withCopy",
-      (SELECT COUNT(*)::int FROM post_targets pt JOIN external_posts e ON e."targetId" = pt."targetId" AND e."remoteId" = pt."remotePostId" WHERE pt."targetId" = t.id AND pt.status::text = 'published' AND pt."publishedAt" > NOW() - INTERVAL '30 days' AND e.insights IS NOT NULL) AS "withReach",
-      (SELECT COUNT(*)::int FROM external_posts e WHERE e."targetId" = t.id AND e."createdTime" > NOW() - INTERVAL '30 days') AS "feedRows",
-      (SELECT COUNT(*)::int FROM external_posts e WHERE e."targetId" = t.id AND e."createdTime" > NOW() - INTERVAL '30 days' AND e.insights IS NOT NULL) AS "feedWithReach"
-    FROM targets t WHERE t."workspaceId" = ${workspaceId} AND t.type = 'page' AND t.name IN ('Recettes - Faciles', 'Cuisine Pleine d’Envie', 'Recettes Sans Soucis') ORDER BY t.name`;
-  return { mismatched: Number(mismatched[0]?.count ?? 0), coverage };
-}
