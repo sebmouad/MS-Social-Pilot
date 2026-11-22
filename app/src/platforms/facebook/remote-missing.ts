@@ -19,3 +19,15 @@ export async function markPostMissing(targetId: string, remotePostId: string, at
   const feed = await prisma.$executeRaw`UPDATE external_posts SET "remoteMissingAt" = ${at} WHERE "targetId" = ${targetId} AND ("remoteId" = ${remotePostId} OR (${part} <> '' AND split_part("remoteId", '_', 2) = ${part})) AND "remoteMissingAt" IS NULL`;
   return own + feed;
 }
+
+/**
+ * A post's reach as a reading at a fixed age (2026-11-22): `reach3h` when it is 2 to 5 hours old, `reach24h` when 22 to
+ * 30 hours old, otherwise null (the stored value is kept). Reach is Facebook's « media viewed by unique people », else reach.
+ */
+export function reachAtAge(insights: unknown, createdTime: Date, now: Date): { reach3h: number | null; reach24h: number | null } {
+  const i = (insights ?? {}) as Record<string, unknown>;
+  const raw = typeof i.post_total_media_view_unique === 'number' ? i.post_total_media_view_unique : typeof i.reach === 'number' ? i.reach : null;
+  const reach = raw !== null && Number.isFinite(raw) && raw >= 0 ? Math.round(raw) : null;
+  const hours = (now.getTime() - createdTime.getTime()) / 3_600_000;
+  return { reach3h: reach !== null && hours >= 2 && hours <= 5 ? reach : null, reach24h: reach !== null && hours >= 22 && hours <= 30 ? reach : null };
+}

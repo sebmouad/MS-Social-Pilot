@@ -1596,6 +1596,8 @@ model external_posts {
   fetchedAt        DateTime  @default(now())
   pictureUrl       String?
   remoteMissingAt  DateTime?
+  reach3h          Int?
+  reach24h         Int?
   targets          Target    @relation(fields: [targetId], references: [id], onDelete: Cascade)
 
   @@unique([targetId, remoteId])

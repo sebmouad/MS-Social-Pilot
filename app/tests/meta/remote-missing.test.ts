@@ -26,3 +26,12 @@ test('one post, two ids: the post part is the same whatever the Page or profile 
   assert.equal(postPart('122193628256614220_122194441490614220'), '122194441490614220');
   assert.equal(postPart('122194441490614220'), '122194441490614220');
 });
+
+test('reach at a fixed age: read at 2–5 h and 22–30 h only, from media views else reach', async () => {
+  const { reachAtAge } = await import('@/platforms/facebook/remote-missing');
+  const now = new Date('2026-11-22T15:15:00Z'); const ago = (h: number) => new Date(now.getTime() - h * 3_600_000);
+  assert.deepEqual(reachAtAge({ post_total_media_view_unique: 812.4, reach: 5 }, ago(3), now), { reach3h: 812, reach24h: null });
+  assert.deepEqual(reachAtAge({ reach: 9000 }, ago(25), now), { reach3h: null, reach24h: 9000 });
+  assert.deepEqual(reachAtAge({ reach: 9000 }, ago(12), now), { reach3h: null, reach24h: null });
+  assert.deepEqual(reachAtAge(null, ago(3), now), { reach3h: null, reach24h: null });
+});
