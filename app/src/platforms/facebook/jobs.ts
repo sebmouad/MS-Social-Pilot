@@ -357,12 +357,14 @@ export async function syncPageAnalytics(now = new Date(), retryLimit = 0, retryB
             for (const post of history.posts) {
               signal.throwIfAborted();
               if (ownFirstComment.has(post.remoteId) && typeof post.insights.comments === 'number' && post.insights.comments > 0) post.insights = { ...post.insights, comments: post.insights.comments - 1 };
+              // Insights are merged, not replaced (2026-11-22): a metric Facebook refused on this read (« HTTP 500, please
+              // retry » on post_total_media_view_unique, 9 times since 17 Nov) keeps its last value instead of vanishing.
               // Reach at fixed ages (2026-11-22): read once between 2 and 5 hours and once between 22 and 30 hours, never
               // overwritten, so posts of different ages compare fairly (tests, manual vs app). This sync runs hourly.
               const at = reachAtAge(post.insights, post.createdTime, now);
               await tx.$executeRaw`INSERT INTO external_posts (id, "targetId", "remoteId", message, permalink, "statusType", "pictureUrl", "createdTime", insights, "insightsSyncedAt", "fetchedAt", "reach3h", "reach24h")
                 VALUES (${`fb_${randomUUID()}`}, ${target.id}, ${post.remoteId}, ${post.message}, ${post.permalink}, ${post.statusType}, ${post.pictureUrl}, ${post.createdTime}, ${JSON.stringify(post.insights)}::jsonb, ${now}, ${now}, ${at.reach3h}, ${at.reach24h})
-                ON CONFLICT ("targetId", "remoteId") DO UPDATE SET "remoteMissingAt" = NULL, "reach3h" = COALESCE(external_posts."reach3h", EXCLUDED."reach3h"), "reach24h" = COALESCE(external_posts."reach24h", EXCLUDED."reach24h"), message = EXCLUDED.message, permalink = EXCLUDED.permalink, "statusType" = EXCLUDED."statusType", "pictureUrl" = EXCLUDED."pictureUrl", "createdTime" = EXCLUDED."createdTime", insights = EXCLUDED.insights, "insightsSyncedAt" = EXCLUDED."insightsSyncedAt", "fetchedAt" = EXCLUDED."fetchedAt"`;
+                ON CONFLICT ("targetId", "remoteId") DO UPDATE SET "remoteMissingAt" = NULL, "reach3h" = COALESCE(external_posts."reach3h", EXCLUDED."reach3h"), "reach24h" = COALESCE(external_posts."reach24h", EXCLUDED."reach24h"), message = EXCLUDED.message, permalink = EXCLUDED.permalink, "statusType" = EXCLUDED."statusType", "pictureUrl" = EXCLUDED."pictureUrl", "createdTime" = EXCLUDED."createdTime", insights = COALESCE(external_posts.insights, '{}'::jsonb) || EXCLUDED.insights, "insightsSyncedAt" = EXCLUDED."insightsSyncedAt", "fetchedAt" = EXCLUDED."fetchedAt"`;
               persistedCount++;
             }
             // Facebook's own time wins: a held post goes live on Facebook's schedule (on a 5-minute mark), not always the minute asked for.
