@@ -6,7 +6,7 @@ import type { WpDb } from '@/modules/feeds/wordpress/db';
 
 const config = { mapping: { captionMetaKey: '', imageMetaKey: '', recipeMetaKey: '', skipMetaKey: '', attachedFileMetaKey: '_wp_attached_file', postType: 'post', postStatus: 'publish' } } as never;
 
-test('recipeByTitle: only an exact title (accents, case, punctuation aside) is taken, and asked once a day', async () => {
+test('recipeByTitle: the exact title first (accents, case, punctuation aside), else the closest variant; asked once a day', async () => {
   let calls = 0; let lastSearch = '';
   const db = { async candidates(q: { search?: string }) { calls++; lastSearch = q.search ?? '';
     return { rows: [{ id: '55265', title: 'Pastéis de nata : recette portugaise facile' }, { id: '55266', title: 'Pastéis de nata, crème lisse et pâte bien croustillante' }], fetched: 2, requested: 10 }; } } as unknown as WpDb;
@@ -15,7 +15,9 @@ test('recipeByTitle: only an exact title (accents, case, punctuation aside) is t
   assert.equal(lastSearch, 'PASTEIS DE NATA, crème lisse et pâte bien croustillante');
   assert.equal(await recipeByTitle(db, config, 'Pasteis de nata creme lisse et pate bien croustillante', new Date(now.getTime() + 3_600_000)), '55266');
   assert.equal(calls, 1);
-  assert.equal(await recipeByTitle(db, config, 'Pastéis de nata maison', now), null);
+  // No exact title: the closest variant sharing at least half the dish words, else nothing.
+  assert.equal(await recipeByTitle(db, config, 'Pastéis de nata portugaise facile', now), '55265');
+  assert.equal(await recipeByTitle(db, config, 'Tarte au citron meringuée', now), null);
 });
 
 test('closestVariant: the site\'s nearest variant of a hit, only when they share at least half their dish words', async () => {
