@@ -535,10 +535,15 @@ export async function syncAdsAnalytics(now = new Date(), retryLimit = 0, retryBa
   return result;
 }
 
-/** Posts the scheduled inbox sync reads comments for: those published in the last this many days. */
-export const INBOX_POST_DAYS = 14;
-/** Once an hour the inbox sync also reads comments of posts up to this many days old. */
-export const INBOX_SWEEP_DAYS = 60;
+/**
+ * How old the posts are that this inbox run reads comments for: 3 days on every run, 14 days on the runs starting in the
+ * first two minutes of each ten, 60 days on the run starting in the first two minutes of each hour (the sync runs every 2
+ * minutes), so recent posts are fresh and late comments on older ones still arrive.
+ */
+export function inboxPostDays(now: Date): number {
+  const minute = now.getUTCMinutes();
+  return minute < 2 ? 60 : minute % 10 < 2 ? 14 : 3;
+}
 
 /** Operator log line for a failed sync item: target id and redacted reason, never credentials. */
 async function logItemFailure(job: string, targetId: string, error: unknown) {
@@ -581,10 +586,9 @@ async function fetchInboxTarget(target: { id: string; workspaceId: string; provi
   };
   try {
     const conversations = await withRetries(async () => { const binding = await freshTarget(); const engine = await configuredFacebookEngine({ signal }); return engine.listInbox(binding.token, binding.providerId, bounds); }, retryLimit, retryBackoff);
-    // Only posts of the last INBOX_POST_DAYS (2026-11-22 audit): every published post was read every 2 minutes (a run took
-    // 7.5 minutes for 12 Pages, so the job was never fresh); comments come in a post's first days. The run starting in the
-    // first two minutes of each hour also reads posts up to INBOX_SWEEP_DAYS old, so late comments still arrive.
-    const posts = await prisma.postTarget.findMany({ where: { targetId: target.id, status: 'published', remotePostId: { not: null }, remoteMissingAt: null, publishedAt: { gte: new Date(now.getTime() - (now.getUTCMinutes() < 2 ? INBOX_SWEEP_DAYS : INBOX_POST_DAYS) * DAY_MS) }, post: { workspaceId: target.workspaceId } }, orderBy: [{ publishedAt: 'desc' }, { id: 'asc' }], take: limit, select: { id: true, remotePostId: true } });
+    // How far back depends on the run (2026-11-22 audit, inboxPostDays): every published post was read every 2 minutes and a
+    // run took 7.5 minutes for 12 Pages, so the job was never fresh; most comments come in a post's first days.
+    const posts = await prisma.postTarget.findMany({ where: { targetId: target.id, status: 'published', remotePostId: { not: null }, remoteMissingAt: null, publishedAt: { gte: new Date(now.getTime() - inboxPostDays(now) * DAY_MS) }, post: { workspaceId: target.workspaceId } }, orderBy: [{ publishedAt: 'desc' }, { id: 'asc' }], take: limit, select: { id: true, remotePostId: true } });
     const commentBatches: InboxFetch['commentBatches'] = [];
     for (const post of posts) {
       if (jobStopRequested()) break;

@@ -35,3 +35,13 @@ test('reach at a fixed age: read at 2–5 h and 22–30 h only, from media views
   assert.deepEqual(reachAtAge({ reach: 9000 }, ago(12), now), { reach3h: null, reach24h: null });
   assert.deepEqual(reachAtAge(null, ago(3), now), { reach3h: null, reach24h: null });
 });
+
+test('inbox sync depth: 3 days each run, 14 days every ten minutes, 60 days once an hour', async () => {
+  const { inboxPostDays } = await import('@/platforms/facebook/jobs');
+  const at = (m: number) => new Date(Date.UTC(2026, 10, 22, 22, m, 4));
+  assert.equal(inboxPostDays(at(0)), 60);
+  assert.equal(inboxPostDays(at(10)), 14);
+  assert.equal(inboxPostDays(at(31)), 14);
+  assert.equal(inboxPostDays(at(4)), 3);
+  assert.equal(inboxPostDays(at(58)), 3);
+});
