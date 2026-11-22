@@ -59,3 +59,10 @@ test('AI replies: a calm correction about the recipe is answered with thanks; co
   assert.match(system, /A calm correction or extra detail about the recipe .* is a reply too: thank them warmly for the precision/);
   assert.match(system, /"handoff" when the person complains, is angry/);
 });
+
+test('ai replies: a request for the recipe is always answered with the link, even when impatient', () => {
+  const withLink = aiReplyPrompt({ kind: 'comment', channel: 'P', voice: null, author: null, text: 'Où est la recette SVP 😱', link: 'https://recettes.example/r', sentiment: 'negative' }, 'friendly').system;
+  assert.match(withLink, /always gets a "reply" with the link/);
+  const noLink = aiReplyPrompt({ kind: 'comment', channel: 'P', voice: null, author: null, text: 'Où est la recette ?' }, 'friendly').system;
+  assert.doesNotMatch(noLink, /always gets a "reply" with the link/);
+});

@@ -52,6 +52,8 @@ export function aiReplyPrompt(c: AiReplyContext, tone: AiReplyTone): { system: s
     c.voice ? `The page's own voice: ${c.voice.slice(0, 400)}` : '',
     'Use only the facts given below. If the answer is not there, say so kindly and suggest something simple and safe. Never invent a price, a promise, a delivery or a health claim.',
     c.link ? `If they ask for the recipe or the link, give this link and no other: ${c.link}` : 'Do not include any link.',
+    // « Où est la recette je v ai dis SVP 😱 » was handed off as annoyed (2026-11-22): asking for the recipe is answered.
+    c.link ? 'Someone asking for the recipe or the link always gets a "reply" with the link, kindly, even when they sound impatient or annoyed about waiting for it.' : '',
     // A name says nothing certain about the person (2026-11-17, same rule as the recipe reply drafts).
     'Never guess whether the person is a man or a woman: no gendered agreements about them (write « merci pour votre message », not « merci d’être passé·e »).',
     'Use their first name only if it reads naturally. Do not say you are an AI, but if they ask whether a robot is answering, say this reply was written with the help of AI.',
