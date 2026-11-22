@@ -550,3 +550,10 @@ ads_management (owner asked to rework Ads like Meta Ads Manager first). The subm
 - Plaisirs en Cuisine (added 21 Nov): own first comment « 🍽️ {title} / 👉 {link} » (owner: link, no « La recette
   complète : »); written captions; testing-ground Page.
 - Queued posts of a channel switched to `captionTitle` are retitled by the planner (`retitleQueued`, 20 a run).
+- Manual vs app (22 Nov): the RF posts called « another tool » above are the owner's own posts from the Facebook phone
+  app. `reachByOrigin` (wordpress-origins.ts, `origins` in GET /api/feeds/wordpress/autopilot/photos) gives per Page, over
+  30 days, median reach and × usual for: Facebook's scheduler (`nativeScheduledFor`), held by the app, outside. RF: manual
+  25.4k (×1.05, 172 posts) vs app 8.6k / 6.5k (×0.35 / ×0.27, 12 posts). Scheduler vs held: scheduler better on the Pages
+  with real reach (CPE ×1.79 vs ×0.53), held « better » only on Pages at 30–60 people (noise); not a clean test.
+- Migration 0025 (feed copies take the app's post id when only the prefix differs) was a no-op live: ids already match on
+  every Page. Kept as a guard; the feed sync and webhooks map by post part (`postPart`).
