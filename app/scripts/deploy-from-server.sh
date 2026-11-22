@@ -421,6 +421,26 @@ Persistent=true
 [Install]
 WantedBy=timers.target
 UNIT
+# Weekly restore test (2026-11-22): the newest dump is restored into a throwaway database and checked (backup.sh --restore-test).
+cat > /etc/systemd/system/social-pilot-restore-test.service <<'UNIT'
+[Unit]
+Description=MS Social Pilot restore test (newest dump into a throwaway database)
+After=postgresql.service
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/env bash /usr/local/lib/social-pilot-backup.sh --restore-test
+TimeoutStartSec=1h
+UNIT
+cat > /etc/systemd/system/social-pilot-restore-test.timer <<'UNIT'
+[Unit]
+Description=Test-restore the MS Social Pilot backup every week
+[Timer]
+OnCalendar=Sun *-*-* 04:47:00
+RandomizedDelaySec=10min
+Persistent=true
+[Install]
+WantedBy=timers.target
+UNIT
 cat > /etc/systemd/system/social-pilot-updater.service <<'UNIT'
 [Unit]
 Description=MS Social Pilot updater (installs the updates the app records)
@@ -445,6 +465,8 @@ systemctl daemon-reload
 systemctl enable social-pilot social-pilot-worker >/dev/null 2>&1 || true
 systemctl enable --now social-pilot-updater.timer >/dev/null 2>&1 || true
 [ -f /usr/local/lib/social-pilot-backup.sh ] && { systemctl enable --now social-pilot-backup.timer >/dev/null 2>&1 || true; }
+# Only once the installed backup script knows --restore-test (an automatic update does not replace it; socialpilot-deploy does).
+grep -q -- '--restore-test' /usr/local/lib/social-pilot-backup.sh 2>/dev/null && { systemctl enable --now social-pilot-restore-test.timer >/dev/null 2>&1 || true; }
 
 # Step 8: Atomic Swap & Restart
 log_step "Performing atomic release swap & restarting services..."

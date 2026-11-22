@@ -585,3 +585,9 @@ ads_management (owner asked to rework Ads like Meta Ads Manager first). The subm
   (Instagram, YouTube, TikTok…) report missing keys, expected.
 - Left as is: 293 pre-existing lint warnings (266 unused vars), mostly in Publishing / Insights / Ads screens under
   review; hook warnings there too; AppShell scope effect re-runs each render but only rewrites a cookie when needed.
+- Backups (22 Nov): `backup.sh --restore-test` restores the newest dump into `<db>_restore_test`, checks users/posts/
+  post targets/recipe plans, drops it and records « restore_test » in Root › Backups; weekly timer
+  social-pilot-restore-test (Sun 04:47), enabled by the deploy script once the installed backup.sh knows the option
+  (run `socialpilot-deploy` on the server once). Off-site copy needs BACKUP_RSYNC_TARGET in
+  /etc/ms-social-pilot-backup.conf (owner's destination). « backup.failed » is open by design until an off-site backup
+  succeeds. Operator alerts are emailed to the owner (sent since 21 Nov); chatWorkspaceId only adds team-chat delivery.
