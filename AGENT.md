@@ -557,3 +557,15 @@ ads_management (owner asked to rework Ads like Meta Ads Manager first). The subm
   with real reach (CPE ×1.79 vs ×0.53), held « better » only on Pages at 30–60 people (noise); not a clean test.
 - Migration 0025 (feed copies take the app's post id when only the prefix differs) was a no-op live: ids already match on
   every Page. Kept as a guard; the feed sync and webhooks map by post part (`postPart`).
+- Reach at fixed ages (22 Nov, migration 0026): `external_posts."reach3h"` (read at 2–5 h) and `"reach24h"` (22–30 h),
+  set once by the hourly Page feed sync (`reachAtAge` in remote-missing.ts), every feed post including manual ones.
+  `origins` adds at24h / read24h; `atAge` (photos figures) lists each post of 10 days with both readings. Use them for
+  every test read (the 22 Nov read compared a 1-day-old post with week-old ones). Next: calibrate the radar's
+  `expectedAt` curve (assumes the full usual reach by 3 h) from the real reach3h / reach24h ratio once a week of
+  readings exists.
+- Owner's manual posts repeated by a queued autopilot post are replaced each run (`replaceOutsideRepeats`, 7 days,
+  posts more than 3 h away, 5 a run; log « repeatReplaced »). Owner's own biggest hits (≥ 50k and 5× usual, older
+  than 30 days) join the evergreen winners, exact recipe by WordPress search or its closest variant (`recipeByTitle`,
+  `closestVariant`).
+- Competitors to read after Page Public Content Access: magickitchen038, cookikitchen1, mabonnerecette92 (behind
+  Facebook's login on the web; owner chose to wait for the permission).
