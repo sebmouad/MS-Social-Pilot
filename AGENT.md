@@ -573,3 +573,15 @@ ads_management (owner asked to rework Ads like Meta Ads Manager first). The subm
   step questions are answered only from the post and recipe text, else handed off (« beurre » reply had explained a
   photo). Owner's « fix all »: the handed-off « Où est la recette… SVP » on the pains aux raisins post was answered
   with its link by hand; the photo-mismatch complaint on RF is left to the owner.
+
+### 7.1s Audit (22 Nov 2026, owner: « deep audit and improve all features except screens under Meta review »)
+- Fixed: Page feed sync merges post insights (stored || new), so a metric Facebook refuses on one read (HTTP 500 on
+  post_total_media_view_unique) keeps its last value instead of erasing the post's reach.
+- Fixed: scheduled inbox sync read every published post of every Page every 2 minutes (run 449 s, never fresh);
+  `inboxPostDays`: 3 days each run, 14 days every ten minutes, 60 days hourly → runs 76–87 s, fresh.
+- Root › Errors: 45 entries last seen before 22 Nov with fixed causes were resolved (a recurrence reopens them).
+- Open, owner's side: no off-site backup and no restore test ever recorded (local dumps daily are fine); operator alerts
+  have no destination (`chatWorkspaceId` empty), the 11 Nov « backup.failed » alert stays open; unused platforms
+  (Instagram, YouTube, TikTok…) report missing keys, expected.
+- Left as is: 293 pre-existing lint warnings (266 unused vars), mostly in Publishing / Insights / Ads screens under
+  review; hook warnings there too; AppShell scope effect re-runs each render but only rewrites a cookie when needed.
