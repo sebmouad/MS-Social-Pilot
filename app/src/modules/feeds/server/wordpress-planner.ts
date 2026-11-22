@@ -6,7 +6,7 @@ import type { ArticleInput, ArticleWriting } from '@/modules/studio/ai';
 import { autopilotOf, type AutopilotSettings } from '../wordpress/autopilot';
 import { prismaScoringPorts, pageLearning, PHOTO_BATCH, PHOTO_VERSION, type ScoringPorts, type Rating } from './wordpress-scoring';
 import { makePicker } from './wordpress-pick';
-import { guessKind, type RecipeKind } from '../wordpress/score';
+import { guessKind, titleWords, type RecipeKind } from '../wordpress/score';
 import { captionGuidance, hitBoost, hitWords, memoryModel, photoWeak } from '../wordpress/memory';
 import { bestStyle, captionPrompt, cleanCaption, clicheIn, ctaFor, opensLike, postingMoment, styleFor, voiceFor, withCta, type HookStyle } from '../wordpress/caption';
 import { instantToWall } from '@/lib/calendar-dates';
@@ -153,6 +153,37 @@ async function toCandidates(db: WpDb, settings: WordpressSettings, source: Pick<
 }
 
 /** Autopilot (2026-11-16): read chosen recipes (past winners) by WordPress id. */
+/** The row sharing the most dish words with `title` (titleWords, Jaccard), when they share at least half. */
+export function closestVariant<R extends { id: string; title: string }>(title: string, rows: readonly R[]): R | null {
+  const mine = new Set(titleWords(title));
+  if (!mine.size) return null;
+  let best: { row: R; score: number } | null = null;
+  for (const row of rows) {
+    const theirs = new Set(titleWords(row.title)); const shared = [...mine].filter(word => theirs.has(word)).length;
+    const score = shared / new Set([...mine, ...theirs]).size;
+    if (score >= 0.5 && (!best || score > best.score)) best = { row, score };
+  }
+  return best?.row ?? null;
+}
+/** An outside post is a hit to bring back from this many people reached (and 5× its Page's usual). */
+export const OUTSIDE_HIT_REACH = 50_000;
+const titleCache = new Map<string, { id: string | null; at: number }>();
+/**
+ * The site's recipe whose title is exactly this one (accents, case and punctuation aside), else its closest variant, by
+ * WordPress search; the answer is kept a day so the planner, every 15 minutes, does not ask again (2026-11-22).
+ */
+export async function recipeByTitle(db: WpDb, config: PlanConfig, title: string, now: Date): Promise<string | null> {
+  const key = recipeTitleKey(title);
+  const cached = titleCache.get(key);
+  if (cached && now.getTime() - cached.at < 86_400_000) return cached.id;
+  const { rows } = await db.candidates({ mapping: config.mapping, order: 'newest', skipShared: false, maxAgeDays: 0, offset: 0, limit: 10, now, search: title });
+  // The exact recipe when the site still has it; otherwise its closest variant (the site makes several of each hit:
+  // « Camembert en croûte au bacon, doré et fondant » for « Camembert feuilleté au bacon, doré et fondant »).
+  const id = rows.find(row => recipeTitleKey(row.title) === key)?.id ?? closestVariant(title, rows)?.id ?? null;
+  titleCache.set(key, { id, at: now.getTime() });
+  return id;
+}
+
 export async function readCandidates(db: WpDb, settings: WordpressSettings, source: Pick<SourceRow, 'siteUrl'>, config: PlanConfig, ids: readonly string[], now: Date, writer = false): Promise<Candidate[]> {
   if (!ids.length) return [];
   const { rows } = await db.candidates({ mapping: config.mapping, order: config.order, skipShared: false, maxAgeDays: 0, offset: 0, limit: ids.length, now, include: ids });
@@ -301,6 +332,20 @@ async function prepareChoosing(ctx: Ctx, source: SourceRow, config: PlanConfig, 
   for (const w of winners) for (const page of pages) {
     const last = lastOn.get(`${page.id}|${w.wpPostId}`);
     if (last !== undefined && last < cutoff) { blocked.get(page.id)?.delete(w.wpPostId); blocked.get(page.id)?.delete(recipeTitleKey(w.title)); }
+  }
+  // The owner's own biggest hits come back too (2026-11-22): found on the site by their title, on the Page where they
+  // were hits, after the same rest as the autopilot's winners.
+  if (pilot.evergreen.enabled && pilot.evergreen.share > 0 && ctx.ports.store.outsideHits) {
+    const hits = await ctx.ports.store.outsideHits(pages.map(page => page.id), new Date(cutoff), OUTSIDE_HIT_REACH, 10).catch(() => []);
+    const found = new Map<string, string>();
+    for (const hit of hits) { const id = await recipeByTitle(ctx.db, config, hit.title, now).catch(() => null); if (id) found.set(`${hit.targetId}|${id}`, id); }
+    const extra = [...new Set(found.values())].filter(id => !winners.some(w => w.wpPostId === id));
+    if (extra.length) winners.push(...usable(await readCandidates(ctx.db, settings, source, config, extra, now, writer).catch(() => [])));
+    for (const key of found.keys()) {
+      const [pageId, id] = key.split('|') as [string, string];
+      const w = winners.find(item => item.wpPostId === id); const last = lastOn.get(key);
+      if (w && (last === undefined || last < cutoff)) { blocked.get(pageId)?.delete(id); blocked.get(pageId)?.delete(recipeTitleKey(w.title)); }
+    }
   }
   const winnerQuota = Math.floor(needCount * pilot.evergreen.share / 100);
   const preferredStyle = bestStyle(outcomes).style;

@@ -28,6 +28,8 @@ export interface RecipeStore {
   releaseDrafted?(sourceId: string, now: Date): Promise<number>;
   /** First lines of the Pages' posts published outside this app since `from` (2026-11-21); optional for test stores. */
   outsideTitles?(pageIds: readonly string[], from: Date): Promise<Array<{ targetId: string; title: string }>>;
+  /** The biggest posts made outside this app before `before` (2026-11-22): at least `minReach` and 5× their Page's usual. */
+  outsideHits?(pageIds: readonly string[], before: Date, minReach: number, limit: number): Promise<Array<{ targetId: string; title: string; reach: number }>>;
   claim(input: ClaimInput): Promise<string | null>;
   settle(workspaceId: string, id: string, settlement: Settlement): Promise<void>;
   recordRun(workspaceId: string, sourceId: string, run: RunRecord): Promise<void>;
@@ -85,6 +87,21 @@ export const prismaRecipeStore: RecipeStore = {
       LEFT JOIN post_targets pt ON pt."postId" = p.id AND pt."targetId" = l."targetId"
       WHERE l."sourceId" = $1 AND l."slotAt" >= $2`, sourceId, from);
     return rows.map(toLedger);
+  },
+  async outsideHits(pageIds, before, minReach, limit) {
+    if (!pageIds.length) return [];
+    // The owner's own hits from the phone app (« Camembert feuilleté au bacon » 1.24M) are never in the plan ledger, so the
+    // evergreen winners never brought them back (2026-11-22). Their caption is the recipe's title.
+    return prisma.$queryRaw<Array<{ targetId: string; title: string; reach: number }>>`
+      WITH posts AS (SELECT ep."targetId", ep."remoteId", ep.message, ep."createdTime",
+          COALESCE((ep.insights->>'post_total_media_view_unique')::numeric, (ep.insights->>'reach')::numeric) AS reach
+        FROM external_posts ep WHERE ep."targetId" = ANY(${[...pageIds]}::text[]) AND ep."remoteMissingAt" IS NULL AND ep.message IS NOT NULL
+          AND COALESCE(ep.insights->>'post_total_media_view_unique', ep.insights->>'reach') ~ '^[0-9.]+$'),
+      usual AS (SELECT "targetId", percentile_cont(0.5) WITHIN GROUP (ORDER BY reach) AS median FROM posts GROUP BY 1)
+      SELECT p."targetId", split_part(p.message, E'\n', 1) AS title, p.reach::int AS reach FROM posts p JOIN usual u ON u."targetId" = p."targetId"
+      WHERE p."createdTime" < ${before} AND p.reach >= GREATEST(${minReach}, 5 * u.median)
+        AND NOT EXISTS (SELECT 1 FROM post_targets pt WHERE pt."targetId" = p."targetId" AND pt."remotePostId" = p."remoteId")
+      ORDER BY p.reach DESC LIMIT ${limit}`.catch(() => []);
   },
   async outsideTitles(pageIds, from) {
     if (!pageIds.length) return [];

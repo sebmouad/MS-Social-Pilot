@@ -41,6 +41,8 @@ export type CandidateQuery = {
   now: Date;
   /** Autopilot (2026-11-16): read exactly these posts (WordPress ids), whatever their date; order and offset are ignored. */
   include?: readonly string[];
+  /** Posts whose text matches these words (WordPress search), newest first; with `include`, ignored (2026-11-22). */
+  search?: string;
 };
 /** `fetched` counts posts WordPress returned before local filtering; fewer than `requested` means the library ended. */
 export type CandidatePage = { rows: WpCandidateRow[]; fetched: number; requested: number };
@@ -286,6 +288,7 @@ export async function openWordpressDb(settings: DbSettings): Promise<WpDb> {
       const params = new URLSearchParams(include.length
         ? { per_page: String(requested), include: include.join(','), orderby: 'include', _embed: 'wp:featuredmedia' }
         : { per_page: String(requested), offset: String(Math.max(0, q.offset)), orderby: 'date', order: q.order === 'newest' ? 'desc' : 'asc', _embed: 'wp:featuredmedia' });
+      if (q.search && !include.length) params.set('search', q.search.slice(0, 200));
       if (q.mapping.postStatus && q.mapping.postStatus !== 'publish' && settings.apiToken) {
         params.set('status', q.mapping.postStatus);
       }
