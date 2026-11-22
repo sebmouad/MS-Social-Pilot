@@ -739,6 +739,14 @@ export async function runRecipePlanning(overrides: Partial<PlannerPorts> & { aut
           if (count) entries.push({ at: now.toISOString(), kind: 'healing', code: 'retitled', params: { count }, text: `${count} queued posts now carry the recipe title only.` });
         } catch { /* never stops planning */ }
       }
+      // A recipe the owner posted by hand after it was queued is replaced (2026-11-22, ./wordpress-repeats.ts).
+      if (!overrides.autopilot) {
+        try {
+          const { replaceOutsideRepeats } = await import('./wordpress-repeats');
+          for (const repeat of await replaceOutsideRepeats(auth.actor, source.id, now))
+            entries.push({ at: now.toISOString(), kind: 'healing', channelId: repeat.targetId, code: 'repeatReplaced', params: { title: repeat.title }, text: `« ${repeat.title} » was already posted by hand: another recipe takes its time.` });
+        } catch { /* never stops planning */ }
+      }
       // « AI info » on published recipe posts (2026-11-19, ./wordpress-ai-disclosure.ts), when photos are labelled as AI-made.
       if (!overrides.autopilot && settings.image.aiLabel) {
         try {

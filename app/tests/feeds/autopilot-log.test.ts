@@ -47,3 +47,8 @@ test('log: queued posts switched to the recipe title', () => {
   const at = '2026-11-21T12:00:00Z';
   assert.equal(logSentence({ at, kind: 'healing', code: 'retitled', params: { count: 4 } }, 'en'), '4 queued posts now carry the recipe title only, as their Page’s setting asks.');
 });
+
+test('log: a queued recipe replaced because the owner posted it by hand', () => {
+  const at = '2026-11-22T14:00:00Z';
+  assert.equal(logSentence({ at, kind: 'healing', code: 'repeatReplaced', params: { title: 'Roulé au saumon fumé' } }, 'fr'), '« Roulé au saumon fumé » a déjà été publiée à la main : une autre recette prend son horaire.');
+});
