@@ -66,3 +66,9 @@ test('ai replies: a request for the recipe is always answered with the link, eve
   const noLink = aiReplyPrompt({ kind: 'comment', channel: 'P', voice: null, author: null, text: 'Où est la recette ?' }, 'friendly').system;
   assert.doesNotMatch(noLink, /always gets a "reply" with the link/);
 });
+
+test('ai replies: ingredient, quantity, time and step questions are answered only from the recipe, else handed off', () => {
+  const system = aiReplyPrompt({ kind: 'comment', channel: 'P', voice: null, author: null, text: 'Du beurre sur la photo ?' }, 'friendly').system;
+  assert.match(system, /answered only with what the post and recipe below say/);
+  assert.match(system, /Never explain a photo or guess what is in it/);
+});

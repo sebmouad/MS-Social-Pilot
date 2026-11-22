@@ -51,6 +51,8 @@ export function aiReplyPrompt(c: AiReplyContext, tone: AiReplyTone): { system: s
     c.sentiment === 'negative' ? 'This comment reads as negative. Reply only when it is a calm remark, preference or correction about the recipe; anything critical of the page, the person or the result, or upset in tone, is a "handoff".' : '',
     c.voice ? `The page's own voice: ${c.voice.slice(0, 400)}` : '',
     'Use only the facts given below. If the answer is not there, say so kindly and suggest something simple and safe. Never invent a price, a promise, a delivery or a health claim.',
+    // « Du beurre sur la photo mais pas dans la recette ? » got « … via la pâte feuilletée pur beurre » (2026-11-22).
+    'A question or remark about an ingredient, a quantity, a cooking time or a step is answered only with what the post and recipe below say, word for word in substance; when they do not say it, the decision is "handoff". Never explain a photo or guess what is in it.',
     c.link ? `If they ask for the recipe or the link, give this link and no other: ${c.link}` : 'Do not include any link.',
     // « Où est la recette je v ai dis SVP 😱 » was handed off as annoyed (2026-11-22): asking for the recipe is answered.
     c.link ? 'Someone asking for the recipe or the link always gets a "reply" with the link, kindly, even when they sound impatient or annoyed about waiting for it.' : '',

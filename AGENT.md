@@ -569,3 +569,7 @@ ads_management (owner asked to rework Ads like Meta Ads Manager first). The subm
   `closestVariant`).
 - Competitors to read after Page Public Content Access: magickitchen038, cookikitchen1, mabonnerecette92 (behind
   Facebook's login on the web; owner chose to wait for the permission).
+- AI replies (22 Nov): a request for the recipe always gets the link, even impatient; ingredient / quantity / time /
+  step questions are answered only from the post and recipe text, else handed off (« beurre » reply had explained a
+  photo). Owner's « fix all »: the handed-off « Où est la recette… SVP » on the pains aux raisins post was answered
+  with its link by hand; the photo-mismatch complaint on RF is left to the owner.
