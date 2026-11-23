@@ -35,7 +35,7 @@ function settings(): WordpressSettings {
 }
 
 /** In-memory ledger and publishing; returns the ports and what they recorded. */
-function harness(seed: LedgerRow[] = [], opts: { list?: typeof recipes; scoring?: ScoringPorts; at?: Date; captions?: (system: string, prompt: string) => Promise<string> } = {}) {
+function harness(seed: LedgerRow[] = [], opts: { list?: typeof recipes; scoring?: ScoringPorts; at?: Date; captions?: (system: string, prompt: string) => Promise<string>; write?: () => Promise<unknown> } = {}) {
   const list = opts.list ?? recipes; const clock = opts.at ?? now;
   const ledger: LedgerRow[] = [...seed];
   const created: Array<{ targetId: string; scheduledAt: Date; message: string; firstComment?: string; delay?: number }> = [];
@@ -62,7 +62,7 @@ function harness(seed: LedgerRow[] = [], opts: { list?: typeof recipes; scoring?
     async cancelPost() {}, async postForSlot() { return null; },
     image: { async download() { return Buffer.from('x'); }, async inspect() {}, async convert() { return Buffer.from('jpeg'); }, async store() { return { id: 'media1' }; } },
     async qualify() { return null; }, store,
-    writer: { async available() { return Boolean(opts.captions); }, async write() { throw new Error('unused'); } },
+    writer: { async available() { return Boolean(opts.captions || opts.write); }, async write() { if (opts.write) return opts.write(); throw new Error('unused'); } },
     now: () => clock,
     ...(opts.scoring ? { scoring: opts.scoring } : {}),
     ...(opts.captions ? { captions: { write: (_actor: unknown, system: string, prompt: string) => opts.captions!(system, prompt) } } : {}),
@@ -220,6 +220,20 @@ test('autopilot: when AI refuses, the recipe keeps its own caption', async () =>
   const h = harness([], { captions: async () => { throw new Error('hourly limit'); } });
   await planSource({ settings: settings(), ports: h.ports, db: h.db as never, budget: { left: 50 }, now }, source(), auth);
   assert.ok(h.created.length > 0 && h.created.every(p => p.message.startsWith('A tasty caption')));
+});
+
+test('planner: the AI limit stops the run at the first refusal; the other slots stay open for the next run', async () => {
+  const { OperationError } = await import('@/lib/operation-error');
+  let calls = 0;
+  const list = recipes.map(r => ({ ...r, caption: '', article: `Article text for ${r.title}` }));
+  const h = harness([], { list, write: async () => { calls++; throw new OperationError('conflict', 'This workspace has reached its hourly AI assist limit. Try again later.'); } });
+  const out = await planSource({ settings: settings(), ports: h.ports, db: h.db as never, budget: { left: 50 }, now }, source(), auth);
+  assert.equal(calls, 1);
+  assert.equal(out.reason, 'ai_limit');
+  assert.equal(out.failed, 1);
+  assert.ok(out.unfilled > 0);
+  assert.equal(h.created.length, 0);
+  assert.deepEqual(h.ledger.map(row => `${row.state}:${row.reason}`), ['failed:writing:conflict']);
 });
 
 test('planner: a placeholder caption (« p3 ») is never posted', async () => {

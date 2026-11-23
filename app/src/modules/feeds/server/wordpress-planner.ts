@@ -536,6 +536,9 @@ export async function planSource(ctx: Ctx, source: SourceRow, auth: FeedAuthoriz
       await ports.store.settle(source.workspaceId, claimId, { state: 'failed', reason: `writing:${code}`, skipped: code === 'invalid_request' ? [...priorSkipped, c.wpPostId] : priorSkipped }).catch(() => undefined);
       out.failed += 1;
       if (AUTHORITY.has(code)) return { ...out, reason: code };
+      // The AI hourly limit or monthly budget (2026-11-23): every later slot would be claimed and fail the same way
+      // (5 on 20–21 Nov). The run stops here; the slots stay open and the next run fills them.
+      if (code === 'conflict') { out.unfilled += assignments.length - index - 1; out.reason = 'ai_limit'; break; }
       continue;
     }
     // Autopilot (2026-11-16): the channel's own caption in its voice and a hook style, and a call to action on the comment.
