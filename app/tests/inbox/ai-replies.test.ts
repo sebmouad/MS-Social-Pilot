@@ -54,6 +54,14 @@ test('ai replies: the prompt names the page, the decision rules, the link and th
   assert.match(message.prompt, /Visitor: Bonjour\nPage: Bonjour !\nMessage from a visitor: Et pour 6 \?/);
 });
 
+test('ai replies: the page\'s latest replies are shown so a new one is worded differently', () => {
+  const recent = ['Merci beaucoup, ça nous fait plaisir ! 😊', 'Avec plaisir, merci pour votre message ! 😊'];
+  const { system } = aiReplyPrompt({ kind: 'comment', channel: 'P', voice: null, author: null, text: 'J’adore', recent }, 'friendly');
+  assert.match(system, /must not be repeated/);
+  assert.match(system, /- Merci beaucoup, ça nous fait plaisir ! 😊\n- Avec plaisir, merci pour votre message ! 😊/);
+  assert.doesNotMatch(aiReplyPrompt({ kind: 'comment', channel: 'P', voice: null, author: null, text: 'J’adore' }, 'friendly').system, /must not be repeated/);
+});
+
 test('AI replies: a calm correction about the recipe is answered with thanks; complaints still go to a person', () => {
   const { system } = aiReplyPrompt({ kind: 'comment', channel: 'Cuisine', voice: null, author: 'Marie', text: 'La pâte est levée feuilletée.' }, 'friendly');
   assert.match(system, /A calm correction or extra detail about the recipe .* is a reply too: thank them warmly for the precision/);

@@ -32,6 +32,8 @@ export type AiReplyContext = {
   link?: string | null;
   /** Earlier messages of a Messenger conversation, oldest first. */
   history?: ReadonlyArray<{ from: 'visitor' | 'page'; text: string }>;
+  /** The page's latest AI replies, newest first: a new reply must not reuse their wording. */
+  recent?: readonly string[];
 };
 
 const TONES: Record<AiReplyTone, string> = {
@@ -50,6 +52,9 @@ export function aiReplyPrompt(c: AiReplyContext, tone: AiReplyTone): { system: s
     `For a reply: write in the same language as the person. Tone: ${TONES[tone]}. ${c.kind === 'comment' ? 'One or two short sentences.' : 'At most three short sentences.'} At most one emoji.`,
     c.sentiment === 'negative' ? 'This comment reads as negative. Reply only when it is a calm remark, preference or correction about the recipe; anything critical of the page, the person or the result, or upset in tone, is a "handoff".' : '',
     c.voice ? `The page's own voice: ${c.voice.slice(0, 400)}` : '',
+    // « Merci beaucoup, ça nous fait plaisir ! 😊 » three times in eight replies (2026-11-23): the same line under every
+    // post reads as a robot. The page's latest replies are shown so a new one is worded differently.
+    c.recent?.length ? `The page's latest replies, which must not be repeated: do not reuse their opening words or phrasing, and reply to what this person actually said:\n${c.recent.slice(0, 8).map(line => `- ${line.slice(0, 160)}`).join('\n')}` : '',
     'Use only the facts given below. If the answer is not there, say so kindly and suggest something simple and safe. Never invent a price, a promise, a delivery or a health claim.',
     // « Du beurre sur la photo mais pas dans la recette ? » got « … via la pâte feuilletée pur beurre » (2026-11-22).
     'A question or remark about an ingredient, a quantity, a cooking time or a step is answered only with what the post and recipe below say, word for word in substance; when they do not say it, the decision is "handoff". Never explain a photo or guess what is in it.',

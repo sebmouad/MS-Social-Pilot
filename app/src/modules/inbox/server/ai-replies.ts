@@ -136,7 +136,10 @@ async function handle(actor: InboxReadActor, item: Waiting, tone: AiRepliesSetti
   if (pre === 'negative') { await settle('ai_handoff', ''); return 'handed_off'; }
   if (item.kind === 'message' && await aiRepliesInConversation(actor.workspaceId, item.id, now) >= AI_REPLIES_PER_CONVERSATION_DAY) { await settle('ai_handoff', ''); return 'handed_off'; }
 
-  const { system, prompt } = aiReplyPrompt(item, tone);
+  const recent = await prisma.$queryRaw<Array<{ text: string }>>`SELECT "replyText" AS text FROM moderation_actions
+    WHERE "workspaceId" = ${actor.workspaceId} AND "targetId" = ${item.targetId} AND "ruleId" IS NULL AND action = 'ai_reply' AND error IS NULL AND "replyText" IS NOT NULL AND id <> ${claimId}
+    ORDER BY "createdAt" DESC LIMIT 8`.catch(() => []);
+  const { system, prompt } = aiReplyPrompt({ ...item, recent: recent.map(row => row.text) }, tone);
   let raw: string;
   try { raw = await deps.complete(system, prompt); }
   catch {
