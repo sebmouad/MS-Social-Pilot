@@ -167,7 +167,8 @@ export function createFacebookDataCollector(config: FacebookConfig, policy: Poli
           failures.push({ metric: `content:${collection.edge}`, message: 'Configured content discovery failed.' });
         }
       }
-      if (!result.length && failures.length) throw new Error('No configured Facebook insight collection succeeded.');
+      // Name the first refusals so Root › Errors says why, not only that everything failed.
+      if (!result.length && failures.length) throw new Error(`No configured Facebook insight collection succeeded (${failures.slice(0, 2).map(item => `${item.metric}: ${item.message}`).join('; ')}).`);
       if (failures.length) Object.defineProperty(result, 'failedMetrics', { value: failures, enumerable: false });
       return result;
     },
