@@ -591,3 +591,7 @@ ads_management (owner asked to rework Ads like Meta Ads Manager first). The subm
   (run `socialpilot-deploy` on the server once). Off-site copy needs BACKUP_RSYNC_TARGET in
   /etc/ms-social-pilot-backup.conf (owner's destination). « backup.failed » is open by design until an off-site backup
   succeeds. Operator alerts are emailed to the owner (sent since 21 Nov); chatWorkspaceId only adds team-chat delivery.
+- RF first-comment test (owner's choice, 23 Nov): with the same title-only captions and site photos, the owner's manual RF
+  posts reached 2–4× more at 24 h (22 Nov). From 24 Nov 08:35 RF is `plainComment` with template « 👉 {link} » (no
+  recipe text, no call to action), queued posts rewritten (`recommentQueued`). Read on 27 Nov 15:10 Paris at 24 h.
+- Root › Errors: 114 more stale entries resolved on 23 Nov (the API pages by 50); 8 open, all current.
