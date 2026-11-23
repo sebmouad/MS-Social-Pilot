@@ -463,3 +463,14 @@ test('captions: worn-out phrases are found whatever the accents or apostrophes, 
   assert.ok(CLICHES.every(phrase => system.includes(phrase)));
   assert.ok(!system.includes('family life'));
 });
+
+test('plainComment: a channel can post its template as is; a link-only template renders to the link alone', async () => {
+  const { channelConfig, planConfigPatchSchema, renderComment } = await import('@/modules/feeds/wordpress/recipe');
+  const base = { slots: ['11:00'], autopilot: AUTOPILOT_DEFAULTS, firstCommentTemplate: '{ingredients}', channels: { rf: { plainComment: true, firstCommentTemplate: '👉 {link}' } } } as unknown as Parameters<typeof channelConfig>[0];
+  assert.equal(channelConfig(base, 'rf').plainComment, true);
+  assert.equal(channelConfig(base, 'other').plainComment, false);
+  const schema = planConfigPatchSchema({ template: 2000, horizon: { min: 1, max: 14 }, cooldown: { min: 0, max: 730 }, age: { min: 0, max: 3650 }, delay: { min: 0, max: 60 } });
+  assert.equal(schema.safeParse({ channels: { rf: { plainComment: true } } }).success, true);
+  const recipe = { title: 'Gratin', description: '', servings: '', prep: '', cook: '', total: '', ingredients: [], steps: [] };
+  assert.equal(renderComment('👉 {link}', recipe, 'https://recettes.example/gratin/', { max: 2000, mark: '…' }), '👉 https://recettes.example/gratin/');
+});

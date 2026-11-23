@@ -30,7 +30,7 @@ export function ChannelSettings({ pages, config, onChange, busy, maxTemplate, t,
 
   const open = (page: { id: string; name: string }) => {
     const r = resolved(page.id);
-    setEditing({ id: page.id, name: page.name, value: { slots: [...r.slots], weekdays: [...(r.weekdays ?? ALL_DAYS)], order: r.order, firstCommentTemplate: r.firstCommentTemplate, firstCommentDelayMinutes: r.firstCommentDelayMinutes, paused: r.paused, captionTitle: r.captionTitle } });
+    setEditing({ id: page.id, name: page.name, value: { slots: [...r.slots], weekdays: [...(r.weekdays ?? ALL_DAYS)], order: r.order, firstCommentTemplate: r.firstCommentTemplate, firstCommentDelayMinutes: r.firstCommentDelayMinutes, paused: r.paused, captionTitle: r.captionTitle, plainComment: r.plainComment } });
   };
   const withoutLegacy = (id: string) => { const next = { ...(config.channelSlots ?? {}) }; delete next[id]; return next; };
   const save = () => {
@@ -49,6 +49,7 @@ export function ChannelSettings({ pages, config, onChange, busy, maxTemplate, t,
     if (before?.pausedReason && value.paused && before.paused) value.pausedReason = before.pausedReason;
     // Title-only captions (2026-11-21) are stored only when on.
     if (!value.captionTitle) delete (value as Partial<Own>).captionTitle;
+    if (!value.plainComment) delete (value as Partial<Own>).plainComment;
     onChange({ ...channels, [editing.id]: value }, withoutLegacy(editing.id));
     setEditing(null);
   };
@@ -95,6 +96,7 @@ export function ChannelSettings({ pages, config, onChange, busy, maxTemplate, t,
         <label>{t('order')}<select disabled={editing.value.paused} value={editing.value.order} onChange={e => set({ order: e.target.value === 'oldest' ? 'oldest' : 'newest' })}>
           <option value="newest">{t('orderNewest')}</option><option value="oldest">{t('orderOldest')}</option></select></label>
         <label className={styles.inline}><input type="checkbox" disabled={editing.value.paused} checked={editing.value.captionTitle} onChange={e => set({ captionTitle: e.target.checked })} /> {t('perChannelCaptionTitle')}</label>
+        <label className={styles.inline}><input type="checkbox" disabled={editing.value.paused} checked={editing.value.plainComment} onChange={e => set({ plainComment: e.target.checked })} /> {t('perChannelPlainComment')}</label>
         <label>{t('template')}<textarea disabled={editing.value.paused} rows={7} maxLength={maxTemplate} value={editing.value.firstCommentTemplate} onChange={e => set({ firstCommentTemplate: e.target.value })} /><span>{t('templateHint')}</span></label>
         <label>{t('delay')}<input disabled={editing.value.paused} type="number" min={0} step={1} value={editing.value.firstCommentDelayMinutes} onChange={e => set({ firstCommentDelayMinutes: Math.max(0, Math.trunc(Number(e.target.value)) || 0) })} /></label>
       </div>}

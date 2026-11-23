@@ -5,7 +5,7 @@ import type { AutopilotLogEntry } from './wordpress/autopilot';
  * written when shown, so a French page reads French. Entries saved before codes existed are recognised by their English
  * sentence and written the same way (2026-11-17); any other text is shown as saved.
  */
-export type LogCode = 'photosUnread' | 'replanned' | 'stranded' | 'refilled' | 'publishFailed' | 'channelHeld' | 'hot' | 'hotShort' | 'breathe' | 'spread' | 'notSpread' | 'radarFailed' | 'photoMade' | 'retitled' | 'repeatReplaced' | 'photoNotMade' | 'replacedOpen' | 'aiTagged' | 'aiTaggedOne' | 'aiTagFailed' | 'lateHit';
+export type LogCode = 'photosUnread' | 'replanned' | 'stranded' | 'refilled' | 'publishFailed' | 'channelHeld' | 'hot' | 'hotShort' | 'breathe' | 'spread' | 'notSpread' | 'radarFailed' | 'photoMade' | 'retitled' | 'recommented' | 'repeatReplaced' | 'photoNotMade' | 'replacedOpen' | 'aiTagged' | 'aiTaggedOne' | 'aiTagFailed' | 'lateHit';
 
 const TEXT: Record<'en' | 'fr', Record<LogCode, string>> = {
   en: {
@@ -24,6 +24,7 @@ const TEXT: Record<'en' | 'fr', Record<LogCode, string>> = {
     photoMade: 'New photo generated for « {title} »: the recipe’s own photo shows little of what gets reach on this Page.',
     retitled: '{count} queued posts now carry the recipe title only, as their Page’s setting asks.',
     repeatReplaced: '« {title} » was already posted by hand: another recipe takes its time.',
+    recommented: '{count} queued posts now carry their Page’s plain first comment.',
     photoNotMade: 'A new photo could not be generated ({why}); the recipe’s own photo went out.',
     replacedOpen: 'Re-planned with this Page’s memory: « {from} » (expected ×{fromValue}) removed; a stronger recipe takes {time}.',
     aiTagged: '{count} published posts marked as AI-generated on Facebook (« AI info »).',
@@ -47,6 +48,7 @@ const TEXT: Record<'en' | 'fr', Record<LogCode, string>> = {
     photoMade: 'Nouvelle photo générée pour « {title} » : la photo de la recette montre peu de ce qui touche du monde sur cette Page.',
     retitled: '{count} publications programmées portent maintenant seulement le titre de la recette, comme le demande le réglage de leur Page.',
     repeatReplaced: '« {title} » a déjà été publiée à la main : une autre recette prend son horaire.',
+    recommented: '{count} publications programmées portent maintenant le premier commentaire simple de leur Page.',
     photoNotMade: 'Une nouvelle photo n’a pas pu être générée ({why}) ; la photo de la recette est partie.',
     replacedOpen: 'Replanifié avec la mémoire de cette Page : « {from} » (attendu ×{fromValue}) retirée ; une recette plus forte prend {time}.',
     aiTagged: '{count} publications marquées comme générées par IA sur Facebook (« Info IA »).',

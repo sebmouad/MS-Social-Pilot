@@ -563,7 +563,8 @@ export async function planSource(ctx: Ctx, source: SourceRow, auth: FeedAuthoriz
         if (clean) { written = { ...written, caption: clean }; style = pick.style; openings.unshift(clean.split('\n')[0]!.slice(0, 90)); } }
       catch { /* over the AI limit or unavailable: the recipe's own caption goes out */ }
     }
-    if (pilot.comment.enabled) written = { ...written, firstComment: withCta(written.firstComment, ctaFor(pilot.comment.cta, key), settings.commentMax) };
+    // A channel set to a plain first comment (2026-11-23) posts its template as is, without the call to action.
+    if (pilot.comment.enabled && !of(targetId).plainComment) written = { ...written, firstComment: withCta(written.firstComment, ctaFor(pilot.comment.cta, key), settings.commentMax) };
     let postId: string;
     let imageSource: 'site' | 'generated' = 'site';
     try {
@@ -737,6 +738,12 @@ export async function runRecipePlanning(overrides: Partial<PlannerPorts> & { aut
           const { retitleQueued } = await import('./wordpress-retitle');
           const count = await retitleQueued({ userId: auth.actor.userId, workspaceId: source.workspaceId }, source.id, titled, now);
           if (count) entries.push({ at: now.toISOString(), kind: 'healing', code: 'retitled', params: { count }, text: `${count} queued posts now carry the recipe title only.` });
+          // Channels set to a plain first comment: their queued posts take it too (2026-11-23).
+          const config = configOf(settings, source);
+          const plain = new Map(Object.keys(config.channels ?? {}).filter(id => config.channels?.[id]?.plainComment).map(id => [id, channelConfig(config, id).firstCommentTemplate]));
+          const { recommentQueued } = await import('./wordpress-retitle');
+          const recommented = await recommentQueued({ userId: auth.actor.userId, workspaceId: source.workspaceId }, source.id, plain, { max: settings.commentMax, mark: settings.truncationMark }, now);
+          if (recommented) entries.push({ at: now.toISOString(), kind: 'healing', code: 'recommented', params: { count: recommented }, text: `${recommented} queued posts now carry their Page's plain first comment.` });
         } catch { /* never stops planning */ }
       }
       // A recipe the owner posted by hand after it was queued is replaced (2026-11-22, ./wordpress-repeats.ts).

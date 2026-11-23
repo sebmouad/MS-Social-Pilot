@@ -52,3 +52,7 @@ test('log: a queued recipe replaced because the owner posted it by hand', () => 
   const at = '2026-11-22T14:00:00Z';
   assert.equal(logSentence({ at, kind: 'healing', code: 'repeatReplaced', params: { title: 'Roulé au saumon fumé' } }, 'fr'), '« Roulé au saumon fumé » a déjà été publiée à la main : une autre recette prend son horaire.');
 });
+
+test('log: queued posts moved to their Page\'s plain first comment', () => {
+  assert.equal(logSentence({ at: '2026-11-23T19:00:00Z', kind: 'healing', code: 'recommented', params: { count: 7 } }, 'en'), '7 queued posts now carry their Page’s plain first comment.');
+});
