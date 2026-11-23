@@ -32,7 +32,6 @@ export function Avatar({ name, src, size = "md", decorative = false, className =
   const [failed, setFailed] = useState<string | null>(null);
   return <span className={`ui-avatar ui-avatar--${size} ${className}`.trim()} data-slot={avatarSlot(name)} role={decorative ? undefined : "img"} aria-label={decorative ? undefined : name} aria-hidden={decorative || undefined}>
     {src && failed !== src
-      // eslint-disable-next-line @next/next/no-img-element -- avatar sources are arbitrary authorized URLs
       ? <img src={src} alt="" loading="lazy" decoding="async" onError={() => setFailed(src)} />
       : <span aria-hidden="true">{avatarInitials(name)}</span>}
   </span>;

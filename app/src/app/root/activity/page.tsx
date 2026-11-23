@@ -12,7 +12,7 @@ import { listRootActivity } from '@/server/root/activity';
 import { RootActivityFilters } from '@/modules/root/ui/RootActivityFilters';
 import { rootActivitySearchParams, type RootActivitySearch } from '@/lib/root-activity';
 import { OperationError } from '@/lib/operation-error';
-import { loadRootDates, loadRootInterfaceCopy, rootText } from '@/modules/root/ui/interface-copy';
+import { loadRootInterfaceCopy } from '@/modules/root/ui/interface-copy';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Activity · Root' };

@@ -139,7 +139,7 @@ export async function readFacebookNativeStatus(record: Pick<FacebookNativeAttemp
       const raw = await transport.getGraph(id, [...STATUS_FIELDS], signal);
       if (aborted(signal)) return { status: 'unknown', detail: 'aborted', polls };
       last = rec(raw) ? mapFacebookVideoStatus(format, raw) : { status: 'unknown', detail: 'status_shape_invalid' };
-    } catch (e) {
+    } catch {
       if (aborted(signal)) return { status: 'unknown', detail: 'aborted', polls };
       // Graph code 100/subcode 33 can mean inaccessible or unsupported as well as
       // absent. It is not proof of absence and must not settle publication state.

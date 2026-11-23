@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useCallback, useContext, useMemo, useRef, useState, type ReactNode } from 'react';
-import { DEFAULT_THEME, THEMES, isModeId, isThemeId, type ModeId, type ThemeId } from '@/lib/themes';
+import { DEFAULT_THEME, isModeId, isThemeId, type ModeId, type ThemeId } from '@/lib/themes';
 import { appearanceCopy, type AppearanceCopy } from '@/modules/settings/ui/appearance/copy';
 export { MODE_COOKIE, MODES, THEME_COOKIE, THEMES, type ModeId, type ThemeId } from '@/lib/themes';
 

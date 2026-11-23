@@ -6,7 +6,7 @@ import { loadRootLifecycle } from '@/modules/root/server/admin/lifecycle';
 import { DeleteUser, DeleteWorkspace, EnableUser, RestoreWorkspace } from './AccessControls';
 import { TransferOwnership } from './TransferOwnership';
 import '../plans/root-ops.css';
-import { loadRootDates, loadRootInterfaceCopy, rootText } from '@/modules/root/ui/interface-copy';
+import { loadRootDates, loadRootInterfaceCopy } from '@/modules/root/ui/interface-copy';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Lifecycle · Root' };

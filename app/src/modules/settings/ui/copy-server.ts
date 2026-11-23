@@ -1,5 +1,4 @@
 import { configOrDefault } from '@/server/config/config-or-default';
-import { runtimeConfig } from '@/server/config/store';
 import { settingsUiCopySchema } from './copy-catalog';
 import { sectionsCopySchema, type SectionsCopy } from './sections-copy';
 export async function readSettingsUiCopy() {

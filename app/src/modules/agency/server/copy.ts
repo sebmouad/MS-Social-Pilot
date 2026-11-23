@@ -4,7 +4,6 @@ import { OperationError, type OperationErrorCode } from '@/lib/operation-error';
 import { uiCopy, type CustomerCopy } from '../ui/copy';
 import { cache } from 'react';
 import { exportCopyByLocale } from '../export-copy';
-import { runtimeConfig } from '@/server/config/store';
 
 /** React cache shares one catalog read across a rendered request. */
 export const loadCustomerCopy = cache(() => configValueOrDefault('agency.customerCopy'));

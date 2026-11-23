@@ -4,7 +4,7 @@ import { PLATFORM_MODULES } from '@/platforms';
 import { assertRootActor, lockRootActor, conflict, invalid } from './authz';
 import { writeRootAudit } from './audit';
 import { rootResultLimit, adminSetting, rootTransaction } from './policy';
-import { planAssignSchema, planConfirmation, planFeatureCatalog, planPatchSchema, planUpdateSchema, type PlanPatch } from './shared';
+import { planAssignSchema, planConfirmation, planFeatureCatalog, planUpdateSchema, type PlanPatch } from './shared';
 
 type PlanRow = {
   id: string; key: string; name: string; position: number; currency: string; priceMonthly: number; priceYearly: number; extraChannelPrice: number;

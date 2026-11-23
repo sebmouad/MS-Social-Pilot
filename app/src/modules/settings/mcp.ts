@@ -179,7 +179,7 @@ export const SETTINGS_MCP: readonly McpToolGroup[] = [
     resources: [
       { uri: 'msp://data/deletion-preview', name: "Data deletion preview", description: "Current workspace record counts before deletion.", mimeType: 'application/json', feature: 'settings/data', readTool: 'preview_workspace_data_deletion', managerOnly: true, guardedRead: true },
     ],
-    execute: async (viewer, name, args, cap) => {
+    execute: async (viewer, name, args, _cap) => {
       switch (name) {
       case 'preview_workspace_data_deletion':
         return previewWorkspaceDataDeletion({ userId: viewer.userId, workspaceId: viewer.workspaceId });

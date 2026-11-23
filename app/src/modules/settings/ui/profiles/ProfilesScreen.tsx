@@ -1,6 +1,5 @@
 import { configOrDefault } from '@/server/config/config-or-default';
 import { readSettingsUiCopy } from '@/modules/settings/ui/copy-server';
-import { runtimeConfig } from '@/server/config/store';
 import { profileConfirmationCopySchema } from '../../channel-profiles/config';
 import { headers } from 'next/headers';
 import { PageFrame } from '@/server/PageFrame';

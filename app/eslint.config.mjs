@@ -15,6 +15,9 @@ export default [
       // Reported, not blocking, until the existing cases are cleaned up.
       '@typescript-eslint/no-explicit-any': 'warn',
       '@typescript-eslint/no-unsafe-function-type': 'warn',
+      // The codebase drops fields by destructuring them under a leading underscore (« const { secret: _secret, ...rest } »);
+      // those, and `_`-prefixed arguments kept for a signature, are deliberate.
+      '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_', destructuredArrayIgnorePattern: '^_', ignoreRestSiblings: true }],
     },
   },
 ];

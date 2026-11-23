@@ -8,7 +8,6 @@ import type { SectionsCopy } from '@/modules/settings/ui/sections-copy';
 import styles from './cards.module.css';
 
 type Locale = 'en' | 'fr';
-type Fields = Partial<Record<keyof WorkspaceOperations, unknown>>;
 
 /** One card = one independent save. `onSave` returns an error text, or null on success. */
 function Card({ id, title, detail, canSave, dirty, invalid, copy, onSave, children }: { id: string; title: string; detail: string; canSave: boolean; dirty: boolean; invalid?: string; copy: SectionsCopy; onSave: () => Promise<string | null>; children: ReactNode }) {

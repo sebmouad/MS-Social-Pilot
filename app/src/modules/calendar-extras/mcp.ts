@@ -1,6 +1,6 @@
 import { OperationError } from '@/lib/operation-error';
 import { pageIdsFor, type McpToolGroup } from '@/server/mcp/kit';
-import { AREAS, FEATURES, type Actor, type Area } from './contracts';
+import { AREAS, FEATURES, type Actor } from './contracts';
 import { calendarOptions, changeCalendarEntry, listCalendarEntries } from './server/service';
 import { settings } from './server/settings';
 const string = { type: 'string' };

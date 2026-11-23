@@ -78,7 +78,6 @@ export function verifyMetaWebhookToken(provided: string | null, expected: string
 const pageIdSchema = z.string().regex(/^[0-9]{1,40}$/);
 // Post/comment ids are `digits_digits`; message mids carry dots and `$` (e.g. `mid.$...`).
 const remoteIdSchema = z.string().regex(/^[A-Za-z0-9_.:$-]{1,200}$/);
-const unixSeconds = z.number().int().positive().max(4102444800);
 
 function eventIdOf(parts: Record<string, unknown>): string {
   return `evt_${createHash('sha256').update(JSON.stringify(parts)).digest('hex').slice(0, 32)}`;
@@ -217,7 +216,7 @@ async function storeFeedComment(targetId: string, event: MetaWebhookEvent, now: 
   return true;
 }
 
-async function storeMessage(targetId: string, event: MetaWebhookEvent, now: Date): Promise<boolean> {
+async function storeMessage(targetId: string, event: MetaWebhookEvent, _now: Date): Promise<boolean> {
   if (!event.messageId || !event.senderId || !event.text || !event.createdAt) return false;
   // A webhook carries no conversation id, so the message joins the visitor's
   // existing thread only when exactly one thread on this channel holds them.

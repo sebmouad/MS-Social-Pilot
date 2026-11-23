@@ -1,6 +1,4 @@
 import { bilingualCatalog } from '../catalog';
-import { z } from 'zod';
-import { copySchema } from '@/lib/config/copy-schema';
 
 export type AuthLocale = 'en' | 'fr';
 

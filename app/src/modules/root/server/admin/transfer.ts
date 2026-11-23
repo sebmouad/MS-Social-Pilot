@@ -1,4 +1,4 @@
-import { synchronousPolicy, withinSynchronousLimit } from '@/lib/config/synchronous-policy';
+import { synchronousPolicy } from '@/lib/config/synchronous-policy';
 import { randomUUID } from 'node:crypto';
 import { OperationError } from '@/lib/operation-error';
 import { prisma } from '@/server/data';

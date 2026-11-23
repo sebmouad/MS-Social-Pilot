@@ -88,7 +88,6 @@ export function createTransactionalMailService(deps: MailDependencies = dependen
       let transport: MailTransport;
       try { transport = deps.createTransport(config); }
       catch { return { status: 'unavailable' }; }
-      let timedOut = false;
       let timer: ReturnType<typeof setTimeout> | undefined;
       try {
         const send = transport.sendMail({
@@ -96,7 +95,7 @@ export function createTransactionalMailService(deps: MailDependencies = dependen
           text: input.text, ...(input.html === undefined ? {} : { html: input.html }),
         });
         const timeout = new Promise<never>((_, reject) => {
-          timer = setTimeout(() => { timedOut = true; transport.close(); reject(new Error('mail_timeout')); }, config.socketTimeoutMs + config.connectionTimeoutMs);
+          timer = setTimeout(() => { transport.close(); reject(new Error('mail_timeout')); }, config.socketTimeoutMs + config.connectionTimeoutMs);
         });
         const info = await Promise.race([send, timeout]);
         clearTimeout(timer);

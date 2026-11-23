@@ -10,7 +10,7 @@ export async function configuredMastodonAdapter(instance: string, transport: Mas
 }
 
 /** Server-only callback derivation; caller owns signed, single-use state. */
-export async function mastodonRedirectUri(request: Request): Promise<string> {
+export async function mastodonRedirectUri(_request: Request): Promise<string> {
   const policy = mastodonPolicySchema.parse(await runtimeConfig('mastodon.policy'));
   return new URL(policy.callbackPath, String(await runtimeConfig('app.publicOrigin'))).href;
 }

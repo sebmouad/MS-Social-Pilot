@@ -108,7 +108,7 @@ export async function runRetentionSweep(now = new Date()): Promise<string> {
 export type RetentionStatus = { policy: RetentionPolicy; pending: RetentionCounts; lastRun: { startedAt: string; summary: string | null; outcome: string } | null };
 
 /** Workspace-scoped status: the policy, rows of this workspace already past it, and the last nightly run. */
-export async function getRetentionStatus(actor: RetentionActor, now = new Date(), locale: 'en' | 'fr' = 'en'): Promise<RetentionStatus> {
+export async function getRetentionStatus(actor: RetentionActor, now = new Date(), _locale: 'en' | 'fr' = 'en'): Promise<RetentionStatus> {
   const text = await authorize(actor, 'read');
   void text;
   const p = await policy();

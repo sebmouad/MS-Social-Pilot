@@ -2,7 +2,7 @@ import { requestOrigin } from '@/server/request-origin';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { requireViewer } from '@/server/context';
-import { deleteWorkspaceData, exportWorkspaceData, previewWorkspaceDataDeletion } from '@/server/data-control';
+import { deleteWorkspaceData, previewWorkspaceDataDeletion } from '@/server/data-control';
 import { exportWorkspaceArchive } from '@/server/data-control/archive';
 
 export const runtime = 'nodejs';

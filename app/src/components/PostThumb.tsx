@@ -21,7 +21,6 @@ export function PostThumb({ thumb, size = 'md', label }: Props) {
   const named = !url && !!label;
   return <span className="ui-post-thumb" data-size={size} data-empty={url ? undefined : true} data-video={thumb?.video || undefined} role={named ? 'img' : undefined} aria-label={named ? label : undefined} aria-hidden={!url && !label ? true : undefined}>
     {url
-      // eslint-disable-next-line @next/next/no-img-element
       ? <img src={url} alt="" loading="lazy" onError={() => setFailed(url)} />
       : thumb?.video ? <IconPlayerPlayFilled size={18} aria-hidden="true" /> : <IconPhoto size={18} stroke={1.6} aria-hidden="true" />}
     {url && thumb?.video ? <span className="ui-post-thumb__play" aria-hidden="true"><IconPlayerPlayFilled size={12} /></span> : null}

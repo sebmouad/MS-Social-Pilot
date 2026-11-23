@@ -5,7 +5,6 @@ import type { ReactNode } from 'react';
 import type { FeatureId } from '@/lib/product';
 import styles from './settings.module.css';
 import { PageHeader } from '@/components/PageHeader';
-import { Badge } from '@/components/Badge';
 import { LinkTabs } from '@/components/Tabs';
 import { readSectionsCopy } from './copy-server';
 import { SECTION_TABS, sectionOf, type SectionTabKey } from './section-tabs';

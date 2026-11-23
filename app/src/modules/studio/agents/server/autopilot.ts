@@ -5,7 +5,7 @@ import { runtimeConfig } from '@/server/config/store';
 import { OperationError, type OperationErrorCode } from '@/lib/operation-error';
 import { instantToWall, wallTimeToInstant } from '@/lib/calendar-dates';
 import { isAutopilotQuietHour } from '../quiet-hours';
-import { authorizeAi, type AiActor } from '@/modules/studio/server/access';
+import { authorizeAi } from '@/modules/studio/server/access';
 import { autopilotPolicySchema, autopilotTierSchema, type AutopilotTier } from '../../config';
 import { agentCopy } from './copy';
 import type { AgentActor } from './service';

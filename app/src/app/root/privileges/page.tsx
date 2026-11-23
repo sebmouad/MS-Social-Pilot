@@ -12,7 +12,7 @@ import { ROOT_PRIVILEGE_CSV_FORMAT, ROOT_PRIVILEGE_CSV_NAME, WORKSPACE_ROLES } f
 import { StatusChip } from '@/components/StatusChip';
 import { RoleControl } from './RoleControl';
 import '../plans/root-ops.css';
-import { loadRootDates, loadRootInterfaceCopy, rootText } from '@/modules/root/ui/interface-copy';
+import { loadRootInterfaceCopy, rootText } from '@/modules/root/ui/interface-copy';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Privileges · Root' };

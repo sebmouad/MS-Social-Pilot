@@ -1,6 +1,6 @@
 import { loadCustomerCopy } from '../../server/copy';
 import { headers } from 'next/headers';
-import { uiCopy, type CustomerCopy, uiLocale } from '../copy';
+import { uiCopy, uiLocale } from '../copy';
 import { requireViewer } from '@/server/context';
 import { OperationError } from '@/lib/operation-error';
 import { RouteNotice } from '@/components/RouteNotice';

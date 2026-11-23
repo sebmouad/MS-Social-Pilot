@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { OperationError } from '@/lib/operation-error';
 import { addTeamMember, getTeamDirectory, removeTeamMember, updateTeamMember } from './server/team';
 import { TEAM_ROLES, type TeamActor } from './team';
-import { invitationAvailability, inviteTeamMember, listTeamInvitations, revokeTeamInvitation } from './server/invitations';
+import { inviteTeamMember, listTeamInvitations, revokeTeamInvitation } from './server/invitations';
 export { invitationAvailability } from './server/invitations';
 
 /** Version-one team MCP page protocol; operational directory bounds belong to Root. */

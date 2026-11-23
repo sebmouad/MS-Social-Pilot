@@ -1,7 +1,7 @@
 'use client';
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { IconCommand, IconPlus, IconSearch, IconMoon, IconSun, IconLayoutSidebar, IconCalendar, IconInbox, IconChefHat, IconChartBar, IconSpeakerphone } from '@tabler/icons-react';
+import { IconCommand, IconPlus, IconSearch } from '@tabler/icons-react';
 import type { CommandCopy } from '@/modules/home/command-copy';
 import type { CommandAction, CommandChannel, CommandItem } from '@/modules/home/server/commands';
 import { Avatar } from './Avatar';

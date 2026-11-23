@@ -71,15 +71,6 @@ export function InvitationControls({ invitations, actorRole, available, unavaila
   const canManage = actorRole === 'owner' || actorRole === 'admin';
   const pendingForEmail = invitations.find(item => item.status === 'pending' && item.email.trim().toLowerCase() === canonicalEmail);
 
-  function closeDialogs() {
-    if (busy) return;
-    setInviteReview(false);
-    setReissuing(null);
-    setRevoking(null);
-
-    setFeedback(null);
-  }
-
   function startInvite(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const errors: Record<string, string> = {};

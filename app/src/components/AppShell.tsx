@@ -4,7 +4,7 @@ import { usePathname, useSearchParams } from "next/navigation";
 import { IconChevronsLeft, IconChevronsRight, IconCheck, IconChevronDown, IconHelp, IconKeyboard, IconLogout, IconMenu2, IconMoon, IconPlus, IconSelector, IconSettings, IconBuildingStore, IconPlugConnected, IconUsers, IconShare, IconApps, IconDatabase, IconHistory, IconShieldLock, IconSun, IconUserCircle, IconX } from "@tabler/icons-react";
 import { MODULES, areaForPath, areaPages, pageForPath, type AreaId, type ModuleId } from "@/lib/product";
 import { HUB_ORDER, hubForPath, hubPages, type HubId } from "@/lib/hubs";
-import { nextChannelScope, parseChannelScope, withChannelScope } from "@/lib/channel-scope";
+import { parseChannelScope, withChannelScope } from "@/lib/channel-scope";
 import { fill, type ShellCopy, type ShellPolicy } from "@/modules/shell/copy";
 import type { ConnectionState } from "@/lib/connection-status";
 import { HubGlyph, ModuleGlyph } from "./icons";
@@ -88,7 +88,7 @@ const SETTINGS_ICON: Record<string, typeof IconSettings> = {
   "settings/mcp": IconApps, "settings/account": IconUserCircle, "settings/data": IconDatabase, "settings/history": IconHistory,
 };
 
-export function AppShell({ children, activeModule, enabledModules, enabledFeatures, writableFeatures = [], rootAccess, userName, workspaceName, workspaceId, workspaces = [], rootNav, installationMode = false, paletteCopy, copy, policy, channels = [], initialScope = [], initialScopeDropped = 0, optionalAreas = [], tabCounts = {}, hubCounts = {}, initialCollapsed = false }: AppShellProps) {
+export function AppShell({ children, activeModule, enabledModules: _enabledModules, enabledFeatures, writableFeatures = [], rootAccess, userName, workspaceName, workspaceId, workspaces = [], rootNav, installationMode = false, paletteCopy, copy, policy, channels = [], initialScope = [], initialScopeDropped = 0, optionalAreas = [], tabCounts = {}, hubCounts = {}, initialCollapsed = false }: AppShellProps) {
   const pathname = usePathname();
   const search = useSearchParams();
   const theme = useOptionalTheme();
@@ -202,7 +202,6 @@ export function AppShell({ children, activeModule, enabledModules, enabledFeatur
     setNavigating(true);
     window.location.assign(withChannelScope(`${pathname}${search?.toString() ? `?${search.toString()}` : ""}`, ids));
   }, [pathname, search, workspaceId, policy.scopeCookiePrefix, policy.scopeCookieDays]);
-  const onSelectChannel = (id: string, additive: boolean) => applyScope(nextChannelScope(scope, id, additive));
   useEffect(() => {
     // A removed channel must not stay in the remembered scope.
     if (dropped > 0 && workspaceId) writeCookie(`${policy.scopeCookiePrefix}${workspaceId}`, scope.join(","), policy.scopeCookieDays);
@@ -338,7 +337,6 @@ export function AppShell({ children, activeModule, enabledModules, enabledFeatur
       return { id: hub, href: hubHref(hub), label: (copy.hubsShort as Partial<Record<HubId, string>>)[hub] ?? copy.hubs[hub], icon: <HubGlyph id={hub} size={22} />, active: activeHub === hub, ...(count > 0 ? { badge: count, badgeLabel: hubName(hub) } : {}) };
     });
 
-  const scopeActive = !settingsActive && activeArea !== "tasks" && activeArea !== "agency";
   // Channel switcher (2026-11-13), like Meta Business Suite's account switcher: one button with the current choice
   // that opens the searchable channel picker, instead of a long list in the sidebar.
   const scopeChannels = (scope.length ? channels.filter(channel => scope.includes(channel.id)) : channels) as ScopeChannel[];

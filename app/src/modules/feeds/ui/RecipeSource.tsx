@@ -252,7 +252,6 @@ export function RecipeSource({ initial, locale, canWrite, copy = recipeCopy, fig
     {preview && <div aria-live="polite"><h3 className={styles.sectionTitle}>{t('previewTitle')}</h3>
       {preview.captionsPerChannel ? <p className={styles.help}>{t('previewPerChannel')}</p> : null}
       {preview.items.length ? <ul className={styles.recipes}>{preview.items.map(item => <li key={item.wpPostId} className={styles.recipe}>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
         <img className={styles.thumb} src={item.imageUrl} alt={t('previewImage', { title: item.title })} loading="lazy" width={160} height={160} />
         <div><strong>{item.title}</strong>{typeof item.score === 'number' ? <span className={styles.scoreChip} data-band={item.score >= 70 ? 'high' : item.score >= 45 ? 'mid' : 'low'} title={t('scoreHint')}>{item.score}</span> : null}{item.kind ? <span className={styles.meta}>{t(`kind_${item.kind}` as RecipeCopyKey)}</span> : null} <a href={item.permalink} target="_blank" rel="noopener noreferrer">{t('previewLink')}</a>
           {item.writtenByAi !== undefined && <span className={styles.meta}>{t(item.writtenByAi ? 'previewByAi' : 'previewAiFailed')}</span>}

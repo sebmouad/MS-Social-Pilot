@@ -1,7 +1,6 @@
 import { configOrDefault } from '@/server/config/config-or-default';
 import { cache } from 'react';
 import { authLocale } from '../auth/locale';
-import { runtimeConfig } from '@/server/config/store';
 import { homeCopySchema, homeLocaleCopy } from '../copy';
 import type { AuthLocale } from '../auth/copy';
 

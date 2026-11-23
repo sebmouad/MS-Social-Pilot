@@ -4,7 +4,7 @@ import { prisma } from '@/server/data';
 import { z } from 'zod';
 import { type Actor, type Area, type KeyDate, type Season, type Note, type Feed, type Filters } from '../contracts';
 import { settings } from './settings';
-import { authorize, audit, checkTargets, fail, transact, visibleArray, array, type Access } from './access';
+import { authorize, audit, checkTargets, fail, transact, visibleArray, array } from './access';
 import { actionSchema, confirmation, day } from './validation';
 import { createFeedRecord } from './subscriptions';
 import { readTrends } from './trends';

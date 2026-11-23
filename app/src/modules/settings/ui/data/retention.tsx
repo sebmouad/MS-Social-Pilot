@@ -11,7 +11,7 @@ type Status = { policy: RetentionPolicy; pending: RetentionCounts; lastRun: { st
 const isStatus = (value: unknown): value is Status => !!value && typeof value === 'object' && 'policy' in (value as object) && 'pending' in (value as object);
 const fill = (template: string, vars: Record<string, string | number>) => template.replace(/\{(\w+)\}/g, (_, key: string) => String(vars[key] ?? ''));
 
-export function RetentionPanel({ copy: t, locale }: { copy: RetentionCopy; locale: 'en' | 'fr' }) {
+export function RetentionPanel({ copy: t, locale: _locale }: { copy: RetentionCopy; locale: 'en' | 'fr' }) {
   const toast = useToast();
   const [status, setStatus] = useState<Status | null>(null);
   const [failed, setFailed] = useState(false);

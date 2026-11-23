@@ -36,7 +36,7 @@ export default async function SharePage({ params, searchParams }: { params: Prom
   try { view = await loadPublicView(link, mode); }
   catch { return <main className={styles.page}><div className={styles.body}><EmptyState tone="error" title={t.loadFailed} /></div></main>; }
   return <main className={styles.page}>
-    <header className={styles.header}>{link.workspaceLogoUrl && /* eslint-disable-next-line @next/next/no-img-element */ <img className={styles.logo} src={link.workspaceLogoUrl} alt="" referrerPolicy="no-referrer" />}<strong>{link.workspaceName}</strong><Badge tone="brand">{t.share.kinds[link.kind] ?? link.kind}</Badge></header>
+    <header className={styles.header}>{link.workspaceLogoUrl && <img className={styles.logo} src={link.workspaceLogoUrl} alt="" referrerPolicy="no-referrer" />}<strong>{link.workspaceName}</strong><Badge tone="brand">{t.share.kinds[link.kind] ?? link.kind}</Badge></header>
     <div className={styles.body}>
       <PageHeader title={link.title} description={[copy.intro, link.description].filter(Boolean).join(' ') || undefined} />
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', padding: '12px 16px', background: 'var(--surface-raised)', border: '1px solid var(--line-subtle)', borderRadius: 'var(--radius-md)', marginBottom: '4px' }}>
@@ -67,8 +67,8 @@ export default async function SharePage({ params, searchParams }: { params: Prom
         <p className={styles.destinations}>{post.destinations.map(d => d.name).join(', ') || t.share.channels}</p>
         <p className={styles.message}>{post.message || t.share.noText}</p>
         {post.link && <a className={styles.attach} href={post.link} rel="noopener noreferrer nofollow" target="_blank">{post.link}</a>}
-        {post.media.length > 0 && <div className={styles.media}>{post.media.map(item => item.kind === 'image' ? /* eslint-disable-next-line @next/next/no-img-element */ <img key={item.url} src={item.url} alt="" referrerPolicy="no-referrer" loading="lazy" /> : <a key={item.url} href={item.url} rel="noopener noreferrer nofollow" target="_blank">{t.share.video}</a>)}</div>}
-        {post.uploadedImages.length > 0 && <div className={styles.media}>{post.uploadedImages.map(id => /* eslint-disable-next-line @next/next/no-img-element */ <img key={id} src={`/share/${encodeURIComponent(token)}/media/${id}`} alt="" referrerPolicy="no-referrer" loading="lazy" />)}</div>}
+        {post.media.length > 0 && <div className={styles.media}>{post.media.map(item => item.kind === 'image' ? <img key={item.url} src={item.url} alt="" referrerPolicy="no-referrer" loading="lazy" /> : <a key={item.url} href={item.url} rel="noopener noreferrer nofollow" target="_blank">{t.share.video}</a>)}</div>}
+        {post.uploadedImages.length > 0 && <div className={styles.media}>{post.uploadedImages.map(id => <img key={id} src={`/share/${encodeURIComponent(token)}/media/${id}`} alt="" referrerPolicy="no-referrer" loading="lazy" />)}</div>}
         {post.uploadedMediaCount > post.uploadedImages.length && <p className={styles.attach}>{t.share.moreFiles(post.uploadedMediaCount - post.uploadedImages.length)}</p>}
         {post.latestFeedback && <p className={styles.feedback}>{t.share.lastAnswer}: {post.latestFeedback.decision === 'approved' ? t.share.approved : post.latestFeedback.decision === 'rejected' ? t.share.changes : t.share.commented}</p>}
         {mode === 'review' && (link.allowComments || post.canDecide) && <ReviewActions token={token} postId={post.id} canDecide={post.canDecide} allowComments={link.allowComments} notice={copy.answerNotice} copy={t.review} />}

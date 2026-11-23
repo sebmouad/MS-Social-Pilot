@@ -29,7 +29,7 @@ export const xOAuthFlow: TokenOAuthFlow = {
 };
 export const xConnection: PlatformHost['connection'] = {
   isReady: () => settings().then(() => true, () => false), start: (request, viewer) => startTokenOAuth(xOAuthFlow, request, viewer), callback: (request, viewer) => finishTokenOAuth(xOAuthFlow, request, viewer),
-  async renewToken({ accessToken, refreshToken }) {
+  async renewToken({ accessToken: _accessToken, refreshToken }) {
     if (!refreshToken) return null;
     const next = await (await configuredXAdapter()).refreshToken(refreshToken);
     // The grant has no separate reported end; Root keeps the stored grant expiry and rotates destination copies.

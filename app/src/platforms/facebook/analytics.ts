@@ -49,10 +49,6 @@ export function facebookAdLabel(key: string, catalog: LabelCatalog = FACEBOOK_ME
   return sentence(key.replace(/^page_/, ''));
 }
 
-function facebookLabel(key: string): string {
-  return facebookAdLabel(key);
-}
-
 export function facebookPageMetricKind(key: string): AnalyticsKind {
   if (['page_follows', 'page_fans', 'page_fans_online_per_day', 'page_daily_follows_unique', 'page_daily_unfollows_unique', 'page_total_media_view_unique', 'page_impressions_unique'].includes(key)) return 'stock';
   if (/country|city|locale|gender_age|source/.test(key)) return 'breakdown';

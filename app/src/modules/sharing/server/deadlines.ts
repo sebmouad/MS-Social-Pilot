@@ -1,6 +1,5 @@
 import { enqueueChatEvent } from '@/modules/notifications/chat-channels/server/delivery';
 import { randomUUID } from 'node:crypto';
-import type { Prisma } from '../../../../generated/client';
 import { OperationError } from '@/lib/operation-error';
 import { prisma } from '@/server/data';
 import { runtimeConfig } from '@/server/config/store';

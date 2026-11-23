@@ -1,6 +1,5 @@
 import { configOrDefault } from '@/server/config/config-or-default';
 import { webhookCopySchema } from '../config';
-import { runtimeConfig } from '@/server/config/store';
 import { PageHeader } from '@/components/PageHeader';
 import { headers } from 'next/headers';
 import { PageFrame } from '@/server/PageFrame';

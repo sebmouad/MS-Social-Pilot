@@ -1,6 +1,4 @@
 import { bilingualCatalog } from './catalog';
-import { z } from 'zod';
-import { copySchema } from '@/lib/config/copy-schema';
 import type { AuthLocale } from './auth/copy';
 
 const en = {

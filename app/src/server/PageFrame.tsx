@@ -4,7 +4,6 @@ import { AppShell } from '@/components';
 import type { AreaId, ModuleId } from '@/lib/product';
 import { parseChannelScope } from '@/lib/channel-scope';
 import { requireViewer } from './context';
-import { requestLocale } from './platforms/request-locale';
 import { canUseFeature, canUseModule } from './entitlements';
 import { canAccessFeature, canAccessModule } from './permissions';
 import { configValueOrDefault } from './config/config-or-default';

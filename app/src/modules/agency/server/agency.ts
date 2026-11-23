@@ -7,7 +7,7 @@ import {
   AGENCY_CLIENTS_FEATURE_ID, AGENCY_GROUPS, AGENCY_OVERVIEW_FEATURE_ID, AGENCY_SORTS,
   type AgencyActor, type AgencyClient, type AgencyClients, type AgencyGroup, type AgencyMetrics, type AgencyOverview, type AgencyTotals, type AgencyWorkspace,
 } from '../agency';
-import { administeredWorkspaces, assertInstallationPolicy, classifyWorkspaces, likePattern, type Classified } from './access';
+import { administeredWorkspaces, assertInstallationPolicy, classifyWorkspaces, type Classified } from './access';
 
 const OVERVIEW_FILTERS = z.object({
   q: z.string().trim().optional(),

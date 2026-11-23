@@ -39,7 +39,7 @@ export function CalendarTools(props: Pick<WorkspaceProps, 'area' | 'copy' | 'fro
  </>;
 }
 export function CalendarWorkspace(props: WorkspaceProps) {
- const { area, copy: c, policy, rows, channels, canWrite } = props;
+ const { area, copy: c, rows, channels, canWrite } = props;
  const router = useRouter();
  const [editor, setEditor] = useState<Row | 'new' | null>(null);
  const [notice, setNotice] = useState('');

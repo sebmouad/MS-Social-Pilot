@@ -7,7 +7,7 @@ import { requireRootPage } from '@/server/config/access';
 import { CreateRootWorkspace, RemoveUnlinkedAdAccounts, RenameRootWorkspace } from './RootWorkspaceControls';
 import { WorkspaceAccessControl } from './WorkspaceAccessControl';
 import { RootDirectorySearch } from '@/modules/root/ui/RootDirectorySearch';
-import { loadRootDates, loadRootInterfaceCopy, rootText } from '@/modules/root/ui/interface-copy';
+import { loadRootInterfaceCopy, rootText } from '@/modules/root/ui/interface-copy';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Workspaces · Root' };

@@ -3,8 +3,6 @@ import { moduleManifests } from '@/modules';
 import { ROOT_JOBS } from '@/modules/root/jobs';
 import { recordError } from '@/server/errors/recorder';
 import { randomUUID } from 'node:crypto';
-import { prisma } from '@/server/data';
-import { runtimeConfig } from '@/server/config/store';
 import { cronMatches } from './cron';
 import { runWithJobContext } from './job-context';
 import type { RetryBackoff } from './retry';

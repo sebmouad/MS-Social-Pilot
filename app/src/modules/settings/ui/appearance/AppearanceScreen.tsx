@@ -8,7 +8,6 @@ import { SettingsPage, SettingsPanel, styles as settingsStyles } from '@/modules
 import { settingsLocale } from '@/modules/settings/ui/locale';
 import { AppearancePicker } from './picker';
 import type { AppearanceCopy } from './copy';
-import { runtimeConfig } from '@/server/config/store';
 import { accountSessionActor } from '@/modules/settings/server/account-session';
 import { appearanceSession } from '@/modules/settings/server/appearance';
 import { canAccessFeature } from '@/server/permissions';

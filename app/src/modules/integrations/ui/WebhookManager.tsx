@@ -20,7 +20,7 @@ async function call(url: string, method: string, fallback: string, body?: unknow
   return result;
 }
 
-export function WebhookManager({ initial, events, emitted, maxEndpoints, copy, locale, nameMaxLength, urlMaxLength }: { nameMaxLength: number; urlMaxLength: number; initial: Hook[]; events: string[]; emitted: string[]; maxEndpoints: number; copy: Copy; locale: string }) {
+export function WebhookManager({ initial, events, emitted, maxEndpoints, copy, locale: _locale, nameMaxLength, urlMaxLength }: { nameMaxLength: number; urlMaxLength: number; initial: Hook[]; events: string[]; emitted: string[]; maxEndpoints: number; copy: Copy; locale: string }) {
   const [hooks, setHooks] = useState(initial);
   const [name, setName] = useState(''); const [url, setUrl] = useState(''); const [chosen, setChosen] = useState<string[]>([]);
   const [busy, setBusy] = useState(false); const [notice, setNotice] = useState<{ tone: 'ok' | 'error'; text: string } | null>(null);
@@ -43,7 +43,7 @@ export function WebhookManager({ initial, events, emitted, maxEndpoints, copy, l
   async function runOnce(task: () => Promise<string | void>) {
     if (inFlight.current) return copy.genericError!;
     inFlight.current = true; setBusy(true); setNotice(null);
-    try { const text = await task(); if (text) { setNotice({ tone: 'ok', text }); toast.notify({ title: text }); } return null; } catch (error) { const text = copy.genericError!; setNotice({ tone: 'error', text }); toast.notify({ title: text, tone: 'error' }); return text; }
+    try { const text = await task(); if (text) { setNotice({ tone: 'ok', text }); toast.notify({ title: text }); } return null; } catch { const text = copy.genericError!; setNotice({ tone: 'error', text }); toast.notify({ title: text, tone: 'error' }); return text; }
     finally { inFlight.current = false; setBusy(false); }
   }
   async function create(event: React.FormEvent<HTMLFormElement>) {

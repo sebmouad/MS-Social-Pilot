@@ -1,5 +1,4 @@
 import { prisma } from '@/server/data';
-import { decryptSecret } from '@/server/secret-crypto';
 import { configuredFacebookAdapter } from '@/platforms/facebook/runtime';
 import { runtimeConfig } from '@/server/config/store';
 import { withRetries } from '@/server/jobs/retry';

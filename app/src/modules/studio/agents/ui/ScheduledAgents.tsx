@@ -33,7 +33,6 @@ export function ScheduledAgents({ agents, channels, maxDrafts, briefMax, history
  const [quietEnd, setQuietEnd] = useState(String(initialPolicy?.quietEndHour ?? 7));
  const [scope, setScope] = useState<string[]>(initialPolicy?.targetIds ?? []);
  const [draftsOnly, setDraftsOnly] = useState<string[]>(initialPolicy?.draftsOnlyTargetIds ?? []);
- const toggle = (list: string[], id: string, set: (next: string[]) => void) => set(list.includes(id) ? list.filter(item => item !== id) : [...list, id]);
  const [editing, setEditing] = useState<string>();
  const [targetId, setTargetId] = useState(channels[0]?.id ?? '');
  const [brief, setBrief] = useState('');

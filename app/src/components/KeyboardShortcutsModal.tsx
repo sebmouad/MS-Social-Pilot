@@ -1,8 +1,6 @@
 "use client";
-import { useEffect, useState } from "react";
 import { Dialog } from "@/components/Dialog";
 import { ShortcutHint } from "@/components/ShortcutHint";
-import { IconKeyboard } from "@tabler/icons-react";
 
 type ShortcutRow = { chord: string; label: string };
 type ShortcutSection = { category: string; rows: ShortcutRow[] };
