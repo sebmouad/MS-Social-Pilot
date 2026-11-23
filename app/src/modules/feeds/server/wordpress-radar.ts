@@ -20,7 +20,7 @@ export type RadarPorts = {
   /** Posts published between `from` and `until` with their stored reach (no platform call), for late hits; optional. */
   storedHits?(sourceId: string, from: Date, until: Date): Promise<Array<RecentPost & { reach: number }>>;
   /** Usual people reached per channel (median of its posts since `from`). */
-  medians(targetIds: readonly string[], from: Date): Promise<Map<string, number>>;
+  medians(targetIds: readonly string[], from: Date, until?: Date): Promise<Map<string, number>>;
   /** The channel's next scheduled post within the window, and the one after it. */
   nextPosts(workspaceId: string, targetId: string, from: Date, until: Date): Promise<Array<{ postId: string; scheduledAt: Date }>>;
   reschedule(actor: FeedActor, postId: string, at: Date): Promise<void>;
@@ -93,7 +93,8 @@ export async function runRadar(input: { timeZone?: string;
   const out: RadarOutcome = { entries: [], handled: [] };
   if (!pilot.radar.enabled && !pilot.breathe.enabled) return out;
   const recent = (await ports.recent(input.sourceId, new Date(now.getTime() - 2 * 3_600_000))).filter(post => !input.handled.has(post.planId));
-  const medians = await ports.medians([...input.names.keys()], new Date(now.getTime() - 30 * 86_400_000));
+  // The usual reach from settled posts only (2026-11-23): posts under a day old have not reached their audience yet.
+  const medians = await ports.medians([...input.names.keys()], new Date(now.getTime() - 30 * 86_400_000), new Date(now.getTime() - 86_400_000));
   const name = (id: string) => input.names.get(id) ?? '';
   /** Spread a hit to the channels with the biggest audience, once (shared by fresh and late hits, 2026-11-20). */
   const spreadHit = async (post: RecentPost, reach: number, promote = false) => {
@@ -185,10 +186,10 @@ export function prismaRadarPorts(choose: RadarPorts['choose']): RadarPorts {
         ORDER BY 7 DESC LIMIT 20`;
       return rows.flatMap(row => row.reach ? [{ ...row, reach: Number(row.reach) }] : []);
     },
-    async medians(targetIds, from) {
+    async medians(targetIds, from, until = new Date()) {
       if (!targetIds.length) return new Map();
       const rows = await prisma.$queryRaw<Array<{ targetId: string; median: number | null }>>`SELECT "targetId", percentile_cont(0.5) WITHIN GROUP (ORDER BY COALESCE((insights->>'post_total_media_view_unique')::numeric, (insights->>'reach')::numeric)) AS median
-        FROM external_posts WHERE "targetId" = ANY(${[...targetIds]}::text[]) AND "createdTime" >= ${from} AND insights IS NOT NULL AND "remoteMissingAt" IS NULL
+        FROM external_posts WHERE "targetId" = ANY(${[...targetIds]}::text[]) AND "createdTime" >= ${from} AND "createdTime" < ${until} AND insights IS NOT NULL AND "remoteMissingAt" IS NULL
           AND COALESCE(insights->>'post_total_media_view_unique', insights->>'reach') ~ '^[0-9.]+$' GROUP BY "targetId"`;
       return new Map(rows.filter(row => Number(row.median) > 0).map(row => [row.targetId, Number(row.median)]));
     },
