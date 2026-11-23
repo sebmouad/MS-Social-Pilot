@@ -30,8 +30,16 @@ export type RadarPorts = {
   choose(planId: string, wpPostId: string): Promise<boolean>;
 };
 
-/** What a usual post of the channel has reached at this age: a quarter at once, all of it after three hours. */
-export const expectedAt = (median: number, ageMinutes: number) => median * Math.min(1, 0.25 + 0.25 * Math.max(0, ageMinutes) / 60);
+/**
+ * What a usual post of the channel has reached at this age. Measured on 23 Nov 2026 (reach kept at 3 h and 24 h, 17 posts):
+ * a post has about 46 % of its day's reach at 3 hours (24 % on Recettes - Faciles), not all of it as assumed before, so
+ * early hits needed 5–10× a normal pace. Now: from 10 % at once to 50 % at 3 hours, then to 100 % at 24 hours.
+ */
+export const expectedAt = (median: number, ageMinutes: number) => {
+  const hours = Math.max(0, ageMinutes) / 60;
+  const share = hours <= 3 ? 0.1 + 0.4 * hours / 3 : Math.min(1, 0.5 + 0.5 * (hours - 3) / 21);
+  return median * share;
+};
 /** People a post must reach before it can count as hot, whatever the channel (2026-11-16: 110 people was called viral). */
 export const MIN_HOT_REACH = 200;
 /** A post past its first two hours is a late hit at 10× its channel's usual and at least this many people. */

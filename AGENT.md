@@ -560,9 +560,9 @@ ads_management (owner asked to rework Ads like Meta Ads Manager first). The subm
 - Reach at fixed ages (22 Nov, migration 0026): `external_posts."reach3h"` (read at 2–5 h) and `"reach24h"` (22–30 h),
   set once by the hourly Page feed sync (`reachAtAge` in remote-missing.ts), every feed post including manual ones.
   `origins` adds at24h / read24h; `atAge` (photos figures) lists each post of 10 days with both readings. Use them for
-  every test read (the 22 Nov read compared a 1-day-old post with week-old ones). Next: calibrate the radar's
-  `expectedAt` curve (assumes the full usual reach by 3 h) from the real reach3h / reach24h ratio once a week of
-  readings exists.
+  every test read (the 22 Nov read compared a 1-day-old post with week-old ones). Radar `expectedAt` recalibrated on
+  23 Nov from them: 10 % at once, 50 % at 3 h, 100 % at 24 h (measured: 46 % of the day's reach at 3 h, RF 24 %; it
+  assumed 100 % at 3 h). Re-check with more readings.
 - Owner's manual posts repeated by a queued autopilot post are replaced each run (`replaceOutsideRepeats`, 7 days,
   posts more than 3 h away, 5 a run; log « repeatReplaced »). Owner's own biggest hits (≥ 50k and 5× usual, older
   than 30 days) join the evergreen winners, exact recipe by WordPress search or its closest variant (`recipeByTitle`,

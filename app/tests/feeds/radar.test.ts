@@ -8,8 +8,11 @@ const now = new Date('2026-11-17T16:00:00Z');
 
 test('hot: three times what a post usually has at its age, never on small numbers', () => {
   assert.equal(isHot({ reach: 3000, median: 1000, ageMinutes: 240, factor: 3 }), true);
-  assert.equal(isHot({ reach: 2000, median: 1000, ageMinutes: 240, factor: 3 }), false);
-  assert.equal(isHot({ reach: 1600, median: 1000, ageMinutes: 60, factor: 3 }), true); // 1 h: a usual post has half its reach
+  // Measured pace (23 Nov): about half the day's reach at 3 h, so a post at 2× its Page's usual by 4 h is hot.
+  assert.equal(isHot({ reach: 2000, median: 1000, ageMinutes: 240, factor: 3 }), true);
+  assert.equal(isHot({ reach: 1500, median: 1000, ageMinutes: 240, factor: 3 }), false);
+  assert.equal(isHot({ reach: 1600, median: 1000, ageMinutes: 60, factor: 3 }), true); // 1 h: a usual post has about a quarter
+  assert.equal(isHot({ reach: 900, median: 1000, ageMinutes: 60, factor: 3 }), false); // never below the Page's usual full reach
   assert.equal(isHot({ reach: 110, median: 73, ageMinutes: 60, factor: 3 }), false); // the first live false alarm
   assert.equal(isHot({ reach: 500, median: 0, ageMinutes: 60, factor: 3 }), false);
 });
@@ -127,4 +130,13 @@ test('radar: a strong early hit goes to the two biggest Pages first, then the us
   assert.deepEqual(spreadTargets('small', medians, 5, 400, false), ['lct']);
   // A hit on a big Page goes to the other big one first, never back to itself.
   assert.deepEqual(spreadTargets('rf', medians, 3, 100_000, true), ['cpe', 'rc', 'nrg']);
+});
+
+test('radar: the expected pace follows the measured curve (10 % at once, 50 % at 3 h, 100 % at 24 h)', async () => {
+  const { expectedAt } = await import('@/modules/feeds/server/wordpress-radar');
+  assert.equal(Math.round(expectedAt(1000, 0)), 100);
+  assert.equal(Math.round(expectedAt(1000, 180)), 500);
+  assert.equal(Math.round(expectedAt(1000, 13.5 * 60)), 750);
+  assert.equal(Math.round(expectedAt(1000, 24 * 60)), 1000);
+  assert.equal(Math.round(expectedAt(1000, 48 * 60)), 1000);
 });
