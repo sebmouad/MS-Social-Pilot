@@ -62,13 +62,45 @@ async function readCandidates(now: Date, limit: number, maxDelayMinutes: number)
   return rows;
 }
 
+/**
+ * A send cut off mid-way (2026-11-24: a worker restart left La Cuisine Ensoleillée's 15:15 post with its claim and no
+ * outcome) blocked the first comment for good: the claim prevents a duplicate, and nothing ever looked again. After
+ * 30 minutes, within 2 days (posts the inbox sync still reads every run):
+ * - the Page's own top-level comment on that post around the attempt → it was sent; its id is recorded;
+ * - none, while the sync has read that Page's comments since → it was not sent; the claim is released for the next run.
+ * Anything else is left as it is, so a comment is never posted twice on a guess.
+ */
+export async function recoverInterruptedFirstComments(now = new Date()): Promise<{ sent: number; released: number }> {
+  const cutoff = new Date(now.getTime() - 30 * 60_000); const oldest = new Date(now.getTime() - 2 * 86_400_000);
+  const sent = await prisma.$executeRaw`
+    WITH stale AS (
+      SELECT pt.id, pt."firstCommentAt", t."providerId" FROM post_targets pt JOIN targets t ON t.id = pt."targetId"
+      WHERE pt.status::text = 'published' AND pt."firstCommentId" IS NULL AND pt."firstCommentError" IS NULL
+        AND pt."firstCommentAt" < ${cutoff} AND pt."firstCommentAt" > ${oldest}),
+    found AS (
+      SELECT DISTINCT ON (s.id) s.id, c."remoteId" FROM stale s JOIN post_comments c ON c."postTargetId" = s.id
+      WHERE c."parentRemoteId" IS NULL AND c."fromId" = s."providerId"
+        AND c."createdTime" BETWEEN s."firstCommentAt" - INTERVAL '5 minutes' AND s."firstCommentAt" + INTERVAL '30 minutes'
+      ORDER BY s.id, c."createdTime")
+    UPDATE post_targets pt SET "firstCommentId" = f."remoteId" FROM found f
+    WHERE pt.id = f.id AND pt."firstCommentId" IS NULL AND pt."firstCommentError" IS NULL`;
+  const released = await prisma.$executeRaw`
+    UPDATE post_targets pt SET "firstCommentAt" = NULL FROM targets t
+    WHERE t.id = pt."targetId" AND pt.status::text = 'published' AND pt."firstCommentId" IS NULL AND pt."firstCommentError" IS NULL
+      AND pt."firstCommentAt" < ${cutoff} AND pt."firstCommentAt" > ${oldest}
+      AND EXISTS (SELECT 1 FROM post_comments c JOIN post_targets o ON o.id = c."postTargetId" WHERE o."targetId" = pt."targetId" AND c."fetchedAt" > pt."firstCommentAt" + INTERVAL '10 minutes')
+      AND NOT EXISTS (SELECT 1 FROM post_comments c WHERE c."postTargetId" = pt.id AND c."parentRemoteId" IS NULL AND c."fromId" = t."providerId")`;
+  return { sent, released };
+}
+
 /** Continue due first comments only; the normal author-bound service owns authorization and dispatch. */
 export async function runDueFirstComments(now = new Date()): Promise<DueFirstCommentSummary> {
   const errorText = await loadPublishingErrorText();
   const [limit, maxDelayMinutes] = await Promise.all([runtimeConfig('sync.maxItemsPerJob'), runtimeConfig('publishing.maxFirstCommentDelayMinutes')]);
   if (!positiveInteger(limit) || limit < 1 || !positiveInteger(maxDelayMinutes)) throw new PublishingOperationError('unavailable', 'automaticFirstcommentSettingsAreUnavailable', {}, errorText);
+  const recovered = await recoverInterruptedFirstComments(now).catch(() => ({ sent: 0, released: 0 }));
   const rows = await readCandidates(now, limit, maxDelayMinutes);
-  const result: DueFirstCommentSummary = { ...empty(), examined: rows.length };
+  const result: DueFirstCommentSummary = { ...empty(), examined: rows.length, sent: recovered.sent };
   if (rows.length && await isStagingDryRun()) {
     await suppressStagingBatch('posts', 'first_comment', rows.map(row => ({ workspaceId: row.workspaceId, id: row.postTargetId })));
     result.skipped += rows.length;
