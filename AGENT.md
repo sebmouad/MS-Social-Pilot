@@ -595,3 +595,27 @@ ads_management (owner asked to rework Ads like Meta Ads Manager first). The subm
   posts reached 2–4× more at 24 h (22 Nov). From 24 Nov 08:35 RF is `plainComment` with template « 👉 {link} » (no
   recipe text, no call to action), queued posts rewritten (`recommentQueued`). Read on 27 Nov 15:10 Paris at 24 h.
 - Root › Errors: 114 more stale entries resolved on 23 Nov (the API pages by 50); 8 open, all current.
+
+### 7.1t Reach drop and the reach test (24 Nov 2026, owner: « reach dropped a lot, fix urgently »)
+- What dropped: mostly the end of Cuisine Pleine d'Envie's viral streak (Page reach 473k on 19 Nov, 665k on 20, 219k
+  on 21, 22k on 22; about 3–4k a day before the streak). Every Page's new posts are weaker too.
+- Posts of 20–23 Nov were published by the app instead of Facebook's scheduler (56 of 61 on 22 Nov). Their hand-off
+  at creation (48 h ahead) failed silently: every `holdScheduledPostAtProvider` caller swallows the error. Cause not
+  identified; since 23 Nov 17:00 UTC hand-offs work again. Fixes: each planning run calls `handOffRemoteSchedules`
+  (log code `reheld`); a refused hand-off is recorded in Root › Errors (`publishing.remoteHold`). Posts going back
+  through the scheduler did not lift reach (24 Nov morning, same Page and hour: mostly lower than 23 Nov).
+- Owner's 2-day reach test (form, « Both, on separate Pages »), from 24 Nov 14:20 UTC:
+  - no « AI info » edit (`ChannelSettings.noAiLabel`): La Cuisine Ensoleillée, Nos Recettes Généreuses, Les Recettes
+    Complices;
+  - 4 posts a day (`ChannelSettings.maxPerDay`, keeps the hours with the best learned value; learning respects it):
+    Cuisine Qui Réunit, La Cuisine Tranquille, La Cuisine Décontractée (were 6; 12 queued posts at dropped times
+    cancelled and deleted);
+  - unchanged: the title-only Pages (Sans Soucis, Sans Routine, Sans Complication), RF, CPE, Plaisirs en Cuisine.
+  - Verdict scheduled 27 Nov 16:40 Paris. Do not extend either change without the owner's answer.
+- The extra posts a day came from the Page memory (`model.bestCount`), not from a member: learned times give 4–6 a day.
+- Also fixed on 24 Nov: AI limit stops a planning run at the first refusal (`ai_limit`); Facebook insight reads stop at
+  a « next » link past the asked window (page_follows backfill blocks failed at the page limit); a slot whose post was
+  deleted is released like a withdrawn draft; a first comment cut off mid-send is settled after 30 min (Page's own
+  comment found → id recorded; none while the sync read the Page since → released and resent; else left); AI replies
+  are told the Page's last 8 replies (no repeated wording) and that the Page is « nous » (« ravis »).
+- Root › Errors: 28 entries resolved on 24 Nov (pageBackfill pagination, Facebook's 09:15–10:30 UTC outage); 7 open.
