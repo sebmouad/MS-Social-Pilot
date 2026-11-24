@@ -544,7 +544,15 @@ const NO_HOLD: RemoteHoldSummary = { held: 0, deferred: 0, reasons: [] };
 export async function holdScheduledPostAtProvider(actor: PublishingActor, postId: string, expectedScheduledAt?: Date) {
   const rows = await prisma.$queryRaw<Array<{ publishMode: string }>>`SELECT "publishMode"::text AS "publishMode" FROM posts WHERE id = ${postId} AND "workspaceId" = ${actor.workspaceId} AND status::text = 'scheduled'`;
   if (rows[0]?.publishMode !== 'native') return null;
-  return publishPost(actor, postId, expectedScheduledAt, { nativeSchedule: true, nativeFallback: true });
+  try {
+    return await publishPost(actor, postId, expectedScheduledAt, { nativeSchedule: true, nativeFallback: true });
+  } catch (error) {
+    // Every caller treats a failed hand-off as « the application publishes it »; posts of 20–23 Nov went out that way and
+    // nobody could see why (2026-11-24). The reason is kept in Root › Errors; callers still decide what to do.
+    const { recordError } = await import('@/server/errors/recorder');
+    await recordError({ source: 'worker', error, location: 'publishing.remoteHold' });
+    throw error;
+  }
 }
 
 export async function publishPost(actor: PublishingActor, postId: string, expectedScheduledAt?: Date, options: { retryOnly?: boolean; nativeSchedule?: boolean; nativeFallback?: boolean } = {}) {
