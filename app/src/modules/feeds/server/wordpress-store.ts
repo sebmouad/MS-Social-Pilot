@@ -192,23 +192,27 @@ export const stillFailedSql = (alias: 'l' | 'p', gapMinutes: number) => Prisma.s
 export type StatusSnapshot = {
   upcoming: Array<{ slotAt: Date; targetName: string; title: string }>;
   publishedToday: number;
-  unresolved: { failed: number; uncertain: number };
+  /** Failed and unsure slots since `failuresSince`, and the slots planned over the same days, for the full-day rule. */
+  unresolved: Array<{ id: string; targetId: string; slotAt: Date; state: string; reason: string | null }>;
+  planned: Array<{ id: string; targetId: string; slotAt: Date; state: string; reason: string | null }>;
 };
 /** Next planned slots, posts published inside [dayStart, dayEnd) and unresolved slots since `failuresSince`. */
 export async function selectStatusSnapshot(workspaceId: string, sourceId: string, input: { now: Date; dayStart: Date; dayEnd: Date; failuresSince: Date; upcomingLimit: number; targetIds?: readonly string[]; gapMinutes?: number }): Promise<StatusSnapshot> {
   const unscoped = input.targetIds === undefined;
   const ids = [...(input.targetIds ?? [])];
-  const [upcoming, published, unresolved] = await Promise.all([
+  const [upcoming, published, unresolved, planned] = await Promise.all([
     prisma.$queryRaw<Array<{ slotAt: Date; targetName: string | null; title: string }>>`SELECT p."slotAt" AS "slotAt", t.name AS "targetName", p.title FROM wordpress_recipe_plans p
       LEFT JOIN targets t ON t.id = p."targetId" AND t."workspaceId" = p."workspaceId"
       WHERE p."workspaceId" = ${workspaceId} AND p."sourceId" = ${sourceId} AND p."slotAt" > ${input.now} AND p.state = 'planned' AND p."postId" IS NOT NULL AND (${unscoped} OR p."targetId" = ANY(${ids}::text[]))
       ORDER BY p."slotAt" ASC, p.id ASC LIMIT ${input.upcomingLimit}`,
     prisma.$queryRaw<Array<{ count: bigint }>>`SELECT COUNT(*)::bigint AS count FROM wordpress_recipe_plans p JOIN posts po ON po.id = p."postId" AND po."workspaceId" = p."workspaceId"
       WHERE p."workspaceId" = ${workspaceId} AND p."sourceId" = ${sourceId} AND po.status = 'published' AND po."publishedAt" >= ${input.dayStart} AND po."publishedAt" < ${input.dayEnd} AND (${unscoped} OR p."targetId" = ANY(${ids}::text[]))`,
-    prisma.$queryRaw<Array<{ state: string; count: bigint }>>(Prisma.sql`SELECT p.state, COUNT(*)::bigint AS count FROM wordpress_recipe_plans p
+    prisma.$queryRaw<StatusSnapshot['unresolved']>(Prisma.sql`SELECT p.id, p."targetId", p."slotAt", p.state, p.reason FROM wordpress_recipe_plans p
       WHERE p."workspaceId" = ${workspaceId} AND p."sourceId" = ${sourceId} AND p."slotAt" >= ${input.failuresSince} AND p.state IN ('failed', 'uncertain') AND (${unscoped} OR p."targetId" = ANY(${ids}::text[]))
-        AND (p.state = 'uncertain' OR (${stillFailedSql('p', input.gapMinutes ?? 60)})) GROUP BY p.state`),
+        AND (p.state = 'uncertain' OR (${stillFailedSql('p', input.gapMinutes ?? 60)})) ORDER BY p."slotAt" LIMIT 2000`),
+    prisma.$queryRaw<StatusSnapshot['planned']>`SELECT p.id, p."targetId", p."slotAt", p.state, p.reason FROM wordpress_recipe_plans p
+      WHERE p."workspaceId" = ${workspaceId} AND p."sourceId" = ${sourceId} AND p."slotAt" >= ${input.failuresSince} AND p."slotAt" < ${input.dayEnd} AND p.state = 'planned' AND (${unscoped} OR p."targetId" = ANY(${ids}::text[]))
+      LIMIT 5000`,
   ]);
-  const count = (state: string) => Number(unresolved.find(row => row.state === state)?.count ?? 0);
-  return { upcoming: upcoming.map(row => ({ slotAt: row.slotAt, targetName: row.targetName ?? '', title: row.title })), publishedToday: Number(published[0]?.count ?? 0), unresolved: { failed: count('failed'), uncertain: count('uncertain') } };
+  return { upcoming: upcoming.map(row => ({ slotAt: row.slotAt, targetName: row.targetName ?? '', title: row.title })), publishedToday: Number(published[0]?.count ?? 0), unresolved, planned };
 }

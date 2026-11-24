@@ -1,6 +1,7 @@
-import { addDaysToKey, wallTimeToInstant, workspaceDateKey } from '@/lib/calendar-dates';
+import { addDaysToKey, instantToWall, wallTimeToInstant, workspaceDateKey } from '@/lib/calendar-dates';
 import { selectStatusSnapshot } from '../server/wordpress-store';
-import { autopilotOf } from '../wordpress/autopilot';
+import { autopilotOf, settledFailures } from '../wordpress/autopilot';
+import { channelConfig, type PlanConfig } from '../wordpress/recipe';
 import type { RecipePool } from './RecipeSource';
 
 export type RecipeStatus = {
@@ -32,11 +33,16 @@ export async function loadRecipeStatus(input: { workspaceId: string; source: Sou
   const snapshot = await selectStatusSnapshot(input.workspaceId, input.source.id, {
     now, dayStart, dayEnd, failuresSince: new Date(now.getTime() - input.failureWindowDays * 86_400_000), upcomingLimit: input.upcomingLimit, targetIds: input.allowedTargetIds, gapMinutes: autopilotOf(input.source.config.autopilot).bestTimes.gapMinutes,
   });
+  // Same rule as the autopilot's « To look at » (2026-11-24): a failed time on a channel whose day still got its full
+  // count of posts was moved, not missed; the card said « 5 failed » for times the board had already settled.
+  const settled = settledFailures([...snapshot.planned, ...snapshot.unresolved.filter(row => row.state === 'failed')],
+    targetId => channelConfig(input.source.config as unknown as PlanConfig, targetId).slots.length, row => `${row.targetId}|${instantToWall(row.slotAt, zone).date}`);
+  const left = snapshot.unresolved.filter(row => !settled.has(row.id));
   return {
     state: !input.available ? 'unavailable' : input.source.enabled ? 'active' : 'paused',
     lastRunAt: input.source.lastRunAt, timeZone: zone,
     upcoming: snapshot.upcoming.map(row => ({ slotAt: row.slotAt.toISOString(), targetName: row.targetName, title: row.title })),
-    publishedToday: snapshot.publishedToday, failed: snapshot.unresolved.failed, uncertain: snapshot.unresolved.uncertain,
+    publishedToday: snapshot.publishedToday, failed: left.filter(row => row.state === 'failed').length, uncertain: left.filter(row => row.state === 'uncertain').length,
     pool: input.pool ? { low: input.pool.low, complete: input.pool.complete, pages: input.pool.pages } : null,
   };
 }
