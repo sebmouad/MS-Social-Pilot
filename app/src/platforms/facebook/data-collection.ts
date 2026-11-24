@@ -47,6 +47,10 @@ export function createFacebookDataCollector(config: FacebookConfig, policy: Poli
       if (lifetimeSnapshot) return values;
       const link = object(payload.paging).next;
       next = typeof link === 'string' && link ? new URL(link) : null;
+      // An insight series' « next » can be the window after the one asked for, again and again (page_follows over a 60-day
+      // history block hit the page limit, 2026-11-24): a link starting at or after our `until` is not part of this read.
+      const nextSince = Number(next?.searchParams.get('since'));
+      if (next && params.until && Number.isFinite(nextSince) && nextSince >= Number(params.until)) next = null;
     }
     if (next) throw new Error('Analytics pagination exceeded the configured limit.');
     return values;
