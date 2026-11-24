@@ -114,8 +114,13 @@ export const prismaRecipeStore: RecipeStore = {
   async releaseDrafted(sourceId, now) {
     // The autopilot only ever creates scheduled posts, so a draft behind an upcoming planned slot was withdrawn by a member:
     // the slot is released (cancelled), so the day's count and its free times are right again.
-    return prisma.$executeRaw`UPDATE wordpress_recipe_plans l SET state = 'failed', reason = 'cancelled', "updatedAt" = NOW() FROM posts p
+    const drafted = await prisma.$executeRaw`UPDATE wordpress_recipe_plans l SET state = 'failed', reason = 'cancelled', "updatedAt" = NOW() FROM posts p
       WHERE p.id = l."postId" AND l."sourceId" = ${sourceId} AND l.state = 'planned' AND l."slotAt" > ${now} AND p.status::text = 'draft'`;
+    // A deleted post leaves its slot pointing at nothing (2026-11-24, 12 posts removed for the owner's 4-a-day test): released too.
+    const deleted = await prisma.$executeRaw`UPDATE wordpress_recipe_plans l SET state = 'failed', reason = 'cancelled', "updatedAt" = NOW()
+      WHERE l."sourceId" = ${sourceId} AND l.state = 'planned' AND l."slotAt" > ${now} AND l."postId" IS NOT NULL
+        AND NOT EXISTS (SELECT 1 FROM posts p WHERE p.id = l."postId")`;
+    return drafted + deleted;
   },
   async expireStale(sourceId, before) {
     return prisma.$executeRaw`UPDATE wordpress_recipe_plans SET state = 'uncertain', reason = 'claim_expired', "updatedAt" = NOW() WHERE "sourceId" = ${sourceId} AND state = 'claimed' AND "claimedAt" < ${before}`;
