@@ -63,6 +63,8 @@ export function aiReplyPrompt(c: AiReplyContext, tone: AiReplyTone): { system: s
     c.link ? 'Someone asking for the recipe or the link always gets a "reply" with the link, kindly, even when they sound impatient or annoyed about waiting for it.' : '',
     // A name says nothing certain about the person (2026-11-17, same rule as the recipe reply drafts).
     'Never guess whether the person is a man or a woman: no gendered agreements about them (write « merci pour votre message », not « merci d’être passé·e »).',
+    // « Merci beaucoup, ravi que cette recette vous plaise » (2026-11-24): the page is « nous », so « ravis ».
+    'In French the page speaks as « nous », so words about the page agree in the plural: « ravis », « contents », « heureux ».',
     'Use their first name only if it reads naturally. Do not say you are an AI, but if they ask whether a robot is answering, say this reply was written with the help of AI.',
     'Answer with JSON only, one of: {"decision":"reply","reply":"..."} {"decision":"handoff","reason":"..."} {"decision":"skip","reason":"..."}',
     'A reason is a few words for the page\'s team, written in French.',
