@@ -757,6 +757,16 @@ export async function runRecipePlanning(overrides: Partial<PlannerPorts> & { aut
             entries.push({ at: now.toISOString(), kind: 'healing', channelId: repeat.targetId, code: 'repeatReplaced', params: { title: repeat.title }, text: `« ${repeat.title} » was already posted by hand: another recipe takes its time.` });
         } catch { /* never stops planning */ }
       }
+      // Facebook's own scheduler for every queued post (2026-11-24): a hand-off that fails is silent, and the app then
+      // publishes the post itself at its time. Posts of 20–23 Nov went out that way, and app-published posts reach less
+      // than Facebook-scheduled ones. Each run hands any such post over again; held ones are skipped.
+      if (!overrides.autopilot) {
+        try {
+          const { handOffRemoteSchedules } = await import('@/modules/publishing/server/remote-handoff');
+          const { handedOver } = await handOffRemoteSchedules(source.workspaceId, now);
+          if (handedOver) entries.push({ at: now.toISOString(), kind: 'healing', code: 'reheld', params: { count: handedOver }, text: `${handedOver} queued posts handed back to Facebook's scheduler.` });
+        } catch { /* never stops planning */ }
+      }
       // « AI info » on published recipe posts (2026-11-19, ./wordpress-ai-disclosure.ts), when photos are labelled as AI-made.
       if (!overrides.autopilot && settings.image.aiLabel) {
         try {
