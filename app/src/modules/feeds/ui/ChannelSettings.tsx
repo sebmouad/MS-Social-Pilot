@@ -30,7 +30,7 @@ export function ChannelSettings({ pages, config, onChange, busy, maxTemplate, t,
 
   const open = (page: { id: string; name: string }) => {
     const r = resolved(page.id);
-    setEditing({ id: page.id, name: page.name, value: { slots: [...r.slots], weekdays: [...(r.weekdays ?? ALL_DAYS)], order: r.order, firstCommentTemplate: r.firstCommentTemplate, firstCommentDelayMinutes: r.firstCommentDelayMinutes, paused: r.paused, captionTitle: r.captionTitle, plainComment: r.plainComment } });
+    setEditing({ id: page.id, name: page.name, value: { slots: [...r.slots], weekdays: [...(r.weekdays ?? ALL_DAYS)], order: r.order, firstCommentTemplate: r.firstCommentTemplate, firstCommentDelayMinutes: r.firstCommentDelayMinutes, paused: r.paused, captionTitle: r.captionTitle, plainComment: r.plainComment, maxPerDay: r.maxPerDay ?? 0, noAiLabel: r.noAiLabel } });
   };
   const withoutLegacy = (id: string) => { const next = { ...(config.channelSlots ?? {}) }; delete next[id]; return next; };
   const save = () => {
@@ -50,6 +50,9 @@ export function ChannelSettings({ pages, config, onChange, busy, maxTemplate, t,
     // Title-only captions (2026-11-21) are stored only when on.
     if (!value.captionTitle) delete (value as Partial<Own>).captionTitle;
     if (!value.plainComment) delete (value as Partial<Own>).plainComment;
+    // Reach test settings (2026-11-24): stored only when set; 0 means no daily cap.
+    if (!value.maxPerDay) delete (value as Partial<Own>).maxPerDay;
+    if (!value.noAiLabel) delete (value as Partial<Own>).noAiLabel;
     onChange({ ...channels, [editing.id]: value }, withoutLegacy(editing.id));
     setEditing(null);
   };
@@ -67,7 +70,7 @@ export function ChannelSettings({ pages, config, onChange, busy, maxTemplate, t,
       <span className={styles.help}>{t('perChannelHint')}</span>
       {pages.length ? <ul className={styles.channelList}>{pages.map(page => {
         const r = resolved(page.id); const mine = own(page.id); const paused = channels[page.id]?.paused === true;
-        const summary = paused ? t('perChannelPaused') : [r.slots.join(' · '), daysText(r.weekdays), r.order === 'oldest' ? t('orderOldest') : t('orderNewest'), r.captionTitle ? t('perChannelCaptionTitleShort') : ''].filter(Boolean).join(' · ');
+        const summary = paused ? t('perChannelPaused') : [r.slots.join(' · '), daysText(r.weekdays), r.order === 'oldest' ? t('orderOldest') : t('orderNewest'), r.captionTitle ? t('perChannelCaptionTitleShort') : '', r.noAiLabel ? t('perChannelNoAiLabelShort') : ''].filter(Boolean).join(' · ');
         return <li key={page.id} className={styles.channelRow}>
           <div><strong>{page.name}</strong><span className={styles.meta}>{summary}</span></div>
           <span className={styles.channelBadge} data-own={mine ? 'true' : undefined} data-paused={paused ? 'true' : undefined}>{paused ? t('perChannelPaused') : (channels[page.id]?.autoTimes || (!channels[page.id]?.slots?.length && autopilotOf(config.autopilot).learnedTimes?.[page.id])) ? t('autoTimesBadge') : mine ? t('perChannelOwn') : t('perChannelShared')}</span>
@@ -97,6 +100,8 @@ export function ChannelSettings({ pages, config, onChange, busy, maxTemplate, t,
           <option value="newest">{t('orderNewest')}</option><option value="oldest">{t('orderOldest')}</option></select></label>
         <label className={styles.inline}><input type="checkbox" disabled={editing.value.paused} checked={editing.value.captionTitle} onChange={e => set({ captionTitle: e.target.checked })} /> {t('perChannelCaptionTitle')}</label>
         <label className={styles.inline}><input type="checkbox" disabled={editing.value.paused} checked={editing.value.plainComment} onChange={e => set({ plainComment: e.target.checked })} /> {t('perChannelPlainComment')}</label>
+        <label className={styles.inline}><input type="checkbox" disabled={editing.value.paused} checked={editing.value.noAiLabel} onChange={e => set({ noAiLabel: e.target.checked })} /> {t('perChannelNoAiLabel')}</label>
+        <label>{t('perChannelMaxPerDay')}<input disabled={editing.value.paused} type="number" min={0} max={24} step={1} value={editing.value.maxPerDay} onChange={e => set({ maxPerDay: Math.min(24, Math.max(0, Math.trunc(Number(e.target.value)) || 0)) })} /><span>{t('perChannelMaxPerDayHint')}</span></label>
         <label>{t('template')}<textarea disabled={editing.value.paused} rows={7} maxLength={maxTemplate} value={editing.value.firstCommentTemplate} onChange={e => set({ firstCommentTemplate: e.target.value })} /><span>{t('templateHint')}</span></label>
         <label>{t('delay')}<input disabled={editing.value.paused} type="number" min={0} step={1} value={editing.value.firstCommentDelayMinutes} onChange={e => set({ firstCommentDelayMinutes: Math.max(0, Math.trunc(Number(e.target.value)) || 0) })} /></label>
       </div>}

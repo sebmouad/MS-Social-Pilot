@@ -11,7 +11,7 @@ import { decryptSecret } from '@/server/secret-crypto';
  * refusal too, with Facebook's reason, and a refused post is tried once more a day later; the first refusal of a run
  * is returned for the activity log.
  */
-export async function discloseAiPosts(workspaceId: string, sourceId: string, now: Date, limit = 60): Promise<{ done: number; problem: string | null }> {
+export async function discloseAiPosts(workspaceId: string, sourceId: string, now: Date, limit = 60, skipTargetIds: readonly string[] = []): Promise<{ done: number; problem: string | null }> {
   // Every autopilot post, not only the last 7 days (2026-11-21, owner: posts on every Page missed the label): never tried,
   // or refused once more than a day ago (Facebook refused 13 posts with a passing permission error); newest first.
   const rows = await prisma.$queryRaw<Array<{ id: string; remotePostId: string; targetId: string; token: string | null; accountToken: string | null }>>`
@@ -24,7 +24,7 @@ export async function discloseAiPosts(workspaceId: string, sourceId: string, now
     JOIN targets t ON t.id = pt."targetId" AND t."workspaceId" = ${workspaceId} AND t.enabled = true
     JOIN social_accounts sa ON sa.id = t."socialAccountId" AND sa.provider = 'facebook' AND sa."invalidatedAt" IS NULL
     LEFT JOIN tried ON tried.id = pt.id
-    WHERE l."sourceId" = ${sourceId} AND l.state = 'planned'
+    WHERE l."sourceId" = ${sourceId} AND l.state = 'planned' AND NOT (pt."targetId" = ANY(${[...skipTargetIds]}::text[]))
       AND (tried.id IS NULL OR (NOT tried.ok AND tried.n < 2 AND tried.last <= ${new Date(now.getTime() - 86_400_000)}))
     ORDER BY COALESCE(pt."publishedAt", l."slotAt") DESC LIMIT ${limit}`;
   if (!rows.length) return { done: 0, problem: null };

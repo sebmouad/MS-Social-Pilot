@@ -771,7 +771,9 @@ export async function runRecipePlanning(overrides: Partial<PlannerPorts> & { aut
       if (!overrides.autopilot && settings.image.aiLabel) {
         try {
           const { discloseAiPosts } = await import('./wordpress-ai-disclosure');
-          const tagged = await discloseAiPosts(source.workspaceId, source.id, now);
+          // Pages in the owner's reach test (2026-11-24) get no « AI info » edit.
+          const unlabelled = Object.entries(configOf(settings, source).channels ?? {}).filter(([, own]) => own?.noAiLabel).map(([id]) => id);
+          const tagged = await discloseAiPosts(source.workspaceId, source.id, now, 60, unlabelled);
           if (tagged.done) entries.push({ at: now.toISOString(), kind: 'healing', code: 'aiTagged', params: { count: tagged.done }, text: `${tagged.done} posts marked as AI-generated.` });
           if (tagged.problem && !(pilot.log ?? []).some(entry => entry.code === 'aiTagFailed' && now.getTime() - Date.parse(entry.at) < 86_400_000))
             entries.push({ at: now.toISOString(), kind: 'healing', code: 'aiTagFailed', params: { why: tagged.problem }, text: 'Facebook did not accept the AI-generated mark.' });

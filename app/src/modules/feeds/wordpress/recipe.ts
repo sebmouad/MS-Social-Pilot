@@ -28,20 +28,32 @@ export type ChannelSettings = { slots?: string[]; weekdays?: number[]; order?: '
   /** The caption is only the recipe's title, with no written hook (2026-11-21, owner's test on 3 Pages). */
   captionTitle?: boolean;
   /** The first comment is the channel's template as is, without the autopilot's call to action (2026-11-23, owner's RF test). */
-  plainComment?: boolean };
+  plainComment?: boolean;
+  /** At most this many posts a day, at the Page's best learned hours (2026-11-24, owner's reach test on 3 Pages). */
+  maxPerDay?: number;
+  /** No « AI info » edit on this Page's published posts (2026-11-24, owner's reach test on 3 Pages). */
+  noAiLabel?: boolean };
 
 /** The settings one channel posts with: its own where it has them, the shared ones otherwise. */
-export function channelConfig(config: PlanConfig, channelId: string): PlanConfig & { paused: boolean; captionTitle: boolean; plainComment: boolean } {
+export function channelConfig(config: PlanConfig, channelId: string): PlanConfig & { paused: boolean; captionTitle: boolean; plainComment: boolean; maxPerDay: number | null; noAiLabel: boolean } {
   const own = config.channels?.[channelId] ?? {};
   // A member's own times win; then times the autopilot learned (while best times are on); then the shared times.
   const pilot = autopilotOf(config.autopilot);
   const learned = pilot.bestTimes.enabled ? pilot.learnedTimes?.[channelId] : undefined;
   const slots = own.slots?.length ? own.slots : config.channelSlots?.[channelId]?.length ? config.channelSlots[channelId]! : learned?.length ? learned : config.slots;
   return {
-    ...config, slots: normalizeSlots(slots), order: own.order ?? config.order,
+    ...config, slots: normalizeSlots(capSlots(slots, own.maxPerDay, pilot.hourValues?.[channelId])), order: own.order ?? config.order,
     firstCommentTemplate: own.firstCommentTemplate ?? config.firstCommentTemplate, firstCommentDelayMinutes: own.firstCommentDelayMinutes ?? config.firstCommentDelayMinutes,
     ...(own.weekdays?.length ? { weekdays: own.weekdays } : {}), paused: own.paused === true, captionTitle: own.captionTitle === true, plainComment: own.plainComment === true,
+    maxPerDay: own.maxPerDay ?? null, noAiLabel: own.noAiLabel === true,
   };
+}
+
+/** Past the cap, the times whose hour reached most on this Page are kept (ties: the earlier time), then put back in order. */
+export function capSlots(slots: readonly string[], max: number | undefined, values: Record<string, number> | undefined): string[] {
+  if (!max || slots.length <= max) return [...slots];
+  const value = (slot: string) => values?.[String(Number(slot.slice(0, 2)))] ?? 1;
+  return [...slots].sort((a, b) => value(b) - value(a) || a.localeCompare(b)).slice(0, max).sort();
 }
 
 const key = z.string().regex(META_KEY);
@@ -66,6 +78,7 @@ export const planConfigPatchSchema = (limits: { template: number; horizon: { min
     weekdays: z.array(z.number().int().min(0).max(6)).min(1).max(7).transform(days => [...new Set(days)].sort()),
     order: z.enum(['newest', 'oldest']), firstCommentTemplate: z.string().min(1).max(limits.template),
     firstCommentDelayMinutes: z.number().int().min(limits.delay.min).max(limits.delay.max), paused: z.boolean(), pausedReason: z.string().max(300), autoTimes: z.boolean(), captionTitle: z.boolean(), plainComment: z.boolean(),
+    maxPerDay: z.number().int().min(1).max(SLOTS_MAX), noAiLabel: z.boolean(),
   }).partial().strict()).refine(map => Object.keys(map).length <= 500, 'Too many channels.'),
   horizonDays: z.number().int().min(limits.horizon.min).max(limits.horizon.max), distinctAcrossPages: z.boolean(),
   cooldownDays: z.number().int().min(limits.cooldown.min).max(limits.cooldown.max),

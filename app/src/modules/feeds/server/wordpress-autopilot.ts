@@ -93,7 +93,7 @@ export async function learnBestTimes(settings: WordpressSettings, source: Source
     if (own?.paused || (own?.slots?.length && !own.autoTimes) || config.channelSlots?.[page.id]?.length) continue;
     const current = channelConfig(config, page.id).slots;
     // How many posts a day, then which hours, from the Page's memory (2026-11-18).
-    const count = model && memories.has(page.id) ? model.bestCount(page.id, current.length).count : current.length;
+    const count = Math.min(model && memories.has(page.id) ? model.bestCount(page.id, current.length).count : current.length, own?.maxPerDay ?? Infinity);
     const learned = (model && memories.has(page.id) ? model.bestTimes(page.id, count, best.window, best.gapMinutes, (index * 5) % 60) ?? (count !== current.length ? model.bestTimes(page.id, current.length, best.window, best.gapMinutes, (index * 5) % 60) : null) : null)
       ?? learnTimes({ observations: scored(page.id), current, timeZone: config.timezone, window: best.window, gapMinutes: best.gapMinutes, channelIndex: index, pooled });
     if (JSON.stringify(learned) === JSON.stringify(current)) continue;

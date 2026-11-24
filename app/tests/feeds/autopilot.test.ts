@@ -474,3 +474,20 @@ test('plainComment: a channel can post its template as is; a link-only template 
   const recipe = { title: 'Gratin', description: '', servings: '', prep: '', cook: '', total: '', ingredients: [], steps: [] };
   assert.equal(renderComment('👉 {link}', recipe, 'https://recettes.example/gratin/', { max: 2000, mark: '…' }), '👉 https://recettes.example/gratin/');
 });
+
+test('reach test (2026-11-24): a daily cap keeps the hours that reach most; « no AI info » is read per channel', async () => {
+  const { channelConfig, capSlots, planConfigPatchSchema } = await import('@/modules/feeds/wordpress/recipe');
+  const learned = ['07:10', '11:10', '14:10', '17:10', '18:10', '20:10'];
+  const values = { '7': 0.4, '11': 1.6, '14': 0.9, '17': 1.2, '18': 2, '20': 0.7 };
+  assert.deepEqual(capSlots(learned, 4, values), ['11:10', '14:10', '17:10', '18:10']);
+  assert.deepEqual(capSlots(learned, undefined, values), learned);
+  assert.deepEqual(capSlots(learned, 4, undefined), ['07:10', '11:10', '14:10', '17:10'], 'no values: the earliest times');
+  const base = { slots: ['11:00', '17:00'], autopilot: { ...AUTOPILOT_DEFAULTS, learnedTimes: { a: learned, b: learned }, hourValues: { a: values } }, channels: { a: { maxPerDay: 4, noAiLabel: true } } } as unknown as Parameters<typeof channelConfig>[0];
+  assert.deepEqual(channelConfig(base, 'a').slots, ['11:10', '14:10', '17:10', '18:10']);
+  assert.equal(channelConfig(base, 'a').noAiLabel, true);
+  assert.equal(channelConfig(base, 'b').slots.length, 6);
+  assert.equal(channelConfig(base, 'b').noAiLabel, false);
+  const schema = planConfigPatchSchema({ template: 500, horizon: { min: 1, max: 14 }, cooldown: { min: 0, max: 365 }, age: { min: 1, max: 3650 }, delay: { min: 0, max: 120 } }).partial();
+  assert.ok(schema.safeParse({ channels: { a: { maxPerDay: 4, noAiLabel: true } } }).success);
+  assert.ok(!schema.safeParse({ channels: { a: { maxPerDay: 0 } } }).success);
+});
