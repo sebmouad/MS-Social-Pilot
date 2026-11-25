@@ -619,3 +619,8 @@ ads_management (owner asked to rework Ads like Meta Ads Manager first). The subm
   comment found → id recorded; none while the sync read the Page since → released and resent; else left); AI replies
   are told the Page's last 8 replies (no repeated wording) and that the Page is « nous » (« ravis »).
 - Root › Errors: 28 entries resolved on 24 Nov (pageBackfill pagination, Facebook's 09:15–10:30 UTC outage); 7 open.
+- Reach analysis (25 Nov, 1,032 autopilot posts of 26 Oct–22 Nov with reach): a typical app post, relative to its Page's
+  median, was 0.74–0.94× on 1–10 Nov, 0.9–1.5× on 11–21 Nov and 0.98× on 22 Nov, so no collapse per post; the drop in
+  totals is the end of the viral run (CPE 18 Nov). Cross-Page repeats are 6% of posts (distinctAcrossPages) and do
+  slightly worse (median 0.90× vs 1.00× for a recipe's first Page). Owner chose « site photos only » from 28 Nov
+  (`autopilot.photos.generate`, switched off on 26 Nov 00:30 Paris since posts are planned 48 h ahead).
