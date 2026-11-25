@@ -23,6 +23,8 @@ export const settingsManifest = {
    * Appearance and Notifications are tabs inside a section. Old routes stay valid as 308 redirects.
    */
   redirects: [
+    // The bare address had no page (404, 2026-11-25); the sidebar and « g s » open Workspace.
+    { from: '/settings', to: '/settings/workspace' },
     { from: '/settings/connections', to: '/settings/channels' },
     { from: '/settings/profiles', to: '/settings/channels/groups' },
     { from: '/settings/bio', to: '/settings/sharing/bio' },
