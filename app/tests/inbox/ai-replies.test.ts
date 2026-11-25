@@ -81,3 +81,12 @@ test('ai replies: ingredient, quantity, time and step questions are answered onl
   assert.match(system, /answered only with what the post and recipe below say/);
   assert.match(system, /Never explain a photo or guess what is in it/);
 });
+
+test('ai replies: a recipe question the post does not answer gets the full recipe link; without a link it goes to a person', () => {
+  const linked = aiReplyPrompt({ kind: 'comment', channel: 'P', voice: null, author: null, text: 'Pour combien de personnes ?', link: 'https://recettes.example/r' }, 'friendly').system;
+  assert.match(linked, /every detail is in the full recipe, with the link; never make the answer up/);
+  assert.doesNotMatch(linked, /When the post below does not say it, the decision is "handoff"/);
+  const bare = aiReplyPrompt({ kind: 'comment', channel: 'P', voice: null, author: null, text: 'Pour combien de personnes ?' }, 'friendly').system;
+  assert.match(bare, /When the post below does not say it, the decision is "handoff"/);
+  assert.match(bare, /Never explain a photo/);
+});

@@ -57,7 +57,9 @@ export function aiReplyPrompt(c: AiReplyContext, tone: AiReplyTone): { system: s
     c.recent?.length ? `The page's latest replies, which must not be repeated: do not reuse their opening words or phrasing, and reply to what this person actually said:\n${c.recent.slice(0, 8).map(line => `- ${line.slice(0, 160)}`).join('\n')}` : '',
     'Use only the facts given below. If the answer is not there, say so kindly and suggest something simple and safe. Never invent a price, a promise, a delivery or a health claim.',
     // « Du beurre sur la photo mais pas dans la recette ? » got « … via la pâte feuilletée pur beurre » (2026-11-22).
-    'A question or remark about an ingredient, a quantity, a cooking time or a step is answered only with what the post and recipe below say, word for word in substance; when they do not say it, the decision is "handoff". Never explain a photo or guess what is in it.',
+    'A question or remark about an ingredient, a quantity, a cooking time or a step is answered only with what the post and recipe below say, word for word in substance. Never explain a photo or guess what is in it.',
+    // « Pour combien de personnes ? » was handed off for want of servings in the post (2026-11-25): the full recipe has them.
+    c.link ? 'When the post below does not say it (servings, a quantity, a time, a step), reply kindly that every detail is in the full recipe, with the link; never make the answer up.' : 'When the post below does not say it, the decision is "handoff".',
     c.link ? `If they ask for the recipe or the link, give this link and no other: ${c.link}` : 'Do not include any link.',
     // « Où est la recette je v ai dis SVP 😱 » was handed off as annoyed (2026-11-22): asking for the recipe is answered.
     c.link ? 'Someone asking for the recipe or the link always gets a "reply" with the link, kindly, even when they sound impatient or annoyed about waiting for it.' : '',
