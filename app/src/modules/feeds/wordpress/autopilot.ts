@@ -25,6 +25,8 @@ export type AutopilotSettings = {
   review: { enabled: boolean; hour: number; notify: boolean };
   digest: { enabled: boolean; day: 'mon' | 'fri' | 'sun' };
   replies: { enabled: boolean; tone: 'friendly' | 'short' | 'expert' };
+  /** New photos for weak recipe photos (2026-11-19); the owner may keep the site's own photos only (2026-11-25). */
+  photos: { generate: boolean };
   /** Days whose plan a member approved on the board (YYYY-MM-DD), newest first. */
   approvedDays?: string[];
   /** Each channel's hours as last learned (hour → value, 1 = usual): best recipes go to the strongest. */
@@ -55,6 +57,7 @@ export const AUTOPILOT_DEFAULTS: AutopilotSettings = {
   review: { enabled: true, hour: 20, notify: true },
   digest: { enabled: true, day: 'mon' },
   replies: { enabled: true, tone: 'friendly' },
+  photos: { generate: true },
 };
 export const AUTOPILOT_LOG_MAX = 60;
 /** Times are relearned at most this often. */
@@ -88,6 +91,7 @@ export const autopilotSchema = z.object({
   review: z.object({ enabled: z.boolean(), hour: z.number().int().min(0).max(23), notify: z.boolean() }).strict().optional(),
   digest: z.object({ enabled: z.boolean(), day: z.enum(['mon', 'fri', 'sun']) }).strict().optional(),
   replies: z.object({ enabled: z.boolean(), tone: z.enum(['friendly', 'short', 'expert']) }).strict().optional(),
+  photos: z.object({ generate: z.boolean() }).strict().optional(),
   approvedDays: z.array(z.string().regex(/^\d{4}-\d{2}-\d{2}$/)).max(60).optional(),
   hourValues: z.record(z.string().max(100), z.record(z.string().max(2), z.number().min(0).max(1_000_000))).optional()
     .refine(map => !map || Object.keys(map).length <= 500, 'Too many channels.'),

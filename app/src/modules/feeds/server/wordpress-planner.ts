@@ -574,7 +574,7 @@ export async function planSource(ctx: Ctx, source: SourceRow, auth: FeedAuthoriz
       const mediaActor = { userId: auth.actor.userId, workspaceId: source.workspaceId };
       // A weak recipe photo is replaced by a generated one (2026-11-19, see ./wordpress-photos.ts); any problem, and the recipe's own photo goes out.
       let image: { mediaId: string } | null = null;
-      if (writer && ports.generatePhotos && prep?.model?.generatedPhotosOk(targetId) !== false) {
+      if (writer && ports.generatePhotos && pilot.photos.generate && prep?.model?.generatedPhotosOk(targetId) !== false) {
         try {
           const photos = await import('./wordpress-photos');
           generationsLeft ??= await photos.generationsLeft(source.workspaceId, now);
@@ -724,7 +724,7 @@ export async function runRecipePlanning(overrides: Partial<PlannerPorts> & { aut
       } catch { /* the autopilot never stops planning */ }
       const outcome = await planSource({ settings, ports, db, budget, now, ...(makeup ? { makeup } : {}) }, source, auth);
       // Queued posts with a strong title and a weak photo get a new photo too (2026-11-19, ./wordpress-photos.ts).
-      if (!overrides.autopilot && ports.generatePhotos && await ports.writer.available(source.workspaceId).catch(() => false)) {
+      if (!overrides.autopilot && ports.generatePhotos && autopilotOf(configOf(settings, source).autopilot).photos.generate && await ports.writer.available(source.workspaceId).catch(() => false)) {
         try {
           const photos = await import('./wordpress-photos');
           const { readPageMemories } = await import('./wordpress-memory');

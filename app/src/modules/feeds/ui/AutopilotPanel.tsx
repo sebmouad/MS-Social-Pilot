@@ -77,6 +77,7 @@ export function AutopilotPanel({ open = false, value, timeZone, pages, busy, onC
       <fieldset className={styles.checks} disabled={busy}><legend>{t('autopilotRadar')}</legend>
         <label className={styles.inline}><input type="checkbox" checked={pilot.radar.enabled} onChange={e => set({ radar: { ...pilot.radar, enabled: e.target.checked } })} /> {t('autopilotRadarOn')}</label>
         <label className={styles.inline}><input type="checkbox" checked={pilot.breathe.enabled} onChange={e => set({ breathe: { ...pilot.breathe, enabled: e.target.checked } })} /> {t('autopilotBreatheOn')}</label>
+        <label className={styles.inline}><input type="checkbox" checked={pilot.photos.generate} onChange={e => set({ photos: { generate: e.target.checked } })} /> {t('autopilotGeneratePhotos')}</label>
         <div className={styles.autoRow}>
           <label>{t('autopilotHotAt')}<select value={pilot.radar.factor} onChange={e => { const v = Number(e.target.value); set({ radar: { ...pilot.radar, factor: v }, breathe: { ...pilot.breathe, factor: v } }); }}>
             {[2, 3, 5].map(v => <option key={v} value={v}>{t('autopilotTimesUsual', { times: v })}</option>)}</select></label>
