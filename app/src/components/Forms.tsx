@@ -75,9 +75,9 @@ type SwitchProps = {
 export function Switch({ checked, onChange, label, description, disabled, name }: SwitchProps) {
   const id = useId();
   return <div className="ui-switch">
-    <button type="button" role="switch" id={id} aria-checked={checked} aria-describedby={description ? `${id}-d` : undefined} disabled={disabled} className="ui-switch__track" onClick={() => onChange(!checked)}><span className="ui-switch__thumb" /></button>
+    <button type="button" role="switch" id={id} aria-checked={checked} aria-labelledby={`${id}-l`} aria-describedby={description ? `${id}-d` : undefined} disabled={disabled} className="ui-switch__track" onClick={() => onChange(!checked)}><span className="ui-switch__thumb" /></button>
     {name && <input type="hidden" name={name} value={checked ? "on" : ""} />}
-    <label htmlFor={id} className="ui-switch__text"><span>{label}</span>{description && <small id={`${id}-d`}>{description}</small>}</label>
+    <label htmlFor={id} className="ui-switch__text"><span id={`${id}-l`}>{label}</span>{description && <small id={`${id}-d`}>{description}</small>}</label>
   </div>;
 }
 
