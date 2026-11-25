@@ -190,7 +190,7 @@ export function AppShell({ children, activeModule, enabledModules: _enabledModul
   // ---- channel scope: the URL wins, then the remembered cookie (01 §5) ----
   const channelIds = useMemo(() => channels.map(channel => channel.id), [channels]);
   const urlScope = useMemo(() => parseChannelScope({ search: search ?? undefined, allowed: channelIds }), [search, channelIds]);
-  const scope = urlScope.source === "url" ? urlScope.ids : [...initialScope];
+  const scope = useMemo(() => urlScope.source === "url" ? urlScope.ids : [...initialScope], [urlScope, initialScope]);
   const dropped = urlScope.source === "url" ? urlScope.dropped : initialScopeDropped;
   const scopeLabel = scope.length === 0 ? copy.allChannels : scope.length === 1 ? channels.find(channel => channel.id === scope[0])?.name ?? copy.allChannels : fill(copy.channelCount, { count: scope.length });
   // Only screens whose figures or lists follow the channel choice show the switcher (2026-11-13): Home, the Content

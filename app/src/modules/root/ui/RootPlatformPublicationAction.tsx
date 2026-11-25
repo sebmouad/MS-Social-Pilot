@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/Button';
 import { ModalDialog } from '@/components/ModalDialog';
@@ -37,7 +37,8 @@ export function RootPlatformPublicationAction({ providerId, action, policy, copy
   const errorRef = useRef<HTMLParagraphElement>(null);
   const noticeRef = useRef<HTMLParagraphElement>(null);
   const fieldRefs = useRef<Record<string, HTMLElement | null>>({});
-  const fields = action.fields ?? [];
+  // A stable list, so the « focus the first error » effect runs when errors change, not on every render.
+  const fields = useMemo(() => action.fields ?? [], [action.fields]);
 
   useEffect(() => { if (error && !busy) errorRef.current?.focus(); }, [error, busy]);
   useEffect(() => { if (notice) noticeRef.current?.focus(); }, [notice]);

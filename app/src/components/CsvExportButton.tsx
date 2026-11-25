@@ -70,7 +70,9 @@ export function CsvExportButton({ href, expectedFormat, rowCountHeader, maxRows,
     }
     if (mounted.current) setFeedback(null);
   }, [href, fileName, expectedFormat, rowCountHeader, maxRows, maxBytes, requireFileNameConfirmation]);
-  useEffect(() => { if (feedback) feedbackRef.current?.focus(); }, [feedback?.id]);
+  // Focus each new message once (its id changes), not on every render.
+  const feedbackKey = feedback?.id;
+  useEffect(() => { if (feedbackKey !== undefined) feedbackRef.current?.focus(); }, [feedbackKey]);
 
   function announce(kind: 'success' | 'error', text: string) {
     if (mounted.current) setFeedback({ kind, text, id: ++feedbackId.current });
