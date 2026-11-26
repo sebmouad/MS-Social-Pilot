@@ -41,32 +41,3 @@ export async function postsAtAge(workspaceId: string, now: Date, days = 10) {
     WHERE e."createdTime" > ${new Date(now.getTime() - days * 86_400_000)} AND e."remoteMissingAt" IS NULL
     ORDER BY e."createdTime" DESC`;
 }
-
-/**
- * TEMPORARY diagnostic (2026-11-26, owner: can the newest API help with reach?). Reads each Page's integrity status
- * (Page Integrity API, GET /{page-id}/page_status: ok / warning / restricted / suspended, violations, restrictions).
- * Read-only. Remove once read.
- */
-export async function pageStatuses(workspaceId: string) {
-  const rows = await prisma.$queryRaw<Array<{ name: string; providerId: string; token: string | null; accountToken: string | null; scopes: string[] | null }>>`
-    SELECT t.name, t."providerId", t."accessToken" AS token, sa."accessToken" AS "accountToken", sa.scopes FROM targets t JOIN social_accounts sa ON sa.id = t."socialAccountId"
-    WHERE t."workspaceId" = ${workspaceId} AND t.enabled = true AND t.type::text = 'page' AND sa.provider = 'facebook' AND sa."invalidatedAt" IS NULL ORDER BY t.name`;
-  const { configuredFacebookConfig } = await import('@/platforms/facebook/runtime');
-  const { graphObjectUrl, facebookAppSecretProof } = await import('@/platforms/facebook/protocol');
-  const { decryptSecret } = await import('@/server/secret-crypto');
-  const config = await configuredFacebookConfig();
-  const out = [];
-  for (const row of rows) {
-    const sealed = row.token ?? row.accountToken; if (!sealed) continue;
-    const token = decryptSecret(sealed);
-    const url = graphObjectUrl(config, `${encodeURIComponent(row.providerId)}/page_status`);
-    url.searchParams.set('access_token', token);
-    if (config.appSecretProofEnabled && config.appSecret) url.searchParams.set('appsecret_proof', facebookAppSecretProof(token, config.appSecret));
-    const payload = await fetch(url, { signal: AbortSignal.timeout(10_000) }).then(r => r.json()).catch(() => null) as Record<string, unknown> | null;
-    const error = payload?.error as { message?: string; code?: number } | undefined;
-    out.push({ page: row.name, metadataScope: (row.scopes ?? []).includes('pages_manage_metadata'), status: payload?.status ?? null,
-      violations: payload?.violations ?? null, restrictions: payload?.restrictions ?? null, recommendedActions: payload?.recommended_actions ?? null,
-      error: error ? `${error.code ?? ''} ${String(error.message ?? '').slice(0, 160)}` : null });
-  }
-  return { graphVersion: config.graphVersion, pages: out };
-}
