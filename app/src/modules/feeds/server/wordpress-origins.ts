@@ -41,3 +41,37 @@ export async function postsAtAge(workspaceId: string, now: Date, days = 10) {
     WHERE e."createdTime" > ${new Date(now.getTime() - days * 86_400_000)} AND e."remoteMissingAt" IS NULL
     ORDER BY e."createdTime" DESC`;
 }
+
+/**
+ * TEMPORARY diagnostic (2026-11-26, owner: why do posts made outside the app reach far more on Recettes - Faciles?).
+ * Asks Facebook, read-only, which app made each recent post of one Page and what kind of post it is. Remove once read.
+ */
+export async function postMakers(workspaceId: string, pageName: string, now: Date, limit = 16) {
+  const rows = await prisma.$queryRaw<Array<{ remoteId: string; at: Date; origin: string; token: string | null; accountToken: string | null; reach: number | null }>>`
+    SELECT e."remoteId", e."createdTime" AS at, CASE WHEN pt.id IS NULL THEN 'outside' WHEN pt."nativeScheduledFor" IS NOT NULL THEN 'facebook_scheduler' ELSE 'app_held' END AS origin,
+      t."accessToken" AS token, sa."accessToken" AS "accountToken", COALESCE((e.insights->>'post_total_media_view_unique')::numeric, (e.insights->>'reach')::numeric)::float AS reach
+    FROM external_posts e JOIN targets t ON t.id = e."targetId" AND t."workspaceId" = ${workspaceId} AND t.name = ${pageName}
+    JOIN social_accounts sa ON sa.id = t."socialAccountId"
+    LEFT JOIN post_targets pt ON pt."targetId" = e."targetId" AND pt."remotePostId" = e."remoteId"
+    WHERE e."createdTime" > ${new Date(now.getTime() - 4 * 86_400_000)} AND e."remoteMissingAt" IS NULL
+    ORDER BY e."createdTime" DESC LIMIT ${limit}`;
+  const { configuredFacebookConfig } = await import('@/platforms/facebook/runtime');
+  const { graphObjectUrl, facebookAppSecretProof } = await import('@/platforms/facebook/protocol');
+  const { decryptSecret } = await import('@/server/secret-crypto');
+  const config = await configuredFacebookConfig();
+  const out = [];
+  for (const row of rows) {
+    const sealed = row.token ?? row.accountToken; if (!sealed) continue;
+    const token = decryptSecret(sealed);
+    const url = graphObjectUrl(config, encodeURIComponent(row.remoteId));
+    url.searchParams.set('fields', 'application,status_type,is_published,created_time,attachments{media_type,type}');
+    url.searchParams.set('access_token', token);
+    if (config.appSecretProofEnabled && config.appSecret) url.searchParams.set('appsecret_proof', facebookAppSecretProof(token, config.appSecret));
+    const payload = await fetch(url, { signal: AbortSignal.timeout(10_000) }).then(r => r.json()).catch(() => null) as Record<string, unknown> | null;
+    const app = payload?.application as { name?: string; id?: string } | undefined;
+    const attachments = (payload?.attachments as { data?: Array<{ media_type?: string; type?: string }> } | undefined)?.data ?? [];
+    out.push({ at: row.at, origin: row.origin, reach: row.reach, application: app?.name ?? (payload?.error ? 'error: ' + String((payload.error as { message?: string }).message ?? '').slice(0, 80) : null),
+      applicationId: app?.id ?? null, statusType: payload?.status_type ?? null, attachment: attachments.map(a => `${a.media_type ?? ''}/${a.type ?? ''}`).join(',') || null });
+  }
+  return out;
+}
