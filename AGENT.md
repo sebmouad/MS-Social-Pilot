@@ -654,3 +654,6 @@ Channels) must not change visibly.
 3. A « Supprimée sur Facebook » marker on the Posts list (posts with remoteMissingAt).
 4. Request Page Public Content Access and read the 3 competitor Pages (docs/meta-page-public-content-access.md).
 5. Two-step sign-in back to « admins » in Root.
+- Recomputed 26 Nov with post_total_media_view_unique first (14 scratch scripts fixed): app posts vs their Page's
+  usual 0.74–0.97× on 1–10 Nov, 1.07–1.53× on 11–22 Nov, 0.97× on 23 Nov, 0.73× on 24 Nov (watch). Cross-Page
+  repeats 1.01× vs 0.97× for a recipe's first Page (no penalty; the earlier 0.90× was the wrong measure).
