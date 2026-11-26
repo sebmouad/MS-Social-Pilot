@@ -624,3 +624,11 @@ ads_management (owner asked to rework Ads like Meta Ads Manager first). The subm
   totals is the end of the viral run (CPE 18 Nov). Cross-Page repeats are 6% of posts (distinctAcrossPages) and do
   slightly worse (median 0.90× vs 1.00× for a recipe's first Page). Owner chose « site photos only » from 28 Nov
   (`autopilot.photos.generate`, switched off on 26 Nov 00:30 Paris since posts are planned 48 h ahead).
+- Title-only verdict (26 Nov, posts ≥24 h old, median reach per post, 14–20 Nov vs 21–25 Nov): every Page fell (end of
+  the mid-November high); title-only Pages ×0.51 (Sans Complication 1.11, Sans Routine 0.51, Sans Soucis 0.35),
+  written-caption controls ×0.39, other small Pages ×0.20, CPE 4,617 → 122. Title-only is not worse, within noise
+  (20–70 people a post); not extended. RF: app posts 4,693 → 2,186 while posts made outside the app rose 12,653 →
+  27,381 (app/outside 0.37 → 0.08): the caption is not what makes outside posts win. App post addresses: /photo.php
+  when Facebook's scheduler published them, /posts/ when the app did (20–23 Nov); on 23 Nov the 8 same-Page pairs
+  favour the app-published ones (×0.64, evening scheduler posts, confounded by hour). Owner asked how the outside RF
+  posts are made.
