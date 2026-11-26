@@ -255,7 +255,7 @@ export async function notificationRecipientEligible(tx: Tx, input: NotificationE
     catch (error) { if (error instanceof OperationError && ['unauthorized', 'forbidden', 'not_found'].includes(error.code)) return false; throw error; }
   }
   // Recipe autopilot (2026-11-16): owners and admins who can read the plan.
-  if (['autopilot_board', 'autopilot_report'].includes(value.kind)) {
+  if (['autopilot_board', 'autopilot_report', 'page_status'].includes(value.kind)) {
     try { const access = await authorizePublishing(recipient, 'publishing/posts', 'read'); return ['owner', 'admin'].includes(access.role); }
     catch (error) { if (error instanceof OperationError && ['unauthorized', 'forbidden', 'not_found'].includes(error.code)) return false; throw error; }
   }
@@ -330,7 +330,7 @@ export async function recipientAllowsNotification(tx: Tx, input: Pick<Notificati
 export const notificationPreferenceDefaults = NOTIFICATIONS_DEFAULTS;
 
 export function notificationPreferenceKey(kind: import('./contracts').NotificationEvent): string {
-  return ({ note_mention: 'onNoteMention', inbox_note_mention: 'onNoteMention', mix_dry: 'onQueueEmpty', queue_empty: 'onQueueEmpty', publish_failure: 'onPublishFailure', connection_expired: 'onPublishFailure', token_expiring: 'onTokenExpiry', approval_request: 'onApprovalRequest', approval_decision: 'onApprovalDecision', draft_updated: 'onDraftUpdated', inbox_digest: 'onNewInbox', moderation_alert: 'onModerationAlert', negative_spike: 'onModerationAlert', metric_alert: 'onMetricAlert', report_delivered: 'onReportDelivered', triage_assigned: 'onTriageAssigned', autopilot_board: 'onReportDelivered', autopilot_report: 'onReportDelivered' })[kind]!;
+  return ({ note_mention: 'onNoteMention', inbox_note_mention: 'onNoteMention', mix_dry: 'onQueueEmpty', queue_empty: 'onQueueEmpty', publish_failure: 'onPublishFailure', connection_expired: 'onPublishFailure', token_expiring: 'onTokenExpiry', approval_request: 'onApprovalRequest', approval_decision: 'onApprovalDecision', draft_updated: 'onDraftUpdated', inbox_digest: 'onNewInbox', moderation_alert: 'onModerationAlert', negative_spike: 'onModerationAlert', metric_alert: 'onMetricAlert', report_delivered: 'onReportDelivered', triage_assigned: 'onTriageAssigned', autopilot_board: 'onReportDelivered', autopilot_report: 'onReportDelivered', page_status: 'onPublishFailure' })[kind]!;
 }
 export async function txLocale(tx: Tx, userId: string) {
   const rows = await tx.$queryRaw<Array<{ locale: string }>>`SELECT locale::text AS locale FROM users WHERE id = ${userId}`;

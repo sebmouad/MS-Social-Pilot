@@ -5,7 +5,7 @@ import type { AutopilotLogEntry } from './wordpress/autopilot';
  * written when shown, so a French page reads French. Entries saved before codes existed are recognised by their English
  * sentence and written the same way (2026-11-17); any other text is shown as saved.
  */
-export type LogCode = 'photosUnread' | 'replanned' | 'stranded' | 'refilled' | 'publishFailed' | 'channelHeld' | 'hot' | 'hotShort' | 'breathe' | 'spread' | 'notSpread' | 'radarFailed' | 'photoMade' | 'retitled' | 'recommented' | 'reheld' | 'repeatReplaced' | 'photoNotMade' | 'replacedOpen' | 'aiTagged' | 'aiTaggedOne' | 'aiTagFailed' | 'lateHit';
+export type LogCode = 'photosUnread' | 'replanned' | 'stranded' | 'refilled' | 'publishFailed' | 'channelHeld' | 'hot' | 'hotShort' | 'breathe' | 'spread' | 'notSpread' | 'radarFailed' | 'photoMade' | 'retitled' | 'recommented' | 'reheld' | 'repeatReplaced' | 'photoNotMade' | 'replacedOpen' | 'aiTagged' | 'aiTaggedOne' | 'aiTagFailed' | 'lateHit' | 'pageStatus';
 
 const TEXT: Record<'en' | 'fr', Record<LogCode, string>> = {
   en: {
@@ -26,6 +26,7 @@ const TEXT: Record<'en' | 'fr', Record<LogCode, string>> = {
     repeatReplaced: '« {title} » was already posted by hand: another recipe takes its time.',
     recommented: '{count} queued posts now carry their Page’s plain first comment.',
     reheld: '{count} queued posts handed back to Facebook’s scheduler, which gets them more reach than publishing from the app.',
+    pageStatus: 'Facebook status of this Page: « {status} »{violations}. Details in Meta Business Suite › Page status.',
     photoNotMade: 'A new photo could not be generated ({why}); the recipe’s own photo went out.',
     replacedOpen: 'Re-planned with this Page’s memory: « {from} » (expected ×{fromValue}) removed; a stronger recipe takes {time}.',
     aiTagged: '{count} published posts marked as AI-generated on Facebook (« AI info »).',
@@ -51,6 +52,7 @@ const TEXT: Record<'en' | 'fr', Record<LogCode, string>> = {
     repeatReplaced: '« {title} » a déjà été publiée à la main : une autre recette prend son horaire.',
     recommented: '{count} publications programmées portent maintenant le premier commentaire simple de leur Page.',
     reheld: '{count} publications programmées confiées de nouveau au planificateur de Facebook, qui leur donne plus de portée qu’une publication par l’application.',
+    pageStatus: 'Statut Facebook de cette Page : « {status} »{violations}. Détails dans Meta Business Suite › Statut de la Page.',
     photoNotMade: 'Une nouvelle photo n’a pas pu être générée ({why}) ; la photo de la recette est partie.',
     replacedOpen: 'Replanifié avec la mémoire de cette Page : « {from} » (attendu ×{fromValue}) retirée ; une recette plus forte prend {time}.',
     aiTagged: '{count} publications marquées comme générées par IA sur Facebook (« Info IA »).',

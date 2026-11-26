@@ -111,11 +111,11 @@ export async function learnBestTimes(settings: WordpressSettings, source: Source
 }
 
 /** Record activity on the source (healing, supply) without changing anything else. */
-export async function logAutopilot(settings: WordpressSettings, source: SourceRow, entries: readonly AutopilotLogEntry[], ports: AutopilotPorts = prismaAutopilotPorts, handled: readonly string[] = []): Promise<void> {
-  if (!entries.length && !handled.length) return;
+export async function logAutopilot(settings: WordpressSettings, source: SourceRow, entries: readonly AutopilotLogEntry[], ports: AutopilotPorts = prismaAutopilotPorts, handled: readonly string[] = [], learned: Partial<Pick<AutopilotSettings, 'pageStatus'>> = {}): Promise<void> {
+  if (!entries.length && !handled.length && !Object.keys(learned).length) return;
   const next = rawConfig(source);
   const current = autopilotOf(configOf(settings, source).autopilot);
-  next.autopilot = { ...withLog(current, entries), ...(handled.length ? { radarHandled: [...handled, ...(current.radarHandled ?? [])].slice(0, 300) } : {}) };
+  next.autopilot = { ...withLog(current, entries), ...(handled.length ? { radarHandled: [...handled, ...(current.radarHandled ?? [])].slice(0, 300) } : {}), ...learned };
   await ports.saveConfig(source, next);
   source.config = next as SourceRow['config'];
 }

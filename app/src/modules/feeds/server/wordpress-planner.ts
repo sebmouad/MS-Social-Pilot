@@ -4,6 +4,7 @@ import { decryptSecret } from '@/server/secret-crypto';
 import { defaultFetchDeps, type FetchDeps } from '@/modules/publishing/server/media/network/net-guard';
 import type { ArticleInput, ArticleWriting } from '@/modules/studio/ai';
 import { autopilotOf, type AutopilotSettings } from '../wordpress/autopilot';
+import { PAGE_STATUS_EVERY_MS } from './wordpress-page-status';
 import { prismaScoringPorts, pageLearning, PHOTO_BATCH, PHOTO_VERSION, type ScoringPorts, type Rating } from './wordpress-scoring';
 import { makePicker } from './wordpress-pick';
 import { guessKind, titleWords, type RecipeKind } from '../wordpress/score';
@@ -833,7 +834,24 @@ export async function runRecipePlanning(overrides: Partial<PlannerPorts> & { aut
           }
         }
       }
-      await autopilot.logAutopilot(settings, source, entries, overrides.autopilot, handled).catch(() => undefined);
+      // Each Page's Facebook status, once a day (2026-11-26, ./wordpress-page-status.ts): a change is logged; warning,
+      // restricted or suspended also alerts owners and admins.
+      let learned: Parameters<typeof autopilot.logAutopilot>[5] = {};
+      if (!overrides.autopilot && (!pilot.pageStatus || now.getTime() - Date.parse(pilot.pageStatus.checkedAt) >= PAGE_STATUS_EVERY_MS)) {
+        try {
+          const status = await import('./wordpress-page-status');
+          const statusPages = await ports.store.pages(source, settings.targetTypes, settings.maxTargets);
+          const reads = await status.readPageStatuses(source.workspaceId, statusPages.map(page => page.id));
+          if (reads.size) {
+            const { record, changes } = status.pageStatusChanges(pilot.pageStatus, statusPages, reads, now);
+            learned = { pageStatus: record };
+            for (const change of changes) entries.push({ at: now.toISOString(), kind: 'healing', channelId: change.targetId, channelName: change.name.slice(0, 200), code: 'pageStatus',
+              params: { status: change.to, violations: change.violations.length ? ` (${change.violations.join(', ').slice(0, 200)})` : '' }, text: `Facebook status of this Page: ${change.to}.` });
+            await status.alertPageStatus(source.workspaceId, changes, now).catch(() => 0);
+          }
+        } catch { /* never stops planning */ }
+      }
+      await autopilot.logAutopilot(settings, source, entries, overrides.autopilot, handled, learned).catch(() => undefined);
       // Evening « plan ready » and the weekly report (2026-11-16); sent once each.
       if (!overrides.autopilot) await import('./wordpress-cockpit').then(cockpit => cockpit.notifyAutopilot(settings, source, now)).catch(() => undefined);
       // Once a day from 17:00, tomorrow and the day after are checked again with the latest Page memories, before the

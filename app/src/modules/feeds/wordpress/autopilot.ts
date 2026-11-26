@@ -7,6 +7,8 @@ import { z } from 'zod';
 export type AutopilotLogEntry = { at: string; kind: 'times' | 'healing' | 'supply' | 'radar'; channelId?: string; channelName?: string; from?: string[]; to?: string[]; text?: string;
   /** What happened, as a code with its values, written in the page language when shown (2026-11-16). */
   code?: string; params?: Record<string, string | number> };
+export const PAGE_INTEGRITY = ['ok', 'warning', 'restricted', 'suspended'] as const;
+export type PageIntegrity = (typeof PAGE_INTEGRITY)[number];
 export type AutopilotSettings = {
   bestTimes: { enabled: boolean; apply: 'auto' | 'approve'; gapMinutes: number; window: [number, number]; learnDays: number };
   healing: { replaceFailed: boolean; pauseBroken: boolean; warnDays: number };
@@ -35,6 +37,8 @@ export type AutopilotSettings = {
   learnedTimes?: Record<string, string[]>;
   /** Recipe slots the radar already acted on. */
   radarHandled?: string[];
+  /** Each Page's Facebook integrity status as last read, once a day (2026-11-26, Page Integrity API). */
+  pageStatus?: { checkedAt: string; pages: Record<string, PageIntegrity> };
   lastLearnedAt?: string;
   /** The learning method the times were last chosen with; a newer method relearns at once. */
   learnVersion?: number;
@@ -85,6 +89,7 @@ export const autopilotSchema = z.object({
   breathe: z.object({ enabled: z.boolean(), factor: z.number().min(1.5).max(20), maxDelayMinutes: z.number().int().min(10).max(240) }).strict().optional(),
   learnedTimes: z.record(z.string().max(100), z.array(z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/)).min(1).max(24)).optional(),
   radarHandled: z.array(z.string().max(100)).max(300).optional(),
+  pageStatus: z.object({ checkedAt: z.string().max(40), pages: z.record(z.string().max(100), z.enum(PAGE_INTEGRITY)) }).strict().optional(),
   captions: z.object({ enabled: z.boolean(), voice: z.enum(['per-page', 'warm', 'short', 'chef']), question: z.boolean(), emoji: z.enum(['none', 'few', 'more']) }).strict().optional(),
   hooks: z.object({ enabled: z.boolean(), share: z.number().int().min(0).max(50) }).strict().optional(),
   comment: z.object({ enabled: z.boolean(), cta: z.enum(['rotate', 'save', 'tag', 'none']), delayMinutes: z.number().int().min(0).max(60) }).strict().optional(),
@@ -224,4 +229,4 @@ export function settledFailures<T extends { id: string; targetId: string; state:
 }
 
 /** What the autopilot learns and logs; only the planner writes these, forms never send them (2026-11-21). */
-export const AUTOPILOT_LEARNED_KEYS = ['log', 'lastLearnedAt', 'learnVersion', 'hourValues', 'learnedTimes', 'radarHandled', 'approvedDays'] as const;
+export const AUTOPILOT_LEARNED_KEYS = ['log', 'lastLearnedAt', 'learnVersion', 'hourValues', 'learnedTimes', 'radarHandled', 'approvedDays', 'pageStatus'] as const;
