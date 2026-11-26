@@ -638,3 +638,19 @@ ads_management (owner asked to rework Ads like Meta Ads Manager first). The subm
   wrong. Corrected, same periods: title-only Pages ×1.38 (1.77, 1.38, 0.96), written-caption controls ×0.97, other
   small Pages ×0.65; RF app posts 4,693 → 10,313 (outside 12,655 → 36,662; app/outside 0.37 → 0.28, and 0.3–0.8 at
   24 h); CPE 4,618 → 439 (the real collapse). Always read post_total_media_view_unique before reach.
+
+### 7.1u After Meta's approval (planned, owner: « not now, plan after review », 26 Nov)
+Do none of this while the App Review runs; the reviewed screens (composer, Posts, Inbox, Statistics/Insights, Ads,
+Channels) must not change visibly.
+1. « Publiée par » (made by) on both post lists (Contenu › Publications and Statistiques › Publications):
+   - Data: ask Graph for `application` (name, id) with the Page feed sync and post history reads; store it on
+     `external_posts` (new nullable columns `application`, `applicationId`, migration). « MS Social Pilot » = this app;
+     none = made in Facebook / Meta Business Suite; any other name = that tool. Backfill the last 60 days once.
+   - Lists: a « Publiée par » column/filter (MS Social Pilot · Facebook · other app), EN/FR copy; CSV export too.
+   - Read on 26 Nov with a temporary diagnostic (removed): RF app posts « MS Social Pilot », outside posts none,
+     all `added_photos` with one photo.
+2. Lint warnings in the reviewed screens (publishing, analytics, ads, inbox, channels, accounts) and the 3 dead
+   no-img-element disable comments in publishing (LibraryPicker, kit.tsx ×2).
+3. A « Supprimée sur Facebook » marker on the Posts list (posts with remoteMissingAt).
+4. Request Page Public Content Access and read the 3 competitor Pages (docs/meta-page-public-content-access.md).
+5. Two-step sign-in back to « admins » in Root.
