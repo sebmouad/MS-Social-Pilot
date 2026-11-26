@@ -632,3 +632,9 @@ ads_management (owner asked to rework Ads like Meta Ads Manager first). The subm
   when Facebook's scheduler published them, /posts/ when the app did (20–23 Nov); on 23 Nov the 8 same-Page pairs
   favour the app-published ones (×0.64, evening scheduler posts, confounded by hour). Owner asked how the outside RF
   posts are made.
+- CORRECTION (26 Nov evening): the title-only verdict above and the 25 Nov per-post analysis read the old `reach`
+  measure first; on recent app posts it is stale (516 where post_total_media_view_unique is 5,265). The app itself
+  (postScore, cockpit reachOf, postsAtAge) reads post_total_media_view_unique first; only the scratch scripts were
+  wrong. Corrected, same periods: title-only Pages ×1.38 (1.77, 1.38, 0.96), written-caption controls ×0.97, other
+  small Pages ×0.65; RF app posts 4,693 → 10,313 (outside 12,655 → 36,662; app/outside 0.37 → 0.28, and 0.3–0.8 at
+  24 h); CPE 4,618 → 439 (the real collapse). Always read post_total_media_view_unique before reach.
