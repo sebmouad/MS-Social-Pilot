@@ -427,7 +427,11 @@ test('dish families: a title can be in several; the memory learns each family an
   const { familiesOf } = await import('@/modules/feeds/wordpress/score');
   const { absorb, memoryModel } = await import('@/modules/feeds/wordpress/memory');
   assert.deepEqual(familiesOf('Feuilletés au fromage et au jambon, garniture crémeuse'), ['feuillete', 'jambon_fromage']);
-  assert.deepEqual(familiesOf('Terrine de saumon fumé'), ['terrine', 'poisson']);
+  assert.deepEqual(familiesOf('Terrine de saumon fumé'), ['terrine', 'saumon']);
+  assert.deepEqual(familiesOf('Roulé de saumon fumé, crémeux et frais aux herbes'), ['saumon', 'roule']);
+  assert.deepEqual(familiesOf('Roulés de jambon aux cornichons'), ['jambon_fromage', 'roule']);
+  assert.deepEqual(familiesOf('Wraps jambon-fromage grillés à la poêle'), ['jambon_fromage', 'sandwich_wrap']);
+  assert.deepEqual(familiesOf('Moules et noix de Saint-Jacques à la crème'), ['poisson']);
   assert.deepEqual(familiesOf('Lait crémeux aux agrumes'), []);
   assert.deepEqual(familiesOf('Camembert feuilleté au bacon, doré et fondant'), ['feuillete']);
   assert.deepEqual(familiesOf('Potimarron farci, fondant et gratiné au four'), ['farci']);

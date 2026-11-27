@@ -38,9 +38,14 @@ const FAMILIES: Array<[string, string[]]> = [
   ['pates', ['pates', 'lasagne*', 'macaroni*', 'spaghetti*', 'tagliatelle*', 'gnocchi*', 'cannelloni*', 'carbonara']],
   ['volaille', ['poulet', 'dinde', 'canard', 'pintade', 'volaille']],
   ['boeuf_porc', ['boeuf', 'porc', 'veau', 'agneau', 'saucisse*', 'filet mignon', 'boulette*', 'viande']],
-  ['poisson', ['saumon', 'cabillaud', 'thon', 'crevette*', 'saint jacques', 'moule*', 'poisson*', 'fruits de mer', 'truite', 'colin']],
+  // Salmon (mostly smoked) and rolls apart from their families (2026-11-27): over 1,098 posts, salmon reached 3× its
+  // Page's usual 23% of the time against 8% for other fish, rolls 27% against 11% overall; « poisson » (×1.05) and
+  // « sandwich_wrap » hid it.
+  ['saumon', ['saumon']],
+  ['roule', ['roule', 'roules', 'roulee', 'roulees']],
+  ['poisson', ['cabillaud', 'thon', 'crevette*', 'saint jacques', 'moule*', 'poisson*', 'fruits de mer', 'truite', 'colin']],
   ['pomme_de_terre', ['pomme de terre', 'pommes de terre', 'patate*', 'frites', 'puree']],
-  ['sandwich_wrap', ['wrap*', 'sandwich*', 'panini*', 'burger*', 'tacos', 'galette*', 'roule*']],
+  ['sandwich_wrap', ['wrap*', 'sandwich*', 'panini*', 'burger*', 'tacos', 'galette*']],
   ['viennoiserie', ['brioche*', 'croissant*', 'pain aux raisins', 'pains aux raisins', 'chocolatine*', 'beignet*', 'donut*', 'gaufre*', 'crepe*', 'pancake*']],
   ['gateau', ['gateau*', 'cake', 'cakes', 'cheesecake*', 'moelleux au*', 'fondant au chocolat', 'brownie*', 'cookie*', 'muffin*', 'madeleine*', 'financier*', 'quatre quarts']],
   ['tarte_sucree', ['tarte au*', 'tarte aux*', 'tartelette*', 'clafoutis', 'crumble*', 'flan*', 'paris brest', 'pasteis', 'eclair*', 'choux', 'chouquette*', 'profiterole*', 'saint honore', 'mille feuille*']],
