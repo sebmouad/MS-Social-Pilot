@@ -661,3 +661,7 @@ Channels) must not change visibly.
   (recipe text + call to action) median 8,712 (mean 9,960, 2 of 13 ≥20k) → 24–26 Nov (« 👉 {link} ») median 15,450
   (mean 25,740, 4 of 13 ≥20k). Outside posts: median 14,213 → 5,356, mean 20,608 → 22,038 (noisy). Owner chose « All
   Pages »: every Page link-only from 27 Nov 16:50 Paris (after the reach test verdict).
+- Reach test verdict (27 Nov, posts of 25–26 Nov vs 20–23 Nov, reach at 24 h): comparison (title-only small Pages)
+  ×0.57 per post; no « AI info » ×0.68 (0.68, 0.43, 0.86; within noise); 4 a day ×0.94 per post (0.94, 1.11, 0.77),
+  daily total ×0.68–0.92. Owner: « AI info » back on the 3 Pages (27 Nov 16:48), 4 a day kept one more week on Cuisine
+  Qui Réunit, La Cuisine Tranquille, La Cuisine Décontractée; follow-up 4 Dec 16:40.
