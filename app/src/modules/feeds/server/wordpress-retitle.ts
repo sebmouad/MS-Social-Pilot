@@ -50,7 +50,9 @@ export async function recommentQueued(actor: { userId: string; workspaceId: stri
     FROM wordpress_recipe_plans l JOIN posts p ON p.id = l."postId"
     WHERE l."sourceId" = ${sourceId} AND l.state = 'planned' AND l."targetId" = ANY(${usable.map(([id]) => id)}::text[]) AND p.status::text = 'scheduled'
       AND p."scheduledAt" > ${new Date(now.getTime() + 30 * 60_000)} AND l.permalink IS NOT NULL
-    ORDER BY p."scheduledAt" ASC LIMIT ${limit * 3}`;
+    ORDER BY p."scheduledAt" ASC LIMIT 1000`;
+  // Every queued post is read, then the first `limit` still to change are taken (2026-11-27): reading only the 60 earliest
+  // left 37 of 122 posts unchanged once those 60 were done.
   const wanted = (row: (typeof rows)[number]) => renderComment(templates.get(row.targetId) ?? '', { title: row.title, description: '', servings: '', prep: '', cook: '', total: '', ingredients: [], steps: [] }, row.permalink ?? '', options);
   const todo = rows.filter(row => (row.firstComment ?? '').trim() !== wanted(row).trim()).slice(0, limit);
   const { cancelScheduledPost, updatePost, schedulePost } = await import('@/modules/publishing/server/lifecycle');
