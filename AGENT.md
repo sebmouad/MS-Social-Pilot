@@ -657,3 +657,7 @@ Channels) must not change visibly.
 - Recomputed 26 Nov with post_total_media_view_unique first (14 scratch scripts fixed): app posts vs their Page's
   usual 0.74–0.97× on 1–10 Nov, 1.07–1.53× on 11–22 Nov, 0.97× on 23 Nov, 0.73× on 24 Nov (watch). Cross-Page
   repeats 1.01× vs 0.97× for a recipe's first Page (no penalty; the earlier 0.90× was the wrong measure).
+- RF link-only first comment result (27 Nov, reach at 24 h, post_total_media_view_unique): RF app posts 21–23 Nov
+  (recipe text + call to action) median 8,712 (mean 9,960, 2 of 13 ≥20k) → 24–26 Nov (« 👉 {link} ») median 15,450
+  (mean 25,740, 4 of 13 ≥20k). Outside posts: median 14,213 → 5,356, mean 20,608 → 22,038 (noisy). Owner chose « All
+  Pages »: every Page link-only from 27 Nov 16:50 Paris (after the reach test verdict).
