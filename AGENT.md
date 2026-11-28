@@ -650,6 +650,10 @@ ads_management (owner asked to rework Ads like Meta Ads Manager first). The subm
   from 15/21 Nov instead of 11/17 Dec. Other moments keep `moments.leadDays` (14). Check after ~5 days: RF festive share
   and median at 24 h.
 - Plain-comment rewrite of queued posts read only the 60 earliest (27 Nov, 37 of 122 left): `recommentQueued` reads all.
+- Choice pool 60 → 300 (`POOL_MIN`, wordpress-planner.ts): a scoring run chose among the newest ~60 unposted recipes (about
+  two days of the site) while 3,082 were eligible per Page. The 27 Nov replan swapped huîtres gratinées, pain d'épices,
+  clémentines farcies for a pineapple smoothie, stuffed melon and peaches (scores 39–54; queue top 85–99). New titles
+  are AI-rated 40 a run (`RATE_BATCH`), so the wider pool is fully rated after a few runs; unrated ones score lower.
 
 ### 7.1u After Meta's approval (planned, owner: « not now, plan after review », 26 Nov)
 Do none of this while the App Review runs; the reviewed screens (composer, Posts, Inbox, Statistics/Insights, Ads,

@@ -184,6 +184,15 @@ test('autopilot: the recipe that fits the moment wins its slot, even far down th
   assert.ok((buche.score ?? 0) > 50);
 });
 
+test('autopilot: the choice reaches past the newest 60 recipes, so a festive one 150 down the list still wins (2026-11-28)', async () => {
+  const december = new Date('2026-12-14T06:00:00Z');
+  const list = [...Array.from({ length: 150 }, (_, i) => `Plat ordinaire ${i + 1}`), 'Bûche de Noël au chocolat'].map((title, i) => ({ ...recipes[i % recipes.length]!, id: `t${i + 1}`, title, slug: `t-${i + 1}`, imageId: `img${i + 1}`, link: `https://site.example/t-${i + 1}` }));
+  const h = harness([], { list, scoring: fakeScoring(), at: december });
+  const wide = settings(); wide.candidateMaxScan = 1000;
+  await planSource({ settings: wide, ports: h.ports, db: h.db as never, budget: { left: 50 }, now: december }, source({ autopilot: undefined }), auth);
+  assert.ok(h.ledger.some(row => row.wpPostId === 't151'), 'the Christmas log is planned');
+});
+
 test('autopilot: never three desserts in a row on a channel', async () => {
   const list = titled(['Tarte tatin', 'Cookies géants', 'Brownie fondant', 'Mousse au chocolat', 'Quiche lorraine', 'Gratin dauphinois', 'Clafoutis cerises', 'Poulet rôti']);
   const ratings = Object.fromEntries(list.map(r => [r.id, { kind: null, hook: r.title.match(/Tarte|Cookies|Brownie|Mousse|Clafoutis/) ? 10 : 2, photo: null }]));

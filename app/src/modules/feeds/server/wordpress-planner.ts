@@ -101,6 +101,9 @@ export type Scan = { candidates: Candidate[]; scanned: number; exhausted: boolea
  * or the scan limit is reached. Rows without a usable caption, image file, link or recipe are not candidates; with
  * `writer`, a post whose caption or recipe field is left empty is one when it has text for AI to write them from.
  */
+/** The fewest candidates a scoring run chooses from. */
+const POOL_MIN = 300;
+
 export async function scanCandidates(db: WpDb, settings: WordpressSettings, source: Pick<SourceRow, 'siteUrl'>, config: PlanConfig, now: Date, enough: (candidates: Candidate[]) => boolean, writer = false): Promise<Scan> {
   const candidates: Candidate[] = [];
   let scanned = 0; let exhausted = false;
@@ -484,8 +487,10 @@ export async function planSource(ctx: Ctx, source: SourceRow, auth: FeedAuthoriz
     const groupConfig = { ...config, order };
     const forcedIds = ctx.force ? [...new Set(group.flatMap(need => ctx.force!.get(slotKey(need.targetId, need.slotAt)) ?? []))] : [];
     const autoTodo = ctx.force ? group.filter(need => !ctx.force!.has(slotKey(need.targetId, need.slotAt))) : group;
-    // With scoring, a wider choice is read: the best of the pool is planned, not just the next in line.
-    const pool = prep ? Math.min(settings.candidateMaxScan, Math.max(60, autoTodo.length * 3)) : 0;
+    // With scoring, a wider choice is read: the best of the pool is planned, not just the next in line. 60 was the newest
+    // two days of the site (2026-11-28): a replacement in late November got a pineapple smoothie or a stuffed melon (score
+    // 39–54) while 3,000 recipes were eligible; 300 lets the season and moments find their dishes.
+    const pool = prep ? Math.min(settings.candidateMaxScan, Math.max(POOL_MIN, autoTodo.length * 3)) : 0;
     const scan = await scanCandidates(ctx.db, settings, source, groupConfig, now, found => forcedIds.length
       ? forcedIds.every(id => found.some(c => c.wpPostId === id))
       : !settings.reuse.enabled && usable(found).length >= pool && allocateRecipes({ needs: autoTodo, candidates: usable(found), blocked: view.blocked, taken, reused: view.reused, distinct: config.distinctAcrossPages }).unfilled === 0, writer);
