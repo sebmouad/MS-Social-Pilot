@@ -639,6 +639,18 @@ ads_management (owner asked to rework Ads like Meta Ads Manager first). The subm
   small Pages ×0.65; RF app posts 4,693 → 10,313 (outside 12,655 → 36,662; app/outside 0.37 → 0.28, and 0.3–0.8 at
   24 h); CPE 4,618 → 439 (the real collapse). Always read post_total_media_view_unique before reach.
 
+### 7.1v Viral reach: festive dishes early, posting path cleared (2026-11-28, owner: « Focus on viral reach »)
+- Reach at 24 h (`reach24h`, not lifetime): RF app posts through Facebook's scheduler median 15,450 vs the owner's own
+  12,300 (n 17 / 29). The earlier « manual ×3 » was lifetime reach of older posts: the posting path is not the gap.
+- The top 25 posts at 24 h (17–27 Nov) are all RF; smoked salmon starters, ham/cheese or camembert/bacon puff pastry,
+  Christmas sablés. Festive titles (Christmas/New Year words) vs the rest, median at 24 h: RF 22.5k vs 8.7k (×2.6, 14 vs
+  43 posts), Nos Recettes Généreuses ×2.7, Plaisirs ×1.6, CPE ×0.9. The site has the stock (1,225 smoked salmon, 620
+  verrines, 335 bûches).
+- Christmas and New Year moments now have `lead: 40` (`Moment.lead`, `activeMoments` takes the longer lead): +15 points
+  from 15/21 Nov instead of 11/17 Dec. Other moments keep `moments.leadDays` (14). Check after ~5 days: RF festive share
+  and median at 24 h.
+- Plain-comment rewrite of queued posts read only the 60 earliest (27 Nov, 37 of 122 left): `recommentQueued` reads all.
+
 ### 7.1u After Meta's approval (planned, owner: « not now, plan after review », 26 Nov)
 Do none of this while the App Review runs; the reviewed screens (composer, Posts, Inbox, Statistics/Insights, Ads,
 Channels) must not change visibly.

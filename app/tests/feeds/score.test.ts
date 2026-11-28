@@ -48,6 +48,11 @@ test('moments: Easter and the active window', () => {
   assert.equal(easter(2027).toISOString().slice(0, 10), '2027-03-28');
   assert.ok(activeMoments(new Date('2027-01-28T12:00:00Z'), 14).some(m => m.id === 'chandeleur'));
   assert.ok(!activeMoments(new Date('2027-01-10T12:00:00Z'), 14).some(m => m.id === 'chandeleur'));
+  // Christmas and New Year dishes are wanted from mid-November (2026-11-28), other moments keep the general lead.
+  const lateNov = activeMoments(new Date('2026-11-28T12:00:00Z'), 14).map(m => m.id);
+  assert.ok(lateNov.includes('christmas') && lateNov.includes('new-year'));
+  assert.ok(!activeMoments(new Date('2026-11-10T12:00:00Z'), 14).some(m => m.id === 'christmas'));
+  assert.ok(activeMoments(new Date('2026-12-26T12:00:00Z'), 14).some(m => m.id === 'new-year') && !activeMoments(new Date('2026-12-26T12:00:00Z'), 14).some(m => m.id === 'christmas'));
 });
 
 test('variety: no more than the allowed run of one kind', () => {

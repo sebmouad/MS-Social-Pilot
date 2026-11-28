@@ -88,7 +88,8 @@ export function easter(year: number): Date {
 const lastSunday = (year: number, month: number) => { const d = new Date(Date.UTC(year, month, 0)); d.setUTCDate(d.getUTCDate() - d.getUTCDay()); return d; };
 const nthSunday = (year: number, month: number, n: number) => { const d = new Date(Date.UTC(year, month - 1, 1)); d.setUTCDate(1 + ((7 - d.getUTCDay()) % 7) + 7 * (n - 1)); return d; };
 
-export type Moment = { id: string; name: string; date: Date; words: string[] };
+/** `lead`: days ahead this moment's dishes are wanted when longer than the general lead. */
+export type Moment = { id: string; name: string; date: Date; words: string[]; lead?: number };
 /** French food moments of a year, each with the dishes people look for. */
 export function moments(year: number): Moment[] {
   const e = easter(year); const day = (d: Date, offset: number) => new Date(d.getTime() + offset * 86_400_000);
@@ -106,15 +107,18 @@ export function moments(year: number): Moment[] {
     { id: 'summer-bbq', name: 'Barbecue', date: utc(7, 14), words: ['barbecue', 'brochette*', 'grillade*', 'marinade', 'plancha', 'salade*'] },
     { id: 'back-to-school', name: 'Rentrée', date: utc(9, 2), words: ['lunch box', 'gouter', 'rapide', 'facile', 'cake*', 'gateau au yaourt', 'muffin*'] },
     { id: 'halloween', name: 'Halloween', date: utc(10, 31), words: ['citrouille', 'potiron', 'halloween', 'courge*', 'sorciere', 'monstre*'] },
-    { id: 'christmas', name: 'Noël', date: utc(12, 25), words: ['noel', 'buche', 'foie gras', 'dinde', 'chapon', 'pain d epice*', 'sable*', 'marron*', 'saumon fume', 'huitre*', 'truffe*', 'bredele*', 'vin chaud', 'fete*', 'reveillon'] },
-    { id: 'new-year', name: 'Nouvel an', date: utc(12, 31), words: ['reveillon', 'champagne', 'aperitif', 'verrine*', 'saumon fume', 'foie gras', 'bouchee*', 'toast*'] },
+    // Christmas and New Year dishes reach far more people from mid-November (2026-11-28, Recettes - Faciles over 17–27 Nov:
+    // festive recipes median 22.5k people at 24 h vs 8.7k for the others; ×2.7 on Nos Recettes Généreuses, ×1.6 on
+    // Plaisirs en Cuisine): they are wanted 40 days ahead, not only the general 14.
+    { id: 'christmas', name: 'Noël', date: utc(12, 25), lead: 40, words: ['noel', 'buche', 'foie gras', 'dinde', 'chapon', 'pain d epice*', 'sable*', 'marron*', 'saumon fume', 'huitre*', 'truffe*', 'bredele*', 'vin chaud', 'fete*', 'reveillon'] },
+    { id: 'new-year', name: 'Nouvel an', date: utc(12, 31), lead: 40, words: ['reveillon', 'champagne', 'aperitif', 'verrine*', 'saumon fume', 'foie gras', 'bouchee*', 'toast*'] },
   ];
 }
 
-/** Moments whose dishes are wanted on `date`: from `leadDays` before until the day itself. */
+/** Moments whose dishes are wanted on `date`: from `leadDays` (or the moment's own longer lead) before until the day itself. */
 export function activeMoments(date: Date, leadDays: number): Moment[] {
   const at = Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
-  return [...moments(date.getUTCFullYear()), ...moments(date.getUTCFullYear() + 1)].filter(m => at <= m.date.getTime() && at >= m.date.getTime() - leadDays * 86_400_000);
+  return [...moments(date.getUTCFullYear()), ...moments(date.getUTCFullYear() + 1)].filter(m => at <= m.date.getTime() && at >= m.date.getTime() - Math.max(leadDays, m.lead ?? 0) * 86_400_000);
 }
 
 export type Weather = { maxC: number };
