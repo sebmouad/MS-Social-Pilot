@@ -351,7 +351,13 @@ async function prepareChoosing(ctx: Ctx, source: SourceRow, config: PlanConfig, 
       if (w && (last === undefined || last < cutoff)) { blocked.get(pageId)?.delete(id); blocked.get(pageId)?.delete(recipeTitleKey(w.title)); }
     }
   }
-  const winnerQuota = Math.floor(needCount * pilot.evergreen.share / 100);
+  // The share counts the whole queue, not one run (2026-11-28): an hourly run fills 1–4 slots, so floor(4 × 20 %) was 0
+  // and past hits came back only in big runs. On Recettes - Faciles a re-run of a hit reached a median 22.5k people at
+  // 24 h, a first-time recipe 9.9k (17–27 Nov).
+  const winnerSet = new Set(winners.map(w => w.wpPostId));
+  let queued = 0; let queuedWinners = 0;
+  for (const row of view.byKey.values()) if (row.state === 'planned' && row.slotAt.getTime() > ctx.now.getTime()) { queued++; if (winnerSet.has(row.wpPostId)) queuedWinners++; }
+  const winnerQuota = Math.max(0, Math.floor((queued + needCount) * pilot.evergreen.share / 100) - queuedWinners);
   const preferredStyle = bestStyle(outcomes).style;
   return {
     winners, blocked, preferredStyle, model,

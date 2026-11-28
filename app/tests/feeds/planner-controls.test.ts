@@ -214,6 +214,25 @@ test('autopilot: past winners come back after the cooldown, within their share',
   assert.ok(back.length <= Math.floor(fresh.length * 0.2), `winners ${back.length} of ${fresh.length}`);
 });
 
+test('autopilot: an hourly run of one slot may still bring a winner back: the share counts the whole queue (2026-11-28)', async () => {
+  const old = new Date(now.getTime() - 90 * 86_400_000);
+  // The hit was posted on every Page long ago, so the first run cannot use it.
+  const seed: LedgerRow[] = pages.map((page, i) => ({ id: `old${i}`, sourceId: 'src1', targetId: page.id, wpPostId: 'r29', slotAt: old, state: 'planned', postId: `p${i}`, title: 'Recipe 29', permalink: null, reason: null, skipped: [], claimedAt: old }));
+  const first = harness(seed, { scoring: fakeScoring() });
+  await planSource({ settings: settings(), ports: first.ports, db: first.db as never, budget: { left: 50 }, now }, source({ horizonDays: 5 }), auth);
+  const queued = first.ledger.filter(row => row.slotAt.getTime() > now.getTime() && row.state === 'planned');
+  assert.ok(queued.length >= 5, `queue ${queued.length}`);
+  // One queued post is gone (published early, deleted): the next run has a single slot to fill.
+  const freed = queued.filter(row => row.targetId === 'pageA').at(-1)!;
+  const later = first.ledger.map(row => row === freed ? { ...row, state: 'failed' as const, postId: null, reason: 'cancelled' } : row);
+  const outcomes: Outcome[] = [{ targetId: 'pageA', wpPostId: 'r29', title: 'Recipe 29', slotAt: old, relative: 4 }, ...Array.from({ length: 9 }, (_, i) => ({ targetId: 'pageA', wpPostId: `x${i}`, title: `Other ${i}`, slotAt: old, relative: 1 }))];
+  const second = harness(later, { scoring: fakeScoring({ r29: { kind: 'main', hook: 10, photo: 10 } }, outcomes) });
+  await planSource({ settings: settings(), ports: second.ports, db: second.db as never, budget: { left: 50 }, now }, source({ horizonDays: 5 }), auth);
+  const refilled = second.ledger.filter(row => row.claimedAt === now && row.targetId === freed.targetId && row.slotAt.getTime() === freed.slotAt.getTime() && row.state !== 'failed');
+  assert.equal(refilled.length, 1);
+  assert.equal(refilled[0]!.wpPostId, 'r29', 'the winner comes back in the single slot');
+});
+
 test('autopilot: every channel gets its own AI caption in its voice, and the comment waits 2 minutes', async () => {
   const prompts: string[] = [];
   const h = harness([], { captions: async (system, prompt) => { prompts.push(system); const page = /« (.*?) »/.exec(system)?.[1]; return `Envie de ${prompt.split('\n')[0]!.slice(8)} ? ${page} 😋 Et vous, vous la faites comment ?`; } });

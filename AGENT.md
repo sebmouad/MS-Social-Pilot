@@ -654,6 +654,10 @@ ads_management (owner asked to rework Ads like Meta Ads Manager first). The subm
   two days of the site) while 3,082 were eligible per Page. The 27 Nov replan swapped huîtres gratinées, pain d'épices,
   clémentines farcies for a pineapple smoothie, stuffed melon and peaches (scores 39–54; queue top 85–99). New titles
   are AI-rated 40 a run (`RATE_BATCH`), so the wider pool is fully rated after a few runs; unrated ones score lower.
+- Re-run share counted over the queue (`winnerQuota` in prepareChoosing): it was floor(slots in this run × share), 0 for
+  every hourly run of 1–4 slots, so past hits (app winners and the owner's outside hits) came back only in big runs. Now
+  floor((queued future posts + this run) × share) − winners already queued. RF 17–27 Nov at 24 h: re-runs of hits median
+  22.5k (12 posts), first-time recipes 9.9k (45).
 
 ### 7.1u After Meta's approval (planned, owner: « not now, plan after review », 26 Nov)
 Do none of this while the App Review runs; the reviewed screens (composer, Posts, Inbox, Statistics/Insights, Ads,
