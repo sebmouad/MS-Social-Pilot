@@ -658,6 +658,9 @@ ads_management (owner asked to rework Ads like Meta Ads Manager first). The subm
   every hourly run of 1–4 slots, so past hits (app winners and the owner's outside hits) came back only in big runs. Now
   floor((queued future posts + this run) × share) − winners already queued. RF 17–27 Nov at 24 h: re-runs of hits median
   22.5k (12 posts), first-time recipes 9.9k (45).
+- Not levers on RF (28 Nov, checked so they are not re-tested): posting hour (Oct–mid-Nov, 280 posts, lifetime median
+  18–37k at every hour 08–21 h; the weak 13–14 h of 17–27 Nov, 6.1k on 12 posts, was noise) and volume (6–7 posts a day
+  10–14 Nov ≈ 290k a day; 9–12 a day 16–26 Nov ≈ 280k: per-post reach fell as posts doubled). Hits decide RF's reach.
 
 ### 7.1u After Meta's approval (planned, owner: « not now, plan after review », 26 Nov)
 Do none of this while the App Review runs; the reviewed screens (composer, Posts, Inbox, Statistics/Insights, Ads,
